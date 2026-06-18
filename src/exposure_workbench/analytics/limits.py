@@ -1,0 +1,192 @@
+"""Limit checking — compare computed metrics against risk limits and generate alerts."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class AlertResult:
+    alert_type: str
+    severity: str          # "warning" | "breach"
+    entity_type: str       # "portfolio" | "sector" | "issuer"
+    entity_id: str         # ticker or sector name or "portfolio"
+    current_value: float
+    limit_value: float
+    utilization: float     # current / limit (breach_level used as denominator)
+    message: str
+
+
+def _check_one(
+    alert_type: str,
+    entity_type: str,
+    entity_id: str,
+    current_value: float,
+    warning_level: float,
+    breach_level: float,
+    label: str | None = None,
+) -> AlertResult | None:
+    """Return an alert if current_value breaches warning or breach level, else None."""
+    if current_value <= 0:
+        return None
+
+    if current_value >= breach_level:
+        severity = "breach"
+        limit_value = breach_level
+    elif current_value >= warning_level:
+        severity = "warning"
+        limit_value = warning_level
+    else:
+        return None
+
+    utilization = current_value / breach_level if breach_level > 0 else 0.0
+    display_name = label or entity_id
+    pct = f"{current_value * 100:.1f}%"
+    limit_pct = f"{limit_value * 100:.1f}%"
+    msg = f"{display_name}: {pct} vs limit {limit_pct} [{severity.upper()}]"
+
+    return AlertResult(
+        alert_type=alert_type,
+        severity=severity,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        current_value=current_value,
+        limit_value=limit_value,
+        utilization=utilization,
+        message=msg,
+    )
+
+
+def check_limits(
+    risk_metrics_result: Any,           # RiskResult
+    stress_result: Any,                 # StressResult
+    exposure_result: Any,               # ExposureResult
+    pnl_result: Any,                    # PnlResult
+    limits_config: dict,
+    db_limits: list[dict] | None = None,
+) -> list[AlertResult]:
+    """
+    Check all risk limits.
+
+    limits_config: dict loaded from risk_limits.yaml
+    db_limits: optional list of per-portfolio overrides from the DB
+    """
+    alerts: list[AlertResult] = []
+
+    def cfg(key: str, sub: str, default: float) -> float:
+        return float(limits_config.get(key, {}).get(sub, default))
+
+    # ── Portfolio-level limits ─────────────────────────────────────────────────
+
+    # Daily loss
+    if pnl_result and pnl_result.daily_return < 0:
+        daily_loss = -pnl_result.daily_return
+        a = _check_one(
+            "daily_loss", "portfolio", "portfolio",
+            daily_loss,
+            cfg("daily_loss", "warning", 0.02),
+            cfg("daily_loss", "breach", 0.03),
+            "Daily portfolio loss",
+        )
+        if a:
+            alerts.append(a)
+
+    # VaR 95
+    if risk_metrics_result and risk_metrics_result.var_95_1d is not None:
+        a = _check_one(
+            "var_95", "portfolio", "portfolio",
+            risk_metrics_result.var_95_1d,
+            cfg("var_95", "warning", 0.025),
+            cfg("var_95", "breach", 0.035),
+            "1-day 95% VaR",
+        )
+        if a:
+            alerts.append(a)
+
+    # Expected Shortfall
+    if risk_metrics_result and risk_metrics_result.es_95 is not None:
+        a = _check_one(
+            "expected_shortfall_95", "portfolio", "portfolio",
+            risk_metrics_result.es_95,
+            cfg("expected_shortfall_95", "warning", 0.035),
+            cfg("expected_shortfall_95", "breach", 0.05),
+            "Expected Shortfall (95%)",
+        )
+        if a:
+            alerts.append(a)
+
+    # Rolling vol 30d
+    if risk_metrics_result and risk_metrics_result.vol_30d is not None:
+        a = _check_one(
+            "rolling_volatility_30d", "portfolio", "portfolio",
+            risk_metrics_result.vol_30d,
+            cfg("rolling_volatility_30d", "warning", 0.18),
+            cfg("rolling_volatility_30d", "breach", 0.25),
+            "30d rolling volatility (annualised)",
+        )
+        if a:
+            alerts.append(a)
+
+    # Gross exposure
+    if exposure_result and exposure_result.portfolio_market_value > 0:
+        mv = exposure_result.portfolio_market_value
+        # Assume NAV ≈ portfolio_market_value for a long-only book
+        gross_pct = exposure_result.gross_exposure / mv
+        a = _check_one(
+            "gross_exposure", "portfolio", "portfolio",
+            gross_pct,
+            cfg("gross_exposure", "warning", 1.10),
+            cfg("gross_exposure", "breach", 1.20),
+            "Gross exposure % NAV",
+        )
+        if a:
+            alerts.append(a)
+
+    # ── Sector concentration ────────────────────────────────────────────────────
+    if exposure_result:
+        for sector, data in exposure_result.sector_map.items():
+            weight = data["weight"]
+            a = _check_one(
+                "sector_concentration", "sector", sector,
+                weight,
+                cfg("sector_concentration", "warning", 0.40),
+                cfg("sector_concentration", "breach", 0.50),
+                f"Sector {sector}",
+            )
+            if a:
+                alerts.append(a)
+
+    # ── Issuer concentration ────────────────────────────────────────────────────
+    if exposure_result:
+        for ticker, data in exposure_result.issuer_map.items():
+            weight = data["weight"]
+            a = _check_one(
+                "issuer_concentration", "issuer", ticker,
+                weight,
+                cfg("issuer_concentration", "warning", 0.15),
+                cfg("issuer_concentration", "breach", 0.20),
+                f"Issuer {ticker}",
+            )
+            if a:
+                alerts.append(a)
+
+    # ── Stress losses ───────────────────────────────────────────────────────────
+    if stress_result:
+        for scenario in stress_result.scenarios:
+            loss_pct = scenario.estimated_loss_pct
+            a = _check_one(
+                "stress_loss", "portfolio", scenario.name,
+                loss_pct,
+                cfg("stress_loss", "warning", 0.06),
+                cfg("stress_loss", "breach", 0.08),
+                f"Stress scenario: {scenario.name}",
+            )
+            if a:
+                alerts.append(a)
+
+    # Sort: breach first, then by entity type
+    severity_order = {"breach": 0, "warning": 1}
+    alerts.sort(key=lambda a: (severity_order.get(a.severity, 2), a.alert_type))
+
+    return alerts

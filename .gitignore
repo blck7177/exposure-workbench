@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+*.so
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Database / data artifacts
+data/artifacts/
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Node / Next.js
+apps/web/node_modules/
+apps/web/.next/
+apps/web/.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/

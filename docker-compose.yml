@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: exposure-postgres
+    environment:
+      POSTGRES_USER: exposure
+      POSTGRES_PASSWORD: exposure
+      POSTGRES_DB: exposure_workbench
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exposure -d exposure_workbench"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  exposure-api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: exposure-api
+    ports:
+      - "${API_HOST_PORT:-8103}:8000"
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-3-5-haiku-20241022}"
+      REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
+      DEMO_MODE: "${DEMO_MODE:-true}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      CORS_ORIGINS: "http://localhost:${WEB_HOST_PORT:-3103},http://127.0.0.1:${WEB_HOST_PORT:-3103}"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  exposure-worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.worker
+    container_name: exposure-worker
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-3-5-haiku-20241022}"
+      REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
+      DEMO_MODE: "${DEMO_MODE:-true}"
+      WORKER_POLL_INTERVAL: "${WORKER_POLL_INTERVAL:-2}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  exposure-web:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.web
+    container_name: exposure-web
+    ports:
+      - "${WEB_HOST_PORT:-3103}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:${API_HOST_PORT:-8103}"
+    depends_on:
+      - exposure-api
+
+volumes:
+  postgres_data:

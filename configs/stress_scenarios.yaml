@@ -1,0 +1,46 @@
+# Stress Scenario Configuration
+# Each scenario defines hypothetical 1-day sector/factor shocks.
+# shock values are expressed as decimal returns (e.g., -0.05 = -5%).
+
+tech_selloff:
+  description: "Technology sector selloff — sharp repricing of growth assets"
+  shocks:
+    Technology: -0.05
+    Communication_Services: -0.03
+    Consumer_Discretionary: -0.02
+    SPY: -0.025
+    QQQ: -0.06
+    TLT: 0.01
+
+rates_shock_up:
+  description: "Rates up 50bps — duration sell-off scenario"
+  shocks:
+    TLT: -0.04
+    HYG: -0.015
+    Financials: 0.01
+    Real_Estate: -0.03
+    Utilities: -0.025
+
+credit_spread_widening:
+  description: "High yield spread widening 200bps — credit stress"
+  shocks:
+    HYG: -0.04
+    Financials: -0.02
+    Energy: -0.015
+    SPY: -0.015
+
+market_downside:
+  description: "Broad market correction -10% — equity risk-off"
+  shocks:
+    SPY: -0.10
+    QQQ: -0.12
+    IWM: -0.11
+    TLT: 0.03
+    GLD: 0.02
+
+energy_shock:
+  description: "Oil price crash -20% — energy sector stress"
+  shocks:
+    USO: -0.20
+    Energy: -0.08
+    SPY: -0.02

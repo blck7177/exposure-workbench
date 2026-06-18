@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/libs/*
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e .
+
+COPY src/ ./src/
+COPY apps/worker/ ./apps/worker/
+COPY apps/__init__.py ./apps/__init__.py
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "apps.worker.worker"]

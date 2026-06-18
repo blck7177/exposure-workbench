@@ -1,0 +1,84 @@
+# Demo Portfolio Configuration
+# Defines the portfolios available in the demo environment.
+
+portfolios:
+  - id: "port_001"
+    name: "US Growth & Income Portfolio"
+    description: "Diversified US equity portfolio with growth tilt and fixed income allocation"
+    currency: "USD"
+    base_nav: 10000000.0
+    manager: "Demo PM"
+    benchmark: "SPY"
+    is_active: true
+
+holdings:
+  port_001:
+    - ticker: "AAPL"
+      sector: "Technology"
+      asset_class: "equity"
+      region: "US"
+      quantity: 5000
+      cost_basis: 165.00
+
+    - ticker: "MSFT"
+      sector: "Technology"
+      asset_class: "equity"
+      region: "US"
+      quantity: 3500
+      cost_basis: 310.00
+
+    - ticker: "NVDA"
+      sector: "Technology"
+      asset_class: "equity"
+      region: "US"
+      quantity: 2000
+      cost_basis: 480.00
+
+    - ticker: "AMZN"
+      sector: "Consumer_Discretionary"
+      asset_class: "equity"
+      region: "US"
+      quantity: 3000
+      cost_basis: 155.00
+
+    - ticker: "GOOGL"
+      sector: "Communication_Services"
+      asset_class: "equity"
+      region: "US"
+      quantity: 4000
+      cost_basis: 130.00
+
+    - ticker: "JPM"
+      sector: "Financials"
+      asset_class: "equity"
+      region: "US"
+      quantity: 4500
+      cost_basis: 175.00
+
+    - ticker: "XOM"
+      sector: "Energy"
+      asset_class: "equity"
+      region: "US"
+      quantity: 3000
+      cost_basis: 105.00
+
+    - ticker: "LLY"
+      sector: "Healthcare"
+      asset_class: "equity"
+      region: "US"
+      quantity: 1200
+      cost_basis: 720.00
+
+    - ticker: "TLT"
+      sector: "Fixed_Income"
+      asset_class: "etf"
+      region: "US"
+      quantity: 8000
+      cost_basis: 92.00
+
+    - ticker: "HYG"
+      sector: "Fixed_Income"
+      asset_class: "etf"
+      region: "US"
+      quantity: 10000
+      cost_basis: 76.00

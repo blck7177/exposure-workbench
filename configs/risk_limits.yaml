@@ -1,0 +1,48 @@
+# Risk Limits Configuration
+# Human-owned policy config — changes here are reflected in the next exposure run.
+# All values are expressed as fractions (e.g., 0.20 = 20%).
+
+issuer_concentration:
+  description: "Single issuer as % of total portfolio market value"
+  warning: 0.15
+  breach: 0.20
+
+sector_concentration:
+  description: "Single sector as % of total portfolio market value"
+  warning: 0.40
+  breach: 0.50
+
+gross_exposure:
+  description: "Gross exposure as % of NAV (abs sum of all positions)"
+  warning: 1.10
+  breach: 1.20
+
+net_exposure:
+  description: "Net exposure as % of NAV"
+  warning: 0.95
+  breach: 1.05
+
+var_95:
+  description: "1-day 95% historical VaR as % of portfolio value"
+  warning: 0.025
+  breach: 0.035
+
+expected_shortfall_95:
+  description: "1-day 95% Expected Shortfall (CVaR) as % of portfolio value"
+  warning: 0.035
+  breach: 0.050
+
+daily_loss:
+  description: "Single-day portfolio loss as % of portfolio value"
+  warning: 0.020
+  breach: 0.030
+
+stress_loss:
+  description: "Stress scenario loss as % of portfolio value"
+  warning: 0.060
+  breach: 0.080
+
+rolling_volatility_30d:
+  description: "30-day rolling annualised volatility"
+  warning: 0.18
+  breach: 0.25

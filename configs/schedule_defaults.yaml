@@ -1,0 +1,16 @@
+# Schedule Defaults
+# Default scheduling configuration for automated exposure updates.
+
+daily_update:
+  enabled: false
+  run_time: "08:00"
+  timezone: "America/New_York"
+  portfolios: ["port_001"]
+  retry_on_failure: true
+  max_retries: 2
+  notify_on_breach: true
+
+market_data_sync:
+  enabled: false
+  run_time: "07:30"
+  timezone: "America/New_York"

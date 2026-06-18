@@ -1,0 +1,127 @@
+"""
+Exposure Workbench Worker — async polling loop.
+
+Polls the tasks table every WORKER_POLL_INTERVAL seconds,
+claims pending tasks, and dispatches them to the appropriate handler.
+
+Usage:
+    python -m apps.worker.worker
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import signal
+import sys
+from pathlib import Path
+
+# Bootstrap path and env before any internal imports
+ROOT = Path(__file__).parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT))
+
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
+from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.db.session import get_session_factory
+from exposure_workbench.services.task_service import claim_next_task, complete_task, fail_task
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("worker")
+
+# Lazy import handlers to avoid circular issues at startup
+HANDLERS: dict[str, object] = {}
+
+
+def _get_handler(task_type: str):
+    if task_type not in HANDLERS:
+        if task_type == "exposure_update":
+            from apps.worker.handlers.exposure_update import handle
+            HANDLERS[task_type] = handle
+        else:
+            return None
+    return HANDLERS[task_type]
+
+
+_running = True
+
+
+def _handle_signal(sig, frame):
+    global _running
+    logger.info(f"Received signal {sig}, shutting down gracefully...")
+    _running = False
+
+
+async def process_one() -> bool:
+    """Claim and process one task. Returns True if a task was processed."""
+    factory = get_session_factory()
+    async with factory() as db:
+        task = await claim_next_task(db)
+        if task is None:
+            return False
+
+        await db.commit()
+        logger.info(f"Claimed task {task.id} (type={task.type})")
+
+    handler = _get_handler(task.task_type if hasattr(task, "task_type") else task.type)
+    if handler is None:
+        logger.warning(f"No handler for task type '{task.type}', skipping task {task.id}")
+        async with factory() as db:
+            await fail_task(db, task.id, f"No handler for task type '{task.type}'")
+            await db.commit()
+        return True
+
+    try:
+        async with factory() as db:
+            # Re-fetch task in new session
+            from sqlalchemy import select
+            from exposure_workbench.db.models import Task
+            result = await db.execute(select(Task).where(Task.id == task.id))
+            fresh_task = result.scalar_one()
+            await handler(db, fresh_task)
+            await complete_task(db, task.id)
+            await db.commit()
+            logger.info(f"Task {task.id} completed successfully")
+
+    except Exception as exc:
+        logger.error(f"Task {task.id} failed: {exc}", exc_info=True)
+        factory2 = get_session_factory()
+        async with factory2() as db2:
+            await fail_task(db2, task.id, str(exc))
+            await db2.commit()
+
+    return True
+
+
+async def run_worker() -> None:
+    settings = get_settings()
+    poll_interval = settings.worker_poll_interval
+    logger.info(f"Worker started — polling every {poll_interval}s")
+
+    while _running:
+        try:
+            processed = await process_one()
+            if not processed:
+                # No tasks available — wait before next poll
+                await asyncio.sleep(poll_interval)
+        except Exception as exc:
+            logger.error(f"Unexpected error in worker loop: {exc}", exc_info=True)
+            await asyncio.sleep(poll_interval)
+
+    logger.info("Worker stopped")
+
+
+def main() -> None:
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+    asyncio.run(run_worker())
+
+
+if __name__ == "__main__":
+    main()

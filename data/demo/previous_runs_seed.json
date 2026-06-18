@@ -1,0 +1,166 @@
+[
+  {
+    "run_id": "run_seed_prev_01",
+    "portfolio_id": "port_001",
+    "as_of_date": "2026-06-15",
+    "status": "completed",
+    "portfolio_market_value": 10223060.09,
+    "daily_return": 0.004974,
+    "daily_pnl": -1084.81,
+    "gross_exposure": 10223060.09,
+    "sector_exposures": {
+      "Technology": {
+        "market_value": 3306160.09,
+        "weight": 0.323402
+      },
+      "Consumer_Discretionary": {
+        "market_value": 738060.01,
+        "weight": 0.072196
+      },
+      "Communication_Services": {
+        "market_value": 1477400.02,
+        "weight": 0.144516
+      },
+      "Financials": {
+        "market_value": 1437299.97,
+        "weight": 0.140594
+      },
+      "Energy": {
+        "market_value": 422759.99,
+        "weight": 0.041354
+      },
+      "Healthcare": {
+        "market_value": 1355219.97,
+        "weight": 0.132565
+      },
+      "Fixed_Income": {
+        "market_value": 1486160.02,
+        "weight": 0.145373
+      }
+    },
+    "issuer_exposures": {
+      "AAPL": {
+        "market_value": 1482100.07,
+        "weight": 0.144976
+      },
+      "MSFT": {
+        "market_value": 1399160.03,
+        "weight": 0.136863
+      },
+      "NVDA": {
+        "market_value": 424899.99,
+        "weight": 0.041563
+      },
+      "AMZN": {
+        "market_value": 738060.01,
+        "weight": 0.072196
+      },
+      "GOOGL": {
+        "market_value": 1477400.02,
+        "weight": 0.144516
+      },
+      "JPM": {
+        "market_value": 1437299.97,
+        "weight": 0.140594
+      },
+      "XOM": {
+        "market_value": 422759.99,
+        "weight": 0.041354
+      },
+      "LLY": {
+        "market_value": 1355219.97,
+        "weight": 0.132565
+      },
+      "TLT": {
+        "market_value": 685760.01,
+        "weight": 0.06708
+      },
+      "HYG": {
+        "market_value": 800400.01,
+        "weight": 0.078294
+      }
+    }
+  },
+  {
+    "run_id": "run_seed_prev_02",
+    "portfolio_id": "port_001",
+    "as_of_date": "2026-06-16",
+    "status": "completed",
+    "portfolio_market_value": 10272954.99,
+    "daily_return": 0.006182,
+    "daily_pnl": 135441.09,
+    "gross_exposure": 10272954.99,
+    "sector_exposures": {
+      "Technology": {
+        "market_value": 3289424.91,
+        "weight": 0.320202
+      },
+      "Consumer_Discretionary": {
+        "market_value": 738000.0,
+        "weight": 0.071839
+      },
+      "Communication_Services": {
+        "market_value": 1493000.0,
+        "weight": 0.145333
+      },
+      "Financials": {
+        "market_value": 1490130.07,
+        "weight": 0.145054
+      },
+      "Energy": {
+        "market_value": 425580.0,
+        "weight": 0.041427
+      },
+      "Healthcare": {
+        "market_value": 1347000.0,
+        "weight": 0.131121
+      },
+      "Fixed_Income": {
+        "market_value": 1489820.01,
+        "weight": 0.145024
+      }
+    },
+    "issuer_exposures": {
+      "AAPL": {
+        "market_value": 1496199.95,
+        "weight": 0.145645
+      },
+      "MSFT": {
+        "market_value": 1378404.95,
+        "weight": 0.134178
+      },
+      "NVDA": {
+        "market_value": 414820.01,
+        "weight": 0.04038
+      },
+      "AMZN": {
+        "market_value": 738000.0,
+        "weight": 0.071839
+      },
+      "GOOGL": {
+        "market_value": 1493000.0,
+        "weight": 0.145333
+      },
+      "JPM": {
+        "market_value": 1490130.07,
+        "weight": 0.145054
+      },
+      "XOM": {
+        "market_value": 425580.0,
+        "weight": 0.041427
+      },
+      "LLY": {
+        "market_value": 1347000.0,
+        "weight": 0.131121
+      },
+      "TLT": {
+        "market_value": 689520.02,
+        "weight": 0.06712
+      },
+      "HYG": {
+        "market_value": 800299.99,
+        "weight": 0.077904
+      }
+    }
+  }
+]

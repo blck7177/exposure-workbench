@@ -1,0 +1,50 @@
+# Factor Model Configuration
+# Factors used for portfolio return attribution via rolling OLS regression.
+
+factors:
+  market:
+    ticker: "SPY"
+    description: "Broad US equity market (S&P 500)"
+    group: "market"
+
+  growth:
+    ticker: "QQQ"
+    description: "US growth / technology proxy (Nasdaq 100)"
+    group: "market"
+
+  small_cap:
+    ticker: "IWM"
+    description: "US small-cap proxy (Russell 2000)"
+    group: "market"
+
+  rates:
+    ticker: "TLT"
+    description: "Long-duration US Treasury (rates sensitivity)"
+    group: "macro"
+
+  credit:
+    ticker: "HYG"
+    description: "High yield credit spread proxy"
+    group: "macro"
+
+  gold:
+    ticker: "GLD"
+    description: "Gold / risk-off proxy"
+    group: "macro"
+
+  oil:
+    ticker: "USO"
+    description: "Oil / energy commodity proxy"
+    group: "commodity"
+
+  volatility:
+    ticker: "^VIX"
+    description: "CBOE VIX — equity volatility / fear gauge"
+    group: "macro"
+
+regression:
+  window_days: 60
+  min_observations: 30
+  method: "ols"           # ols | ewm
+  ewm_halflife_days: 20
+  include_intercept: true

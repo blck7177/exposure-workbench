@@ -1,0 +1,326 @@
+"""SQLAlchemy ORM models — mirrors infra/init.sql schema."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any
+
+from sqlalchemy import (
+    BigInteger, Boolean, Date, DateTime, Float, ForeignKey,
+    Integer, Numeric, String, Text, UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+
+from exposure_workbench.db.session import Base
+
+
+# ─── Portfolios ───────────────────────────────────────────────────────────────
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    base_nav: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    benchmark: Mapped[str | None] = mapped_column(String(32))
+    manager: Mapped[str | None] = mapped_column(String(128))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    positions: Mapped[list["Position"]] = relationship(back_populates="portfolio", cascade="all, delete-orphan")
+    risk_limits: Mapped[list["RiskLimit"]] = relationship(back_populates="portfolio", cascade="all, delete-orphan")
+    exposure_runs: Mapped[list["ExposureRun"]] = relationship(back_populates="portfolio")
+    schedules: Mapped[list["Schedule"]] = relationship(back_populates="portfolio")
+
+
+# ─── Positions ────────────────────────────────────────────────────────────────
+
+class Position(Base):
+    __tablename__ = "positions"
+    __table_args__ = (UniqueConstraint("portfolio_id", "as_of_date", "ticker"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(String(64), ForeignKey("portfolios.id", ondelete="CASCADE"))
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    asset_class: Mapped[str] = mapped_column(String(32), default="equity")
+    sector: Mapped[str | None] = mapped_column(String(64))
+    region: Mapped[str | None] = mapped_column(String(32), default="US")
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    quantity: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    cost_basis: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    price: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    market_value: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    portfolio: Mapped["Portfolio"] = relationship(back_populates="positions")
+
+
+# ─── Market Prices ────────────────────────────────────────────────────────────
+
+class MarketPrice(Base):
+    __tablename__ = "market_prices"
+    __table_args__ = (UniqueConstraint("ticker", "price_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    price_date: Mapped[date] = mapped_column(Date, nullable=False)
+    open: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    high: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    low: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    close: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    adj_close: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    volume: Mapped[int | None] = mapped_column(BigInteger)
+    source: Mapped[str | None] = mapped_column(String(32), default="seed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Factor Prices ────────────────────────────────────────────────────────────
+
+class FactorPrice(Base):
+    __tablename__ = "factor_prices"
+    __table_args__ = (UniqueConstraint("ticker", "price_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    price_date: Mapped[date] = mapped_column(Date, nullable=False)
+    close: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    daily_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    source: Mapped[str | None] = mapped_column(String(32), default="seed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Risk Limits ──────────────────────────────────────────────────────────────
+
+class RiskLimit(Base):
+    __tablename__ = "risk_limits"
+    __table_args__ = (UniqueConstraint("portfolio_id", "limit_type", "entity_id"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(String(64), ForeignKey("portfolios.id", ondelete="CASCADE"))
+    limit_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_type: Mapped[str | None] = mapped_column(String(32))
+    entity_id: Mapped[str | None] = mapped_column(String(64))
+    warning_level: Mapped[float] = mapped_column(Numeric(12, 6), nullable=False)
+    breach_level: Mapped[float] = mapped_column(Numeric(12, 6), nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(16), default="fraction")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    portfolio: Mapped["Portfolio"] = relationship(back_populates="risk_limits")
+
+
+# ─── Exposure Runs ────────────────────────────────────────────────────────────
+
+class ExposureRun(Base):
+    __tablename__ = "exposure_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(String(64), ForeignKey("portfolios.id"))
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
+    task_id: Mapped[str | None] = mapped_column(String(64))
+    triggered_by: Mapped[str | None] = mapped_column(String(32), default="manual")
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    portfolio: Mapped["Portfolio"] = relationship(back_populates="exposure_runs")
+    metrics: Mapped["ExposureMetrics | None"] = relationship(back_populates="run", uselist=False, cascade="all, delete-orphan")
+    sector_exposures: Mapped[list["SectorExposure"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    issuer_exposures: Mapped[list["IssuerExposure"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    factor_attributions: Mapped[list["FactorAttribution"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    risk_alerts: Mapped[list["RiskAlert"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    daily_report: Mapped["DailyReport | None"] = relationship(back_populates="run", uselist=False, cascade="all, delete-orphan")
+    workflow_events: Mapped[list["WorkflowEvent"]] = relationship(back_populates="run", cascade="all, delete-orphan", order_by="WorkflowEvent.created_at")
+
+
+# ─── Exposure Metrics ─────────────────────────────────────────────────────────
+
+class ExposureMetrics(Base):
+    __tablename__ = "exposure_metrics"
+    __table_args__ = (UniqueConstraint("run_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    portfolio_market_value: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    daily_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    daily_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    gross_exposure: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    net_exposure: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    gross_exposure_pct: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    net_exposure_pct: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    rolling_vol_30d: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    rolling_vol_60d: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    var_95_1d: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    expected_shortfall_95: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    max_drawdown: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    stress_loss_tech: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    stress_loss_rates: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    stress_loss_credit: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    stress_loss_market: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="metrics")
+
+
+# ─── Sector Exposures ─────────────────────────────────────────────────────────
+
+class SectorExposure(Base):
+    __tablename__ = "sector_exposures"
+    __table_args__ = (UniqueConstraint("run_id", "sector"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    sector: Mapped[str] = mapped_column(String(64), nullable=False)
+    market_value: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    weight: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    weight_change: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="sector_exposures")
+
+
+# ─── Issuer Exposures ─────────────────────────────────────────────────────────
+
+class IssuerExposure(Base):
+    __tablename__ = "issuer_exposures"
+    __table_args__ = (UniqueConstraint("run_id", "ticker"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    sector: Mapped[str | None] = mapped_column(String(64))
+    market_value: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    weight: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    weight_change: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    daily_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    daily_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="issuer_exposures")
+
+
+# ─── Factor Attributions ──────────────────────────────────────────────────────
+
+class FactorAttribution(Base):
+    __tablename__ = "factor_attributions"
+    __table_args__ = (UniqueConstraint("run_id", "factor_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    factor_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    factor_ticker: Mapped[str | None] = mapped_column(String(16))
+    beta: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    factor_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    contribution: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    r_squared: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="factor_attributions")
+
+
+# ─── Risk Alerts ──────────────────────────────────────────────────────────────
+
+class RiskAlert(Base):
+    __tablename__ = "risk_alerts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    alert_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), default="warning")
+    entity_type: Mapped[str | None] = mapped_column(String(32))
+    entity_id: Mapped[str | None] = mapped_column(String(64))
+    current_value: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    limit_value: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    utilization: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="risk_alerts")
+
+
+# ─── Daily Reports ────────────────────────────────────────────────────────────
+
+class DailyReport(Base):
+    __tablename__ = "daily_reports"
+    __table_args__ = (UniqueConstraint("run_id"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    portfolio_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
+    agent_mode: Mapped[str | None] = mapped_column(String(32), default="direct_llm")
+    executive_summary: Mapped[str | None] = mapped_column(Text)
+    key_movements: Mapped[str | None] = mapped_column(Text)
+    factor_explanation: Mapped[str | None] = mapped_column(Text)
+    risk_alert_explanation: Mapped[str | None] = mapped_column(Text)
+    recommended_actions: Mapped[str | None] = mapped_column(Text)
+    markdown_report: Mapped[str | None] = mapped_column(Text)
+    confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    llm_model: Mapped[str | None] = mapped_column(String(64))
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="daily_report")
+
+
+# ─── Tasks ────────────────────────────────────────────────────────────────────
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    worker_id: Mapped[str | None] = mapped_column(String(64))
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Schedules ────────────────────────────────────────────────────────────────
+
+class Schedule(Base):
+    __tablename__ = "schedules"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(String(64), ForeignKey("portfolios.id"))
+    name: Mapped[str | None] = mapped_column(String(128))
+    task_type: Mapped[str] = mapped_column(String(64), default="exposure_update")
+    cron_expression: Mapped[str | None] = mapped_column(String(64))
+    timezone: Mapped[str | None] = mapped_column(String(64), default="America/New_York")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    portfolio: Mapped["Portfolio"] = relationship(back_populates="schedules")
+
+
+# ─── Workflow Events ──────────────────────────────────────────────────────────
+
+class WorkflowEvent(Base):
+    __tablename__ = "workflow_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    step_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    message: Mapped[str | None] = mapped_column(Text)
+    payload_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    run: Mapped["ExposureRun"] = relationship(back_populates="workflow_events")
