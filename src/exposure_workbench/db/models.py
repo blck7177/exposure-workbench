@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from exposure_workbench.db.session import Base
 
@@ -324,3 +325,259 @@ class WorkflowEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     run: Mapped["ExposureRun"] = relationship(back_populates="workflow_events")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ISSUER INTELLIGENCE MODELS (mirrors infra/init.sql, v3)
+#
+# New models intentionally carry NO relationship() navigations — services query
+# with explicit select()/where (matching market_data_service / portfolio_service),
+# which keeps import-time mapper configuration risk at zero. FK columns still
+# mirror the DB constraints. Evidence four-stores are append-only by discipline.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ─── Raw: Companies ─────────────────────────────────────────────────────────────
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    cik: Mapped[str | None] = mapped_column(String(16))
+    exchange: Mapped[str | None] = mapped_column(String(32))
+    sector: Mapped[str | None] = mapped_column(String(64))       # EDGAR/SIC view
+    industry: Mapped[str | None] = mapped_column(String(128))
+    is_investigable: Mapped[bool] = mapped_column(Boolean, default=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Raw: Filings ───────────────────────────────────────────────────────────────
+
+class Filing(Base):
+    __tablename__ = "filings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    accession_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    form_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    filing_date: Mapped[date] = mapped_column(Date, nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[date | None] = mapped_column(Date)
+    fiscal_year: Mapped[int | None] = mapped_column(Integer)
+    fiscal_quarter: Mapped[int | None] = mapped_column(Integer)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    is_amendment: Mapped[bool] = mapped_column(Boolean, default=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Raw: Filing Documents ──────────────────────────────────────────────────────
+
+class FilingDocument(Base):
+    __tablename__ = "filing_documents"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filing_id: Mapped[str] = mapped_column(String(64), ForeignKey("filings.id", ondelete="CASCADE"))
+    doc_type: Mapped[str | None] = mapped_column(String(32))
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    char_count: Mapped[int | None] = mapped_column(Integer)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Normalized: Filing Sections ────────────────────────────────────────────────
+
+class FilingSection(Base):
+    __tablename__ = "filing_sections"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filing_id: Mapped[str] = mapped_column(String(64), ForeignKey("filings.id", ondelete="CASCADE"))
+    item_code: Mapped[str | None] = mapped_column(String(16))
+    title: Mapped[str | None] = mapped_column(String(255))
+    section_order: Mapped[int | None] = mapped_column(Integer)
+    text: Mapped[str | None] = mapped_column(Text)
+
+
+# ─── Normalized: Filing Chunks (APPEND-ONLY) ────────────────────────────────────
+
+class FilingChunk(Base):
+    __tablename__ = "filing_chunks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    section_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("filing_sections.id", ondelete="CASCADE"))
+    filing_id: Mapped[str] = mapped_column(String(64), ForeignKey("filings.id", ondelete="CASCADE"))
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    chunk_order: Mapped[int | None] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    char_start: Mapped[int | None] = mapped_column(Integer)
+    char_end: Mapped[int | None] = mapped_column(Integer)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
+    embedding_model: Mapped[str | None] = mapped_column(String(64))
+    form_type: Mapped[str | None] = mapped_column(String(16))
+    filing_date: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+
+
+# ─── Normalized: Financial Facts (APPEND-ONLY) ──────────────────────────────────
+
+class FinancialFact(Base):
+    __tablename__ = "financial_facts"
+    __table_args__ = (UniqueConstraint("company_id", "raw_concept", "period_end", "dimensions_hash"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filing_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("filings.id", ondelete="CASCADE"))
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    raw_concept: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_metric: Mapped[str | None] = mapped_column(String(64))
+    statement_type: Mapped[str | None] = mapped_column(String(32))
+    period_start: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+    fiscal_year: Mapped[int | None] = mapped_column(Integer)
+    fiscal_quarter: Mapped[int | None] = mapped_column(Integer)
+    value: Mapped[float | None] = mapped_column(Numeric(24, 4))
+    unit: Mapped[str | None] = mapped_column(String(16))
+    dimensions: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    dimensions_hash: Mapped[str] = mapped_column(String(64), default="")
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    quality_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    mapping_version: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Normalized: Research Sources (APPEND-ONLY) ─────────────────────────────────
+
+class ResearchSource(Base):
+    __tablename__ = "research_sources"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    research_run_id: Mapped[str | None] = mapped_column(String(64))
+    company_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    title: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    publisher_domain: Mapped[str | None] = mapped_column(String(128))
+    published_date: Mapped[date | None] = mapped_column(Date)
+    search_query: Mapped[str | None] = mapped_column(Text)
+    relevance_score: Mapped[float | None] = mapped_column(Numeric(6, 4))
+    snippet: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Calc Ledger (APPEND-ONLY) ──────────────────────────────────────────────────
+
+class CalcLedger(Base):
+    __tablename__ = "calc_ledger"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str | None] = mapped_column(String(64))   # plain column (SPY etc. not in companies)
+    operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    input_refs: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    primitive_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    invoked_by: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Runtime: Research Runs ─────────────────────────────────────────────────────
+
+class ResearchRun(Base):
+    __tablename__ = "research_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id"))
+    portfolio_id: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    task_id: Mapped[str | None] = mapped_column(String(64))
+    agent_session_id: Mapped[str | None] = mapped_column(String(64))
+    triggered_by: Mapped[str | None] = mapped_column(String(64), default="manual")
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Runtime: Agent Sessions ────────────────────────────────────────────────────
+
+class AgentSession(Base):
+    __tablename__ = "agent_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), default="meta")   # 'meta' | 'research'
+    llm_model: Mapped[str | None] = mapped_column(String(64))
+    tool_budget: Mapped[int | None] = mapped_column(Integer)
+    tools_used: Mapped[int] = mapped_column(Integer, default=0)
+    external_searches: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ─── Runtime: Agent Messages ────────────────────────────────────────────────────
+
+class AgentMessage(Base):
+    __tablename__ = "agent_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"))
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str | None] = mapped_column(Text)
+    citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Runtime: Agent Steps (APPEND-ONLY audit trail) ─────────────────────────────
+
+class AgentStep(Base):
+    __tablename__ = "agent_steps"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"))
+    message_id: Mapped[str | None] = mapped_column(String(64))
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|think|delegation|respond
+    tool_name: Mapped[str | None] = mapped_column(String(64))
+    args: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    result_summary: Mapped[str | None] = mapped_column(Text)
+    evidence_refs: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="completed")   # completed|rejected|error
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Artifact: Evidence Packs ───────────────────────────────────────────────────
+
+class EvidencePack(Base):
+    __tablename__ = "evidence_packs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    research_run_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(64))
+    pack: Mapped[list[Any]] = mapped_column(JSONB, default=list)   # refs list, not full snapshot
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Artifact: Issuer Briefs ────────────────────────────────────────────────────
+
+class IssuerBrief(Base):
+    __tablename__ = "issuer_briefs"
+    __table_args__ = (UniqueConstraint("research_run_id"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    research_run_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    financial_summary: Mapped[str | None] = mapped_column(Text)
+    key_changes: Mapped[str | None] = mapped_column(Text)
+    management_explanation: Mapped[str | None] = mapped_column(Text)
+    market_context: Mapped[str | None] = mapped_column(Text)
+    portfolio_implications: Mapped[str | None] = mapped_column(Text)
+    open_questions: Mapped[str | None] = mapped_column(Text)
+    citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    llm_model: Mapped[str | None] = mapped_column(String(64))
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

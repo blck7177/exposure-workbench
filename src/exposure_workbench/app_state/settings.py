@@ -16,6 +16,17 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     anthropic_model: str = "claude-3-5-haiku-20241022"
+    embedding_model: str = "text-embedding-3-small"   # 1536-dim, filing_chunks (M5)
+
+    # External providers (Issuer Intelligence)
+    tavily_api_key: str = ""
+    edgar_identity: str = ""   # SEC requires a UA with contact, e.g. "Name email@x.com"
+
+    # Agent budgets (env-overridable; see IMPLEMENTATION_PLAN §0.5)
+    session_tool_budget: int = 40       # tool calls per agent session
+    external_search_budget: int = 5     # Tavily searches per research run
+    submit_brief_retries: int = 2       # submit_brief citation-gate retries
+    respond_retries: int = 1            # respond citation-gate retries
 
     # Agent mode
     report_agent_mode: str = "direct_llm"
