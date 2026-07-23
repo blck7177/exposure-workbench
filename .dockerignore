@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+.env
+*.env
+
+# Node
+apps/web/node_modules/
+apps/web/.next/
+
+# Data artifacts (large, not needed in image)
+data/artifacts/
+
+# Version control
+.git/
+.gitignore
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+*.log
+*.tmp
+.DS_Store
