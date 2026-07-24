@@ -15,7 +15,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
-from exposure_workbench.providers.tavily_research_search_provider import TavilyResearchSearchProvider
 from exposure_workbench.services import evidence_trail_service as trail
 from exposure_workbench.services import research_search_service as rss
 from exposure_workbench.tools.registry import DELEGATION, GATE, Tool, ToolRegistry, current_session_id
@@ -47,13 +46,9 @@ async def _search_external_research(db: AsyncSession, ticker: str, query: str, r
         return {"error": "company_not_found", "ticker": tk}
     run = await _run_for_session(db, current_session_id())
     try:
-        provider = TavilyResearchSearchProvider()
-    except RuntimeError as e:
+        sources = await rss.search(db, company.id, query, research_run_id=run.id if run else None)
+    except rss.ResearchProviderUnavailable as e:
         return {"error": "provider_unavailable", "detail": str(e)}
-    sources = await rss.search_and_persist(
-        db, provider, company.id, query,
-        research_run_id=run.id if run else None,
-    )
     return {"ticker": tk, "query": query, "reason": reason, "sources": sources}
 
 

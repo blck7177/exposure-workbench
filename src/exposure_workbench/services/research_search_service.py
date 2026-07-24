@@ -24,6 +24,38 @@ from exposure_workbench.utils.ids import new_source_id
 logger = logging.getLogger(__name__)
 
 
+class ResearchProviderUnavailable(RuntimeError):
+    """No usable research provider (e.g. TAVILY_API_KEY missing) — fail loud."""
+
+
+def default_provider() -> ResearchSearchProvider:
+    """The service owns provider selection, so tools never import a provider.
+
+    Raises ResearchProviderUnavailable (not a silent skip) when unconfigured.
+    """
+    from exposure_workbench.providers.tavily_research_search_provider import TavilyResearchSearchProvider
+
+    try:
+        return TavilyResearchSearchProvider()
+    except RuntimeError as e:
+        raise ResearchProviderUnavailable(str(e)) from e
+
+
+async def search(
+    db: AsyncSession,
+    company_id: str,
+    query: str,
+    research_run_id: str | None = None,
+    max_results: int = 5,
+) -> list[dict]:
+    """Search with the default provider and persist results. Callers (tools) need
+    not know which provider is used."""
+    return await search_and_persist(
+        db, default_provider(), company_id, query,
+        research_run_id=research_run_id, max_results=max_results,
+    )
+
+
 async def search_and_persist(
     db: AsyncSession,
     provider: ResearchSearchProvider,
