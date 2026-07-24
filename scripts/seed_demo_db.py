@@ -106,13 +106,14 @@ def _factor_tickers() -> list[str]:
 def seed_portfolio(conn) -> None:
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO portfolios (id, name, description, currency, base_nav, benchmark, manager, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+            INSERT INTO portfolios (id, name, description, currency, base_nav, benchmark, manager, is_active, is_public, owner_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)
+            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, is_public = TRUE,
+                owner_id = EXCLUDED.owner_id, updated_at = NOW()
         """, (
             "port_001", "US Growth & Income Portfolio",
             "Diversified US equity portfolio with growth tilt and fixed income allocation",
-            "USD", 10_000_000.0, "SPY", "Demo PM", True,
+            "USD", 10_000_000.0, "SPY", "Demo PM", True, "user_demo_system",
         ))
     conn.commit()
     print("  portfolios: seeded port_001")

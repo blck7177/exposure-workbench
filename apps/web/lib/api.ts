@@ -19,6 +19,29 @@ export async function getPositions(portfolioId: string): Promise<Position[]> {
   return fetchJson<Position[]>(`/api/portfolios/${portfolioId}/positions`);
 }
 
+// ─── Portfolio create / upload / clone (V2-B, authenticated) ────────────────────
+
+export async function createPortfolio(name: string, csvText?: string): Promise<Portfolio> {
+  return fetchJson<Portfolio>("/api/portfolios", {
+    method: "POST",
+    body: JSON.stringify({ name, csv_text: csvText || null }),
+  });
+}
+
+export async function cloneDemoPortfolio(): Promise<Portfolio> {
+  return fetchJson<Portfolio>("/api/portfolios/clone-demo", { method: "POST", body: "{}" });
+}
+
+export async function uploadPositions(
+  portfolioId: string,
+  csvText: string
+): Promise<{ portfolio_id: string; as_of_date: string; positions: number }> {
+  return fetchJson(`/api/portfolios/${portfolioId}/upload`, {
+    method: "POST",
+    body: JSON.stringify({ csv_text: csvText }),
+  });
+}
+
 // ─── Exposure Runs ────────────────────────────────────────────────────────────
 
 export async function listRuns(portfolioId?: string): Promise<ExposureRunSummary[]> {

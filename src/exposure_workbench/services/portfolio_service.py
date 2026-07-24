@@ -14,15 +14,21 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import Portfolio, Position, RiskLimit
+from exposure_workbench.db.models import MarketPrice, Portfolio, Position, RiskLimit
 from exposure_workbench.services import exposure_run_service
+from exposure_workbench.utils.ids import new_id
 
 _TOP_SECTORS = 8
 _TOP_ISSUERS = 10
+
+DEMO_PORTFOLIO_ID = "port_001"
+# tickers that are funds even when no position metadata names them (U1 covered set)
+_ETF_HINT = {"SPY", "TLT", "HYG", "QQQ", "IWM", "AGG", "LQD", "VOO", "IVV"}
 
 
 async def get_portfolio(db: AsyncSession, portfolio_id: str) -> Portfolio | None:
@@ -156,3 +162,137 @@ async def snapshot_all(db: AsyncSession) -> list[dict]:
     """
     portfolios = await list_portfolios(db, active_only=True)
     return [await _snapshot_one(db, p) for p in portfolios]
+
+
+# ── user portfolios: create / upload / clone (V2-B) ───────────────────────────
+
+class UploadError(Exception):
+    """Atomic-upload rejection. Carries per-row problems; nothing is written."""
+    def __init__(self, problems: list[dict]):
+        super().__init__(f"{len(problems)} problem(s)")
+        self.problems = problems
+
+
+async def list_visible(db: AsyncSession, owner_id: str | None) -> list[Portfolio]:
+    """Portfolios a caller may see: public (demo) plus their own. Semantic filter
+    — real isolation is Postgres RLS (V2-C); this only shapes 'my portfolios'."""
+    q = select(Portfolio).where(Portfolio.is_active.is_(True))
+    if owner_id:
+        q = q.where((Portfolio.owner_id == owner_id) | (Portfolio.is_public.is_(True)))
+    else:
+        q = q.where(Portfolio.is_public.is_(True))
+    return list((await db.execute(q.order_by(Portfolio.created_at))).scalars().all())
+
+
+async def _covered_tickers(db: AsyncSession) -> set[str]:
+    return set((await db.execute(select(MarketPrice.ticker).distinct())).scalars().all())
+
+
+async def _snapshot_date(db: AsyncSession) -> date | None:
+    return (await db.execute(select(func.max(MarketPrice.price_date)))).scalar_one_or_none()
+
+
+async def _latest_prices(db: AsyncSession, tickers: list[str], as_of: date) -> dict[str, float]:
+    rows = (await db.execute(
+        select(MarketPrice.ticker, MarketPrice.close)
+        .where(MarketPrice.ticker.in_(tickers), MarketPrice.price_date <= as_of)
+        .order_by(MarketPrice.ticker, MarketPrice.price_date.desc())
+        .distinct(MarketPrice.ticker)
+    )).all()
+    return {t: float(c) for t, c in rows}
+
+
+async def _ticker_metadata(db: AsyncSession, tickers: list[str]) -> dict[str, dict]:
+    """sector / asset_class / region from the most recent existing position for
+    each ticker (companies.sector is unreliable). U1's covered set are all demo
+    holdings, so this is populated; U2 will enrich unknowns from the provider."""
+    rows = (await db.execute(
+        select(Position.ticker, Position.sector, Position.asset_class, Position.region)
+        .where(Position.ticker.in_(tickers))
+        .order_by(Position.ticker, Position.as_of_date.desc())
+        .distinct(Position.ticker)
+    )).all()
+    return {t: {"sector": s, "asset_class": ac, "region": r} for t, s, ac, r in rows}
+
+
+async def _copy_risk_limits(db: AsyncSession, src_id: str, dst_id: str) -> None:
+    limits = (await db.execute(select(RiskLimit).where(RiskLimit.portfolio_id == src_id))).scalars().all()
+    for lim in limits:
+        db.add(RiskLimit(
+            id=new_id("rl_"), portfolio_id=dst_id, limit_type=lim.limit_type,
+            entity_type=lim.entity_type, entity_id=lim.entity_id,
+            warning_level=lim.warning_level, breach_level=lim.breach_level,
+            unit=lim.unit, is_active=lim.is_active,
+        ))
+    await db.flush()
+
+
+async def create_portfolio(db: AsyncSession, owner_id: str, name: str) -> Portfolio:
+    """New empty portfolio owned by the user, with the demo's risk-limit template
+    (check_limits needs limits to evaluate)."""
+    p = Portfolio(
+        id=new_id("port_"), name=(name or "").strip() or "My Portfolio",
+        currency="USD", benchmark="SPY", owner_id=owner_id, is_active=True, is_public=False,
+    )
+    db.add(p)
+    await db.flush()
+    await _copy_risk_limits(db, DEMO_PORTFOLIO_ID, p.id)
+    return p
+
+
+async def upload_positions(
+    db: AsyncSession, portfolio_id: str, rows, as_of: date | None = None,
+) -> dict:
+    """Atomic holdings upload. Validates every ticker is in the covered set and
+    priceable BEFORE any write; any failure raises UploadError (zero writes).
+    Priced at the snapshot close; re-upload on the same snapshot date upserts."""
+    tickers = [r.ticker for r in rows]
+    if not tickers:
+        raise UploadError([{"row": 0, "ticker": "", "reason": "no rows"}])
+    covered = await _covered_tickers(db)
+    problems = [{"ticker": t, "reason": "ticker_not_supported"} for t in tickers if t not in covered]
+    if problems:
+        raise UploadError(problems)
+
+    as_of = as_of or await _snapshot_date(db)
+    if as_of is None:
+        raise UploadError([{"ticker": "*", "reason": "no_price_data"}])
+    prices = await _latest_prices(db, tickers, as_of)
+    missing = [t for t in tickers if t not in prices]
+    if missing:
+        raise UploadError([{"ticker": t, "reason": "no_price_data"} for t in missing])
+    meta = await _ticker_metadata(db, tickers)
+
+    for r in rows:
+        m = meta.get(r.ticker, {})
+        close = prices[r.ticker]
+        asset_class = m.get("asset_class") or ("etf" if r.ticker in _ETF_HINT else "equity")
+        stmt = pg_insert(Position).values(
+            id=new_id("pos_"), portfolio_id=portfolio_id, as_of_date=as_of, ticker=r.ticker,
+            asset_class=asset_class, sector=m.get("sector"), region=m.get("region") or "US",
+            currency="USD", quantity=r.quantity, cost_basis=r.cost_basis, price=close,
+            market_value=round(r.quantity * close, 2),
+        ).on_conflict_do_update(
+            index_elements=["portfolio_id", "as_of_date", "ticker"],
+            set_={"quantity": r.quantity, "cost_basis": r.cost_basis, "price": close,
+                  "market_value": round(r.quantity * close, 2), "asset_class": asset_class,
+                  "sector": m.get("sector")},
+        )
+        await db.execute(stmt)
+    await db.flush()
+    return {"portfolio_id": portfolio_id, "as_of_date": as_of.isoformat(), "positions": len(rows)}
+
+
+async def clone_demo(db: AsyncSession, owner_id: str, name: str = "My Portfolio (demo copy)") -> Portfolio:
+    """Create a user portfolio pre-filled with the demo's latest holdings — the
+    one-click way to get something runnable without uploading a CSV."""
+    p = await create_portfolio(db, owner_id, name)
+    demo_positions = await get_positions_latest(db, DEMO_PORTFOLIO_ID)
+    for pos in demo_positions:
+        db.add(Position(
+            id=new_id("pos_"), portfolio_id=p.id, as_of_date=pos.as_of_date, ticker=pos.ticker,
+            asset_class=pos.asset_class, sector=pos.sector, region=pos.region, currency=pos.currency,
+            quantity=pos.quantity, cost_basis=pos.cost_basis, price=pos.price, market_value=pos.market_value,
+        ))
+    await db.flush()
+    return p

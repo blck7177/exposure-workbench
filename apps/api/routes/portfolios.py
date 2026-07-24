@@ -9,10 +9,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import optional_user, require_user
+from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import portfolio_service, exposure_run_service
+from exposure_workbench.services import portfolio_csv, portfolio_service, exposure_run_service
 
 router = APIRouter()
+
+
+def _problem_dicts(problems) -> list[dict]:
+    # CsvProblem dataclasses -> JSON; upload_positions problems are already dicts
+    return [p if isinstance(p, dict) else {"row": p.row, "ticker": p.ticker, "reason": p.reason}
+            for p in problems]
 
 
 # ─── Response models ──────────────────────────────────────────────────────────
@@ -62,8 +70,78 @@ class RiskLimitOut(BaseModel):
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/portfolios", response_model=list[PortfolioOut])
-async def list_portfolios(db: AsyncSession = Depends(get_db)):
-    return await portfolio_service.list_portfolios(db)
+async def list_portfolios(
+    user: UserClaims | None = Depends(optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # V2-B: public demo + the caller's own. App-level visibility until V2-C RLS
+    # makes it belt-and-suspenders.
+    return await portfolio_service.list_visible(db, user.user_id if user else None)
+
+
+# ─── Portfolio creation / upload / clone (V2-B, authenticated) ────────────────
+
+class CreatePortfolioRequest(BaseModel):
+    name: str
+    csv_text: str | None = None   # optional holdings in the same request
+
+
+class UploadRequest(BaseModel):
+    csv_text: str
+
+
+@router.post("/portfolios", response_model=PortfolioOut, status_code=201)
+async def create_portfolio(
+    body: CreatePortfolioRequest,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    p = await portfolio_service.create_portfolio(db, owner_id=user.user_id, name=body.name)
+    if body.csv_text:
+        rows, problems = portfolio_csv.parse_csv(body.csv_text)
+        if problems:
+            await db.rollback()   # atomic: bad CSV => no portfolio either
+            raise HTTPException(422, {"problems": _problem_dicts(problems)})
+        try:
+            await portfolio_service.upload_positions(db, p.id, rows)
+        except portfolio_service.UploadError as e:
+            await db.rollback()
+            raise HTTPException(422, {"problems": _problem_dicts(e.problems)})
+    await db.commit()
+    return p
+
+
+@router.post("/portfolios/clone-demo", response_model=PortfolioOut, status_code=201)
+async def clone_demo(
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    p = await portfolio_service.clone_demo(db, owner_id=user.user_id)
+    await db.commit()
+    return p
+
+
+@router.post("/portfolios/{portfolio_id}/upload")
+async def upload_positions(
+    portfolio_id: str,
+    body: UploadRequest,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    p = await portfolio_service.get_portfolio(db, portfolio_id)
+    if p is None:
+        raise HTTPException(404, "Portfolio not found")
+    if p.owner_id != user.user_id:   # temporary until RLS (V2-C) — semantic ownership check
+        raise HTTPException(403, "not your portfolio")
+    rows, problems = portfolio_csv.parse_csv(body.csv_text)
+    if problems:
+        raise HTTPException(422, {"problems": _problem_dicts(problems)})
+    try:
+        result = await portfolio_service.upload_positions(db, portfolio_id, rows)
+    except portfolio_service.UploadError as e:
+        raise HTTPException(422, {"problems": _problem_dicts(e.problems)})
+    await db.commit()
+    return result
 
 
 @router.get("/portfolios/{portfolio_id}", response_model=PortfolioOut)

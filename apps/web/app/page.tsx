@@ -5,11 +5,12 @@ import Link from "next/link";
 import {
   Activity, BarChart3, RefreshCw, AlertTriangle, CheckCircle2,
   Clock, Loader2, ChevronRight, TrendingUp, TrendingDown,
-  ShieldAlert, FileText, ChevronDown, ChevronUp, Search,
+  ShieldAlert, FileText, ChevronDown, ChevronUp, Search, Plus,
 } from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
 import { EvidenceDrawer } from "./components/Evidence";
 import { AuthControls } from "./components/Auth";
+import { PortfolioModal } from "./components/PortfolioModal";
 import type {
   Portfolio, ExposureRun, ExposureRunSummary, Position, RiskAlert,
   FactorAttribution, ExposureMetrics, SectorExposure, IssuerExposure,
@@ -95,7 +96,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function LeftPanel({
   portfolios, selectedPortfolioId, onSelectPortfolio,
-  runs, selectedRunId, onSelectRun,
+  runs, selectedRunId, onSelectRun, onPortfolioCreated,
 }: {
   portfolios: Portfolio[];
   selectedPortfolioId: string | null;
@@ -103,15 +104,29 @@ function LeftPanel({
   runs: ExposureRunSummary[];
   selectedRunId: string | null;
   onSelectRun: (id: string) => void;
+  onPortfolioCreated: (p: Portfolio) => void;
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
   return (
     <aside className="w-56 flex-shrink-0 border-r border-[#21262d] flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-[#21262d]">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-blue-400" />
           <span className="text-xs font-semibold text-slate-300">Portfolios</span>
+          <button
+            onClick={() => setModalOpen(true)}
+            title="New portfolio"
+            className="ml-auto text-slate-400 hover:text-slate-200 flex items-center"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
+      <PortfolioModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={(p) => { setModalOpen(false); onPortfolioCreated(p); }}
+      />
 
       <div className="flex-1 overflow-y-auto">
         {/* Portfolio list */}
@@ -735,6 +750,17 @@ export default function Home() {
     }
   }, [selectedPortfolioId]);
 
+  const handlePortfolioCreated = useCallback((created: Portfolio) => {
+    // reload the (now auth-scoped) list and jump to the new portfolio
+    listPortfolios().then((data) => {
+      setPortfolios(data);
+      setSelectedPortfolioId(created.id);
+      setCurrentRun(null);
+      setSelectedRunId(null);
+      setRuns([]);
+    }).catch(console.error);
+  }, []);
+
   const selectedPortfolio = portfolios.find((p) => p.id === selectedPortfolioId) ?? null;
 
   return (
@@ -770,6 +796,7 @@ export default function Home() {
           onSelectRun={(id) => {
             setSelectedRunId(id);
           }}
+          onPortfolioCreated={handlePortfolioCreated}
         />
         <MiddlePanel
           selectedPortfolio={selectedPortfolio}

@@ -25,3 +25,9 @@ ALTER TABLE research_runs  ADD COLUMN IF NOT EXISTS owner_id      VARCHAR(255);
 ALTER TABLE issuer_briefs  ADD COLUMN IF NOT EXISTS owner_id      VARCHAR(255);
 ALTER TABLE issuer_briefs  ADD COLUMN IF NOT EXISTS is_public     BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE tasks          ADD COLUMN IF NOT EXISTS owner_user_id VARCHAR(255);
+
+-- ═══ V2-B: demo portfolio is public so anonymous visitors keep seeing it ══════
+INSERT INTO users (id, email, display_name)
+    VALUES ('user_demo_system', NULL, 'Demo (system)')
+    ON CONFLICT (id) DO NOTHING;
+UPDATE portfolios SET is_public = TRUE, owner_id = 'user_demo_system' WHERE id = 'port_001';
