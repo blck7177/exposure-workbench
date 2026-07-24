@@ -65,6 +65,50 @@ async def embed_texts(texts: list[str], model: str | None = None) -> tuple[list[
     return [d.embedding for d in ordered], response.model
 
 
+async def chat_with_tools(
+    messages: list[dict],
+    tools: list[dict],
+    model: str | None = None,
+    temperature: float = 0.2,
+    max_tokens: int = 4096,
+) -> tuple[str | None, list[dict] | None, dict]:
+    """One tool-calling turn. Returns (content, tool_calls, usage).
+
+    tool_calls are returned as plain dicts in the exact shape the API accepts back
+    in a subsequent assistant message, so the caller can append and continue.
+    """
+    from exposure_workbench.app_state.settings import get_settings
+
+    settings = get_settings()
+    client = get_openai_client()
+    if client is None:
+        raise RuntimeError("OPENAI_API_KEY not configured — the research session cannot run.")
+
+    response = await client.chat.completions.create(
+        model=model or settings.openai_model,
+        messages=messages,          # type: ignore[arg-type]
+        tools=tools,                # type: ignore[arg-type]
+        max_completion_tokens=max_tokens,
+    )
+    choice = response.choices[0].message
+    tool_calls = None
+    if choice.tool_calls:
+        tool_calls = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            }
+            for tc in choice.tool_calls
+        ]
+    usage = response.usage
+    usage_dict = {
+        "prompt_tokens": usage.prompt_tokens if usage else 0,
+        "completion_tokens": usage.completion_tokens if usage else 0,
+    }
+    return choice.content, tool_calls, usage_dict
+
+
 async def chat_complete(
     messages: list[dict[str, str]],
     model: str | None = None,
@@ -85,11 +129,11 @@ async def chat_complete(
     if client is None:
         raise RuntimeError("OpenAI client not available")
 
+    # gpt-5.x models take max_completion_tokens and only the default temperature.
     response = await client.chat.completions.create(
         model=effective_model,
         messages=messages,  # type: ignore[arg-type]
-        temperature=temperature,
-        max_tokens=max_tokens,
+        max_completion_tokens=max_tokens,
     )
     content = response.choices[0].message.content or ""
     usage = response.usage

@@ -47,6 +47,12 @@ def _get_handler(task_type: str):
         elif task_type == "market_data_sync":
             from apps.worker.handlers.market_data_sync import handle
             HANDLERS[task_type] = handle
+        elif task_type == "company_readiness":
+            from apps.worker.handlers.company_readiness import handle
+            HANDLERS[task_type] = handle
+        elif task_type == "issuer_research":
+            from apps.worker.handlers.issuer_research import handle
+            HANDLERS[task_type] = handle
         else:
             return None
     return HANDLERS[task_type]
