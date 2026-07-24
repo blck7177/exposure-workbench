@@ -505,3 +505,27 @@ CREATE TABLE IF NOT EXISTS issuer_briefs (
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_issuer_briefs_company ON issuer_briefs(company_id);
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- OBSERVABILITY COST VIEWS (M11) — token/call accounting. Account complete;
+-- the MVP UI shows only per-session/brief footers, but the numbers are all here.
+-- ═════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE VIEW session_cost AS
+SELECT s.id AS session_id, s.kind, s.llm_model,
+       s.tools_used, s.external_searches,
+       count(st.id) AS trace_steps,
+       count(st.id) FILTER (WHERE st.status = 'rejected') AS rejected_steps,
+       coalesce(sum(st.prompt_tokens), 0) AS prompt_tokens,
+       coalesce(sum(st.completion_tokens), 0) AS completion_tokens
+FROM agent_sessions s
+LEFT JOIN agent_steps st ON st.session_id = s.id
+GROUP BY s.id;
+
+CREATE OR REPLACE VIEW research_run_cost AS
+SELECT r.id AS research_run_id, r.company_id, r.status,
+       sc.tools_used, sc.external_searches, sc.trace_steps,
+       sc.prompt_tokens, sc.completion_tokens
+FROM research_runs r
+LEFT JOIN session_cost sc ON sc.session_id = r.agent_session_id;

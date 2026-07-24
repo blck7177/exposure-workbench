@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Activity, BarChart3, RefreshCw, AlertTriangle, CheckCircle2,
   Clock, Loader2, ChevronRight, TrendingUp, TrendingDown,
-  ShieldAlert, FileText, ChevronDown, ChevronUp,
+  ShieldAlert, FileText, ChevronDown, ChevronUp, Search,
 } from "lucide-react";
+import { ChatPanel } from "./components/ChatPanel";
+import { EvidenceDrawer } from "./components/Evidence";
 import type {
   Portfolio, ExposureRun, Position, RiskAlert,
   FactorAttribution, ExposureMetrics, SectorExposure, IssuerExposure,
@@ -551,8 +554,12 @@ function RightPanel({
                 ? issuerExposures
                     .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
                     .map((ie) => (
-                      <tr key={ie.ticker} className="border-b border-[#21262d]/50 hover:bg-white/2 transition-colors">
-                        <td className="px-4 py-2 font-semibold text-slate-200">{ie.ticker}</td>
+                      <tr key={ie.ticker} className="border-b border-[#21262d]/50 hover:bg-white/2 transition-colors group">
+                        <td className="px-4 py-2 font-semibold text-slate-200">
+                          <Link href={`/issuer/${ie.ticker}`} className="inline-flex items-center gap-1 hover:text-sky-400" title="Investigate issuer">
+                            {ie.ticker}<Search className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                          </Link>
+                        </td>
                         <td className="px-4 py-2 text-slate-400">{ie.sector?.replace(/_/g, " ") ?? "—"}</td>
                         <td className="px-4 py-2 text-right text-slate-200 font-medium">{formatCurrency(ie.market_value)}</td>
                         <td className="px-4 py-2 text-right text-slate-400">{fPct(ie.weight)}</td>
@@ -566,8 +573,12 @@ function RightPanel({
                     .map((pos) => {
                       const w = displayMV > 0 ? (pos.market_value ?? 0) / displayMV : 0;
                       return (
-                        <tr key={pos.id} className="border-b border-[#21262d]/50 hover:bg-white/2 transition-colors">
-                          <td className="px-4 py-2 font-semibold text-slate-200">{pos.ticker}</td>
+                        <tr key={pos.id} className="border-b border-[#21262d]/50 hover:bg-white/2 transition-colors group">
+                          <td className="px-4 py-2 font-semibold text-slate-200">
+                            <Link href={`/issuer/${pos.ticker}`} className="inline-flex items-center gap-1 hover:text-sky-400" title="Investigate issuer">
+                              {pos.ticker}<Search className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+                            </Link>
+                          </td>
                           <td className="px-4 py-2 text-slate-400">{pos.sector?.replace(/_/g, " ") ?? "—"}</td>
                           <td className="px-4 py-2 text-right text-slate-200 font-medium">{formatCurrency(pos.market_value)}</td>
                           <td className="px-4 py-2 text-right text-slate-400">{fPct(w)}</td>
@@ -766,6 +777,8 @@ export default function Home() {
           run={currentRun}
         />
       </div>
+      <EvidenceDrawer />
+      <ChatPanel />
     </div>
   );
 }
