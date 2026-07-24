@@ -37,6 +37,8 @@ services:
       DEMO_MODE: "${DEMO_MODE:-true}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       CORS_ORIGINS: "http://localhost:${WEB_HOST_PORT:-3103},http://127.0.0.1:${WEB_HOST_PORT:-3103}"
+      CLERK_ISSUER: "${CLERK_ISSUER:-}"
+      CLERK_AUTHORIZED_PARTIES: "${CLERK_AUTHORIZED_PARTIES:-}"
     volumes:
       - ./data:/app/data
     depends_on:
@@ -74,9 +76,15 @@ services:
       dockerfile: infra/Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: "http://localhost:${API_HOST_PORT:-8103}"
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
     container_name: exposure-web
     ports:
       - "${WEB_HOST_PORT:-3103}:3000"
+    environment:
+      # server-side (SSR) Clerk needs these at runtime; publishable key is also
+      # inlined at build time via the build arg above.
+      CLERK_SECRET_KEY: "${CLERK_SECRET_KEY:-}"
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
     depends_on:
       - exposure-api
 
