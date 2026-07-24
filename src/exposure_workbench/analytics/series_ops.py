@@ -1,0 +1,235 @@
+"""Calculation algebra (M3) — the closed primitive set.
+
+Four orthogonal operations. Expressiveness comes from COMPOSING them, not from
+adding more:
+    margin        = combine(gross_profit, revenue, "divide")
+    free cash flow= combine(ocf, capex, "sub")
+    growth        = change(series, "yoy")
+    CAGR          = stat(series, "cagr")
+    event return  = window_return(prices, window)
+
+Adding a primitive is an architecture decision, not a convenience. There is
+deliberately no generic "eval expression" escape hatch: every number an agent
+can quote must come from a named, replayable operation.
+
+Pure functions. Missing inputs produce None plus a quality flag — never
+interpolated, never carried forward, never zero-filled.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from datetime import date
+
+PRIMITIVE_VERSION = "v1"
+
+COMBINE_OPS = ("add", "sub", "divide")
+CHANGE_MODES = ("yoy", "qoq", "pct", "abs")
+STAT_OPS = ("cagr", "avg", "min", "max", "std", "sum", "latest")
+
+
+@dataclass(frozen=True)
+class SeriesPoint:
+    period_end: date
+    value: float | None
+    input_fact_ids: list[str] = field(default_factory=list)
+    quality_flags: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SeriesResult:
+    operation: str
+    points: list[SeriesPoint] = field(default_factory=list)
+    quality_flags: dict = field(default_factory=dict)
+    primitive_version: str = PRIMITIVE_VERSION
+
+    def input_fact_ids(self) -> list[str]:
+        seen: list[str] = []
+        for p in self.points:
+            for fid in p.input_fact_ids:
+                if fid not in seen:
+                    seen.append(fid)
+        return seen
+
+
+@dataclass(frozen=True)
+class ScalarResult:
+    operation: str
+    value: float | None
+    input_fact_ids: list[str] = field(default_factory=list)
+    quality_flags: dict = field(default_factory=dict)
+    primitive_version: str = PRIMITIVE_VERSION
+
+
+# ── combine ────────────────────────────────────────────────────────────────────
+
+def combine_series(a: list[SeriesPoint], b: list[SeriesPoint], op: str) -> SeriesResult:
+    """Align two series on period_end and apply op elementwise.
+
+    Only periods present in BOTH contribute — an unmatched period is skipped and
+    counted, rather than being treated as zero.
+    """
+    if op not in COMBINE_OPS:
+        raise ValueError(f"unsupported combine op {op!r}")
+
+    b_by_period = {p.period_end: p for p in b}
+    points: list[SeriesPoint] = []
+    unmatched = 0
+    div_zero = 0
+
+    for pa in a:
+        pb = b_by_period.get(pa.period_end)
+        if pb is None:
+            unmatched += 1
+            continue
+        if pa.value is None or pb.value is None:
+            points.append(SeriesPoint(pa.period_end, None,
+                                      pa.input_fact_ids + pb.input_fact_ids,
+                                      {"missing_input": True}))
+            continue
+        if op == "add":
+            v = pa.value + pb.value
+        elif op == "sub":
+            v = pa.value - pb.value
+        else:
+            if pb.value == 0:
+                div_zero += 1
+                points.append(SeriesPoint(pa.period_end, None,
+                                          pa.input_fact_ids + pb.input_fact_ids,
+                                          {"division_by_zero": True}))
+                continue
+            v = pa.value / pb.value
+        points.append(SeriesPoint(pa.period_end, v, pa.input_fact_ids + pb.input_fact_ids))
+
+    flags: dict = {}
+    if unmatched:
+        flags["unmatched_periods"] = unmatched
+    if div_zero:
+        flags["division_by_zero_periods"] = div_zero
+    return SeriesResult(operation=f"combine.{op}", points=points, quality_flags=flags)
+
+
+# ── change ─────────────────────────────────────────────────────────────────────
+
+def compute_change(series: list[SeriesPoint], mode: str) -> SeriesResult:
+    """yoy = vs 4 periods back, qoq = vs previous, pct/abs = vs previous."""
+    if mode not in CHANGE_MODES:
+        raise ValueError(f"unsupported change mode {mode!r}")
+
+    ordered = sorted(series, key=lambda p: p.period_end)
+    lag = 4 if mode == "yoy" else 1
+    points: list[SeriesPoint] = []
+    zero_base = 0
+
+    for i in range(lag, len(ordered)):
+        cur, prev = ordered[i], ordered[i - lag]
+        ids = cur.input_fact_ids + prev.input_fact_ids
+        if cur.value is None or prev.value is None:
+            points.append(SeriesPoint(cur.period_end, None, ids, {"missing_input": True}))
+            continue
+        if mode == "abs":
+            v = cur.value - prev.value
+        else:
+            if prev.value == 0:
+                zero_base += 1
+                points.append(SeriesPoint(cur.period_end, None, ids, {"zero_base": True}))
+                continue
+            v = (cur.value - prev.value) / abs(prev.value)
+        points.append(SeriesPoint(cur.period_end, v, ids))
+
+    flags: dict = {}
+    if len(ordered) <= lag:
+        flags["insufficient_history"] = {"needed": lag + 1, "have": len(ordered)}
+    if zero_base:
+        flags["zero_base_periods"] = zero_base
+    return SeriesResult(operation=f"change.{mode}", points=points, quality_flags=flags)
+
+
+# ── stat ───────────────────────────────────────────────────────────────────────
+
+def compute_stat(series: list[SeriesPoint], op: str) -> ScalarResult:
+    if op not in STAT_OPS:
+        raise ValueError(f"unsupported stat op {op!r}")
+
+    ordered = sorted(series, key=lambda p: p.period_end)
+    vals = [(p.period_end, p.value, p.input_fact_ids) for p in ordered if p.value is not None]
+    ids = [fid for _, _, fl in vals for fid in fl]
+    flags: dict = {}
+    dropped = len(ordered) - len(vals)
+    if dropped:
+        flags["skipped_missing_points"] = dropped
+    if not vals:
+        flags["no_values"] = True
+        return ScalarResult(operation=f"stat.{op}", value=None, input_fact_ids=[], quality_flags=flags)
+
+    nums = [v for _, v, _ in vals]
+    if op == "avg":
+        value = sum(nums) / len(nums)
+    elif op == "min":
+        value = min(nums)
+    elif op == "max":
+        value = max(nums)
+    elif op == "sum":
+        value = sum(nums)
+    elif op == "latest":
+        value = nums[-1]
+    elif op == "std":
+        if len(nums) < 2:
+            flags["insufficient_history"] = {"needed": 2, "have": len(nums)}
+            value = None
+        else:
+            mean = sum(nums) / len(nums)
+            value = math.sqrt(sum((x - mean) ** 2 for x in nums) / (len(nums) - 1))
+    else:  # cagr
+        first_end, first_v, _ = vals[0]
+        last_end, last_v, _ = vals[-1]
+        years = (last_end - first_end).days / 365.25
+        if years <= 0 or first_v is None or first_v <= 0 or last_v is None or last_v <= 0:
+            # CAGR is undefined across a sign change or zero base — say so.
+            flags["cagr_undefined"] = True
+            value = None
+        else:
+            value = (last_v / first_v) ** (1 / years) - 1
+    return ScalarResult(operation=f"stat.{op}", value=value, input_fact_ids=ids, quality_flags=flags)
+
+
+# ── window return ──────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class PricePoint:
+    price_date: date
+    close: float
+
+
+def compute_window_return(
+    prices: list[PricePoint],
+    start: date,
+    end: date,
+    benchmark: list[PricePoint] | None = None,
+) -> ScalarResult:
+    """Return over [start, end], optionally relative to a benchmark.
+
+    Uses the last close on/before each bound (markets are closed on many dates);
+    if no price exists on/before a bound, the result is None + a flag.
+    """
+    def at(series: list[PricePoint], when: date) -> float | None:
+        eligible = [p for p in sorted(series, key=lambda x: x.price_date) if p.price_date <= when]
+        return eligible[-1].close if eligible else None
+
+    flags: dict = {}
+    p0, p1 = at(prices, start), at(prices, end)
+    if p0 is None or p1 is None or p0 == 0:
+        flags["no_price_for_window"] = True
+        return ScalarResult(operation="window_return", value=None, quality_flags=flags)
+
+    r = (p1 - p0) / p0
+    op = "window_return"
+    if benchmark:
+        b0, b1 = at(benchmark, start), at(benchmark, end)
+        if b0 is None or b1 is None or b0 == 0:
+            flags["no_benchmark_for_window"] = True
+        else:
+            r -= (b1 - b0) / b0
+            op = "window_return.relative"
+    return ScalarResult(operation=op, value=r, quality_flags=flags)
