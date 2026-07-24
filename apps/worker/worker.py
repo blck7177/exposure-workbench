@@ -44,6 +44,9 @@ def _get_handler(task_type: str):
         if task_type == "exposure_update":
             from apps.worker.handlers.exposure_update import handle
             HANDLERS[task_type] = handle
+        elif task_type == "market_data_sync":
+            from apps.worker.handlers.market_data_sync import handle
+            HANDLERS[task_type] = handle
         else:
             return None
     return HANDLERS[task_type]
