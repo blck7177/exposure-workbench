@@ -46,9 +46,16 @@ def test_settings_new_fields_defaults():
     assert s.submit_brief_retries == 2
     assert s.respond_retries == 1
     assert s.embedding_model == "text-embedding-3-small"
-    # provider keys default empty (fail-loud, no baked-in creds)
-    assert s.tavily_api_key == ""
-    assert s.edgar_identity == ""
+
+
+def test_no_credentials_baked_into_code_defaults():
+    """Declared defaults must be empty — real values come from .env only.
+
+    Asserted on the field declarations rather than an instance, since
+    Settings() legitimately loads .env (which carries real keys in dev).
+    """
+    for field in ("tavily_api_key", "edgar_identity", "openai_api_key", "anthropic_api_key"):
+        assert Settings.model_fields[field].default == "", f"{field} must default empty"
 
 
 def test_id_prefixes():

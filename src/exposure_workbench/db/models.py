@@ -424,7 +424,11 @@ class FilingChunk(Base):
 
 class FinancialFact(Base):
     __tablename__ = "financial_facts"
-    __table_args__ = (UniqueConstraint("company_id", "raw_concept", "period_end", "dimensions_hash"),)
+    # source_accession is in the key on purpose — restatements must append a new
+    # row rather than overwrite the original (see infra/init.sql for rationale).
+    __table_args__ = (
+        UniqueConstraint("company_id", "raw_concept", "period_end", "dimensions_hash", "source_accession"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     filing_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("filings.id", ondelete="CASCADE"))
@@ -443,6 +447,7 @@ class FinancialFact(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     quality_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     mapping_version: Mapped[str | None] = mapped_column(String(16))
+    source_accession: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

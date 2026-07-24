@@ -365,8 +365,16 @@ CREATE TABLE IF NOT EXISTS financial_facts (
     provider           VARCHAR(32) NOT NULL,
     quality_flags      JSONB NOT NULL DEFAULT '{}',
     mapping_version    VARCHAR(16),
+    -- Originating filing accession. Kept even when that filing is not itself
+    -- ingested into `filings` (company-facts spans years of filings, while MVP
+    -- only ingests the latest 10-K/10-Q) — so every fact stays traceable.
+    source_accession   VARCHAR(32),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (company_id, raw_concept, period_end, dimensions_hash)
+    -- source_accession is part of the key ON PURPOSE: the same (concept, period)
+    -- restated in a later filing must land as a NEW row, not overwrite the
+    -- original. Collapsing them would destroy restatement history (measured: 45%
+    -- of NVDA facts) and leave M3's period_ladder nothing to pick "latest" from.
+    UNIQUE (company_id, raw_concept, period_end, dimensions_hash, source_accession)
 );
 CREATE INDEX IF NOT EXISTS idx_financial_facts_company ON financial_facts(company_id);
 CREATE INDEX IF NOT EXISTS idx_financial_facts_metric ON financial_facts(company_id, normalized_metric);
