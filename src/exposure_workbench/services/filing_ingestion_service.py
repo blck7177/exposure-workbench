@@ -25,10 +25,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import Filing, FinancialFact
+from exposure_workbench.db.models import Filing, FilingDocument, FilingSection, FinancialFact
 from exposure_workbench.providers.filing_provider import FactDTO, FilingMeta, FilingProvider
 from exposure_workbench.services.concept_mapping import MAPPING_VERSION, normalize_concept
-from exposure_workbench.utils.ids import new_fact_id, new_filing_id
+from exposure_workbench.utils.ids import new_fact_id, new_filing_id, new_id
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,52 @@ async def ingest_filings_metadata(
         persisted.append(filing)
     await db.flush()
     return persisted
+
+
+async def ingest_filing_text(
+    db: AsyncSession,
+    filing: Filing,
+    provider: FilingProvider,
+) -> int:
+    """M2a text flow: persist the filing document + its Item sections.
+
+    Idempotent: a filing that already has sections is skipped. The caller runs
+    this inside ONE transaction per filing, so a failure leaves no half-ingested
+    filing behind (which is what makes the accession-level skip safe).
+    Fail-loud: unparseable sections raise (no blind fixed-window fallback).
+    """
+    existing = await db.execute(
+        select(FilingSection.id).where(FilingSection.filing_id == filing.id).limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return 0
+
+    doc = provider.fetch_filing_text(filing.accession_number)
+    db.add(
+        FilingDocument(
+            id=new_id("fdoc_"),
+            filing_id=filing.id,
+            doc_type=doc.doc_type,
+            raw_text=doc.raw_text,
+            char_count=len(doc.raw_text),
+        )
+    )
+
+    sections = provider.fetch_sections(filing.accession_number)
+    for s in sections:
+        db.add(
+            FilingSection(
+                id=new_id("fsec_"),
+                filing_id=filing.id,
+                item_code=s.item_code,
+                title=s.title,
+                section_order=s.section_order,
+                text=s.text,
+            )
+        )
+    await db.flush()
+    logger.info("ingested %d sections for filing %s", len(sections), filing.accession_number)
+    return len(sections)
 
 
 async def ingest_financial_facts(

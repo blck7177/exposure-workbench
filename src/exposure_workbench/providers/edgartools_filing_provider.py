@@ -35,6 +35,17 @@ def _quarter(fiscal_period: Any) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def _section_title(text: str) -> str | None:
+    """Item text starts with its own heading, e.g.
+    'Item 1A. Risk Factors\\n\\n...' -> 'Risk Factors'."""
+    first = (text.lstrip().split("\n", 1)[0] or "").strip()
+    if not first:
+        return None
+    m = re.match(r"^\s*(?:part\s+[ivx]+[,\s]+)?item\s+[0-9]+[a-z]?\s*[.:\-–]?\s*(.+)$", first, re.IGNORECASE)
+    title = (m.group(1) if m else first).strip()
+    return title[:255] or None
+
+
 def _as_date(v: Any) -> date | None:
     """edgartools returns period_of_report as a str but report_date as a date."""
     if v is None or v == "":
@@ -159,10 +170,59 @@ class EdgarToolsFilingProvider:
             )
         return out
 
-    # ── Text / sections (P3 — parse approach pending the M2 spike) ────────────
+    # ── Text / sections ───────────────────────────────────────────────────────
+    # Strategy fixed by the M2a spike (docs/spikes/M2_PARSE_EVAL.md): use the
+    # edgartools typed filing object's Item map for BOTH 10-K and 10-Q. Raw-text
+    # regex segmentation was measured and rejected (fragments MSFT 10-K into 144
+    # marks; cannot separate 10-Q Part I Item 1 from Part II Item 1).
+
+    def _find(self, accession_number: str):
+        from edgar import find
+
+        f = find(accession_number)
+        if f is None:
+            raise RuntimeError(f"EDGAR has no filing for accession {accession_number!r}")
+        return f
 
     def fetch_filing_text(self, accession_number: str) -> FilingDoc:
-        raise NotImplementedError("P3: text flow lands after the parse spike decision")
+        f = self._find(accession_number)
+        text = f.text() or ""
+        if not text.strip():
+            raise RuntimeError(f"filing {accession_number} returned empty text")
+        return FilingDoc(accession_number=accession_number, doc_type=str(f.form), raw_text=text)
 
     def fetch_sections(self, accession_number: str) -> list[SectionDTO]:
-        raise NotImplementedError("P3: section parsing lands after the parse spike decision")
+        """Item sections via the typed object. Raises if no sections are parseable —
+        there is deliberately NO blind fixed-window fallback (rule A): a silent
+        fallback would make bad parsing permanently invisible."""
+        f = self._find(accession_number)
+        obj = f.obj()
+        codes = list(getattr(obj, "items", None) or [])
+        if not codes:
+            raise RuntimeError(
+                f"filing {accession_number} ({f.form}) exposed no Item sections "
+                f"via {type(obj).__name__}"
+            )
+
+        sections: list[SectionDTO] = []
+        for order, code in enumerate(codes):
+            try:
+                text = obj[code]
+            except Exception:
+                text = None
+            if not text:
+                continue
+            text = str(text)
+            sections.append(
+                SectionDTO(
+                    item_code=str(code).strip(),
+                    title=_section_title(text),
+                    section_order=order,
+                    text=text,
+                )
+            )
+        if not sections:
+            raise RuntimeError(
+                f"filing {accession_number} advertised {len(codes)} items but none yielded text"
+            )
+        return sections
