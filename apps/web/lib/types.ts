@@ -126,6 +126,21 @@ export interface ExposureRun {
   daily_report: DailyReport | null;
 }
 
+// The list endpoint (GET /api/exposure-runs) returns a lightweight summary — no
+// nested events/metrics/report. Kept as its own type so a summary can never be
+// passed where a full run (with workflow_events etc.) is rendered: that mismatch
+// is a compile error, not a runtime crash.
+export interface ExposureRunSummary {
+  id: string;
+  portfolio_id: string;
+  status: RunStatus;
+  as_of_date: string;
+  triggered_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   type: string;

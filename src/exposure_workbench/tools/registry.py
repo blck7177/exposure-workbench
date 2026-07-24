@@ -9,8 +9,8 @@ The wrapper does three things automatically around every LLM-driven call:
      auto-extracting evidence_refs from the return value
 
 Evidence-ref extraction is automatic: any returned id-shaped field (fact_/chunk_/
-calc_/src_/co_/rrun_ or an explicit {type,id}/citation) becomes a trace ref, so
-tool authors can't forget to report what a call touched.
+calc_/src_/co_/rrun_/alert_/run_ or an explicit {type,id}/citation) becomes a
+trace ref, so tool authors can't forget to report what a call touched.
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -44,7 +44,7 @@ DELEGATION = "delegation"
 REFLECTION = "reflection"
 GATE = "gate"                # respond / submit_brief — session exits
 
-_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "co_", "rrun_", "filing_", "alert_")
+_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "co_", "rrun_", "filing_", "alert_", "run_")
 
 
 @dataclass(frozen=True)

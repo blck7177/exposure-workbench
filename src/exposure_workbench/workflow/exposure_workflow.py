@@ -32,7 +32,7 @@ from exposure_workbench.services import (
     workflow_event_service,
     market_data_service,
 )
-from exposure_workbench.utils.ids import new_id
+from exposure_workbench.utils.ids import new_alert_id, new_id
 from exposure_workbench.workflow.contracts import WorkflowInput, WorkflowOutput
 
 logger = logging.getLogger(__name__)
@@ -431,7 +431,7 @@ class ExposureWorkflow:
         # RiskAlert rows
         for alert in alerts:
             db.add(RiskAlert(
-                id=new_id("alert"),
+                id=new_alert_id(),   # alert_<hex> — must match the evidence prefix (alert_)
                 run_id=run_id,
                 alert_type=alert.alert_type,
                 severity=alert.severity,

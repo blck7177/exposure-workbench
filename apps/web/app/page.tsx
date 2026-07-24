@@ -10,7 +10,7 @@ import {
 import { ChatPanel } from "./components/ChatPanel";
 import { EvidenceDrawer } from "./components/Evidence";
 import type {
-  Portfolio, ExposureRun, Position, RiskAlert,
+  Portfolio, ExposureRun, ExposureRunSummary, Position, RiskAlert,
   FactorAttribution, ExposureMetrics, SectorExposure, IssuerExposure,
 } from "@/lib/types";
 import { listPortfolios, getPositions, createRun, getRun, listRuns } from "@/lib/api";
@@ -99,7 +99,7 @@ function LeftPanel({
   portfolios: Portfolio[];
   selectedPortfolioId: string | null;
   onSelectPortfolio: (id: string) => void;
-  runs: ExposureRun[];
+  runs: ExposureRunSummary[];
   selectedRunId: string | null;
   onSelectRun: (id: string) => void;
 }) {
@@ -152,11 +152,6 @@ function LeftPanel({
                     <span className="text-slate-400 font-mono text-[10px] truncate">{formatDate(r.as_of_date)}</span>
                     <StatusBadge status={r.status} />
                   </div>
-                  {r.risk_alerts && r.risk_alerts.length > 0 && (
-                    <p className="text-[10px] text-amber-500 mt-0.5">
-                      {r.risk_alerts.filter(a => a.severity === "breach").length} breach · {r.risk_alerts.filter(a => a.severity === "warning").length} warn
-                    </p>
-                  )}
                 </button>
               ))}
             </div>
@@ -174,7 +169,7 @@ function MiddlePanel({
 }: {
   selectedPortfolio: Portfolio | null;
   run: ExposureRun | null;
-  onRunUpdate: () => void;
+  onRunUpdate: (run: ExposureRun) => void;
 }) {
   const [launching, setLaunching] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -184,8 +179,10 @@ function MiddlePanel({
     setLaunching(true);
     try {
       const today = new Date().toISOString().split("T")[0];
-      await createRun(selectedPortfolio.id, today);
-      onRunUpdate();
+      // POST returns the full run (empty events until the worker fills it in) —
+      // hand it straight up; polling on selectedRunId takes over from there.
+      const created = await createRun(selectedPortfolio.id, today);
+      onRunUpdate(created);
     } catch (e) {
       console.error("Failed to create run:", e);
     } finally {
@@ -675,7 +672,7 @@ export default function Home() {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [runs, setRuns] = useState<ExposureRun[]>([]);
+  const [runs, setRuns] = useState<ExposureRunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [currentRun, setCurrentRun] = useState<ExposureRun | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -691,26 +688,31 @@ export default function Home() {
 
   useEffect(() => {
     if (!selectedPortfolioId) return;
-    getPositions(selectedPortfolioId).then(setPositions).catch(console.error);
+    let ignore = false;   // drop results that resolve after a portfolio switch
+    getPositions(selectedPortfolioId).then((p) => { if (!ignore) setPositions(p); }).catch(console.error);
     listRuns(selectedPortfolioId).then((data) => {
+      if (ignore) return;
       setRuns(data);
       // Auto-select most recent run
       if (data.length > 0 && !selectedRunId) {
         setSelectedRunId(data[0].id);
       }
     }).catch(console.error);
+    return () => { ignore = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPortfolioId]);
 
   // Poll active run
   useEffect(() => {
     if (!selectedRunId) return;
+    let ignore = false;   // a getRun() in flight when selectedRunId changes must not clobber the new run
     const poll = async () => {
       try {
         const run = await getRun(selectedRunId);
+        if (ignore) return;
         setCurrentRun(run);
         if (selectedPortfolioId) {
-          listRuns(selectedPortfolioId).then(setRuns).catch(console.error);
+          listRuns(selectedPortfolioId).then((data) => { if (!ignore) setRuns(data); }).catch(console.error);
         }
       } catch (e) {
         console.error("Poll error:", e);
@@ -718,19 +720,18 @@ export default function Home() {
     };
     poll();
     const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
+    return () => { ignore = true; clearInterval(interval); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRunId]);
 
-  const handleRunUpdate = useCallback(() => {
-    if (!selectedPortfolioId) return;
-    listRuns(selectedPortfolioId).then((data) => {
-      setRuns(data);
-      if (data.length > 0) {
-        setSelectedRunId(data[0].id);
-        setCurrentRun(data[0]);
-      }
-    });
+  const handleRunUpdate = useCallback((created: ExposureRun) => {
+    // The freshly created run is the full object; show it now and let the
+    // selectedRunId poll effect stream in events/metrics as the worker runs.
+    setCurrentRun(created);
+    setSelectedRunId(created.id);
+    if (selectedPortfolioId) {
+      listRuns(selectedPortfolioId).then(setRuns).catch(console.error);
+    }
   }, [selectedPortfolioId]);
 
   const selectedPortfolio = portfolios.find((p) => p.id === selectedPortfolioId) ?? null;

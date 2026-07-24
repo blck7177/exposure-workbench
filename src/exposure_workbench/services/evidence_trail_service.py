@@ -18,17 +18,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.db.models import (
     AgentStep,
     CalcLedger,
+    ExposureRun,
     FilingChunk,
     FinancialFact,
     ResearchSource,
+    RiskAlert,
 )
 
-# id prefix -> (table, column) for DB existence checks
+# id prefix -> (table, column) for DB existence checks. Must stay in sync with the
+# evidence resolver's prefixes: an id the agent can retrieve and drill through is
+# an id it must be able to cite. alert_/run_ are portfolio-level evidence
+# (get_portfolio_snapshot); without them a portfolio claim can't pass this gate.
 _RESOLVERS = {
     "calc_": (CalcLedger, CalcLedger.id),
     "fact_": (FinancialFact, FinancialFact.id),
     "chunk_": (FilingChunk, FilingChunk.id),
     "src_": (ResearchSource, ResearchSource.id),
+    "alert_": (RiskAlert, RiskAlert.id),
+    "run_": (ExposureRun, ExposureRun.id),
 }
 
 

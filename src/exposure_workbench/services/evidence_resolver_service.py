@@ -1,6 +1,6 @@
 """Evidence resolver (M11) — one endpoint resolves any evidence id.
 
-Every citable id (fact_/calc_/chunk_/src_/alert_) resolves through here to a
+Every citable id (fact_/calc_/chunk_/src_/alert_/run_) resolves through here to a
 uniform envelope {type, body, provenance, upstream}. The UI's citation chip,
 evidence drawer, brief rendering and agent monitor all call this one resolver, so
 drill-through is one component, not per-page fetch logic. `upstream` lets the
@@ -10,11 +10,13 @@ drawer keep drilling (a calc -> its input facts -> the filing).
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import (
     CalcLedger,
     Company,
+    ExposureRun,
     Filing,
     FilingChunk,
     FilingSection,
@@ -117,7 +119,40 @@ async def _alert(db: AsyncSession, aid: str) -> dict | None:
         "body": {"alert_type": row.alert_type, "severity": row.severity, "message": row.message,
                  "entity_id": row.entity_id,
                  "utilization": float(row.utilization) if row.utilization is not None else None},
+        # the run that raised the alert is itself citable evidence — keep drilling
         "provenance": {"run_id": row.run_id},
+        "upstream": [{"type": "exposure_run", "id": row.run_id}] if row.run_id else [],
+    }
+
+
+def _num(v) -> float | None:
+    return float(v) if v is not None else None
+
+
+async def _run(db: AsyncSession, rid: str) -> dict | None:
+    row = (await db.execute(
+        select(ExposureRun).where(ExposureRun.id == rid).options(selectinload(ExposureRun.metrics))
+    )).scalar_one_or_none()
+    if row is None:
+        return None
+    m = row.metrics
+    return {
+        "type": "exposure_run", "id": rid,
+        "body": {
+            "portfolio_id": row.portfolio_id,
+            "as_of_date": row.as_of_date.isoformat() if row.as_of_date else None,
+            "status": row.status,
+            "market_value": _num(m.portfolio_market_value) if m else None,
+            "daily_return": _num(m.daily_return) if m else None,
+            "var_95_1d": _num(m.var_95_1d) if m else None,
+            "rolling_vol_30d": _num(m.rolling_vol_30d) if m else None,
+            "max_drawdown": _num(m.max_drawdown) if m else None,
+        },
+        "provenance": {
+            "triggered_by": row.triggered_by,
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+            "task_id": row.task_id,
+        },
         "upstream": [],
     }
 
@@ -128,6 +163,7 @@ _RESOLVERS = {
     "chunk_": _chunk,
     "src_": _source,
     "alert_": _alert,
+    "run_": _run,
 }
 
 

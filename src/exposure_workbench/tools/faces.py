@@ -26,9 +26,15 @@ READ_CORE = [
     "think",
 ]
 
-# Meta-agent adds delegation + respond (registered in P7); research adds
-# search_external_research + submit_brief (registered in P6). Kept as names here.
-FACE_META_AGENT = READ_CORE + ["ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond"]
+# Meta-agent adds the portfolio entry point + delegation + respond (P7); research
+# adds search_external_research + submit_brief (P6). Kept as names here.
+# get_portfolio_snapshot is meta-only: it frames a portfolio-level question, which
+# is the meta-agent's job. The research face stays issuer-scoped (adding portfolio
+# weights would change brief generation and needs its own validation).
+FACE_META_AGENT = READ_CORE + [
+    "get_portfolio_snapshot",
+    "ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond",
+]
 FACE_RESEARCH = READ_CORE + ["search_external_research", "submit_brief"]
 
 

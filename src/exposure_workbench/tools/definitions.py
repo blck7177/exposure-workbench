@@ -20,6 +20,7 @@ from exposure_workbench.db.models import Company, RiskAlert
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
+from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
 
@@ -50,6 +51,12 @@ async def _get_issuer_snapshot(db: AsyncSession, ticker: str) -> dict:
 
 async def _list_available_data(db: AsyncSession, ticker: str) -> dict:
     return await cs.list_available_metrics(db, ticker.upper())
+
+
+# ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
+
+async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
+    return {"portfolios": await portfolio_service.snapshot_all(db)}
 
 
 # ── financial data / calculations ───────────────────────────────────────────────
@@ -197,6 +204,15 @@ def build_read_registry() -> ToolRegistry:
         description="Which financial metrics exist for this issuer and how many periods each has.",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
         fn=_list_available_data, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_portfolio_snapshot",
+        description="The portfolio(s) this desk manages: latest exposure metrics, largest sector "
+                    "and issuer weights, and active risk alerts. Takes no arguments — this is how "
+                    "you discover holdings for a portfolio-level question. Each portfolio's numbers "
+                    "carry the run_id that produced them; cite run_id (and alert ids) for portfolio claims.",
+        json_schema={"type": "object", "properties": {}},
+        fn=_get_portfolio_snapshot, tool_class=READ,
     ))
     reg.register(Tool(
         name="get_fact_series",

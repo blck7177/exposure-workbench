@@ -1,4 +1,4 @@
-import type { Portfolio, Position, ExposureRun, Task } from "./types";
+import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Task } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8103";
@@ -31,9 +31,9 @@ export async function getPositions(portfolioId: string): Promise<Position[]> {
 
 // ─── Exposure Runs ────────────────────────────────────────────────────────────
 
-export async function listRuns(portfolioId?: string): Promise<ExposureRun[]> {
+export async function listRuns(portfolioId?: string): Promise<ExposureRunSummary[]> {
   const qs = portfolioId ? `?portfolio_id=${portfolioId}` : "";
-  return fetchJson<ExposureRun[]>(`/api/exposure-runs${qs}`);
+  return fetchJson<ExposureRunSummary[]>(`/api/exposure-runs${qs}`);
 }
 
 export async function getRun(runId: string): Promise<ExposureRun> {

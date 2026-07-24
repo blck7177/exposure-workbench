@@ -512,3 +512,45 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 ### 明确不做
 
 暗色主题打磨、移动端、多用户/权限、WebSocket(全站 2s 轮询)。
+
+---
+
+## M14 — 用户管理与生产化(2026-07-24 讨论;★待办:关键决策未拍板,未排期)
+
+背景:项目定位是个人展示,但要呈现 production/deployment-ready。讨论结论:展示型项目的"生产就绪"是叙事资产——每个会坏的边界上有一个能指出来的正交模块,而不是堆基础设施。既有优势直接入账:审计轨迹、预算强制、append-only、幂等 upsert、任务 claim 已是 `FOR UPDATE SKIP LOCKED`(task_service.py)。
+
+### 身份(Clerk)
+
+- 注册/登录/OAuth/邮箱验证整类外包 Clerk;后端集成面 = **一个 FastAPI dependency**(JWKS 验 session JWT → user_id 进 contextvar,与 `_session_ctx` 同构),此外全库零 auth 逻辑
+- 首登 bootstrap:upsert `users` 行(clerk_user_id 主键),幂等
+- ☐ 待拍板:匿名边界。推荐「读公开、写门禁」(dashboard/Brief/evidence 免登录;chat、research 触发要登录);备选全门禁 + README 给 demo 账号
+
+### 租户隔离(先分类数据,再选强制点)
+
+- 数据分类(核心判断):**证据层全局共享、无 owner**(companies/filings/chunks/facts/prices/sources——公共事实,按用户复制 = 浪费 + 不一致);**用户活动层严格隔离**(agent_sessions/messages/steps、research_runs、预算);portfolios MVP 全局只读(policy 写 `owner OR is_public`)
+- ☐ 待拍板:briefs/calc_ledger 归属。推荐全局共享带版本(缓存语义,run 归用户、产物归公共,省 LLM 成本);备选按用户私有
+- ☐ 待拍板:强制点。推荐 **Postgres RLS**(~5 表加 owner_id;session factory 每事务 `SET LOCAL app.user_id`;worker 走 service role)——「忘加 WHERE owner_id」整类错误在 DB 层消灭。已知成本:async 池化下 SET LOCAL 的事务边界要调。备选:应用层 repository 收口(纪律非架构,绕过路径仍在)
+- 附带:登录后会话列表按 user 从 DB 拉,替换 localStorage(现状 = 拿到 session id 即可读任意会话,公网不可接受)
+
+### 并发(三平面)
+
+- **Worker 面(唯一必写的新代码)**:lease + requeue(claimed_at + lease 过期列,轮询顺带回收)——治 P6 亲历的 stuck-run 类事故;配合既有幂等步骤 = 正确的 at-least-once;之后 `--scale worker=N` 零代码横扩
+- Agent 面:每 session 单 in-flight turn(防双击交叉写 trace);research per-company singleflight **保持全局**(证据库共享,两个用户触发同一公司只跑一次)
+- API/DB 面:async + append-only 天然并发友好,只需池尺寸确认;写进文档,不写代码
+
+### 预算(公网 + 真 key 的硬前提)
+
+- per-user 日上限进现有 ToolRegistry wrapper(session 预算加一维);cost views 按 user 聚合即可;全局日上限(env)兜底
+
+### 部署呈现
+
+- EC2 + Caddy(已有):子域反代 web;**API 走同源 /api 反代**——顺带消灭 `NEXT_PUBLIC_API_URL` build 期烧死 localhost:8103 的问题(docker-compose.yml)与 CORS
+- `docs/PRODUCTION.md`:身份/租户/并发/预算/审计五节,每节写「强制点在哪、消灭了哪类错误」
+
+### 排期估算
+
+2–3 天,顺序 AUTH → TENANCY → QUEUE → BUDGET → DEPLOY。
+
+### 明确不做
+
+k8s/微服务/消息中间件(Redis/Celery)、企业 SSO、组织/团队模型、用户自建组合(现无创建入口)、分库分表。
