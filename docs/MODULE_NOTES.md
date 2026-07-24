@@ -77,11 +77,29 @@ chunk/embedding(M5)、任何计算(M3)、10-K/10-Q 之外表单、修正案(只�
 - **parse 方式需要反复实测才能定**——用户此前做过类似项目,section 解析质量不能靠假设,实现期先做 parse 质量评估(对 8 家公司的真实 10-K/10-Q 跑解析、人工抽查),再定最终 parse 方案。
 - **可能有 external 项目/skill 可复用**——实现前先盘点用户已有的相关项目/skill,避免重写已验证过的 parse 逻辑。EdgarTools 只是当前候选,不是定论。
 
-### 待拍板(带默认倾向)
+### 已定(2026-07-24,实测后)
 
-1. 事实流数据源:**倾向 company-facts API**(一次拿全历史,fact 仍带 accession 可追溯;与文本流正交更彻底)vs 逐 filing 解析 XBRL。
-2. Q4 单季推导(Q4 = FY − Q1..Q3):**倾向归 M3**,M2 只存 as-reported。
-3. MVP 映射指标集(10 个):revenue / operating_income / net_income / gross_profit / operating_cash_flow / capex / cash_and_equivalents / short_term_debt / long_term_debt / current_assets + current_liabilities。
+1. 事实流数据源:**company-facts API**(一次拿全历史,每条 fact 带 accession)。实测 8 家共 61,642 条,NVDA FY2025 营收 $130.50B 与真实披露一致。
+2. Q4 单季推导:**归 M3**。实测确认 NVDA 每财年只有 3 条 ~90d 季度 fact(Q1/Q2/Q3),Q4 必须用 `年报 − (Q1+Q2+Q3)` 推导,M2 只存 as-reported。
+3. 映射指标集:在原 11 个基础上增加 **cost_of_revenue** 与 **pretax_income** 两个独立指标(mapping v2)。
+   - `cost_of_revenue` 让 M3 能为不披露 GrossProfit 的公司(AMZN/GOOGL/LLY/XOM/JPM)**计算**毛利;计算归 M3,M2 仍严格 1 fact→1 metric。
+   - `pretax_income` **刻意不并入 operating_income**——两者经济含义不同,合并会让覆盖率好看但数值是另一个东西。JPM/XOM/LLY 没有 OperatingIncomeLoss 就是真的没有,保持可见。已用测试锁死。
+4. **schema 修正(改动 P0)**:`financial_facts` 增加 `source_accession` 并纳入 UNIQUE 键。原键会把重述折叠——实测会丢 NVDA 45% 的 fact(7635→4182),M3 的"重述择新"将无对象可选。
+5. **fiscal_year/fiscal_quarter 标签不可信**:同一期间 `2025-01-27→2025-04-27` 在两份 filing 里分别被标成 FY2027 与 FY2026(值相同)。**period_start/period_end 才是权威键**,M3 的 period_ladder 不得用 FY 标签做 key。
+6. 存在 half(~180d)/9mo(~270d)累计口径 fact(共 189 条),period_ladder 必须按时长过滤,不能误当季度。
+
+### ★ M2a parse 方案定稿(2026-07-24,基于 16 份真实 filing 实测)
+
+**决定:统一采用 edgartools 的 typed filing object(`filing.obj()` + Item 访问),10-K 与 10-Q 都走这条。**
+
+证据(完整表见 `docs/spikes/M2_PARSE_EVAL.md`):
+- **obj / 10-K**:8 家全部拿到 Item 1 / 1A / 7 / 7A / 8,篇幅正常(Item 1A 35k–114k 字符)
+- **obj / 10-Q**:8 家全部拿到 Part I Item 1(财报)与 Part I Item 2(MD&A),7/8 拿到 Part II Item 1A(XOM 本期确实未列风险因素)
+- **regex(原始文本按 `Item N` 切)被否决**:MSFT 10-K 被切成 144 段、每段仅 4–7k(obj 为 48k–128k),JPM 10-K Item 1 = 0k,XOM 10-K Item 7/8 为空;且结构上**无法区分 10-Q 的 Part I Item 1 与 Part II Item 1**(前者财报、后者法律诉讼)
+
+⚠ **过程教训**:第一版 spike 曾误判「obj 在 10-Q 上完全失败」,根因是比对键用了裸 `Item 2`,而 TenQ 的 items 是 `Part I, Item 2`。修正归一化后结论完全反转。**负面结论必须先排除自己的测量 bug**。
+
+配套规则(不变):Item 解析不出 → 该步 failed,**不退回固定窗口盲切**(规则 A)。
 
 ---
 

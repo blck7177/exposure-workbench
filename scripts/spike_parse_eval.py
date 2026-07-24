@@ -38,7 +38,10 @@ OUT_MD = ROOT / "docs" / "spikes" / "M2_PARSE_EVAL.md"
 
 # Items we care about for issuer research (10-K / 10-Q respectively).
 KEY_ITEMS_10K = ["Item 1", "Item 1A", "Item 7", "Item 7A", "Item 8"]
-KEY_ITEMS_10Q = ["Item 1", "Item 2", "Item 3", "Item 1A"]
+# 10-Q items MUST be Part-qualified: Part I Item 1 is Financial Statements while
+# Part II Item 1 is Legal Proceedings. Comparing on the bare number conflates them
+# (that mistake is what made the first spike run report 10-Q as "missing").
+KEY_ITEMS_10Q = ["Part I, Item 1", "Part I, Item 2", "Part I, Item 3", "Part II, Item 1A"]
 
 _ITEM_RE = re.compile(r"^\s*item\s+(\d+[A-Za-z]?)\b", re.IGNORECASE | re.MULTILINE)
 
@@ -149,11 +152,12 @@ def render(results: list[dict]) -> str:
             norm = { _norm(k): v for k, v in items.items() }
             got, missing = [], []
             for k in key:
-                v = norm.get(_norm(k), 0)
+                v, ambiguous = _lookup(norm, k)
+                mark = "~" if ambiguous else ""      # ~ = Part-insensitive match
                 if v > 500:
-                    got.append(f"{k}({v//1000}k)")
+                    got.append(f"{mark}{k}({v//1000}k)")
                 elif v > 0:
-                    got.append(f"{k}(small)")
+                    got.append(f"{mark}{k}(small)")
                 else:
                     missing.append(k)
             lines.append(
@@ -164,8 +168,33 @@ def render(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+_PART_MAP = {"i": "p1", "ii": "p2", "iii": "p3", "1": "p1", "2": "p2", "3": "p3"}
+
+
 def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", s.lower())
+    """'Part I, Item 1A' -> 'p1item1a'; 'Item 7' -> 'item7'.
+
+    Keeps the Part when present so 10-Q Part I/Part II items stay distinct.
+    """
+    t = s.lower()
+    pm = re.search(r"part\s+(iii|ii|i|[123])\b", t)
+    part = _PART_MAP.get(pm.group(1), "") if pm else ""
+    im = re.search(r"item\s*([0-9]+[a-z]?)", t)
+    item = f"item{im.group(1)}" if im else re.sub(r"[^a-z0-9]", "", t)
+    return part + item
+
+
+def _lookup(norm_items: dict[str, int], key: str) -> tuple[int, bool]:
+    """Return (chars, ambiguous). Falls back to a Part-insensitive match, which is
+    all the regex strategy can offer — flagged so the report doesn't overstate it."""
+    k = _norm(key)
+    if k in norm_items:
+        return norm_items[k], False
+    bare = re.sub(r"^p[123]", "", k)
+    for cand, v in norm_items.items():
+        if re.sub(r"^p[123]", "", cand) == bare:
+            return v, True
+    return 0, False
 
 
 def main() -> None:

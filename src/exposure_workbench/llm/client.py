@@ -31,6 +31,40 @@ def get_openai_client():
         return None
 
 
+class EmbeddingUnavailable(RuntimeError):
+    """Raised when embeddings are requested without a usable API key (fail-loud).
+
+    There is deliberately no keyword-search degradation path: a missing key must
+    stop the indexing step visibly rather than silently producing a weaker index.
+    """
+
+
+async def embed_texts(texts: list[str], model: str | None = None) -> tuple[list[list[float]], str]:
+    """Embed a batch of texts. Returns (vectors, model_name).
+
+    Vector dimension must match filing_chunks.embedding (1536 for
+    text-embedding-3-small); a mismatch surfaces at insert time rather than
+    being silently truncated.
+    """
+    from exposure_workbench.app_state.settings import get_settings
+
+    settings = get_settings()
+    effective_model = model or settings.embedding_model
+
+    client = get_openai_client()
+    if client is None:
+        raise EmbeddingUnavailable(
+            "OPENAI_API_KEY is not configured — filing indexing cannot run."
+        )
+    if not texts:
+        return [], effective_model
+
+    response = await client.embeddings.create(model=effective_model, input=texts)
+    # OpenAI may return items out of order; sort by index before unpacking.
+    ordered = sorted(response.data, key=lambda d: d.index)
+    return [d.embedding for d in ordered], response.model
+
+
 async def chat_complete(
     messages: list[dict[str, str]],
     model: str | None = None,

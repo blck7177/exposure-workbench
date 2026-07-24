@@ -1,0 +1,751 @@
+[
+  {
+    "ticker": "AAPL",
+    "form": "10-K",
+    "accession": "0000320193-25-000079",
+    "filing_date": "2025-10-31",
+    "obj": {
+      "items": {
+        "Item 1": 16054,
+        "Item 1A": 68163,
+        "Item 1B": 44,
+        "Item 1C": 2705,
+        "Item 2": 521,
+        "Item 3": 5409,
+        "Item 4": 94,
+        "Item 5": 2648,
+        "Item 6": 55,
+        "Item 7": 18018,
+        "Item 7A": 3034,
+        "Item 8": 60874,
+        "Item 9": 102,
+        "Item 9A": 4513,
+        "Item 9B": 575,
+        "Item 9C": 106,
+        "Item 10": 401,
+        "Item 11": 2080,
+        "Item 12": 232,
+        "Item 13": 211,
+        "Item 14": 219,
+        "Item 15": 11806,
+        "Item 16": 2131
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 16068,
+        "Item 1A": 68246,
+        "Item 1B": 137,
+        "Item 1C": 2705,
+        "Item 2": 520,
+        "Item 3": 5412,
+        "Item 4": 274,
+        "Item 5": 3493,
+        "Item 6": 137,
+        "Item 7": 20904,
+        "Item 7A": 3384,
+        "Item 8": 103274,
+        "Item 9": 137,
+        "Item 9A": 4517,
+        "Item 9B": 575,
+        "Item 9C": 274,
+        "Item 10": 400,
+        "Item 11": 159,
+        "Item 12": 231,
+        "Item 13": 210,
+        "Item 14": 274,
+        "Item 15": 20798,
+        "Item 16": 3859
+      },
+      "note": "267481 chars, 46 item marks"
+    }
+  },
+  {
+    "ticker": "AAPL",
+    "form": "10-Q",
+    "accession": "0000320193-26-000013",
+    "filing_date": "2026-05-01",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 25961,
+        "Part I, Item 2": 21837,
+        "Part I, Item 3": 393,
+        "Part I, Item 4": 1392,
+        "Part II, Item 1": 5160,
+        "Part II, Item 1A": 22125,
+        "Part II, Item 2": 1544,
+        "Part II, Item 3": 49,
+        "Part II, Item 4": 51,
+        "Part II, Item 5": 723,
+        "Part II, Item 6": 1461
+      },
+      "note": "11 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 61745,
+        "Item 2": 26211,
+        "Item 3": 392,
+        "Item 4": 1421,
+        "Item 1A": 22150,
+        "Item 5": 722,
+        "Item 6": 3109
+      },
+      "note": "128616 chars, 22 item marks"
+    }
+  },
+  {
+    "ticker": "AMZN",
+    "form": "10-K",
+    "accession": "0001018724-26-000004",
+    "filing_date": "2026-02-06",
+    "obj": {
+      "items": {
+        "Item 1": 13497,
+        "Item 1A": 60660,
+        "Item 1B": 40,
+        "Item 1C": 4066,
+        "Item 2": 1265,
+        "Item 3": 156,
+        "Item 4": 56,
+        "Item 5": 479,
+        "Item 6": 15,
+        "Item 7": 46296,
+        "Item 7A": 6128,
+        "Item 8": 121717,
+        "Item 9": 117,
+        "Item 9A": 7358,
+        "Item 9B": 1986,
+        "Item 9C": 102,
+        "Item 10": 1154,
+        "Item 11": 203,
+        "Item 12": 275,
+        "Item 13": 273,
+        "Item 14": 229,
+        "Item 15": 8654,
+        "Item 16": 32
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 14755,
+        "Item 1A": 60790,
+        "Item 1B": 143,
+        "Item 1C": 4112,
+        "Item 2": 2172,
+        "Item 3": 204,
+        "Item 4": 286,
+        "Item 5": 621,
+        "Item 6": 143,
+        "Item 7": 53776,
+        "Item 7A": 7163,
+        "Item 8": 174922,
+        "Item 9": 214,
+        "Item 9A": 7404,
+        "Item 9B": 2017,
+        "Item 9C": 286,
+        "Item 10": 1243,
+        "Item 11": 257,
+        "Item 12": 401,
+        "Item 13": 360,
+        "Item 14": 299,
+        "Item 15": 8514,
+        "Item 16": 4122
+      },
+      "note": "353163 chars, 46 item marks"
+    }
+  },
+  {
+    "ticker": "AMZN",
+    "form": "10-Q",
+    "accession": "0001018724-26-000014",
+    "filing_date": "2026-04-30",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 64780,
+        "Part I, Item 2": 36647,
+        "Part I, Item 3": 5148,
+        "Part I, Item 4": 2028,
+        "Part II, Item 1": 132,
+        "Part II, Item 1A": 60877,
+        "Part II, Item 2": 92,
+        "Part II, Item 3": 45,
+        "Part II, Item 4": 47,
+        "Part II, Item 5": 53,
+        "Part II, Item 6": 3390
+      },
+      "note": "11 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 103294,
+        "Item 2": 44122,
+        "Item 3": 5241,
+        "Item 4": 2112,
+        "Item 1A": 61267,
+        "Item 5": 135,
+        "Item 6": 3853
+      },
+      "note": "227599 chars, 22 item marks"
+    }
+  },
+  {
+    "ticker": "GOOGL",
+    "form": "10-K",
+    "accession": "0001652044-26-000018",
+    "filing_date": "2026-02-05",
+    "obj": {
+      "items": {
+        "Item 1": 23835,
+        "Item 1A": 85311,
+        "Item 1B": 50,
+        "Item 1C": 3369,
+        "Item 2": 296,
+        "Item 3": 272,
+        "Item 4": 97,
+        "Item 5": 5130,
+        "Item 6": 22,
+        "Item 7": 52545,
+        "Item 7A": 7988,
+        "Item 8": 130361,
+        "Item 9": 132,
+        "Item 9A": 2927,
+        "Item 9B": 2261,
+        "Item 9C": 148,
+        "Item 10": 1451,
+        "Item 11": 506,
+        "Item 12": 358,
+        "Item 13": 397,
+        "Item 14": 287,
+        "Item 15": 12885,
+        "Item 16": 880
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 23985,
+        "Item 1A": 85606,
+        "Item 1B": 167,
+        "Item 1C": 3370,
+        "Item 2": 299,
+        "Item 3": 275,
+        "Item 4": 334,
+        "Item 5": 5689,
+        "Item 6": 167,
+        "Item 7": 60364,
+        "Item 7A": 9247,
+        "Item 8": 219292,
+        "Item 9": 167,
+        "Item 9A": 2930,
+        "Item 9B": 2269,
+        "Item 9C": 334,
+        "Item 10": 1454,
+        "Item 11": 513,
+        "Item 12": 361,
+        "Item 13": 404,
+        "Item 14": 334,
+        "Item 15": 24620,
+        "Item 16": 5245
+      },
+      "note": "463121 chars, 46 item marks"
+    }
+  },
+  {
+    "ticker": "GOOGL",
+    "form": "10-Q",
+    "accession": "0001652044-26-000071",
+    "filing_date": "2026-07-23",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 109483,
+        "Part I, Item 2": 51405,
+        "Part I, Item 3": 290,
+        "Part I, Item 4": 1938,
+        "Part II, Item 1": 305,
+        "Part II, Item 1A": 16629,
+        "Part II, Item 2": 430,
+        "Part II, Item 5": 1641,
+        "Part II, Item 6": 6852
+      },
+      "note": "9 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 205012,
+        "Item 2": 62624,
+        "Item 3": 293,
+        "Item 4": 1969,
+        "Item 1A": 16617,
+        "Item 5": 1637,
+        "Item 6": 13597
+      },
+      "note": "319677 chars, 18 item marks"
+    }
+  },
+  {
+    "ticker": "JPM",
+    "form": "10-K",
+    "accession": "0001628280-26-008131",
+    "filing_date": "2026-02-13",
+    "obj": {
+      "items": {
+        "Item 1": 39220,
+        "Item 1A": 112862,
+        "Item 1B": 230,
+        "Item 2": 2169,
+        "Item 3": 104,
+        "Item 4": 49,
+        "Item 5": 2665,
+        "Item 6": 16,
+        "Item 7": 414433,
+        "Item 7A": 250,
+        "Item 8": 567675,
+        "Item 9": 100,
+        "Item 9A": 2229,
+        "Item 9B": 5377,
+        "Item 9C": 94,
+        "Item 10": 3923,
+        "Item 11": 69,
+        "Item 12": 1351,
+        "Item 13": 102,
+        "Item 14": 67,
+        "Item 15": 17480
+      },
+      "note": "21 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 994,
+        "Item 1A": 142,
+        "Item 1B": 142,
+        "Item 2": 142,
+        "Item 3": 142,
+        "Item 4": 284,
+        "Item 5": 142,
+        "Item 6": 142,
+        "Item 7": 142,
+        "Item 7A": 142,
+        "Item 8": 142,
+        "Item 9": 142,
+        "Item 9A": 142,
+        "Item 9B": 142,
+        "Item 9C": 284,
+        "Item 10": 142,
+        "Item 11": 142,
+        "Item 12": 142,
+        "Item 13": 142,
+        "Item 14": 284,
+        "Item 15": 782706
+      },
+      "note": "790376 chars, 22 item marks"
+    }
+  },
+  {
+    "ticker": "JPM",
+    "form": "10-Q",
+    "accession": "0001628280-26-029344",
+    "filing_date": "2026-05-01",
+    "obj": {
+      "items": {
+        "Part I, Item 2": 539596,
+        "Part I, Item 3": 288,
+        "Part I, Item 4": 1727,
+        "Part II, Item 1": 252,
+        "Part II, Item 1A": 402,
+        "Part II, Item 2": 1186,
+        "Part II, Item 3": 50,
+        "Part II, Item 4": 52,
+        "Part II, Item 5": 1597,
+        "Part II, Item 6": 2487
+      },
+      "note": "10 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 2": 3000,
+        "Item 3": 290,
+        "Item 4": 1761,
+        "Item 1": 254,
+        "Item 1A": 406,
+        "Item 5": 1877,
+        "Item 6": 939514
+      },
+      "note": "965939 chars, 19 item marks"
+    }
+  },
+  {
+    "ticker": "LLY",
+    "form": "10-K",
+    "accession": "0000059478-26-000013",
+    "filing_date": "2026-02-12",
+    "obj": {
+      "items": {
+        "Item 1": 84170,
+        "Item 1A": 77580,
+        "Item 1B": 40,
+        "Item 1C": 6281,
+        "Item 2": 1075,
+        "Item 3": 318,
+        "Item 4": 60,
+        "Item 5": 3347,
+        "Item 6": 26,
+        "Item 7": 48919,
+        "Item 7A": 307,
+        "Item 8": 117080,
+        "Item 9": 98,
+        "Item 9A": 2506,
+        "Item 9B": 264,
+        "Item 9C": 111,
+        "Item 10": 2260,
+        "Item 11": 631,
+        "Item 12": 1331,
+        "Item 13": 756,
+        "Item 14": 444,
+        "Item 15": 5782,
+        "Item 16": 1390
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 13845,
+        "Item 1A": 77692,
+        "Item 1B": 142,
+        "Item 1C": 6301,
+        "Item 2": 1078,
+        "Item 3": 323,
+        "Item 4": 284,
+        "Item 5": 4941,
+        "Item 6": 142,
+        "Item 7": 59136,
+        "Item 7A": 310,
+        "Item 8": 169004,
+        "Item 9": 142,
+        "Item 9A": 2511,
+        "Item 9B": 267,
+        "Item 9C": 284,
+        "Item 10": 2262,
+        "Item 11": 635,
+        "Item 12": 2514,
+        "Item 13": 759,
+        "Item 14": 447,
+        "Item 15": 8620,
+        "Item 16": 7215
+      },
+      "note": "457061 chars, 47 item marks"
+    }
+  },
+  {
+    "ticker": "LLY",
+    "form": "10-Q",
+    "accession": "0000059478-26-000045",
+    "filing_date": "2026-04-30",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 45885,
+        "Part I, Item 2": 25426,
+        "Part I, Item 3": 261,
+        "Part I, Item 4": 1288,
+        "Part II, Item 1": 408,
+        "Part II, Item 1A": 322,
+        "Part II, Item 2": 796,
+        "Part II, Item 5": 1285,
+        "Part II, Item 6": 1088
+      },
+      "note": "9 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 73110,
+        "Item 2": 29785,
+        "Item 3": 262,
+        "Item 4": 1318,
+        "Item 1A": 322,
+        "Item 5": 1287,
+        "Item 6": 7543
+      },
+      "note": "125567 chars, 18 item marks"
+    }
+  },
+  {
+    "ticker": "MSFT",
+    "form": "10-K",
+    "accession": "0000950170-25-100235",
+    "filing_date": "2025-07-30",
+    "obj": {
+      "items": {
+        "Item 1": 48799,
+        "Item 1A": 68824,
+        "Item 1B": 272,
+        "Item 1C": 9205,
+        "Item 2": 1450,
+        "Item 3": 203,
+        "Item 4": 60,
+        "Item 5": 2685,
+        "Item 6": 18,
+        "Item 7": 49534,
+        "Item 7A": 2130,
+        "Item 8": 128086,
+        "Item 9": 110,
+        "Item 9A": 6687,
+        "Item 9B": 362,
+        "Item 9C": 103,
+        "Item 10": 1612,
+        "Item 11": 316,
+        "Item 12": 309,
+        "Item 13": 265,
+        "Item 14": 418,
+        "Item 15": 14834,
+        "Item 16": 33
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 4699,
+        "Item 1A": 6091,
+        "Item 1B": 274,
+        "Item 1C": 5126,
+        "Item 2": 1522,
+        "Item 3": 204,
+        "Item 4": 302,
+        "Item 5": 3633,
+        "Item 6": 151,
+        "Item 7": 5175,
+        "Item 7A": 2488,
+        "Item 8": 7885,
+        "Item 9": 151,
+        "Item 9A": 4067,
+        "Item 9B": 362,
+        "Item 9C": 302,
+        "Item 10": 1614,
+        "Item 11": 319,
+        "Item 12": 312,
+        "Item 13": 276,
+        "Item 14": 417,
+        "Item 15": 5396,
+        "Item 16": 3446
+      },
+      "note": "349181 chars, 144 item marks"
+    }
+  },
+  {
+    "ticker": "MSFT",
+    "form": "10-Q",
+    "accession": "0001193125-26-191507",
+    "filing_date": "2026-04-29",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 88992,
+        "Part I, Item 2": 61409,
+        "Part I, Item 3": 2119,
+        "Part I, Item 4": 734,
+        "Part II, Item 1": 201,
+        "Part II, Item 1A": 70725,
+        "Part II, Item 2": 1738,
+        "Part II, Item 5": 1534,
+        "Part II, Item 6": 2026
+      },
+      "note": "9 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 9230,
+        "Item 2": 5283,
+        "Item 3": 2478,
+        "Item 4": 746,
+        "Item 1A": 5487,
+        "Item 5": 1547,
+        "Item 6": 3836
+      },
+      "note": "243757 chars, 83 item marks"
+    }
+  },
+  {
+    "ticker": "NVDA",
+    "form": "10-K",
+    "accession": "0001045810-26-000021",
+    "filing_date": "2026-02-25",
+    "obj": {
+      "items": {
+        "Item 1": 48222,
+        "Item 1A": 114773,
+        "Item 1B": 41,
+        "Item 1C": 3957,
+        "Item 2": 925,
+        "Item 3": 197,
+        "Item 4": 57,
+        "Item 5": 5220,
+        "Item 6": 18,
+        "Item 7": 34156,
+        "Item 7A": 4247,
+        "Item 8": 207,
+        "Item 9": 99,
+        "Item 9A": 3417,
+        "Item 9B": 729,
+        "Item 9C": 429,
+        "Item 10": 2560,
+        "Item 11": 360,
+        "Item 12": 640,
+        "Item 13": 455,
+        "Item 14": 304,
+        "Item 15": 105394,
+        "Item 16": 1613
+      },
+      "note": "23 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 48529,
+        "Item 1A": 114872,
+        "Item 1B": 139,
+        "Item 1C": 3962,
+        "Item 2": 910,
+        "Item 3": 199,
+        "Item 4": 278,
+        "Item 5": 7379,
+        "Item 6": 139,
+        "Item 7": 40922,
+        "Item 7A": 4248,
+        "Item 8": 209,
+        "Item 9": 139,
+        "Item 9A": 3420,
+        "Item 9B": 1158,
+        "Item 9C": 431,
+        "Item 10": 2564,
+        "Item 11": 362,
+        "Item 12": 642,
+        "Item 13": 457,
+        "Item 14": 306,
+        "Item 15": 174297,
+        "Item 16": 4575
+      },
+      "note": "423467 chars, 46 item marks"
+    }
+  },
+  {
+    "ticker": "NVDA",
+    "form": "10-Q",
+    "accession": "0001045810-26-000052",
+    "filing_date": "2026-05-20",
+    "obj": {
+      "items": {
+        "Part I, Item 1": 48091,
+        "Part I, Item 2": 28905,
+        "Part I, Item 3": 1837,
+        "Part I, Item 4": 2304,
+        "Part II, Item 1": 217,
+        "Part II, Item 1A": 43097,
+        "Part II, Item 2": 3269,
+        "Part II, Item 5": 825,
+        "Part II, Item 6": 2689
+      },
+      "note": "9 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 84785,
+        "Item 2": 37729,
+        "Item 3": 1836,
+        "Item 4": 2336,
+        "Item 1A": 43135,
+        "Item 5": 1263,
+        "Item 6": 5412
+      },
+      "note": "189301 chars, 18 item marks"
+    }
+  },
+  {
+    "ticker": "XOM",
+    "form": "10-K",
+    "accession": "0000034088-26-000045",
+    "filing_date": "2026-02-18",
+    "obj": {
+      "items": {
+        "Item 1": 6640,
+        "Item 1A": 35671,
+        "Item 1B": 41,
+        "Item 1C": 3888,
+        "Item 2": 35873,
+        "Item 3": 252,
+        "Item 4": 3399,
+        "Item 5": 1789,
+        "Item 7": 130464,
+        "Item 7A": 407,
+        "Item 8": 162817,
+        "Item 9": 99,
+        "Item 9A": 2216,
+        "Item 9B": 339,
+        "Item 9C": 103,
+        "Item 10": 1480,
+        "Item 11": 298,
+        "Item 12": 2079,
+        "Item 13": 389,
+        "Item 14": 278,
+        "Item 15": 209,
+        "Item 16": 21261
+      },
+      "note": "22 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 6684,
+        "Item 1A": 35980,
+        "Item 1B": 168,
+        "Item 1C": 3835,
+        "Item 2": 98690,
+        "Item 3": 288,
+        "Item 4": 9085,
+        "Item 5": 6342,
+        "Item 7": 370,
+        "Item 7A": 542,
+        "Item 8": 775,
+        "Item 9": 203,
+        "Item 9A": 2317,
+        "Item 9B": 316,
+        "Item 9C": 336,
+        "Item 10": 1559,
+        "Item 11": 397,
+        "Item 12": 4990,
+        "Item 13": 483,
+        "Item 14": 337,
+        "Item 15": 271,
+        "Item 16": 577943
+      },
+      "note": "762525 chars, 45 item marks"
+    }
+  },
+  {
+    "ticker": "XOM",
+    "form": "10-Q",
+    "accession": "0000034088-26-000067",
+    "filing_date": "2026-05-04",
+    "obj": {
+      "items": {
+        "Part I, Item 2": 33579,
+        "Part I, Item 3": 261,
+        "Part I, Item 4": 1113,
+        "Part II, Item 1": 247,
+        "Part II, Item 2": 1269,
+        "Part II, Item 5": 282,
+        "Part II, Item 6": 1404
+      },
+      "note": "7 items advertised"
+    },
+    "regex": {
+      "items": {
+        "Item 1": 58402,
+        "Item 2": 63218,
+        "Item 3": 195,
+        "Item 4": 1140,
+        "Item 5": 282,
+        "Item 6": 3459,
+        "Item 7A": 65
+      },
+      "note": "142977 chars, 19 item marks"
+    }
+  }
+]
