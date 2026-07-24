@@ -1,15 +1,8 @@
 // Issuer Intelligence API client + types.
+// Uses the shared transport (lib/http) so its POST writes (chat, research,
+// ensure-ready) carry the Clerk bearer token, same as lib/api.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8103";
-
-async function j<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<T>;
-}
+import { apiFetch as j } from "./http";
 
 // ─── types ──────────────────────────────────────────────────────────────────
 export type CompanyRow = { ticker: string; name: string; sector: string | null; is_investigable: boolean };

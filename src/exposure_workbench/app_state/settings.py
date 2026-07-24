@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     edgar_identity: str = ""   # SEC requires a UA with contact, e.g. "Name email@x.com"
 
+    # Identity (Clerk — V2-A). Verification is JWKS-only; no secret key needed.
+    clerk_issuer: str = ""                 # e.g. https://xxxx.clerk.accounts.dev
+    clerk_authorized_parties: str = ""     # comma-sep origins allowed as azp, e.g. http://localhost:3103
+
     # Agent budgets (env-overridable; see IMPLEMENTATION_PLAN §0.5)
     session_tool_budget: int = 40       # tool calls per agent session
     external_search_budget: int = 5     # Tavily searches per research run
@@ -48,6 +52,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def clerk_authorized_parties_list(self) -> list[str]:
+        return [p.strip() for p in self.clerk_authorized_parties.split(",") if p.strip()]
 
 
 _settings: Settings | None = None

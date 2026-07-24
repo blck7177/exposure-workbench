@@ -13,7 +13,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import require_user
 from exposure_workbench.agents.meta_agent import handle_message
+from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.services import agent_session_service
@@ -32,8 +34,11 @@ class SessionOut(BaseModel):
 
 
 @router.post("/agent/sessions", response_model=SessionOut, status_code=201)
-async def create_agent_session(db: AsyncSession = Depends(get_db)):
-    s = await agent_session_service.create_session(db, kind="meta")
+async def create_agent_session(
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    s = await agent_session_service.create_session(db, kind="meta", owner_id=user.user_id)
     await db.commit()
     return s
 
@@ -50,7 +55,11 @@ class MessageOut(BaseModel):
 
 
 @router.post("/agent/sessions/{session_id}/messages", response_model=MessageOut)
-async def post_message(session_id: str, body: MessageIn, db: AsyncSession = Depends(get_db)):
+async def post_message(
+    session_id: str, body: MessageIn,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
     s = await agent_session_service.get_session(db, session_id)
     if s is None:
         raise HTTPException(404, "unknown session")

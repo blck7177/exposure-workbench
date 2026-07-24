@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import require_user
+from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import task_service
 
@@ -23,11 +25,16 @@ class SyncResponse(BaseModel):
 
 
 @router.post("/market-data/sync", response_model=SyncResponse, status_code=201)
-async def sync_market_data(body: SyncRequest, db: AsyncSession = Depends(get_db)):
+async def sync_market_data(
+    body: SyncRequest,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
     task = await task_service.create_task(
         db,
         task_type="market_data_sync",
         payload={"tickers": body.tickers, "lookback_days": body.lookback_days},
+        owner_user_id=user.user_id,
     )
     await db.commit()
     return SyncResponse(task_id=task.id, status=task.status)

@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import require_user
+from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import exposure_run_service, task_service
 
@@ -162,6 +164,7 @@ class CreateRunRequest(BaseModel):
 @router.post("/exposure-runs", response_model=ExposureRunOut, status_code=201)
 async def create_exposure_run(
     body: CreateRunRequest,
+    user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new exposure run and enqueue a worker task."""
@@ -173,6 +176,7 @@ async def create_exposure_run(
             "as_of_date": body.as_of_date.isoformat(),
             "triggered_by": body.triggered_by,
         },
+        owner_user_id=user.user_id,
     )
     run = await exposure_run_service.create_run(
         db,

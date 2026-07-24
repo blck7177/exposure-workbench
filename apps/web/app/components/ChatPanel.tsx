@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageSquare, Plus, Send, X, Wrench, Brain, Send as SendIcon } from "lucide-react";
 import { createSession, postMessage, getSessionDetail, type AgentStep } from "../../lib/issuer";
 import { CitationChip, openEvidence } from "./Evidence";
+import { AuthGate } from "./Auth";
 
 const LS_KEY = "ew_agent_session";
 
@@ -133,14 +134,22 @@ export function ChatPanel() {
         <div ref={endRef} />
       </div>
 
-      <div className="border-t border-[#21262d] p-2 flex gap-2 shrink-0">
-        <input value={input} onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy}
-          placeholder="Ask about an issuer…"
-          className="flex-1 bg-[#161b22] border border-[#21262d] rounded px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-blue-600 disabled:opacity-50" />
-        <button onClick={send} disabled={busy || !input.trim()}
-          className="px-2.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white"><Send className="w-4 h-4" /></button>
-      </div>
+      <AuthGate
+        fallback={
+          <div className="border-t border-[#21262d] p-3 text-center text-xs text-slate-500 shrink-0">
+            Sign in to chat with the analyst.
+          </div>
+        }
+      >
+        <div className="border-t border-[#21262d] p-2 flex gap-2 shrink-0">
+          <input value={input} onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy}
+            placeholder="Ask about an issuer…"
+            className="flex-1 bg-[#161b22] border border-[#21262d] rounded px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-blue-600 disabled:opacity-50" />
+          <button onClick={send} disabled={busy || !input.trim()}
+            className="px-2.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white"><Send className="w-4 h-4" /></button>
+        </div>
+      </AuthGate>
     </div>
   );
 }

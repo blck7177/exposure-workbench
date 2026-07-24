@@ -270,3 +270,36 @@ FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM 无预算,只留台账)
 8. respond 成为工具(chat 与 Brief 共用提交门);外部搜索的 query 判断归 agent(无确定性搜索步)
 9. 种子行情数据退役,全库真实化;skip 语义统一为显式参数/工具面裁剪
 10. workflow_events 步序表述、agent_sessions 与 research_runs 关联列等细节按 MODULE_NOTES 为准
+
+---
+
+## 13. 租户拓扑(V2 多用户;2026-07-24)
+
+单机 demo 升级为多用户产品:用户注册/登录(Clerk)、创建/上传自己的 portfolio、chat 与分析私有。核心判断是**数据分三层**,隔离强制点沉到数据库(Postgres RLS),与 §5「所有 agent 自由度流经同一 ToolRegistry」同构——都是把强制沉在调用方之下。
+
+### 13.1 三层归属
+
+| 层 | 表 | 归属 | 理由 |
+|---|---|---|---|
+| **公司层(共享)** | companies, filings, filing_*, financial_facts, research_sources, **calc_ledger**, market_prices, factor_*, security_master | 无 owner,全局读 | SEC/市场公共事实与其确定性派生;按用户复制 = 浪费 + 不一致。calc_ledger 只含公司级确定性计算(零用户数据),共享 = 纯去重 |
+| **用户层(私有)** | users, portfolios, positions, exposure_runs(及全部子表), agent_sessions/messages/steps, research_runs, **issuer_briefs**, evidence_packs | owner + RLS | 用户活动与含用户输入的产物。issuer_briefs 私有:portfolio_implications 引用用户持仓,是含机密输入的分析物 |
+| **Demo(公开只读)** | demo 组合 port_001、demo 的 NVDA/AAPL brief | `is_public=true` | 匿名访客的展示面(读公开、写门禁);新用户登录后亦可见 |
+
+### 13.2 强制点(单一,fail-closed)
+
+- 运行时用**非 owner 角色 `app_rls`**(owner 天然 bypass RLS,是头号坑);无 DELETE 权限,append-only 在权限层顺带硬化。
+- owner 列只在**五张主表**(users/portfolios/agent_sessions/research_runs/issuer_briefs);子表一律 `EXISTS(父表)` 级联,不加冗余 owner。
+- 每事务 `SET LOCAL app.user_id`,单一 choke point;缺失 → `current_setting` 为 NULL → 只放行 is_public(fail-closed:忘设身份 = 看不到数据,不泄)。
+- **安全归 RLS、业务语义归显式谓词**:service/route 里的 owner 过滤只用于"哪个是我的组合"这类语义,标注 `# semantic, not security`;绝不作为隔离手段。
+
+### 13.3 身份
+
+Clerk 外包注册/登录/OAuth/MFA;后端唯一 auth 代码 = 一个 dependency(`auth/clerk.py` JWKS 验 RS256 → `auth/context.current_user_ctx`),与 `tools/registry._session_ctx` 是**两个平行 contextvar**(前者租户、后者工具会话,永不合并)。写路径 `require_user` 门禁 + 落 owner;读路径不加门禁,可见性由 RLS 决定。
+
+### 13.4 三平面并发(V2-E)
+
+- Worker:`FOR UPDATE SKIP LOCKED`(已有)+ lease/requeue(治 stuck-run);幂等 handler 保证 at-least-once 安全。
+- Agent:每 session 单飞行 turn;research per-company singleflight 保持全局(证据共享,同公司只跑一次)。
+- 预算:per-user 日上限进 ToolRegistry wrapper(session 预算加一维)+ 全局兜底。
+
+> 分阶段落地(A 身份 → B 组合 → C RLS → D 宇宙 → E 并发/预算 → F 部署)见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md)。

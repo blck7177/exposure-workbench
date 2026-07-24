@@ -34,6 +34,8 @@ dependencies = [
     "tavily-python>=0.5",     # external market research (M6)
     "pgvector>=0.3",          # filing_chunks.embedding column type (M5)
     "mcp>=1.2",               # FastMCP server: exposure-workbench tool face (M10)
+    # ─── Multi-user (V2-A) ────────────────────────────────────────────────────
+    "pyjwt[crypto]>=2.8",     # verify Clerk RS256 session JWTs against JWKS
 ]
 
 [project.optional-dependencies]

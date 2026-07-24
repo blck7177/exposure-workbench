@@ -515,7 +515,7 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 
 ---
 
-## M14 — 用户管理与生产化(2026-07-24 讨论;★待办:关键决策未拍板,未排期)
+## M14 — 多用户 Portfolio 工作台与生产化(2026-07-24 定稿;执行计划见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md))
 
 背景:项目定位是个人展示,但要呈现 production/deployment-ready。讨论结论:展示型项目的"生产就绪"是叙事资产——每个会坏的边界上有一个能指出来的正交模块,而不是堆基础设施。既有优势直接入账:审计轨迹、预算强制、append-only、幂等 upsert、任务 claim 已是 `FOR UPDATE SKIP LOCKED`(task_service.py)。
 
@@ -523,13 +523,13 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 
 - 注册/登录/OAuth/邮箱验证整类外包 Clerk;后端集成面 = **一个 FastAPI dependency**(JWKS 验 session JWT → user_id 进 contextvar,与 `_session_ctx` 同构),此外全库零 auth 逻辑
 - 首登 bootstrap:upsert `users` 行(clerk_user_id 主键),幂等
-- ☐ 待拍板:匿名边界。推荐「读公开、写门禁」(dashboard/Brief/evidence 免登录;chat、research 触发要登录);备选全门禁 + README 给 demo 账号
+- ★ 已定:匿名边界 = **读公开、写门禁**——demo 组合/brief 标 `is_public` 作为匿名展示面;chat、research/run 触发、上传要登录
 
 ### 租户隔离(先分类数据,再选强制点)
 
-- 数据分类(核心判断):**证据层全局共享、无 owner**(companies/filings/chunks/facts/prices/sources——公共事实,按用户复制 = 浪费 + 不一致);**用户活动层严格隔离**(agent_sessions/messages/steps、research_runs、预算);portfolios MVP 全局只读(policy 写 `owner OR is_public`)
-- ☐ 待拍板:briefs/calc_ledger 归属。推荐全局共享带版本(缓存语义,run 归用户、产物归公共,省 LLM 成本);备选按用户私有
-- ☐ 待拍板:强制点。推荐 **Postgres RLS**(~5 表加 owner_id;session factory 每事务 `SET LOCAL app.user_id`;worker 走 service role)——「忘加 WHERE owner_id」整类错误在 DB 层消灭。已知成本:async 池化下 SET LOCAL 的事务边界要调。备选:应用层 repository 收口(纪律非架构,绕过路径仍在)
+- 数据分类(核心判断):**证据层全局共享、无 owner**(companies/filings/chunks/facts/prices/sources——公共事实,按用户复制 = 浪费 + 不一致);**用户活动层严格隔离**(agent_sessions/messages/steps、research_runs、预算);portfolios policy 写 `owner OR is_public`
+- ★ 已定:**calc_ledger 归共享层**(纯公司级确定性派生,零用户数据;invoked_by 元数据小泄露可接受);**issuer_briefs 归用户**——用户组合上线后 portfolio_implications 含用户持仓,brief 是含机密输入的分析产物;demo 的 brief 标 `is_public` 作为公开样例
+- ★ 已定:强制点 = **Postgres RLS**。运行时用非 owner 角色 `app_rls`(owner 天然 bypass RLS,这是头号坑);owner 列只在五张主表(users/portfolios/agent_sessions/research_runs/issuer_briefs),子表一律 `EXISTS(父表)` 级联;每事务 `SET LOCAL app.user_id`,单一 choke point `tenant_session()`;**安全归 RLS、业务语义归显式谓词**(标注 semantic),两层不混
 - 附带:登录后会话列表按 user 从 DB 拉,替换 localStorage(现状 = 拿到 session id 即可读任意会话,公网不可接受)
 
 ### 并发(三平面)
@@ -547,10 +547,18 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 - EC2 + Caddy(已有):子域反代 web;**API 走同源 /api 反代**——顺带消灭 `NEXT_PUBLIC_API_URL` build 期烧死 localhost:8103 的问题(docker-compose.yml)与 CORS
 - `docs/PRODUCTION.md`:身份/租户/并发/预算/审计五节,每节写「强制点在哪、消灭了哪类错误」
 
+### 功能扩展定稿(2026-07-24 晚,与上述生产化合并为一条执行线)
+
+- **用户组合**:创建 / CSV 上传(`ticker,quantity[,cost_basis]`,≤200 行,整单原子拒绝)/ 一键克隆 demo;重传 = 新 as_of_date 快照(append-only);新组合默认 USD/SPY + demo 限额模板
+- **U1 → U2 连做**:U1 限已覆盖 ticker;U2 引入 `security_master` 宇宙表——**来源修正**:Yahoo 无全量列表口,用 NASDAQ Trader 两个上市文件(实测 ~13k 行,含 ETF 与 Test-Issue 标志)+ SEC company_tickers.json(实测 10,429 家,直接给 CIK)。yfinance 只当价格 provider;符号映射 `BRK.A→BRK-A` 只在 provider 调用点
+- **识别 = 确定性搜索 + 人点选确认**:ticker 精确 > ticker 前缀 > 名称子串,typeahead 下拉带能力徽章(价格✓/ETF/研究✓),**永不自动选**(实测搜 "apple" 命中 5 家——自动挑选即赌错误类);CSV 批量保持精确 ticker,不做名称解析
+- **三道门**:在宇宙表(能加)→ 拉得到价(U2 回填,fail-loud 拒行)→ 有 CIK 且显式触发(issuer 研究,仍限策展集)
+- 并发补齐:worker lease+requeue(治 stuck-run 类)、per-session 单飞行 turn、per-user/全局日预算进 wrapper
+
 ### 排期估算
 
-2–3 天,顺序 AUTH → TENANCY → QUEUE → BUDGET → DEPLOY。
+~7 天,V2-A 身份 → B 组合 U1 → C RLS → D 宇宙 U2 → E 并发+预算 → F 部署 → G 终验;逐阶段任务/验收/红线见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md)。
 
 ### 明确不做
 
-k8s/微服务/消息中间件(Redis/Celery)、企业 SSO、组织/团队模型、用户自建组合(现无创建入口)、分库分表。
+k8s/微服务/消息中间件(Redis/Celery)、企业 SSO、组织/团队模型、用户间共享、组合原地编辑与删除流、agent 写组合工具、非美市场、分库分表、alembic。

@@ -1,19 +1,9 @@
 import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Task } from "./types";
+import { apiFetch as fetchJson } from "./http";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8103";
-
-async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text}`);
-  }
-  return res.json() as Promise<T>;
-}
+// setAuthTokenGetter now lives in ./http (the shared transport); re-export so
+// existing importers keep working.
+export { setAuthTokenGetter } from "./http";
 
 // ─── Portfolios ───────────────────────────────────────────────────────────────
 

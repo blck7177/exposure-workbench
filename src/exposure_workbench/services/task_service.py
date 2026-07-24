@@ -19,12 +19,14 @@ async def create_task(
     db: AsyncSession,
     task_type: str,
     payload: dict[str, Any] | None = None,
+    owner_user_id: str | None = None,
 ) -> Task:
     task = Task(
         id=new_task_id(),
         type=task_type,
         status="pending",
         payload=payload or {},
+        owner_user_id=owner_user_id,   # V2-A: worker restores tenant from this
     )
     db.add(task)
     await db.flush()

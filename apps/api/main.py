@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from exposure_workbench.app_state.settings import get_settings
-from apps.api.routes import portfolios, exposure_runs, tasks, market_data, research, agent, issuers
+from apps.api.routes import portfolios, exposure_runs, tasks, market_data, research, agent, issuers, me
 
 settings = get_settings()
 
@@ -38,6 +38,7 @@ app.include_router(market_data.router, prefix="/api", tags=["market-data"])
 app.include_router(research.router, prefix="/api", tags=["research"])
 app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(issuers.router, prefix="/api", tags=["issuers"])
+app.include_router(me.router, prefix="/api", tags=["identity"])
 
 
 @app.get("/")

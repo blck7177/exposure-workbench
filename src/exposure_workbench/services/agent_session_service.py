@@ -36,11 +36,14 @@ class BudgetStatus:
     external_budget: int
 
 
-async def create_session(db: AsyncSession, kind: str = "meta", llm_model: str | None = None) -> AgentSession:
+async def create_session(
+    db: AsyncSession, kind: str = "meta", llm_model: str | None = None, owner_id: str | None = None,
+) -> AgentSession:
     s = get_settings()
     session = AgentSession(
         id=new_session_id(),
         kind=kind,
+        owner_id=owner_id,   # V2-A tenancy
         llm_model=llm_model or s.openai_model,
         tool_budget=s.session_tool_budget,
         tools_used=0,

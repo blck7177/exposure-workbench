@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
 import { EvidenceDrawer } from "./components/Evidence";
+import { AuthControls } from "./components/Auth";
 import type {
   Portfolio, ExposureRun, ExposureRunSummary, Position, RiskAlert,
   FactorAttribution, ExposureMetrics, SectorExposure, IssuerExposure,
@@ -743,11 +744,14 @@ export default function Home() {
         <BarChart3 className="w-4 h-4 text-blue-400" />
         <span className="text-sm font-medium text-slate-300">Exposure Workbench</span>
         <span className="text-xs text-slate-600">Portfolio Risk Workflow</span>
-        {error && (
-          <span className="ml-auto text-xs text-red-400 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" /> {error}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {error && (
+            <span className="text-xs text-red-400 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> {error}
+            </span>
+          )}
+          <AuthControls />
+        </div>
       </header>
 
       {/* Three-panel workspace */}

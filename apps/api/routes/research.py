@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import require_user
+from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import company_service, research_run_service, task_service
@@ -32,7 +34,11 @@ class TaskAck(BaseModel):
 
 
 @router.post("/companies/{ticker}/ensure-ready", response_model=TaskAck, status_code=201)
-async def ensure_ready(ticker: str, body: ReadinessRequest | None = None, db: AsyncSession = Depends(get_db)):
+async def ensure_ready(
+    ticker: str, body: ReadinessRequest | None = None,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
     tk = ticker.upper()
     try:
         await company_service.require_investigable(db, tk)
@@ -43,6 +49,7 @@ async def ensure_ready(ticker: str, body: ReadinessRequest | None = None, db: As
     task = await task_service.create_task(
         db, task_type="company_readiness",
         payload={"ticker": tk, "skip_market_refresh": bool(body and body.skip_market_refresh)},
+        owner_user_id=user.user_id,
     )
     await db.commit()
     return TaskAck(task_id=task.id, status=task.status)
@@ -71,7 +78,11 @@ class ResearchRunOut(BaseModel):
 
 
 @router.post("/research-runs", response_model=ResearchRunOut, status_code=201)
-async def create_research_run(body: ResearchRequest, db: AsyncSession = Depends(get_db)):
+async def create_research_run(
+    body: ResearchRequest,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
     tk = body.ticker.upper()
     try:
         company = await company_service.require_investigable(db, tk)
@@ -80,10 +91,13 @@ async def create_research_run(body: ResearchRequest, db: AsyncSession = Depends(
     except company_service.NotInvestigable:
         raise HTTPException(422, f"{tk} is not investigable")
 
-    task = await task_service.create_task(db, task_type="issuer_research", payload={"ticker": tk})
+    task = await task_service.create_task(
+        db, task_type="issuer_research", payload={"ticker": tk}, owner_user_id=user.user_id,
+    )
     try:
         run = await research_run_service.create_run(
             db, company.id, body.portfolio_id, triggered_by="manual", task_id=task.id,
+            owner_id=user.user_id,
         )
     except research_run_service.ActiveRunExists as e:
         # a run is already active for this issuer — point the caller at it

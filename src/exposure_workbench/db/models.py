@@ -17,6 +17,18 @@ from pgvector.sqlalchemy import Vector
 from exposure_workbench.db.session import Base
 
 
+# ─── Users (V2-A: identity from Clerk; local row for ownership FKs) ────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)   # Clerk user id
+    email: Mapped[str | None] = mapped_column(String(320))
+    display_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # ─── Portfolios ───────────────────────────────────────────────────────────────
 
 class Portfolio(Base):
@@ -30,6 +42,9 @@ class Portfolio(Base):
     benchmark: Mapped[str | None] = mapped_column(String(32))
     manager: Mapped[str | None] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # V2-A tenancy: owner_id nullable now, backfilled + NOT NULL in V2-C.
+    owner_id: Mapped[str | None] = mapped_column(String(255))
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -287,6 +302,7 @@ class Task(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    owner_user_id: Mapped[str | None] = mapped_column(String(255))   # V2-A: whose request enqueued it (worker sets tenant from this)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -494,6 +510,7 @@ class ResearchRun(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id"))
     portfolio_id: Mapped[str | None] = mapped_column(String(64))
+    owner_id: Mapped[str | None] = mapped_column(String(255))   # V2-A tenancy
     status: Mapped[str] = mapped_column(String(32), default="pending")
     task_id: Mapped[str | None] = mapped_column(String(64))
     agent_session_id: Mapped[str | None] = mapped_column(String(64))
@@ -511,6 +528,7 @@ class AgentSession(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     kind: Mapped[str] = mapped_column(String(32), default="meta")   # 'meta' | 'research'
+    owner_id: Mapped[str | None] = mapped_column(String(255))   # V2-A tenancy
     llm_model: Mapped[str | None] = mapped_column(String(64))
     tool_budget: Mapped[int | None] = mapped_column(Integer)
     tools_used: Mapped[int] = mapped_column(Integer, default=0)
@@ -574,6 +592,8 @@ class IssuerBrief(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     research_run_id: Mapped[str] = mapped_column(String(64), nullable=False)
     company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"))
+    owner_id: Mapped[str | None] = mapped_column(String(255))   # V2-A tenancy
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     financial_summary: Mapped[str | None] = mapped_column(Text)
     key_changes: Mapped[str | None] = mapped_column(Text)
     management_explanation: Mapped[str | None] = mapped_column(Text)

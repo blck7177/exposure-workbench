@@ -29,13 +29,15 @@ async def get_active_run(db: AsyncSession, company_id: str) -> ResearchRun | Non
 
 
 async def create_run(
-    db: AsyncSession, company_id: str, portfolio_id: str | None, triggered_by: str, task_id: str | None
+    db: AsyncSession, company_id: str, portfolio_id: str | None, triggered_by: str, task_id: str | None,
+    owner_id: str | None = None,
 ) -> ResearchRun:
     existing = await get_active_run(db, company_id)
     if existing is not None:
         raise ActiveRunExists(existing.id)
     run = ResearchRun(
         id=new_research_run_id(), company_id=company_id, portfolio_id=portfolio_id,
+        owner_id=owner_id,   # V2-A tenancy
         status="pending", triggered_by=triggered_by, task_id=task_id,
     )
     db.add(run)

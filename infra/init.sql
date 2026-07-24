@@ -5,6 +5,15 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS vector;   -- pgvector: filing_chunks.embedding (Issuer Intelligence)
 
+-- ─── Users (V2-A: identity from Clerk; local row for ownership FKs) ────────────
+CREATE TABLE IF NOT EXISTS users (
+    id              VARCHAR(255) PRIMARY KEY,   -- Clerk user id
+    email           VARCHAR(320),
+    display_name    VARCHAR(255),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at    TIMESTAMPTZ
+);
+
 -- ─── Portfolios ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS portfolios (
     id              VARCHAR(64) PRIMARY KEY,
@@ -15,6 +24,8 @@ CREATE TABLE IF NOT EXISTS portfolios (
     benchmark       VARCHAR(32),
     manager         VARCHAR(128),
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    owner_id        VARCHAR(255),                        -- V2-A tenancy (NOT NULL in V2-C)
+    is_public       BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -223,6 +234,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at    TIMESTAMPTZ,
     error_message   TEXT,
     retry_count     INTEGER NOT NULL DEFAULT 0,
+    owner_user_id   VARCHAR(255),   -- V2-A: whose request enqueued it (worker sets tenant from this)
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -420,6 +432,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     id                VARCHAR(64) PRIMARY KEY,
     company_id        VARCHAR(64) NOT NULL REFERENCES companies(id),
     portfolio_id      VARCHAR(64),
+    owner_id          VARCHAR(255),   -- V2-A tenancy
     status            VARCHAR(32) NOT NULL DEFAULT 'pending',   -- pending|running|completed|failed
     task_id           VARCHAR(64),
     agent_session_id  VARCHAR(64),          -- link to the analysis subagent session
@@ -436,6 +449,7 @@ CREATE INDEX IF NOT EXISTS idx_research_runs_status ON research_runs(status);
 CREATE TABLE IF NOT EXISTS agent_sessions (
     id                VARCHAR(64) PRIMARY KEY,
     kind              VARCHAR(32) NOT NULL DEFAULT 'meta',   -- 'meta' | 'research'
+    owner_id          VARCHAR(255),   -- V2-A tenancy
     llm_model         VARCHAR(64),
     tool_budget       INTEGER,          -- snapshot of session_tool_budget at creation
     tools_used        INTEGER NOT NULL DEFAULT 0,
@@ -491,6 +505,8 @@ CREATE TABLE IF NOT EXISTS issuer_briefs (
     id                      VARCHAR(64) PRIMARY KEY,
     research_run_id         VARCHAR(64) NOT NULL UNIQUE,
     company_id              VARCHAR(64) NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    owner_id                VARCHAR(255),                     -- V2-A tenancy
+    is_public               BOOLEAN NOT NULL DEFAULT FALSE,
     financial_summary       TEXT,
     key_changes             TEXT,
     management_explanation  TEXT,
