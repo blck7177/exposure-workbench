@@ -46,24 +46,50 @@ def test_combine_division_by_zero_is_none_not_inf():
     assert r.quality_flags["division_by_zero_periods"] == 1
 
 
-def test_change_yoy_uses_four_period_lag():
+def test_change_yoy_matches_one_year_back_by_date():
     s = [sp(Q[i], v) for i, v in enumerate([100.0, 110.0, 120.0, 130.0, 150.0])]
     r = so.compute_change(s, "yoy")
     assert len(r.points) == 1
-    assert r.points[0].value == pytest.approx(0.5)          # 150 vs 100
+    assert r.points[0].value == pytest.approx(0.5)          # 2026-01-31 vs 2025-01-31
     assert r.points[0].period_end == date(2026, 1, 31)
 
 
-def test_change_qoq_and_abs():
-    s = [sp(Q[0], 100.0), sp(Q[1], 150.0)]
+def test_yoy_on_a_SPARSE_series_does_not_compare_across_years():
+    """Regression: cash-flow metrics are filed cumulatively, so a 'quarterly'
+    series can hold only Q1 of each year. Positional lag-4 compared 2026 against
+    2022 and reported it as YoY growth (a measured 2808%). Date matching must
+    compare each point with ~1 year earlier, or emit nothing."""
+    sparse = [sp("2022-05-01", 10.0), sp("2023-04-30", 20.0),
+              sp("2024-04-28", 30.0), sp("2025-04-27", 40.0), sp("2026-04-26", 50.0)]
+    r = so.compute_change(sparse, "yoy")
+    # each point (except the first) has a genuine ~1-year prior
+    assert len(r.points) == 4
+    assert r.points[-1].period_end == date(2026, 4, 26)
+    assert r.points[-1].value == pytest.approx(0.25)        # 50 vs 40, NOT 50 vs 10
+    assert all(p.value is not None and p.value < 1.5 for p in r.points)
+
+
+def test_yoy_emits_nothing_when_no_comparable_prior_exists():
+    gappy = [sp("2022-05-01", 10.0), sp("2026-04-26", 50.0)]   # 4-year hole
+    r = so.compute_change(gappy, "yoy")
+    assert r.points == []                                   # refuses to bridge the gap
+    assert r.quality_flags["periods_without_comparable_prior"] >= 1
+
+
+def test_change_qoq_matches_one_quarter_back_by_date():
+    s = [sp(Q[0], 100.0), sp(Q[1], 150.0)]                  # ~89 days apart
     assert so.compute_change(s, "qoq").points[0].value == pytest.approx(0.5)
+
+
+def test_change_abs_uses_immediately_prior_point():
+    s = [sp(Q[0], 100.0), sp(Q[1], 150.0)]
     assert so.compute_change(s, "abs").points[0].value == pytest.approx(50.0)
 
 
 def test_change_insufficient_history_is_flagged():
     r = so.compute_change([sp(Q[0], 100.0)], "yoy")
     assert r.points == []
-    assert r.quality_flags["insufficient_history"] == {"needed": 5, "have": 1}
+    assert "insufficient_history" in r.quality_flags
 
 
 def test_change_zero_base_is_none():

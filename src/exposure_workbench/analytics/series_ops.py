@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
-PRIMITIVE_VERSION = "v1"
+PRIMITIVE_VERSION = "v2"   # v2: yoy/qoq match by date, not list position
 
 COMBINE_OPS = ("add", "sub", "divide")
 CHANGE_MODES = ("yoy", "qoq", "pct", "abs")
@@ -112,18 +112,51 @@ def combine_series(a: list[SeriesPoint], b: list[SeriesPoint], op: str) -> Serie
 
 # ── change ─────────────────────────────────────────────────────────────────────
 
+# yoy/qoq are matched BY DATE, not by list position. Financial series are often
+# sparse or irregular — e.g. cash-flow metrics are filed cumulatively, so a
+# company's "quarterly" operating-cash-flow series can contain only Q1 of each
+# year. Positional lag then silently compares points four YEARS apart and
+# reports it as year-over-year growth (measured: a bogus 2808%). Matching on
+# dates makes an unmatched period visibly absent instead of quietly wrong.
+YOY_DAYS, YOY_TOLERANCE = 365, 45
+QOQ_DAYS, QOQ_TOLERANCE = 91, 25
+
+
+def _nearest_prior(ordered: list[SeriesPoint], idx: int, back_days: int, tolerance: int):
+    """The earlier point closest to (period_end - back_days), within tolerance."""
+    target = ordered[idx].period_end - timedelta(days=back_days)
+    best, best_gap = None, None
+    for p in ordered[:idx]:
+        gap = abs((p.period_end - target).days)
+        if gap <= tolerance and (best_gap is None or gap < best_gap):
+            best, best_gap = p, gap
+    return best
+
+
 def compute_change(series: list[SeriesPoint], mode: str) -> SeriesResult:
-    """yoy = vs 4 periods back, qoq = vs previous, pct/abs = vs previous."""
+    """yoy / qoq match by date; pct / abs compare with the immediately prior point."""
     if mode not in CHANGE_MODES:
         raise ValueError(f"unsupported change mode {mode!r}")
 
     ordered = sorted(series, key=lambda p: p.period_end)
-    lag = 4 if mode == "yoy" else 1
     points: list[SeriesPoint] = []
     zero_base = 0
+    unmatched = 0
 
-    for i in range(lag, len(ordered)):
-        cur, prev = ordered[i], ordered[i - lag]
+    for i in range(len(ordered)):
+        cur = ordered[i]
+        if mode == "yoy":
+            prev = _nearest_prior(ordered, i, YOY_DAYS, YOY_TOLERANCE)
+        elif mode == "qoq":
+            prev = _nearest_prior(ordered, i, QOQ_DAYS, QOQ_TOLERANCE)
+        else:
+            prev = ordered[i - 1] if i >= 1 else None
+
+        if prev is None:
+            if i > 0 or mode in ("yoy", "qoq"):
+                unmatched += 1
+            continue
+
         ids = cur.input_fact_ids + prev.input_fact_ids
         if cur.value is None or prev.value is None:
             points.append(SeriesPoint(cur.period_end, None, ids, {"missing_input": True}))
@@ -139,8 +172,10 @@ def compute_change(series: list[SeriesPoint], mode: str) -> SeriesResult:
         points.append(SeriesPoint(cur.period_end, v, ids))
 
     flags: dict = {}
-    if len(ordered) <= lag:
-        flags["insufficient_history"] = {"needed": lag + 1, "have": len(ordered)}
+    if not points:
+        flags["insufficient_history"] = {"mode": mode, "have": len(ordered)}
+    if unmatched:
+        flags["periods_without_comparable_prior"] = unmatched
     if zero_base:
         flags["zero_base_periods"] = zero_base
     return SeriesResult(operation=f"change.{mode}", points=points, quality_flags=flags)
