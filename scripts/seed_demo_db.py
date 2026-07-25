@@ -290,7 +290,26 @@ def main() -> None:
     seed_previous_runs(conn, snapshot)
 
     conn.close()
+
+    # V2-D: refresh the investable universe (best-effort — needs network).
+    try:
+        asyncio.run(_refresh_universe())
+    except Exception as e:  # noqa: BLE001
+        print(f"  security_master refresh skipped: {e}")
+
     print(f"\nDone. Demo database seeded (snapshot {snapshot}).")
+
+
+async def _refresh_universe() -> None:
+    from exposure_workbench.services import security_master_service as sm
+    engine = create_async_engine(ASYNC_DB_URL)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            r = await sm.refresh(db)
+        print(f"  security_master: {r['active']} securities")
+    finally:
+        await engine.dispose()
 
 
 if __name__ == "__main__":

@@ -130,3 +130,18 @@ CREATE POLICY tenant ON agent_steps USING (EXISTS (SELECT 1 FROM agent_sessions 
 ALTER TABLE evidence_packs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON evidence_packs;
 CREATE POLICY tenant ON evidence_packs USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true)));
+
+-- ═══ V2-D: security_master universe (shared, no RLS) ═════════════════════════
+CREATE TABLE IF NOT EXISTS security_master (
+    ticker      VARCHAR(20) PRIMARY KEY,
+    name        VARCHAR(255),
+    exchange    VARCHAR(32),
+    is_etf      BOOLEAN NOT NULL DEFAULT FALSE,
+    cik         VARCHAR(16),
+    status      VARCHAR(16) NOT NULL DEFAULT 'active',
+    source      VARCHAR(32),
+    fetched_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_security_master_name ON security_master(name);
+-- created after the ALL-TABLES grant above, so grant app_rls explicitly
+GRANT SELECT, INSERT, UPDATE ON security_master TO app_rls;

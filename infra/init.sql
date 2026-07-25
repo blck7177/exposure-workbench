@@ -14,6 +14,19 @@ CREATE TABLE IF NOT EXISTS users (
     last_seen_at    TIMESTAMPTZ
 );
 
+-- ─── Security master (V2-D: investable US universe; shared, no RLS) ────────────
+CREATE TABLE IF NOT EXISTS security_master (
+    ticker      VARCHAR(20) PRIMARY KEY,   -- listing form, dot preserved (BRK.A)
+    name        VARCHAR(255),
+    exchange    VARCHAR(32),
+    is_etf      BOOLEAN NOT NULL DEFAULT FALSE,
+    cik         VARCHAR(16),
+    status      VARCHAR(16) NOT NULL DEFAULT 'active',   -- active | delisted
+    source      VARCHAR(32),
+    fetched_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_security_master_name ON security_master(name);
+
 -- ─── Portfolios ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS portfolios (
     id              VARCHAR(64) PRIMARY KEY,

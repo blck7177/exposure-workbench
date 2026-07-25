@@ -82,6 +82,7 @@ async def ingest_market_prices(
     start: date,
     end: date,
     provider: MarketDataProvider,
+    commit: bool = True,
 ) -> dict[str, int]:
     counts: dict[str, int] = {}
     for ticker in tickers:
@@ -105,7 +106,8 @@ async def ingest_market_prices(
         await db.execute(stmt)
         counts[ticker] = len(rows)
         logger.info("ingested %d market rows for %s", len(rows), ticker)
-    await db.commit()
+    if commit:
+        await db.commit()
     return counts
 
 

@@ -12,6 +12,8 @@ passes the citation gate, so a portfolio-level claim is cited like an issuer one
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import date
 
 from sqlalchemy import func, select
@@ -21,8 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import MarketPrice, Portfolio, Position, RiskLimit
-from exposure_workbench.services import exposure_run_service
+from exposure_workbench.services import exposure_run_service, security_master_service
 from exposure_workbench.utils.ids import new_id
+
+logger = logging.getLogger(__name__)
 
 _TOP_SECTORS = 8
 _TOP_ISSUERS = 10
@@ -196,6 +200,22 @@ async def _snapshot_date(db: AsyncSession) -> date | None:
     return (await db.execute(select(func.max(MarketPrice.price_date)))).scalar_one_or_none()
 
 
+async def _common_snapshot_date(db: AsyncSession, tickers: list[str]) -> date | None:
+    """The latest date on which EVERY uploaded ticker has a price. Using a global
+    max instead would date a whole upload to the freshest ticker's day and price
+    the others at a stale close — this pins one real, coherent snapshot (matches
+    the seed's own HAVING count(distinct)=N logic)."""
+    n = len(set(tickers))
+    return (await db.execute(
+        select(MarketPrice.price_date)
+        .where(MarketPrice.ticker.in_(tickers))
+        .group_by(MarketPrice.price_date)
+        .having(func.count(func.distinct(MarketPrice.ticker)) == n)
+        .order_by(MarketPrice.price_date.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
 async def _latest_prices(db: AsyncSession, tickers: list[str], as_of: date) -> dict[str, float]:
     rows = (await db.execute(
         select(MarketPrice.ticker, MarketPrice.close)
@@ -217,6 +237,51 @@ async def _ticker_metadata(db: AsyncSession, tickers: list[str]) -> dict[str, di
         .distinct(Position.ticker)
     )).all()
     return {t: {"sector": s, "asset_class": ac, "region": r} for t, s, ac, r in rows}
+
+
+async def _backfill_prices(db: AsyncSession, tickers: list[str]) -> None:
+    """Pull ~1y of daily prices for new tickers into THIS transaction (atomic with
+    the upload). Unpriceable tickers are left absent -> caught as no_price_data."""
+    from datetime import timedelta
+
+    from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
+    from exposure_workbench.services import market_data_ingestion_service as mdi
+
+    provider = YFinanceMarketDataProvider()
+    end = date.today()
+    start = end - timedelta(days=365)
+    for t in tickers:
+        try:
+            await mdi.ingest_market_prices(db, [t], start, end, provider, commit=False)
+        except mdi.MarketDataUnavailable:
+            pass  # no data -> step 4 rejects it as no_price_data (upload stays atomic)
+        except Exception as e:  # noqa: BLE001 — a provider/network hiccup (rate limit,
+            # timeout) must not 500 the upload; leave the ticker unpriced so step 4
+            # reports a clean no_price_data. A genuine DB error still surfaces later.
+            logger.warning("price backfill failed for %s: %s", t, e)
+
+
+async def _enrich_new_meta(db: AsyncSession, tickers: list[str], meta: dict) -> None:
+    """Fill asset_class/sector for tickers with no existing-position metadata, from
+    security_master (is_etf) + best-effort yfinance sector (None -> Unclassified)."""
+    provider = None
+    for t in tickers:
+        m = meta.get(t) or {}
+        if m.get("asset_class"):
+            continue  # already described by an existing position (sector incl. None for ETFs)
+        sm_row = await security_master_service.get(db, t)
+        is_etf = bool(sm_row and sm_row.is_etf)
+        if is_etf:
+            meta[t] = {"asset_class": "etf", "sector": None, "region": "US"}
+            continue
+        from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
+        provider = provider or YFinanceMarketDataProvider()
+        # yfinance .info is a blocking network call — offload so it can't stall the loop
+        try:
+            sector = await asyncio.to_thread(provider.fetch_sector, t)
+        except Exception:  # noqa: BLE001 — sector is best-effort
+            sector = None
+        meta[t] = {"asset_class": "equity", "sector": sector or "Unclassified", "region": "US"}
 
 
 async def _copy_risk_limits(db: AsyncSession, src_id: str, dst_id: str) -> None:
@@ -253,24 +318,43 @@ async def upload_positions(
     tickers = [r.ticker for r in rows]
     if not tickers:
         raise UploadError([{"row": 0, "ticker": "", "reason": "no rows"}])
-    covered = await _covered_tickers(db)
-    problems = [{"ticker": t, "reason": "ticker_not_supported"} for t in tickers if t not in covered]
+
+    # 1) universe membership (U2): every ticker must be in the active universe
+    problems = [{"ticker": t, "reason": "ticker_not_in_universe"}
+                for t in tickers if not await security_master_service.is_in_universe(db, t)]
     if problems:
         raise UploadError(problems)
 
-    as_of = as_of or await _snapshot_date(db)
+    # 2) backfill prices for tickers we don't already have (yfinance, this txn)
+    have = await _covered_tickers(db)
+    to_backfill = [t for t in tickers if t not in have]
+    if to_backfill:
+        await _backfill_prices(db, to_backfill)
+
+    # 3) snapshot date = latest date on which ALL uploaded tickers are priced
+    #    (a coherent common date, not a global max that would stale-price others)
+    as_of = as_of or await _common_snapshot_date(db, tickers)
     if as_of is None:
-        raise UploadError([{"ticker": "*", "reason": "no_price_data"}])
+        # no date where every ticker has a price -> at least one is unpriceable
+        priced_any = await _covered_tickers(db)
+        raise UploadError([{"ticker": t, "reason": "no_price_data"}
+                           for t in tickers if t not in priced_any] or
+                          [{"ticker": "*", "reason": "no_common_price_date"}])
+
+    # 4) price every ticker; any still unpriced -> reject the whole upload (atomic)
     prices = await _latest_prices(db, tickers, as_of)
     missing = [t for t in tickers if t not in prices]
     if missing:
         raise UploadError([{"ticker": t, "reason": "no_price_data"} for t in missing])
+
+    # 5) metadata: existing positions first, then universe + yfinance for new tickers
     meta = await _ticker_metadata(db, tickers)
+    await _enrich_new_meta(db, tickers, meta)
 
     for r in rows:
         m = meta.get(r.ticker, {})
         close = prices[r.ticker]
-        asset_class = m.get("asset_class") or ("etf" if r.ticker in _ETF_HINT else "equity")
+        asset_class = m.get("asset_class") or "equity"
         stmt = pg_insert(Position).values(
             id=new_id("pos_"), portfolio_id=portfolio_id, as_of_date=as_of, ticker=r.ticker,
             asset_class=asset_class, sector=m.get("sector"), region=m.get("region") or "US",

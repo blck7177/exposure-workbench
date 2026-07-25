@@ -28,11 +28,18 @@ def _f(v) -> float | None:
 class YFinanceMarketDataProvider:
     name = "yfinance"
 
+    @staticmethod
+    def _yf_symbol(ticker: str) -> str:
+        # yfinance uses '-' where exchange listings use '.' (BRK.A -> BRK-A). The
+        # conversion lives ONLY here, at the provider boundary; the canonical dot
+        # form is what we store (PriceBar.ticker below stays the original).
+        return ticker.replace(".", "-")
+
     def fetch_prices(self, ticker: str, start: date, end: date) -> list[PriceBar]:
         import yfinance as yf
 
         # yfinance `end` is exclusive — extend by one day to include `end`.
-        hist = yf.Ticker(ticker).history(
+        hist = yf.Ticker(self._yf_symbol(ticker)).history(
             start=start.isoformat(),
             end=(end + timedelta(days=1)).isoformat(),
             auto_adjust=False,
@@ -64,3 +71,15 @@ class YFinanceMarketDataProvider:
                 )
             )
         return bars
+
+    def fetch_sector(self, ticker: str) -> str | None:
+        """Best-effort GICS sector for a newly-added equity (V2-D). yfinance
+        .info is slow/flaky, so any failure returns None (caller -> 'Unclassified')."""
+        import yfinance as yf
+
+        try:
+            info = yf.Ticker(self._yf_symbol(ticker)).info
+            sector = (info or {}).get("sector")
+            return sector or None
+        except Exception:  # noqa: BLE001 — sector is best-effort, never fatal
+            return None

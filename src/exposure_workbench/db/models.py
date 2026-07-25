@@ -29,6 +29,21 @@ class User(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+# ─── Security master (V2-D: the investable US universe; shared, no RLS) ─────────
+
+class SecurityMaster(Base):
+    __tablename__ = "security_master"
+
+    ticker: Mapped[str] = mapped_column(String(20), primary_key=True)   # listing form (BRK.A)
+    name: Mapped[str | None] = mapped_column(String(255))
+    exchange: Mapped[str | None] = mapped_column(String(32))
+    is_etf: Mapped[bool] = mapped_column(Boolean, default=False)
+    cik: Mapped[str | None] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default="active")   # active | delisted
+    source: Mapped[str | None] = mapped_column(String(32))
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # ─── Portfolios ───────────────────────────────────────────────────────────────
 
 class Portfolio(Base):

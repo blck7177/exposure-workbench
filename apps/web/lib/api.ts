@@ -42,6 +42,21 @@ export async function uploadPositions(
   });
 }
 
+// ─── Securities universe search (V2-D typeahead) ────────────────────────────────
+
+export interface SecurityHit {
+  ticker: string;
+  name: string | null;
+  exchange: string | null;
+  is_etf: boolean;
+  has_cik: boolean;
+  has_prices: boolean;
+}
+
+export async function searchSecurities(q: string): Promise<SecurityHit[]> {
+  return fetchJson<SecurityHit[]>(`/api/securities/search?q=${encodeURIComponent(q)}`);
+}
+
 // ─── Exposure Runs ────────────────────────────────────────────────────────────
 
 export async function listRuns(portfolioId?: string): Promise<ExposureRunSummary[]> {
