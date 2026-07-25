@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.auth_deps import require_user
+from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.agents.meta_agent import handle_message
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
@@ -88,8 +88,33 @@ class SessionDetailOut(BaseModel):
     steps: list[StepOut]
 
 
+class SessionSummaryOut(BaseModel):
+    id: str
+    kind: str
+    started_at: datetime
+    ended_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/agent/sessions", response_model=list[SessionSummaryOut])
+async def list_agent_sessions(
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # RLS scopes this to the caller's own sessions (owner_id = tenant).
+    rows = (await db.execute(
+        select(AgentSession).where(AgentSession.kind == "meta").order_by(AgentSession.started_at.desc()).limit(50)
+    )).scalars().all()
+    return rows
+
+
 @router.get("/agent/sessions/{session_id}", response_model=SessionDetailOut)
-async def get_agent_session(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_agent_session(
+    session_id: str,
+    user: UserClaims | None = Depends(optional_user),   # sets tenant so the owner (only) can read it
+    db: AsyncSession = Depends(get_db),
+):
     s = await agent_session_service.get_session(db, session_id)
     if s is None:
         raise HTTPException(404, "unknown session")

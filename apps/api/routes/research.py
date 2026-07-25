@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.auth_deps import require_user
+from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
 from exposure_workbench.db.session import get_db
@@ -112,7 +112,8 @@ async def create_research_run(
     return await research_run_service.get_run(db, run.id)
 
 
-@router.get("/research-runs/{run_id}", response_model=ResearchRunOut)
+@router.get("/research-runs/{run_id}", response_model=ResearchRunOut,
+            dependencies=[Depends(optional_user)])
 async def get_research_run(run_id: str, db: AsyncSession = Depends(get_db)):
     run = await research_run_service.get_run(db, run_id)
     if run is None:

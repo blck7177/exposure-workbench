@@ -88,6 +88,7 @@ async def _submit_brief(db: AsyncSession, **blocks) -> dict:
     all_citations = sorted(set(citation_ids))
     db.add(IssuerBrief(
         id=brief_id, research_run_id=run.id, company_id=run.company_id,
+        owner_id=run.owner_id,   # V2-C: brief belongs to who triggered the research (RLS WITH CHECK)
         financial_summary=(blocks.get("financial_summary") or {}).get("text"),
         key_changes=(blocks.get("key_changes") or {}).get("text"),
         management_explanation=(blocks.get("management_explanation") or {}).get("text"),

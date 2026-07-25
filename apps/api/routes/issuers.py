@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.api.auth_deps import optional_user
 from exposure_workbench.db.models import (
     CalcLedger, Company, Filing, FilingSection, IssuerBrief, IssuerExposure,
     ResearchRun, ResearchSource,
@@ -30,8 +31,10 @@ async def _company(db: AsyncSession, ticker: str) -> Company:
 
 # ── evidence resolver (the drill-through endpoint) ────────────────────────────────
 
-@router.get("/evidence/{ref_id}")
+@router.get("/evidence/{ref_id}", dependencies=[Depends(optional_user)])
 async def get_evidence(ref_id: str, db: AsyncSession = Depends(get_db)):
+    # optional_user sets the tenant so run_/alert_ evidence for the caller's own
+    # runs resolves (public demo evidence resolves anonymously via is_public).
     try:
         return await ev.resolve(db, ref_id)
     except ev.EvidenceNotFound:
@@ -145,7 +148,7 @@ async def research_sources(ticker: str, db: AsyncSession = Depends(get_db)):
 
 # ── latest brief for an issuer ─────────────────────────────────────────────────────
 
-@router.get("/issuers/{ticker}/latest-brief")
+@router.get("/issuers/{ticker}/latest-brief", dependencies=[Depends(optional_user)])
 async def latest_brief(ticker: str, db: AsyncSession = Depends(get_db)):
     c = await _company(db, ticker)
     brief = (await db.execute(

@@ -26,8 +26,14 @@ from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
 from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.services.task_service import claim_next_task, complete_task, fail_task
+
+# The worker is a system process; each task runs under the tenant of the user who
+# enqueued it (owner_user_id) so RLS writes land, falling back to the demo system
+# user for ownerless/system tasks (readiness touches only shared tables anyway).
+DEMO_SYSTEM_USER = "user_demo_system"
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -86,6 +92,10 @@ async def process_one() -> bool:
             await db.commit()
         return True
 
+    # Run the handler under the enqueuing user's tenant (set BEFORE the session's
+    # first query so the RLS listener applies it to the whole transaction).
+    tenant = getattr(task, "owner_user_id", None) or DEMO_SYSTEM_USER
+    ctx_token = current_user_ctx.set(tenant)
     try:
         async with factory() as db:
             # Re-fetch task in new session
@@ -104,6 +114,8 @@ async def process_one() -> bool:
         async with factory2() as db2:
             await fail_task(db2, task.id, str(exc))
             await db2.commit()
+    finally:
+        current_user_ctx.reset(ctx_token)
 
     return True
 

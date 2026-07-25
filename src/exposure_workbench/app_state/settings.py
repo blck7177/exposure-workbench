@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench"
     database_url_sync: str = "postgresql+psycopg2://exposure:exposure@localhost:5433/exposure_workbench"
+    # V2-C: runtime connects as the non-owner role app_rls so RLS policies bind.
+    # Empty => fall back to database_url (offline tests / pre-RLS local dev).
+    database_url_app: str = ""
 
     # LLM
     openai_api_key: str = ""

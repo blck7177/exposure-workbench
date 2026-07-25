@@ -9,10 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.api.auth_deps import require_user
+from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import exposure_run_service, task_service
+from exposure_workbench.services import exposure_run_service, portfolio_service, task_service
 
 router = APIRouter()
 
@@ -168,6 +168,11 @@ async def create_exposure_run(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new exposure run and enqueue a worker task."""
+    # You can only run portfolios you own — the public demo is read-only (clone to
+    # run). Semantic check for a clean 403; RLS WITH CHECK is the real guard.
+    pf = await portfolio_service.get_portfolio(db, body.portfolio_id)
+    if pf is None or pf.owner_id != user.user_id:
+        raise HTTPException(403, "You can only run portfolios you own. Clone the demo to run it.")
     task = await task_service.create_task(
         db,
         task_type="exposure_update",
@@ -195,7 +200,8 @@ async def create_exposure_run(
     return full_run
 
 
-@router.get("/exposure-runs", response_model=list[RunSummaryOut])
+@router.get("/exposure-runs", response_model=list[RunSummaryOut],
+            dependencies=[Depends(optional_user)])
 async def list_exposure_runs(
     portfolio_id: str | None = None,
     limit: int = 20,
@@ -204,7 +210,8 @@ async def list_exposure_runs(
     return await exposure_run_service.list_runs(db, portfolio_id=portfolio_id, limit=limit)
 
 
-@router.get("/exposure-runs/{run_id}", response_model=ExposureRunOut)
+@router.get("/exposure-runs/{run_id}", response_model=ExposureRunOut,
+            dependencies=[Depends(optional_user)])
 async def get_exposure_run(run_id: str, db: AsyncSession = Depends(get_db)):
     run = await exposure_run_service.get_run(db, run_id)
     if not run:

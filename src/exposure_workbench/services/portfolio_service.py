@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import MarketPrice, Portfolio, Position, RiskLimit
 from exposure_workbench.services import exposure_run_service
 from exposure_workbench.utils.ids import new_id
@@ -120,6 +121,9 @@ async def _snapshot_one(db: AsyncSession, p: Portfolio) -> dict:
     base = {
         "portfolio_id": p.id, "name": p.name, "benchmark": p.benchmark,
         "currency": p.currency, "manager": p.manager,
+        # is_own distinguishes the user's portfolio from the shared public demo
+        # (semantic, for the agent to prefer the user's own — not a security check).
+        "is_own": p.owner_id is not None and p.owner_id == current_user_id(),
     }
     latest = await exposure_run_service.get_latest_completed_run(db, p.id)
     if latest is None:

@@ -26,6 +26,8 @@ services:
       - "${API_HOST_PORT:-8103}:8000"
     environment:
       DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
+      # V2-C: runtime uses the non-owner app_rls role so RLS policies bind.
+      DATABASE_URL_APP: "${DATABASE_URL_APP:-postgresql+asyncpg://app_rls:app_rls_pw@postgres:5432/exposure_workbench}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
@@ -52,6 +54,7 @@ services:
     container_name: exposure-worker
     environment:
       DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
+      DATABASE_URL_APP: "${DATABASE_URL_APP:-postgresql+asyncpg://app_rls:app_rls_pw@postgres:5432/exposure_workbench}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"

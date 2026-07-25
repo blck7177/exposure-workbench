@@ -144,7 +144,8 @@ async def upload_positions(
     return result
 
 
-@router.get("/portfolios/{portfolio_id}", response_model=PortfolioOut)
+@router.get("/portfolios/{portfolio_id}", response_model=PortfolioOut,
+            dependencies=[Depends(optional_user)])
 async def get_portfolio(portfolio_id: str, db: AsyncSession = Depends(get_db)):
     portfolio = await portfolio_service.get_portfolio(db, portfolio_id)
     if not portfolio:
@@ -152,7 +153,8 @@ async def get_portfolio(portfolio_id: str, db: AsyncSession = Depends(get_db)):
     return portfolio
 
 
-@router.get("/portfolios/{portfolio_id}/positions", response_model=list[PositionOut])
+@router.get("/portfolios/{portfolio_id}/positions", response_model=list[PositionOut],
+            dependencies=[Depends(optional_user)])
 async def get_positions(
     portfolio_id: str,
     as_of_date: date | None = None,
@@ -161,7 +163,8 @@ async def get_positions(
     return await portfolio_service.get_positions(db, portfolio_id, as_of_date)
 
 
-@router.get("/portfolios/{portfolio_id}/limits", response_model=list[RiskLimitOut])
+@router.get("/portfolios/{portfolio_id}/limits", response_model=list[RiskLimitOut],
+            dependencies=[Depends(optional_user)])
 async def get_risk_limits(
     portfolio_id: str,
     db: AsyncSession = Depends(get_db),
@@ -186,7 +189,8 @@ class DashboardOut(BaseModel):
     report_summary: dict[str, Any] | None
 
 
-@router.get("/portfolios/{portfolio_id}/dashboard", response_model=DashboardOut)
+@router.get("/portfolios/{portfolio_id}/dashboard", response_model=DashboardOut,
+            dependencies=[Depends(optional_user)])
 async def get_portfolio_dashboard(
     portfolio_id: str,
     db: AsyncSession = Depends(get_db),

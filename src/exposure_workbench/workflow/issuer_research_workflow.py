@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.agents.research_session import run_research_session
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company, EvidencePack, FilingChunk, FinancialFact
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import company_service
@@ -70,7 +71,8 @@ async def run_issuer_research(
 
     # ── phase 2: agent session ─────────────────────────────────────────────────
     async with db_factory() as db:
-        agent_session = await sess.create_session(db, kind="research")
+        # owner = the user who triggered this research (worker set the tenant ctx)
+        agent_session = await sess.create_session(db, kind="research", owner_id=current_user_id())
         await research_run_service.update_status(db, run_id, "running", agent_session_id=agent_session.id)
         await db.commit()
         session_id = agent_session.id
