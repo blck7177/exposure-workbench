@@ -261,6 +261,22 @@ CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type);
 -- idle queue), so give it a partial index rather than a scan of every task ever.
 CREATE INDEX IF NOT EXISTS idx_tasks_lease ON tasks(lease_until) WHERE status = 'running';
 
+-- ─── Daily usage counters (V2-E3) ────────────────────────────────────────────
+-- The unit is a USER ACTION, not a token or a tool call. Deliberately in the
+-- SHARED layer with NO RLS, like tasks: the global backstop pool has to count
+-- across tenants, and any `user_id = current_setting(...)` policy would silently
+-- reduce it to counting only the caller — a fail-OPEN backstop, which is worse
+-- than none. The global pool is just the reserved row user_id = '_global', so a
+-- single primitive covers both levels. Read routes filter by user for meaning,
+-- not for safety, and say so at the call site.
+CREATE TABLE IF NOT EXISTS usage_daily (
+    user_id     VARCHAR(255) NOT NULL,   -- Clerk user id, or the reserved '_global'
+    day         DATE NOT NULL,           -- UTC; resets at 00:00 UTC
+    kind        VARCHAR(32) NOT NULL,    -- chat_turn|research_run|readiness|exposure_run|market_sync
+    used        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day, kind)
+);
+
 -- ─── Schedules ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS schedules (
     id              VARCHAR(64) PRIMARY KEY,
@@ -475,7 +491,9 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     tools_used        INTEGER NOT NULL DEFAULT 0,
     external_searches INTEGER NOT NULL DEFAULT 0,
     started_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    ended_at          TIMESTAMPTZ
+    ended_at          TIMESTAMPTZ,
+    -- V2-E2: non-NULL and recent => a turn is in flight. Set from SERVER time.
+    turn_started_at   TIMESTAMPTZ
 );
 
 -- ─── Runtime: Agent Messages ─────────────────────────────────────────────────

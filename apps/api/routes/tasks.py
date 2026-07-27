@@ -27,7 +27,8 @@ class TaskOut(BaseModel):
     claimed_at: datetime | None
     completed_at: datetime | None
     error_message: str | None
-    retry_count: int
+    retry_count: int   # V2-E1: the reaper is its first writer, so non-zero values start here
+    lease_until: datetime | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.db.models import Task
+from exposure_workbench.services import usage_service
 from exposure_workbench.utils.ids import new_task_id
 
 WORKER_ID = socket.gethostname()
@@ -42,12 +43,36 @@ LEASE_EXPIRED_ERROR = (
 )
 
 
+# task type -> quota pool. NO default on purpose: a new task type that nobody
+# remembered to give a pool raises KeyError here instead of quietly becoming a
+# free action. This single mapping covers both surfaces that enqueue work — the
+# four REST routes and the three meta-agent delegation tools — which are parallel
+# implementations sharing no code, so any charge point above this one would have
+# to be written twice and would eventually be written once.
+TASK_TYPE_QUOTA_KIND = {
+    "exposure_update": "exposure_run",
+    "issuer_research": "research_run",
+    "company_readiness": "readiness",
+    "market_data_sync": "market_sync",
+}
+
+
 async def create_task(
     db: AsyncSession,
     task_type: str,
     payload: dict[str, Any] | None = None,
     owner_user_id: str | None = None,
 ) -> Task:
+    """Enqueue one task, charging the enqueuing user's daily quota.
+
+    The charge shares the caller's transaction, so a caller that later fails and
+    rolls back gives the quota back for free. Ownerless work (seeds, the worker's
+    own internal calls) is not charged — there is no user to charge, and the
+    worker never reaches this function.
+    """
+    if owner_user_id is not None:
+        await usage_service.charge(db, owner_user_id, TASK_TYPE_QUOTA_KIND[task_type])
+
     task = Task(
         id=new_task_id(),
         type=task_type,

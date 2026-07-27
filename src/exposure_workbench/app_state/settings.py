@@ -50,6 +50,26 @@ class Settings(BaseSettings):
     # issuer_research: EDGAR ingest + embeddings + a 30-turn agent loop).
     task_lease_seconds: int = 1800
     task_max_retries: int = 3
+    # One in-flight turn per agent session. Generous on purpose: a legitimate
+    # 16-turn LLM loop must never have its lease stolen, and the worst case for a
+    # turn whose process died is that its session is stuck for this long.
+    turn_lease_seconds: int = 900
+
+    # Daily quota (V2-E3). The unit is a USER ACTION — not tokens, not tool
+    # calls. Orthogonal to the per-session budgets above: those bound one
+    # conversation, these bound one day. Every action is charged twice, once to
+    # the user's pool and once to the shared '_global' backstop row.
+    daily_chat_turns: int = 10
+    daily_research_runs: int = 3
+    daily_readiness: int = 10
+    daily_exposure_runs: int = 20
+    daily_market_syncs: int = 10
+
+    global_daily_chat_turns: int = 200
+    global_daily_research_runs: int = 30
+    global_daily_readiness: int = 100
+    global_daily_exposure_runs: int = 200
+    global_daily_market_syncs: int = 50
 
     # CORS
     cors_origins: str = "http://localhost:3103,http://127.0.0.1:3103"

@@ -186,3 +186,19 @@ ALTER VIEW research_run_cost SET (security_invoker = true);
 -- so non-zero values start appearing in the /tasks view. That is expected.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_tasks_lease ON tasks(lease_until) WHERE status = 'running';
+
+-- ═══ V2-E2/E3: turn lease + daily usage counters ═════════════════════════════
+ALTER TABLE agent_sessions ADD COLUMN IF NOT EXISTS turn_started_at TIMESTAMPTZ;
+
+-- Shared layer, NO RLS on purpose — see the note in init.sql. The global
+-- backstop lives in this same table as the reserved row user_id = '_global'.
+CREATE TABLE IF NOT EXISTS usage_daily (
+    user_id     VARCHAR(255) NOT NULL,
+    day         DATE NOT NULL,
+    kind        VARCHAR(32) NOT NULL,
+    used        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day, kind)
+);
+-- Created after the ALL-TABLES grant near the top of this file, so app_rls needs
+-- an explicit one (the same trap V2-D hit with security_master).
+GRANT SELECT, INSERT, UPDATE ON usage_daily TO app_rls;

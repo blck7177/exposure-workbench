@@ -324,6 +324,23 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# ─── Daily usage counters (V2-E3) ─────────────────────────────────────────────
+
+class UsageDaily(Base):
+    """One row per (user, UTC day, action kind). Shared layer, NO RLS — see the
+    note in infra/init.sql: the global backstop is the reserved row
+    user_id='_global', and a tenant policy would silently make it count only the
+    caller. Written exclusively through usage_service.charge's conditional
+    upsert, never by ORM attribute assignment."""
+
+    __tablename__ = "usage_daily"
+
+    user_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    used: Mapped[int] = mapped_column(Integer, default=0)
+
+
 # ─── Schedules ────────────────────────────────────────────────────────────────
 
 class Schedule(Base):
@@ -553,6 +570,10 @@ class AgentSession(Base):
     external_searches: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # V2-E2: one in-flight turn per session. Claimed by a conditional UPDATE
+    # using SERVER time (never an ORM attribute set — that would be client time),
+    # released in a finally. A stale value simply expires; nothing renews it.
+    turn_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # ─── Runtime: Agent Messages ────────────────────────────────────────────────────

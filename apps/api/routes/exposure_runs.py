@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import exposure_run_service, portfolio_service, task_service
+from exposure_workbench.services import exposure_run_service, portfolio_service, task_service, usage_service
 
 router = APIRouter()
 
@@ -173,16 +173,19 @@ async def create_exposure_run(
     pf = await portfolio_service.get_portfolio(db, body.portfolio_id)
     if pf is None or pf.owner_id != user.user_id:
         raise HTTPException(403, "You can only run portfolios you own. Clone the demo to run it.")
-    task = await task_service.create_task(
-        db,
-        task_type="exposure_update",
-        payload={
-            "portfolio_id": body.portfolio_id,
-            "as_of_date": body.as_of_date.isoformat(),
-            "triggered_by": body.triggered_by,
-        },
-        owner_user_id=user.user_id,
-    )
+    try:
+        task = await task_service.create_task(
+            db,
+            task_type="exposure_update",
+            payload={
+                "portfolio_id": body.portfolio_id,
+                "as_of_date": body.as_of_date.isoformat(),
+                "triggered_by": body.triggered_by,
+            },
+            owner_user_id=user.user_id,
+        )
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
     run = await exposure_run_service.create_run(
         db,
         portfolio_id=body.portfolio_id,

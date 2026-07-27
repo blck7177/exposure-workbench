@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.db.models import AgentSession
+from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.utils.ids import new_session_id
 
 
@@ -26,6 +27,14 @@ class BudgetExceeded(Exception):
         self.kind = kind
         self.used = used
         self.limit = limit
+
+
+class TurnInFlight(Exception):
+    """This session already has a turn running (V2-E2)."""
+
+    def __init__(self, session_id: str):
+        super().__init__(f"a turn is already in flight for session {session_id!r}")
+        self.session_id = session_id
 
 
 @dataclass(frozen=True)
@@ -56,6 +65,67 @@ async def create_session(
 
 async def get_session(db: AsyncSession, session_id: str) -> AgentSession | None:
     return (await db.execute(select(AgentSession).where(AgentSession.id == session_id))).scalar_one_or_none()
+
+
+# One in-flight turn per session (V2-E2). Server time on both sides: with more
+# than one API replica a skewed client clock would either steal a live turn or
+# strand a dead one. Nothing renews the lease — a turn whose process died frees
+# itself once turn_lease_seconds have passed.
+_CLAIM_TURN_SQL = text("""
+UPDATE agent_sessions
+   SET turn_started_at = now()
+ WHERE id = :session_id
+   AND (turn_started_at IS NULL
+        OR turn_started_at < now() - make_interval(secs => :lease_secs))
+RETURNING id
+""")
+
+
+async def claim_turn(db: AsyncSession, session_id: str) -> bool:
+    """Try to take this session's single turn slot. False if one is in flight.
+
+    Runs on the CALLER's session so it can share a transaction with the quota
+    charge — over-quota then rolls the claim back with it, which is why there is
+    no "release on the rejection path" special case anywhere.
+
+    That transaction must be a SHORT one of its own, never the request-scoped
+    db: get_db holds its transaction until the route returns, so an uncommitted
+    claim would keep a row lock for the whole turn while reserve() — on a
+    different connection, once per tool call — waits on it. Postgres would not
+    report a deadlock (one side is waiting on application logic, not a lock), so
+    the request would simply hang forever.
+
+    Cross-user calls get False rather than a 403: agent_sessions' policy is FOR
+    ALL, so another tenant's row is invisible to the UPDATE as well as to SELECT.
+    Separating that from a genuine conflict is what the route's 404 precheck is
+    for; without it, "not yours" and "busy" collapse into one 0-row answer.
+    """
+    row = (await db.execute(
+        _CLAIM_TURN_SQL,
+        {"session_id": session_id, "lease_secs": get_settings().turn_lease_seconds},
+    )).first()
+    return row is not None
+
+
+async def release_turn(session_id: str) -> None:
+    """Free the turn slot. Opens its own session and commits immediately.
+
+    Called from a finally, which is the whole point: the request-scoped session
+    rolls back on the error paths, and those are exactly the ones that must still
+    release. Never raises — a failure here costs at most turn_lease_seconds of
+    availability for one session, and letting it escape would mask the original
+    error that sent us into the finally.
+    """
+    try:
+        factory = get_session_factory()
+        async with factory() as db, db.begin():
+            await db.execute(
+                update(AgentSession)
+                .where(AgentSession.id == session_id)
+                .values(turn_started_at=None)
+            )
+    except Exception:   # noqa: BLE001 — see docstring; expiry is the backstop
+        pass
 
 
 async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool) -> BudgetStatus:

@@ -5,21 +5,15 @@ import { X, Upload, Copy, Loader2, AlertTriangle, Search, Trash2 } from "lucide-
 import { createPortfolio, cloneDemoPortfolio, searchSecurities, type SecurityHit } from "@/lib/api";
 import type { Portfolio } from "@/lib/types";
 import { AuthGate } from "./Auth";
+import { apiErrorDetail } from "@/lib/http";
 
 type Problem = { row?: number; ticker?: string; reason: string };
 type Picked = { ticker: string; name: string | null; qty: string };
 
 function extractProblems(err: unknown): Problem[] | null {
-  const msg = err instanceof Error ? err.message : String(err);
-  const i = msg.indexOf("{");
-  if (i < 0) return null;
-  try {
-    const body = JSON.parse(msg.slice(i));
-    const p = body?.detail?.problems ?? body?.problems;
-    return Array.isArray(p) ? p : null;
-  } catch {
-    return null;
-  }
+  const detail = apiErrorDetail(err);
+  const p = detail?.problems;
+  return Array.isArray(p) ? (p as Problem[]) : null;
 }
 
 export function PortfolioModal({

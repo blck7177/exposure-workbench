@@ -18,7 +18,7 @@ from exposure_workbench.agents.meta_agent import handle_message
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
-from exposure_workbench.services import agent_session_service
+from exposure_workbench.services import agent_session_service, usage_service
 
 router = APIRouter()
 
@@ -60,12 +60,47 @@ async def post_message(
     user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """One turn of the meta-agent.
+
+    Status order is fixed: 401 (require_user) -> 404 (precheck) -> 409 (a turn is
+    already in flight) -> 429 (daily quota). Deliberately no 403: agent_sessions
+    has a FOR ALL policy, so another tenant's session is invisible to both the
+    SELECT and the UPDATE — the precheck below is what keeps "not yours" (404)
+    distinguishable from "busy" (409); drop it and the two collapse into one
+    indistinguishable 0-row answer.
+    """
     s = await agent_session_service.get_session(db, session_id)
     if s is None:
         raise HTTPException(404, "unknown session")
+
     factory = get_session_factory()
-    result = await handle_message(factory, session_id, body.text)
-    return result
+
+    # Claim the turn and charge the quota in ONE short transaction, committed
+    # before any LLM call. Over-quota rolls the claim back with it, so there is
+    # no "release on the rejection path" case to get wrong. It must not use the
+    # request-scoped db: get_db holds its transaction open until the route
+    # returns, and reserve() runs on a different connection once per tool call,
+    # so an uncommitted claim would hang the request on its own row lock.
+    #
+    # It must also land BEFORE handle_message, which commits the user's message
+    # before entering the LLM loop — claim later and a rejected turn would still
+    # leave that message in the database.
+    async with factory() as gate_db, gate_db.begin():
+        if not await agent_session_service.claim_turn(gate_db, session_id):
+            raise HTTPException(409, {"error": "turn_in_flight", "session_id": session_id})
+        try:
+            await usage_service.charge(gate_db, user.user_id, "chat_turn")
+        except usage_service.QuotaExceeded as e:
+            raise HTTPException(429, e.as_dict()) from e
+
+    try:
+        return await handle_message(factory, session_id, body.text)
+    finally:
+        # finally, not a happy-path call: chat_with_tools raises outright when no
+        # API key is configured, OpenAI network errors pass straight through, and
+        # reserve's ValueError("unknown session") is outside the only except
+        # clause in registry.invoke. Every one of those must still free the slot.
+        await agent_session_service.release_turn(session_id)
 
 
 class StepOut(BaseModel):

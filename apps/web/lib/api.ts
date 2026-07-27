@@ -1,4 +1,4 @@
-import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Task } from "./types";
+import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Task, Usage } from "./types";
 import { apiFetch as fetchJson } from "./http";
 
 // setAuthTokenGetter now lives in ./http (the shared transport); re-export so
@@ -86,4 +86,10 @@ export async function createRun(
 export async function listTasks(status?: string): Promise<Task[]> {
   const qs = status ? `?status=${status}` : "";
   return fetchJson<Task[]>(`/api/tasks${qs}`);
+}
+
+// ─── Daily quota (V2-E4) ──────────────────────────────────────────────────────
+
+export async function getMyUsage(): Promise<Usage> {
+  return fetchJson<Usage>("/api/me/usage");
 }

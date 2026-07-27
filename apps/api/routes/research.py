@@ -16,7 +16,7 @@ from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import company_service, research_run_service, task_service
+from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 
 router = APIRouter()
 
@@ -46,11 +46,14 @@ async def ensure_ready(
         raise HTTPException(404, f"unknown ticker {tk}")
     except company_service.NotInvestigable:
         raise HTTPException(422, f"{tk} is not investigable")
-    task = await task_service.create_task(
-        db, task_type="company_readiness",
-        payload={"ticker": tk, "skip_market_refresh": bool(body and body.skip_market_refresh)},
-        owner_user_id=user.user_id,
-    )
+    try:
+        task = await task_service.create_task(
+            db, task_type="company_readiness",
+            payload={"ticker": tk, "skip_market_refresh": bool(body and body.skip_market_refresh)},
+            owner_user_id=user.user_id,
+        )
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
     await db.commit()
     return TaskAck(task_id=task.id, status=task.status)
 
@@ -91,17 +94,29 @@ async def create_research_run(
     except company_service.NotInvestigable:
         raise HTTPException(422, f"{tk} is not investigable")
 
-    task = await task_service.create_task(
-        db, task_type="issuer_research", payload={"ticker": tk}, owner_user_id=user.user_id,
-    )
+    # Check for an active run BEFORE enqueuing (V2-E3). create_run raises
+    # ActiveRunExists after the fact, and charging quota for a request that is
+    # about to 409 would let a user burn their research allowance on a conflict.
+    # The REST path never leaked an orphan task — get_db rolls back on the raise —
+    # but the agent path did, and both now share this ordering.
+    active = await research_run_service.get_active_run(db, company.id)
+    if active is not None:
+        raise HTTPException(409, detail={"error": "active_run_exists", "run_id": active.id})
+
+    try:
+        task = await task_service.create_task(
+            db, task_type="issuer_research", payload={"ticker": tk}, owner_user_id=user.user_id,
+        )
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
     try:
         run = await research_run_service.create_run(
             db, company.id, body.portfolio_id, triggered_by="manual", task_id=task.id,
             owner_id=user.user_id,
         )
     except research_run_service.ActiveRunExists as e:
-        # a run is already active for this issuer — point the caller at it
-        raise HTTPException(409, detail={"message": "active run exists", "run_id": e.run_id})
+        # lost a race with a concurrent request between the precheck and here
+        raise HTTPException(409, detail={"error": "active_run_exists", "run_id": e.run_id})
 
     task.payload = {**task.payload, "run_id": run.id,
                     "skip_external_research": body.skip_external_research,

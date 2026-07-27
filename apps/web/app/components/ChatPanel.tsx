@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageSquare, Plus, Send, X, Wrench, Brain, Send as SendIcon } from "lucide-react";
 import { createSession, postMessage, getSessionDetail, type AgentStep } from "../../lib/issuer";
+import { getMyUsage } from "@/lib/api";
+import { apiErrorDetail, type ApiError } from "@/lib/http";
+import type { Usage } from "@/lib/types";
 import { CitationChip, openEvidence } from "./Evidence";
 import { AuthGate } from "./Auth";
 
@@ -25,6 +28,26 @@ function TraceLine({ s }: { s: AgentStep }) {
   );
 }
 
+// Today's chat allowance. Renders nothing until a fetch succeeds, so a signed-out
+// visitor (whose /me/usage 401s) simply never sees it.
+function QuotaBadge({ usage }: { usage: Usage | null }) {
+  const pool = usage?.pools.find((p) => p.kind === "chat_turn");
+  if (!pool) return null;
+  const spent = pool.remaining === 0;
+  return (
+    <span
+      title={`${pool.used} of ${pool.limit} chat turns used today — resets ${new Date(usage!.resets_at).toLocaleString()}`}
+      className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+        spent
+          ? "text-amber-400 border-amber-900/60 bg-amber-950/30"
+          : "text-slate-500 border-[#21262d]"
+      }`}
+    >
+      {pool.remaining}/{pool.limit}
+    </span>
+  );
+}
+
 export function ChatPanel() {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -32,6 +55,8 @@ export function ChatPanel() {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // restore session across page navigations / refresh
@@ -64,12 +89,26 @@ export function ChatPanel() {
     return () => clearInterval(iv);
   }, [busy, sessionId]);
 
+  // Refresh the allowance when the panel opens and after every turn settles.
+  // Guarded like the other effects here: a late response from a previous render
+  // must not overwrite a newer one. Failure (including the 401 apiFetch throws
+  // when signed out) leaves it null and the badge hidden — never throws.
+  useEffect(() => {
+    if (!open || busy) return;
+    let ignore = false;
+    getMyUsage()
+      .then((u) => { if (!ignore) setUsage(u); })
+      .catch(() => { if (!ignore) setUsage(null); });
+    return () => { ignore = true; };
+  }, [open, busy]);
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, steps]);
 
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
+    setNotice(null);
     setMessages((m) => [...m, { role: "user", text, citations: [] }]);
     setBusy(true);
     try {
@@ -79,7 +118,33 @@ export function ChatPanel() {
       const d = await getSessionDetail(sid);
       setSteps(d.steps);
     } catch (e) {
-      setMessages((m) => [...m, { role: "assistant", text: `error: ${(e as Error).message}`, citations: [] }]);
+      const status = (e as ApiError).status;
+      const detail = apiErrorDetail(e);
+
+      // The gate (401/404/409/429) rejects before handle_message runs, and
+      // handle_message is what commits the user's message — so on any 4xx the
+      // server holds no record of what we optimistically rendered. Leave it up
+      // and it silently disappears on the next refresh. A 5xx means the turn
+      // had already started, so the message IS persisted and the bubble stays.
+      if (status && status < 500) setMessages((m) => m.slice(0, -1));
+
+      if (detail?.error === "turn_in_flight") {
+        // A concurrency signal, not an account — say it in words. The realistic
+        // cause is a second tab (the session id lives in localStorage, shared
+        // per origin) or a previous turn whose process died and whose lease has
+        // not expired yet.
+        setNotice("This session already has a turn running — it may be open in another tab. Wait for it to finish, or start a new session.");
+      } else if (detail?.error === "quota_exceeded") {
+        // An account. Show the numbers as the server reported them rather than
+        // paraphrasing: the user wants to know what they spent and when it resets.
+        setNotice(
+          `Daily limit reached: ${detail.used}/${detail.limit} ${String(detail.kind).replace(/_/g, " ")}s` +
+          (detail.scope === "global" ? " across all users" : "") +
+          `. Resets ${new Date(String(detail.resets_at)).toLocaleString()}.`
+        );
+      } else {
+        setMessages((m) => [...m, { role: "assistant", text: `error: ${(e as Error).message}`, citations: [] }]);
+      }
     } finally {
       setBusy(false);
     }
@@ -102,6 +167,7 @@ export function ChatPanel() {
       <div className="h-10 border-b border-[#21262d] flex items-center px-3 gap-2 shrink-0">
         <MessageSquare className="w-4 h-4 text-blue-400" />
         <span className="text-sm text-slate-300">Analyst</span>
+        <QuotaBadge usage={usage} />
         <button onClick={newSession} title="New session" className="ml-auto text-slate-400 hover:text-slate-200 flex items-center gap-1 text-xs">
           <Plus className="w-3.5 h-3.5" /> New
         </button>
@@ -133,6 +199,12 @@ export function ChatPanel() {
         )}
         <div ref={endRef} />
       </div>
+
+      {notice && (
+        <div className="border-t border-amber-900/50 bg-amber-950/20 px-3 py-2 text-xs text-amber-300 shrink-0">
+          {notice}
+        </div>
+      )}
 
       <AuthGate
         fallback={

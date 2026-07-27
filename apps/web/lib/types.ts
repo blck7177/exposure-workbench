@@ -151,7 +151,23 @@ export interface Task {
   completed_at: string | null;
   error_message: string | null;
   retry_count: number;
+  lease_until: string | null;
   created_at: string;
 }
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
+
+// ─── Daily quota (V2-E4) ──────────────────────────────────────────────────────
+
+export interface UsagePool {
+  kind: string;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface Usage {
+  day: string;
+  resets_at: string;
+  pools: UsagePool[];
+}
