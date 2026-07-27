@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     worker_poll_interval: int = 2
 
+    # Concurrency (V2-E). Leases rely on "pick a generous value, let expiry
+    # self-heal" — there is deliberately no heartbeat or renewal thread, so the
+    # only failure mode is a dead task sitting a while, never a live one being
+    # stolen. 1800s is comfortably longer than the slowest real task (a cold
+    # issuer_research: EDGAR ingest + embeddings + a 30-turn agent loop).
+    task_lease_seconds: int = 1800
+    task_max_retries: int = 3
+
     # CORS
     cors_origins: str = "http://localhost:3103,http://127.0.0.1:3103"
 

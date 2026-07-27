@@ -314,6 +314,9 @@ class Task(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     worker_id: Mapped[str | None] = mapped_column(String(64))
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # V2-E1: set from SERVER time on claim; the reaper treats a past value as
+    # "the worker holding this died". Cleared on requeue, complete and fail.
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)

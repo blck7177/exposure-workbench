@@ -239,11 +239,15 @@ CREATE TABLE IF NOT EXISTS daily_reports (
 -- ─── Tasks ───────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tasks (
     id              VARCHAR(64) PRIMARY KEY,
-    type            VARCHAR(64) NOT NULL,  -- exposure_update|market_data_sync|scheduled_update
+    type            VARCHAR(64) NOT NULL,  -- exposure_update|market_data_sync|company_readiness|issuer_research
     status          VARCHAR(32) NOT NULL DEFAULT 'pending',  -- pending|running|completed|failed
     payload         JSONB DEFAULT '{}',
     worker_id       VARCHAR(64),
     claimed_at      TIMESTAMPTZ,
+    -- V2-E1: SERVER-time deadline stamped at claim. Past value + status='running'
+    -- means the worker holding it died, and the reaper decides requeue vs fail by
+    -- task type (see task_service.REQUEUEABLE_TYPES). Never renewed.
+    lease_until     TIMESTAMPTZ,
     completed_at    TIMESTAMPTZ,
     error_message   TEXT,
     retry_count     INTEGER NOT NULL DEFAULT 0,
@@ -253,6 +257,9 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type);
+-- V2-E1: the reaper runs on every worker poll (every WORKER_POLL_INTERVAL on an
+-- idle queue), so give it a partial index rather than a scan of every task ever.
+CREATE INDEX IF NOT EXISTS idx_tasks_lease ON tasks(lease_until) WHERE status = 'running';
 
 -- ─── Schedules ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS schedules (

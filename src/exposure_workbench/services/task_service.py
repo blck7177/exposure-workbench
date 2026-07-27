@@ -1,4 +1,4 @@
-"""Task service — create, claim, complete, and fail tasks."""
+"""Task service — create, claim, complete, fail, and reap tasks."""
 
 from __future__ import annotations
 
@@ -6,13 +6,40 @@ import socket
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import bindparam, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.db.models import Task
 from exposure_workbench.utils.ids import new_task_id
 
 WORKER_ID = socket.gethostname()
+
+# Which task types survive being run twice — measured against the persistence
+# code, NOT assumed. Re-delivery is a WHITELIST because the two omissions are
+# actively harmful, not merely wasteful:
+#
+#   company_readiness  — every step is an upsert or an index short-circuit
+#   market_data_sync   — ON CONFLICT DO UPDATE on (ticker, price_date)
+#
+#   exposure_update    — _persist_outputs is five bare INSERTs against
+#                        UNIQUE(run_id...) on exposure_metrics / daily_reports /
+#                        sector_exposures / issuer_exposures / factor_attributions,
+#                        so a replay raises IntegrityError (and risk_alerts, which
+#                        has no unique key, would silently duplicate instead)
+#   issuer_research    — issuer_briefs UNIQUE(research_run_id), and submit_brief is
+#                        the agent's exit gate, so the collision only fires AFTER a
+#                        whole LLM session has been paid for
+#
+# Anything not listed here is failed on lease expiry rather than replayed. A new
+# task type must state its side here explicitly; there is no default.
+REQUEUEABLE_TYPES = frozenset({"company_readiness", "market_data_sync"})
+
+LEASE_EXPIRED_ERROR = (
+    "lease expired — the worker holding this task stopped reporting. "
+    "This task type is not safe to replay, so it was failed rather than requeued; "
+    "start it again to retry."
+)
 
 
 async def create_task(
@@ -52,6 +79,12 @@ async def claim_next_task(
     task.status = "running"
     task.worker_id = worker_id
     task.claimed_at = datetime.now(timezone.utc)
+    # Lease deadline comes from the SERVER clock, not this process's. With
+    # several worker replicas a skewed local clock would otherwise both steal
+    # live tasks (clock ahead) and strand dead ones (clock behind).
+    task.lease_until = text("now() + make_interval(secs => :lease_secs)").bindparams(
+        lease_secs=get_settings().task_lease_seconds
+    )
     await db.flush()
     return task
 
@@ -60,7 +93,11 @@ async def complete_task(db: AsyncSession, task_id: str) -> None:
     await db.execute(
         update(Task)
         .where(Task.id == task_id)
-        .values(status="completed", completed_at=datetime.now(timezone.utc))
+        .values(
+            status="completed",
+            completed_at=datetime.now(timezone.utc),
+            lease_until=None,   # settled: nothing left for the reaper to find
+        )
     )
 
 
@@ -72,8 +109,60 @@ async def fail_task(db: AsyncSession, task_id: str, error: str) -> None:
             status="failed",
             error_message=error,
             completed_at=datetime.now(timezone.utc),
+            lease_until=None,
         )
     )
+
+
+_REAP_SQL = text("""
+WITH expired AS (
+    SELECT id,
+           (type IN :requeueable AND retry_count < :max_retries) AS requeue
+      FROM tasks
+     WHERE status = 'running'
+       AND lease_until IS NOT NULL
+       AND lease_until < now()
+     FOR UPDATE SKIP LOCKED
+)
+UPDATE tasks t
+   SET status        = CASE WHEN e.requeue THEN 'pending'          ELSE 'failed' END,
+       retry_count   = CASE WHEN e.requeue THEN t.retry_count + 1  ELSE t.retry_count END,
+       error_message = CASE WHEN e.requeue THEN NULL               ELSE :expired_msg END,
+       completed_at  = CASE WHEN e.requeue THEN NULL               ELSE now() END,
+       worker_id     = CASE WHEN e.requeue THEN NULL               ELSE t.worker_id END,
+       claimed_at    = CASE WHEN e.requeue THEN NULL               ELSE t.claimed_at END,
+       lease_until   = NULL
+  FROM expired e
+ WHERE t.id = e.id
+RETURNING t.id, t.type, t.payload, t.owner_user_id, t.retry_count, t.status
+""").bindparams(bindparam("requeueable", expanding=True))
+
+
+async def reclaim_expired_leases(db: AsyncSession) -> list[dict[str, Any]]:
+    """Reap tasks whose lease ran out. Returns one dict per reaped task.
+
+    This is the FIRST of the reaper's two transactions and it deliberately runs
+    with NO tenant set: tasks carries no RLS, so one batch statement can settle
+    every user's expired work at once. Marking the associated runs failed is the
+    caller's second transaction, one per task and each under its own tenant —
+    they cannot be merged, because a single RLS failure on exposure_runs aborts
+    the whole transaction it is in, which would turn one bad row into a reaper
+    that dies every cycle.
+
+    All timestamps and the expiry comparison use the SERVER clock, matching how
+    the lease was stamped. FOR UPDATE SKIP LOCKED keeps two workers' reapers from
+    both settling the same task.
+    """
+    settings = get_settings()
+    rows = await db.execute(
+        _REAP_SQL,
+        {
+            "requeueable": list(REQUEUEABLE_TYPES),
+            "max_retries": settings.task_max_retries,
+            "expired_msg": LEASE_EXPIRED_ERROR,
+        },
+    )
+    return [dict(r) for r in rows.mappings().all()]
 
 
 async def get_task(db: AsyncSession, task_id: str) -> Task | None:

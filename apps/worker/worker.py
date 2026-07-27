@@ -28,6 +28,7 @@ load_dotenv(ROOT / ".env")
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.db.session import get_session_factory
+from exposure_workbench.services import exposure_run_service, research_run_service, task_service
 from exposure_workbench.services.task_service import claim_next_task, complete_task, fail_task
 
 # The worker is a system process; each task runs under the tenant of the user who
@@ -129,6 +130,70 @@ async def process_one() -> bool:
     return True
 
 
+# How to reach a failed task's run, per task type: (lookup, mark-failed). Only
+# the two non-replayable types have a run row at all — company_readiness logs
+# under the task's own id and market_data_sync has no run concept — so their
+# absence here is the design, not an oversight. The two services spell the
+# updater differently (update_run_status vs update_status), hence the pair.
+_RUN_FAILERS = {
+    "exposure_update": (exposure_run_service.get_run, exposure_run_service.update_run_status),
+    "issuer_research": (research_run_service.get_run, research_run_service.update_status),
+}
+
+
+async def _fail_run_for(task_row: dict) -> None:
+    """Mark one reaped task's run failed, under that task's own tenant.
+
+    Its own transaction, on purpose. exposure_runs' RLS policy passes reads via
+    `p.is_public` but requires ownership on write, so a WITH CHECK violation here
+    aborts the entire transaction it runs in — batching these would let one bad
+    row take down the whole reap, every cycle, forever.
+    """
+    run_id = (task_row.get("payload") or {}).get("run_id")
+    failer = _RUN_FAILERS.get(task_row["type"])
+    if not run_id or failer is None:
+        return
+    get_run, mark_failed = failer
+
+    # Must be set before the session's first query: the after_begin listener
+    # reads the contextvar when the transaction opens, not when it commits.
+    tenant = task_row.get("owner_user_id") or DEMO_SYSTEM_USER
+    ctx_token = current_user_ctx.set(tenant)
+    try:
+        factory = get_session_factory()
+        async with factory() as db, db.begin():
+            # Both update helpers return silently when the run is not visible,
+            # which under RLS is indistinguishable from success. Check first so a
+            # tenant mistake shows up in the log instead of vanishing.
+            if await get_run(db, run_id) is None:
+                logger.error(
+                    "Reaped task %s: run %s not visible as tenant %s — run left as-is",
+                    task_row["id"], run_id, tenant,
+                )
+                return
+            await mark_failed(db, run_id, "failed", error_message=task_service.LEASE_EXPIRED_ERROR)
+            logger.warning("Reaped task %s: marked run %s failed", task_row["id"], run_id)
+    except Exception as exc:
+        logger.error("Reaped task %s: could not fail run %s: %s", task_row["id"], run_id, exc)
+    finally:
+        current_user_ctx.reset(ctx_token)
+
+
+async def reap_stale_leases() -> None:
+    """Settle every task whose lease has expired. Two phases, two transactions."""
+    factory = get_session_factory()
+    async with factory() as db, db.begin():
+        reaped = await task_service.reclaim_expired_leases(db)
+
+    for row in reaped:
+        logger.warning(
+            "Reaped task %s (type=%s) -> %s (retry_count=%s)",
+            row["id"], row["type"], row["status"], row["retry_count"],
+        )
+        if row["status"] == "failed":
+            await _fail_run_for(row)
+
+
 async def run_worker() -> None:
     settings = get_settings()
     poll_interval = settings.worker_poll_interval
@@ -137,6 +202,18 @@ async def run_worker() -> None:
     while _running:
         try:
             processed = await process_one()
+
+            # Reaping belongs here, not in process_one: that function returns
+            # early on an empty queue — exactly when stale leases most need
+            # collecting — and on a busy queue it is re-entered back-to-back with
+            # no delay, which would spin the reaper once per task. Its own try
+            # block so a persistently failing reap degrades to noise in the log
+            # instead of starving task processing.
+            try:
+                await reap_stale_leases()
+            except Exception as exc:
+                logger.error(f"Lease reaper failed: {exc}", exc_info=True)
+
             if not processed:
                 # No tasks available — wait before next poll
                 await asyncio.sleep(poll_interval)

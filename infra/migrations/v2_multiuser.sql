@@ -176,3 +176,13 @@ CREATE POLICY tenant ON workflow_events USING (EXISTS (SELECT 1 FROM exposure_ru
 -- was never exploited. security_invoker (PG15+) makes them honour the caller.
 ALTER VIEW session_cost      SET (security_invoker = true);
 ALTER VIEW research_run_cost SET (security_invoker = true);
+
+-- ═══ V2-E1: worker lease + requeue ═══════════════════════════════════════════
+-- lease_until is stamped from SERVER time at claim and never renewed. A past
+-- value on a 'running' task means the worker holding it died; the reaper then
+-- requeues the two replay-safe task types and fails the other two outright
+-- (see task_service.REQUEUEABLE_TYPES for why that split is not symmetric).
+-- retry_count already existed with no writer since P0 — the reaper is its first,
+-- so non-zero values start appearing in the /tasks view. That is expected.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_tasks_lease ON tasks(lease_until) WHERE status = 'running';

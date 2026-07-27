@@ -2,6 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16   # Postgres 16 + pgvector (filing_chunks.embedding)
     container_name: exposure-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: exposure
       POSTGRES_PASSWORD: exposure
@@ -22,6 +23,7 @@ services:
       context: .
       dockerfile: infra/Dockerfile.api
     container_name: exposure-api
+    restart: unless-stopped
     ports:
       - "${API_HOST_PORT:-8103}:8000"
     environment:
@@ -48,10 +50,14 @@ services:
         condition: service_healthy
 
   exposure-worker:
+    # No container_name: it would make `docker compose up --scale exposure-worker=N`
+    # fail on a name collision. Replicas get the compose-generated name, and
+    # WORKER_ID (socket.gethostname() = the 12-char container id) differs per
+    # replica with no code change.
+    restart: unless-stopped
     build:
       context: .
       dockerfile: infra/Dockerfile.worker
-    container_name: exposure-worker
     environment:
       DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
       DATABASE_URL_APP: "${DATABASE_URL_APP:-postgresql+asyncpg://app_rls:app_rls_pw@postgres:5432/exposure_workbench}"
@@ -65,6 +71,10 @@ services:
       REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
       DEMO_MODE: "${DEMO_MODE:-true}"
       WORKER_POLL_INTERVAL: "${WORKER_POLL_INTERVAL:-2}"
+      # V2-E1 lease. Override to a few seconds to exercise takeover; the
+      # production value must exceed the slowest real task.
+      TASK_LEASE_SECONDS: "${TASK_LEASE_SECONDS:-1800}"
+      TASK_MAX_RETRIES: "${TASK_MAX_RETRIES:-3}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
       - ./data:/app/data
@@ -81,6 +91,7 @@ services:
         NEXT_PUBLIC_API_URL: "http://localhost:${API_HOST_PORT:-8103}"
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
     container_name: exposure-web
+    restart: unless-stopped
     ports:
       - "${WEB_HOST_PORT:-3103}:3000"
     environment:
