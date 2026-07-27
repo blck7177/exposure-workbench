@@ -151,7 +151,7 @@ def test_bearer_extraction():
 async def test_require_user_no_token_401():
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as e:
-        await auth_deps.require_user(authorization=None, db=None)
+        await auth_deps.require_user(authorization=None)
     assert e.value.status_code == 401
     assert e.value.detail["error"] == "unauthenticated"
 
@@ -161,16 +161,16 @@ async def test_require_user_bad_token_401(keypair):
     now = int(time.time())
     expired = _sign(keypair, iat=now - 7200, exp=now - 3600)
     with pytest.raises(HTTPException) as e:
-        await auth_deps.require_user(authorization=f"Bearer {expired}", db=None)
+        await auth_deps.require_user(authorization=f"Bearer {expired}")
     assert e.value.status_code == 401
     assert e.value.detail["reason"] == "expired"
 
 
 async def test_optional_user_no_token_returns_none():
-    assert await auth_deps.optional_user(authorization=None, db=None) is None
+    assert await auth_deps.optional_user(authorization=None) is None
 
 
 async def test_optional_user_bad_token_returns_none(keypair):
     now = int(time.time())
     expired = _sign(keypair, iat=now - 7200, exp=now - 3600)
-    assert await auth_deps.optional_user(authorization=f"Bearer {expired}", db=None) is None
+    assert await auth_deps.optional_user(authorization=f"Bearer {expired}") is None

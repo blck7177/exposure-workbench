@@ -4,19 +4,24 @@
 - optional_user: UserClaims or None. For reads whose visibility varies by
   identity (wired in V2-C once RLS exists).
 
-On success both upsert the users row (bootstrap) and set the current-user
-contextvar, so V2-C's tenant DB session and any service can see the tenant
-without threading it through signatures.
+On success both set the current-user contextvar — so V2-C's tenant DB session
+and any service can see the tenant without threading it through signatures —
+and then upsert the users row. That order is load-bearing: user_service.touch
+opens its own session, and the after_begin listener reads the contextvar when
+that session's transaction starts.
+
+Neither dependency takes a DB session (V2-E0). They used to, and the users-row
+upsert then rode the request-scoped transaction, holding a row lock on users for
+the entire turn; the same user's second concurrent request blocked here instead
+of reaching the route.
 """
 
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Header, HTTPException
 
 from exposure_workbench.auth.clerk import AuthError, UserClaims, verify_token
 from exposure_workbench.auth.context import current_user_ctx
-from exposure_workbench.db.session import get_db
 from exposure_workbench.services import user_service
 
 
@@ -31,7 +36,6 @@ def _bearer(authorization: str | None) -> str | None:
 
 async def optional_user(
     authorization: str | None = Header(default=None),
-    db: AsyncSession = Depends(get_db),
 ) -> UserClaims | None:
     token = _bearer(authorization)
     if not token:
@@ -41,13 +45,12 @@ async def optional_user(
     except AuthError:
         return None
     current_user_ctx.set(claims.user_id)
-    await user_service.touch(db, claims.user_id, claims.email)
+    await user_service.touch(claims.user_id, claims.email)
     return claims
 
 
 async def require_user(
     authorization: str | None = Header(default=None),
-    db: AsyncSession = Depends(get_db),
 ) -> UserClaims:
     token = _bearer(authorization)
     if not token:
@@ -57,5 +60,5 @@ async def require_user(
     except AuthError as e:
         raise HTTPException(401, {"error": "unauthenticated", "reason": e.reason})
     current_user_ctx.set(claims.user_id)
-    await user_service.touch(db, claims.user_id, claims.email)
+    await user_service.touch(claims.user_id, claims.email)
     return claims

@@ -32,7 +32,16 @@ from exposure_workbench.services.task_service import claim_next_task, complete_t
 
 # The worker is a system process; each task runs under the tenant of the user who
 # enqueued it (owner_user_id) so RLS writes land, falling back to the demo system
-# user for ownerless/system tasks (readiness touches only shared tables anyway).
+# user for ownerless/system tasks.
+#
+# The parenthetical that used to end that sentence — "readiness touches only
+# shared tables anyway" — was false and hid a bug for two phases: every workflow
+# step writes workflow_events, which IS an RLS table, and its policy knew only
+# the exposure-run and research-run parents. Readiness logs under
+# run_id = task.id, matched nothing, and so had never once completed. Any new
+# task type that runs a workflow must have a matching parent branch in that
+# policy (infra/init.sql, mirrored in the migration, guarded by
+# tests/test_rls_parity.py).
 DEMO_SYSTEM_USER = "user_demo_system"
 
 logging.basicConfig(

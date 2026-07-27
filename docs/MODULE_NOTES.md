@@ -534,13 +534,19 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 
 ### 并发(三平面)
 
-- **Worker 面(唯一必写的新代码)**:lease + requeue(claimed_at + lease 过期列,轮询顺带回收)——治 P6 亲历的 stuck-run 类事故;配合既有幂等步骤 = 正确的 at-least-once;之后 `--scale worker=N` 零代码横扩
+- **Worker 面(唯一必写的新代码)**:lease + requeue(`lease_until` 列,轮询顺带回收)——治 P6 亲历的 stuck-run 类事故;之后 `--scale worker=N` 零代码横扩
+  - ★ 已改(V2-E 实测推翻原设计):原文写「配合既有幂等步骤 = 正确的 at-least-once」,**此断言为假**。实测幂等的只有 `company_readiness` 与 `market_data_sync`(全链 `ON CONFLICT DO UPDATE` + 索引短路);`exposure_workflow._persist_outputs` 是裸 `db.add` INSERT,打在 `exposure_metrics`/`daily_reports`/`sector_exposures`/`issuer_exposures`/`factor_attributions` 五个 `UNIQUE(run_id…)` 上,第二次必 IntegrityError(`risk_alerts` 无唯一键则静默重复);`issuer_research_workflow` 模块 docstring 自陈 "deliberately NOT idempotent"。因此**重投集是白名单**:前两类过期回 `pending` 并计 `retry_count`,后两类 task 与 run 双双标 `failed`(`app_rls` 无 DELETE,半截 run 在应用层清不掉,标红让用户显式重跑是唯一诚实解),这同时解开 research 的 `ActiveRunExists` 永久 409 死锁
 - Agent 面:每 session 单 in-flight turn(防双击交叉写 trace);research per-company singleflight **保持全局**(证据库共享,两个用户触发同一公司只跑一次)
 - API/DB 面:async + append-only 天然并发友好,只需池尺寸确认;写进文档,不写代码
 
 ### 预算(公网 + 真 key 的硬前提)
 
-- per-user 日上限进现有 ToolRegistry wrapper(session 预算加一维);cost views 按 user 聚合即可;全局日上限(env)兜底
+- ★ 已改(V2-E 定稿,推翻原「进 wrapper」设计):强制点 = **`usage_daily` 计数表 + 两个扣费点**。理由有二:①wrapper 只看得见工具调用,而 exposure/readiness/research 各有 REST 路由与 agent 委派**两条平行入口**,wrapper 拦不住路由面;②按 `agent_steps` 数当日用量要 join `agent_sessions` 再对无索引的 `created_at` 做范围扫描,而这落在每次工具调用的热路径上
+- 形状:`usage_daily(user_id, day, kind, used)`,**共享层不加 RLS**(同 `tasks`)——全局兜底池必须跨租户计数,任何 `user_id = current_setting(...)` 的策略都会让它只数到调用者自己 = fail-open 的假兜底;放共享层后全局池就是同表的保留行 `user_id = '_global'`,一个原语覆盖两级。读路由按 user 过滤须标 `# semantic, not security`
+- 唯一原语 `usage_service.charge(db, user_id, kind, limit)`,形状照抄 `agent_session_service.reserve` 的条件 upsert(`ON CONFLICT … DO UPDATE … WHERE used < :limit RETURNING used`,0 行 → 抛 `QuotaExceeded`)。`user_id` 为 None → 抛错,不静默放行
+- 扣费点**只有两个**:`task_service.create_task`(按 task type 映射五池之四,**映射表无默认值** → 将来新增 task type 忘配额 = KeyError fail loud,这一个点同时盖住 REST 与 agent 委派两条面)与 `POST /agent/sessions/{id}/messages`(`chat_turn`;不可按 session 创建扣——一个 session 能发无限条消息)。先扣 user 池再扣全局池、同一事务,任一超限即回滚 → **不需要任何退款/补偿逻辑**
+- 可见面 `GET /api/me/usage` **直查表,禁止建视图**——V2-E0 刚修掉的 `session_cost` 越权正是视图默认绕过 RLS 造成的,再造一个等于把洞重开
+- wrapper 内既有的 session 预算(工具调用数 / external_search 数)保持不变,与日配额是两个正交维度;`cost views` 仅供 owner 侧核账,不作为配额数据源
 
 ### 部署呈现
 
@@ -553,7 +559,7 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 - **U1 → U2 连做**:U1 限已覆盖 ticker;U2 引入 `security_master` 宇宙表——**来源修正**:Yahoo 无全量列表口,用 NASDAQ Trader 两个上市文件(实测 ~13k 行,含 ETF 与 Test-Issue 标志)+ SEC company_tickers.json(实测 10,429 家,直接给 CIK)。yfinance 只当价格 provider;符号映射 `BRK.A→BRK-A` 只在 provider 调用点
 - **识别 = 确定性搜索 + 人点选确认**:ticker 精确 > ticker 前缀 > 名称子串,typeahead 下拉带能力徽章(价格✓/ETF/研究✓),**永不自动选**(实测搜 "apple" 命中 5 家——自动挑选即赌错误类);CSV 批量保持精确 ticker,不做名称解析
 - **三道门**:在宇宙表(能加)→ 拉得到价(U2 回填,fail-loud 拒行)→ 有 CIK 且显式触发(issuer 研究,仍限策展集)
-- 并发补齐:worker lease+requeue(治 stuck-run 类)、per-session 单飞行 turn、per-user/全局日预算进 wrapper
+- 并发补齐:worker lease+requeue(治 stuck-run 类,重投走白名单)、per-session 单飞行 turn(lease 版)、per-user/全局日配额走 `usage_daily`(见上「预算」节的 ★ 改写)
 
 ### 排期估算
 

@@ -8,7 +8,7 @@
 > 3. [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) —— 已完成的 P0-P9 基线(体例与纪律沿用)
 > 4. [spikes/P9_COVERAGE.md](spikes/P9_COVERAGE.md) —— 现状基线数字(83 offline 测试、8 issuer、demo 组合 port_001)
 
-**本计划交付**:用户注册/登录(Clerk)→ 创建/上传/克隆自己的 portfolio → 公司层数据共享、chat/组合/分析按用户隔离(Postgres RLS)→ 全美股 ticker 宇宙搜索(U2)→ per-user 预算 + worker 崩溃恢复 → 公网部署。
+**本计划交付**:用户注册/登录(Clerk)→ 创建/上传/克隆自己的 portfolio → 公司层数据共享、chat/组合/分析按用户隔离(Postgres RLS)→ 全美股 ticker 宇宙搜索(U2)→ per-user 日配额 + worker 崩溃恢复 + 价格新鲜度 fail-loud → 公网部署。
 
 ---
 
@@ -63,21 +63,25 @@
 | PG 会话变量 | `app.user_id`,事务内 `SET LOCAL`;政策读 `current_setting('app.user_id', true)`(missing→NULL→fail-closed) |
 | DB 角色 | `exposure` = owner,仅 DDL/migration/seed;**`app_rls`** = api+worker 运行时(LOGIN,GRANT SELECT/INSERT/UPDATE,**无 DELETE**;非 owner 故 RLS 天然生效) |
 | 新 env | `DATABASE_URL_APP`(app_rls 连接串)、`APP_DB_PASSWORD`、`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_ISSUER`、`CLERK_AUTHORIZED_PARTIES` |
-| 预算(settings,env 可覆盖) | `USER_DAILY_TOOL_CALLS=300` `USER_DAILY_RESEARCH_RUNS=3` `USER_DAILY_EXPOSURE_RUNS=20` `GLOBAL_DAILY_TOOL_CALLS=3000` `TASK_LEASE_SECONDS=1800` |
+| 并发(settings,env 可覆盖) | `TASK_LEASE_SECONDS=1800` `TASK_MAX_RETRIES=3` `TURN_LEASE_SECONDS=900`。两把 lease 都靠「取值够宽 + 到期自愈」,**不续期、不心跳** |
+| 日配额(settings,env 可覆盖) | 单位 = **用户动作**,不是 token、不是工具调用。per-user:`DAILY_CHAT_TURNS=10` `DAILY_RESEARCH_RUNS=3` `DAILY_READINESS=10` `DAILY_EXPOSURE_RUNS=20` `DAILY_MARKET_SYNCS=10`;全局兜底 `GLOBAL_DAILY_*` = `200/30/100/200/50`。与 §6 的**会话内**预算(40 工具调用 / 5 次 external_search)是两层正交的东西,勿混 |
+| 配额口径 | 计数表 `usage_daily(user_id, day, kind, used)` PK`(user_id, day, kind)`,共享层**无 RLS**(同 `tasks`);全局池 = 同表保留行 `user_id = '_global'`;`day` 取 UTC(`utils/dates.today_utc()`),`resets_at` = 次日 UTC 00:00(= 北京时间 08:00);扣费点**只有两个**:`task_service.create_task`(按 `task_type→kind` 映射,无默认值)与 `POST /agent/sessions/{id}/messages`(`chat_turn`) |
+| 价格新鲜度 | `PRICE_STALENESS_DAYS=10`(自然日,约 7 个交易日);判定点**唯一**,在 `exposure_workflow._validate_inputs` |
 | CSV 规格 | 列 `ticker,quantity[,cost_basis]`;首行含 "ticker" 视为表头;≤200 行;quantity>0;**整单原子**——任一行错则零写入,返回 `problems:[{row,ticker,reason}]` |
 | 新组合默认 | currency=USD,benchmark=SPY,risk_limits = 拷贝 demo(port_001)的限额模板 |
 | 快照语义 | 每次上传 as_of_date = `SELECT max(price_date) FROM market_prices`;price=该日 close;market_value=quantity×close |
 | universe 源(D) | `https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt` + `.../otherlisted.txt`(\|分隔,剔 `Test Issue=Y` 与尾行)+ `https://www.sec.gov/files/company_tickers.json`(UA=EDGAR_IDENTITY)。实测 ~13k 行 / SEC 10,429 家 |
 | 符号映射 | yfinance 侧 `'.'→'-'`(BRK.A→BRK-A),**只在 market-data provider 调用点转换**;库内存上市文件原文 |
 | 搜索排序 | ticker 精确 > ticker 前缀 > name ILIKE 子串;limit 10;**typeahead 点击确认,永不自动选** |
-| 错误码 | `unauthenticated` `turn_in_flight` `user_budget_exceeded` `ticker_not_supported`(U1) `ticker_not_in_universe`(U2) `no_price_data` `invalid_csv` |
+| 错误码(附 HTTP 状态) | `unauthenticated`(401) `turn_in_flight`(409) `quota_exceeded`(429) `active_run_exists`(409) `ticker_not_supported`(U1,422) `ticker_not_in_universe`(U2,422) `no_price_data`(422) `invalid_csv`(422)。**注**:与工具面的 `budget_exceeded`(会话内预算,结构化工具结果,非 HTTP)是两回事,勿改名勿混用 |
+| 错误体信封 | 一律 `raise HTTPException(status, {"error": ..., ...})`,FastAPI 包成 `{"detail":{...}}` —— 与既有 401/409 一致。**禁止**为此新增本仓第一个 exception handler 或 JSONResponse |
 | 验收主角 | 双账号 **A/B**(Clerk 免费两邮箱)+ 匿名 + demo |
 
 ### 0.6 数据归属总表(政策的唯一依据)
 
 | 层 | 表 | RLS |
 |---|---|---|
-| **共享(公司层)** | companies, filings, filing_documents, filing_sections, filing_chunks, financial_facts, research_sources, **calc_ledger**, market_prices, factor_*, security_master, tasks(系统队列,带 `owner_user_id` 供 worker 设上下文) | 无 |
+| **共享(公司层)** | companies, filings, filing_documents, filing_sections, filing_chunks, financial_facts, research_sources, **calc_ledger**, market_prices, factor_*, security_master, tasks(系统队列,带 `owner_user_id` 供 worker 设上下文), usage_daily(E:配额计数,带 `user_id` 且含全局保留行 `_global`;**故意不加 RLS**,否则全局兜底池只数得到调用者自己 = fail-open) | 无 |
 | **用户主表** | users(本人可见)、portfolios(`owner OR is_public`)、agent_sessions(owner)、research_runs(owner)、issuer_briefs(`owner OR is_public`) | 有,owner 列在此五表 |
 | **子表(EXISTS 级联,不加 owner 列)** | positions/risk_limits/schedules → portfolios;exposure_runs → portfolios;metrics/sector_exposures/issuer_exposures/factor_attributions/risk_alerts/daily_reports/workflow_events → exposure_runs;agent_messages/agent_steps/evidence_packs → agent_sessions | 有,`EXISTS(父表)`(父表政策自动级联) |
 
@@ -86,8 +90,8 @@
 ### 0.7 阶段依赖图
 
 ```
-A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并发+预算) ─▶ F(部署) ─▶ G(终验)
-串行执行。D 仅逻辑依赖 B,但与 C 改同一批上传文件,不并行。总预估 ~7 agent 工作日。
+A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并发+配额+新鲜度) ─▶ F(部署) ─▶ G(终验)
+串行执行。D 仅逻辑依赖 B,但与 C 改同一批上传文件,不并行。总预估 ~8 agent 工作日(E 因实测新增 E0/E5 由 1d 上调为 2d)。
 ```
 
 ### 0.8 风险与回滚杠杆
@@ -207,23 +211,108 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
 
 ---
 
-## V2-E — 并发硬化 + 预算(1d)
+## V2-E — 并发硬化 + 日配额 + 价格新鲜度(2d)
 
-**范围**:worker lease/requeue、per-session 单飞行 turn、per-user 与全局日预算。
+**范围**:worker lease/requeue/重试上限、per-session 单飞行 turn、per-user 与全局日配额、run 前价格新鲜度(消灭 $0 静默估值)。产品目标是「个人主页上的展示产品,但达到生产使用标准」:每个登录用户有自己的组合、每天可发起有限次 agent 动作、这些历史与分析都留在他自己的租户里。
+
+**前置认定(实测得出,勿再推翻;推翻了原 V2-E 的两条前提)**
+
+- ❶ **handler 并非都幂等** —— 接缝备忘曾断言「exposure/readiness/research handler 已幂等,lease 重投安全性依赖于此」,**此断言为假**。`exposure_workflow._persist_outputs` 是裸 `db.add` INSERT,打在 `exposure_metrics UNIQUE(run_id)`、`daily_reports UNIQUE(run_id)`、`sector_exposures UNIQUE(run_id,sector)`、`issuer_exposures UNIQUE(run_id,ticker)`、`factor_attributions UNIQUE(run_id,factor_name)` 上 → 第二次必 IntegrityError(`risk_alerts` 无唯一键,则静默重复);`issuer_research_workflow` 模块 docstring 自己写着 "deliberately NOT idempotent",`issuer_briefs UNIQUE(research_run_id)` 会在 agent 烧完整轮 LLM 预算**之后**才炸。真正幂等的只有 `company_readiness` 与 `market_data_sync`(全链 `ON CONFLICT DO UPDATE` + 索引短路)。
+- ❷ **标 run failed 与回收 task 不对称** —— 以 `app_rls` 且**未设 tenant** 实测:`UPDATE exposure_runs SET status='failed'` 抛 RLS 错并**中止整个事务**(USING 靠 `p.is_public` 放行,WITH CHECK 却要求 `p.owner_id = current_setting(...)` 而它是 NULL);`UPDATE research_runs ...` 则**静默 0 行**。设了 tenant 后两者都成功。而 `tasks` **无 RLS**,reaper 的回收 UPDATE 无 tenant 也能跨租户批量执行(实测 UPDATE 命中全表)。
+- ❸ **卡死 run 的代价不对称** —— `research_run_service.create_run` 有 `ActiveRunExists` 守卫(pending/running 即拒),一个卡死的 research run 让该用户对该公司**永久 409**,run 清理是**承重**的;`exposure_runs` 无此守卫,卡死只是 UI 上一直转,属观感。
+- ❹ **$0 静默估值 bug 已复现** —— `calc_exposure` 左连接后 `merged["price"].fillna(0.0)`(`analytics/exposure.py:61`),窗口内无价的持仓 → price 0 / mv 0 / weight 0,run 照常绿。`_validate_inputs` 只挡「整个 DataFrame 为空」,而 `get_prices_df` 本就按持仓 ticker 过滤,**只要有一只票有价,partial miss 永远静默**。实测:AAPL 100 股 @200 + 无价的 STALE 200 股 → 报 MV \$20,000(真值 \$31,000),扇区权重 Tech 100% / Energy 0%。连带三处塌陷:`calc_pnl` 反而回退到 positions 存的旧价(`pnl.py:67-70`)→ 同一个 run 的分子分母来自两个宇宙;`build_portfolio_returns` 丢掉无价 ticker 再把幸存者归一到 100% → VaR/波动来自残缺组合;被低估的 `total_mv` 抬高所有幸存权重 → 直接喂给集中度限额检查。且 `calc_exposure`/`calc_pnl`/`ExposureWorkflow` 目前**零测试覆盖**。
+- ❺ **两个既有缺陷必须先修**,否则 E1/E3 建在坏地基上,见 E0。
+- ❻ **与上游文档的已知冲突,待回写**:`TARGET_ARCHITECTURE.md` §13.4 与 `MODULE_NOTES.md` M14 都写着「per-user 日上限**进 ToolRegistry wrapper**(session 预算加一维);cost views 按 user 聚合即可」。本节改为**按用户动作计数的 usage_daily 表 + 两个扣费点**,理由:wrapper 只看得见工具调用,而 research/exposure/readiness 各有 REST 与 agent 委派**两条平行入口**,wrapper 拦不住路由面;且按 `agent_steps` 数当日用量要 join `agent_sessions` 再对无索引的 `created_at` 做范围扫描,落在每次工具调用的热路径上。按 §0「以 TARGET_ARCHITECTURE 为准」的规矩,**E 开工前需用户拍板并回写 §13.4 与 M14**,否则实现者应停下来问。
 
 **任务**:
-1. lease:`tasks.lease_until TIMESTAMPTZ NULL`;`claim_next_task` 在 SKIP LOCKED 基础上 set `lease_until = now() + TASK_LEASE_SECONDS`;轮询循环每轮顺带 `UPDATE tasks SET status='pending', worker_id=NULL, lease_until=NULL WHERE status='running' AND lease_until < now()`(回收即重投,幂等步骤保证 at-least-once 安全)
-2. 横扩解锁:compose 去掉 worker 的 `container_name`(允许 `--scale`)
-3. 单飞行 turn:`agent_sessions.active_turn BOOL DEFAULT false`;POST messages 入口 `UPDATE ... SET active_turn=true WHERE id=:id AND active_turn=false RETURNING id`,无行 → 409 `{"error":"turn_in_flight"}`;finally 复位(异常也复位)
-4. 预算:settings 四常量(0.5);`agent_session_service.reserve` 扩两级检查——owner 当日 agent_steps 计数 ≥ USER_DAILY_TOOL_CALLS → `BudgetExceeded(kind='user_daily')`;全局当日 ≥ GLOBAL_DAILY_TOOL_CALLS → `kind='global_daily'`;research/exposure 触发路由前置当日次数检查(USER_DAILY_RESEARCH_RUNS / USER_DAILY_EXPOSURE_RUNS);错误体 `{"error":"user_budget_exceeded", kind, used, limit}`
-5. 视图:`user_cost_today`(session_cost 加 owner 维);ChatPanel 对预算错误 verbatim 展示(UI 不美化失败)
+
+**E0 — 前置修复(先做,各自独立可验证)**
+1. **`company_readiness` 中毒任务**:`workflow_events` 的 RLS WITH CHECK 只认 `exposure_runs` / `research_runs` 两个父,而 readiness 用 `run_id = task.id`(`task_` 前缀)→ 以 `app_rls` 身份写第一条 step 就被拒。实测活库 **0 条 `task_` 前缀事件、0 个成功的 readiness task —— 这个 task type 经 worker 从未成功过一次**(V2-C 引入,至今未被发现,因为没人从 UI 触发过)。修:`workflow_events` 上的 `tenant` 是一条 `FOR ALL` 策略,**USING 与 WITH CHECK 两套表达式都只认那两个父,必须各加同一个第三分支**(init.sql + migration 同步):
+   ```sql
+   OR EXISTS (SELECT 1 FROM tasks t WHERE t.id = workflow_events.run_id
+              AND t.owner_user_id = current_setting('app.user_id', true))
+   ```
+   (`tasks` 无 RLS,EXISTS 是普通查表。)**只补 WITH CHECK 不够**,USING 分支同样是写路径的必要条件:`log_event` 走 `db.add` + `flush`,SERIAL 主键让 SQLAlchemy 发出 `INSERT ... RETURNING id, created_at`,而 Postgres 对 `INSERT ... RETURNING` 会把 SELECT(即 USING)也套在新行上。实测:只补 WITH CHECK 时裸 `INSERT` = `INSERT 0 1`,带 `RETURNING` = `ERROR: new row violates row-level security policy` —— **报错文本读起来完全像 WITH CHECK 失败,会把实现者带回已经改过的那半边打转**。两边都补后 INSERT…RETURNING 通过,且时间线能被 `app_rls` 读到(否则验收里的「事件落库」只能以 owner 角色验)。**不修则 readiness 池毫无意义,且会在 E1 里每次都吃满 `TASK_MAX_RETRIES`。**
+2. **cost 视图越权**:`session_cost` / `research_run_cost` 建在 owner 名下且未设 `security_invoker`。实测以 `app_rls` 无 tenant 查 `agent_sessions` 得 0 行,查 `session_cost` 得**全库 20 行(跨租户)**。目前无任何代码查这两个视图,故尚未被利用。修:两处都加 `WITH (security_invoker = true)`(PG16 支持),init.sql + migration 同步。
+3. **`user_service.touch` 的行锁横跨整个 turn(E2 的前置,不修则 409 不可达)**:`require_user` 调 `touch`,它在**请求作用域的 `db`** 上 `UPDATE users SET last_seen_at=...` 后 `flush`,而 `get_db` 要等路由返回才 commit —— 这把 users 行的排他锁一直持有到 turn 结束。同一用户的第二个请求会阻塞在 auth 依赖里,**根本走不到 E2 的 turn 认领**,表现是「先卡住、等第一个 turn 跑完再返回 200」,而不是 409。修:把 users 的 upsert 挪进它自己的短事务(`get_session_factory()` 开 → upsert → 立刻 commit),与 E2 任务 4 是同一条纪律;contextvar 必须在该 session 第一次查询**之前**设好,`after_begin` 才会发 `set_config`。注意「`last_seen_at` 超过 N 分钟才写」只是缓解:写的那一次仍然持锁整个 turn,不能让 409 变确定。
+
+**E1 — worker lease + requeue + 重试上限**
+1. schema 三份同步:`tasks.lease_until TIMESTAMPTZ NULL`。`retry_count` **已存在**(`NOT NULL DEFAULT 0`,至今零写入,且已在 `TaskOut` 与前端 `Task` 类型里),不新增列——注意 reaper 是它的第一个写入者,`/tasks` 视图上会首次出现非 0 值,这是预期而非意外。
+2. `claim_next_task` 在现有 `FOR UPDATE SKIP LOCKED` 之上 set `lease_until = now() + TASK_LEASE_SECONDS`,**用服务器时间**(多副本时钟不齐会既误抢又误放)。
+3. **可重投集是白名单**(依据 ❶):
+   - `company_readiness` / `market_data_sync` → 过期即回 `pending`,`retry_count + 1`;达 `TASK_MAX_RETRIES` → `failed`
+   - `exposure_update` / `issuer_research` → **不重投**,task 直接 `failed`(`error_message` 写明 lease 过期),并把关联 run 一并标 `failed`
+   - 理由:`app_rls` 无 DELETE 权限,半截 run 在应用层清不掉;把没跑完的 run 标红让用户显式重跑,比伪装成功或炸在第二次写入诚实。这条**同时解开** ❸ 的 research 永久 409 死锁。
+4. reaper 落点在 `run_worker` 的 while 体(**不是 `process_one`** —— 它空队列时提前 return,忙队列时又无间隔空转),每轮一次,**分两段事务**(依据 ❷):
+   - 第一段,无 tenant、可批量:`UPDATE tasks ... WHERE status='running' AND lease_until < now() RETURNING id, type, payload, owner_user_id, retry_count`
+   - 第二段,逐条:先把 `current_user_ctx` 设成 `task.owner_user_id or user_demo_system`(必须在该 session 第一次查询**之前**,`after_begin` 监听器才会发 `set_config`),再开事务标 run failed
+   - **必须分开**:一条 `exposure_runs` 的 RLS 错会中止整段事务,混在一起 = reaper 每轮全灭的自伤式永久停摆
+   - run 的存在性要判:readiness 的 `run_id` 就是 task.id(无 run 行),`market_data_sync` 压根没有 run_id
+5. compose:删 `container_name: exposure-worker` 解锁 `--scale`(实测 `--dry-run` 报的正是这条);**同时给 worker 加 `restart: unless-stopped`** —— 实测四个服务的 RestartPolicy 全是 `no`,单 worker 部署崩了没人拉起,而 reaper 就住在 worker 里,等于没有恢复。`WORKER_ID = socket.gethostname()` 在 compose 下是 12 位容器 ID,各副本天然不同,无需改代码。
+6. 改写本文档末尾接缝备忘的「handler 已幂等」那条,换成本任务 3 的白名单事实。
+
+**E2 — per-session 单飞行 turn(lease 版,替换原 BOOL 设计)**
+1. schema 三份同步:`agent_sessions.turn_started_at TIMESTAMPTZ NULL`。
+2. 认领:`UPDATE agent_sessions SET turn_started_at = now() WHERE id = :id AND (turn_started_at IS NULL OR turn_started_at < now() - make_interval(secs => :lease)) RETURNING id`,全程服务器时间。
+3. **状态码顺序钉死**:401(`require_user`)→ 404(保留现有 `get_session` 预检)→ 认领 0 行 → 409 `{"error":"turn_in_flight"}`。**不写 403**:实测非 owner 的 UPDATE 与 SELECT 都返回 0 行(FOR ALL 策略),存在性本身不可见——这正是 §0.6 的「跨用户自动 404,零代码」。预检必须保留:去掉它,404 与 409 就并成一个不可分辨的 0 行。
+4. **认领与释放各自一个独立短事务**(`get_session_factory()` 新开、立刻 commit),**绝不用请求作用域的 `db`**:
+   - 用请求 `db` 认领而不提交 = **自死锁**:`get_db` 直到路由返回才 commit,行级排他锁横跨整个 turn;而 `reserve` 每次工具调用都从**另一条连接**对同一行做条件 UPDATE,会阻塞在这把锁上,而这把锁又在等 `handle_message` 完成。Postgres **不会**报死锁(一侧等的是应用逻辑),表现为请求永久挂起。
+   - 用请求 `db` 释放 = 异常路径上白写:`get_db` 的 except 分支 `rollback()` 会把释放丢掉,而那正是 finally 存在的理由。
+5. 释放放 `finally`,并接住这些逃逸路径:`chat_with_tools` 缺 key 抛 RuntimeError、OpenAI 网络异常直穿、`reserve` 的 `ValueError("unknown session")` **不在** `invoke` 的捕获范围内(它只捕 `BudgetExceeded`)。
+6. `TURN_LEASE_SECONDS=900` 的取值理由:**宁可让死的 turn 多卡一会儿,也不能让活的 turn 被抢**(`max_turns=16` 轮 LLM 的合法长 turn 必须安全);进程崩了最坏卡该 session 15 分钟后自愈。
+7. 前端:ChatPanel 已用 `busy` 挡住同标签页双击(输入框与按钮都 disabled),所以 409 的现实来源有两个:**过期 lease**(上一个 turn 崩了留下的),以及**第二个标签页/设备**(`localStorage` 的 `ew_agent_session` 跨标签页共享)——后者**以 E0-3 落地为前提**,否则第二个请求会先卡在 auth 的行锁上。409 到达时**撤回乐观追加的用户气泡**:服务端此时没有落 user message,不撤就与库不一致,下次刷新会凭空消失。
+
+**E3 — 日配额(usage_daily + 五池)**
+1. schema 三份同步 + **两条额外义务**(V2-D 踩过):`usage_daily` 建在 `GRANT ... ON ALL TABLES` 之后 → 必须补 `GRANT SELECT, INSERT, UPDATE ON usage_daily TO app_rls;`;归属写进 §0.6。
+   表:`usage_daily(user_id TEXT NOT NULL, day DATE NOT NULL, kind TEXT NOT NULL, used INT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day, kind))`,**共享层,不加 RLS**(同 `tasks`)。理由:全局兜底池必须跨租户计数,任何 `user_id = current_setting(...)` 的策略都会让它只数到调用者自己 = **fail-open 的假兜底**;放共享层后,全局池就是同表的保留行 `user_id = '_global'`,一个原语覆盖两级。读路由按 user 过滤须带 `# semantic, not security` 注释(与 `apps/api/routes/tasks.py:43` 同款)。
+2. 唯一原语 `services/usage_service.charge(db, user_id, kind, limit)`,形状照抄 `agent_session_service.reserve`:
+   ```sql
+   INSERT INTO usage_daily (user_id, day, kind, used) VALUES (:u, :d, :k, 1)
+   ON CONFLICT (user_id, day, kind) DO UPDATE SET used = usage_daily.used + 1
+   WHERE usage_daily.used < :limit
+   RETURNING used
+   ```
+   0 行 → 抛 `QuotaExceeded(kind, scope, used, limit, resets_at)` 且不改状态。`day` 用已有的 `utils/dates.today_utc()`。`user_id` 为 None → **抛错,不静默放行**。
+3. 每个动作扣两次:先 user 池、再全局池,**同一事务**;任一超限 → 抛错 → 回滚 → 两个计数都没动(因此**不需要任何退款/补偿逻辑**)。
+4. 扣费点**只有两个,不是七个**:
+   - `task_service.create_task`:`{exposure_update: exposure_run, issuer_research: research_run, company_readiness: readiness, market_data_sync: market_sync}`,**无默认值** —— 将来新增 task type 忘配额 = KeyError fail loud。这一个点同时盖住 REST 路由(4 处)与 meta-agent 委派工具(3 处)**两条面**;它们是平行实现、不共享代码,分开写必漏一条。`owner_user_id is None`(系统路径)→ 不扣;worker 侧零处调用 `create_task`,不存在「扣到 demo 哨兵头上」的路径。
+   - `POST /agent/sessions/{id}/messages`:扣 `chat_turn`。**不可按 session 创建扣** —— 一个 session 能发无限条消息,且 `issuer_research` 会另建一个 `kind='research'` 的 session(每个 research run 都会白扣一次 chat)。
+5. chat 扣费与 E2 的 turn 认领**放同一个短事务**并一起 commit(在 LLM 循环开始之前):超配额 → 回滚 → lease 一并释放,「拒绝路径手工释放」这个特例因此消失。循环开始之后失败**不退款**(LLM 已经花掉了),此语义明确写进 `docs/PRODUCTION.md`。
+6. 委派工具侧必须**自己**接住 `QuotaExceeded` 并转成结构化 dict(house style,同 `company_not_found` / `active_run_exists`):`registry.invoke` 的兜底 `except Exception` 会把任何异常压成 `{"error":"tool_error","detail":str(exc)}`,`kind/used/limit/resets_at` 全丢。
+7. 顺带修一个既有缺陷:research 两条路径都是先 `create_task` 再 `create_run`,`ActiveRunExists` 在后面抛 → agent 路径已 commit 出一个无 `run_id` 的**孤儿 task**(worker 捡起来必失败)。改成**先 `get_active_run` 预检、再 `create_task`**,让 `create_task` 成为最后一步,配额才不会被一个注定失败的请求吃掉。
+8. **已知豁口,明确接受不补**:`issuer_research` 在数据未就绪时会在 worker 内联调 `run_readiness()`(无 task、无路由、无扣费),所以 research 配额隐含吃掉同一条摄取管线。research 池(3/天)本就是更紧的约束,不再叠一层。
+
+**E4 — 配额可见面**
+1. `GET /api/me/usage`(`require_user`,落在既有 `apps/api/routes/me.py`,`/api` 前缀已挂,`main.py` 不用动):返回 `{day, resets_at, pools:[{kind, used, limit, remaining}]}`。**直查 `usage_daily`,禁止建视图** —— E0-2 刚修掉的越权就是视图默认绕过 RLS 造成的,再造一个 `user_cost_today` 等于把洞重开一次。(原计划任务 5 的 `user_cost_today` 视图**作废**。)
+2. ChatPanel 头部加配额徽章(`Analyst` 与 `[New]` 之间);turn 结束后刷新,**必须带 ignore 闭包守卫**(`page.tsx:707`/`724`、`PortfolioModal.tsx:48` 三处同款先例),未登录不发请求,失败落 null 不抛(`apiFetch` 对 401 也会 throw,且 `Auth.tsx` 注册 token getter 无 `isLoaded` 门,首帧可能匿名发出)。
+3. 失败展示**分两类规则,不要一刀切**:`quota_exceeded` **原文透传**(§0.1「UI 不美化失败」——用户要看的是账);`turn_in_flight` 换成一句人话(并发信号,不是账)。解析复用 `PortfolioModal.tsx:12-23` 的 `extractProblems` 同款做法(从 `Error.message` 里切 JSON),不要发明第二套。
+
+**E5 — 价格新鲜度(消灭 $0 静默估值,依据 ❹)**
+1. 新增 step 0 `sync_prices`,**放在 workflow 里而不是 handler 里**(handler 不写 `workflow_events`,放 workflow 才会出现在 UI 时间线上):对本组合持仓 ticker 调 `market_data_ingestion_service.ingest_market_prices`,**窗口用 run 自己的 `[as_of - 90d, as_of]`,不是 `date.today()`** —— `POST /exposure-runs` 接受任意 `as_of`,用 today 会去同步一段工作流根本不查的区间,等于没修。实测成本:冷启 1.52s + 0.07~0.09s/ticker,10 只 ≈ 2.4s 冷 / 1s 热,内联可接受。
+   - **持仓取法必须与 `_load_inputs` 一致**:先 `get_positions(db, portfolio_id, as_of_date)`,空则 `get_positions_latest(db, portfolio_id)`。`get_positions` 对 `as_of_date` 是**精确等值**过滤,而按 §0.5 快照语义持仓日期 = `max(price_date)`、run 的 `as_of` 默认是 `date.today()`,两者**正常情况下就不相等**(实测活库:port_001 持仓 as_of `2026-07-23`,最近三个 run as_of `2026-07-24` → 精确取法返回 0 行)。只写 `get_positions(as_of)` 会拿到空 ticker 列表,step 0 变成**永远绿的空转**。实现上在 step 0 加载一次并传给 step 1 复用(`_load_inputs` 增加 `positions` 入参),保证两步 ticker 集合同源且只读一次库。
+   - `ingest_market_prices` 默认 `commit=True` 且**遇第一个零 bar 的 ticker 就抛**(用户只看得到第一个坏 ticker)。本步改为记录不可得的 ticker 并继续,把「哪些票没价」的判决**统一交给 step 2**(单一判定点)。
+   - 坑:`_StepContext.__aexit__` 无条件 `log_event` + `commit`,而本步是**第一个在自己失败点之前就做 DML 的 step**,DB 异常会被 `PendingRollbackError` 掩盖成假死因。步内 DML 必须自己接住、回滚干净再抛。
+2. `_validate_inputs` 升级为**唯一 fail-loud 判定点**:窗口内无任何价格行的 ticker、以及最新价距 `as_of` 超过 `PRICE_STALENESS_DAYS` 的 ticker,**列出全部名单**(不是第一个)后抛错,run 显式变红。
+3. **拆掉两处静默兜底**:`calc_exposure` 的 `fillna(0.0)` 与 `calc_pnl` 的 `row.get("price")` 回退。到这一步价格已由 step 2 保证齐全,继续保留只会掩盖将来的新缺口。
+4. 步数 10 → 11,同步六处「10 步」写法:本文档 §0.4 红线 2、:142、:203,`IMPLEMENTATION_PLAN.md` :44/:104/:283;并修 `docs/WORKFLOW_CONTRACT.md` 表的两个既有错误(第 2 行早就宣称检查 stale data 而代码从没做过;表里 `persist_outputs`/`generate_report` 顺序与代码相反)。前端不受影响(时间线由返回事件动态推导,无硬编码步数)。
+5. 补测试:`calc_exposure`/`calc_pnl`/`ExposureWorkflow` 目前零覆盖。写纯离线单测(无 DB 无网络):两只票的 `positions_df` + 只含一只的 `prices_df` → 断言**抛错**,而不是 `portfolio_market_value == 幸存者市值`。
 
 **验收**:
-- [ ] 离线:reserve 的 user_daily/global 分支(fixture steps);单飞行 turn 的 409 分支与 finally 复位
-- [ ] live:`--scale exposure-worker=2` 起双 worker,连发 5 个 run 无重复处理(task 各被恰好一个 worker 完成);跑长任务途中 `docker kill` 持有 worker,lease(临时调短至 30s)过期后另一 worker 接手完成——**这是 P6 stuck-run 事故的正式解**;USER_DAILY_TOOL_CALLS 临时设 3,chat 第 4 次工具调用得到 user_budget_exceeded 且 trace 记 rejected;双击发消息 → 第二个 409
-- [ ] 回归红线三条
+- [ ] 离线:reaper 三分支(白名单类型回 pending / 非幂等类型直接 failed / `retry_count` 达上限 failed);`charge` 三分支(未超、恰好用尽、并发抢最后一个单位得 0 行)+ 映射表无默认值(未知 task_type 抛错);turn lease 的认领/过期认领/409;`_validate_inputs` 缺价与过期两类各自抛错且列出**全部** ticker 名单
+- [ ] live:`--scale exposure-worker=2` 连发 5 个 run,每个 task 恰好一个 worker 完成(`worker_id` 互不重复、无重复 metrics 行)
+- [ ] live:`TASK_LEASE_SECONDS` 临调 30s,跑 readiness 途中 `docker kill` 持有 worker → 另一 worker 接手完成且 `retry_count=1`(**这是 P6 stuck-run 事故的正式解**);同样手法对 `issuer_research` → task 与 run 双双 failed 且 `error_message` 写明 lease 过期,该用户对该 ticker **能立刻重新发起**(证明 ❸ 的死锁解除)
+- [ ] live:`DAILY_CHAT_TURNS` 临调 2 → 第 3 条消息 429 且 body 原文出现在聊天面板,`usage_daily` 中 `(user, day, chat_turn)` = 2 且 `_global` 行同步 = 2;`DAILY_RESEARCH_RUNS` 临调 1 → 第 2 次 research 走 REST 得 429、走 agent 委派得**结构化 `quota_exceeded`(不是 `tool_error`)**
+- [ ] live:两个标签页同时发消息 → 第二个**立刻** 409(**卡住再返回 200 = 不通过**,那是 E0-3 未落地的症状);另用 `TURN_LEASE_SECONDS` 临调 30s + 杀 API 容器,验过期 lease 自愈后同一 session 可继续发言
+- [ ] live(E0):以真实用户跑通一次 `company_readiness`,事件落库、task completed —— **这是该 task type 第一次成功**
+- [ ] live(E5 缺价 → 红):以 owner 身份直接向 demo 组合最新快照 INSERT 一条 yfinance 取不到 bar 的持仓(合成/已退市符号,如 `ZZTEST`;**必须走 owner DML** —— V2-D 的上传通道会先用 `ticker_not_in_universe` / `no_price_data` 挡住它)→ step 0 记录该 ticker 不可得并继续 → step `validate_inputs` 抛错、run 红且 `error_message` 只点名它;删掉该持仓行后重跑 → 绿
+- [ ] live(E5 过期 → 红):`POST /exposure-runs` 传一个超出最新可得 bar 且距其 > `PRICE_STALENESS_DAYS` 的未来 `as_of`(如 today+30d)→ run 红且 `error_message` **列出全部** ticker 名单(证明「列全部而不是第一个」)
+- [ ] live(E5 step 0 回填 → 绿):以 owner 角色删掉 demo 组合某只票近 90 天价格 → **不手工恢复,直接重跑** → 时间线出现 `sync_prices` 事件(message 带同步 ticker 数,须 = 持仓只数且非 0)、该 ticker 在 `[as_of-90d, as_of]` 的行数复原(实测 AAPL = 62 行)、run 绿、MV = Σ qty×close 与持仓一致
+  > ⚠ 这三条**不可合并**:step 0 会在 step 2 之前把删掉的价格从 yfinance 原样抓回来,所以「删价格」只能证明 step 0 生效,**永远产不出红 run**;红分支必须用 step 0 修不好的东西(provider 无 bar / 未来 as_of)触发。
+- [ ] 回归红线三条(红线 2 的「10 步」自本阶段起读作「11 步」)
 
-**禁止**:Redis/Celery/任何队列中间件;心跳线程(lease 粗粒度足够 MVP)。
+**禁止**:Redis/Celery/任何队列中间件;**任何形式的心跳/续租线程**(两把 lease 都靠「取值够宽 + 到期自愈」);为 429 新增本仓第一个 exception handler;把配额算成 token 或工具调用数;退款/补偿逻辑;给 `app_rls` 授 DELETE;新建任何未设 `security_invoker` 的视图。
+
+**用户检查点**:五个池的默认值(10/3/10/20/10)在公开链接前定稿;**E5 是行为变更** —— 过期持仓从「静默估 \$0 照常出报告」变成「显式红 run」,用户需确认接受(这正是 V2-D review 留下的遗留项的正式解)。
 
 ---
 
@@ -265,4 +354,6 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
 - `_session_ctx`(tools/registry.py)与本计划的 `current_user_ctx` 是**两个平行 contextvar**:前者管 calc 台账 invoked_by,后者管租户;不要合并。
 - evidence 前缀三清单(registry `_ID_PREFIXES` / trail `_RESOLVERS` / resolver `_RESOLVERS`)已含 `run_`/`alert_` 且有 parity 测试(tests/test_portfolio_snapshot.py)——新表不引入新引用前缀,无需动。
 - 上一轮已修:alert id 统一 `alert_` 前缀(exposure_workflow 用 `new_alert_id()`);listRuns 返回 `ExposureRunSummary`(前端类型区分列表/详情)——V2 改动 page.tsx 时保持该区分。
-- worker 的 exposure/readiness/research handler 已幂等(upsert/append-only),lease 重投安全性依赖于此,新 handler 必须保持。
+- ~~worker 的 exposure/readiness/research handler 已幂等(upsert/append-only),lease 重投安全性依赖于此~~ —— **此条已被 V2-E 前置认定 ❶ 实测推翻**。真实情况:仅 `company_readiness` / `market_data_sync` 幂等可重投;`exposure_update`(裸 INSERT 打 5 个 `UNIQUE(run_id…)`)与 `issuer_research`(`issuer_briefs UNIQUE(research_run_id)`,且模块 docstring 自陈 "deliberately NOT idempotent")**不可重投**,lease 过期一律标 failed。新 handler 必须在这两类里明确站队,并写进本备忘。
+- **RLS 表上的 ORM 写入一律是 `INSERT … RETURNING`**(`flush()` 要回填 SERIAL 主键 / server_default),而 Postgres 对 `INSERT … RETURNING` 会把 SELECT 策略(USING)也套在新行上 —— 所以带 RLS 的表**USING 与 WITH CHECK 必须同时覆盖写入行**,只补一边会得到一条读起来像 WITH CHECK 失败的错。E1/E3 的 `RETURNING` 之所以无碍,只因 `tasks` / `usage_daily` 在共享层无 RLS。
+- 任何 lease 重投都会**重复整条 `workflow_events` 时间线**(该表无唯一键,`step_context` 每步进出各写 1 行)。UI 按 `step_name` 去重(后写覆盖先写)故观感无碍,但读取原始事件做统计时须知。

@@ -539,9 +539,15 @@ CREATE INDEX IF NOT EXISTS idx_issuer_briefs_company ON issuer_briefs(company_id
 -- ═════════════════════════════════════════════════════════════════════════════
 -- OBSERVABILITY COST VIEWS (M11) — token/call accounting. Account complete;
 -- the MVP UI shows only per-session/brief footers, but the numbers are all here.
+--
+-- V2-E0: both carry security_invoker. Without it a view runs with its DEFINER's
+-- privileges (the owner role, which bypasses RLS), so app_rls read straight
+-- through the tenant policies — measured on the live DB: an unset tenant saw
+-- 0 rows in agent_sessions but all 20 in session_cost. Any future view over an
+-- RLS table must set this too; prefer querying the table directly.
 -- ═════════════════════════════════════════════════════════════════════════════
 
-CREATE OR REPLACE VIEW session_cost AS
+CREATE OR REPLACE VIEW session_cost WITH (security_invoker = true) AS
 SELECT s.id AS session_id, s.kind, s.llm_model,
        s.tools_used, s.external_searches,
        count(st.id) AS trace_steps,
@@ -552,14 +558,19 @@ FROM agent_sessions s
 LEFT JOIN agent_steps st ON st.session_id = s.id
 GROUP BY s.id;
 
-CREATE OR REPLACE VIEW research_run_cost AS
+CREATE OR REPLACE VIEW research_run_cost WITH (security_invoker = true) AS
 SELECT r.id AS research_run_id, r.company_id, r.status,
        sc.tools_used, sc.external_searches, sc.trace_steps,
        sc.prompt_tokens, sc.completion_tokens
 FROM research_runs r
 LEFT JOIN session_cost sc ON sc.session_id = r.agent_session_id;
 
--- ═══ V2-C: Postgres RLS tenant isolation (generated; do not hand-edit) ═════
+-- ═══ V2-C: Postgres RLS tenant isolation ═════════════════════════════════
+-- Originally emitted by a throwaway generator (scratchpad/gen_rls.py, never
+-- committed and now gone), so this block is hand-maintained from V2-E onward:
+-- edit here, then mirror the change as a NEW dated section at the end of
+-- infra/migrations/v2_multiuser.sql — this file is the fresh-DB truth, that
+-- file is the chronological log applied to live volumes.
 -- Runtime connects as the non-owner role app_rls, so these policies bind.
 -- The table owner (exposure) BYPASSES RLS, so seed/migration/DDL are unaffected.
 -- app.user_id is set transaction-locally by the app (db/session.py listener);
@@ -642,10 +653,18 @@ ALTER TABLE risk_alerts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON risk_alerts;
 CREATE POLICY tenant ON risk_alerts USING (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = risk_alerts.run_id AND (p.owner_id = current_setting('app.user_id', true) OR p.is_public))) WITH CHECK (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = risk_alerts.run_id AND p.owner_id = current_setting('app.user_id', true)));
 
--- workflow_events: polymorphic (exposure run_ OR research rrun_)
+-- workflow_events: polymorphic over THREE parents — exposure run_, research
+-- rrun_, and (V2-E0) task_ for company_readiness, whose handler logs its
+-- timeline under run_id = task.id. Missing that third branch denied every
+-- readiness step INSERT, so the task type had never once completed through the
+-- worker. Both USING and WITH CHECK need it: ORM writes here are
+-- INSERT ... RETURNING (flush() backfills the SERIAL id), and Postgres applies
+-- the SELECT policy to the returned row, so patching only WITH CHECK still
+-- fails — with an error whose text reads exactly like a WITH CHECK failure.
+-- tasks carries no RLS, so the third EXISTS is an ordinary lookup.
 ALTER TABLE workflow_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON workflow_events;
-CREATE POLICY tenant ON workflow_events USING (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND (p.owner_id = current_setting('app.user_id', true) OR p.is_public)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND p.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true)));
+CREATE POLICY tenant ON workflow_events USING (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND (p.owner_id = current_setting('app.user_id', true) OR p.is_public)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM tasks t WHERE t.id = workflow_events.run_id AND t.owner_user_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND p.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM tasks t WHERE t.id = workflow_events.run_id AND t.owner_user_id = current_setting('app.user_id', true)));
 
 -- agent-session children
 ALTER TABLE agent_messages ENABLE ROW LEVEL SECURITY;

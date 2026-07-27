@@ -298,8 +298,8 @@ Clerk 外包注册/登录/OAuth/MFA;后端唯一 auth 代码 = 一个 dependency
 
 ### 13.4 三平面并发(V2-E)
 
-- Worker:`FOR UPDATE SKIP LOCKED`(已有)+ lease/requeue(治 stuck-run);幂等 handler 保证 at-least-once 安全。
-- Agent:每 session 单飞行 turn;research per-company singleflight 保持全局(证据共享,同公司只跑一次)。
-- 预算:per-user 日上限进 ToolRegistry wrapper(session 预算加一维)+ 全局兜底。
+- Worker:`FOR UPDATE SKIP LOCKED`(已有)+ lease/requeue(治 stuck-run)。**重投是白名单,不是默认**——实测只有 `company_readiness` / `market_data_sync` 全链 upsert 因而幂等;`exposure_update` 的 `_persist_outputs` 是裸 INSERT 打在五个 `UNIQUE(run_id…)` 上,`issuer_research` 会在烧完整轮 LLM 预算**之后**才撞 `issuer_briefs UNIQUE(research_run_id)`。这两类 lease 过期一律把 task 与 run 双双标 failed,让用户显式重跑——比伪装成功或炸在第二次写入诚实,也解开 research 的 `ActiveRunExists` 永久 409 死锁。
+- Agent:每 session 单飞行 turn(`turn_started_at` + 条件 UPDATE 认领,取值够宽 + 到期自愈,**无心跳/续租线程**);research per-company singleflight 保持全局(证据共享,同公司只跑一次)。
+- 预算:**按用户动作计数的 `usage_daily` 表 + 两个扣费点**(`task_service.create_task` 覆盖四类 task,`POST /agent/sessions/{id}/messages` 扣 chat turn),user 池与 `_global` 兜底池同表、同事务扣两次,任一超限即整体回滚(因此不需要退款/补偿逻辑)。**不进 ToolRegistry wrapper**:wrapper 只看得见工具调用,而 exposure/readiness/research 各有 REST 路由与 agent 委派**两条平行入口**,wrapper 拦不住路由面。wrapper 内既有的 session 预算(工具调用数/external_search 数)保持不变,与日配额是两个正交维度。
 
 > 分阶段落地(A 身份 → B 组合 → C RLS → D 宇宙 → E 并发/预算 → F 部署)见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md)。

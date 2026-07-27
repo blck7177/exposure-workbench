@@ -32,7 +32,13 @@ INSERT INTO users (id, email, display_name)
     ON CONFLICT (id) DO NOTHING;
 UPDATE portfolios SET is_public = TRUE, owner_id = 'user_demo_system' WHERE id = 'port_001';
 
--- ═══ V2-C: Postgres RLS tenant isolation (generated; do not hand-edit) ═════
+-- ═══ V2-C: Postgres RLS tenant isolation ═════════════════════════════════
+-- Historical section — do not edit in place. The generator that emitted it
+-- (scratchpad/gen_rls.py) was never committed and is gone; from V2-E onward
+-- policies are hand-maintained, and a change lands as a NEW dated section at
+-- the end of this file (re-running the whole file stays correct because every
+-- CREATE POLICY is preceded by its own DROP, so the last definition wins).
+-- The workflow_events policy below is SUPERSEDED by the V2-E0 section.
 -- Runtime connects as the non-owner role app_rls, so these policies bind.
 -- The table owner (exposure) BYPASSES RLS, so seed/migration/DDL are unaffected.
 -- app.user_id is set transaction-locally by the app (db/session.py listener);
@@ -145,3 +151,28 @@ CREATE TABLE IF NOT EXISTS security_master (
 CREATE INDEX IF NOT EXISTS idx_security_master_name ON security_master(name);
 -- created after the ALL-TABLES grant above, so grant app_rls explicitly
 GRANT SELECT, INSERT, UPDATE ON security_master TO app_rls;
+
+-- ═══ V2-E0: prerequisite fixes (supersedes the V2-C block above) ═════════════
+-- Re-running this whole file stays correct: every policy below is preceded by
+-- its own DROP, so the later definition wins.
+
+-- E0-1 — workflow_events is polymorphic over THREE parents, not two.
+-- company_readiness logs its timeline under run_id = task.id ('task_' prefix,
+-- set either by the handler's fallback or explicitly by meta_tools), which
+-- matched neither branch, so the first step INSERT was denied and the task type
+-- had never once completed through the worker (measured: 0 task-prefixed rows in
+-- workflow_events, 0 company_readiness rows in tasks — not even failed ones).
+-- BOTH halves need the third branch: ORM writes here are INSERT ... RETURNING
+-- (flush() backfills the SERIAL id) and Postgres applies the SELECT policy
+-- (USING) to the returned row, so patching only WITH CHECK still errors — with a
+-- message that reads exactly like a WITH CHECK failure and sends you back to the
+-- half you already fixed. tasks has no RLS, so the third EXISTS is a plain lookup.
+DROP POLICY IF EXISTS tenant ON workflow_events;
+CREATE POLICY tenant ON workflow_events USING (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND (p.owner_id = current_setting('app.user_id', true) OR p.is_public)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM tasks t WHERE t.id = workflow_events.run_id AND t.owner_user_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM exposure_runs r JOIN portfolios p ON p.id = r.portfolio_id WHERE r.id = workflow_events.run_id AND p.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM research_runs rr WHERE rr.id = workflow_events.run_id AND rr.owner_id = current_setting('app.user_id', true)) OR EXISTS (SELECT 1 FROM tasks t WHERE t.id = workflow_events.run_id AND t.owner_user_id = current_setting('app.user_id', true)));
+
+-- E0-2 — cost views ran with their definer's (owner's) privileges, which bypass
+-- RLS: measured on the live DB, app_rls with no tenant set saw 0 rows in
+-- agent_sessions but all 20 in session_cost. No code reads them today, so this
+-- was never exploited. security_invoker (PG15+) makes them honour the caller.
+ALTER VIEW session_cost      SET (security_invoker = true);
+ALTER VIEW research_run_cost SET (security_invoker = true);
