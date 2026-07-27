@@ -99,8 +99,20 @@ def build_portfolio_returns(
     if pivot.empty:
         return pd.Series(dtype=float)
 
-    # Get tickers that exist in both positions and prices
-    tickers = [t for t in positions_df["ticker"].tolist() if t in pivot.columns]
+    # Every holding must be represented. Silently keeping only the ones that
+    # happen to have prices and renormalising their weights to 1.0 was a THIRD
+    # missing-price convention living alongside calc_exposure's zero-fill and
+    # calc_pnl's snapshot fallback — three different answers to one question,
+    # inside a single run. Risk metrics built from a subset of the book get fed
+    # straight into VaR and the limit checks, so this fails loudly instead.
+    held = [str(t) for t in positions_df["ticker"].tolist()]
+    missing = sorted(set(held) - set(map(str, pivot.columns)))
+    if missing:
+        raise ValueError(
+            "Cannot build a portfolio return series without every holding: "
+            f"no usable price history for {', '.join(missing)}"
+        )
+    tickers = held
     if not tickers:
         return pd.Series(dtype=float)
 

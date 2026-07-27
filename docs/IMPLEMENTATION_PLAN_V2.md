@@ -52,7 +52,7 @@
 - 每阶段结束:`pytest -m "not live"` 全绿(基线 83)+ 阶段验收全过 + commit(消息 `V2-{阶段}: <摘要>`)
 - **回归红线(每阶段三条)**:
   1. `pytest -m "not live"` 全绿
-  2. demo 组合 exposure run 10 步全绿(C 起:以 `user_demo_system` 上下文或测试 token 触发)
+  2. demo 组合 exposure run 11 步全绿(C 起:以 `user_demo_system` 上下文或测试 token 触发)
   3. 匿名 GET `/`、`/issuer/NVDA`、demo latest-brief 全部 200;(C 起追加)匿名 POST 任何写路径 = 401
 
 ### 0.5 钉死的实现常量
@@ -143,7 +143,7 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
 
 **验收**:
 - [ ] 离线:parse_csv(表头识别/非法行/超 200);upload 原子性(一行坏→零插入)与逐行 reason;clone 行数一致
-- [ ] live:登录 → CSV `AAPL,10 / MSFT,5 / TLT,20` → 组合出现,positions 按最新收盘定价;对它 Run Daily Update → 10 步全绿,MV=Σqty×close 非零;重传新 CSV → 新 as_of 快照,旧行仍在;`PLTR,10`(无价格数据)→ 422 指名该行,库零变更
+- [ ] live:登录 → CSV `AAPL,10 / MSFT,5 / TLT,20` → 组合出现,positions 按最新收盘定价;对它 Run Daily Update → 11 步全绿,MV=Σqty×close 非零;重传新 CSV → 新 as_of 快照,旧行仍在;`PLTR,10`(无价格数据)→ 422 指名该行,库零变更
 - [ ] 回归红线三条
 
 **禁止**:security_master/任意 ticker(D);组合删除/改名。
@@ -204,7 +204,7 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
 
 **验收**:
 - [ ] 离线:两个上市文件的 fixture 解析(含 Test Issue 剔除、BRK.A 点号保留、尾行剔除);`no_price_data` 拒绝路径(mock ingestion 返回 0 行)
-- [ ] live:refresh 后 `security_master` >10,000 行且 AAPL/TLT/BRK.A 在;二次 refresh 幂等;search "apple" → AAPL 首位且能看到 APLE 等干扰项(点选消歧的活证据);上传 `RBLX,5` → 自动回填 >200 行价格、组合 run 10 步全绿含 RBLX;`BRK.B,1` → 符号映射生效、定价成功;`ZZZZZZ,1` → `ticker_not_in_universe` 整单拒
+- [ ] live:refresh 后 `security_master` >10,000 行且 AAPL/TLT/BRK.A 在;二次 refresh 幂等;search "apple" → AAPL 首位且能看到 APLE 等干扰项(点选消歧的活证据);上传 `RBLX,5` → 自动回填 >200 行价格、组合 run 11 步全绿含 RBLX;`BRK.B,1` → 符号映射生效、定价成功;`ZZZZZZ,1` → `ticker_not_in_universe` 整单拒
 - [ ] 回归红线三条
 
 **禁止**:自动触发 readiness/EDGAR 摄取(issuer 研究仍限 `is_investigable` 集,显式按钮);非美证券;pg_trgm(先 ILIKE,不够再说)。
@@ -294,7 +294,7 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
    - 坑:`_StepContext.__aexit__` 无条件 `log_event` + `commit`,而本步是**第一个在自己失败点之前就做 DML 的 step**,DB 异常会被 `PendingRollbackError` 掩盖成假死因。步内 DML 必须自己接住、回滚干净再抛。
 2. `_validate_inputs` 升级为**唯一 fail-loud 判定点**:窗口内无任何价格行的 ticker、以及最新价距 `as_of` 超过 `PRICE_STALENESS_DAYS` 的 ticker,**列出全部名单**(不是第一个)后抛错,run 显式变红。
 3. **拆掉两处静默兜底**:`calc_exposure` 的 `fillna(0.0)` 与 `calc_pnl` 的 `row.get("price")` 回退。到这一步价格已由 step 2 保证齐全,继续保留只会掩盖将来的新缺口。
-4. 步数 10 → 11,同步六处「10 步」写法:本文档 §0.4 红线 2、:142、:203,`IMPLEMENTATION_PLAN.md` :44/:104/:283;并修 `docs/WORKFLOW_CONTRACT.md` 表的两个既有错误(第 2 行早就宣称检查 stale data 而代码从没做过;表里 `persist_outputs`/`generate_report` 顺序与代码相反)。前端不受影响(时间线由返回事件动态推导,无硬编码步数)。
+4. 步数 10 → 11,同步六处「10 步」写法:本文档 §0.4 红线 2(:55)、:146、:207,`IMPLEMENTATION_PLAN.md` :44/:104/:283(计划里写的 :142/:203 已漂移,实际在 :146/:207);并修 `docs/WORKFLOW_CONTRACT.md` 表的两个既有错误(第 2 行早就宣称检查 stale data 而代码从没做过;表里 `persist_outputs`/`generate_report` 顺序与代码相反)。前端不受影响(时间线由返回事件动态推导,无硬编码步数)。
 5. 补测试:`calc_exposure`/`calc_pnl`/`ExposureWorkflow` 目前零覆盖。写纯离线单测(无 DB 无网络):两只票的 `positions_df` + 只含一只的 `prices_df` → 断言**抛错**,而不是 `portfolio_market_value == 幸存者市值`。
 
 **验收**:
@@ -308,7 +308,7 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
 - [ ] live(E5 过期 → 红):`POST /exposure-runs` 传一个超出最新可得 bar 且距其 > `PRICE_STALENESS_DAYS` 的未来 `as_of`(如 today+30d)→ run 红且 `error_message` **列出全部** ticker 名单(证明「列全部而不是第一个」)
 - [ ] live(E5 step 0 回填 → 绿):以 owner 角色删掉 demo 组合某只票近 90 天价格 → **不手工恢复,直接重跑** → 时间线出现 `sync_prices` 事件(message 带同步 ticker 数,须 = 持仓只数且非 0)、该 ticker 在 `[as_of-90d, as_of]` 的行数复原(实测 AAPL = 62 行)、run 绿、MV = Σ qty×close 与持仓一致
   > ⚠ 这三条**不可合并**:step 0 会在 step 2 之前把删掉的价格从 yfinance 原样抓回来,所以「删价格」只能证明 step 0 生效,**永远产不出红 run**;红分支必须用 step 0 修不好的东西(provider 无 bar / 未来 as_of)触发。
-- [ ] 回归红线三条(红线 2 的「10 步」自本阶段起读作「11 步」)
+- [ ] 回归红线三条(红线 2 的「10 步」自本阶段起读作「11 步」,六处写法已同步)
 
 **禁止**:Redis/Celery/任何队列中间件;**任何形式的心跳/续租线程**(两把 lease 都靠「取值够宽 + 到期自愈」);为 429 新增本仓第一个 exception handler;把配额算成 token 或工具调用数;退款/补偿逻辑;给 `app_rls` 授 DELETE;新建任何未设 `security_invoker` 的视图。
 
@@ -359,4 +359,6 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
   - **实现期又查出两处计划未列的非幂等写入(都在 issuer_research 内,不改结论只补账)**:①`evidence_packs` 无任何唯一键(`models.py` 无 `__table_args__`),重投静默重复 pack;②phase 2 每次都 `sess.create_session` 新建一行 `agent_sessions`,重投会把上一轮的 session 变成孤儿。这两条进一步确认 `issuer_research` 只能 fail、不能 requeue。
   - **readiness 的「幂等」有一处代价**:`standard_recipe` 走 `calc_service` 的 `db.add(CalcLedger(...))`,`calc_ledger` 无唯一键、按设计 append-only,所以重投不报错但会多出台账行。可接受(台账本就是 append-only 的审计流水),但 requeue 不是零成本,`TASK_MAX_RETRIES` 的存在理由之一即此。
 - **RLS 表上的 ORM 写入一律是 `INSERT … RETURNING`**(`flush()` 要回填 SERIAL 主键 / server_default),而 Postgres 对 `INSERT … RETURNING` 会把 SELECT 策略(USING)也套在新行上 —— 所以带 RLS 的表**USING 与 WITH CHECK 必须同时覆盖写入行**,只补一边会得到一条读起来像 WITH CHECK 失败的错。E1/E3 的 `RETURNING` 之所以无碍,只因 `tasks` / `usage_daily` 在共享层无 RLS。
+- **`check_limits(db_limits=...)` 是死参数**(E5 实现期发现):`analytics/limits.py` 声明并在 docstring 里提了它,函数体里**一次都没用**;而 `_load_inputs` 每次 run 都专门查一次库把它建出来,`portfolio_service._copy_risk_limits` 还会把 demo 的限额模板拷进每个新建组合。实际生效的**只有** `configs/risk_limits.yaml` 的全局默认值。后果有二:①用户组合的自定义限额目前完全无效;②任何断言「因为该组合的 DB 限额而触发告警」的测试必然失败。修它不属于 E5 范围,但**在公开链接前应决定**:要么接上,要么把这条路径连同拷贝逻辑一起删掉——留着一个假装可配置的界面比没有更糟。
+- 两个 step 是**非致命**的:`compare_previous_run`(吞异常且不进 `steps_completed`)与 `generate_report`(失败只记 warning、`report_id=None`)。所以「11 步全绿」不能当字面断言用——一个成功的 run 时间线上可以出现红步骤,`steps_completed` 也可以只有 9 或 10 项。
 - 任何 lease 重投都会**重复整条 `workflow_events` 时间线**(该表无唯一键,`step_context` 每步进出各写 1 行)。UI 按 `step_name` 去重(后写覆盖先写)故观感无碍,但读取原始事件做统计时须知。

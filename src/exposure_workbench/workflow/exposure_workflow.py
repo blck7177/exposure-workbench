@@ -26,11 +26,14 @@ from exposure_workbench.db.models import (
     ExposureMetrics, SectorExposure, IssuerExposure,
     FactorAttribution, RiskAlert, DailyReport,
 )
+from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
 from exposure_workbench.services import (
     exposure_run_service,
     portfolio_service,
     workflow_event_service,
     market_data_service,
+    market_data_ingestion_service,
 )
 from exposure_workbench.utils.ids import new_alert_id, new_id
 from exposure_workbench.workflow.contracts import WorkflowInput, WorkflowOutput
@@ -87,12 +90,31 @@ class ExposureWorkflow:
         steps_completed: list[str] = []
 
         try:
-            # ── Step 1: Load inputs ────────────────────────────────────────────
+            # ── Step 1: Sync prices ────────────────────────────────────────────
+            # Lives in the workflow, not the handler, so it shows up on the run's
+            # timeline. The window is the RUN's own [as_of - lookback, as_of] —
+            # using date.today() here would refresh a stretch the rest of the run
+            # never reads, which looks like a fix and is not one.
+            ctx = _StepContext(db, run_id, "sync_prices", "Refreshing prices for held tickers")
+            await ctx.__aenter__()
+            try:
+                positions, synced, unavailable = await self._sync_prices(db, portfolio_id, as_of_date)
+                ctx.message = (
+                    f"Refreshed prices for {synced} of {len(positions)} holdings"
+                    + (f"; provider had no data for {', '.join(unavailable)}" if unavailable else "")
+                )
+                await ctx.__aexit__(None, None, None)
+                steps_completed.append("sync_prices")
+            except Exception as e:
+                await ctx.__aexit__(type(e), e, None)
+                raise
+
+            # ── Step 2: Load inputs ────────────────────────────────────────────
             ctx = _StepContext(db, run_id, "load_inputs", "Loading portfolio positions and market data")
             await ctx.__aenter__()
             try:
                 positions_df, prices_df, factor_prices_df, db_limits = await self._load_inputs(
-                    db, portfolio_id, as_of_date
+                    db, portfolio_id, as_of_date, positions=positions
                 )
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("load_inputs")
@@ -100,7 +122,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 2: Validate inputs ────────────────────────────────────────
+            # ── Step 3: Validate inputs ────────────────────────────────────────
             ctx = _StepContext(db, run_id, "validate_inputs", "Validating prices and position data")
             await ctx.__aenter__()
             try:
@@ -111,7 +133,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 3: Exposure ───────────────────────────────────────────────
+            # ── Step 4: Exposure ───────────────────────────────────────────────
             ctx = _StepContext(db, run_id, "calculate_exposure", "Calculating market values and sector exposure")
             await ctx.__aenter__()
             try:
@@ -122,7 +144,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 4: P&L ────────────────────────────────────────────────────
+            # ── Step 5: P&L ────────────────────────────────────────────────────
             ctx = _StepContext(db, run_id, "calculate_pnl", "Computing daily P&L and return attribution")
             await ctx.__aenter__()
             try:
@@ -133,7 +155,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 5: Factor attribution ─────────────────────────────────────
+            # ── Step 6: Factor attribution ─────────────────────────────────────
             ctx = _StepContext(db, run_id, "calculate_attribution", "Running factor regression and attribution")
             await ctx.__aenter__()
             try:
@@ -162,7 +184,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 6: Risk metrics ───────────────────────────────────────────
+            # ── Step 7: Risk metrics ───────────────────────────────────────────
             ctx = _StepContext(db, run_id, "calculate_risk", "Computing VaR, volatility and stress scenarios")
             await ctx.__aenter__()
             try:
@@ -181,7 +203,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 7: Limit checks ───────────────────────────────────────────
+            # ── Step 8: Limit checks ───────────────────────────────────────────
             ctx = _StepContext(db, run_id, "check_limits", "Checking risk limits and generating alerts")
             await ctx.__aenter__()
             try:
@@ -199,7 +221,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 8: Compare previous run ──────────────────────────────────
+            # ── Step 9: Compare previous run ──────────────────────────────────
             ctx = _StepContext(db, run_id, "compare_previous_run", "Comparing with previous run")
             await ctx.__aenter__()
             try:
@@ -221,7 +243,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 prev_sector_weights = {}
 
-            # ── Step 9: Persist outputs ────────────────────────────────────────
+            # ── Step 10: Persist outputs ────────────────────────────────────────
             ctx = _StepContext(db, run_id, "persist_outputs", "Persisting results to database")
             await ctx.__aenter__()
             try:
@@ -237,7 +259,7 @@ class ExposureWorkflow:
                 await ctx.__aexit__(type(e), e, None)
                 raise
 
-            # ── Step 10: Generate report (best-effort) ─────────────────────────
+            # ── Step 11: Generate report (best-effort) ─────────────────────────
             ctx = _StepContext(db, run_id, "generate_report", "Generating LLM executive summary and report")
             await ctx.__aenter__()
             try:
@@ -271,18 +293,71 @@ class ExposureWorkflow:
 
     # ── Load inputs ────────────────────────────────────────────────────────────
 
+    @staticmethod
+    async def _positions_for(db: AsyncSession, portfolio_id: str, as_of_date: date) -> list:
+        """The run's holdings, resolved the one way the whole workflow agrees on.
+
+        get_positions filters as_of_date by EXACT equality, while uploads date a
+        snapshot by max(price_date) and a run's as_of defaults to today — so the
+        two normally differ and the fallback is the branch that actually fires.
+        Shared rather than duplicated because a copy that skipped the fallback
+        would return nothing and turn its step into a permanently green no-op.
+        """
+        positions = await portfolio_service.get_positions(db, portfolio_id, as_of_date)
+        if not positions:
+            positions = await portfolio_service.get_positions_latest(db, portfolio_id)
+        return positions
+
+    async def _sync_prices(
+        self,
+        db: AsyncSession,
+        portfolio_id: str,
+        as_of_date: date,
+    ) -> tuple[list, int, list[str]]:
+        """Pull fresh bars for every held ticker over the run's own window.
+
+        Per ticker, and swallowing only "the provider has nothing for this
+        symbol": ingest_market_prices raises on the FIRST empty result, which
+        would hide every other missing name behind whichever one sorted first.
+        Whether a gap is fatal is not decided here — step 3 is the single place
+        that judges, so it can name all of them at once.
+        """
+        positions = await self._positions_for(db, portfolio_id, as_of_date)
+        tickers = sorted({p.ticker for p in positions})
+        if not tickers:
+            return positions, 0, []
+
+        provider = YFinanceMarketDataProvider()
+        start_date = as_of_date - timedelta(days=_LOOKBACK_DAYS)
+        synced, unavailable = 0, []
+        for ticker in tickers:
+            try:
+                counts = await market_data_ingestion_service.ingest_market_prices(
+                    db, [ticker], start_date, as_of_date, provider, commit=False,
+                )
+                synced += 1 if counts.get(ticker) else 0
+            except market_data_ingestion_service.MarketDataUnavailable:
+                unavailable.append(ticker)
+            except Exception:
+                # A DB failure marks the transaction rollback-only, and the event
+                # write in __aexit__ would then raise something that reads like
+                # the cause. Leave the session clean before propagating.
+                await db.rollback()
+                raise
+        await db.commit()
+        return positions, synced, unavailable
+
     async def _load_inputs(
         self,
         db: AsyncSession,
         portfolio_id: str,
         as_of_date: date,
+        positions: list | None = None,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[dict]]:
         """Load positions, prices, factor prices, and limits from DB."""
 
-        positions = await portfolio_service.get_positions(db, portfolio_id, as_of_date)
-        if not positions:
-            # Fall back: get positions for the most recent available date
-            positions = await portfolio_service.get_positions_latest(db, portfolio_id)
+        if positions is None:
+            positions = await self._positions_for(db, portfolio_id, as_of_date)
 
         positions_df = pd.DataFrame([
             {
@@ -337,10 +412,48 @@ class ExposureWorkflow:
         prices_df: pd.DataFrame,
         as_of_date: date,
     ) -> None:
+        """The single place a run decides its prices are good enough.
+
+        Everything downstream may now assume every holding has a usable, recent
+        price — which is what lets calc_exposure and calc_pnl drop their
+        fallbacks. Before this existed, an unpriced holding was valued at $0 but
+        left in the denominator, so the run went green while every OTHER name's
+        weight was inflated: a two-name book with one bad ticker reported the
+        survivor at 100% instead of 71%, which is enough to fabricate a
+        concentration breach out of nothing.
+
+        Both problems are reported as complete lists. Naming only the first
+        turns one fix-and-rerun cycle into as many as there are bad tickers.
+        """
         if positions_df.empty:
             raise ValueError("No positions found for the given portfolio and date")
         if prices_df.empty:
             raise ValueError("No market prices found — ensure seed data is loaded")
+
+        held = set(positions_df["ticker"].astype(str))
+        as_of_ts = pd.Timestamp(as_of_date)
+        usable = prices_df[prices_df["price_date"] <= as_of_ts]
+        newest = usable.groupby("ticker")["price_date"].max()
+
+        missing = sorted(held - set(newest.index.astype(str)))
+        max_age = get_settings().price_staleness_days
+        stale = sorted(
+            f"{ticker} ({(as_of_ts - newest[ticker]).days}d old)"
+            for ticker in held & set(newest.index.astype(str))
+            if (as_of_ts - newest[ticker]).days > max_age
+        )
+
+        problems = []
+        if missing:
+            problems.append(f"no price on or before {as_of_date} for: {', '.join(missing)}")
+        if stale:
+            problems.append(f"newest price older than {max_age} days for: {', '.join(stale)}")
+        if problems:
+            raise ValueError(
+                "Cannot value this portfolio as of "
+                f"{as_of_date} — " + "; ".join(problems)
+                + ". Re-run once the data is available, or remove the holdings."
+            )
 
     # ── Persist outputs ────────────────────────────────────────────────────────
 
@@ -574,6 +687,16 @@ class _StepContext:
         else:
             status = "failed"
             msg = f"{self.message} — ERROR: {exc_val}"
+            # A step that failed part-way through its own DML leaves the
+            # transaction marked rollback-only, and the event write below would
+            # then raise PendingRollbackError. That is not merely noisy: it
+            # replaces the real cause in the timeline AND leaves the caller's
+            # session poisoned, so update_run_status() fails too and the run row
+            # sits at 'running' forever. The partial work is being abandoned
+            # regardless; recording WHY is the entire job of this write.
+            # (No step had uncommitted DML at its failure point until
+            # sync_prices, which is why this never bit before.)
+            await self.db.rollback()
 
         await workflow_event_service.log_event(
             db=self.db,

@@ -41,7 +41,7 @@ EDGAR_IDENTITY      必需(SEC 要求 UA 含联系邮箱,如 "Name email@x.com")
 - 单测:离线、fixture 数据、断言确定值,放 `tests/`(现为空目录);命名 `test_<module>.py`
 - 集成测(需网络/key):标 `@pytest.mark.live`,默认 `pytest -m "not live"` 全绿
 - 每阶段结束:`pytest -m "not live"` 全绿 + 该阶段验收全过 + git commit(消息 `P{n}: <摘要>`)
-- **回归红线**:任何阶段结束时,现有 exposure run(POST /api/exposure-runs → 10 步全绿)必须仍然工作
+- **回归红线**:任何阶段结束时,现有 exposure run(POST /api/exposure-runs → 11 步全绿)必须仍然工作
 
 ### 0.5 本计划中已钉死的实现常量
 
@@ -101,7 +101,7 @@ P2 与 P3 可并行;其余串行。总预估 ~9.5 agent 工作日。
 
 **验收**:
 - [ ] seed 后 `market_prices` 中 `source='yfinance'` 行数 > 2500(12 ticker × ~250 交易日),无 `source='seed'` 价格行
-- [ ] 现有 exposure run 在**真实数据**上 10 步全绿,指标值非零
+- [ ] 现有 exposure run 在**真实数据**上 11 步全绿,指标值非零
 - [ ] 单测:company_service 三分支(存在/不存在/不可调查)——mock DB 会话即可
 - [ ] `curl POST /api/market-data/sync` → task 完成,重复执行不产生重复行(幂等)
 
@@ -280,7 +280,7 @@ P2 与 P3 可并行;其余串行。总预估 ~9.5 agent 工作日。
   - `grep -rn "_mock_output\|mock_mode" src/` 仅现有 direct_llm_agent 一处
   - 新 services 中无 UPDATE/DELETE 于证据四库
 - [ ] 幂等三连:同一公司 readiness ×3、recipe ×2、research run ×2(前次完成后),行为均符合 MODULE_NOTES M8 幂等地图
-- [ ] 回归终验:exposure run 10 步全绿;243..不适用——`pytest -m "not live"` 全绿,live 套件全绿各一遍
+- [ ] 回归终验:exposure run 11 步全绿;243..不适用——`pytest -m "not live"` 全绿,live 套件全绿各一遍
 - [ ] 文档收尾:README 更新 Quick Start(真实数据 seed、新 env);TARGET_ARCHITECTURE v3 "留白"清单核对,已定的划掉
 
 ---

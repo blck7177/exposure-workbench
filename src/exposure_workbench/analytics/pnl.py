@@ -65,9 +65,17 @@ def calc_pnl(
         prev_price = _last_price(prices_df, ticker, prev_date)
 
         if curr_price is None:
-            curr_price = float(row.get("price", 0) or row.get("cost_basis", 0) or 0)
+            # No fallback to the position's stored price or cost basis. That
+            # fallback is why a single run could report a market value computed
+            # one way and a daily return computed from a different, larger
+            # denominator — the same portfolio priced in two universes. The
+            # workflow's validate_inputs step now guarantees a current price
+            # exists, so reaching here means a caller skipped it.
+            raise ValueError(f"calc_pnl called with no price for {ticker} as of {as_of_date}")
         if prev_price is None:
-            prev_price = curr_price  # no change if no history
+            # Genuinely fine: a holding with no bar on the comparison date has no
+            # measurable move, and prev_date can predate a recent listing.
+            prev_price = curr_price
 
         curr_mv = qty * curr_price
         prev_mv = qty * prev_price

@@ -27,7 +27,7 @@ agent_steps 107.
 
 ## Acceptance checks
 
-- **Exposure regression (red line):** the existing 10-step exposure pipeline runs
+- **Exposure regression (red line):** the existing exposure pipeline runs (10 steps at P9; 11 from V2-E5, which added sync_prices)
   green on real data with non-zero metrics (MV ~$10.26M) — unchanged by the upgrade.
 - **Two full research runs:** NVDA (16 citations) and AAPL (17 citations) produced
   complete Issuer Risk Briefs end to end through the real worker/API.

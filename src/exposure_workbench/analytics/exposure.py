@@ -58,7 +58,13 @@ def calc_exposure(
     pos_clean = positions_df.drop(columns=["price", "market_value"], errors="ignore")
     merged = pos_clean.merge(prices_on_date, on="ticker", how="left")
     merged = merged.rename(columns={"mkt_price": "price"})
-    merged["price"] = merged["price"].fillna(0.0)
+    # No fillna here: the workflow's validate_inputs step has already refused
+    # to run unless every holding has a recent price. Zero-filling used to turn
+    # "no price" into a $0 position that stayed in the denominator, inflating
+    # every other name's weight and fabricating concentration breaches.
+    if merged["price"].isna().any():
+        missing = ", ".join(sorted(merged.loc[merged["price"].isna(), "ticker"].astype(str)))
+        raise ValueError(f"calc_exposure called with no price for: {missing}")
     merged["market_value"] = merged["quantity"] * merged["price"]
 
     total_mv = merged["market_value"].sum()

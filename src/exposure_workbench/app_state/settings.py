@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     global_daily_exposure_runs: int = 200
     global_daily_market_syncs: int = 50
 
+    # Price freshness (V2-E5). Calendar days, so ~10 covers a long weekend plus a
+    # holiday and still catches a genuinely dead ticker. A holding whose newest
+    # bar is older than this fails the run instead of being valued at a stale
+    # price — the judgement lives in exactly one place, _validate_inputs.
+    price_staleness_days: int = 10
+
     # CORS
     cors_origins: str = "http://localhost:3103,http://127.0.0.1:3103"
 
