@@ -101,7 +101,10 @@ async def create_portfolio(
     user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
-    p = await portfolio_service.create_portfolio(db, owner_id=user.user_id, name=body.name)
+    try:
+        p = await portfolio_service.create_portfolio(db, owner_id=user.user_id, name=body.name)
+    except portfolio_service.TooManyPortfolios as e:
+        raise HTTPException(429, {"error": "too_many_portfolios", "limit": e.limit}) from e
     if body.csv_text:
         rows, problems = portfolio_csv.parse_csv(body.csv_text)
         if problems:
@@ -121,7 +124,10 @@ async def clone_demo(
     user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
-    p = await portfolio_service.clone_demo(db, owner_id=user.user_id)
+    try:
+        p = await portfolio_service.clone_demo(db, owner_id=user.user_id)
+    except portfolio_service.TooManyPortfolios as e:
+        raise HTTPException(429, {"error": "too_many_portfolios", "limit": e.limit}) from e
     await db.commit()
     return p
 

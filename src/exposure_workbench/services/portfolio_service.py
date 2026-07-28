@@ -298,9 +298,31 @@ async def _copy_risk_limits(db: AsyncSession, src_id: str, dst_id: str) -> None:
     await db.flush()
 
 
+class TooManyPortfolios(Exception):
+    def __init__(self, limit: int):
+        super().__init__(f"a user may own at most {limit} portfolios")
+        self.limit = limit
+
+
+# A ceiling rather than a daily quota: nobody should earn ten more portfolios
+# every morning. Creation is not otherwise counted anywhere — each one also
+# copies 13 risk-limit rows, and a clone copies the demo's positions on top — so
+# without this a single free account can grow the shared database unbounded and
+# nothing shows up on the usage dashboard while it happens.
+MAX_PORTFOLIOS_PER_USER = 20
+
+
 async def create_portfolio(db: AsyncSession, owner_id: str, name: str) -> Portfolio:
     """New empty portfolio owned by the user, with the demo's risk-limit template
     (check_limits needs limits to evaluate)."""
+    # semantic, not security: RLS already scopes this count to the caller; the
+    # explicit owner filter is what makes it mean "mine" rather than "visible".
+    owned = (await db.execute(
+        select(func.count()).select_from(Portfolio).where(Portfolio.owner_id == owner_id)
+    )).scalar_one()
+    if owned >= MAX_PORTFOLIOS_PER_USER:
+        raise TooManyPortfolios(MAX_PORTFOLIOS_PER_USER)
+
     p = Portfolio(
         id=new_id("port_"), name=(name or "").strip() or "My Portfolio",
         currency="USD", benchmark="SPY", owner_id=owner_id, is_active=True, is_public=False,

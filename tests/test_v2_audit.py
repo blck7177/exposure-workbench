@@ -120,3 +120,16 @@ def test_providers_do_not_import_upwards():
             if re.match(r"\s*(from|import)\s+apps\.", line):
                 offenders.append(f"{f.name}:{i} {line.strip()}")
     assert offenders == [], f"providers importing upwards: {offenders}"
+
+
+def test_unbounded_growth_paths_carry_a_ceiling():
+    """Not every write route enqueues a task, so not every one is quota-charged.
+    The ones that create rows directly need their own bound, or a single free
+    account can grow the shared database with nothing showing on the dashboard."""
+    from exposure_workbench.services import portfolio_service
+    from apps.api.routes import agent, market_data
+
+    assert portfolio_service.MAX_PORTFOLIOS_PER_USER <= 100
+    assert hasattr(portfolio_service, "TooManyPortfolios")
+    assert agent.MAX_MESSAGE_CHARS <= 32_000, "one charged turn must not carry unbounded prompt"
+    assert market_data.MAX_SYNC_TICKERS <= 100
