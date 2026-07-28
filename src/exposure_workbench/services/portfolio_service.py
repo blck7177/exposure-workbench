@@ -125,8 +125,8 @@ async def _snapshot_one(db: AsyncSession, p: Portfolio) -> dict:
     base = {
         "portfolio_id": p.id, "name": p.name, "benchmark": p.benchmark,
         "currency": p.currency, "manager": p.manager,
-        # is_own distinguishes the user's portfolio from the shared public demo
-        # (semantic, for the agent to prefer the user's own — not a security check).
+        # semantic, not security: is_own only lets the agent prefer the user's own
+        # book over the shared public demo. Visibility itself is decided by RLS.
         "is_own": p.owner_id is not None and p.owner_id == current_user_id(),
     }
     latest = await exposure_run_service.get_latest_completed_run(db, p.id)
@@ -182,8 +182,10 @@ class UploadError(Exception):
 
 
 async def list_visible(db: AsyncSession, owner_id: str | None) -> list[Portfolio]:
-    """Portfolios a caller may see: public (demo) plus their own. Semantic filter
-    — real isolation is Postgres RLS (V2-C); this only shapes 'my portfolios'."""
+    """Portfolios a caller may see: public (demo) plus their own.
+
+    semantic, not security: Postgres RLS is what isolates tenants. This filter
+    only shapes what 'my portfolios' means for the list view."""
     q = select(Portfolio).where(Portfolio.is_active.is_(True))
     if owner_id:
         q = q.where((Portfolio.owner_id == owner_id) | (Portfolio.is_public.is_(True)))

@@ -131,7 +131,9 @@ async def upload_positions(
     p = await portfolio_service.get_portfolio(db, portfolio_id)
     if p is None:
         raise HTTPException(404, "Portfolio not found")
-    if p.owner_id != user.user_id:   # temporary until RLS (V2-C) — semantic ownership check
+    # semantic, not security: RLS already makes another tenant's portfolio
+    # invisible; this only turns that into a clear 403 instead of a 404.
+    if p.owner_id != user.user_id:
         raise HTTPException(403, "not your portfolio")
     rows, problems = portfolio_csv.parse_csv(body.csv_text)
     if problems:

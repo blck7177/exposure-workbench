@@ -81,8 +81,9 @@ async def _start_issuer_research(db: AsyncSession, ticker: str, reason: str) -> 
 
 async def _start_exposure_run(db: AsyncSession, portfolio_id: str, as_of_date: str, reason: str) -> dict:
     from exposure_workbench.services import exposure_run_service, portfolio_service
-    # only run portfolios the user owns — the public demo is read-only (matches the
-    # REST route + the RLS WITH CHECK; a clean error beats an RLS-aborted transaction).
+    # Only run portfolios the user owns — the public demo is read-only.
+    # semantic, not security: the RLS WITH CHECK is the real stop; this just gives
+    # the agent a structured error instead of an aborted transaction.
     pf = await portfolio_service.get_portfolio(db, portfolio_id)
     if pf is None or pf.owner_id != current_user_id():
         return {"error": "not_your_portfolio", "portfolio_id": portfolio_id,

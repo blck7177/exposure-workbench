@@ -41,8 +41,9 @@ async def list_tasks(
     user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # tasks is a shared system queue (no RLS — the worker must see all); scope this
-    # user-facing view to the caller's own tasks by owner (semantic filter).
+    # tasks is a shared system queue and carries no RLS — the worker must see every
+    # row. semantic, not security: this scopes the user-facing view to the caller's
+    # own tasks. Nothing sensitive lives here, but it is still a deliberate choice.
     q = select(Task).where(Task.owner_user_id == user.user_id).order_by(Task.created_at.desc()).limit(limit)
     if status:
         q = q.where(Task.status == status)

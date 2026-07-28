@@ -169,7 +169,8 @@ async def create_exposure_run(
 ):
     """Create a new exposure run and enqueue a worker task."""
     # You can only run portfolios you own — the public demo is read-only (clone to
-    # run). Semantic check for a clean 403; RLS WITH CHECK is the real guard.
+    # run). semantic, not security: RLS WITH CHECK is what actually stops the
+    # write; this just produces a readable 403 rather than an aborted transaction.
     pf = await portfolio_service.get_portfolio(db, body.portfolio_id)
     if pf is None or pf.owner_id != user.user_id:
         raise HTTPException(403, "You can only run portfolios you own. Clone the demo to run it.")
