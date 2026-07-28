@@ -11,12 +11,12 @@ Issuer Intelligence MVP.
 
 | | |
 |---|---|
-| Offline tests | **191** (`pytest -m "not live"`) — 83 at P9, 113 entering V2-E |
+| Offline tests | **196** (`pytest -m "not live"`) — 83 at P9, 113 entering V2-E |
 | Live tests | **31** (`pytest -m live`) |
 | Tables with RLS | **20**, one `tenant` policy each |
 | Shared tables (no RLS, deliberately) | 13 — company evidence, `tasks`, `usage_daily` |
 | `security_master` | 13,024 symbols |
-| Commits in V2-E..G | 6, on `issuer-intelligence` |
+| Commits in V2-E..G | 9, on `issuer-intelligence` |
 
 Task types exercised end to end: `exposure_update` 15 completed / 2 failed,
 `market_data_sync` 4 / 1, `issuer_research` 2 / 1, `company_readiness` **3 / 0**.
