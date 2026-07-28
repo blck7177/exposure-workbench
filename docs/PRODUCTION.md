@@ -231,12 +231,33 @@ much of it there is.
 
 ### Known limits
 
+Each of these is a decision, not an oversight. They are here so that the next
+person to touch this — including me — does not have to rediscover them.
+
 - **Account deletion has no path.** `app_rls` holds no DELETE grant by design, so
   removing a user's data requires an owner-role script that does not exist yet.
   Worth building before inviting anyone who is not a friend.
 - **A portfolio's own risk limits do nothing.** `check_limits` takes a
-  `db_limits` argument it never reads; only the YAML defaults fire. Either wire
-  it up or delete the copy path — an interface that pretends to be configurable
-  is worse than none.
-- **Every exposure run now calls the price provider once per holding.** That is
-  the cost of `sync_prices`, and it is not separately rate-limited.
+  `db_limits` argument it never reads; only the YAML defaults fire, while every
+  run queries for them and every new portfolio gets a copied template. Either
+  wire it up or delete the copy path — an interface that pretends to be
+  configurable is worse than none.
+- **Every exposure run calls the price provider once per holding.** That is the
+  cost of `sync_prices`, and it is not separately rate-limited.
+- **A quota-rejected delegation call is refunded its session tool budget.** The
+  rollback that correctly discards the half charge also discards the reservation,
+  so `tools_used` and `agent_steps` disagree for that session.
+- **The "one active research run per company" guard is per-tenant.** It reads
+  `research_runs`, which is owner-scoped by RLS, so N users can research the same
+  issuer at once and pay for the same ingest N times. A shared advisory lock or a
+  partial unique index would fix it; neither exists.
+- **Factor prices sit outside `sync_prices` and `validate_inputs`.** Holdings are
+  refreshed and checked for staleness; the factor ETFs behind the attribution
+  step are not, so they can silently drift older.
+- **A transient provider error in step 1 fails a run whose prices were already
+  complete.** The step distinguishes "the provider has nothing for this symbol"
+  from a hard failure, but not a network blip from a real outage.
+- **There is no rate limiting.** The quota bounds what a signed-in user can spend
+  and the reverse proxy bounds body size, but nothing bounds request *frequency*.
+  For a demo behind a personal domain that is a considered trade; it would not be
+  for anything larger.
