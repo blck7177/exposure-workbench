@@ -1,0 +1,52 @@
+# Exposure Workbench — reverse proxy for the public demo (V2-F).
+#
+# Copy this block into the machine's /etc/caddy/Caddyfile alongside whatever else
+# it already serves, then `sudo caddy validate --config /etc/caddy/Caddyfile`
+# and `sudo systemctl reload caddy`. Back the file up first — a syntax error
+# takes down every site on the box, not just this one.
+#
+# PREREQUISITE: the DNS record must exist and resolve BEFORE you add this block.
+# Caddy tries to issue a certificate on load; for a name that does not resolve it
+# retries in the background and logs failures, which is noise at best and a
+# reload that surprises you at worst.
+#
+#   A   exposure   <this machine's public IP>    (DNS-only / grey cloud on Cloudflare)
+#
+# Then, before the first build, in .env:
+#   NEXT_PUBLIC_API_URL=            # empty = same origin; see apps/web/lib/http.ts
+#   CORS_ORIGINS=                   # nothing cross-origin left to allow
+#   CLERK_AUTHORIZED_PARTIES=https://exposure.example.com
+# and rebuild the web image, because NEXT_PUBLIC_* is inlined at build time —
+# changing it in the environment of a running container does nothing.
+
+exposure.example.com {
+	encode gzip
+
+	# /api/* goes to FastAPI. Do NOT strip the prefix: the routers are mounted
+	# under /api inside the app, so `uri strip_prefix /api` would 404 everything.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8103
+	}
+
+	# Everything else is the Next.js app.
+	handle {
+		reverse_proxy 127.0.0.1:3103
+	}
+
+	log {
+		output file /var/log/caddy/exposure.log
+		format json
+	}
+}
+
+# Smoke checks after reload (all from another machine, not this one):
+#
+#   curl -sS https://exposure.example.com/api/health           -> {"status":"ok"}
+#   curl -sS https://exposure.example.com/api/portfolios       -> the public demo only
+#   curl -sS -o /dev/null -w '%{http_code}\n' \
+#        -X POST https://exposure.example.com/api/agent/sessions   -> 401
+#   curl -sS https://exposure.example.com/ | grep -c localhost:8103 -> 0
+#
+# The last one matters most: the API base is baked into the client bundle at
+# build time, so a stale image looks completely healthy from the server side and
+# is broken for every visitor.

@@ -55,3 +55,14 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/health")
+def api_health():
+    """The same check, reachable through the reverse proxy.
+
+    In production Caddy routes only /api/* to this service and everything else to
+    the web app, so a bare /health lands on Next.js and 404s — which reads as
+    "the API is down" during exactly the smoke test meant to prove it is up.
+    """
+    return {"status": "ok"}

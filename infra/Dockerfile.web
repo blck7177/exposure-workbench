@@ -5,7 +5,10 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
-ARG NEXT_PUBLIC_API_URL=http://localhost:8103
+# Default EMPTY = same origin, which is what production wants; compose passes the
+# explicit localhost:8103 for local development. A hardcoded default here meant a
+# bare `docker build` produced an image that only worked on the build machine.
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Clerk publishable key is inlined into the client bundle at build time; empty =>
 # auth disabled (public demo still builds and renders).

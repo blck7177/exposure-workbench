@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: exposure
       POSTGRES_DB: exposure_workbench
     ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
+      # Loopback only. Docker publishes straight past ufw, so a bare "5433:5432"
+      # put Postgres — credentials exposure/exposure — on the public internet.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -25,7 +27,9 @@ services:
     container_name: exposure-api
     restart: unless-stopped
     ports:
-      - "${API_HOST_PORT:-8103}:8000"
+      # Loopback only: Caddy reverse-proxies to it. Published on 0.0.0.0 the API
+      # would be reachable directly, defeating same-origin CORS entirely.
+      - "127.0.0.1:${API_HOST_PORT:-8103}:8000"
     environment:
       DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
       # V2-C: runtime uses the non-owner app_rls role so RLS policies bind.
@@ -40,7 +44,8 @@ services:
       REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
       DEMO_MODE: "${DEMO_MODE:-true}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      CORS_ORIGINS: "http://localhost:${WEB_HOST_PORT:-3103},http://127.0.0.1:${WEB_HOST_PORT:-3103}"
+      # Same-origin production needs no entry here at all; these are the dev origins.
+      CORS_ORIGINS: "${CORS_ORIGINS-http://localhost:${WEB_HOST_PORT:-3103},http://127.0.0.1:${WEB_HOST_PORT:-3103}}"
       CLERK_ISSUER: "${CLERK_ISSUER:-}"
       CLERK_AUTHORIZED_PARTIES: "${CLERK_AUTHORIZED_PARTIES:-}"
       # V2-E2/E3. Quota units are user actions per UTC day; the GLOBAL_* pools are
@@ -102,12 +107,13 @@ services:
       context: .
       dockerfile: infra/Dockerfile.web
       args:
-        NEXT_PUBLIC_API_URL: "http://localhost:${API_HOST_PORT:-8103}"
+        # Empty in production (same origin behind Caddy); localhost for dev.
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL-http://localhost:${API_HOST_PORT:-8103}}"
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
     container_name: exposure-web
     restart: unless-stopped
     ports:
-      - "${WEB_HOST_PORT:-3103}:3000"
+      - "127.0.0.1:${WEB_HOST_PORT:-3103}:3000"
     environment:
       # server-side (SSR) Clerk needs these at runtime; publishable key is also
       # inlined at build time via the build arg above.

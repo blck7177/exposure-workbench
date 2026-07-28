@@ -3,7 +3,12 @@
 // analogue of the backend's single auth choke point. A duplicated transport was
 // exactly what let signed-in chat/research writes go out token-less.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8103";
+// Empty string means SAME ORIGIN — the production shape, where Caddy proxies
+// /api/* to the API on the same host, so there is no cross-origin request and no
+// CORS to configure. `??` not `||`: an empty string is falsy, so `||` would
+// silently fall back to localhost:8103 in exactly the build that is supposed to
+// be same-origin, and the page would 404 in production with nothing in any log.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8103";
 
 // A Clerk-aware component registers the token getter once (see components/Auth).
 // Null getter => anonymous (read-only); write routes then 401 by design.
