@@ -98,7 +98,7 @@ async def process_one() -> bool:
     if handler is None:
         logger.warning(f"No handler for task type '{task.type}', skipping task {task.id}")
         async with factory() as db:
-            await fail_task(db, task.id, f"No handler for task type '{task.type}'")
+            await fail_task(db, task.id, f"No handler for task type '{task.type}'")  # fenced; see task_service
             await db.commit()
         return True
 
@@ -114,15 +114,25 @@ async def process_one() -> bool:
             result = await db.execute(select(Task).where(Task.id == task.id))
             fresh_task = result.scalar_one()
             await handler(db, fresh_task)
-            await complete_task(db, task.id)
+            settled = await complete_task(db, task.id)
             await db.commit()
-            logger.info(f"Task {task.id} completed successfully")
+            if settled:
+                logger.info(f"Task {task.id} completed successfully")
+            else:
+                # Our lease expired mid-flight and the reaper handed this task on.
+                # Whatever we just wrote may now be duplicated or superseded, so
+                # say so loudly rather than report a success we no longer own.
+                logger.warning(
+                    f"Task {task.id} finished but was no longer ours — the lease expired "
+                    f"and it was reclaimed. TASK_LEASE_SECONDS may be too low for this work."
+                )
 
     except Exception as exc:
         logger.error(f"Task {task.id} failed: {exc}", exc_info=True)
         factory2 = get_session_factory()
         async with factory2() as db2:
-            await fail_task(db2, task.id, str(exc))
+            if not await fail_task(db2, task.id, str(exc)):
+                logger.warning(f"Task {task.id} failed but had already been reclaimed; left alone")
             await db2.commit()
     finally:
         current_user_ctx.reset(ctx_token)

@@ -114,22 +114,33 @@ async def claim_next_task(
     return task
 
 
-async def complete_task(db: AsyncSession, task_id: str) -> None:
-    await db.execute(
+# Terminal transitions are FENCED on (still running, still mine). A worker whose
+# lease expired has already had its task reclaimed — possibly requeued and picked
+# up by someone else — and must not be able to reach back and declare an outcome
+# for a run it no longer owns. Marking such a task 'completed' would strand the
+# replacement mid-flight and report success for work that never finished.
+#
+# Both return whether the write landed, so the worker can say so rather than
+# silently believing it finished the job.
+
+async def complete_task(db: AsyncSession, task_id: str, worker_id: str = WORKER_ID) -> bool:
+    result = await db.execute(
         update(Task)
-        .where(Task.id == task_id)
+        .where(Task.id == task_id, Task.status == "running", Task.worker_id == worker_id)
         .values(
             status="completed",
             completed_at=datetime.now(timezone.utc),
             lease_until=None,   # settled: nothing left for the reaper to find
         )
     )
+    return result.rowcount > 0
 
 
-async def fail_task(db: AsyncSession, task_id: str, error: str) -> None:
-    await db.execute(
+async def fail_task(db: AsyncSession, task_id: str, error: str,
+                    worker_id: str = WORKER_ID) -> bool:
+    result = await db.execute(
         update(Task)
-        .where(Task.id == task_id)
+        .where(Task.id == task_id, Task.status == "running", Task.worker_id == worker_id)
         .values(
             status="failed",
             error_message=error,
@@ -137,6 +148,7 @@ async def fail_task(db: AsyncSession, task_id: str, error: str) -> None:
             lease_until=None,
         )
     )
+    return result.rowcount > 0
 
 
 _REAP_SQL = text("""

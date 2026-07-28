@@ -194,10 +194,12 @@ function MiddlePanel({
     if (!selectedPortfolio || launching) return;
     setLaunching(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      // No date: the browser's idea of "today" is not the market's. The server
+      // reports on the last completed session, which before the close is
+      // yesterday — asking for today would compare a bar against itself.
       // POST returns the full run (empty events until the worker fills it in) —
       // hand it straight up; polling on selectedRunId takes over from there.
-      const created = await createRun(selectedPortfolio.id, today);
+      const created = await createRun(selectedPortfolio.id);
       onRunUpdate(created);
     } catch (e) {
       console.error("Failed to create run:", e);

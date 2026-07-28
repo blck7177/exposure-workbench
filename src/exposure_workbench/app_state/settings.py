@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # LLM
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    # gpt-5.x takes max_completion_tokens rather than max_tokens and accepts only
+    # the default temperature — see llm/client.py, which branches on the prefix.
+    openai_model: str = "gpt-5.4-mini"
     anthropic_model: str = "claude-3-5-haiku-20241022"
     embedding_model: str = "text-embedding-3-small"   # 1536-dim, filing_chunks (M5)
 

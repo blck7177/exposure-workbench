@@ -28,11 +28,18 @@ class PnlResult:
     top_detractors: list[PositionPnl] = field(default_factory=list)
 
 
-def _last_price(prices_df: pd.DataFrame, ticker: str, on_or_before: pd.Timestamp) -> float | None:
+def _last_bar(prices_df: pd.DataFrame, ticker: str, on_or_before: pd.Timestamp):
+    """(close, bar_date) of the newest bar at or before a date, or (None, None).
+
+    The date comes back with the price because a daily move needs two DIFFERENT
+    bars. Returning only the number made it impossible to tell "flat day" from
+    "both lookups landed on the same bar", and those are not the same fact.
+    """
     sub = prices_df[(prices_df["ticker"] == ticker) & (prices_df["price_date"] <= on_or_before)]
     if sub.empty:
-        return None
-    return float(sub.sort_values("price_date").iloc[-1]["close"])
+        return None, None
+    last = sub.sort_values("price_date").iloc[-1]
+    return float(last["close"]), last["price_date"]
 
 
 def calc_pnl(
@@ -50,6 +57,7 @@ def calc_pnl(
     prev_date = as_of - pd.tseries.offsets.BDay(1)  # previous business day
 
     pos_pnl_list: list[PositionPnl] = []
+    stale_tickers: list[str] = []
     total_pnl = 0.0
 
     # We need yesterday's MV to compute portfolio daily return properly
@@ -61,8 +69,8 @@ def calc_pnl(
         qty = float(row["quantity"])
         sector = str(row.get("sector", "Unknown") or "Unknown")
 
-        curr_price = _last_price(prices_df, ticker, as_of)
-        prev_price = _last_price(prices_df, ticker, prev_date)
+        curr_price, curr_bar = _last_bar(prices_df, ticker, as_of)
+        prev_price, prev_bar = _last_bar(prices_df, ticker, prev_date)
 
         if curr_price is None:
             # No fallback to the position's stored price or cost basis. That
@@ -72,10 +80,16 @@ def calc_pnl(
             # workflow's validate_inputs step now guarantees a current price
             # exists, so reaching here means a caller skipped it.
             raise ValueError(f"calc_pnl called with no price for {ticker} as of {as_of_date}")
+
         if prev_price is None:
-            # Genuinely fine: a holding with no bar on the comparison date has no
-            # measurable move, and prev_date can predate a recent listing.
+            # Genuinely fine: nothing existed before this bar, e.g. a listing
+            # younger than the comparison window. No prior close, no move.
             prev_price = curr_price
+        elif prev_bar == curr_bar:
+            # Both lookups landed on the SAME bar, so there is no move to
+            # measure — most often because as_of is today and today has not
+            # closed yet. Counted, not silently reported as a flat day.
+            stale_tickers.append(ticker)
 
         curr_mv = qty * curr_price
         prev_mv = qty * prev_price
@@ -95,6 +109,23 @@ def calc_pnl(
             prev_price=prev_price,
             curr_price=curr_price,
         ))
+
+    # If EVERY holding priced off the same bar twice, there is no trading day
+    # between the two sides of this comparison, and the "daily" figures would all
+    # be exactly zero — a whole book reported as perfectly flat, which reads as a
+    # calm day rather than as missing data. Measured on the live system before
+    # this check existed: a run dated today, with the newest bar from yesterday,
+    # reported daily_pnl 0.00 and daily_return 0.00000000 for a $10.4M portfolio.
+    #
+    # A subset being stale is left alone: one name that did not trade among many
+    # that did is a real, measurable flat position.
+    if stale_tickers and len(stale_tickers) == len(pos_pnl_list):
+        raise ValueError(
+            f"No daily move to report as of {as_of_date}: every holding's latest "
+            f"price and its comparison price are the same bar, so no trading day "
+            f"separates them. Run against the most recent completed session "
+            f"instead — the newest available data predates {as_of_date}."
+        )
 
     # Compute contribution = position_weight_yesterday × ticker_return
     for p in pos_pnl_list:

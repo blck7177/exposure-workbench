@@ -5,10 +5,22 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import MarketPrice, FactorPrice
+
+
+async def latest_session_date(db: AsyncSession) -> date | None:
+    """The newest session we actually hold prices for, or None if we hold none.
+
+    This is what "daily" means for a report: the last completed trading session,
+    not the wall-clock date. Asking for today before today has closed produces a
+    run whose two comparison prices are the same bar — measured on the live
+    system, a $10.4M book reporting daily P&L of exactly 0.00, which reads as a
+    calm day rather than as absent data.
+    """
+    return (await db.execute(select(func.max(MarketPrice.price_date)))).scalar_one_or_none()
 
 
 async def get_prices_df(

@@ -37,6 +37,13 @@ async def _ensure_company_ready(db: AsyncSession, ticker: str, reason: str) -> d
         task = await task_service.create_task(db, task_type="company_readiness", payload={"ticker": tk},
                                               owner_user_id=current_user_id())
     except usage_service.QuotaExceeded as e:
+        # Roll back before returning. charge() debits the user pool and then the
+        # global backstop in one transaction; when the backstop refuses, this
+        # tool RETURNS rather than raising, and meta_agent commits the session
+        # straight afterwards — making the user's debit permanent for an action
+        # that never ran. The session holds only this tool call, so discarding it
+        # is exactly right.
+        await db.rollback()
         return e.as_dict() | {"ticker": tk}
     task.payload = {**task.payload, "run_id": task.id}
     from sqlalchemy.orm.attributes import flag_modified
@@ -64,6 +71,13 @@ async def _start_issuer_research(db: AsyncSession, ticker: str, reason: str) -> 
         task = await task_service.create_task(db, task_type="issuer_research", payload={"ticker": tk},
                                               owner_user_id=current_user_id())
     except usage_service.QuotaExceeded as e:
+        # Roll back before returning. charge() debits the user pool and then the
+        # global backstop in one transaction; when the backstop refuses, this
+        # tool RETURNS rather than raising, and meta_agent commits the session
+        # straight afterwards — making the user's debit permanent for an action
+        # that never ran. The session holds only this tool call, so discarding it
+        # is exactly right.
+        await db.rollback()
         return e.as_dict() | {"ticker": tk}
     try:
         run = await research_run_service.create_run(
@@ -79,7 +93,8 @@ async def _start_issuer_research(db: AsyncSession, ticker: str, reason: str) -> 
     return {"enqueued": True, "run_id": run.id, "kind": "issuer_research", "ticker": tk, "reason": reason}
 
 
-async def _start_exposure_run(db: AsyncSession, portfolio_id: str, as_of_date: str, reason: str) -> dict:
+async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
+                              as_of_date: str | None = None) -> dict:
     from exposure_workbench.services import exposure_run_service, portfolio_service
     # Only run portfolios the user owns — the public demo is read-only.
     # semantic, not security: the RLS WITH CHECK is the real stop; this just gives
@@ -88,16 +103,28 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, as_of_date: s
     if pf is None or pf.owner_id != current_user_id():
         return {"error": "not_your_portfolio", "portfolio_id": portfolio_id,
                 "detail": "you can only run a portfolio you own; clone the demo to run it"}
+    # The reporting date is a server fact, not something for the model to guess:
+    # an LLM-supplied date reached the workflow completely unchecked, and "today"
+    # before the close compares the newest bar against itself.
+    from exposure_workbench.services import market_data_service
+    if as_of_date:
+        as_of = __import__("datetime").date.fromisoformat(as_of_date)
+    else:
+        as_of = await market_data_service.latest_session_date(db)
+        if as_of is None:
+            return {"error": "no_price_data", "detail": "no market prices are loaded yet"}
+
     try:
         task = await task_service.create_task(
             db, task_type="exposure_update",
-            payload={"portfolio_id": portfolio_id, "as_of_date": as_of_date},
+            payload={"portfolio_id": portfolio_id, "as_of_date": as_of.isoformat()},
             owner_user_id=current_user_id(),
         )
     except usage_service.QuotaExceeded as e:
+        await db.rollback()   # see _ensure_company_ready: never commit a half charge
         return e.as_dict() | {"portfolio_id": portfolio_id}
     run = await exposure_run_service.create_run(
-        db, portfolio_id=portfolio_id, as_of_date=__import__("datetime").date.fromisoformat(as_of_date),
+        db, portfolio_id=portfolio_id, as_of_date=as_of,
         task_id=task.id, triggered_by=f"agent:{current_session_id()}",
     )
     task.payload = {**task.payload, "run_id": run.id}
@@ -147,9 +174,11 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         description="Enqueue a portfolio exposure run. Returns a run id immediately.",
         json_schema={"type": "object", "properties": {
             "portfolio_id": {"type": "string"},
-            "as_of_date": {"type": "string", "description": "YYYY-MM-DD"},
+            "as_of_date": {"type": "string", "description":
+                "YYYY-MM-DD. Omit unless the user asked for a specific date — "
+                "the server reports on the last completed session by default."},
             "reason": {"type": "string"},
-        }, "required": ["portfolio_id", "as_of_date", "reason"]},
+        }, "required": ["portfolio_id", "reason"]},
         fn=_start_exposure_run, tool_class=DELEGATION,
     ))
     reg.register(Tool(

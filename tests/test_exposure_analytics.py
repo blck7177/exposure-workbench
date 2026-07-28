@@ -113,14 +113,46 @@ def test_pnl_refuses_to_fall_back_to_the_stored_snapshot_price():
 
 
 def test_a_missing_prior_close_is_flat_not_an_error():
-    """Distinct from a missing CURRENT price: a name listed yesterday has no
-    measurable move, which is a fact rather than a data gap."""
+    """Distinct from a missing CURRENT price: a name with nothing before its
+    first bar has no prior close, which is a fact rather than a data gap.
+
+    Note this is NOT the same as both lookups landing on the same bar — see
+    below. Telling those apart is the whole reason _last_bar returns a date.
+    """
     out = calc_pnl(
         positions(("NEW", 10, "Tech")),
         prices(("NEW", "2026-07-24", 50.0)),
         AS_OF,
     )
     assert out.daily_pnl == pytest.approx(0.0)
+
+
+def test_a_book_priced_entirely_off_one_bar_refuses_to_report_a_flat_day():
+    """Found by review, reproduced on the live system: a run dated today, before
+    today's close exists, resolved both sides of the comparison to yesterday's
+    bar and reported daily_pnl 0.00 on a $10.4M portfolio. Perfectly flat reads
+    as a calm day, not as missing data."""
+    with pytest.raises(ValueError) as e:
+        calc_pnl(
+            positions(("AAPL", 100, "Tech"), ("XOM", 50, "Energy")),
+            # newest bar predates as_of, so as_of and prev_date both land on it
+            prices(("AAPL", "2026-07-22", 200.0), ("AAPL", "2026-07-23", 210.0),
+                   ("XOM", "2026-07-22", 50.0), ("XOM", "2026-07-23", 51.0)),
+            date(2026, 7, 27),
+        )
+    assert "no daily move" in str(e.value).lower()
+
+
+def test_one_untraded_name_among_many_is_still_a_real_flat_position():
+    """A subset being stale must NOT fail the run — that is a genuine, measurable
+    zero, and failing on it would make illiquid holdings unusable."""
+    out = calc_pnl(
+        positions(("AAPL", 100, "Tech"), ("QUIET", 10, "Utilities")),
+        prices(("AAPL", "2026-07-23", 100.0), ("AAPL", "2026-07-24", 110.0),
+               ("QUIET", "2026-07-20", 5.0)),
+        AS_OF,
+    )
+    assert out.daily_pnl == pytest.approx(1_000.0), "AAPL's move still counts"
 
 
 # ── build_portfolio_returns ───────────────────────────────────────────────────

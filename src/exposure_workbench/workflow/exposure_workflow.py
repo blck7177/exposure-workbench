@@ -335,6 +335,13 @@ class ExposureWorkflow:
                 counts = await market_data_ingestion_service.ingest_market_prices(
                     db, [ticker], start_date, as_of_date, provider, commit=False,
                 )
+                # Commit per ticker rather than once at the end. market_prices is
+                # shared and every write is an upsert, so there is nothing to make
+                # atomic across tickers — while holding one transaction open would
+                # keep each ticker's row locks for the whole remaining loop, i.e.
+                # across every subsequent provider network call. Two runs sharing
+                # a holding would then block each other for seconds at a time.
+                await db.commit()
                 synced += 1 if counts.get(ticker) else 0
             except market_data_ingestion_service.MarketDataUnavailable:
                 unavailable.append(ticker)
@@ -344,7 +351,6 @@ class ExposureWorkflow:
                 # the cause. Leave the session clean before propagating.
                 await db.rollback()
                 raise
-        await db.commit()
         return positions, synced, unavailable
 
     async def _load_inputs(

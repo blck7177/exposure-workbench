@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import User
@@ -32,16 +33,25 @@ async def touch(user_id: str, email: str | None) -> None:
     transaction, and users is an RLS table (a row is only insertable under its
     own tenant).
     """
+    # A single upsert, not read-then-insert. Two concurrent requests from a user
+    # who has never signed in before would both find no row and both INSERT, and
+    # one would take a primary-key violation — a 500 on somebody's very first
+    # request, which is the least forgiving moment to get one.
+    #
+    # COALESCE keeps an email already on file rather than letting a token that
+    # happens to omit the claim blank it out.
+    now = datetime.now(timezone.utc)
+    stmt = pg_insert(User).values(id=user_id, email=email, last_seen_at=now)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["id"],
+        set_={
+            "last_seen_at": stmt.excluded.last_seen_at,
+            "email": func.coalesce(User.email, stmt.excluded.email),
+        },
+    )
     factory = get_session_factory()
     async with factory() as session, session.begin():
-        row = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-        now = datetime.now(timezone.utc)
-        if row is None:
-            session.add(User(id=user_id, email=email, last_seen_at=now))
-        else:
-            row.last_seen_at = now
-            if email and not row.email:
-                row.email = email
+        await session.execute(stmt)
 
 
 async def get(db: AsyncSession, user_id: str) -> User | None:

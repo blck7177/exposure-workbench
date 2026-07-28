@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import exposure_run_service
+from exposure_workbench.services import exposure_run_service, market_data_service
 from exposure_workbench.workflow.contracts import WorkflowInput
 from exposure_workbench.workflow.exposure_workflow import ExposureWorkflow
 
@@ -43,7 +43,12 @@ async def handle(db: AsyncSession, task: Any) -> None:
     if as_of_date_str:
         as_of_date = date.fromisoformat(as_of_date_str)
     else:
-        as_of_date = date.today()
+        # Every producer now pins the date at creation, so this is a belt-and-
+        # braces path. Fall back to the last completed session rather than the
+        # wall clock, which would compare the newest bar against itself.
+        as_of_date = await market_data_service.latest_session_date(db)
+        if as_of_date is None:
+            raise ValueError(f"Task {task.id} has no as_of_date and no prices are loaded")
 
     workflow = ExposureWorkflow(configs_dir=str(settings.configs_dir))
     workflow_input = WorkflowInput(

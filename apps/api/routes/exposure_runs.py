@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import exposure_run_service, portfolio_service, task_service, usage_service
+from exposure_workbench.services import (
+    exposure_run_service, market_data_service, portfolio_service, task_service, usage_service,
+)
 
 router = APIRouter()
 
@@ -155,7 +157,11 @@ class RunSummaryOut(BaseModel):
 
 class CreateRunRequest(BaseModel):
     portfolio_id: str
-    as_of_date: date = Field(default_factory=date.today)
+    # Omit to report on the last completed session, which is what a "daily"
+    # report means. An explicit date is honoured exactly — including one the data
+    # cannot support, which fails the run loudly rather than reporting a figure
+    # for a date nothing was priced on.
+    as_of_date: date | None = None
     triggered_by: str = "manual"
 
 
@@ -168,6 +174,14 @@ async def create_exposure_run(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new exposure run and enqueue a worker task."""
+    # The reporting date is resolved here, not by the caller: a browser's "today"
+    # is not the market's, and before the close it would compare the newest bar
+    # against itself. An explicit date is still honoured exactly.
+    as_of = body.as_of_date or await market_data_service.latest_session_date(db)
+    if as_of is None:
+        raise HTTPException(422, {"error": "no_price_data",
+                                  "detail": "no market prices are loaded yet"})
+
     # You can only run portfolios you own — the public demo is read-only (clone to
     # run). semantic, not security: RLS WITH CHECK is what actually stops the
     # write; this just produces a readable 403 rather than an aborted transaction.
@@ -180,7 +194,7 @@ async def create_exposure_run(
             task_type="exposure_update",
             payload={
                 "portfolio_id": body.portfolio_id,
-                "as_of_date": body.as_of_date.isoformat(),
+                "as_of_date": as_of.isoformat(),
                 "triggered_by": body.triggered_by,
             },
             owner_user_id=user.user_id,
@@ -190,7 +204,7 @@ async def create_exposure_run(
     run = await exposure_run_service.create_run(
         db,
         portfolio_id=body.portfolio_id,
-        as_of_date=body.as_of_date,
+        as_of_date=as_of,
         task_id=task.id,
         triggered_by=body.triggered_by,
     )

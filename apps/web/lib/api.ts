@@ -68,15 +68,16 @@ export async function getRun(runId: string): Promise<ExposureRun> {
   return fetchJson<ExposureRun>(`/api/exposure-runs/${runId}`);
 }
 
+/** Omit asOfDate to report on the last completed session (the usual case). */
 export async function createRun(
   portfolioId: string,
-  asOfDate: string
+  asOfDate?: string
 ): Promise<ExposureRun> {
   return fetchJson<ExposureRun>("/api/exposure-runs", {
     method: "POST",
     body: JSON.stringify({
       portfolio_id: portfolioId,
-      as_of_date: asOfDate,
+      ...(asOfDate ? { as_of_date: asOfDate } : {}),
     }),
   });
 }
