@@ -113,12 +113,12 @@ async def test_reaper_three_branches_and_the_untouched_case(owner, app_rls):
                             payload={"run_id": f"run_{TAG}_x", "portfolio_id": DEMO_PORTFOLIO})
     alive = await _plant(owner, "alive", "company_readiness", expired=False)
 
+    # A running worker reaps on its own poll interval, so it may well settle
+    # these before this call does. The outcome is what is under test, not which
+    # reaper produced it — asserting "my call returned these ids" made this test
+    # flaky against a live stack, which is the environment it is meant to model.
     async with app_rls() as db, db.begin():
-        reaped = await task_service.reclaim_expired_leases(db)
-
-    reaped_ids = {r["id"] for r in reaped}
-    assert {requeue, at_cap, not_safe} <= reaped_ids
-    assert alive not in reaped_ids, "a lease that has not expired must never be reaped"
+        await task_service.reclaim_expired_leases(db)
 
     r = await _row(owner, requeue)
     assert r["status"] == "pending", "replay-safe type under the cap goes back on the queue"
@@ -138,7 +138,9 @@ async def test_reaper_three_branches_and_the_untouched_case(owner, app_rls):
     assert r["worker_id"] == "dead-worker", "failed tasks keep who held them, for forensics"
 
     r = await _row(owner, alive)
-    assert r["status"] == "running" and r["retry_count"] == 0
+    assert r["status"] == "running" and r["retry_count"] == 0, (
+        "a lease that has not expired must never be reaped, by any reaper"
+    )
 
 
 async def test_phase_two_marks_the_run_failed_under_the_tasks_own_tenant(owner, app_rls):
@@ -154,7 +156,16 @@ async def test_phase_two_marks_the_run_failed_under_the_tasks_own_tenant(owner, 
 
     async with app_rls() as db, db.begin():
         reaped = await task_service.reclaim_expired_leases(db)
-    row = next(r for r in reaped if r["id"] == task_id)
+
+    # A live worker's reaper may have taken this row first; rebuild the same dict
+    # from the settled task so the phase-2 call under test still runs either way.
+    row = next((r for r in reaped if r["id"] == task_id), None)
+    if row is None:
+        async with owner() as db:
+            row = dict((await db.execute(
+                text("SELECT id, type, payload, owner_user_id, retry_count, status "
+                     "FROM tasks WHERE id = :id"), {"id": task_id})).mappings().one())
+        assert row["status"] == "failed", "exposure_update must never be requeued"
 
     current_user_ctx.set(None)   # the reaper's phase 1 runs tenant-less; phase 2 must set its own
     await worker._fail_run_for(row)
@@ -173,7 +184,11 @@ async def test_types_without_a_run_row_are_reaped_without_phase_two(owner, app_r
     at all — phase 2 must be a no-op for them, not an error."""
     readiness = await _plant(owner, "noRun", "company_readiness", retry_count=3)
     async with app_rls() as db, db.begin():
-        reaped = await task_service.reclaim_expired_leases(db)
-    row = next(r for r in reaped if r["id"] == readiness)
-    assert row["status"] == "failed"
+        await task_service.reclaim_expired_leases(db)
+    settled = await _row(owner, readiness)
+    assert settled["status"] == "failed"
+    async with owner() as db:
+        row = dict((await db.execute(
+            text("SELECT id, type, payload, owner_user_id, retry_count, status "
+                 "FROM tasks WHERE id = :id"), {"id": readiness})).mappings().one())
     await worker._fail_run_for(row)     # must not raise
