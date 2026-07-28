@@ -129,6 +129,90 @@ every declared table is explicitly tenant-scoped or explicitly shared (no third
 state), every write route requires a user, every application-layer owner filter
 carries the `semantic, not security` label, and providers never import upwards.
 
+## Adversarial review
+
+Six reviewers over the V2-E..F diff, each on a distinct failure dimension, with a
+live stack to attack rather than only code to read. Thirty-eight findings raised;
+of the fifteen from the two reviewers that were asked to flag it explicitly, eight
+were reproduced against the running system. Nineteen were fixed.
+
+The pass was worth more than some of the phases it reviewed. Three findings were
+blockers, all three reproduced — and one of them was a hole inside a fix from this
+same effort, which is the argument for adversarial review in one sentence: the
+person who wrote the fix is the last person who will notice what it missed.
+
+### Blockers, all reproduced and all fixed
+
+**Unauthenticated event-loop denial of service.** `PyJWKClient` re-fetches the
+whole JWK Set whenever a token's `kid` is unknown, and that fetch is `urllib` —
+synchronous — called straight from an `async def` dependency. A stranger sending
+bearer tokens with random key ids therefore pinned the API's single event loop
+for one Clerk round trip per request, on the anonymous read surface. Measured: 30
+concurrent such requests took a plain `GET /api/health` from **0.002s to 1.733s**.
+Fixed with a short-lived negative cache for key ids already known to be
+unresolvable, plus running the verifier in a threadpool so it can never block the
+loop again. A genuine key rotation still resolves — only repeats are cheap-rejected.
+
+**No request body limit, and the body is parsed before auth.** FastAPI reads and
+JSON-decodes the whole body before dependencies run, so `require_user` could not
+reject anything until the API had already buffered it. Measured: an anonymous
+100 MB POST was accepted, parsed, and answered 401 after 6.7s, on a 3.7 GB box
+shared with Postgres. Now capped at the proxy (`request_body max_size`), with
+schema-level ceilings on the CSV and chat fields so the API does not depend on
+being behind one.
+
+**A stuck run the reaper could not see.** E1's rollback in `_StepContext.__aexit__`
+fixed only half the problem it named. When the *event write itself* failed, the
+handler wrote the run's terminal status on the same poisoned session and raised;
+the task then went terminal with `lease_until` cleared, which is exactly what the
+reaper's query excludes. Task failed, run 'running' for ever. Reproduced by
+injecting a fault into the event write; fixed by writing the terminal status on a
+fresh session, and re-verified with the same injection.
+
+### Also fixed, each reproduced
+
+- **`registry.invoke` could raise** despite a docstring promising it never does:
+  the trace write ran on a session the failed tool had already aborted, so the
+  whole turn died as a 500 with a hole in the audit trail — after the quota was
+  charged.
+- **`release_turn` was unfenced**, so a superseded turn cleared its
+  *replacement's* slot on the way out, allowing two concurrent turns on one
+  session — the single invariant that mechanism exists to hold. Now fenced on the
+  stamp it claimed, the same way `complete_task`/`fail_task` are.
+- **CSV upload amplified**: past the 200-row cap it kept building one problem per
+  line and serialising them all. Measured at a million lines: 7 MB in, 65 MB out,
+  4.3s of blocked event loop, 475 MB RSS. It now stops at the cap.
+- **A lost race left a spent quota unit and an orphan task**: the `ActiveRunExists`
+  fallback in the research delegation tool returned without rolling back, and
+  meta_agent commits immediately after.
+- **A pool limit of 0 did not disable a pool.** The `WHERE` guards only the
+  `DO UPDATE` branch, so the first action of a day always took the plain `INSERT`
+  path. 0 is now a working kill switch — the thing you reach for when a public
+  link is being abused.
+- **One `market_sync` unit bought unbounded provider calls** (no cap on the ticker
+  list or lookback). Both bounded.
+- **A user could not read a brief they had paid a quota unit for**: the route had
+  no auth dependency at all, so the RLS tenant was never set and the policy
+  matched only public rows. Six issuer read routes had the same omission.
+- **A 429 from the shared backstop reported every user's activity** back to
+  whoever tripped it. Global refusals now carry no numbers.
+- `GET /api/exposure-runs?limit=-1` returned an unhandled 500 on the anonymous
+  surface.
+
+### Reported, not yet fixed
+
+- **Portfolio creation, demo cloning and session creation are charged against no
+  quota.** Each is cheap individually, but nothing bounds the loop, and none of it
+  shows up on the usage dashboard.
+- **A quota-rejected delegation call is refunded its session tool budget**, since
+  the rollback that discards the half charge also discards the reservation.
+- **The "one active research run per company" guard is per-tenant** under RLS, so
+  N users can run the same issuer concurrently and pay for the same ingest N times.
+- **Factor prices are outside `sync_prices` and `validate_inputs`**, so they can go
+  stale while holdings are fresh.
+- **A transient provider error in step 1 fails a run whose prices were already
+  complete.**
+
 ## Known gaps, carried forward deliberately
 
 - **No account-deletion path.** `app_rls` holds no DELETE grant by design, so

@@ -22,6 +22,15 @@
 exposure.example.com {
 	encode gzip
 
+	# Refuse oversized bodies at the edge. This is not belt-and-braces: FastAPI
+	# reads and JSON-parses the whole body BEFORE dependencies run, so
+	# require_user cannot reject anything until the API has already buffered it.
+	# Measured: an anonymous 100 MB POST was accepted, parsed, and answered 401
+	# after 6.7s. The largest legitimate request is a 200-row CSV.
+	request_body {
+		max_size 2MB
+	}
+
 	# /api/* goes to FastAPI. Do NOT strip the prefix: the routers are mounted
 	# under /api inside the app, so `uri strip_prefix /api` would 404 everything.
 	handle /api/* {

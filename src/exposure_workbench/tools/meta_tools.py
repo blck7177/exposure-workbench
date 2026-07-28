@@ -85,6 +85,12 @@ async def _start_issuer_research(db: AsyncSession, ticker: str, reason: str) -> 
             owner_id=current_user_id(),
         )
     except research_run_service.ActiveRunExists as e:
+        # Lost the race between the precheck above and create_run's own re-read.
+        # Roll back: create_task has already charged a research unit and inserted
+        # a tasks row, and this tool RETURNS rather than raises, so meta_agent
+        # would commit both — costing the user one of three daily runs and
+        # leaving an orphan task the worker is guaranteed to fail.
+        await db.rollback()
         return {"error": "active_run_exists", "run_id": e.run_id, "ticker": tk}
     task.payload = {**task.payload, "run_id": run.id}
     from sqlalchemy.orm.attributes import flag_modified
@@ -108,7 +114,14 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
     # before the close compares the newest bar against itself.
     from exposure_workbench.services import market_data_service
     if as_of_date:
-        as_of = __import__("datetime").date.fromisoformat(as_of_date)
+        try:
+            as_of = __import__("datetime").date.fromisoformat(as_of_date)
+        except ValueError:
+            # Typed, like every other bad-argument case here. Flattened to
+            # tool_error the model cannot tell "you formatted the argument wrong,
+            # drop it" from "the server broke".
+            return {"error": "invalid_as_of_date", "as_of_date": as_of_date,
+                    "detail": "expected YYYY-MM-DD, or omit it for the last completed session"}
     else:
         as_of = await market_data_service.latest_session_date(db)
         if as_of is None:

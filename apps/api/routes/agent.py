@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,8 +43,17 @@ async def create_agent_session(
     return s
 
 
+# One quota unit buys one TURN, so the turn itself has to be bounded. Without
+# this a single charged action could carry a megabyte of text, which the agent
+# loop then replays to the model on every one of up to 16 iterations — three
+# orders of magnitude more spend for the same quota, which is the quota not
+# doing its job. It also stops a single oversized message from bricking a
+# session: once persisted, every later turn reloads it as history.
+MAX_MESSAGE_CHARS = 8_000
+
+
 class MessageIn(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
 
 
 class MessageOut(BaseModel):
@@ -86,7 +95,8 @@ async def post_message(
     # before entering the LLM loop — claim later and a rejected turn would still
     # leave that message in the database.
     async with factory() as gate_db, gate_db.begin():
-        if not await agent_session_service.claim_turn(gate_db, session_id):
+        claimed_at = await agent_session_service.claim_turn(gate_db, session_id)
+        if claimed_at is None:
             raise HTTPException(409, {"error": "turn_in_flight", "session_id": session_id})
         try:
             await usage_service.charge(gate_db, user.user_id, "chat_turn")
@@ -100,7 +110,9 @@ async def post_message(
         # API key is configured, OpenAI network errors pass straight through, and
         # reserve's ValueError("unknown session") is outside the only except
         # clause in registry.invoke. Every one of those must still free the slot.
-        await agent_session_service.release_turn(session_id)
+        # Fenced on the stamp we claimed: if this turn outlived its lease and was
+        # superseded, releasing unconditionally would free the REPLACEMENT's slot.
+        await agent_session_service.release_turn(session_id, claimed_at)
 
 
 class StepOut(BaseModel):

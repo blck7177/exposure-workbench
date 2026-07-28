@@ -61,13 +61,27 @@ async def handle(db: AsyncSession, task: Any) -> None:
     result = await workflow.run(db, workflow_input)
 
     final_status = result.status  # "completed" or "failed"
-    await exposure_run_service.update_run_status(
-        db,
-        run_id,
-        final_status,
-        error_message=result.error,
-    )
-    await db.commit()
+
+    # The terminal status goes on a FRESH session, not the one the workflow just
+    # ran on. A step that failed while writing its own event leaves that session
+    # aborted, and this write would then raise instead of landing — the task goes
+    # terminal (with lease_until cleared, so the reaper never looks at it again)
+    # while the run sits at 'running' for ever, which is precisely the stuck-run
+    # class the lease was introduced to remove. Reproduced by injecting a fault
+    # into the event write.
+    from exposure_workbench.db.session import get_session_factory
+    try:
+        await db.rollback()
+    except Exception:  # noqa: BLE001 — the session may be unusable; we are done with it
+        logger.warning("could not roll back the workflow session for run %s", run_id, exc_info=True)
+
+    async with get_session_factory()() as status_db, status_db.begin():
+        await exposure_run_service.update_run_status(
+            status_db,
+            run_id,
+            final_status,
+            error_message=result.error,
+        )
 
     if final_status == "failed":
         raise RuntimeError(f"Workflow failed: {result.error}")

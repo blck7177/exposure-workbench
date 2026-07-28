@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import require_user
@@ -14,9 +14,18 @@ from exposure_workbench.services import task_service, usage_service
 router = APIRouter()
 
 
+# One quota unit buys ONE sync, so the sync itself has to be bounded — otherwise
+# a single charged action could ask for ten thousand symbols over twenty years and
+# spend the afternoon inside the price provider. The caps are generous for any
+# real portfolio and ruinous for nobody.
+MAX_SYNC_TICKERS = 50
+MAX_LOOKBACK_DAYS = 365 * 5
+
+
 class SyncRequest(BaseModel):
-    tickers: list[str] | None = None   # None => portfolio holdings + SPY + factor config
-    lookback_days: int = 365
+    # None => portfolio holdings + SPY + factor config
+    tickers: list[str] | None = Field(default=None, max_length=MAX_SYNC_TICKERS)
+    lookback_days: int = Field(default=365, ge=1, le=MAX_LOOKBACK_DAYS)
 
 
 class SyncResponse(BaseModel):

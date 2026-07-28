@@ -59,8 +59,13 @@ def parse_csv(text: str) -> tuple[list[PositionRow], list[CsvProblem]]:
         data_lines = data_lines[1:]
 
     if len(data_lines) > MAX_ROWS:
-        problems.append(CsvProblem(0, "", f"too many rows: {len(data_lines)} > {MAX_ROWS}"))
-        # still parse for per-row feedback, but this alone rejects the upload
+        # Stop here. Continuing "for per-row feedback" turned a small body into a
+        # very large reply and seconds of blocked event loop: one problem per
+        # line, all of them serialised into the 422. Measured at a million lines,
+        # 7 MB of input produced a 65 MB response, 4.3s of parsing and 475 MB of
+        # RSS. The upload is rejected either way, so the extra detail buys the
+        # user nothing and costs everyone else the server.
+        return [], [CsvProblem(0, "", f"too many rows: {len(data_lines)} > {MAX_ROWS}")]
 
     seen: set[str] = set()
     for line_no, raw in data_lines:

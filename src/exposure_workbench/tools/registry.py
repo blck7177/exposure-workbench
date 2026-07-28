@@ -184,14 +184,30 @@ async def invoke(
         logger.warning("tool %s failed: %s", tool_name, exc, exc_info=True)
         status = "error"
         result = {"error": "tool_error", "detail": str(exc)}
+        # If the tool failed part-way through its own DML, this session is now in
+        # an aborted transaction and the trace write below would raise
+        # InFailedSQLTransactionError — straight past this handler, past the agent
+        # loop, and out as a bare 500. The docstring above promises this function
+        # never raises; keeping that promise means leaving the session usable.
+        # The tool's partial work is being discarded anyway.
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001 — nothing left to salvage either way
+            logger.exception("could not roll back after %s failed", tool_name)
 
     # 3) trace (auto-extract evidence refs)
     refs = extract_evidence_refs(result) if status == "completed" else []
-    await trace_service.record_step(
-        db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
-        result_summary=_summarize(result), evidence_refs=refs, status=status,
-        duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
-    )
+    try:
+        await trace_service.record_step(
+            db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
+            result_summary=_summarize(result), evidence_refs=refs, status=status,
+            duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
+        )
+    except Exception:  # noqa: BLE001
+        # A hole in the audit trail is bad; turning one into an unexplained 500
+        # that also spends the user's turn is worse. Log loudly and let the agent
+        # see the structured result it was given.
+        logger.exception("could not record trace step for %s (session %s)", tool_name, session_id)
     return result
 
 

@@ -58,15 +58,26 @@ class QuotaExceeded(Exception):
         )
 
     def as_dict(self) -> dict:
-        """The structured shape both the HTTP body and the delegation tools use."""
-        return {
+        """The structured shape both the HTTP body and the delegation tools use.
+
+        A GLOBAL refusal reports no numbers. `used` there is every user's activity
+        added together, and this dict is returned verbatim to whoever tripped it —
+        which would hand an outsider a daily census of how busy the platform is,
+        and a clean signal for when it has been denied to everyone. /api/me/usage
+        already keeps the backstop private; this is the same rule.
+        """
+        body = {
             "error": "quota_exceeded",
             "kind": self.kind,
             "scope": self.scope,
-            "used": self.used,
-            "limit": self.limit,
             "resets_at": self.resets_at,
         }
+        if self.scope != "global":
+            body["used"] = self.used
+            body["limit"] = self.limit
+        else:
+            body["detail"] = "the shared daily limit for this action is exhausted; try again tomorrow"
+        return body
 
 
 def next_reset_at() -> str:
@@ -98,6 +109,14 @@ RETURNING used
 
 async def _charge_one(db: AsyncSession, user_id: str, kind: str, limit: int, scope: str,
                       day: date) -> int:
+    # A non-positive limit disables the pool outright. The SQL alone cannot express
+    # that: the WHERE guards only the DO UPDATE branch, so the very first action of
+    # a day takes the plain INSERT path and slips through whatever the limit says.
+    # Handled here so 0 works as a kill switch — the thing you reach for when a
+    # public link is being abused and you need it off in one deploy.
+    if limit <= 0:
+        raise QuotaExceeded(kind, scope, 0, limit)
+
     row = (await db.execute(
         _CHARGE_SQL, {"user_id": user_id, "day": day, "kind": kind, "limit": limit}
     )).first()

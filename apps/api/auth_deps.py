@@ -19,6 +19,7 @@ of reaching the route.
 from __future__ import annotations
 
 from fastapi import Header, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from exposure_workbench.auth.clerk import AuthError, UserClaims, verify_token
 from exposure_workbench.auth.context import current_user_ctx
@@ -41,7 +42,8 @@ async def optional_user(
     if not token:
         return None
     try:
-        claims = verify_token(token)
+        # Blocking (it can fetch the JWK Set) — never on the event loop.
+        claims = await run_in_threadpool(verify_token, token)
     except AuthError:
         return None
     current_user_ctx.set(claims.user_id)
@@ -56,7 +58,8 @@ async def require_user(
     if not token:
         raise HTTPException(401, {"error": "unauthenticated"})
     try:
-        claims = verify_token(token)
+        # Blocking (it can fetch the JWK Set) — never on the event loop.
+        claims = await run_in_threadpool(verify_token, token)
     except AuthError as e:
         raise HTTPException(401, {"error": "unauthenticated", "reason": e.reason})
     current_user_ctx.set(claims.user_id)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -222,7 +222,7 @@ async def create_exposure_run(
             dependencies=[Depends(optional_user)])
 async def list_exposure_runs(
     portfolio_id: str | None = None,
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
     return await exposure_run_service.list_runs(db, portfolio_id=portfolio_id, limit=limit)

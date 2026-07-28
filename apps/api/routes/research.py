@@ -152,7 +152,12 @@ class BriefOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-@router.get("/research-runs/{run_id}/brief", response_model=BriefOut)
+@router.get("/research-runs/{run_id}/brief", response_model=BriefOut,
+            # optional_user sets the RLS tenant. Without it current_setting is NULL
+            # and the policy matches only is_public rows — so the owner of a private
+            # result cannot read it back, which is worse than a leak: they paid a
+            # quota unit for something they can never see.
+            dependencies=[Depends(optional_user)])
 async def get_brief(run_id: str, db: AsyncSession = Depends(get_db)):
     brief = (await db.execute(select(IssuerBrief).where(IssuerBrief.research_run_id == run_id))).scalar_one_or_none()
     if brief is None:

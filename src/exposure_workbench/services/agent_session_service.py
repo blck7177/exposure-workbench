@@ -77,12 +77,16 @@ UPDATE agent_sessions
  WHERE id = :session_id
    AND (turn_started_at IS NULL
         OR turn_started_at < now() - make_interval(secs => :lease_secs))
-RETURNING id
+RETURNING turn_started_at
 """)
 
 
-async def claim_turn(db: AsyncSession, session_id: str) -> bool:
-    """Try to take this session's single turn slot. False if one is in flight.
+async def claim_turn(db: AsyncSession, session_id: str):
+    """Take this session's single turn slot. Returns the stamp written, or None
+    if a turn is already in flight.
+
+    The stamp is the fence token: pass it back to release_turn so a turn that has
+    been superseded cannot free its replacement's slot on the way out.
 
     Runs on the CALLER's session so it can share a transaction with the quota
     charge — over-quota then rolls the claim back with it, which is why there is
@@ -104,10 +108,10 @@ async def claim_turn(db: AsyncSession, session_id: str) -> bool:
         _CLAIM_TURN_SQL,
         {"session_id": session_id, "lease_secs": get_settings().turn_lease_seconds},
     )).first()
-    return row is not None
+    return row[0] if row is not None else None
 
 
-async def release_turn(session_id: str) -> None:
+async def release_turn(session_id: str, claimed_at=None) -> None:
     """Free the turn slot. Opens its own session and commits immediately.
 
     Called from a finally, which is the whole point: the request-scoped session
@@ -119,11 +123,16 @@ async def release_turn(session_id: str) -> None:
     try:
         factory = get_session_factory()
         async with factory() as db, db.begin():
-            await db.execute(
-                update(AgentSession)
-                .where(AgentSession.id == session_id)
-                .values(turn_started_at=None)
-            )
+            # Fenced on the stamp we claimed. A turn whose lease expired has
+            # already been superseded, and an unfenced release would clear the
+            # REPLACEMENT's slot on its way out — letting a third turn start
+            # while the second is still running, which is the one invariant this
+            # whole mechanism exists to hold. Same reasoning as the fence on
+            # complete_task/fail_task in task_service.
+            stmt = update(AgentSession).where(AgentSession.id == session_id)
+            if claimed_at is not None:
+                stmt = stmt.where(AgentSession.turn_started_at == claimed_at)
+            await db.execute(stmt.values(turn_started_at=None))
     except Exception:   # noqa: BLE001 — see docstring; expiry is the backstop
         pass
 

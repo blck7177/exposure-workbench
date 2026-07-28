@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
@@ -15,6 +15,11 @@ from exposure_workbench.db.session import get_db
 from exposure_workbench.services import portfolio_csv, portfolio_service, exposure_run_service
 
 router = APIRouter()
+
+# A 200-row CSV is ~4 KB. This bounds the request when nothing else does — the
+# reverse proxy is the real guard, but the API must not depend on being behind
+# one. Pydantic enforces it before any parsing work happens.
+MAX_CSV_TEXT_BYTES = 256_000
 
 
 def _problem_dicts(problems) -> list[dict]:
@@ -83,11 +88,11 @@ async def list_portfolios(
 
 class CreatePortfolioRequest(BaseModel):
     name: str
-    csv_text: str | None = None   # optional holdings in the same request
+    csv_text: str | None = Field(default=None, max_length=MAX_CSV_TEXT_BYTES)
 
 
 class UploadRequest(BaseModel):
-    csv_text: str
+    csv_text: str = Field(max_length=MAX_CSV_TEXT_BYTES)
 
 
 @router.post("/portfolios", response_model=PortfolioOut, status_code=201)

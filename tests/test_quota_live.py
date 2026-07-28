@@ -213,22 +213,22 @@ async def test_turn_lease_claim_refuse_and_expiry(owner, app_rls):
 
     free = await _make_session(owner, "free")
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, free) is True
+        assert await agent_session_service.claim_turn(db, free) is not None
 
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, free) is False, (
+        assert await agent_session_service.claim_turn(db, free) is None, (
             "a second turn on the same session must be refused, not queued"
         )
 
     stale = await _make_session(owner, "stale", started_secs_ago=lease + 60)
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, stale) is True, (
+        assert await agent_session_service.claim_turn(db, stale) is not None, (
             "an expired lease self-heals — nothing renews it, so this is the only recovery"
         )
 
     fresh = await _make_session(owner, "fresh", started_secs_ago=lease - 60)
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, fresh) is False, (
+        assert await agent_session_service.claim_turn(db, fresh) is None, (
             "a turn still inside its lease must never be stolen from a live request"
         )
 
@@ -239,12 +239,12 @@ async def test_release_frees_the_slot_immediately(owner, app_rls, monkeypatch):
 
     sid = await _make_session(owner, "release")
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, sid) is True
+        assert await agent_session_service.claim_turn(db, sid) is not None
 
     await agent_session_service.release_turn(sid)
 
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, sid) is True, (
+        assert await agent_session_service.claim_turn(db, sid) is not None, (
             "release must not depend on the lease expiring"
         )
 
@@ -263,9 +263,9 @@ async def test_another_tenant_sees_no_session_to_claim(owner, app_rls):
     sid = await _make_session(owner, "tenant")
     current_user_ctx.set(f"{USER}_intruder")
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, sid) is False
+        assert await agent_session_service.claim_turn(db, sid) is None
     current_user_ctx.set(USER)
     async with app_rls() as db, db.begin():
-        assert await agent_session_service.claim_turn(db, sid) is True, (
+        assert await agent_session_service.claim_turn(db, sid) is not None, (
             "and the real owner is unaffected by the intruder's attempt"
         )

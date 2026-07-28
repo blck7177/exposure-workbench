@@ -43,7 +43,7 @@ async def get_evidence(ref_id: str, db: AsyncSession = Depends(get_db)):
 
 # ── companies list (for the portfolio -> investigate entry) ───────────────────────
 
-@router.get("/companies")
+@router.get("/companies", dependencies=[Depends(optional_user)])
 async def list_companies(db: AsyncSession = Depends(get_db)):
     rows = await company_service.list_companies(db)
     return [{"ticker": c.ticker, "name": c.name, "sector": c.sector,
@@ -52,7 +52,7 @@ async def list_companies(db: AsyncSession = Depends(get_db)):
 
 # ── snapshot tab ──────────────────────────────────────────────────────────────────
 
-@router.get("/issuers/{ticker}/snapshot")
+@router.get("/issuers/{ticker}/snapshot", dependencies=[Depends(optional_user)])
 async def snapshot(ticker: str, db: AsyncSession = Depends(get_db)):
     c = await _company(db, ticker)
     metrics = await calc_service.list_available_metrics(db, c.ticker)
@@ -80,7 +80,7 @@ async def snapshot(ticker: str, db: AsyncSession = Depends(get_db)):
 
 # ── financials tab (recipe ledger rows, each with a calc_id chip) ─────────────────
 
-@router.get("/issuers/{ticker}/financials")
+@router.get("/issuers/{ticker}/financials", dependencies=[Depends(optional_user)])
 async def financials(ticker: str, db: AsyncSession = Depends(get_db)):
     c = await _company(db, ticker)
     rows = (await db.execute(
@@ -101,7 +101,7 @@ async def financials(ticker: str, db: AsyncSession = Depends(get_db)):
 
 # ── filings tab ────────────────────────────────────────────────────────────────────
 
-@router.get("/issuers/{ticker}/filings")
+@router.get("/issuers/{ticker}/filings", dependencies=[Depends(optional_user)])
 async def filings(ticker: str, db: AsyncSession = Depends(get_db)):
     c = await _company(db, ticker)
     rows = (await db.execute(
@@ -122,7 +122,7 @@ async def filings(ticker: str, db: AsyncSession = Depends(get_db)):
     return {"ticker": c.ticker, "filings": out}
 
 
-@router.get("/filing-sections/{section_id}")
+@router.get("/filing-sections/{section_id}", dependencies=[Depends(optional_user)])
 async def filing_section(section_id: str, db: AsyncSession = Depends(get_db)):
     sec = (await db.execute(select(FilingSection).where(FilingSection.id == section_id))).scalar_one_or_none()
     if sec is None:
@@ -132,7 +132,7 @@ async def filing_section(section_id: str, db: AsyncSession = Depends(get_db)):
 
 # ── research tab ───────────────────────────────────────────────────────────────────
 
-@router.get("/issuers/{ticker}/research-sources")
+@router.get("/issuers/{ticker}/research-sources", dependencies=[Depends(optional_user)])
 async def research_sources(ticker: str, db: AsyncSession = Depends(get_db)):
     c = await _company(db, ticker)
     rows = (await db.execute(

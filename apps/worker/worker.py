@@ -175,10 +175,20 @@ async def _fail_run_for(task_row: dict) -> None:
             # Both update helpers return silently when the run is not visible,
             # which under RLS is indistinguishable from success. Check first so a
             # tenant mistake shows up in the log instead of vanishing.
-            if await get_run(db, run_id) is None:
+            run = await get_run(db, run_id)
+            if run is None:
                 logger.error(
                     "Reaped task %s: run %s not visible as tenant %s — run left as-is",
                     task_row["id"], run_id, tenant,
+                )
+                return
+            if run.status not in ("pending", "running"):
+                # It finished under its own steam between the lease expiring and
+                # this reap; overwriting a completed run with 'failed' would
+                # discard a real result.
+                logger.info(
+                    "Reaped task %s: run %s already %s — left alone",
+                    task_row["id"], run_id, run.status,
                 )
                 return
             await mark_failed(db, run_id, "failed", error_message=task_service.LEASE_EXPIRED_ERROR)

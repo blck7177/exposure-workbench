@@ -106,3 +106,26 @@ def test_charge_sql_only_increments_below_the_limit():
     assert "ON CONFLICT (user_id, day, kind) DO UPDATE" in sql
     assert "WHERE usage_daily.used < :limit" in sql
     assert "RETURNING used" in sql
+
+
+def test_a_zero_limit_is_a_working_kill_switch():
+    """The SQL alone cannot express this: the WHERE clause guards only the DO
+    UPDATE branch, so the first action of a day takes the plain INSERT path and
+    slips through whatever the limit says. Setting a pool to 0 is what you reach
+    for when a public link is being abused, so it has to actually stop things."""
+    import asyncio
+    for limit in (0, -1):
+        with pytest.raises(usage_service.QuotaExceeded) as e:
+            asyncio.run(usage_service._charge_one(None, "user_x", "chat_turn", limit, "user",
+                                                  __import__("datetime").date(2026, 7, 28)))
+        assert e.value.limit == limit
+        assert e.value.used == 0
+
+
+def test_market_sync_is_bounded_so_one_unit_cannot_buy_the_afternoon():
+    from apps.api.routes import market_data
+    assert market_data.MAX_SYNC_TICKERS <= 100
+    assert market_data.MAX_LOOKBACK_DAYS <= 365 * 10
+    fields = market_data.SyncRequest.model_fields
+    assert any(getattr(m, "max_length", None) == market_data.MAX_SYNC_TICKERS
+               for m in fields["tickers"].metadata), "ticker list must carry a cap"
