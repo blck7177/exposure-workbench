@@ -269,3 +269,44 @@ async def test_another_tenant_sees_no_session_to_claim(owner, app_rls):
         assert await agent_session_service.claim_turn(db, sid) is not None, (
             "and the real owner is unaffected by the intruder's attempt"
         )
+
+
+async def test_a_superseded_turn_cannot_release_its_replacements_slot(owner, app_rls, monkeypatch):
+    """The fence on release_turn. Found by review, reproduced before the fix:
+
+    turn A hangs past its lease, turn B legitimately takes over, and then A finally
+    unwinds and its `finally: release_turn(...)` clears B's slot — so turn C starts
+    while B is still running. That breaks the single invariant the turn lease
+    exists to hold, and it is invisible: nothing errors, the session just runs two
+    turns at once.
+    """
+    current_user_ctx.set(USER)
+    monkeypatch.setattr(agent_session_service, "get_session_factory", lambda: app_rls)
+    lease = get_settings().turn_lease_seconds
+
+    sid = await _make_session(owner, "fence")
+    async with app_rls() as db, db.begin():
+        stamp_a = await agent_session_service.claim_turn(db, sid)
+    assert stamp_a is not None
+
+    # A hangs past its lease; B takes over legitimately
+    async with owner() as db, db.begin():
+        await db.execute(
+            text("UPDATE agent_sessions SET turn_started_at = now() - make_interval(secs => :o) "
+                 "WHERE id = :id"), {"o": lease + 60, "id": sid})
+    async with app_rls() as db, db.begin():
+        stamp_b = await agent_session_service.claim_turn(db, sid)
+    assert stamp_b is not None, "an expired lease must be reclaimable"
+
+    # A's finally runs, carrying ITS stamp
+    await agent_session_service.release_turn(sid, stamp_a)
+
+    async with app_rls() as db, db.begin():
+        assert await agent_session_service.claim_turn(db, sid) is None, (
+            "turn B is still running — A's release must not have freed its slot"
+        )
+
+    # and B's own release still works
+    await agent_session_service.release_turn(sid, stamp_b)
+    async with app_rls() as db, db.begin():
+        assert await agent_session_service.claim_turn(db, sid) is not None
