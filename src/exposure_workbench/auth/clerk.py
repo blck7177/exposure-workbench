@@ -8,6 +8,7 @@ about identity (login, OAuth, MFA, sessions, password storage) is Clerk's.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -34,20 +35,27 @@ class UserClaims:
 # Kept module-level so tests can monkeypatch `_jwks_client` to return local keys.
 _clients: dict[str, PyJWKClient] = {}
 
-# Unknown key ids are a denial-of-service lever, not a caching detail. PyJWKClient
-# re-fetches the whole JWK Set whenever a token's `kid` is not in its cache, and
-# that fetch is urllib — fully synchronous — so an unauthenticated stranger
-# sending tokens with random kids pins the API's single event loop for one Clerk
-# round trip per request and hammers Clerk's rate limiter at the same time.
-# Measured before this guard: 30 concurrent such requests took a plain
-# GET /api/health from 2ms to 1.7s.
+# Unknown key ids are a denial-of-service lever, not a caching detail.
+# PyJWKClient.get_signing_key re-fetches the entire JWK Set whenever a token's
+# `kid` is not in its cache, and that fetch is urllib — fully synchronous. An
+# unauthenticated stranger sending tokens with RANDOM kids therefore gets one
+# outbound Clerk request per request of their own, and (before this) one blocked
+# event loop with it. Measured on the live API: 30 such requests took a plain
+# GET /api/health from 2ms to 1.7s, and Clerk's own rate limiter would start
+# refusing the JWKS endpoint, breaking sign-in for everyone.
 #
-# So: remember the kids we have already failed to resolve and refuse them without
-# touching the network. A legitimate key rotation still gets through, because a
-# rotated kid is unseen and is looked up once; only repeats are cheap-rejected.
-# The window is short so a genuinely new key is never blocked for long.
+# A per-kid negative cache does NOT fix that — every request carries a fresh
+# random kid, so every one is a first-time miss. The bound has to be on the
+# REFRESH itself: however many unknown kids arrive, we go and ask Clerk at most
+# once per cooldown. A genuine key rotation still resolves, within one cooldown,
+# for everyone. The per-kid memory below is a cheap short-circuit on top, for the
+# repeat case.
+_REFRESH_COOLDOWN_SECONDS = 60
 _UNKNOWN_KID_TTL_SECONDS = 300
 _MAX_REMEMBERED_KIDS = 4096
+
+_last_refresh: dict[str, float] = {}
+_refresh_lock = threading.Lock()
 _unknown_kids: OrderedDict[str, float] = OrderedDict()
 
 
@@ -62,7 +70,7 @@ def _jwks_client(jwks_url: str) -> PyJWKClient:
 def _kid_of(token: str) -> str | None:
     try:
         return jwt.get_unverified_header(token).get("kid")
-    except Exception:  # noqa: BLE001 — malformed header is its own rejection below
+    except Exception:  # noqa: BLE001 — a malformed header is rejected below anyway
         return None
 
 
@@ -87,6 +95,42 @@ def _remember_unknown(kid: str | None) -> None:
         _unknown_kids.popitem(last=False)
 
 
+def _resolve_signing_key(jwks_url: str, kid: str | None):
+    """The cached set first; the network only if a refresh is affordable.
+
+    The lock is acquired non-blockingly on purpose. Under a flood of unknown
+    kids, blocking would simply move the queue from the network to the lock and
+    still tie up one worker thread per attacker request. A caller that cannot
+    take it learns nothing by waiting — whoever holds it is already fetching the
+    only answer there is.
+    """
+    client = _jwks_client(jwks_url)
+    key = PyJWKClient.match_kid(client.get_signing_keys(), kid)
+    if key is not None:
+        return key
+
+    now = time.monotonic()
+    last = _last_refresh.get(jwks_url)
+    if last is not None and now - last < _REFRESH_COOLDOWN_SECONDS:
+        raise AuthError("unknown_kid")
+    if not _refresh_lock.acquire(blocking=False):
+        raise AuthError("unknown_kid")
+    try:
+        # re-check under the lock: several threads can pass the cooldown test
+        # at once, and only the first should actually go out.
+        last = _last_refresh.get(jwks_url)
+        if last is not None and time.monotonic() - last < _REFRESH_COOLDOWN_SECONDS:
+            raise AuthError("unknown_kid")
+        _last_refresh[jwks_url] = time.monotonic()
+        key = PyJWKClient.match_kid(client.get_signing_keys(refresh=True), kid)
+    finally:
+        _refresh_lock.release()
+
+    if key is None:
+        raise AuthError("unknown_kid")
+    return key
+
+
 def verify_token(token: str) -> UserClaims:
     """Blocking: it may fetch the JWK Set. Call it off the event loop —
     apps/api/auth_deps.py runs it in a thread for exactly this reason."""
@@ -101,8 +145,11 @@ def verify_token(token: str) -> UserClaims:
         raise AuthError("unknown_kid")
 
     try:
-        signing_key = _jwks_client(f"{issuer}/.well-known/jwks.json").get_signing_key_from_jwt(token)
-    except Exception as e:  # noqa: BLE001 — network / unknown-kid / malformed all mean "can't verify"
+        signing_key = _resolve_signing_key(f"{issuer}/.well-known/jwks.json", kid)
+    except AuthError:
+        _remember_unknown(kid)
+        raise
+    except Exception as e:  # noqa: BLE001 — network / malformed both mean "can't verify"
         _remember_unknown(kid)
         raise AuthError(f"jwks_error:{e}")
 

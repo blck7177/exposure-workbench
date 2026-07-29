@@ -43,7 +43,7 @@ app.include_router(securities.router, prefix="/api", tags=["securities"])
 
 
 @app.get("/")
-def root():
+async def root():
     return {
         "service": "Exposure Workbench API",
         "version": "0.1.0",
@@ -53,12 +53,12 @@ def root():
 
 
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok"}
 
 
 @app.get("/api/health")
-def api_health():
+async def api_health():
     """The same check, reachable through the reverse proxy.
 
     In production Caddy routes only /api/* to this service and everything else to
