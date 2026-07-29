@@ -11,12 +11,12 @@ Issuer Intelligence MVP.
 
 | | |
 |---|---|
-| Offline tests | **196** (`pytest -m "not live"`) — 83 at P9, 113 entering V2-E |
-| Live tests | **31** (`pytest -m live`) |
+| Offline tests | **199** (`pytest -m "not live"`) — 83 at P9, 113 entering V2-E |
+| Live tests | **32** (`pytest -m live`) |
 | Tables with RLS | **20**, one `tenant` policy each |
 | Shared tables (no RLS, deliberately) | 13 — company evidence, `tasks`, `usage_daily` |
 | `security_master` | 13,024 symbols |
-| Commits in V2-E..G | 9, on `issuer-intelligence` |
+| Commits in V2-E..G | 13, on `issuer-intelligence` |
 
 Task types exercised end to end: `exposure_update` 15 completed / 2 failed,
 `market_data_sync` 4 / 1, `issuer_research` 2 / 1, `company_readiness` **3 / 0**.
@@ -147,11 +147,23 @@ person who wrote the fix is the last person who will notice what it missed.
 whole JWK Set whenever a token's `kid` is unknown, and that fetch is `urllib` —
 synchronous — called straight from an `async def` dependency. A stranger sending
 bearer tokens with random key ids therefore pinned the API's single event loop
-for one Clerk round trip per request, on the anonymous read surface. Measured: 30
-concurrent such requests took a plain `GET /api/health` from **0.002s to 1.733s**.
-Fixed with a short-lived negative cache for key ids already known to be
-unresolvable, plus running the verifier in a threadpool so it can never block the
-loop again. A genuine key rotation still resolves — only repeats are cheap-rejected.
+for one Clerk round trip per request, on the anonymous read surface, while also
+hammering Clerk's own rate limiter. Measured: 30 concurrent such requests took a
+plain `GET /api/health` from **0.002s to 1.733s**.
+
+The first fix was the wrong shape, and re-measuring said so: a per-kid negative
+cache never fires when every request carries a fresh random kid. `/api/health`
+was still 0.814s. The bound has to be on the **refresh** — at most one outbound
+fetch per cooldown however many unknown kids arrive, behind a non-blocking lock
+so the queue does not simply move from the network to the lock. Re-measuring
+again surfaced a second, unrelated cause: `/health` was `def`, not `async def`,
+so FastAPI ran it in the threadpool behind the very work it was meant to report
+on.
+
+After both: **0.486s** during the same flood, against a 0.012s baseline. The
+offline test pins the mechanism rather than the timing — 25 distinct unknown kids
+cost exactly one outbound fetch, a rotated key still resolves once the cooldown
+passes, and a known kid never touches the network.
 
 **No request body limit, and the body is parsed before auth.** FastAPI reads and
 JSON-decodes the whole body before dependencies run, so `require_user` could not
