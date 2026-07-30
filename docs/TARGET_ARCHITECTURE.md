@@ -154,7 +154,7 @@ apps/
 
 - **`company_readiness`(能力 A)**:resolve_company → ingest_filings(每 filing 单事务)→ extract_facts → index_filings → refresh_market(可显式 skip)→ standard_recipe。全机械全幂等,已 ready 整体秒过;幂等键详见 MODULE_NOTES M8。
 - **`issuer_research`(能力 C)**:readiness 前置检查 → 分析 subagent 会话 → finalize(物化 Evidence Trail)。判断步刻意不幂等——重跑就该产生新判断。
-- 同 company 同时一个活跃 research run(冲突 409 + 返回现有 run_id)。
+- **singleflight 在共享 ingest 上,不在 run 上**(★ V2-H 更正,原文写「同 company 同时一个活跃 research run」)。锁按 company 加在 `run_readiness` 内(Postgres advisory lock),两个租户同时研究同一公司只 ingest 一次;research run 本身是**每用户每 issuer 一个活跃**(冲突 409 + 返回**该用户自己的** run_id)。理由:贵的是 ingest,而 ingest 产出的是共享证据;brief 是 RLS 私有的每用户产物,全局锁会让用户 B 不是「晚点拿到」而是**永远拿不到**,并且拿回一个属于别的租户的 `rrun_` id(随后 404)= 拒绝 + 存在性预言机。同一把锁顺带盖住 `company_readiness`——它今天连守卫都没有。
 - skip 参数 = **工具面裁剪**(组装会话时不给该工具),不是步内 if——能力边界即物理边界。
 
 ### 提交门(规则 B 的完全体)
@@ -281,7 +281,7 @@ FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM 无预算,只留台账)
 
 | 层 | 表 | 归属 | 理由 |
 |---|---|---|---|
-| **公司层(共享)** | companies, filings, filing_*, financial_facts, research_sources, **calc_ledger**, market_prices, factor_*, security_master | 无 owner,全局读 | SEC/市场公共事实与其确定性派生;按用户复制 = 浪费 + 不一致。calc_ledger 只含公司级确定性计算(零用户数据),共享 = 纯去重 |
+| **公司层(共享)** | companies, filings, filing_*, financial_facts, research_sources, **calc_ledger**, market_prices, factor_prices, security_master | 无 owner,全局读 | SEC/市场公共事实与其确定性派生;按用户复制 = 浪费 + 不一致。calc_ledger 只含公司级确定性计算(零用户数据),共享 = 纯去重 |
 | **用户层(私有)** | users, portfolios, positions, exposure_runs(及全部子表), agent_sessions/messages/steps, research_runs, **issuer_briefs**, evidence_packs | owner + RLS | 用户活动与含用户输入的产物。issuer_briefs 私有:portfolio_implications 引用用户持仓,是含机密输入的分析物 |
 | **Demo(公开只读)** | demo 组合 port_001、demo 的 NVDA/AAPL brief | `is_public=true` | 匿名访客的展示面(读公开、写门禁);新用户登录后亦可见 |
 
@@ -299,7 +299,7 @@ Clerk 外包注册/登录/OAuth/MFA;后端唯一 auth 代码 = 一个 dependency
 ### 13.4 三平面并发(V2-E)
 
 - Worker:`FOR UPDATE SKIP LOCKED`(已有)+ lease/requeue(治 stuck-run)。**重投是白名单,不是默认**——实测只有 `company_readiness` / `market_data_sync` 全链 upsert 因而幂等;`exposure_update` 的 `_persist_outputs` 是裸 INSERT 打在五个 `UNIQUE(run_id…)` 上,`issuer_research` 会在烧完整轮 LLM 预算**之后**才撞 `issuer_briefs UNIQUE(research_run_id)`。这两类 lease 过期一律把 task 与 run 双双标 failed,让用户显式重跑——比伪装成功或炸在第二次写入诚实,也解开 research 的 `ActiveRunExists` 永久 409 死锁。
-- Agent:每 session 单飞行 turn(`turn_started_at` + 条件 UPDATE 认领,取值够宽 + 到期自愈,**无心跳/续租线程**);research per-company singleflight 保持全局(证据共享,同公司只跑一次)。
-- 预算:**按用户动作计数的 `usage_daily` 表 + 两个扣费点**(`task_service.create_task` 覆盖四类 task,`POST /agent/sessions/{id}/messages` 扣 chat turn),user 池与 `_global` 兜底池同表、同事务扣两次,任一超限即整体回滚(因此不需要退款/补偿逻辑)。**不进 ToolRegistry wrapper**:wrapper 只看得见工具调用,而 exposure/readiness/research 各有 REST 路由与 agent 委派**两条平行入口**,wrapper 拦不住路由面。wrapper 内既有的 session 预算(工具调用数/external_search 数)保持不变,与日配额是两个正交维度。
+- Agent:每 session 单飞行 turn(`turn_started_at` + 条件 UPDATE 认领,取值够宽 + 到期自愈,**无心跳/续租线程**);research per-company singleflight **落在共享 ingest 上**(★ V2-H 更正,原文写「保持全局」):`ingest_lock_service` 的 advisory lock 按 company 加在 `run_readiness` 内,同公司只 ingest 一次;research run 本身按用户,详见 §5。锁走**专用连接**而非调用方 session(step_context 每步进出都 commit,连接会还回池),且靠连接断开自愈——无 lease、无心跳、无 reaper,同 §0.5「取值够宽 + 到期自愈」。
+- 预算:**按用户动作计数的 `usage_daily` 表 + 五个扣费点**(★ V2-H:原为两个。`task_service.create_task` 覆盖四类 task,`POST /agent/sessions/{id}/messages` 扣 chat turn,`portfolio_service.create_portfolio` 扣建仓,`POST /api/portfolios/{id}/upload` 扣重传,`POST /api/agent/sessions` 扣建会话;逐点口径见 IMPLEMENTATION_PLAN_V2 §0.5),user 池与 `_global` 兜底池同表、同事务扣两次,任一超限即整体回滚(因此不需要退款/补偿逻辑)。**不进 ToolRegistry wrapper**:wrapper 只看得见工具调用,而 exposure/readiness/research 各有 REST 路由与 agent 委派**两条平行入口**,wrapper 拦不住路由面。wrapper 内既有的 session 预算(工具调用数/external_search 数)保持不变,与日配额是两个正交维度。
 
 > 分阶段落地(A 身份 → B 组合 → C RLS → D 宇宙 → E 并发/预算 → F 部署)见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md)。

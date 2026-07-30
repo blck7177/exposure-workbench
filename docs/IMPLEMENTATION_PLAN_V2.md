@@ -29,7 +29,8 @@
 - **schema 三份同步**:每个变更同时进 `infra/init.sql`(新库)+ `db/models.py`(镜像)+ `infra/migrations/v2_multiuser.sql`(幂等 ALTER,应用到活库;本项目无 alembic,此文件即迁移真相)
 - `app_rls` 运行时角色**不授 DELETE**(append-only 在权限层顺便硬化)
 - 前端:`page.tsx` 只加不重构;新 UI 一律组件化(`app/components/`)
-- 明确不做(全计划):组织/团队、用户间共享、组合原地编辑、删除流(最多 `is_active=false`)、agent 写组合的工具(编辑只走 UI)、非美市场、alembic、WebSocket
+- 明确不做(全计划):组织/团队、用户间共享、组合原地编辑、**应用内**删除流(最多 `is_active=false`)、agent 写组合的工具(编辑只走 UI)、非美市场、alembic、WebSocket
+  - ★ V2-H 划界:上面禁的是**应用面**的删除流(路由、agent 工具、UI 按钮)——`app_rls` 无 DELETE 授权就是这条规则在权限层的硬化。**运维脚本不在此列**:以 owner 角色执行的 `scripts/delete_user.py` 是删号的唯一形状,它不是产品功能,不经过 API,只由运维手工调用。这不是给禁令开口子,而是承认「用户有权被抹除」与「应用代码不得删行」是两件事
 
 ### 0.3 环境前置(用户提供)
 
@@ -64,8 +65,8 @@
 | DB 角色 | `exposure` = owner,仅 DDL/migration/seed;**`app_rls`** = api+worker 运行时(LOGIN,GRANT SELECT/INSERT/UPDATE,**无 DELETE**;非 owner 故 RLS 天然生效) |
 | 新 env | `DATABASE_URL_APP`(app_rls 连接串)、`APP_DB_PASSWORD`、`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`、`CLERK_ISSUER`、`CLERK_AUTHORIZED_PARTIES` |
 | 并发(settings,env 可覆盖) | `TASK_LEASE_SECONDS=1800` `TASK_MAX_RETRIES=3` `TURN_LEASE_SECONDS=900`。两把 lease 都靠「取值够宽 + 到期自愈」,**不续期、不心跳** |
-| 日配额(settings,env 可覆盖) | 单位 = **用户动作**,不是 token、不是工具调用。per-user:`DAILY_CHAT_TURNS=10` `DAILY_RESEARCH_RUNS=3` `DAILY_READINESS=10` `DAILY_EXPOSURE_RUNS=20` `DAILY_MARKET_SYNCS=10`;全局兜底 `GLOBAL_DAILY_*` = `200/30/100/200/50`。与 §6 的**会话内**预算(40 工具调用 / 5 次 external_search)是两层正交的东西,勿混 |
-| 配额口径 | 计数表 `usage_daily(user_id, day, kind, used)` PK`(user_id, day, kind)`,共享层**无 RLS**(同 `tasks`);全局池 = 同表保留行 `user_id = '_global'`;`day` 取 UTC(`utils/dates.today_utc()`),`resets_at` = 次日 UTC 00:00(= 北京时间 08:00);扣费点**只有两个**:`task_service.create_task`(按 `task_type→kind` 映射,无默认值)与 `POST /agent/sessions/{id}/messages`(`chat_turn`) |
+| 日配额(settings,env 可覆盖) | 单位 = **用户动作**,不是 token、不是工具调用。per-user:`DAILY_CHAT_TURNS=10` `DAILY_RESEARCH_RUNS=3` `DAILY_READINESS=10` `DAILY_EXPOSURE_RUNS=20` `DAILY_MARKET_SYNCS=10` `DAILY_PORTFOLIO_CREATES=5` `DAILY_POSITION_UPLOADS=10` `DAILY_AGENT_SESSIONS=5`;全局兜底 `GLOBAL_DAILY_*` = `200/30/100/200/50/100/100/100`(**同序**)。后三池 V2-H 追加,理由见 §0.5 扣费点一行。与 §6 的**会话内**预算(40 工具调用 / 5 次 external_search)是两层正交的东西,勿混 |
+| 配额口径 | 计数表 `usage_daily(user_id, day, kind, used)` PK`(user_id, day, kind)`,共享层**无 RLS**(同 `tasks`);全局池 = 同表保留行 `user_id = '_global'`;`day` 取 UTC(`utils/dates.today_utc()`),`resets_at` = 次日 UTC 00:00(= 北京时间 08:00);扣费点**共五个,逐一列出**:①`task_service.create_task`(按 `task_type→kind` 映射,无默认值)②`POST /agent/sessions/{id}/messages`(`chat_turn`)③`portfolio_service.create_portfolio`(`portfolio_create`,同时盖住新建与克隆 demo)④`POST /api/portfolios/{id}/upload`(`position_upload`)⑤`POST /api/agent/sessions`(`agent_session`,扣在**路由**不在 service——service 层会踩到 MCP server 的无 owner session 与 research workflow 的重复扣费)。①③⑤与调用方共事务(工作廉价且本地,失败一起回滚是对的);②④是**先提交的门事务**——花销发生在请求内而非 worker 上,共事务会让每次被拒的请求把已花掉的 provider 钱退回去,变成免费重试循环 |
 | 价格新鲜度 | `PRICE_STALENESS_DAYS=10`(自然日,约 7 个交易日);判定点**唯一**,在 `exposure_workflow._validate_inputs` |
 | CSV 规格 | 列 `ticker,quantity[,cost_basis]`;首行含 "ticker" 视为表头;≤200 行;quantity>0;**整单原子**——任一行错则零写入,返回 `problems:[{row,ticker,reason}]` |
 | 新组合默认 | currency=USD,benchmark=SPY,risk_limits = 拷贝 demo(port_001)的限额模板 |
@@ -81,9 +82,11 @@
 
 | 层 | 表 | RLS |
 |---|---|---|
-| **共享(公司层)** | companies, filings, filing_documents, filing_sections, filing_chunks, financial_facts, research_sources, **calc_ledger**, market_prices, factor_*, security_master, tasks(系统队列,带 `owner_user_id` 供 worker 设上下文), usage_daily(E:配额计数,带 `user_id` 且含全局保留行 `_global`;**故意不加 RLS**,否则全局兜底池只数得到调用者自己 = fail-open) | 无 |
+| **共享(公司层)** | companies, filings, filing_documents, filing_sections, filing_chunks, financial_facts, research_sources, **calc_ledger**, market_prices, factor_prices, security_master, tasks(系统队列,带 `owner_user_id` 供 worker 设上下文), usage_daily(E:配额计数,带 `user_id` 且含全局保留行 `_global`;**故意不加 RLS**,否则全局兜底池只数得到调用者自己 = fail-open) | 无 |
 | **用户主表** | users(本人可见)、portfolios(`owner OR is_public`)、agent_sessions(owner)、research_runs(owner)、issuer_briefs(`owner OR is_public`) | 有,owner 列在此五表 |
-| **子表(EXISTS 级联,不加 owner 列)** | positions/risk_limits/schedules → portfolios;exposure_runs → portfolios;metrics/sector_exposures/issuer_exposures/factor_attributions/risk_alerts/daily_reports/workflow_events → exposure_runs;agent_messages/agent_steps/evidence_packs → agent_sessions | 有,`EXISTS(父表)`(父表政策自动级联) |
+| **子表(EXISTS 级联,不加 owner 列)** | positions/risk_limits/schedules → portfolios;exposure_runs → portfolios;metrics/sector_exposures/issuer_exposures/factor_attributions/**factor_residuals**/risk_alerts/daily_reports/workflow_events → exposure_runs;agent_messages/agent_steps/evidence_packs → agent_sessions | 有,`EXISTS(父表)`(父表政策自动级联) |
+
+> ★ 两处此前失真、V2-H 更正:①共享层原写 `factor_*`,该通配把 `factor_residuals` 一并卷进「无 RLS」,而它其实是 `exposure_runs` 的子表——共享的只有 `factor_prices`。②`daily_reports` 的外键是 `run_id REFERENCES exposure_runs(id) ON DELETE CASCADE`(init.sql:221),而它的 RLS 策略键在**反范式化的 `portfolio_id`** 上(init.sql:659),该列不带外键;两者今天一致,只是因为写入方恰好这么填。删号脚本按外键筛,不按策略键筛。
 
 推论(实现时反复自查):demo 组合 `is_public=true` → 其 runs/alerts/reports 对所有人可见(公共沙盘,诚实);用户组合的一切只有本人可见;`/api/evidence/{run_/alert_}` 跨用户自动 404,零代码。
 
@@ -274,9 +277,10 @@ A(身份) ─▶ B(组合 U1) ─▶ C(RLS) ─▶ D(Universe U2) ─▶ E(并�
    ```
    0 行 → 抛 `QuotaExceeded(kind, scope, used, limit, resets_at)` 且不改状态。`day` 用已有的 `utils/dates.today_utc()`。`user_id` 为 None → **抛错,不静默放行**。
 3. 每个动作扣两次:先 user 池、再全局池,**同一事务**;任一超限 → 抛错 → 回滚 → 两个计数都没动(因此**不需要任何退款/补偿逻辑**)。
-4. 扣费点**只有两个,不是七个**:
+4. 扣费点(V2-E 落成两个;V2-H 追加三个,见 §0.5 表):
    - `task_service.create_task`:`{exposure_update: exposure_run, issuer_research: research_run, company_readiness: readiness, market_data_sync: market_sync}`,**无默认值** —— 将来新增 task type 忘配额 = KeyError fail loud。这一个点同时盖住 REST 路由(4 处)与 meta-agent 委派工具(3 处)**两条面**;它们是平行实现、不共享代码,分开写必漏一条。`owner_user_id is None`(系统路径)→ 不扣;worker 侧零处调用 `create_task`,不存在「扣到 demo 哨兵头上」的路径。
-   - `POST /agent/sessions/{id}/messages`:扣 `chat_turn`。**不可按 session 创建扣** —— 一个 session 能发无限条消息,且 `issuer_research` 会另建一个 `kind='research'` 的 session(每个 research run 都会白扣一次 chat)。
+   - `POST /agent/sessions/{id}/messages`:扣 `chat_turn`。**chat_turn 不可改扣在 session 创建上** —— 一个 session 能发无限条消息,且 `issuer_research` 会另建一个 `kind='research'` 的 session(每个 research run 都会白扣一次 chat)。
+   - ★ V2-H 追加(此条原文写「扣费点只有两个」,现更正):上一句否定的是「把 chat_turn 的扣费点搬到 session 创建」,**不是**「session 创建不该有自己的池」。`POST /api/agent/sessions` 此前无配额也无上限,登录后一个循环即可无限建行;现按 `agent_session` 单独计一池(5/天),**扣在路由层**——扣进 `agent_session_service.create_session` 会打到 MCP server 的无 owner session(`usage_service.charge` 对 None 抛错)并让 `issuer_research_workflow` 在已于 enqueue 扣过之后再扣一次。附:`agent_sessions.ended_at` 全仓从未被写入,所以「同时开着 N 个」这类上限今天实现不了(会把用户永久锁死),日配额是唯一可行形状。
 5. chat 扣费与 E2 的 turn 认领**放同一个短事务**并一起 commit(在 LLM 循环开始之前):超配额 → 回滚 → lease 一并释放,「拒绝路径手工释放」这个特例因此消失。循环开始之后失败**不退款**(LLM 已经花掉了),此语义明确写进 `docs/PRODUCTION.md`。
 6. 委派工具侧必须**自己**接住 `QuotaExceeded` 并转成结构化 dict(house style,同 `company_not_found` / `active_run_exists`):`registry.invoke` 的兜底 `except Exception` 会把任何异常压成 `{"error":"tool_error","detail":str(exc)}`,`kind/used/limit/resets_at` 全丢。
 7. 顺带修一个既有缺陷:research 两条路径都是先 `create_task` 再 `create_run`,`ActiveRunExists` 在后面抛 → agent 路径已 commit 出一个无 `run_id` 的**孤儿 task**(worker 捡起来必失败)。改成**先 `get_active_run` 预检、再 `create_task`**,让 `create_task` 成为最后一步,配额才不会被一个注定失败的请求吃掉。
