@@ -229,14 +229,49 @@ constraint rather than a piece of infrastructure, which is the whole argument:
 the interesting part of "production-ready" is where the boundaries are, not how
 much of it there is.
 
+### Erasing an account
+
+`app_rls` holds no DELETE grant, so erasure cannot be reached from the running
+system at all — no route, no agent tool, no button. It is an operational act
+performed as the table owner, and `scripts/delete_user.py` is its only shape.
+
+Order matters. **Clerk first**: it is the identity system of record, and while
+the Clerk user exists one sign-in re-upserts the `users` row under the same id
+and quietly undoes the erasure. `--apply` therefore refuses without
+`--clerk-deleted`, which is an assertion by the operator rather than a check.
+
+```
+# 1. delete the user in the Clerk dashboard
+# 2. see what would go
+python scripts/delete_user.py user_2abc...
+# 3. do it
+python scripts/delete_user.py user_2abc... --apply --clerk-deleted
+```
+
+Four guards reject the whole invocation before anything is written: the demo
+sentinel and the `_global` quota row are refused outright; an id that owns
+nothing is refused rather than reported as a success; and work still in flight
+is refused, because a live worker holds that tenant's context and would write
+rows back after the commit. The dry run is the default.
+
+What survives, deliberately: every shared company table, and the two pointers
+into the departed account that `calc_ledger.invoked_by` and
+`research_sources.research_run_id` hold. Those are left dangling. Rewriting them
+to a tombstone would be the first mutation ever made to an append-only evidence
+store, and dangling ids already exist there.
+
+Running it twice ends in the "owns nothing" refusal, which is correct: from
+inside the script, "already erased" and "you typed the wrong id" are the same
+case, and only one of the two is safe to treat as success.
+
+Covered by `tests/test_account_deletion_live.py` (33 cases): every owned table
+empty, the other tenant bit-for-bit unchanged, shared evidence and its dangling
+pointers intact, and each guard refusing without writing.
+
 ### Known limits
 
 Each of these is a decision, not an oversight. They are here so that the next
 person to touch this — including me — does not have to rediscover them.
-
-- **Account deletion has no path.** `app_rls` holds no DELETE grant by design, so
-  removing a user's data requires an owner-role script that does not exist yet.
-  Worth building before inviting anyone who is not a friend.
 - **A portfolio's own risk limits do nothing.** `check_limits` takes a
   `db_limits` argument it never reads; only the YAML defaults fire, while every
   run queries for them and every new portfolio gets a copied template. Either

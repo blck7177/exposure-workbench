@@ -227,9 +227,10 @@ fresh session, and re-verified with the same injection.
 
 ## Known gaps, carried forward deliberately
 
-- **No account-deletion path.** `app_rls` holds no DELETE grant by design, so
-  erasing a user needs an owner-role script that does not exist. Build it before
-  inviting anyone who is not a friend.
+- ~~**No account-deletion path.**~~ Closed in V2-H by `scripts/delete_user.py`,
+  an owner-role operator script — 22 tables in FK order, four refuse-before-write
+  guards, shared company evidence untouched. See PRODUCTION.md and
+  `tests/test_account_deletion_live.py`.
 - **A portfolio's own risk limits do nothing.** `check_limits` takes a
   `db_limits` argument it never reads; only the YAML defaults fire, while
   `_load_inputs` queries for them every run and new portfolios get a copied

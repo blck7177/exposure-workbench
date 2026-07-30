@@ -521,8 +521,8 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 > 199 offline + 32 live 测试全绿(实测复核 2026-07-30);终验数字与实测证据见 [spikes/V2_COVERAGE.md](spikes/V2_COVERAGE.md)。
 > 执行计划见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md),生产口径见 [PRODUCTION.md](PRODUCTION.md)。
 > 实现期推翻的两条原设计已在下文就地标 ★ 改写(重投白名单、配额不进 wrapper);
-> 尚未做完的部分集中记在 V2_COVERAGE 的「Known gaps」一节(删号路径、`check_limits` 的死参数、
-> `owner_id NOT NULL` 收紧、Clerk 仍是 dev 实例)。**公网链接前仍需人工完成**:DNS 记录 +
+> 尚未做完的部分集中记在 V2_COVERAGE 的「Known gaps」一节(`owner_id NOT NULL` 收紧、
+> Clerk 仍是 dev 实例;删号路径与 `check_limits` 死参数已在 V2-H 关闭)。**公网链接前仍需人工完成**:DNS 记录 +
 > 机器上的 `/etc/caddy/Caddyfile`(样例在 `infra/Caddyfile.example`)。
 
 背景:项目定位是个人展示,但要呈现 production/deployment-ready。讨论结论:展示型项目的"生产就绪"是叙事资产——每个会坏的边界上有一个能指出来的正交模块,而不是堆基础设施。既有优势直接入账:审计轨迹、预算强制、append-only、幂等 upsert、任务 claim 已是 `FOR UPDATE SKIP LOCKED`(task_service.py)。

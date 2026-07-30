@@ -133,3 +133,57 @@ def test_unbounded_growth_paths_carry_a_ceiling():
     assert hasattr(portfolio_service, "TooManyPortfolios")
     assert agent.MAX_MESSAGE_CHARS <= 32_000, "one charged turn must not carry unbounded prompt"
     assert market_data.MAX_SYNC_TICKERS <= 100
+
+
+# ─── The erasure script agrees with the ownership table ───────────────────────
+
+def _deletion_order() -> list[str]:
+    """The real list the script will execute, not a copy of it."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_delete_user_under_test", ROOT / "scripts" / "delete_user.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)          # imports psycopg2, opens no connection
+    return [table for table, _predicate in mod.DELETION_ORDER]
+
+
+def test_erasure_covers_every_table_that_holds_user_data():
+    """The way a deletion script goes wrong is by missing a table nobody
+    remembers — factor_residuals was absent from the ownership table in section
+    0.6 for exactly that reason, and four of these tables have no foreign key to
+    their parent, so a missed row is unreachable forever afterwards."""
+    expected = TENANT_TABLES | {"tasks", "usage_daily"}
+    actual = set(_deletion_order())
+    assert actual == expected, (
+        f"missing from the erasure script: {sorted(expected - actual)}; "
+        f"deleted but not owned by a user: {sorted(actual - expected)}"
+    )
+
+
+def test_erasure_never_touches_a_shared_table():
+    """Company evidence is other tenants' data. Deleting a companies row would
+    cascade seven ways out of this user's account."""
+    assert set(_deletion_order()) & SHARED_TABLES == {"tasks", "usage_daily"}
+
+
+def test_erasure_order_deletes_children_before_parents():
+    """Two foreign keys into portfolios are NO ACTION, not CASCADE, so getting
+    this order wrong is a mid-transaction integrity error rather than a silent
+    partial erasure — but only for those two. The rest cascade, which is exactly
+    why the order is asserted here instead of being left to the database."""
+    order = _deletion_order()
+    position = {table: i for i, table in enumerate(order)}
+
+    sql = INIT_SQL.read_text()
+    violations = []
+    for block in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\n\);", sql, re.S):
+        child, body = block.group(1), block.group(2)
+        if child not in position:
+            continue
+        for parent in re.findall(r"REFERENCES\s+(\w+)\s*\(", body):
+            if parent in position and position[child] > position[parent]:
+                violations.append(f"{child} deleted after its parent {parent}")
+
+    assert violations == [], violations
