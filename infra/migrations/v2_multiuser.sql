@@ -195,6 +195,10 @@ ALTER TABLE agent_sessions ADD COLUMN IF NOT EXISTS turn_started_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS usage_daily (
     user_id     VARCHAR(255) NOT NULL,
     day         DATE NOT NULL,
+    -- chat_turn|research_run|readiness|exposure_run|market_sync
+    -- |portfolio_create|position_upload|agent_session  (V2-H)
+    -- Unconstrained on purpose: a new pool needs no DDL, so this comment is the
+    -- only thing that can fall behind usage_service.POOLS.
     kind        VARCHAR(32) NOT NULL,
     used        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day, kind)

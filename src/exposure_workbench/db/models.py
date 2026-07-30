@@ -331,7 +331,13 @@ class UsageDaily(Base):
     note in infra/init.sql: the global backstop is the reserved row
     user_id='_global', and a tenant policy would silently make it count only the
     caller. Written exclusively through usage_service.charge's conditional
-    upsert, never by ORM attribute assignment."""
+    upsert, never by ORM attribute assignment.
+
+    `kind` is an unconstrained VARCHAR in all three schema files — no CHECK, no
+    enum — so adding a pool is a change to usage_service.POOLS plus two settings
+    and never a migration. The current set: chat_turn, research_run, readiness,
+    exposure_run, market_sync, and (V2-H) portfolio_create, position_upload,
+    agent_session."""
 
     __tablename__ = "usage_daily"
 

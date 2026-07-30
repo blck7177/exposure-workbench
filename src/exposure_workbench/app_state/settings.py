@@ -66,12 +66,24 @@ class Settings(BaseSettings):
     daily_readiness: int = 10
     daily_exposure_runs: int = 20
     daily_market_syncs: int = 10
+    # V2-H. Three actions that created rows with nothing bounding them.
+    # 5 creates/day sits under MAX_PORTFOLIOS_PER_USER=20, so the lifetime
+    # ceiling is reached over days rather than in one scripted loop — the two
+    # are orthogonal and both stay. 10 uploads matches daily_market_syncs:
+    # both are "one action buys a bounded pile of provider calls", and an
+    # upload can drive up to ~400 yfinance requests inside one request.
+    daily_portfolio_creates: int = 5
+    daily_position_uploads: int = 10
+    daily_agent_sessions: int = 5
 
     global_daily_chat_turns: int = 200
     global_daily_research_runs: int = 30
     global_daily_readiness: int = 100
     global_daily_exposure_runs: int = 200
     global_daily_market_syncs: int = 50
+    global_daily_portfolio_creates: int = 100
+    global_daily_position_uploads: int = 100
+    global_daily_agent_sessions: int = 100
 
     # Price freshness (V2-E5). Calendar days, so ~10 covers a long weekend plus a
     # holiday and still catches a genuinely dead ticker. A holding whose newest

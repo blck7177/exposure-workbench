@@ -29,11 +29,15 @@ def test_every_mapped_kind_is_a_registered_pool():
         assert kind in usage_service.POOLS, f"{task_type} maps to unknown pool {kind!r}"
 
 
-def test_chat_turn_is_a_pool_but_not_reachable_from_a_task_type():
-    """chat_turn is charged at the OTHER charge point (the messages route). It
-    must not also hang off a task type, or a turn would be charged twice."""
-    assert "chat_turn" in usage_service.POOLS
-    assert "chat_turn" not in task_service.TASK_TYPE_QUOTA_KIND.values()
+@pytest.mark.parametrize(
+    "kind", ["chat_turn", "portfolio_create", "position_upload", "agent_session"]
+)
+def test_inline_pools_are_not_also_reachable_from_a_task_type(kind):
+    """These four are charged at their own sites, not through create_task,
+    because they create rows inline instead of enqueuing work. Wiring any of
+    them to a task type as well would charge the action twice."""
+    assert kind in usage_service.POOLS
+    assert kind not in task_service.TASK_TYPE_QUOTA_KIND.values()
 
 
 def test_unknown_task_type_raises_rather_than_passing_through_free():
@@ -58,7 +62,24 @@ def test_pool_defaults_match_the_published_plan():
             s.daily_exposure_runs, s.daily_market_syncs) == (10, 3, 10, 20, 10)
     assert (s.global_daily_chat_turns, s.global_daily_research_runs, s.global_daily_readiness,
             s.global_daily_exposure_runs, s.global_daily_market_syncs) == (200, 30, 100, 200, 50)
+    assert (s.daily_portfolio_creates, s.daily_position_uploads,
+            s.daily_agent_sessions) == (5, 10, 5)
+    assert (s.global_daily_portfolio_creates, s.global_daily_position_uploads,
+            s.global_daily_agent_sessions) == (100, 100, 100)
     assert s.turn_lease_seconds == 900
+
+
+def test_every_pool_is_pinned_by_the_test_above():
+    """The pin is a literal tuple, so it does not fail when a pool is ADDED — it
+    just stops covering it. This is the guard on the guard: a new pool ships with
+    its numbers unasserted unless someone extends the tuple."""
+    pinned = {
+        "chat_turn", "research_run", "readiness", "exposure_run", "market_sync",
+        "portfolio_create", "position_upload", "agent_session",
+    }
+    assert set(usage_service.POOLS) == pinned, (
+        "a pool was added or removed without updating test_pool_defaults_match_the_published_plan"
+    )
 
 
 async def test_charge_refuses_an_anonymous_action():
@@ -108,15 +129,20 @@ def test_charge_sql_only_increments_below_the_limit():
     assert "RETURNING used" in sql
 
 
-def test_a_zero_limit_is_a_working_kill_switch():
+@pytest.mark.parametrize("kind", sorted(usage_service.POOLS))
+def test_a_zero_limit_is_a_working_kill_switch(kind):
     """The SQL alone cannot express this: the WHERE clause guards only the DO
     UPDATE branch, so the first action of a day takes the plain INSERT path and
     slips through whatever the limit says. Setting a pool to 0 is what you reach
-    for when a public link is being abused, so it has to actually stop things."""
+    for when a public link is being abused, so it has to actually stop things.
+
+    Parametrized over every pool, not just chat_turn: the fix lives in the shared
+    _charge_one, so this asserts that a new pool inherits it rather than that
+    someone remembered to re-apply it."""
     import asyncio
     for limit in (0, -1):
         with pytest.raises(usage_service.QuotaExceeded) as e:
-            asyncio.run(usage_service._charge_one(None, "user_x", "chat_turn", limit, "user",
+            asyncio.run(usage_service._charge_one(None, "user_x", kind, limit, "user",
                                                   __import__("datetime").date(2026, 7, 28)))
         assert e.value.limit == limit
         assert e.value.used == 0

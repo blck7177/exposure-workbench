@@ -1,17 +1,33 @@
 """Daily quota (V2-E3) — the one primitive that bounds what a visitor can spend.
 
 The unit is a USER ACTION: one chat turn, one research run, one exposure run.
-Not tokens, not tool calls. That choice is what lets the whole thing hang off two
-charge points instead of a wrapper: exposure, readiness and research each have a
-REST route AND a meta-agent delegation tool, and only `create_task` sits under
-both. Per-session budgets (tool calls, external searches) live in
+Not tokens, not tool calls. That choice is what collapses the task-shaped actions
+onto ONE charge point instead of a wrapper: exposure, readiness and research each
+have a REST route AND a meta-agent delegation tool, and only `create_task` sits
+under both. Per-session budgets (tool calls, external searches) live in
 agent_session_service and bound one conversation; these bound one day. The two
 are orthogonal and must not be merged.
 
-Every action is charged twice in the SAME transaction — the user's pool, then
-the shared '_global' backstop. Either one over limit rolls the whole thing back,
-so no counter moves and there is nothing to refund. That is the entire reason
-the design has no compensation logic.
+Every action is charged twice — the user's pool, then the shared '_global'
+backstop — and both debits share one transaction, so either one over limit rolls
+back the other. Nothing is ever half-charged and there is nothing to refund.
+
+WHERE THAT TRANSACTION COMES FROM DIFFERS, and the difference is deliberate
+(V2-H; before it, every charge shared its caller's transaction and this docstring
+said so without qualification):
+
+  * Shared with the caller — create_task, portfolio_create, agent_session. The
+    expensive work happens later on the worker, or the work is one cheap local
+    INSERT. If the request then fails, rolling the charge back with it is right.
+  * A gate transaction, committed before the work starts — chat_turn,
+    position_upload. Here the money is spent INSIDE the request, before the
+    outcome is known: an LLM round trip, or up to ~400 provider calls during a
+    CSV upload. Sharing the caller's transaction would refund every rejected
+    request after its cost was already incurred, which turns fail-loud validation
+    into a free retry loop.
+
+So "no compensation logic" still holds, but for two different reasons: the first
+group never half-charges, and the second group never gives anything back.
 """
 
 from __future__ import annotations
@@ -40,6 +56,11 @@ POOLS: dict[str, tuple[str, str]] = {
     "readiness": ("daily_readiness", "global_daily_readiness"),
     "exposure_run": ("daily_exposure_runs", "global_daily_exposure_runs"),
     "market_sync": ("daily_market_syncs", "global_daily_market_syncs"),
+    # V2-H. None of these three go through create_task — they create rows
+    # inline — so each is charged at its own site. See the module docstring.
+    "portfolio_create": ("daily_portfolio_creates", "global_daily_portfolio_creates"),
+    "position_upload": ("daily_position_uploads", "global_daily_position_uploads"),
+    "agent_session": ("daily_agent_sessions", "global_daily_agent_sessions"),
 }
 
 

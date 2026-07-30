@@ -272,7 +272,11 @@ CREATE INDEX IF NOT EXISTS idx_tasks_lease ON tasks(lease_until) WHERE status = 
 CREATE TABLE IF NOT EXISTS usage_daily (
     user_id     VARCHAR(255) NOT NULL,   -- Clerk user id, or the reserved '_global'
     day         DATE NOT NULL,           -- UTC; resets at 00:00 UTC
+    -- Deliberately unconstrained: no CHECK, no enum. Adding a pool is a change
+    -- to usage_service.POOLS and two settings, never a migration. This comment
+    -- is therefore the ONLY thing that can drift — keep it level with POOLS.
     kind        VARCHAR(32) NOT NULL,    -- chat_turn|research_run|readiness|exposure_run|market_sync
+                                         -- |portfolio_create|position_upload|agent_session  (V2-H)
     used        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day, kind)
 );
