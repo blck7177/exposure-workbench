@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import MarketPrice, Portfolio, Position, RiskLimit
-from exposure_workbench.services import exposure_run_service, security_master_service
+from exposure_workbench.services import exposure_run_service, security_master_service, usage_service
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
@@ -304,11 +304,12 @@ class TooManyPortfolios(Exception):
         self.limit = limit
 
 
-# A ceiling rather than a daily quota: nobody should earn ten more portfolios
-# every morning. Creation is not otherwise counted anywhere — each one also
-# copies 13 risk-limit rows, and a clone copies the demo's positions on top — so
-# without this a single free account can grow the shared database unbounded and
-# nothing shows up on the usage dashboard while it happens.
+# A ceiling, and since V2-H also a daily pool. The two are orthogonal and both
+# stay: the ceiling bounds how many rows one account can ever hold, the pool
+# bounds how fast it can get there. Nobody should earn ten more portfolios every
+# morning, and nobody should be able to spend their whole allowance in one
+# scripted loop either. Each creation also copies 13 risk-limit rows, and a
+# clone copies the demo's positions on top.
 MAX_PORTFOLIOS_PER_USER = 20
 
 
@@ -322,6 +323,14 @@ async def create_portfolio(db: AsyncSession, owner_id: str, name: str) -> Portfo
     )).scalar_one()
     if owned >= MAX_PORTFOLIOS_PER_USER:
         raise TooManyPortfolios(MAX_PORTFOLIOS_PER_USER)
+
+    # Charged here rather than in the routes so that both surfaces — POST
+    # /portfolios and POST /portfolios/clone-demo — are covered by one call.
+    # clone_demo goes through this function exactly once and produces exactly
+    # one Portfolio row, so there is no double charge. Shares the caller's
+    # transaction: the work is a handful of local INSERTs, so a later failure
+    # rolling the charge back with them is the correct outcome.
+    await usage_service.charge(db, owner_id, "portfolio_create")
 
     p = Portfolio(
         id=new_id("port_"), name=(name or "").strip() or "My Portfolio",

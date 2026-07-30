@@ -38,6 +38,20 @@ async def create_agent_session(
     user: UserClaims = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Charged HERE and not in agent_session_service.create_session, which has two
+    # other callers that must stay free: apps/mcp/server.py opens an ownerless
+    # session (charge() raises on a None user by design), and
+    # issuer_research_workflow opens a second session per research run, which has
+    # already paid at enqueue. Shares the request transaction — this is one cheap
+    # local INSERT, so rolling the charge back with a failed request is right.
+    #
+    # Not a ceiling on open sessions: agent_sessions.ended_at is never written
+    # anywhere in this repo, so "at most N open" would lock a user out for good
+    # after N. A daily pool is the only shape that actually works today.
+    try:
+        await usage_service.charge(db, user.user_id, "agent_session")
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
     s = await agent_session_service.create_session(db, kind="meta", owner_id=user.user_id)
     await db.commit()
     return s

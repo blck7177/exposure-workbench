@@ -90,6 +90,54 @@ def test_every_write_route_requires_a_user(route):
     assert "require_user" in signature, f"{name} accepts writes without authentication"
 
 
+# Route modules with a POST that deliberately charges nothing. Empty, and it
+# should stay that way — an entry here is a decision someone has to defend.
+UNCHARGED_WRITE_MODULES: set[str] = set()
+
+
+def test_every_module_with_a_write_route_charges_something():
+    """The uncharged write path is the one that gets found by a reviewer rather
+    than by a test. Four of them shipped this way — portfolio create, clone,
+    upload and session create — and the worst could drive ~400 provider calls
+    per request with nothing counting. A module with a POST either reaches the
+    quota or is named here on purpose."""
+    offenders = []
+    for f in sorted(ROUTES.glob("*.py")):
+        src = f.read_text()
+        if "@router.post" not in src or f.stem in UNCHARGED_WRITE_MODULES:
+            continue
+        # Directly, or via a service that charges on its behalf.
+        if "usage_service" in src or "create_task" in src:
+            continue
+        offenders.append(f.name)
+    assert offenders == [], (
+        f"write routes with no quota behind them: {offenders}. Charge them, or add "
+        f"the module to UNCHARGED_WRITE_MODULES with a reason."
+    )
+
+
+def test_the_upload_gate_sits_after_the_free_checks():
+    """Ordering is 401 -> 404 -> 403 -> 422 parse -> 429 -> 422 upload, and it is
+    load-bearing in both directions. Billing before parse_csv would charge for a
+    malformed file that cost the server nothing; billing after upload_positions
+    would charge only successes, when the ~400 provider calls are already spent
+    by the time the rejection is decided. It reads like an inconsistency with the
+    401->404->403->429 order used elsewhere, so it is pinned rather than left to
+    be tidied up."""
+    src = (ROUTES / "portfolios.py").read_text()
+    body = src[src.index('@router.post("/portfolios/{portfolio_id}/upload")'):]
+    body = body[:body.index("@router.get")]
+
+    forbidden = body.index('403, "not your portfolio"')
+    parse = body.index("portfolio_csv.parse_csv")
+    charge = body.index('"position_upload"')
+    upload = body.index("portfolio_service.upload_positions")
+
+    assert forbidden < parse < charge < upload, (
+        "the position_upload charge moved; see the docstring before changing it"
+    )
+
+
 def test_semantic_owner_filters_are_labelled():
     """Application-layer owner checks are allowed only as business semantics —
     the database is what isolates tenants. The label is what stops the next

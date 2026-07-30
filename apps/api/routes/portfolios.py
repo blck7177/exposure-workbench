@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
-from exposure_workbench.db.session import get_db
-from exposure_workbench.services import portfolio_csv, portfolio_service, exposure_run_service
+from exposure_workbench.db.session import get_db, get_session_factory
+from exposure_workbench.services import (
+    exposure_run_service, portfolio_csv, portfolio_service, usage_service,
+)
 
 router = APIRouter()
 
@@ -105,6 +107,10 @@ async def create_portfolio(
         p = await portfolio_service.create_portfolio(db, owner_id=user.user_id, name=body.name)
     except portfolio_service.TooManyPortfolios as e:
         raise HTTPException(429, {"error": "too_many_portfolios", "limit": e.limit}) from e
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
+    # Note both 429s: too_many_portfolios is a permanent ceiling, quota_exceeded
+    # resets tomorrow. A client branching on the status alone conflates them.
     if body.csv_text:
         rows, problems = portfolio_csv.parse_csv(body.csv_text)
         if problems:
@@ -128,6 +134,8 @@ async def clone_demo(
         p = await portfolio_service.clone_demo(db, owner_id=user.user_id)
     except portfolio_service.TooManyPortfolios as e:
         raise HTTPException(429, {"error": "too_many_portfolios", "limit": e.limit}) from e
+    except usage_service.QuotaExceeded as e:
+        raise HTTPException(429, e.as_dict()) from e
     await db.commit()
     return p
 
@@ -149,6 +157,26 @@ async def upload_positions(
     rows, problems = portfolio_csv.parse_csv(body.csv_text)
     if problems:
         raise HTTPException(422, {"problems": _problem_dicts(problems)})
+
+    # Ordering is 401 -> 404 -> 403 -> 422 parse -> 429 -> 422 upload, and the
+    # gate sitting AFTER the parse is deliberate: parse_csv is free server-side
+    # validation, so billing a malformed file is pure friction, while everything
+    # past this point either reads the database or calls yfinance — up to ~400
+    # provider requests for a 200-row file.
+    #
+    # A gate transaction, committed before the work starts, rather than sharing
+    # the request's. get_db rolls back on any raise, and the no_price_data
+    # rejection is decided AFTER _backfill_prices has already spent the provider
+    # calls; a shared charge would refund every rejected upload and turn this
+    # into a free retry loop. Safe on an independent session because
+    # db/session.py stamps the RLS tenant at the start of every transaction.
+    factory = get_session_factory()
+    async with factory() as gate_db, gate_db.begin():
+        try:
+            await usage_service.charge(gate_db, user.user_id, "position_upload")
+        except usage_service.QuotaExceeded as e:
+            raise HTTPException(429, e.as_dict()) from e
+
     try:
         result = await portfolio_service.upload_positions(db, portfolio_id, rows)
     except portfolio_service.UploadError as e:
