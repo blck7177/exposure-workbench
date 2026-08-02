@@ -68,10 +68,15 @@ def test_alert_harvested_cleanly_not_typed_by_category():
 
 
 def test_run_prefix_does_not_collide_with_research_run():
+    """run_ is harvested; rrun_ is not, and the longer prefix must not be read as
+    the shorter one wearing an extra letter. V3-A0-3 dropped rrun_ from the
+    harvest set (the gate cannot resolve it), so the collision now has to be
+    checked as an absence rather than as a second type."""
     refs = extract_evidence_refs({"a": "run_1", "b": "rrun_2"})
     kinds = {(r["type"], r["id"]) for r in refs}
     assert ("run", "run_1") in kinds
-    assert ("research_run", "rrun_2") in kinds
+    assert not any(r["id"] == "rrun_2" for r in refs)
+    assert not any(r["id"] == "run_2" for r in refs)      # not silently re-prefixed
 
 
 # ── citation gate <-> resolver prefix parity ──────────────────────────────────
@@ -86,6 +91,16 @@ def test_every_gate_prefix_is_resolvable():
     """A citable id (passes the gate) must also resolve for the drawer."""
     for prefix in trail._RESOLVERS:
         assert prefix in resolver._RESOLVERS, prefix
+
+
+def test_harvest_gate_and_resolver_agree_on_exactly_one_prefix_set():
+    """Three lists that must be one list. Harvest wider than the gate gives the
+    model ids it can never cite; the gate wider than the resolver gives the user
+    a citation whose drawer is empty. V3-A0-3 made the first equality true; this
+    asserts all three together so the next prefix is added in three places or in
+    none."""
+    from exposure_workbench.tools import registry as R
+    assert set(R._ID_PREFIXES) == set(trail._RESOLVERS) == set(resolver._RESOLVERS)
 
 
 def test_id_helpers_match_evidence_prefixes():

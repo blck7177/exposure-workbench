@@ -9,8 +9,10 @@ The wrapper does three things automatically around every LLM-driven call:
      auto-extracting evidence_refs from the return value
 
 Evidence-ref extraction is automatic: any returned id-shaped field (fact_/chunk_/
-calc_/src_/co_/rrun_/alert_/run_ or an explicit {type,id}/citation) becomes a
-trace ref, so tool authors can't forget to report what a call touched.
+calc_/src_/alert_/run_ or an explicit {type,id}/citation) becomes a trace ref, so
+tool authors can't forget to report what a call touched. Two limits are
+deliberate: the prefix set is exactly what the citation gate can resolve, and a
+GATE tool's own output is never harvested (see _harvestable).
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -44,7 +46,11 @@ DELEGATION = "delegation"
 REFLECTION = "reflection"
 GATE = "gate"                # respond / submit_brief — session exits
 
-_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "co_", "rrun_", "filing_", "alert_", "run_")
+# Exactly the prefixes the citation gate can resolve (evidence_trail_service.
+# _RESOLVERS), and the symmetry is the point: harvesting an id the gate can never
+# accept hands the model something it can retrieve, quote and then be refused
+# for. co_/rrun_/filing_ used to be harvested and were never citable.
+_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "alert_", "run_")
 
 
 @dataclass(frozen=True)
@@ -196,7 +202,7 @@ async def invoke(
             logger.exception("could not roll back after %s failed", tool_name)
 
     # 3) trace (auto-extract evidence refs)
-    refs = extract_evidence_refs(result) if status == "completed" else []
+    refs = extract_evidence_refs(result) if _harvestable(tool, status) else []
     try:
         await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
@@ -209,6 +215,25 @@ async def invoke(
         # see the structured result it was given.
         logger.exception("could not record trace step for %s (session %s)", tool_name, session_id)
     return result
+
+
+def _harvestable(tool: Tool, status: str) -> bool:
+    """Whether a call's return value may contribute evidence to the trail.
+
+    A GATE's output is never evidence — it is the session's verdict on evidence
+    — and its REJECTION payload is actively poisonous: invalid_citations echoes
+    the ids it just refused under problems[].id. The call itself completes
+    successfully, so the harvester used to walk that payload and write the
+    fabricated ids into the trail. On the next attempt they passed the trail
+    check, leaving only _exists_in_db between a made-up id and an accepted
+    answer, and materialize_pack wrote them into the run's evidence pack.
+
+    Note this closes the fabricated-id loop and nothing else: the explicit
+    {type,id} branch and the calc_id/fact_id key branch are separate ingestion
+    paths, and one malformed id from before V1's alert-prefix fix is still
+    sitting in agent_steps.evidence_refs by way of the former.
+    """
+    return status == "completed" and tool.tool_class != GATE
 
 
 def _step_type(tool: Tool) -> str:
