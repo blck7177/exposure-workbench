@@ -43,19 +43,31 @@ class BudgetStatus:
     tool_budget: int
     external_searches: int
     external_budget: int
+    turn_tools_used: int = 0
 
 
 async def create_session(
     db: AsyncSession, kind: str = "meta", llm_model: str | None = None, owner_id: str | None = None,
 ) -> AgentSession:
     s = get_settings()
+    # The budget REGIME is chosen once, here, and carried by the row (V3-B2).
+    # A conversation gets a per-turn budget: a lifetime one does not run out so
+    # much as make the session quietly less able to answer, with no signal to
+    # anyone. A research run gets the lifetime budget it has always had, because
+    # it spends its whole allowance inside one session and never claims a turn —
+    # a per-turn counter would never be zeroed for it, and every run would die
+    # partway through. Encoding that as `if kind == "research"` inside reserve()
+    # would put a policy decision in the enforcement path; the column keeps
+    # reserve() reading one rule off the row.
     session = AgentSession(
         id=new_session_id(),
         kind=kind,
         owner_id=owner_id,   # V2-A tenancy
         llm_model=llm_model or s.openai_model,
         tool_budget=s.session_tool_budget,
+        turn_tool_budget=s.turn_tool_budget if kind == "meta" else None,
         tools_used=0,
+        turn_tools_used=0,
         external_searches=0,
     )
     db.add(session)
@@ -73,7 +85,8 @@ async def get_session(db: AsyncSession, session_id: str) -> AgentSession | None:
 # itself once turn_lease_seconds have passed.
 _CLAIM_TURN_SQL = text("""
 UPDATE agent_sessions
-   SET turn_started_at = now()
+   SET turn_started_at = now(),
+       turn_tools_used = 0
  WHERE id = :session_id
    AND (turn_started_at IS NULL
         OR turn_started_at < now() - make_interval(secs => :lease_secs))
@@ -148,30 +161,47 @@ async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool
     if session is None:
         raise ValueError(f"unknown session {session_id!r}")
 
-    tool_limit = session.tool_budget or settings.session_tool_budget
     ext_limit = settings.external_search_budget
 
-    if session.tools_used >= tool_limit:
-        raise BudgetExceeded("tool", session.tools_used, tool_limit)
+    # Which counter is enforced comes off the ROW, not off the session's kind:
+    # a per-turn budget if the row carries one, the lifetime budget otherwise
+    # (see create_session for why research is the latter). tools_used keeps
+    # incrementing either way — it stops being the enforced number and stays the
+    # lifetime audit number.
+    if session.turn_tool_budget is not None:
+        kind, counter, used, limit = ("turn_tool", AgentSession.turn_tools_used,
+                                      session.turn_tools_used, session.turn_tool_budget)
+    else:
+        # `is not None`, not `or`: a stored 0 has to mean zero. Under `or` it
+        # meant "unset, use the default", so the one value you would reach for to
+        # switch a runaway session off was the one value that did nothing.
+        limit = (session.tool_budget if session.tool_budget is not None
+                 else settings.session_tool_budget)
+        kind, counter, used = "tool", AgentSession.tools_used, session.tools_used
+
+    if used >= limit:
+        raise BudgetExceeded(kind, used, limit)
     if is_external_search and session.external_searches >= ext_limit:
         raise BudgetExceeded("external_search", session.external_searches, ext_limit)
 
     ext_inc = 1 if is_external_search else 0
+    conditions = [AgentSession.id == session_id, counter < limit]
+    if is_external_search:
+        conditions.append(AgentSession.external_searches < ext_limit)
+
     result = await db.execute(
         update(AgentSession)
-        .where(
-            AgentSession.id == session_id,
-            AgentSession.tools_used < tool_limit,
-            (AgentSession.external_searches < ext_limit) if is_external_search else (AgentSession.id == session_id),
-        )
+        .where(*conditions)
         .values(
             tools_used=AgentSession.tools_used + 1,
+            turn_tools_used=AgentSession.turn_tools_used + 1,
             external_searches=AgentSession.external_searches + ext_inc,
         )
-        .returning(AgentSession.tools_used, AgentSession.external_searches)
+        .returning(AgentSession.tools_used, AgentSession.external_searches,
+                   AgentSession.turn_tools_used)
     )
     row = result.first()
     if row is None:
         # Lost the race for the last unit.
-        raise BudgetExceeded("tool", tool_limit, tool_limit)
-    return BudgetStatus(row[0], tool_limit, row[1], ext_limit)
+        raise BudgetExceeded(kind, limit, limit)
+    return BudgetStatus(row[0], limit, row[1], ext_limit, row[2])

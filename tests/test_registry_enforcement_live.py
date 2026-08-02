@@ -55,8 +55,12 @@ async def test_budget_exhaustion_rejects_and_is_traced():
         reg = build_read_registry()
         async with mk() as db:
             s = await sess.create_session(db, kind="meta")
-            # tiny budget: allow exactly one tool call
-            await db.execute(AgentSession.__table__.update().where(AgentSession.id == s.id).values(tool_budget=1))
+            # Tiny budget: allow exactly one tool call. V3-B2 made turn_tool_budget
+            # the enforced number for a conversation (tool_budget stayed as the
+            # lifetime audit counter), so this sets the one reserve() actually
+            # reads — setting the other would silently test nothing.
+            await db.execute(AgentSession.__table__.update()
+                             .where(AgentSession.id == s.id).values(turn_tool_budget=1))
             await db.commit()
             sid = s.id
         async with mk() as db:
