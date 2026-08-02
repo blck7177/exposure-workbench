@@ -18,13 +18,13 @@
 
 - **D4 会话粒度(stateless 下)**:一行 `agent_sessions` per **(owner, kind='mcp', UTC 日)**,partial unique index 保证。日粒度与日配额同节奏;trace 按天聚合可审计。
 - **D5 turn lease 不用于 MCP 调用**:turn 是对话概念(V2-E2 防并发聊天 turn);MCP 的每次 `tools/call` 是独立调用,并发正确性由预算扣减的事务性(行级锁)保证。不做每调用互斥。
-- **D6 面 = scope**:`mcp:read` → `READ_CORE`(★ 实为 **11** 工具;12 是 `build_read_registry()` 的大小 = READ_CORE + `get_portfolio_snapshot`,两者都随 V3-C 的四个新读工具再变);`mcp:act` → `FACE_META_AGENT`(16 工具)。scope 不足 → `403 insufficient_scope` + `WWW-Authenticate` 挑战(spec 内建的 step-up 机制)。
+- **D6 面 = scope**:`mcp:read` → `READ_CORE`(★ V3-C 后 **12** 工具:原 11 + `compute_combine`;`build_read_registry()` 是 **16**,多出 `get_portfolio_snapshot`/`get_task_status`/`get_portfolio_positions`/`read_issuer_brief` 四个 meta-only 读工具);`mcp:act` → `FACE_META_AGENT`(★ **20** 工具)。scope 不足 → `403 insufficient_scope` + `WWW-Authenticate` 挑战(spec 内建的 step-up 机制)。
 
 ---
 
 ## 0. 目标与非目标
 
-**目标**:外部 MCP 客户端经 streamable HTTP + OAuth 2.1 连接 `/mcp`,以真实用户身份调用工具;RLS、session 预算、日配额、trace 与 web 路径**同一套机制、同一强度**;16 工具全量面按 scope 开放。
+**目标**:外部 MCP 客户端经 streamable HTTP + OAuth 2.1 连接 `/mcp`,以真实用户身份调用工具;RLS、session 预算、日配额、trace 与 web 路径**同一套机制、同一强度**;★ **20** 工具全量面按 scope 开放。
 
 **非目标(显式排除)**:
 
@@ -147,7 +147,7 @@ stdio 门(local-dev):同一个 Server 对象,共享 factory,MCP_STDIO_USER_ID �
 
 ### B3 — 工具面 = scope(D6 + 补齐四工具)
 
-- stdio/HTTP 共用的 `Server` 改为构造 **meta registry**(`register_meta_tools(build_read_registry())`,16 工具),face 用 `faces.resolve` 严格解析(B0.1 保证不漂移)。
+- stdio/HTTP 共用的 `Server` 改为构造 **meta registry**(`register_meta_tools(build_read_registry())`,★ **20** 工具),face 用 `faces.resolve` 严格解析(B0.1 保证不漂移)。
 - 每请求按 scope 出面:`tools/list` 只列该 scope 的面;`tools/call` 面外工具 → `403 insufficient_scope` + `scope="mcp:act"` 挑战。**stdio 门给 `mcp:act` 等价全量面**(local-dev,环境凭证即最高信任)。
 - 语义确认(实现时验证,不改代码先):`respond` 对 kind='mcp' session 的行为 = 引用校验后把最终答案落 `agent_messages`(外部宿主的"最终结论"审计记录);`start_*` 三工具因 ctx 有 user,`task_service` 记 owner + 扣配额,链路应原样通。
 - 验收:`mcp:read` token 调 `start_issuer_research` → 403 挑战;`mcp:act` token → 入队成功,run owner = 该 user;`ensure_company_ready` 幂等语义不变。

@@ -17,9 +17,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, RiskAlert
+from exposure_workbench.services import brief_service
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
+from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
@@ -115,6 +117,52 @@ async def _get_market_stats(db: AsyncSession, ticker: str, window: str = "1y", b
     start = end - timedelta(days=days)
     return await cs.window_return(db, ticker.upper(), start, end, benchmark=benchmark,
                                   invoked_by=current_session_id())
+
+
+async def _compute_combine(db: AsyncSession, ticker: str, metric_a: str, metric_b: str, op: str,
+                           period_type: str = "quarterly", last_n: int = 12) -> dict:
+    """add / sub / divide over two metric series. compute_ratio is the divide case
+    under its domain name; the other two had been unreachable from every agent
+    face since M3, which is why free cash flow — operating_cash_flow minus capex,
+    the example in the module notes — could not be computed as a ledgered calc."""
+    if op not in ("add", "sub", "divide"):
+        return {"error": "unsupported_op", "op": op, "supported": ["add", "sub", "divide"]}
+    try:
+        return await cs.combine(
+            db, _spec(ticker, metric_a, period_type, last_n),
+            _spec(ticker, metric_b, period_type, last_n), op,
+            invoked_by=current_session_id(),
+        )
+    except cs.UnknownMetric as e:
+        return {"error": "metric_unavailable", "detail": str(e)}
+
+
+async def _get_task_status(db: AsyncSession, job_id: str) -> dict:
+    try:
+        row = await job_status_service.status_of(db, job_id)
+    except job_status_service.NoOwner:
+        return {"error": "sign_in_required", "detail": "task status is per-account"}
+    if row is None:
+        return {"error": "unknown_job", "job_id": job_id}
+    return row
+
+
+async def _get_portfolio_positions(db: AsyncSession, portfolio_id: str) -> dict:
+    out = await portfolio_service.positions_with_weights(db, portfolio_id)
+    if out is None:
+        return {"error": "unknown_portfolio", "portfolio_id": portfolio_id}
+    return out
+
+
+async def _read_issuer_brief(db: AsyncSession, ticker: str) -> dict:
+    company = await _resolve_company(db, ticker)
+    if company.get("error"):
+        return company
+    brief = await brief_service.latest_visible(db, company["id"])
+    if brief is None:
+        return {"error": "no_brief", "ticker": ticker.upper(),
+                "hint": "start_issuer_research produces one"}
+    return {"ticker": ticker.upper(), **brief}
 
 
 # ── filing retrieval ────────────────────────────────────────────────────────────
@@ -243,6 +291,43 @@ def build_read_registry() -> ToolRegistry:
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
         }, "required": ["ticker", "numerator", "denominator"]},
         fn=_compute_ratio, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="compute_combine",
+        description="Combine two metric series: add / sub / divide "
+                    "(e.g. operating_cash_flow sub capex = free cash flow). Writes a ledger entry.",
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER, "metric_a": {"type": "string"}, "metric_b": {"type": "string"},
+            "op": {"type": "string", "enum": ["add", "sub", "divide"]},
+            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
+            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+        }, "required": ["ticker", "metric_a", "metric_b", "op"]},
+        fn=_compute_combine, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_task_status",
+        description="Whether delegated work has finished. Accepts the task_/run_/rrun_ id "
+                    "that ensure_company_ready, start_exposure_run or start_issuer_research returned.",
+        json_schema={"type": "object", "properties": {
+            "job_id": {"type": "string", "description": "task_… / run_… / rrun_…"},
+        }, "required": ["job_id"]},
+        fn=_get_task_status, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_portfolio_positions",
+        description="Every holding in a portfolio: ticker, quantity, sector, market value and weight. "
+                    "get_portfolio_snapshot only carries the largest few.",
+        json_schema={"type": "object", "properties": {
+            "portfolio_id": {"type": "string"},
+        }, "required": ["portfolio_id"]},
+        fn=_get_portfolio_positions, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="read_issuer_brief",
+        description="The latest Issuer Risk Brief for a company, with the evidence ids behind "
+                    "each block. Cite those ids, not the brief.",
+        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
+        fn=_read_issuer_brief, tool_class=READ,
     ))
     reg.register(Tool(
         name="compute_stat",

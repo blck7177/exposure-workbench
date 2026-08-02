@@ -269,3 +269,51 @@ def test_the_context_check_sits_before_the_charge_and_never_releases_the_turn():
     assert "release_turn(" not in gate_code, (
         "the gate transaction must not release the turn explicitly — the rollback does it"
     )
+
+
+# ── V3-C5: a face may not promise a tool the registry does not have ──────────
+# faces.available() TRIMS silently by design (P5 had only READ_CORE registered),
+# which is fine as a mechanism and dangerous as a habit: a declaration nobody
+# checks drifts from the registry and the drift shows up as a capability the
+# model was told about and cannot call.
+#
+# Asserted by EQUALITY, not containment, so an entry cannot outlive the drift it
+# documents. The single entry here is real and is NOT this phase's to fix: the
+# MCP server declares the meta-agent face while building only the read registry,
+# so its four delegation/gate tools are trimmed away. That belongs to
+# MCP_BOUNDARY_PLAN, which gives MCP a face of its own; pinning it here stops it
+# growing a fifth in the meantime.
+KNOWN_TRIMMED = {
+    ("apps/mcp/server.py", "FACE_META_AGENT", "build_read_registry"):
+        {"ensure_company_ready", "respond", "start_exposure_run", "start_issuer_research"},
+}
+
+
+def _pairings():
+    from exposure_workbench.agents.meta_agent import build_meta_registry
+    from exposure_workbench.tools import faces
+    from exposure_workbench.tools.definitions import build_read_registry
+    from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+    return [
+        ("apps/api (chat)", "FACE_META_AGENT", "build_meta_registry",
+         faces.FACE_META_AGENT, build_meta_registry()),
+        ("issuer_research_workflow", "FACE_RESEARCH", "build_research_registry",
+         faces.FACE_RESEARCH, build_research_registry()),
+        ("apps/mcp/server.py", "FACE_META_AGENT", "build_read_registry",
+         faces.FACE_META_AGENT, build_read_registry()),
+    ]
+
+
+def test_no_face_declares_a_tool_its_registry_does_not_register():
+    from exposure_workbench.tools import faces
+
+    drift = {}
+    for site, face_name, builder, face, registry in _pairings():
+        missing = set(face) - set(faces.available(registry, face))
+        if missing:
+            drift[(site, face_name, builder)] = missing
+
+    assert drift == KNOWN_TRIMMED, (
+        f"new drift: { {k: v for k, v in drift.items() if k not in KNOWN_TRIMMED} }; "
+        f"fixed but still listed: { {k: v for k, v in KNOWN_TRIMMED.items() if k not in drift} }"
+    )

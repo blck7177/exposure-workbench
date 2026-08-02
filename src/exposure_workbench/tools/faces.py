@@ -18,6 +18,7 @@ READ_CORE = [
     "get_fact_series",
     "compute_change",
     "compute_ratio",
+    "compute_combine",
     "compute_stat",
     "get_market_stats",
     "search_filing_passages",
@@ -31,8 +32,13 @@ READ_CORE = [
 # get_portfolio_snapshot is meta-only: it frames a portfolio-level question, which
 # is the meta-agent's job. The research face stays issuer-scoped (adding portfolio
 # weights would change brief generation and needs its own validation).
+# get_task_status, get_portfolio_positions and read_issuer_brief are meta-only for
+# the same reason get_portfolio_snapshot is: they answer questions ABOUT this
+# desk's own work rather than about an issuer's filings. read_issuer_brief is also
+# kept off the research face deliberately — letting a brief-writing agent cite a
+# previous brief's ids is a citation loop, not a source.
 FACE_META_AGENT = READ_CORE + [
-    "get_portfolio_snapshot",
+    "get_portfolio_snapshot", "get_task_status", "get_portfolio_positions", "read_issuer_brief",
     "ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond",
 ]
 FACE_RESEARCH = READ_CORE + ["search_external_research", "submit_brief"]

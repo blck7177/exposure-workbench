@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.auth.context import current_user_id
-from exposure_workbench.db.models import MarketPrice, Portfolio, Position, RiskLimit
+from exposure_workbench.db.models import IssuerExposure, MarketPrice, Portfolio, Position, RiskLimit
 from exposure_workbench.services import exposure_run_service, security_master_service, usage_service
 from exposure_workbench.utils.ids import new_id
 
@@ -417,3 +417,69 @@ async def clone_demo(db: AsyncSession, owner_id: str, name: str = "My Portfolio 
         ))
     await db.flush()
     return p
+
+
+# ── full holdings (V3-C3) ─────────────────────────────────────────────────────
+
+async def positions_with_weights(db: AsyncSession, portfolio_id: str) -> dict | None:
+    """Every holding, with the run whose numbers these are.
+
+    A SIBLING of the snapshot rather than a widening of it: the snapshot is a
+    framing device capped at the largest few names, and making it unbounded would
+    change what every portfolio question costs.
+
+    Market values and weights come from the latest completed run's
+    issuer_exposures, NEVER from a position row. That is not a preference — a
+    number the agent quotes has to have a citable id behind it, and only the run
+    has one. Reading a price off the position would hand the model figures that
+    A1's numeric check must then refuse, turning a memory feature into a
+    generator of false rejections.
+
+    The two dates are reported separately because they really are different: on
+    the live demo book the newest position snapshot is 2026-07-23 while the
+    newest completed run is 2026-07-27. Collapsing them into one "as of" would be
+    a small lie that gets repeated in every answer built on this.
+
+    With no completed run the quantities are still real and are returned as
+    themselves, with market_value and weight ABSENT rather than zero — a holding
+    worth nothing and a holding not yet valued are different facts, and this
+    codebase has been bitten by conflating them before.
+    """
+    p = await get_portfolio(db, portfolio_id)
+    if p is None:
+        return None
+
+    # The established convention for "which snapshot is the book": newest.
+    positions = await get_positions_latest(db, portfolio_id)
+
+    latest = await exposure_run_service.get_latest_completed_run(db, portfolio_id)
+    priced: dict[str, IssuerExposure] = {}
+    if latest is not None:
+        rows = (await db.execute(
+            select(IssuerExposure).where(IssuerExposure.run_id == latest.id)
+        )).scalars().all()
+        priced = {r.ticker: r for r in rows}
+
+    holdings = []
+    for pos in positions:
+        row = {"ticker": pos.ticker, "quantity": _f(pos.quantity),
+               "sector": pos.sector, "asset_class": pos.asset_class}
+        exposure = priced.get(pos.ticker)
+        if exposure is not None:
+            row["market_value"] = _f(exposure.market_value)
+            row["weight"] = _f(exposure.weight)
+        holdings.append(row)
+
+    unpriced = [h["ticker"] for h in holdings if "market_value" not in h]
+    return {
+        "portfolio_id": p.id, "name": p.name,
+        "run_id": latest.id if latest is not None else None,
+        "valued_as_of": latest.as_of_date if latest is not None else None,
+        "positions_as_of": positions[0].as_of_date if positions else None,
+        "holdings": holdings,
+        "count": len(holdings),
+        **({"unpriced": unpriced} if unpriced else {}),
+        **({} if latest is not None else
+           {"note": "no completed run: quantities are real, market values and weights are "
+                    "not available and are omitted rather than reported as zero"}),
+    }
