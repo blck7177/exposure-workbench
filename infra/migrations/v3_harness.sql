@@ -42,7 +42,13 @@ UPDATE agent_sessions SET turn_tool_budget = 15 WHERE kind = 'meta' AND turn_too
 -- `is not None` makes 0 mean zero, which is what a kill switch has to mean. This
 -- sweeps the rows where that flips (test residue on this database, but the
 -- distinction is real).
-UPDATE agent_sessions SET tool_budget = NULL WHERE tool_budget = 0;
+--
+-- Bounded by started_at, because this is a one-time sweep of rows written under
+-- the OLD reading and the migration is re-run on every deploy. Without the
+-- bound, a session someone switched off by hand at 3am comes back on at the
+-- next deploy — the sweep would undo the kill switch it exists to make work.
+UPDATE agent_sessions SET tool_budget = NULL
+ WHERE tool_budget = 0 AND started_at < TIMESTAMPTZ '2026-08-02';
 
 -- ═══ C1: per-block citations on a brief ══════════════════════════════════════
 -- issuer_briefs.citations is one flat array, and submit_brief builds it with

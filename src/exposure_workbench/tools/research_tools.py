@@ -65,6 +65,41 @@ def _collect_citation_ids(blocks: dict) -> list[str]:
     return ids
 
 
+async def _unverified_blocks(db: AsyncSession, blocks: dict, citation_ids: list[str]) -> dict[str, list[dict]]:
+    """Which blocks state a figure their evidence does not hold.
+
+    Each cited block is checked against THAT block's own citations. Pooling them
+    would let a figure in market_context be justified by an id cited only under
+    financial_summary — which is how a brief ends up internally consistent and
+    individually unsupported.
+
+    open_questions is the exception, and it used to be the omission: it carries
+    no citations by design, because it is where the analyst writes down what is
+    still unknown, and the loop over the cited blocks therefore never saw it. A
+    brief could ask "will capex stay above $23B?" with $23B appearing in none of
+    its evidence, and that number is rendered to the reader exactly like every
+    other one. It is verified against the UNION of everything the brief cites —
+    the honest denominator for a block that cannot name its own support. A
+    question built on the brief's own figures passes; one built on a figure from
+    nowhere is an unsupported claim with a question mark on the end.
+    """
+    unverified: dict[str, list[dict]] = {}
+    for name in _ALL_BLOCKS:
+        block = blocks.get(name) or {}
+        stated = numeric.extract_numbers(block.get("text") or "")
+        if not stated:
+            continue
+        if name == "open_questions":
+            ids = list(citation_ids)
+        else:
+            ids = [c for c in (block.get("citations") or []) if isinstance(c, str)]
+        values, quoted = await numeric.resolve_cited_values(db, ids)
+        bad = numeric.verify(stated, values, quoted)
+        if bad:
+            unverified[name] = bad
+    return unverified
+
+
 async def _submit_brief(db: AsyncSession, **blocks) -> dict:
     """Gate: validate citations against the evidence trail; persist only if clean."""
     session_id = current_session_id()
@@ -85,25 +120,13 @@ async def _submit_brief(db: AsyncSession, **blocks) -> dict:
         return {"error": "invalid_citations", "problems": problems,
                 "detail": "cited ids must be in this session's evidence trail and resolve in the DB"}
 
-    # Per block, against THAT block's own citations. Pooling them would let a
-    # figure in market_context be justified by an id cited only under
-    # financial_summary — which is how a brief ends up internally consistent and
-    # individually unsupported.
-    unverified: dict[str, list[dict]] = {}
-    for name in _CITED_BLOCKS:
-        block = blocks.get(name) or {}
-        stated = numeric.extract_numbers(block.get("text") or "")
-        if not stated:
-            continue
-        block_ids = [c for c in (block.get("citations") or []) if isinstance(c, str)]
-        values, quoted = await numeric.resolve_cited_values(db, block_ids)
-        bad = numeric.verify(stated, values, quoted)
-        if bad:
-            unverified[name] = bad
+    unverified = await _unverified_blocks(db, blocks, citation_ids)
     if unverified:
         return {"error": "unverified_numbers", "blocks": unverified,
                 "detail": "each figure must match a value held by the evidence cited in the "
-                          "SAME block; re-cite the id that carries it, or drop the figure"}
+                          "SAME block; re-cite the id that carries it, or drop the figure. "
+                          "A figure in open_questions is checked against everything the brief "
+                          "cites — ask the question without inventing a number for it"}
 
     brief_id = new_brief_id()
     all_citations = sorted(set(citation_ids))

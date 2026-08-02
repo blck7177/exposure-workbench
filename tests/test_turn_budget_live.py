@@ -123,3 +123,34 @@ async def test_a_stored_zero_budget_is_a_kill_switch_not_an_unset_default():
             assert exc.value.limit == 0
     finally:
         await engine.dispose()
+
+
+async def test_the_mcp_host_session_keeps_the_lifetime_budget_the_docs_promise():
+    """V3-R6. B2 chose the budget regime from `kind`, and the MCP host opens its
+    session with kind="meta" — so it was stamped with a per-turn budget of 15
+    and never claimed a turn to reset it. Fifteen tool calls per PROCESS, not
+    per turn, silently, in the face documented as keeping the lifetime budget.
+
+    The regime is now an argument rather than an inference from a label that
+    means something else. kind still says what the session is; per_turn says how
+    it is metered, and the MCP host is the case where those two differ."""
+    engine, mk = await _session()
+    try:
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta", per_turn=False)
+            await db.commit()
+            assert s.turn_tool_budget is None, "the MCP host has no per-turn budget"
+
+            over_the_turn_limit = get_settings().turn_tool_budget + 1
+            for _ in range(over_the_turn_limit):
+                status = await sess.reserve(db, s.id, is_external_search=False)
+            await db.commit()
+            assert status.tools_used == over_the_turn_limit
+            assert status.tool_budget == get_settings().session_tool_budget
+
+            # and a conversation still gets one, from the same function
+            c = await sess.create_session(db, kind="meta")
+            await db.commit()
+            assert c.turn_tool_budget == get_settings().turn_tool_budget
+    finally:
+        await engine.dispose()

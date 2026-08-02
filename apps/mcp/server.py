@@ -64,7 +64,11 @@ async def _ensure_state() -> None:
         _state.sessionmaker = async_sessionmaker(_state.engine, expire_on_commit=False)
     if _state.agent_session_id is None:
         async with _state.sessionmaker() as db:
-            s = await sess.create_session(db, kind="meta")
+            # per_turn=False: this session is the HOST PROCESS, not a
+            # conversation. It never claims a turn, so a per-turn budget would
+            # be spent once and never reset — 15 tool calls for the life of the
+            # process (V3-R6).
+            s = await sess.create_session(db, kind="meta", per_turn=False)
             await db.commit()
             _state.agent_session_id = s.id
             logger.info("MCP host session %s created", s.id)

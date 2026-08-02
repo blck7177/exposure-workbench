@@ -43,8 +43,12 @@ from exposure_workbench.services import evidence_trail_service as trail  # noqa:
 from exposure_workbench.services import numeric_verification as nv  # noqa: E402
 
 URL = os.getenv("DATABASE_URL_LOCAL", "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
+# open_questions is measured too, against the union of the brief's citations —
+# the same rule submit_brief enforces (V3-R5), and the honest one for a block
+# that carries no citations of its own. Leaving it out of the metric was how the
+# gap stayed invisible: the eval and the gate agreed, and both were looking away.
 BLOCKS = ("financial_summary", "key_changes", "management_explanation",
-          "market_context", "portfolio_implications")
+          "market_context", "portfolio_implications", "open_questions")
 
 
 async def _resolves(db, ids) -> tuple[int, list[str]]:
@@ -98,7 +102,10 @@ async def evaluate() -> dict:
                         continue
                     # Briefs written before V3 kept only a flat list; measuring
                     # them against it is the honest reading of what they carry.
-                    ids = per_block.get(name) or list(b.citations or [])
+                    # open_questions has no list of its own by design and is
+                    # measured against the union, which is the flat list.
+                    ids = (list(b.citations or []) if name == "open_questions"
+                           else per_block.get(name) or list(b.citations or []))
                     n, dangling = await _resolves(db, ids)
                     b_cited += n
                     b_dangling += len(dangling)

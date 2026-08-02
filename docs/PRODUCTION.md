@@ -296,7 +296,10 @@ enough that people will trust it.
   through the first of them.
 - **MCP is on the older budget regime and is worse off than chat.** It never
   claims a turn, so a per-turn counter would never reset for it; it keeps the
-  lifetime budget until it has a face of its own.
+  lifetime budget until it has a face of its own. *(V3-R6 made that sentence
+  true. It described the intent, and the code inferred the regime from
+  `kind="meta"` — so the MCP host was stamped with 15 tool calls that nothing
+  ever reset. `create_session` now takes `per_turn` explicitly.)*
 - **The context pre-check will rarely fire.** It cannot see a session's first
   turn, and a full turn measures in the low thousands of tokens against an
   80,000 limit. The provider-side mapping is the one that would actually catch an

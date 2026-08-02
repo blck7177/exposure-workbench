@@ -57,6 +57,51 @@ pytest_live = pytest.mark.live
 
 
 @pytest.mark.live
+async def test_a_number_in_an_open_question_is_verified_against_the_whole_brief():
+    """V3-R5. open_questions is the one block that cites nothing — it is where
+    the analyst says what is still unknown — and the per-block loop iterated the
+    CITED blocks, so it was never checked at all. A brief could ask "will capex
+    stay above $23B?" with $23B appearing nowhere in its evidence, and the
+    figure is rendered to the user exactly like every other one.
+
+    The rule is the honest denominator for a block that cannot name its own
+    support: the UNION of everything the brief cites. A question whose number
+    the brief's own evidence carries is a fair question; one whose number came
+    from nowhere is the same defect as an unsupported claim, phrased with a
+    question mark."""
+    from sqlalchemy import text as sql
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    url = os.getenv("DATABASE_URL_LOCAL", "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
+    engine = create_async_engine(url)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with mk() as db:
+            row = (await db.execute(sql(
+                "SELECT id, (result->>'value')::float FROM calc_ledger "
+                "WHERE operation = 'stat.latest' AND result ? 'value' LIMIT 1"))).first()
+            if row is None:
+                pytest.skip("no ledgered absolute value in this database")
+            calc_id, value = row
+
+            def blocks(question: str) -> dict:
+                # The number lives in a block that cites NOTHING; the citation is
+                # carried by financial_summary, which is the point of the union.
+                return {"financial_summary": {"text": "See the ledger.", "citations": [calc_id]},
+                        "open_questions": {"text": question}}
+
+            supported = f"Will spend stay near ${value / 1e9:.3f}B next year?"
+            invented = f"Will spend stay near ${value / 1e9 + 7:.3f}B next year?"
+
+            assert await rt._unverified_blocks(db, blocks(supported), [calc_id]) == {}
+            assert await rt._unverified_blocks(db, blocks("What drove the mix shift?"), [calc_id]) == {}
+            bad = await rt._unverified_blocks(db, blocks(invented), [calc_id])
+            assert set(bad) == {"open_questions"}
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.live
 async def test_gate_rejects_citations_not_in_trail():
     """A fabricated citation id must be rejected by validate_citations."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

@@ -330,7 +330,10 @@ approximate forms is warranted on this evidence.
   route); `apps/mcp/server.py` reuses one process-global session that never
   claims a turn, so a per-turn counter would never reset for it. It stays on the
   lifetime regime until MCP_BOUNDARY_PLAN gives it a face of its own. The face
-  guard pins the drift at exactly one entry.
+  guard pins the drift at exactly one entry. *(V3-R6: this was the intent and
+  not the behaviour — the regime was inferred from `kind="meta"`, which the MCP
+  host also uses, so it ran on 15 tool calls per process. `create_session(...,
+  per_turn=False)` is now the way it is said.)*
 - **B1's pre-check will realistically never fire.** It cannot see a session's
   first turn (no measurement to project from), and a full turn measures in the
   low thousands against an 80,000 limit. The provider-side mapping is what would

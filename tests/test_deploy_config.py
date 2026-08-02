@@ -115,3 +115,19 @@ def test_caddy_example_does_not_strip_the_api_prefix():
     assert not any("strip_prefix" in ln for ln in directives), (
         "strip_prefix may be discussed in a comment, never configured"
     )
+
+
+def test_a_one_time_backfill_cannot_undo_a_deliberate_zero():
+    """V3-R6. There is no alembic here: every migration file is re-applied by
+    hand on every deploy, so a backfill has to say WHICH rows it is repairing.
+
+    The tool_budget sweep did not. It was written to fix rows stored under the
+    old reading of 0 ("unset" -> hand back the default) and it matched every 0
+    for ever — including the one an operator sets at 3am to switch a runaway
+    session off. The next deploy would clear it, and the kill switch the sweep
+    exists to make meaningful would be the thing it undid."""
+    sql = (MIGRATIONS / "v3_harness.sql").read_text()
+    sweeps = re.findall(r"UPDATE agent_sessions SET tool_budget = NULL[^;]*;", sql)
+    assert sweeps, "expected the tool_budget backfill to still be present"
+    for stmt in sweeps:
+        assert "started_at" in stmt, f"unbounded one-time backfill: {stmt}"

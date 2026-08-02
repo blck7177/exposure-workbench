@@ -48,6 +48,7 @@ class BudgetStatus:
 
 async def create_session(
     db: AsyncSession, kind: str = "meta", llm_model: str | None = None, owner_id: str | None = None,
+    per_turn: bool = True,
 ) -> AgentSession:
     s = get_settings()
     # The budget REGIME is chosen once, here, and carried by the row (V3-B2).
@@ -59,13 +60,20 @@ async def create_session(
     # partway through. Encoding that as `if kind == "research"` inside reserve()
     # would put a policy decision in the enforcement path; the column keeps
     # reserve() reading one rule off the row.
+    #
+    # per_turn is that choice made explicit, because `kind` turned out not to
+    # carry it (V3-R6). The MCP host opens a kind="meta" session and never
+    # claims a turn, so inferring the regime from the label gave it 15 tool
+    # calls per PROCESS and no way to get them back — while the documentation
+    # said it kept the lifetime budget. kind says what the session is; per_turn
+    # says how it is metered, and the two are only usually the same.
     session = AgentSession(
         id=new_session_id(),
         kind=kind,
         owner_id=owner_id,   # V2-A tenancy
         llm_model=llm_model or s.openai_model,
         tool_budget=s.session_tool_budget,
-        turn_tool_budget=s.turn_tool_budget if kind == "meta" else None,
+        turn_tool_budget=s.turn_tool_budget if (per_turn and kind == "meta") else None,
         tools_used=0,
         turn_tools_used=0,
         external_searches=0,
