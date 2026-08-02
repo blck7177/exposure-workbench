@@ -210,24 +210,28 @@ decide which item a passage reports.
 
 | | Chat | Briefs |
 |---|---|---|
-| Numbers stated | 20 | 66 |
-| Unverified | **0** | 13 |
-| Citations checked | 8 | 244 |
+| Numbers stated | 29 | 66 |
+| Unverified | **1** | 14 |
+| Citations checked | 22 | 244 |
 | Citations that no longer resolve | **0** | **0** |
 | Number-bearing answers with no citation | **0** | n/a |
 
-Chat is 0 of 20 against the plan's acceptance bar of 2 in 20.
+Chat measured **0 of 20** when the numeric check first shipped, against the
+plan's bar of 2 in 20. It is 1 of 29 now, and the one is a correct refusal that
+the acceptance run itself produced — see Live acceptance below.
 
-The 13 brief refusals are enumerated, not averaged:
+The 14 brief refusals are enumerated, not averaged:
 
 - **4** are the derived-Q4 class, closed by A1c for anything written afterwards
   but not retrofittable onto stored text;
 - **1** is the rule working as designed — a brief writes 32.2% where the
   operating margin is 32.2753%, i.e. truncation rather than rounding, and the
   rule is that the true value must *round* to what was written;
-- **8** are true catches: a `$58.3B` net income in a block citing revenue,
-  gross profit and operating income but never net income, and prior-year
-  comparison figures cited to the current-year rows.
+- **9** are true catches: a `$58.3B` net income in a block citing revenue,
+  gross profit and operating income but never net income; prior-year comparison
+  figures cited to the current-year rows; and a "25% import tariff" whose two
+  cited chunks contain neither "tariff" nor "H200" (see Live acceptance — that
+  one was found by the gate refusing an answer, not by reading the brief).
 
 It replays the stored corpus rather than generating fresh answers on purpose:
 an answer produced after A1 has by construction already passed A1, so it can
@@ -268,6 +272,29 @@ returned **413** with `projected_tokens: 5127`; `usage_daily.used` for
 `chat_turn` stayed at **1** across the refusal, so it was not charged; and
 `agent_sessions.turn_started_at` came back **NULL** — the lease released by the
 transaction rollback, with no `release_turn` call anywhere on that path.
+
+**The acceptance run found a defect the tests could not.** Asked to summarise the
+NVDA brief, the agent read it, was refused three times, and gave up with an
+apology. Two things came out of that:
+
+The refusal offered two ways forward — re-cite, or recompute — and neither can
+conjure evidence that was never there. It now offers a third: leave the figure
+out and answer with what is supportable. Re-run with that one sentence changed,
+the same question produced a full, correctly cited summary in two attempts, and
+the agent **dropped the `$58.3B` net income figure by itself** — the true catch
+the brief had been carrying.
+
+That answer then exposed a **false accept in the prose route**. It restated the
+brief's claim that H200 shipments face "a 25% import tariff", citing two chunks
+that contain neither "tariff" nor "H200" — and it passed, because the route
+matched bare digits and "25" happens to occur in one of them (nine of that
+chunk's seventeen digit keys are two characters or shorter). The route now
+matches the number *as written*: a percent claim needs a percent in the passage.
+The first attempt at a fix was a minimum digit length, and re-measuring rejected
+it — it refused six legitimate figures like "revenue grew 17%" quoted straight
+out of a filing. Written-form matching closes the hole and keeps those: brief
+refusals went 13 → 19 under the length rule, and 13 → 14 under this one, the
+extra one being the tariff claim itself.
 
 Both temporary settings (the lowered limit, and the blanked `azp` needed to use
 a browserless token) were restored afterwards and re-verified: the limit is back

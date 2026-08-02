@@ -171,10 +171,20 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
             values, quoted = await numeric.resolve_cited_values(db, citation_ids)
             bad = numeric.verify(stated, values, quoted)
             if bad:
+                # Three options, and the third one matters. Observed live: asked
+                # to summarise a pre-V3 brief, the agent hit this three times
+                # running and then gave up with an apology — because the brief
+                # itself states figures its own citations do not support, and
+                # neither re-citing nor recomputing can conjure evidence that was
+                # never there. Omitting the figure and answering with the rest is
+                # a legitimate, honest move, and the model has no way to know
+                # that unless the refusal says so.
                 return {"error": "unverified_numbers", "problems": bad,
                         "detail": "each number must match a value held by the evidence you "
-                                  "cited; re-cite the id that actually carries it, or compute "
-                                  "it with a tool so it has one"}
+                                  "cited. Re-cite the id that actually carries it, compute it "
+                                  "with a tool so it has one, or leave that figure out and "
+                                  "answer with what you can support — a partial answer that "
+                                  "holds up is worth more than a complete one that does not"}
     else:
         # Zero citations used to skip validation entirely, so a reply made
         # entirely of numbers passed the gate untouched — the one shape the gate

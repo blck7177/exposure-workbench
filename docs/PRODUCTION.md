@@ -286,8 +286,10 @@ enough that people will trust it.
   number answers the question asked: swapping two real figures within one answer,
   both drawn from the same citation, passes.
 - **Citations to prose are checked scale-blind.** A `chunk_`/`src_` citation is
-  verified by whether the digits appear verbatim in the passage, because a filing
-  table's scale usually sits in a header the chunk does not carry.
+  verified by whether the number appears in the passage as written — a percent
+  claim needs a percent, which is what stops short digit strings matching by
+  coincidence — but not by magnitude, because a filing table's scale usually sits
+  in a header the chunk does not carry.
 - **Two evidence-ingestion paths remain open.** The explicit `{type,id}` branch
   and the `calc_id`/`fact_id` key branch can still put an unciteable id into the
   trail. One malformed id from before V1's alert-prefix fix is in the live trail

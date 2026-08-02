@@ -247,6 +247,20 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
     return found
 
 
+# The prose route matches the number AS WRITTEN, unit and all, not its bare
+# digits. Found in live acceptance: a brief claimed H200 shipments face "a 25%
+# import tariff" citing two chunks containing neither "H200" nor "tariff", and it
+# was accepted because "25" occurs somewhere in one of them — nine of that
+# chunk's seventeen digit keys are two characters or shorter. Requiring "25%" to
+# appear as a percentage kills the coincidence without refusing the very common
+# "revenue grew 17%" quoted straight out of a filing, which a bare minimum-length
+# rule did refuse (measured: six such figures in three briefs).
+#
+# A bare number still needs length, because there is no unit to make it
+# improbable: three significant digits.
+_MIN_BARE_QUOTED_DIGITS = 3
+
+
 def quoted_keys(text: str) -> set[str]:
     """The digit sequences a passage literally contains.
 
@@ -257,7 +271,18 @@ def quoted_keys(text: str) -> set[str]:
     papered over — a scale-blind accept is still strictly narrower than accepting
     any number that has a citation attached, which is what happened before.
     """
-    return {m.group(0).replace(",", "").lstrip("+-") for m in _DIGITS.finditer(text or "")}
+    text = text or ""
+    keys: set[str] = set()
+    for m in _DIGITS.finditer(text):
+        digits = m.group(0).replace(",", "").lstrip("+-")
+        before = text[max(0, m.start() - 2):m.start()]
+        after = text[m.end():m.end() + 2]
+        if after.lstrip().startswith("%"):
+            keys.add(f"%:{digits}")
+        elif "$" in before:
+            keys.add(f"$:{digits}")
+        keys.add(f":{digits}")          # the untagged form, for bare numbers
+    return keys
 
 
 def raw_forms(numbers: Iterable[ExtractedNumber]) -> list[str]:
@@ -452,6 +477,22 @@ async def resolve_cited_values(
     return values, quoted
 
 
+def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
+    """Whether a cited passage contains this number as the KIND of thing it is."""
+    if n.unit_class == PERCENT:
+        return f"%:{n.key}" in quoted
+    if n.unit_class == MONEY:
+        # A money claim may be quoted with or without the sign in the source
+        # ("$111.184 billion" vs a table cell reading 111,184), so both count —
+        # but only at bare-number length when the sign is absent.
+        if f"$:{n.key}" in quoted:
+            return True
+        return (len(n.key.replace(".", "")) >= _MIN_BARE_QUOTED_DIGITS
+                and f":{n.key}" in quoted)
+    return (len(n.key.replace(".", "")) >= _MIN_BARE_QUOTED_DIGITS
+            and f":{n.key}" in quoted)
+
+
 def verify(
     numbers: Iterable[ExtractedNumber],
     values: Iterable[EvidenceValue],
@@ -469,7 +510,7 @@ def verify(
     problems: list[dict] = []
 
     for n in numbers:
-        if n.key in quoted:
+        if _is_quoted(n, quoted):
             continue
         allowed = _COMPATIBLE.get(n.unit_class, ())
         candidates = [v for v in values if v.unit_class in allowed]

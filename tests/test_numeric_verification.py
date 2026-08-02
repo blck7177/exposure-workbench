@@ -274,3 +274,20 @@ def test_every_citable_prefix_has_a_value_source():
     from exposure_workbench.services import evidence_trail_service as trail
     from exposure_workbench.services.numeric_verification import _VALUE_SOURCES
     assert set(trail._RESOLVERS) == set(_VALUE_SOURCES)
+
+
+def test_a_short_digit_string_cannot_be_verified_by_prose_alone():
+    """Found in live acceptance, not by a test. A brief claimed H200 shipments
+    face "a 25% import tariff" and cited two filing chunks containing neither
+    "H200" nor "tariff" — and the gate accepted it, because "25" occurs
+    somewhere in one of them. Nine of that chunk's seventeen distinct digit keys
+    are two characters or shorter, so the prose route was accepting coincidences.
+
+    A number with fewer than three significant digits now has to come through
+    the structured route or be refused. That does refuse some correct claims
+    quoted from prose; in this domain a false accept costs more."""
+    passage = "as described in Note 25 of the accompanying financial statements"
+    assert verify(extract_numbers("a 25% import tariff"), [], quoted_keys(passage)) != []
+    # a long enough string is still evidence
+    long_passage = "Total net sales increased to 111,184 for the quarter"
+    assert verify(extract_numbers("net sales of 111,184"), [], quoted_keys(long_passage)) == []
