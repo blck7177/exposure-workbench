@@ -201,11 +201,18 @@ git pull
 #   CORS_ORIGINS=                   (nothing cross-origin left to allow)
 #   CLERK_AUTHORIZED_PARTIES=https://exposure.<domain>
 docker compose build
-docker compose up -d
 
-# schema: idempotent, safe to re-run in full
+# Schema BEFORE the new code sees the database. Both files are idempotent and
+# safe to re-run in full, but the order is not optional: every V3 column is read
+# by V3 code, so an API that starts first answers 500 on the agent routes until
+# the ALTERs land. Bring postgres up alone, migrate, then start the rest.
+docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v3_harness.sql
+
+docker compose up -d
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy

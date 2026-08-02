@@ -21,6 +21,8 @@ DOCKERFILE_WEB = ROOT / "infra" / "Dockerfile.web"
 COMPOSE = ROOT / "docker-compose.yml"
 MAIN_PY = ROOT / "apps" / "api" / "main.py"
 CADDY = ROOT / "infra" / "Caddyfile.example"
+MIGRATIONS = ROOT / "infra" / "migrations"
+PRODUCTION_MD = ROOT / "docs" / "PRODUCTION.md"
 
 
 def test_api_base_treats_empty_string_as_same_origin():
@@ -78,6 +80,30 @@ def test_health_is_reachable_under_the_api_prefix():
     """Caddy routes only /api/* to this service, so a bare /health lands on the
     web app and 404s — during the very smoke test meant to prove the API is up."""
     assert '@app.get("/api/health")' in MAIN_PY.read_text()
+
+
+def test_every_migration_is_named_in_the_deploy_doc():
+    """There is no alembic here, so a migration runs because a human read this
+    document and typed it. A file nobody names is a file nobody applies, and the
+    failure surfaces as the new code 500ing on a column that does not exist —
+    long after the deploy looked successful."""
+    doc = PRODUCTION_MD.read_text()
+    for path in sorted(MIGRATIONS.glob("*.sql")):
+        assert path.name in doc, f"{path.name} is not named in docs/PRODUCTION.md"
+
+
+def test_schema_lands_before_the_code_that_reads_it():
+    """Additive columns are only backward compatible in one direction: old code
+    tolerates a new column, new code does not tolerate its absence. The doc used
+    to bring the whole stack up first, so every additive migration had a window
+    where the API was live against a schema it predated."""
+    doc = PRODUCTION_MD.read_text()
+    deploy = doc[doc.index("## Deploying"):]
+    last_migration = max(deploy.index(p.name) for p in MIGRATIONS.glob("*.sql"))
+    full_up = deploy.index("docker compose up -d\n")
+    assert last_migration < full_up, (
+        "the migrations must be applied before the full stack starts"
+    )
 
 
 def test_caddy_example_does_not_strip_the_api_prefix():

@@ -580,6 +580,15 @@ class AgentSession(Base):
     # using SERVER time (never an ORM attribute set — that would be client time),
     # released in a finally. A stale value simply expires; nothing renews it.
     turn_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # V3-B0: observation only — last turn's prompt size, tool schemas included.
+    last_prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    # V3-B2: per-turn tool budget, carried BY THE ROW. reserve() reads which
+    # regime applies off the row instead of branching on kind, so the research
+    # carve-out is data rather than a special case. NULL = lifetime budget only,
+    # which is what research needs: it spends 25-32 calls inside one session and
+    # never claims a turn, so nothing would ever zero a per-turn counter for it.
+    turn_tools_used: Mapped[int] = mapped_column(Integer, default=0)
+    turn_tool_budget: Mapped[int | None] = mapped_column(Integer)
 
 
 # ─── Runtime: Agent Messages ────────────────────────────────────────────────────
@@ -592,6 +601,10 @@ class AgentMessage(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str | None] = mapped_column(Text)
     citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    # V3: out-of-band facts about the turn — the gate outcome (A0-2) and the
+    # prompt size (B0). Deliberately not encoded in `role`, which _load_history
+    # feeds verbatim into the provider's messages array.
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -646,6 +659,10 @@ class IssuerBrief(Base):
     portfolio_implications: Mapped[str | None] = mapped_column(Text)
     open_questions: Mapped[str | None] = mapped_column(Text)
     citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    # V3-C1: {block_name: [ids]}. `citations` above is flattened with
+    # sorted(set(...)) at submit time, so the block association only survives if
+    # it is written separately. NULL on briefs written before V3.
+    block_citations: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     llm_model: Mapped[str | None] = mapped_column(String(64))
     prompt_tokens: Mapped[int | None] = mapped_column(Integer)

@@ -497,7 +497,15 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     started_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ended_at          TIMESTAMPTZ,
     -- V2-E2: non-NULL and recent => a turn is in flight. Set from SERVER time.
-    turn_started_at   TIMESTAMPTZ
+    turn_started_at   TIMESTAMPTZ,
+    -- V3-B0: observation only — the prompt size of the last turn, tools included.
+    last_prompt_tokens INTEGER,
+    -- V3-B2: per-turn tool budget, carried BY THE ROW so reserve() needs no
+    -- `kind` branch. NULL = no per-turn budget, fall back to the lifetime one:
+    -- research spends 25-32 calls in one session and never claims a turn, so a
+    -- per-turn counter would never be zeroed for it.
+    turn_tools_used   INTEGER NOT NULL DEFAULT 0,
+    turn_tool_budget  INTEGER
 );
 
 -- ─── Runtime: Agent Messages ─────────────────────────────────────────────────
@@ -507,6 +515,9 @@ CREATE TABLE IF NOT EXISTS agent_messages (
     role        VARCHAR(16) NOT NULL,           -- 'user' | 'assistant'
     content     TEXT,
     citations   JSONB NOT NULL DEFAULT '[]',    -- assistant evidence refs
+    -- V3-A0-2/B0: out-of-band facts about the turn (gate outcome, prompt size).
+    -- NOT role: _load_history feeds role verbatim into the provider's messages.
+    meta        JSONB NOT NULL DEFAULT '{}',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_agent_messages_session ON agent_messages(session_id, created_at);
@@ -556,6 +567,10 @@ CREATE TABLE IF NOT EXISTS issuer_briefs (
     portfolio_implications  TEXT,
     open_questions          TEXT,
     citations               JSONB NOT NULL DEFAULT '[]',
+    -- V3-C1: {block_name: [ids]}. The flat `citations` above is built with
+    -- sorted(set(...)) at submit time, which destroys the block association;
+    -- briefs written before V3 keep NULL here rather than a guessed mapping.
+    block_citations         JSONB,
     confidence_flags        JSONB NOT NULL DEFAULT '{}',
     llm_model               VARCHAR(64),
     prompt_tokens           INTEGER,
