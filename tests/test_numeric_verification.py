@@ -130,6 +130,74 @@ def test_a_designator_does_not_swallow_the_claim_beside_it():
     assert extract_numbers("the H200 accelerator") == []
 
 
+@pytest.mark.parametrize("text,forms", [
+    ("Your holdings are AAPL 5000, MSFT 3500.", ["5000", "3500"]),   # the A0-1 bypass
+    ("Backlog 2500 units", ["2500"]),
+    ("A 500 basis point move", ["500"]),
+    ("priced in USD 5000", ["5000"]),
+    ("a $2000 rebate", ["$2000"]),                                   # not a year: it has a currency mark
+    ("1950 million shares outstanding", ["1950 million"]),           # not a year: it has a scale
+])
+def test_a_capitalised_word_in_front_of_digits_does_not_make_them_a_name(text: str, forms: list[str]):
+    """V3-R3, and the review's third blocker sits in the first case. The old
+    designator pattern asked only whether a capitalised word preceded the
+    digits, so "AAPL 5000" read as a product name like "Microsoft 365" — and a
+    reply made entirely of share counts extracted to NOTHING, which means it
+    carried no numbers, which means A0-1 let it through with no citations at
+    all. The two holes A1 was built to close, open at once, on the single most
+    ordinary question a portfolio user asks."""
+    assert raw_forms(extract_numbers(text)) == forms
+
+
+@pytest.mark.parametrize("text", [
+    "the H200 accelerator",          # digits attached to the name
+    "the GB200 rack",
+    "an RTX4090 card",
+    "outperformed the S&P 500",      # enumerated: a name with a space in it
+    "Microsoft 365 Commercial cloud",
+    "the Russell 2000 index",
+    "Nasdaq 100 futures",
+    "a Fortune 500 customer",
+    "the Dow 30 constituents",
+    "shipping in 2027 M&A activity",  # a year, and "M&A" is not a scale word
+])
+def test_a_real_designator_is_still_exempt(text: str):
+    assert extract_numbers(text) == [], f"{text!r} yielded {raw_forms(extract_numbers(text))}"
+
+
+def test_a_date_without_a_year_is_still_a_date():
+    """Found by the corpus re-run rather than by reasoning: the old designator
+    pattern was also — accidentally — the only thing exempting "March 28", and
+    removing it would have started refusing "for the quarter ended March 28" as
+    an unsupported 28. The day is closed with a word boundary so the pattern
+    cannot back off to "March 1" and leave "5%" standing next to it."""
+    assert extract_numbers("for the quarter ended March 28") == []
+    assert extract_numbers("the April 30 close") == []
+    assert raw_forms(extract_numbers("In March 15% of revenue came from China")) == ["15%"]
+
+
+def test_the_designator_exemption_is_two_shapes_and_a_closed_list():
+    """Which is the point of the redesign, not an implementation detail. Digits
+    ATTACHED to a name are self-evidently part of it; a name with a space in it
+    cannot be recognised by shape at all, so it is enumerated. Adding one is an
+    edit to this tuple plus a test — the same rule the exemption set as a whole
+    is built on — rather than a pattern that widens to admit it and everything
+    shaped like it."""
+    from exposure_workbench.services.numeric_verification import _SPACED_DESIGNATORS
+    for name in _SPACED_DESIGNATORS:
+        assert extract_numbers(f"tracking the {name} today") == [], name
+
+
+@pytest.mark.asyncio
+async def test_the_gate_no_longer_lets_a_reply_made_of_share_counts_through():
+    """The bypass, end to end. Nothing about A0-1 changed; it was never reached,
+    because a reply the extractor reads as number-free is a reply with nothing
+    to demand citations for."""
+    out = await _respond(None, "Your holdings are AAPL 5000, MSFT 3500.", [])
+    assert out["error"] == "citations_required"
+    assert out["numbers_found"] == ["5000", "3500"]
+
+
 def test_an_id_is_exempt_whole_not_digit_by_digit():
     """A naive scan of calc_50c612fc9f59 yields 50, 612 and 59 — three numbers
     the model never claimed, in a reply that is otherwise number-free."""

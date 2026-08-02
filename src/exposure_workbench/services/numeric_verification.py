@@ -114,6 +114,24 @@ _LIT = r"\d(?:[\d,]*\d)?(?:\.\d+)?"
 # only thing separating them is what follows the digits.
 _UNIT_MARKER = rf"(?!\.\d)(?!\s*%)(?!\s*[xX]\b)(?!\s*(?:{_SCALE_ALT})\b)"
 
+# Names that contain a space AND digits. There is no shape that tells "S&P 500"
+# from "AAPL 5000" — both are a capitalised word followed by digits — so the
+# spaced ones are ENUMERATED rather than described, which is the rule the whole
+# exemption set is built on. Adding a name is an edit to this tuple plus a test.
+# Matched case-insensitively: these are proper names, and lowercasing one does
+# not turn it into a measurement.
+_SPACED_DESIGNATORS = (
+    "S&P 500", "S&P 400", "S&P 600",
+    "Nasdaq 100", "Russell 1000", "Russell 2000", "Russell 3000",
+    "Fortune 500", "Microsoft 365", "Dow 30",
+)
+_SPACED_ALT = "|".join(re.escape(n).replace(r"\ ", r"\s+") for n in _SPACED_DESIGNATORS)
+
+# A scale word, with the boundary that stops "M&A" and "T-bills" from being read
+# as millions and trillions. Used by the year exemption to tell "1950 million"
+# (a quantity) from "in 1950" (a year).
+_SCALE_WORD = rf"(?i:{_SCALE_ALT})\b(?![&-])"
+
 _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     (name, re.compile(pattern, flags))
     for name, pattern, flags in (
@@ -122,23 +140,37 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
         # SEC accession, e.g. 0000320193-24-000123
         ("accession", r"\b\d{10}-\d{2}-\d{6}\b", 0),
         ("date_iso", r"\b\d{4}-\d{2}-\d{2}\b", 0),
+        # "March 28, 2026" and the bare "quarter ended March 28". The year is
+        # optional because the corpus says the old designator pattern was the
+        # only thing covering the bare form — accidentally, and it is gone. The
+        # day is closed with \b so the pattern cannot back off to "March 1" and
+        # leave "5%" behind, and _UNIT_MARKER keeps "In March 15% of revenue"
+        # a claim rather than a date.
         ("date_long",
-         r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s*\d{4}\b", 0),
+         r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b"
+         rf"(?:,\s*\d{{4}}\b)?{_UNIT_MARKER}", 0),
         # 10-K, 10-Q, 8-K, 20-F, S-1 — a form name, not a quantity.
         ("form_type", r"\b(?:10-[KQ]|8-K|20-F|6-K|S-[13]|DEF\s?14A)\b", 0),
         ("period_label", r"\b(?:[QH][1-4]|FY\d{2,4}|CY\d{2,4})\b", 0),
-        # A product or index whose name contains digits: H200, S&P 500,
-        # Nasdaq 100, Microsoft 365, Russell 2000. The capital letter before the
-        # digits is what says "name"; _UNIT_MARKER is what stops this from eating
-        # the claim in "AAPL 15.8%" — measured: without it, two of the three
-        # issuer weights in a real live answer were silently never checked.
-        ("designator",
-         rf"\b(?:[A-Z][A-Za-z&.]{{0,14}}\s)?[A-Z][A-Za-z&.]{{0,14}}\s?\d{{2,4}}\b{_UNIT_MARKER}", 0),
+        # A product whose name ENDS IN DIGITS, with nothing between them: H200,
+        # GB200, RTX4090, S&P500. Attachment is what says "name" — a space is
+        # not, which is the hole this replaced. The old pattern accepted any
+        # capitalised word followed by digits, so "AAPL 5000" and "Backlog 2500"
+        # were read as product names and never checked, and a reply made
+        # entirely of share counts extracted to nothing and passed the
+        # citations-required gate untouched. _UNIT_MARKER is what stops even the
+        # attached form from eating a claim.
+        ("designator_attached", rf"\b[A-Z][A-Za-z&.]{{0,14}}\d{{2,4}}\b{_UNIT_MARKER}", 0),
+        # ...and the names that do carry a space, enumerated (see above).
+        ("designator_spaced", rf"\b(?:{_SPACED_ALT})\b{_UNIT_MARKER}", re.IGNORECASE),
         # "over the last 3 months", "a 1-year relative return"
         ("duration", r"\b\d{1,3}[-\s](?:day|week|month|quarter|year)s?\b", 0),
         # A standalone calendar year. The lookahead rejects "2024.5" but must NOT
         # reject a year that ends a sentence — "shipping in 2027." is still a year.
-        ("year", r"(?<![\d.])\b(?:19|20)\d{2}\b(?![\d%])(?!\.\d)", 0),
+        # A currency mark in front or a scale word behind means it was never a
+        # year: "$2000" is a price and "1950 million" is a quantity, and both
+        # were silently exempted as years by the first three guards alone.
+        ("year", rf"(?<![\d.$])\b(?:19|20)\d{{2}}\b(?![\d%])(?!\.\d)(?!\s*{_SCALE_WORD})", 0),
         # "1)" / "2." at the start of a line — enumeration, not measurement.
         ("list_ordinal", r"^\s{0,4}\d{1,2}[.)]\s", re.MULTILINE),
     )
