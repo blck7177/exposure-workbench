@@ -39,6 +39,18 @@ measured against the live corpus first:
      rejections in seven live answers ("H200", "the S&P 500", "42.4% over the
      last 1 year"), so the categories below are the ones the corpus demanded.
 
+  4. THE SIGN IS PART OF THE NUMBER. Added in V3-R after the adversarial review
+     reproduced its absence: the literal pattern begins at a digit, so a matched
+     "-" reached the surface and never the value, and "-$81.615B" was checked as
+     POSITIVE 81.615 billion. That is a false accept on the one corruption this
+     domain punishes hardest — an inverted figure — and, at the same time, a
+     false rejection of every negative the database holds: 117 of 127 factor
+     contributions are negative, and none of them could be cited. A written sign
+     now reaches the value and is matched exactly, which also means a claim that
+     carries its sign in a verb ("the factor detracted 0.8%") is refused rather
+     than guessed at. Accepting either sign would be a two-way "I do not know
+     the sign" in the module whose job is refusing.
+
 Extraction and matching are pure functions and testable without a database;
 resolve_cited_values() is the only part that reads one.
 """
@@ -132,6 +144,15 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     )
 )
 
+# A leading sign, and only where a sign is what it is. "15-20%" is a range,
+# "COVID-19" is a name and "$5-10B" is a span: in all three the '-' has a word
+# character running into it from the left, and none of them is negative. The
+# lookbehind therefore sits INSIDE the optional group, so it constrains only the
+# case where a sign is actually consumed — in front of the whole pattern it would
+# also refuse "US$5B", whose match starts on a character preceded by a letter,
+# and silently demote it to a unitless count.
+_SIGN = r"(?:(?<![\w.])[+-])?"
+
 # Ordered longest-form-first: "$111.184 billion" must not be read as "$111.184".
 # IGNORECASE on the scale forms because "$81.615B" and "$111.184 billion" are the
 # same claim written two ways — and a case-sensitive alternation silently read
@@ -139,12 +160,12 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
 _NUMBER_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     (name, re.compile(pattern, flags))
     for name, pattern, flags in (
-        ("money_scaled", rf"[+-]?\$\s?{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
-        ("money_plain", rf"[+-]?\$\s?{_LIT}", 0),
-        ("percent", rf"[+-]?{_LIT}\s*%", 0),
-        ("multiple", rf"[+-]?{_LIT}\s?x\b", 0),
-        ("scaled", rf"[+-]?{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
-        ("bare", rf"[+-]?{_LIT}", 0),
+        ("money_scaled", rf"{_SIGN}\$\s?{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
+        ("money_plain", rf"{_SIGN}\$\s?{_LIT}", 0),
+        ("percent", rf"{_SIGN}{_LIT}\s*%", 0),
+        ("multiple", rf"{_SIGN}{_LIT}\s?x\b", 0),
+        ("scaled", rf"{_SIGN}{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
+        ("bare", rf"{_SIGN}{_LIT}", 0),
     )
 )
 
@@ -165,7 +186,7 @@ class ExtractedNumber:
     value: float
     unit_class: str
     atol: float
-    key: str            # digits as written, separators stripped — the prose probe
+    key: str            # digits as written, unsigned, separators stripped — the prose probe
 
 
 def _decimals(literal: str) -> int:
@@ -213,6 +234,12 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
                 magnitude = float(literal)
             except ValueError:
                 continue
+            # The sign is read off the SURFACE, because the literal cannot carry
+            # it: _LIT begins at a digit, and _DIGITS re-parses the surface from
+            # the first one. That gap is the whole defect this closes — every
+            # negative in the corpus was checked as its own positive.
+            if surface.startswith("-"):
+                magnitude = -magnitude
 
             decimals = _decimals(literal)
             scale = 1.0
@@ -239,8 +266,12 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
 
             taken.append(span)
             found.append(ExtractedNumber(
+                # `key` is the literal, which is unsigned by construction, and
+                # deliberately stays that way: it feeds the prose route, and a
+                # filing table writes a negative as "(16,450)" as readily as
+                # "-16,450". The sign is checked on the structured route.
                 span=span, surface=surface.strip(), value=value,
-                unit_class=unit_class, atol=atol, key=literal.lstrip("+-"),
+                unit_class=unit_class, atol=atol, key=literal,
             ))
 
     found.sort(key=lambda n: n.span)
@@ -267,14 +298,19 @@ def quoted_keys(text: str) -> set[str]:
     The prose route, used for chunk_ and src_ citations. It is an EXISTENCE check
     on the digits, not a magnitude check: a filing table's scale ("in millions")
     lives in a header the chunker may not have kept, so the passage cannot always
-    say what its own numbers mean. Recorded as A1's irreducible limit rather than
-    papered over — a scale-blind accept is still strictly narrower than accepting
-    any number that has a citation attached, which is what happened before.
+    say what its own numbers mean. It cannot speak to SIGN either, for a sister
+    reason — a table writes a negative as "(16,450)" at least as often as
+    "-16,450", so requiring the minus to appear verbatim would refuse the
+    ordinary case. Both are recorded as A1's irreducible limits rather than
+    papered over: a scale- and sign-blind accept is still strictly narrower than
+    accepting any number that has a citation attached, which is what happened
+    before, and the structured route (calc_, fact_, alert_, run_) checks both
+    exactly.
     """
     text = text or ""
     keys: set[str] = set()
     for m in _DIGITS.finditer(text):
-        digits = m.group(0).replace(",", "").lstrip("+-")
+        digits = m.group(0).replace(",", "")
         before = text[max(0, m.start() - 2):m.start()]
         after = text[m.end():m.end() + 2]
         if after.lstrip().startswith("%"):

@@ -86,6 +86,53 @@ async def test_a_run_resolves_through_its_children_not_its_own_columns():
         await engine.dispose()
 
 
+async def test_a_negative_number_can_be_cited_and_its_flip_cannot():
+    """V3-R1, on the rows that make it a blocker rather than a curiosity.
+
+    Three real negatives, one per shape the desk writes: a portfolio P&L in
+    money, a daily return in percent, a factor contribution in percent. 117 of
+    the 127 factor_attributions rows in this database are negative, and before
+    the sign reached the value every one of them was uncitable — the claim was
+    compared against its own positive and matched nothing the run holds. The
+    mirror assertion is the reason the first half is not enough: written
+    POSITIVE, the same figure must be refused against the same citation, which
+    is the sign flip the review reproduced."""
+    engine, mk = await _session()
+    try:
+        async with mk() as db:
+            row = (await db.execute(text(
+                "SELECT run_id, daily_pnl, daily_return FROM exposure_metrics "
+                "WHERE daily_pnl < 0 AND daily_return < 0 ORDER BY daily_pnl LIMIT 1"
+            ))).first()
+            if row is None:
+                pytest.skip("no losing day in this database")
+            run_id, pnl, ret = row
+            factor = (await db.execute(text(
+                "SELECT factor_name, contribution FROM factor_attributions "
+                "WHERE run_id = :r AND contribution < 0 ORDER BY contribution LIMIT 1"
+            ), {"r": run_id})).first()
+
+            values, quoted = await nv.resolve_cited_values(db, [run_id])
+            # "-$165,456.00", the form the desk writes: the sign leads, the
+            # currency mark follows it. ("$-165,456.00" is not a form this
+            # extractor claims to read — see the module's known limits.)
+            claims = [f"the book lost -${abs(float(pnl)):,.2f}",
+                      f"a daily return of {float(ret) * 100:.2f}%"]
+            if factor is not None:
+                claims.append(f"{factor[0]} contributed {float(factor[1]) * 100:.2f}%")
+
+            for claim in claims:
+                signed = nv.extract_numbers(claim)
+                assert signed and signed[0].value < 0, f"{claim!r} did not extract as negative"
+                assert nv.verify(signed, values, quoted) == [], (
+                    f"{claim!r} is what the run holds and must verify")
+                flipped = nv.extract_numbers(claim.replace("-", ""))
+                assert nv.verify(flipped, values, quoted) != [], (
+                    f"{claim!r} written positive is a sign flip and must be refused")
+    finally:
+        await engine.dispose()
+
+
 async def test_the_answers_already_in_the_database_still_pass():
     """The acceptance bar, measured rather than asserted: verification must not
     start refusing the system's own past work. Every number-bearing assistant

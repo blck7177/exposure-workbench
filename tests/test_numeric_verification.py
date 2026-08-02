@@ -291,3 +291,78 @@ def test_a_short_digit_string_cannot_be_verified_by_prose_alone():
     # a long enough string is still evidence
     long_passage = "Total net sales increased to 111,184 for the quarter"
     assert verify(extract_numbers("net sales of 111,184"), [], quoted_keys(long_passage)) == []
+
+
+# ── group E: the sign axis (V3-R1) ────────────────────────────────────────────
+# The axis did not exist. _LIT begins at a digit, so the [+-] the patterns
+# matched reached the SURFACE and never the value: "-$81.615B" extracted as
+# POSITIVE 81.615 billion. Both halves of that are defects and the first is the
+# one a finance desk cares about — a sign flip verified clean against the
+# evidence it inverts.
+
+@pytest.mark.parametrize("text,value,unit_class", [
+    ("free cash flow of -$16,450.00", -16_450.0, MONEY),
+    ("revenue was -$81.615B", -81_615_000_000.0, MONEY),
+    ("the momentum factor contributed -0.8%", -0.008, PERCENT),
+    ("interest coverage of -1.28x", -1.28, MULTIPLE),
+    ("daily P&L fell to -16,450", -16_450.0, COUNT),
+    ("net income grew +85.2%", 0.852, PERCENT),
+])
+def test_a_written_sign_reaches_the_value(text: str, value: float, unit_class: str):
+    n = _one(text)
+    assert n.unit_class == unit_class
+    assert n.value == pytest.approx(value, rel=1e-12)
+
+
+def test_a_sign_flip_is_refused():
+    """The blocker, in the shape the review reproduced it. A stored +81.615B is
+    not evidence for a claim of -$81.615B; before this it was, because the claim
+    was read as its own positive and matched exactly."""
+    numbers = extract_numbers("free cash flow of -$81.615B")
+    assert verify(numbers, [_val(81_615_000_000.0, MONEY)]) != []
+    assert verify(numbers, [_val(-81_615_000_000.0, MONEY)]) == []
+
+
+def test_a_negative_value_can_be_cited_at_all():
+    """The other half, and the larger one by volume: 117 of the 127 factor
+    contributions in the live database are negative, and every one of them was
+    uncitable — the claim was compared against its own positive and matched
+    nothing the run holds."""
+    assert verify(extract_numbers("the momentum factor contributed -0.8%"),
+                  [_val(-0.00804, RATIO, "factor_attributions.momentum.contribution")]) == []
+
+
+def test_dropping_the_sign_is_refused_like_any_other_wrong_number():
+    """The cost of the rule, stated rather than hidden. "the factor detracted
+    0.8%" is correct English and correct finance, and the sign lives in a verb
+    this module cannot read — so it is refused. Accepting either sign would be a
+    two-way "I do not know the sign" in the module whose entire job is refusing,
+    and it would take the sign flip above with it. The refusal is recoverable
+    where the false accept is not: it names the signed value, so the model can
+    restate the claim as a contribution of -0.8%."""
+    problems = verify(extract_numbers("the momentum factor detracted 0.8%"),
+                      [_val(-0.008, RATIO, "factor_attributions.momentum.contribution")])
+    assert len(problems) == 1
+    assert problems[0]["nearest"]["value"] == -0.008
+
+
+def test_a_hyphen_between_numbers_is_not_a_minus_sign():
+    """A range, a product name and a date fragment all put a '-' in front of
+    digits and none of them is a negative. A sign is a sign only when nothing
+    runs into it from the left — which is also what stops the model from being
+    quoted back a "-20%" it never wrote."""
+    assert raw_forms(extract_numbers("revenue grew 15-20%")) == ["15", "20%"]
+    assert [n.value for n in extract_numbers("the COVID-19 era")] == [19.0]
+    assert [n.value for n in extract_numbers("a range of $5-10B")] == [5.0, 1e10]
+
+
+def test_the_prose_route_cannot_speak_to_sign():
+    """Pinned as a limit rather than left to be discovered. The prose route is
+    an existence check on the digits a passage contains, and a filing table
+    writes a negative as (16,450) at least as often as -16,450 — so requiring
+    the minus to appear would refuse the ordinary case. A chunk citation buys
+    the magnitude; the sign is checked exactly on the structured route, which is
+    where every calc, fact, alert and run figure comes from. Same shape, and the
+    same reason, as the scale limit quoted_keys already carries."""
+    passage = "Operating cash flow for the quarter was (16,450), in thousands"
+    assert verify(extract_numbers("a swing of -16,450"), [], quoted_keys(passage)) == []
