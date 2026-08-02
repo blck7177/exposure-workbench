@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from exposure_workbench.tools.meta_tools import _respond
 from exposure_workbench.services.numeric_verification import (
     COUNT,
     MONEY,
@@ -140,3 +141,39 @@ def test_an_id_is_exempt_whole_not_digit_by_digit():
 def test_a_number_free_reply_yields_nothing():
     assert extract_numbers("Sure — what would you like to know about the portfolio?") == []
     assert extract_numbers("") == []
+
+
+# ── group C: the gate that consumes it (A0-1) ─────────────────────────────────
+# db is None throughout: the empty-citations branch provably never touches it,
+# and a test that needed a database to prove a pure refusal would be testing the
+# database.
+
+@pytest.mark.asyncio
+async def test_the_gate_refuses_a_number_without_a_citation():
+    out = await _respond(None, "NVDA's most recent quarterly revenue was $81.615B.", [])
+    assert out["error"] == "citations_required"
+    assert out["numbers_found"] == ["$81.615B"]
+    assert "responded" not in out
+
+
+@pytest.mark.asyncio
+async def test_the_gate_lets_a_number_free_reply_through_uncited():
+    out = await _respond(None, "Sure — which issuer would you like me to look at?", [])
+    assert out["responded"] is True
+    assert out["citations"] == []
+
+
+@pytest.mark.asyncio
+async def test_an_id_in_the_reply_is_not_a_number_the_gate_demands_evidence_for():
+    """The live corpus contains exactly this reply, uncited and legitimate: it
+    hands the user a run id to follow. Keying the id exemption to the six
+    citable prefixes would have refused it, because rrun_ is not one of them."""
+    out = await _respond(None, "Started it. You can follow it with run id rrun_0bef53cb5360.", [])
+    assert out["responded"] is True
+
+
+@pytest.mark.asyncio
+async def test_every_refused_number_is_reported_so_the_model_can_fix_them():
+    out = await _respond(None, "Technology is 32.9% of the book, with AAPL 15.8%.", None)
+    assert out["error"] == "citations_required"
+    assert out["numbers_found"] == ["32.9%", "15.8%"]

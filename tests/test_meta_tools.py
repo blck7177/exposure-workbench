@@ -28,10 +28,24 @@ def test_delegation_tools_require_reason():
 
 
 def test_respond_requires_only_text():
+    """Schema-optional on purpose. The rule "a reply stating a number must cite"
+    is enforced in the gate (V3-A0-1), not by making citations a required field:
+    required-in-schema would also block the number-free replies — greetings,
+    clarifying questions — that are legitimately uncited. See
+    test_the_gate_refuses_a_number_without_a_citation for the enforced half."""
     reg = build_meta_registry()
     schema = reg.get("respond").json_schema
-    assert schema["required"] == ["text"]                # citations optional (ack needs none)
+    assert schema["required"] == ["text"]
     assert "citations" in schema["properties"]
+
+
+def test_respond_description_states_the_rule_the_gate_enforces():
+    """The tool description is the model's only contract with the gate. It used
+    to say an acknowledgement needs no citations, which after A0-1 is true only
+    when the acknowledgement states no number — and a description that is half
+    true is a rejection the model cannot learn from."""
+    desc = build_meta_registry().get("respond").description
+    assert "number" in desc.lower()
 
 
 def test_research_face_has_no_delegation():

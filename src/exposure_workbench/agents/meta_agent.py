@@ -46,8 +46,11 @@ it's being prepared (this runs in the background — don't wait). For a full wri
 brief, call start_issuer_research and give the user the run id to follow. These \
 return immediately; never block waiting for them.
 
-Finish every turn by calling respond. Acknowledgements need no citations; factual \
-answers must cite. If respond rejects a citation, fix that id — never invent one."""
+Finish every turn by calling respond. A reply with no numbers in it — a greeting, \
+a clarifying question — needs no citations; any reply that states a number must \
+cite the evidence that number came from. If respond rejects a citation, fix that \
+id — never invent one. If it says citations_required, you stated a number you did \
+not fetch: call the tool that produces it, then cite what comes back."""
 
 
 def build_meta_registry() -> R.ToolRegistry:

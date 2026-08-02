@@ -18,6 +18,7 @@ from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 from exposure_workbench.services import evidence_trail_service as trail
+from exposure_workbench.services import numeric_verification as numeric
 from exposure_workbench.tools.registry import DELEGATION, GATE, Tool, ToolRegistry, current_session_id
 
 logger = logging.getLogger(__name__)
@@ -150,14 +151,32 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
 # ── respond gate ────────────────────────────────────────────────────────────────
 
 async def _respond(db: AsyncSession, text: str, citations: list[str] | None = None) -> dict:
-    """Meta-agent exit. citations=[] is fine (non-factual replies); but any cited
-    id must be in the session's evidence trail and resolve in the DB."""
+    """Meta-agent exit. A reply that states no number may cite nothing — a
+    greeting or a clarifying question is not a factual claim. A reply that states
+    a number must cite, and any cited id must be in the session's evidence trail
+    and resolve in the DB.
+
+    The empty-citations branch never touches `db`, which is what makes the
+    refusal testable without one.
+    """
     citation_ids = [c for c in (citations or []) if isinstance(c, str)]
     if citation_ids:
         ok, problems = await trail.validate_citations(db, current_session_id(), citation_ids)
         if not ok:
             return {"error": "invalid_citations", "problems": problems,
                     "detail": "cited ids must come from tool results you called this session"}
+    else:
+        # Zero citations used to skip validation entirely, so a reply made
+        # entirely of numbers passed the gate untouched — the one shape the gate
+        # exists to stop. Enforced here rather than by making `citations` a
+        # required schema field, because that would also block the number-free
+        # replies this branch deliberately allows.
+        stated = numeric.extract_numbers(text)
+        if stated:
+            return {"error": "citations_required",
+                    "numbers_found": numeric.raw_forms(stated),
+                    "detail": "a reply that states numbers must cite the evidence ids "
+                              "they came from; call a tool to get them first"}
     return {"responded": True, "text": text, "citations": citation_ids}
 
 
@@ -196,8 +215,9 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="respond",
-        description="Reply to the user. Provide citations (evidence ids) for any factual claim; "
-                    "an acknowledgement needs none, but whatever you cite must be real.",
+        description="Reply to the user. Any reply that states a number must cite the evidence "
+                    "ids that number came from; a reply with no numbers (a greeting, a "
+                    "clarifying question) may cite nothing. Whatever you cite must be real.",
         json_schema={"type": "object", "properties": {
             "text": {"type": "string"},
             "citations": {"type": "array", "items": {"type": "string"}},
