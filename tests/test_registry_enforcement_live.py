@@ -129,6 +129,45 @@ async def test_a_session_cannot_talk_an_id_into_its_own_evidence_trail():
         await engine.dispose()
 
 
+async def test_a_share_count_survives_the_whole_path_from_tool_to_gate():
+    """V3-R4 end to end, which is C3's acceptance query and nothing less: read
+    the book, state a holding, cite the holding. Four things have to line up for
+    it — the tool must return the id, the harvester must recognise the prefix,
+    the gate must resolve it, and the numeric check must find the quantity
+    behind it — and before this commit the first of them was missing, so the
+    other three had nothing to do."""
+    engine, mk = await _mk()
+    try:
+        reg = build_read_registry()
+        from exposure_workbench.tools.meta_tools import register_meta_tools
+        register_meta_tools(reg)
+
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta")
+            await db.commit()
+            sid = s.id
+        async with mk() as db:
+            book = await R.invoke(reg, db, sid, "get_portfolio_positions", {"portfolio_id": "port_001"})
+            await db.commit()
+            if book.get("error"):
+                pytest.skip(f"demo book unavailable: {book['error']}")
+            holding = book["holdings"][0]
+            assert holding["pos_id"].startswith("pos_")
+        async with mk() as db:
+            step = (await db.execute(
+                select(AgentStep).where(AgentStep.session_id == sid).order_by(AgentStep.seq.desc())
+            )).scalars().first()
+            assert any(r["type"] == "position" for r in step.evidence_refs)
+
+            out = await R.invoke(reg, db, sid, "respond", {
+                "text": f"You hold {holding['quantity']:,.0f} shares of {holding['ticker']}.",
+                "citations": [holding["pos_id"]]})
+            await db.commit()
+            assert out.get("responded") is True, out
+    finally:
+        await engine.dispose()
+
+
 async def test_reflection_tool_is_free():
     engine, mk = await _mk()
     try:

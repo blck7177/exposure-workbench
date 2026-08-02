@@ -50,3 +50,17 @@ UPDATE agent_sessions SET tool_budget = NULL WHERE tool_budget = 0;
 -- written before V3 keep a NULL here; read_issuer_brief reports that as the
 -- distinct fact it is rather than inventing a mapping.
 ALTER TABLE issuer_briefs ADD COLUMN IF NOT EXISTS block_citations JSONB;
+
+-- ═══ R4: a holding needs an id it can be cited by ════════════════════════════
+-- The seed script minted position ids as bare uuid4 — the third time in this
+-- project an id has been minted without the prefix that makes it evidence
+-- (alert<hex> was the first, and V1 fixed that one row by row). positions.id is
+-- referenced by nothing: no foreign key, no stored citation, no cached payload,
+-- so rewriting it in place is safe in a way the alert fix was not.
+--
+-- Idempotent by predicate rather than by guard: rows already carrying the prefix
+-- do not match. The hex is taken from the uuid so a re-run of this migration
+-- lands on the same id, and 12 characters matches new_id().
+UPDATE positions
+   SET id = 'pos_' || left(replace(id, '-', ''), 12)
+ WHERE id NOT LIKE 'pos\_%';

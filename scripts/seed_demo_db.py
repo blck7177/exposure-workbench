@@ -197,7 +197,11 @@ def seed_positions(conn, holdings: list[dict]) -> date:
         price = close_by_ticker[h["ticker"]]
         mv = price * h["quantity"]
         rows.append((
-            str(uuid.uuid4()), h["portfolio_id"], snap, h["ticker"], h["asset_class"],
+            # pos_ + 12 hex, the same shape new_id("pos_") mints. A bare uuid4
+            # here is what left the demo book's holdings uncitable: the id is the
+            # evidence handle, and a holding without one is a number the agent
+            # can read and cannot support.
+            f"pos_{uuid.uuid4().hex[:12]}", h["portfolio_id"], snap, h["ticker"], h["asset_class"],
             h["sector"], h["region"], h["currency"], h["quantity"], h["cost_basis"], price, mv,
         ))
     with conn.cursor() as cur:

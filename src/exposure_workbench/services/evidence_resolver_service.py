@@ -21,6 +21,7 @@ from exposure_workbench.db.models import (
     FilingChunk,
     FilingSection,
     FinancialFact,
+    Position,
     ResearchSource,
     RiskAlert,
 )
@@ -157,6 +158,30 @@ async def _run(db: AsyncSession, rid: str) -> dict | None:
     }
 
 
+async def _position(db: AsyncSession, pid: str) -> dict | None:
+    """A holding, as the drawer shows it: what is held, how much, and as of when.
+
+    Price and market_value are on this row and are deliberately NOT in the body.
+    They are a snapshot the seed writes and no run updates, and the whole reason
+    positions_with_weights values a book from issuer_exposures is that this
+    codebase already carried three valuation conventions and cut back to one.
+    Rendering a stale price in the evidence drawer would resurrect it in the one
+    place a user goes to check a number.
+    """
+    row = (await db.execute(select(Position).where(Position.id == pid))).scalar_one_or_none()
+    if row is None:
+        return None
+    return {
+        "type": "position", "id": pid,
+        "body": {"ticker": row.ticker, "quantity": _num(row.quantity),
+                 "asset_class": row.asset_class, "sector": row.sector, "currency": row.currency,
+                 "as_of_date": row.as_of_date.isoformat() if row.as_of_date else None},
+        "provenance": {"portfolio_id": row.portfolio_id,
+                       "created_at": row.created_at.isoformat() if row.created_at else None},
+        "upstream": [],
+    }
+
+
 _RESOLVERS = {
     "fact_": _fact,
     "calc_": _calc,
@@ -164,6 +189,7 @@ _RESOLVERS = {
     "src_": _source,
     "alert_": _alert,
     "run_": _run,
+    "pos_": _position,
 }
 
 

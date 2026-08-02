@@ -103,6 +103,25 @@ def test_harvest_gate_and_resolver_agree_on_exactly_one_prefix_set():
     assert set(R._ID_PREFIXES) == set(trail._RESOLVERS) == set(resolver._RESOLVERS)
 
 
+def test_a_holding_is_citable_evidence():
+    """V3-R4. C3 gave the agent a tool that reads back every holding, and the
+    first question anyone asks it — "how many shares of AAPL do I hold" — could
+    not be answered: the quantity is real, it is on a positions row, and that
+    row had no evidence identity, so the number had nothing to cite and A1
+    refused it by construction. The acceptance query for the memory component
+    failed on the memory component's own output.
+
+    Asserted in all four places at once because that is the invariant: harvest,
+    gate, resolver and the numeric verifier are one list, and pos_ arriving in
+    three of them would be a hole with a test signing it off."""
+    from exposure_workbench.services.numeric_verification import _VALUE_SOURCES
+    from exposure_workbench.tools import registry as R
+    assert "pos_" in trail._RESOLVERS
+    assert "pos_" in resolver._RESOLVERS
+    assert "pos_" in R._ID_PREFIXES
+    assert "pos_" in _VALUE_SOURCES
+
+
 def test_id_helpers_match_evidence_prefixes():
     """The bug real data caught: alerts were minted as new_id("alert") -> "alert<hex>",
     which no evidence prefix ("alert_") ever matches, so alert evidence was dead.

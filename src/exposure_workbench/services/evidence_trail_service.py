@@ -21,6 +21,7 @@ from exposure_workbench.db.models import (
     ExposureRun,
     FilingChunk,
     FinancialFact,
+    Position,
     ResearchSource,
     RiskAlert,
 )
@@ -36,6 +37,12 @@ _RESOLVERS = {
     "src_": (ResearchSource, ResearchSource.id),
     "alert_": (RiskAlert, RiskAlert.id),
     "run_": (ExposureRun, ExposureRun.id),
+    # A holding is evidence for exactly one thing — how many shares are held —
+    # and the memory tool that reads the book back (C3) cannot support that
+    # number without it. Under RLS this row is only visible on the user's own or
+    # a public portfolio, which is the behaviour to want: citing a holding you
+    # cannot see does not resolve.
+    "pos_": (Position, Position.id),
 }
 
 

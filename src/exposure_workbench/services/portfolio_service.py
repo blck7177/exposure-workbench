@@ -462,7 +462,10 @@ async def positions_with_weights(db: AsyncSession, portfolio_id: str) -> dict | 
 
     holdings = []
     for pos in positions:
-        row = {"ticker": pos.ticker, "quantity": _f(pos.quantity),
+        # pos_id is what makes the quantity answerable: it is the only number on
+        # this row that comes from the position itself, and without an id beside
+        # it the model can read the holding and cannot support it.
+        row = {"pos_id": pos.id, "ticker": pos.ticker, "quantity": _f(pos.quantity),
                "sector": pos.sector, "asset_class": pos.asset_class}
         exposure = priced.get(pos.ticker)
         if exposure is not None:

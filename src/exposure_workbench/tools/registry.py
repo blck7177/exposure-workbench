@@ -52,7 +52,7 @@ GATE = "gate"                # respond / submit_brief — session exits
 # _RESOLVERS), and the symmetry is the point: harvesting an id the gate can never
 # accept hands the model something it can retrieve, quote and then be refused
 # for. co_/rrun_/filing_ used to be harvested and were never citable.
-_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "alert_", "run_")
+_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "alert_", "run_", "pos_")
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,8 @@ def extract_evidence_refs(result: Any) -> list[dict]:
                 walk(item, key_hint)
         elif _looks_like_id(node):
             prefix = node.split("_", 1)[0]
-            add({"src": "source", "co": "company", "rrun": "research_run"}.get(prefix, prefix), node)
+            add({"src": "source", "co": "company", "rrun": "research_run",
+                 "pos": "position"}.get(prefix, prefix), node)
 
     walk(result)
     return refs

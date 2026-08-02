@@ -71,6 +71,7 @@ from exposure_workbench.db.models import (
     FilingChunk,
     FinancialFact,
     IssuerExposure,
+    Position,
     ResearchSource,
     RiskAlert,
     SectorExposure,
@@ -504,6 +505,24 @@ async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], se
     return out, set()
 
 
+async def _from_position(db: AsyncSession, pid: str) -> tuple[list[EvidenceValue], set[str]]:
+    """A holding supports its QUANTITY and nothing else.
+
+    Not its price and not its market_value, both of which sit on this row: they
+    are a snapshot written once by the seed and superseded by every run, and
+    positions_with_weights already refuses to value a book from them for exactly
+    that reason (V2-E5 cut this codebase back to one valuation convention).
+    Letting them in here would restore the other two, with a citable id attached.
+
+    A share count is a COUNT: the text says "5,000 shares", the unit is in the
+    noun, and the number itself claims none.
+    """
+    row = (await db.execute(select(Position).where(Position.id == pid))).scalar_one_or_none()
+    if row is None or row.quantity is None:
+        return [], set()
+    return [EvidenceValue(float(row.quantity), COUNT, f"{row.ticker}.quantity@{row.as_of_date}", pid)], set()
+
+
 async def _from_chunk(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], set[str]]:
     row = (await db.execute(select(FilingChunk).where(FilingChunk.id == cid))).scalar_one_or_none()
     return ([], quoted_keys(row.text)) if row is not None else ([], set())
@@ -524,6 +543,7 @@ _VALUE_SOURCES = {
     "fact_": _from_fact,
     "alert_": _from_alert,
     "run_": _from_run,
+    "pos_": _from_position,
     "chunk_": _from_chunk,
     "src_": _from_source,
 }

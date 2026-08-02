@@ -133,6 +133,56 @@ async def test_a_negative_number_can_be_cited_and_its_flip_cannot():
         await engine.dispose()
 
 
+async def test_a_share_count_can_be_cited_to_the_holding_it_came_from():
+    """V3-R4, and it is C3's own acceptance query: "how many shares of AAPL do I
+    hold". The quantity is real and sits on a positions row; before this that row
+    had no evidence identity, so the honest answer had nothing to cite and the
+    gate refused it by construction.
+
+    A position offers its QUANTITY and nothing else. Its price and market_value
+    columns are a stale snapshot the exposure run supersedes — V2-E5 removed the
+    third valuation convention from this codebase deliberately, and a position
+    that could hand back a price would put it straight back, with a citable id
+    attached this time."""
+    engine, mk = await _session()
+    try:
+        async with mk() as db:
+            row = (await db.execute(text(
+                "SELECT id, ticker, quantity FROM positions ORDER BY as_of_date DESC, id LIMIT 1"
+            ))).first()
+            if row is None:
+                pytest.skip("no positions in this database")
+            pos_id, ticker, qty = row
+            assert pos_id.startswith("pos_"), f"{pos_id!r} is not a citable id"
+
+            values, quoted = await nv.resolve_cited_values(db, [pos_id])
+            assert [v.unit_class for v in values] == [nv.COUNT], (
+                "a position offers its quantity, as a count, and nothing else")
+
+            claim = f"You hold {float(qty):,.0f} shares of {ticker}"
+            assert nv.verify(nv.extract_numbers(claim), values, quoted) == []
+            wrong = f"You hold {float(qty) + 1:,.0f} shares of {ticker}"
+            assert nv.verify(nv.extract_numbers(wrong), values, quoted) != []
+    finally:
+        await engine.dispose()
+
+
+async def test_every_holding_in_the_database_has_a_citable_id():
+    """The demo book's ten holdings were minted as bare UUIDs by the seed script
+    — the third time in this project an id has been minted without the prefix
+    that makes it evidence (alert<hex> was the first). A position the agent can
+    read and cannot cite is worse than one it cannot read: it is a number in
+    front of the model with no way to support it."""
+    engine, mk = await _session()
+    try:
+        async with mk() as db:
+            bad = (await db.execute(text(
+                "SELECT count(*) FROM positions WHERE id NOT LIKE 'pos\\_%'"))).scalar_one()
+            assert bad == 0, f"{bad} positions rows cannot be cited"
+    finally:
+        await engine.dispose()
+
+
 async def test_the_answers_already_in_the_database_still_pass():
     """The acceptance bar, measured rather than asserted: verification must not
     start refusing the system's own past work. Every number-bearing assistant
