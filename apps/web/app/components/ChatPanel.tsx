@@ -11,7 +11,10 @@ import { AuthGate } from "./Auth";
 
 const LS_KEY = "ew_agent_session";
 
-type ChatMsg = { role: string; text: string; citations: string[] };
+// gateFailed: the loop ended without the citation gate accepting an answer.
+// Rendered as a refusal, because a paragraph saying "I could not produce an
+// answer" styled exactly like a verified answer reads as one.
+type ChatMsg = { role: string; text: string; citations: string[]; gateFailed?: boolean };
 
 // One step in the live trace — machine-recorded (tool/delegation) solid, agent
 // narration (think/respond) dashed, matching the audit "who recorded what" split.
@@ -114,7 +117,8 @@ export function ChatPanel() {
     try {
       const sid = await ensureSession();
       const r = await postMessage(sid, text);
-      setMessages((m) => [...m, { role: "assistant", text: r.text, citations: r.citations || [] }]);
+      setMessages((m) => [...m, { role: "assistant", text: r.text, citations: r.citations || [],
+                                 gateFailed: (r.meta as { gate?: string } | undefined)?.gate === "exhausted" }]);
       const d = await getSessionDetail(sid);
       setSteps(d.steps);
     } catch (e) {
@@ -183,7 +187,10 @@ export function ChatPanel() {
         )}
         {messages.map((m, i) => (
           <div key={i} className={m.role === "user" ? "text-right" : ""}>
-            <div className={`inline-block max-w-[92%] px-3 py-2 rounded-lg text-sm text-left ${m.role === "user" ? "bg-blue-600/20 text-slate-200" : "bg-[#161b22] text-slate-300"}`}>
+            <div className={`inline-block max-w-[92%] px-3 py-2 rounded-lg text-sm text-left ${m.role === "user" ? "bg-blue-600/20 text-slate-200" : m.gateFailed ? "bg-amber-950/40 border border-amber-800/50 text-amber-200/90" : "bg-[#161b22] text-slate-300"}`}>
+              {m.gateFailed && (
+                <div className="text-[10px] uppercase tracking-wide text-amber-500/80 mb-1">unverified — nothing was answered</div>
+              )}
               <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
               {m.citations.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap">{m.citations.map((c) => <CitationChip key={c} id={c} />)}</div>

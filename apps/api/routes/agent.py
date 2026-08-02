@@ -75,6 +75,11 @@ class MessageOut(BaseModel):
     message_id: str
     text: str
     citations: list
+    # {"gate": "exhausted"} when the loop ended without the gate accepting an
+    # answer. The UI renders that message as a refusal rather than as an answer;
+    # without it, "I could not produce an answer" is a paragraph the user has no
+    # reason to read differently from any other.
+    meta: dict = {}
 
 
 @router.post("/agent/sessions/{session_id}/messages", response_model=MessageOut)
@@ -187,6 +192,7 @@ async def get_agent_session(
     )).scalars().all()
     return SessionDetailOut(
         id=s.id, kind=s.kind, tools_used=s.tools_used,
-        messages=[{"id": m.id, "role": m.role, "content": m.content, "citations": m.citations} for m in msgs],
+        messages=[{"id": m.id, "role": m.role, "content": m.content,
+                   "citations": m.citations, "meta": m.meta or {}} for m in msgs],
         steps=steps,
     )

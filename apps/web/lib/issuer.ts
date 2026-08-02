@@ -28,7 +28,9 @@ export type Brief = {
 export type Evidence = { type: string; id: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
 export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; started_at: string | null; completed_at: string | null };
 export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string };
-export type AgentMessage = { id: string; role: string; content: string | null; citations: string[] };
+// meta carries out-of-band facts about the turn. {"gate":"exhausted"} means the
+// loop ended without the citation gate accepting an answer — a refusal, not a reply.
+export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: Record<string, unknown> };
 export type SessionDetail = { id: string; kind: string; tools_used: number; messages: AgentMessage[]; steps: AgentStep[] };
 
 // ─── reads ──────────────────────────────────────────────────────────────────
@@ -47,5 +49,5 @@ export const startResearch = (t: string) => j<ResearchRun>("/api/research-runs",
 export const getResearchRun = (id: string) => j<ResearchRun>(`/api/research-runs/${id}`);
 
 export const createSession = () => j<{ id: string }>("/api/agent/sessions", { method: "POST", body: "{}" });
-export const postMessage = (sid: string, text: string) => j<{ session_id: string; message_id: string; text: string; citations: string[] }>(`/api/agent/sessions/${sid}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+export const postMessage = (sid: string, text: string) => j<{ session_id: string; message_id: string; text: string; citations: string[]; meta?: Record<string, unknown> }>(`/api/agent/sessions/${sid}/messages`, { method: "POST", body: JSON.stringify({ text }) });
 export const getSessionDetail = (sid: string) => j<SessionDetail>(`/api/agent/sessions/${sid}`);

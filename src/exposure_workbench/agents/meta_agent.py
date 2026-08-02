@@ -53,6 +53,22 @@ id — never invent one. If it says citations_required, you stated a number you 
 not fetch: call the tool that produces it, then cite what comes back."""
 
 
+# What the user is told when the loop ended without the gate ever accepting an
+# answer. TWO paths reach it and both must, because they are the same event: the
+# model stopped calling tools on the last turn, or it spent every turn without a
+# respond the gate would take. The first used to substitute the model's raw
+# content as the answer — an ungated reply, with citations=[], indistinguishable
+# from a verified one — and the second used to emit "(no response produced)",
+# which reads like a bug rather than a refusal.
+_GATE_EXHAUSTED_TEXT = (
+    "I could not produce an answer I can stand behind for this turn — every "
+    "attempt either cited evidence I had not actually retrieved or stated a "
+    "figure I could not trace back to a source. Ask again, or narrow the "
+    "question to one issuer or one metric."
+)
+_GATE_EXHAUSTED_META = {"gate": "exhausted"}
+
+
 def build_meta_registry() -> R.ToolRegistry:
     return register_meta_tools(build_read_registry())
 
@@ -96,7 +112,9 @@ async def handle_message(
 
         if not tool_calls:
             if turn >= max_turns - 1:
-                reply_text = content or ""
+                # Deliberately NOT `reply_text = content`. Substituting the raw
+                # model text here handed the user an answer that had passed no
+                # gate, with citations=[], rendered exactly like a verified one.
                 break
             messages.append({"role": "user", "content": "Call respond to reply to the user."})
             continue
@@ -118,11 +136,20 @@ async def handle_message(
         if reply_text is not None:
             break
 
-    reply_text = reply_text if reply_text is not None else "(no response produced)"
+    # The single convergence point for both ungated paths. The turn is still a
+    # 200 and the message is still persisted: the chat_turn quota was charged and
+    # committed before the loop started (routes/agent.py), the work really was
+    # done, and hiding the failure from the transcript would leave the user's
+    # question sitting there with no reply and no explanation.
+    meta: dict = {}
+    if reply_text is None:
+        reply_text, reply_citations = _GATE_EXHAUSTED_TEXT, []
+        meta = dict(_GATE_EXHAUSTED_META)
+
     async with db_factory() as db:
         db.add(AgentMessage(id=message_id, session_id=session_id, role="assistant",
-                            content=reply_text, citations=reply_citations))
+                            content=reply_text, citations=reply_citations, meta=meta))
         await db.commit()
 
     return {"session_id": session_id, "message_id": message_id,
-            "text": reply_text, "citations": reply_citations}
+            "text": reply_text, "citations": reply_citations, "meta": meta}
