@@ -591,8 +591,9 @@ k8s/微服务/消息中间件(Redis/Celery)、企业 SSO、组织/团队模型�
 
 ## M15 — Harness 组件补全(2026-08-02 完成)
 
-> **状态**:Verify / Context / Memory / Evals 四个组件全部落地,13 commits。
-> 277 offline + 89 live 全绿;终验数字与实测证据见 [spikes/V3_COVERAGE.md](spikes/V3_COVERAGE.md),
+> **状态**:Verify / Context / Memory / Evals 四个组件全部落地,16 commits;
+> 其后 V3-R 按对抗式 review 收口 +7(见本节末)。
+> 278 offline + 89 live 全绿(V3-R 后 313 + 98);终验数字与实测证据见 [spikes/V3_COVERAGE.md](spikes/V3_COVERAGE.md),
 > 执行计划见 [IMPLEMENTATION_PLAN_V3.md](IMPLEMENTATION_PLAN_V3.md)。
 
 背景:把系统对到 agent harness 的标准组件清单(loop / tools / context / guardrails /
@@ -633,3 +634,28 @@ verification / memory / observability / evals)上之后,V2 之前散着的一堆
 B3 上下文摘要(B0 实测显示一整轮只有几千 token 对 80k 上限,现在建等于猜)、LLM-as-judge
 评测(确定性检查还没用尽)、passage 级检索标注(要人读 3,078 个 chunk)、MCP 自己的 face
 (属 MCP_BOUNDARY_PLAN)。
+
+### ★ V3-R —— 对抗式 review 的回答(2026-08-02,+7 commits)
+
+> 六个维度交付五个(第六个按指示叫停),每条发现**先手工复现再采信**。
+> 313 offline + 98 live;执行计划见 [IMPLEMENTATION_PLAN_V3R.md](IMPLEMENTATION_PLAN_V3R.md),
+> 逐条清单、驳回理由与遗留见 V3_COVERAGE §Adversarial review。
+
+两条新踩坑,和上面四条同级:
+
+- **豁免正则的每一支都要有对抗测试**。V3 给 designator 写了"大写词 + 数字"这一支,并且
+  有测试证明 `AAPL 15.8%` 不被吞——但那条测试只覆盖了**后面跟单位**的形状。
+  `AAPL 5000` 后面什么都不跟,于是整句话抽不出数字,A0-1 连"有数字"这个前提都不成立,
+  零引用直接放行。**一条豁免规则的测试必须同时给出"它该盖住的"和"它绝不能盖住的"**,
+  后者要按该规则的每一个自由维度各来一个,不是给一个反例就算完。
+  同源教训:窄化一条豁免前先跑真语料——旧 designator 顺手在盖 `March 28`,
+  删掉它会开始误拒"quarter ended March 28",这是语料告诉我的,不是我想出来的。
+- **测 RLS 必须用非特权角色**。`exposure` 是表 owner 且 `rolbypassrls`,拿它连上去写的
+  "另一个租户看不见"断言在 RLS 整个关掉时也照样绿。V3-C 的两条可见性主张(brief 归属、
+  跨租户 rrun_)就是这么"验证"的。改成 `app_rls` + 事务内 `set_config('app.user_id')` 之后,
+  再把连接换回 owner 跑一遍确认变红——**一条在被测机制关闭后仍然通过的测试,比没有测试更坏**。
+
+补充一条给"证据身份"的:**铸 id 的地方每多一处,就多一次漏前缀的机会**。
+`alert<hex>`(V1)、seed 的 `str(uuid.uuid4())` 位置(V3-R,10 行 demo 持仓)是同一个 bug 的
+第一次和第三次。四方对称测试(harvest / gate / resolver / numeric)挡住了"prefix 只加三处",
+但挡不住"铸造点不走 `new_id`"——后者现在由 live 语料断言(`positions` 全表必须 `pos_` 形)守。

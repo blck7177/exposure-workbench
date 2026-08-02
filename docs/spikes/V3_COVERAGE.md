@@ -11,14 +11,19 @@ against fixtures.
 
 ## Totals
 
-| | |
-|---|---|
-| Offline tests | **277** (`pytest -m "not live"`) — 215 entering V3 |
-| Live tests | **89** — 70 entering V3 |
-| Commits | 13, on `issuer-intelligence` |
-| Diff | 48 files, +3,590 / −81 |
-| New columns | 5, one migration (`infra/migrations/v3_harness.sql`) |
-| New agent tools | 4 (face 16 → 20) |
+| | V3 | after V3-R |
+|---|---|---|
+| Offline tests | 278 (`pytest -m "not live"`) — 215 entering V3 | **313** |
+| Live tests | 89 — 70 entering V3 | **98** |
+| Commits | 16, on `issuer-intelligence` | +7 |
+| Diff | 48 files, +3,590 / −81 | +28 files, +1,215 / −82 |
+| New columns | 5, one migration (`infra/migrations/v3_harness.sql`) | — |
+| New agent tools | 4 (face 16 → 20) | — |
+| Citable evidence prefixes | 6 | **7** (`pos_`) |
+
+V3-R is the adversarial review's answer, not a second feature phase: it adds no
+capability and decides whether what V3 built is real. See
+[the section below](#adversarial-review-and-what-answering-it-cost).
 
 ## The problem V3 was for
 
@@ -210,15 +215,19 @@ decide which item a passage reports.
 
 | | Chat | Briefs |
 |---|---|---|
-| Numbers stated | 29 | 66 |
+| Numbers stated | 29 → **32** after V3-R | 66 |
 | Unverified | **1** | 14 |
-| Citations checked | 22 | 244 |
+| Citations checked | 22 → **25** | 244 |
 | Citations that no longer resolve | **0** | **0** |
 | Number-bearing answers with no citation | **0** | n/a |
 
 Chat measured **0 of 20** when the numeric check first shipped, against the
-plan's bar of 2 in 20. It is 1 of 29 now, and the one is a correct refusal that
-the acceptance run itself produced — see Live acceptance below.
+plan's bar of 2 in 20. It is 1 of 29 now — 1 of 32 after V3-R's three acceptance
+turns, all of which verify — and the one is a correct refusal that the V3
+acceptance run itself produced (see Live acceptance below). The brief figures do
+not move under V3-R: every extractor change in that phase was re-measured
+against this corpus and none of them changed a single number, which for a set of
+changes that only ever NARROW the extractor is the result to want.
 
 The 14 brief refusals are enumerated, not averaged:
 
@@ -311,17 +320,175 @@ approximate forms is warranted on this evidence.
 
 ---
 
+## V3-R live acceptance — the rebuilt stack, after the review fixes
+
+API and worker images rebuilt on V3-R code and restarted; the migration's new
+`pos_` backfill applied and re-applied (it matches nothing the second time).
+Three turns through the real chat route, each chosen because it was impossible
+or wrong before:
+
+**A share count, cited to the holding.** *"How many shares of AAPL does the demo
+portfolio hold?"* → **"holds 5,000 shares of AAPL (`pos_bb75f719df7a`)"**,
+citing `pos_bb75f719df7a`, in **5.5s**. C3's own acceptance query, unanswerable
+until this phase: the quantity had no citable id, so the gate refused the honest
+answer. That the API accepted a `pos_` citation at all is also the proof that
+the container is running the new code.
+
+**A negative number, stated with its sign.** *"Which issuer had the worst daily
+return in the latest run?"* → **"NVDA … at -4.994198%"**, citing
+`run_01bf110e5e15`, in **1.5s**. Measured against that run's evidence both ways:
+as written it verifies; read the way the pre-R1 extractor read it (as positive
+4.994198%) it is **REFUSED**. This exact correct answer was impossible to state
+yesterday.
+
+**A refusal that stayed a refusal.** *"…and which factor contributed most
+negatively to return?"* → the agent answered the drawdown (5.673757%, cited) and
+said plainly that the factor breakdown **was not in the snapshot it fetched**
+rather than producing a number. The tool surface genuinely has no factor
+attribution reader; the gate's job here was to make inventing one impossible,
+and the honest half-answer is what that looks like from the user's side.
+
+The trail-poisoning sequence is asserted as a live test rather than a chat turn
+— it needs the model to call two specific tools in one order, which is not
+something to leave to a sampled turn.
+
+`CLERK_AUTHORIZED_PARTIES` was blanked for the run (Backend-API tokens carry no
+`azp`) and **restored and re-verified afterwards**: an azp-less token is refused
+again with `bad_azp`.
+
+## Adversarial review, and what answering it cost
+
+Six dimensions were commissioned over the V3 diff. **Five were delivered; the
+sixth — concurrency and budget interaction — was stopped on instruction**, so
+the review's own coverage is 5/6 and the gap is named here rather than absorbed.
+
+Every finding was **reproduced by hand before being believed**, and doing that
+corrected one of them: the `think` echo poisons the trail only when the whole
+thought IS an id, while a thought that merely begins with one writes a different
+defect — an unresolvable, sentence-length "id" — into the audit trail. Both are
+closed by the same rule, but the reproduction is what got the description right.
+
+What survived reproduction: **2 blockers, 4 majors, 3 minors, and 5 defects in
+the tests and documents** rather than in the system. All are fixed in V3-R
+except those listed as deliberately not done, at the end.
+
+### Blockers
+
+**The sign axis did not exist.** `extract_numbers("-$81.615B")` returned
+POSITIVE 81,615,000,000: the literal pattern begins at a digit, so a matched `-`
+reached the surface and never the value. A sign flip therefore verified CLEAN
+against the evidence it inverts — the one corruption a finance desk punishes
+hardest — and, simultaneously, every negative in the database was uncitable:
+**117 of 127 factor contributions**, 32 of 175 issuer daily returns, 4 of 18
+portfolio P&L rows. A correct claim of "-0.98%" was compared against +0.0098 and
+matched nothing.
+
+**A tool that echoes its argument was evidence.** Harvest decided what counts as
+evidence from a tool's class and status, when the property the trail needs is
+that the value came back from a LOOKUP. `think` returns the thought;
+`get_task_status` and `get_portfolio_positions` return the unknown id they were
+given. A session that called two read tools with a real run id, retrieved
+nothing, and cited that run PASSED — trail check, existence check, and then
+every number on the run's children available to support an answer built on a run
+it never read. Provenance is the trail's whole promise.
+
+### Majors
+
+- **"Your holdings are AAPL 5000, MSFT 3500." extracted to nothing**, so the
+  citations-required gate had no numbers to demand evidence for and let it
+  through uncited. The designator exemption asked only whether a capitalised
+  word preceded the digits — the question "Microsoft 365" and "AAPL 5000" both
+  answer yes to. Both halves of the verification layer, off at once, on the
+  most ordinary portfolio question there is.
+- **A share count could not be cited.** C3 shipped a tool that reads the whole
+  book back, and its own acceptance query — "how many shares of AAPL do I hold"
+  — was unanswerable: positions had no evidence identity, so the quantity had
+  nothing to cite and A1 refused it by construction.
+- **`open_questions` was never numerically checked.** It is the one brief block
+  that carries no citations, and the check looped over the cited blocks, so a
+  brief could ask "will capex stay above $23B?" with that figure in none of its
+  evidence.
+- **MCP ran on 15 tool calls per PROCESS.** B2 inferred the budget regime from
+  `kind="meta"`, which the MCP host also uses; it never claims a turn, so
+  nothing ever reset the counter — while two documents said it kept the lifetime
+  budget.
+
+### Minors
+
+`.5%` read as `5%` (a silent factor of ten); `3 M&A deals` read as three
+million; and the module docstring's headline example argued against the
+implementation — it claimed unit classes stop "15.8% of its limit" when the
+answer is 79.2%, which they do not, because 0.158 is one of the three values
+that alert row holds. The test asserting it was named for a separation it does
+not perform.
+
+### Defects in the tests and documents, not in the system
+
+- **The RLS tests proved nothing.** `brief_service.latest_visible` and
+  `status_of("rrun_")` carry no owner filter and say RLS scopes them — asserted
+  through the `exposure` connection, which has `rolbypassrls`. The assertions
+  held with row-level security switched off entirely. Now run as `app_rls`, and
+  re-run against the bypassing connection to confirm they go red.
+- **A one-time migration sweep had no bound**, and migrations here are re-applied
+  by hand on every deploy: a session an operator switched off by setting its
+  budget to 0 came back on at the next deploy.
+- **`read_issuer_brief` did not say whose brief it was**, though RLS shows a
+  caller the public demo briefs too.
+- **The full-book read was unbounded**, against a 6,000-character result
+  summariser — a large book would be cut mid-JSON.
+- Documents that had drifted from the code: the tool budget (15/turn + 40/session
+  since B2, not "40 per conversation"), the MCP face size (16 trimmed from 20,
+  not 12), and README's claim of an identical REST/MCP surface.
+
+### Found while fixing, not by the review
+
+- **The demo book's ten holdings were minted as bare `uuid4`.** Third occurrence
+  of this bug class in the project (`alert<hex>` was the first). Rewritten in
+  place by migration — `positions.id` is referenced by nothing — and the seed
+  script now mints `pos_` like `new_id` does.
+- **`date_long` was leaning on the designator pattern.** The mandatory corpus
+  re-run showed three of the nine spans the old pattern exempted were dates, so
+  narrowing it would have started refusing "for the quarter ended March 28". The
+  rule that any extractor change re-runs the corpus paid for itself here.
+- **`check_limits` ignores `db_limits` entirely.** Found while correcting a note
+  that said the dead parameter had been closed in V2-H. The workflow loads
+  per-portfolio `risk_limits` and passes them; the body never reads the name, so
+  every alert comes from the global YAML and the demo book's twelve rows —
+  several TIGHTER than the defaults — do nothing.
+
+### Deliberately not done
+
+| | Why |
+|---|---|
+| Accounting parentheses as negatives | Zero instances in the corpus, and reading them means telling `(135,441)` the negative from `(see note 3)` the aside |
+| Tightening COUNT compatibility | A bare number claiming no unit is the design; changing it is a semantics decision, not a repair |
+| Removing `think`'s echo | Closed at the harvest layer instead, which also covers the next echoing tool nobody has written yet |
+| The sixth review dimension | Stopped on instruction; the risk it would have covered is recorded above |
+| Honouring `db_limits` | Changes which alerts exist — a decision, not a repair |
+| MCP face explicitness | Belongs to MCP_BOUNDARY_PLAN |
+
+---
+
 ## Known limits, carried forward deliberately
 
 - **Two evidence-ingestion paths remain open.** The `{type,id}` dict branch and
   the `calc_id`/`fact_id` key branch can still put an id into the trail that the
   gate cannot resolve. A malformed `alertb41eec529430` is in the live trail via
   the former; 10 of 35 `risk_alerts` rows carry ids without the underscore.
-- **The prose route is scale-blind.** `chunk_`/`src_` citations are checked by
-  whether the digits appear verbatim in the passage, not by magnitude: a filing
-  table's scale usually lives in a header the chunk does not carry. Strictly
-  narrower than the previous rule (any number with a citation attached), and
-  strictly weaker than the structured route.
+- **The prose route is scale-blind, and sign-blind.** `chunk_`/`src_` citations
+  are checked by whether the digits appear verbatim in the passage, not by
+  magnitude: a filing table's scale usually lives in a header the chunk does not
+  carry, and it writes a negative as `(16,450)` at least as often as `-16,450`,
+  so requiring the minus would refuse the ordinary case. Strictly narrower than
+  the previous rule (any number with a citation attached), and strictly weaker
+  than the structured route, which since V3-R1 checks the sign exactly.
+- **A bare number may still meet any class.** A number written without a unit
+  claims none, so COUNT compares against ratios, money and counts alike. That is
+  the design and not an oversight; tightening it would refuse "the series
+  returned 2 points", and it is recorded here because the review asked.
+- **Per-portfolio risk limits are loaded, passed, and never read.** See
+  PRODUCTION's known limits: `check_limits` ignores its `db_limits` argument, so
+  every alert comes from the global YAML thresholds.
 - **A1 is an existence check, not a correctness check.** It proves a number
   appears in the cited evidence. It cannot prove the number *answers the
   question* — cross-swapping two figures within one answer, both of which are
