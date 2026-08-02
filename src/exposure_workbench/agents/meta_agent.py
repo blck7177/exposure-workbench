@@ -14,9 +14,12 @@ from __future__ import annotations
 import json
 import logging
 
+from sqlalchemy import update
+
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.db.models import AgentMessage
+from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.llm import client as llm_client
+from exposure_workbench.services import context_budget
 from exposure_workbench.tools import faces, registry as R
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.meta_tools import register_meta_tools
@@ -103,7 +106,13 @@ async def handle_message(
     messages = [{"role": "system", "content": _SYSTEM}, *history]
     reply_text, reply_citations = None, []
 
+    # The PEAK, not the first: messages grow with every tool result inside the
+    # turn, so the largest request is the last one, and the largest request is
+    # what a ceiling is about. B1 reads this back to decide the next turn.
+    prompt_peak = 0
+
     for turn in range(max_turns):
+        prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
         content, tool_calls, _usage = await llm_client.chat_with_tools(messages=messages, tools=tools)
         assistant_msg: dict = {"role": "assistant", "content": content or ""}
         if tool_calls:
@@ -141,14 +150,20 @@ async def handle_message(
     # committed before the loop started (routes/agent.py), the work really was
     # done, and hiding the failure from the transcript would leave the user's
     # question sitting there with no reply and no explanation.
-    meta: dict = {}
+    meta: dict = {"prompt_tokens": prompt_peak}
     if reply_text is None:
         reply_text, reply_citations = _GATE_EXHAUSTED_TEXT, []
-        meta = dict(_GATE_EXHAUSTED_META)
+        meta |= _GATE_EXHAUSTED_META
 
     async with db_factory() as db:
         db.add(AgentMessage(id=message_id, session_id=session_id, role="assistant",
                             content=reply_text, citations=reply_citations, meta=meta))
+        # Session-level, so the next turn can be refused before it is charged
+        # without reading the whole message history back first.
+        await db.execute(
+            update(AgentSession).where(AgentSession.id == session_id)
+            .values(last_prompt_tokens=prompt_peak)
+        )
         await db.commit()
 
     return {"session_id": session_id, "message_id": message_id,

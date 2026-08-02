@@ -18,7 +18,8 @@ from exposure_workbench.agents.meta_agent import handle_message
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
-from exposure_workbench.services import agent_session_service, usage_service
+from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.services import agent_session_service, context_budget, usage_service
 
 router = APIRouter()
 
@@ -82,6 +83,20 @@ class MessageOut(BaseModel):
     meta: dict = {}
 
 
+def _is_provider_context_error(exc: Exception) -> bool:
+    """Whether a provider error means "this prompt is too long".
+
+    Matched on the message because neither SDK exposes a distinct type for it.
+    Deliberately narrow: a false positive here would tell a user to start a new
+    session over an unrelated outage, and every other error must keep its own
+    shape rather than being absorbed into a tidy 413.
+    """
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return ("context_length_exceeded" in text
+            or "maximum context length" in text
+            or ("too many tokens" in text and "context" in text))
+
+
 @router.post("/agent/sessions/{session_id}/messages", response_model=MessageOut)
 async def post_message(
     session_id: str, body: MessageIn,
@@ -91,7 +106,9 @@ async def post_message(
     """One turn of the meta-agent.
 
     Status order is fixed: 401 (require_user) -> 404 (precheck) -> 409 (a turn is
-    already in flight) -> 429 (daily quota). Deliberately no 403: agent_sessions
+    already in flight) -> 413 (the session's context is spent) -> 429 (daily
+    quota). 413 sits before 429 deliberately: a turn that cannot run must not
+    cost a quota unit. Deliberately no 403: agent_sessions
     has a FOR ALL policy, so another tenant's session is invisible to both the
     SELECT and the UPDATE — the precheck below is what keeps "not yours" (404)
     distinguishable from "busy" (409); drop it and the two collapse into one
@@ -117,6 +134,23 @@ async def post_message(
         claimed_at = await agent_session_service.claim_turn(gate_db, session_id)
         if claimed_at is None:
             raise HTTPException(409, {"error": "turn_in_flight", "session_id": session_id})
+
+        # Before the charge, never after: a turn that cannot run must not cost a
+        # quota unit. Raising here rolls the claim_turn UPDATE back with the
+        # transaction, and THAT is the release — the 429 below has always worked
+        # this way. Calling release_turn explicitly would open a second
+        # connection onto the row lock this one still holds and hang the request
+        # with its exception swallowed.
+        projected = (s.last_prompt_tokens or 0) + context_budget.count_tokens(body.text)
+        if projected > get_settings().context_soft_limit_tokens:
+            raise HTTPException(413, {
+                "error": "session_context_exhausted",
+                "projected_tokens": projected,
+                "limit": get_settings().context_soft_limit_tokens,
+                "detail": "this conversation has grown past what one turn can carry; "
+                          "start a new session to continue",
+            })
+
         try:
             await usage_service.charge(gate_db, user.user_id, "chat_turn")
         except usage_service.QuotaExceeded as e:
@@ -124,6 +158,20 @@ async def post_message(
 
     try:
         return await handle_message(factory, session_id, body.text)
+    except Exception as e:      # noqa: BLE001 — narrowed immediately below
+        # Defence in depth for the case the pre-check cannot see: the FIRST turn
+        # of a session has no measurement to project from, and a single 8k-char
+        # message plus a large tool result can still overrun. Same error shape,
+        # but the quota is NOT refunded — it was charged and committed before the
+        # loop, the provider call really happened, and V2-H's rule is that a
+        # charge shares its caller's transaction only when the money is spent
+        # later on the worker.
+        if _is_provider_context_error(e):
+            raise HTTPException(413, {
+                "error": "session_context_exhausted",
+                "detail": "the provider refused this turn as too long; start a new session",
+            }) from e
+        raise
     finally:
         # finally, not a happy-path call: chat_with_tools raises outright when no
         # API key is configured, OpenAI network errors pass straight through, and

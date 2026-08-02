@@ -50,6 +50,9 @@ services:
       # the shared backstop across everyone. Both are what stands between a public
       # link and an unbounded bill, so they are tunable without a rebuild.
       TURN_LEASE_SECONDS: "${TURN_LEASE_SECONDS:-900}"
+      # V3-B1. Without this line the refusal threshold cannot be changed on a
+      # running deployment, which also makes it untestable there.
+      CONTEXT_SOFT_LIMIT_TOKENS: "${CONTEXT_SOFT_LIMIT_TOKENS:-80000}"
       DAILY_CHAT_TURNS: "${DAILY_CHAT_TURNS:-10}"
       DAILY_RESEARCH_RUNS: "${DAILY_RESEARCH_RUNS:-3}"
       DAILY_READINESS: "${DAILY_READINESS:-10}"

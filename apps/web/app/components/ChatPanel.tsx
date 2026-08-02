@@ -138,6 +138,15 @@ export function ChatPanel() {
         // per origin) or a previous turn whose process died and whose lease has
         // not expired yet.
         setNotice("This session already has a turn running — it may be open in another tab. Wait for it to finish, or start a new session.");
+      } else if (detail?.error === "session_context_exhausted") {
+        // Not an account problem and not a transient one: this conversation is
+        // finished. Say which, and say what to do — the only fix is a new session.
+        setNotice(
+          "This conversation has grown too long for one turn. Start a new session to carry on — " +
+          "your earlier answers stay in the history."
+        );
+        setSessionId(null);
+        localStorage.removeItem(LS_KEY);
       } else if (detail?.error === "quota_exceeded") {
         // An account. Show the numbers as the server reported them rather than
         // paraphrasing: the user wants to know what they spent and when it resets.

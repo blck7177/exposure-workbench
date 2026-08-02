@@ -56,7 +56,7 @@ def test_settings_new_fields_defaults():
 # containment, so the list cannot quietly grow AND cannot quietly keep an entry
 # after its consumer ships — landing B1/B2 turns this test red until the name is
 # removed. It must be empty at V3 sign-off.
-_PENDING_CONSUMERS = {"turn_tool_budget", "context_soft_limit_tokens"}
+_PENDING_CONSUMERS = {"turn_tool_budget"}   # B2; context_soft_limit_tokens retired by B1
 
 
 def test_no_settings_field_is_declared_but_never_read():

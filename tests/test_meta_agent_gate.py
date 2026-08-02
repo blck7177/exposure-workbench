@@ -50,7 +50,7 @@ async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(
     assert out["text"] == _GATE_EXHAUSTED_TEXT
     assert "999.9" not in out["text"]
     assert out["citations"] == []
-    assert out["meta"] == {"gate": "exhausted"}
+    assert out["meta"]["gate"] == "exhausted"
 
 
 @pytest.mark.asyncio
@@ -70,7 +70,7 @@ async def test_a_loop_that_never_reaches_respond_says_so_in_the_same_words(monke
     out = await handle_message(_factory(store), "sess_2", "how did NVDA do?", max_turns=2)
 
     assert out["text"] == _GATE_EXHAUSTED_TEXT
-    assert out["meta"] == {"gate": "exhausted"}
+    assert out["meta"]["gate"] == "exhausted"
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,7 @@ async def test_the_failure_is_persisted_and_marked_not_swallowed(monkeypatch):
     assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
     assert len(assistant) == 1
     assert assistant[0].content == _GATE_EXHAUSTED_TEXT
-    assert assistant[0].meta == {"gate": "exhausted"}
+    assert assistant[0].meta["gate"] == "exhausted"
 
 
 @pytest.mark.asyncio
@@ -108,4 +108,23 @@ async def test_an_accepted_answer_carries_no_marker(monkeypatch):
     out = await handle_message(_factory(store), "sess_4", "hi", max_turns=4)
 
     assert out["text"] == "Hello."
-    assert out["meta"] == {}
+    assert "gate" not in out["meta"]
+
+
+@pytest.mark.asyncio
+async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
+    """V3-B0. Measurement, not policy: B1 refuses on this number and B3's
+    go/no-go on summarisation is decided by its distribution, so it has to exist
+    before either. The count includes the tool schemas, which are sent on every
+    request and appear nowhere in `messages` — a bare system prompt already costs
+    thousands of tokens once they are counted."""
+    async def _no_tools(**_kw):
+        return ("whatever", None, {})
+
+    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    store: list = []
+    out = await handle_message(_factory(store), "sess_5", "hello?", max_turns=1)
+
+    assert out["meta"]["prompt_tokens"] > 1000, "tool schemas must be in the count"
+    assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
+    assert assistant[0].meta["prompt_tokens"] == out["meta"]["prompt_tokens"]

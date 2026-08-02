@@ -35,6 +35,11 @@ dependencies = [
     "mcp>=1.2",               # FastMCP server: exposure-workbench tool face (M10)
     # ─── Multi-user (V2-A) ────────────────────────────────────────────────────
     "pyjwt[crypto]>=2.8",     # verify Clerk RS256 session JWTs against JWKS
+    # ─── Harness (V3-B0) ──────────────────────────────────────────────────────
+    # Declared, not inherited: it arrives transitively through langchain-core
+    # today, and context measurement is not something to leave at the mercy of
+    # another package's dependency resolution.
+    "tiktoken>=0.7",          # prompt-size measurement (o200k_base, pinned)
 ]
 
 [project.optional-dependencies]

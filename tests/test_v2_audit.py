@@ -235,3 +235,37 @@ def test_erasure_order_deletes_children_before_parents():
                 violations.append(f"{child} deleted after its parent {parent}")
 
     assert violations == [], violations
+
+
+def test_the_context_check_sits_before_the_charge_and_never_releases_the_turn():
+    """V3-B1, and two invariants in one test because they share a cause.
+
+    Order: a turn the server will not run must not cost a quota unit, so the
+    413 has to be decided before charge(). Both the 409 and the 429 beside it
+    already work this way.
+
+    Absence: the check lives inside `async with ... gate_db.begin()`, so raising
+    rolls the claim_turn UPDATE back — and that rollback IS the release. An
+    explicit release_turn would open a SECOND connection onto the row lock this
+    transaction still holds, and release_turn swallows every exception, so the
+    symptom would be a request that hangs for ever with nothing in any log.
+    """
+    src = (ROUTES / "agent.py").read_text()
+    body = src[src.index("async def post_message("):]
+
+    claim = body.index("claim_turn")
+    in_flight = body.index('"turn_in_flight"')
+    context = body.index('"session_context_exhausted"')
+    charge = body.index('"chat_turn"')
+
+    assert claim < in_flight < context < charge, (
+        "the context check moved relative to the quota charge; see the docstring"
+    )
+    # Code only: the comment right beside it explains why the call must not be
+    # there, and a check that cannot tell an explanation from a call is a check
+    # that punishes documenting the reason.
+    gate_code = "\n".join(ln for ln in body[claim:charge].splitlines()
+                          if not ln.lstrip().startswith("#"))
+    assert "release_turn(" not in gate_code, (
+        "the gate transaction must not release the turn explicitly — the rollback does it"
+    )
