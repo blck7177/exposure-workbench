@@ -18,7 +18,7 @@
 
 - **D4 会话粒度(stateless 下)**:一行 `agent_sessions` per **(owner, kind='mcp', UTC 日)**,partial unique index 保证。日粒度与日配额同节奏;trace 按天聚合可审计。
 - **D5 turn lease 不用于 MCP 调用**:turn 是对话概念(V2-E2 防并发聊天 turn);MCP 的每次 `tools/call` 是独立调用,并发正确性由预算扣减的事务性(行级锁)保证。不做每调用互斥。
-- **D6 面 = scope**:`mcp:read` → `READ_CORE`(12 工具);`mcp:act` → `FACE_META_AGENT`(16 工具)。scope 不足 → `403 insufficient_scope` + `WWW-Authenticate` 挑战(spec 内建的 step-up 机制)。
+- **D6 面 = scope**:`mcp:read` → `READ_CORE`(★ 实为 **11** 工具;12 是 `build_read_registry()` 的大小 = READ_CORE + `get_portfolio_snapshot`,两者都随 V3-C 的四个新读工具再变);`mcp:act` → `FACE_META_AGENT`(16 工具)。scope 不足 → `403 insufficient_scope` + `WWW-Authenticate` 挑战(spec 内建的 step-up 机制)。
 
 ---
 

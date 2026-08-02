@@ -18,7 +18,6 @@ dependencies = [
     "pydantic-settings>=2.3",
     "python-dotenv>=1.0",
     "openai>=1.30",
-    "anthropic>=0.28",
     "langgraph>=0.1",
     "langchain-openai>=0.1",
     "yfinance>=0.2",

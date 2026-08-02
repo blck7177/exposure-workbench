@@ -94,7 +94,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full design.
 | Worker | Python async polling loop |
 | Database | PostgreSQL 16 |
 | Analytics | pandas + numpy + scipy |
-| Report Agent | OpenAI / Anthropic (switchable) |
+| Report Agent | OpenAI |
 | Identity | Clerk (optional; blank keys = anonymous demo) |
 | Tenancy | Postgres row-level security |
 | Orchestration | LangGraph (optional) |

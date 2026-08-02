@@ -9,18 +9,15 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench"
-    database_url_sync: str = "postgresql+psycopg2://exposure:exposure@localhost:5433/exposure_workbench"
     # V2-C: runtime connects as the non-owner role app_rls so RLS policies bind.
     # Empty => fall back to database_url (offline tests / pre-RLS local dev).
     database_url_app: str = ""
 
     # LLM
     openai_api_key: str = ""
-    anthropic_api_key: str = ""
     # gpt-5.x takes max_completion_tokens rather than max_tokens and accepts only
     # the default temperature — see llm/client.py, which branches on the prefix.
     openai_model: str = "gpt-5.4-mini"
-    anthropic_model: str = "claude-3-5-haiku-20241022"
     embedding_model: str = "text-embedding-3-small"   # 1536-dim, filing_chunks (M5)
 
     # External providers (Issuer Intelligence)
@@ -32,17 +29,27 @@ class Settings(BaseSettings):
     clerk_authorized_parties: str = ""     # comma-sep origins allowed as azp, e.g. http://localhost:3103
 
     # Agent budgets (env-overridable; see IMPLEMENTATION_PLAN §0.5)
-    session_tool_budget: int = 40       # tool calls per agent session
+    session_tool_budget: int = 40       # tool calls per SESSION (research; and any
+                                        # session with no per-turn budget of its own)
     external_search_budget: int = 5     # Tavily searches per research run
-    submit_brief_retries: int = 2       # submit_brief citation-gate retries
-    respond_retries: int = 1            # respond citation-gate retries
+    # V3-B2: tool calls per TURN, for sessions that have turns. A lifetime budget
+    # is the wrong shape for a conversation — it does not run out, it makes the
+    # session progressively less able to answer, with no signal to the user. The
+    # value is stamped on the row at creation (agent_sessions.turn_tool_budget),
+    # so which regime a session is under is data, not a branch in reserve().
+    turn_tool_budget: int = 15
+
+    # V3-B1: refuse a turn whose prompt would exceed this, BEFORE charging quota.
+    # Deliberately conservative and measured before it is relaxed: B0 records the
+    # real distribution (agent_sessions.last_prompt_tokens) and B3's summarisation
+    # is only built if that data says it is needed.
+    context_soft_limit_tokens: int = 80_000
 
     # Agent mode
     report_agent_mode: str = "direct_llm"
 
     # App
     demo_mode: bool = True
-    log_level: str = "INFO"
     worker_poll_interval: int = 2
 
     # Concurrency (V2-E). Leases rely on "pick a generous value, let expiry
@@ -95,7 +102,6 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3103,http://127.0.0.1:3103"
 
     # Paths
-    data_dir: Path = Path("/app/data")
     configs_dir: Path = Path("/app/configs")
 
     model_config = {"env_file": ".env", "extra": "ignore"}

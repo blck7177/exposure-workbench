@@ -296,7 +296,8 @@ workflow 收尾步:物化 Evidence Trail,run completed
 
 ### 已定决策(默认采纳,可推翻)
 
-1. 提交门修正预算:**2 次重提**(初提+2 修正),耗尽 run failed;数值进配置。
+1. ~~提交门修正预算:**2 次重提**(初提+2 修正),耗尽 run failed;数值进配置。~~
+   ★ V3-A0-4 更正:**从未实现**。`submit_brief_retries` 在 settings 里躺了两个阶段、被 test_p0_schema 断言、被这一行写成已定决策,而**没有任何生产代码读它**。真实的界是`max_turns`(research 30)加会话工具预算;配置项已删除,`tests/test_p0_schema.py` 的结构守卫现在会让下一个这样的死旋钮直接测试失败。
 2. open_questions 免引用豁免:**采纳**,其余五块强制。
 
 ### 明确不做
@@ -421,7 +422,9 @@ skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审
 
 ### ★ 已定:respond 也是工具(选项 1)
 
-`respond(text, citations[])` 是会话唯一出口:citations 结构化提交,wrapper 校验每个 id ∈ 本轮 Evidence Trail,编造被拒(1 次重试)。`citations=[]` 合法(非事实性回复);**但凡引了,必须是真的**。一套门机制服务 chat 消息与 Brief 两种产物。
+`respond(text, citations[])` 是会话唯一出口:citations 结构化提交,wrapper 校验每个 id ∈ 本轮 Evidence Trail。**但凡引了,必须是真的**。一套门机制服务 chat 消息与 Brief 两种产物。
+
+★ V3 两处更正:①「1 次重试」**从未实现**(`respond_retries` 同 M9,已删,见上);真实的界是 `max_turns=16` 加工具预算。②「`citations=[]` 合法(非事实性回复)」在 V3-A0-1 之后**只对不含数字的回复成立**:文本里出现实质数字而 citations 为空 → `citations_required`,问候与澄清反问仍可零引用。schema 的 `required` 仍只有 `text` —— 强制在 gate 语义层,因为把 citations 设成 schema 必填会连无数字回复一起堵死。
 
 ### ★ 已定:MCP 双轨规则(2026-07-23,吸收 M12)
 
