@@ -11,8 +11,10 @@ The wrapper does three things automatically around every LLM-driven call:
 Evidence-ref extraction is automatic: any returned id-shaped field (fact_/chunk_/
 calc_/src_/alert_/run_ or an explicit {type,id}/citation) becomes a trace ref, so
 tool authors can't forget to report what a call touched. Two limits are
-deliberate: the prefix set is exactly what the citation gate can resolve, and a
-GATE tool's own output is never harvested (see _harvestable).
+deliberate: the prefix set is exactly what the citation gate can resolve, and
+only a RETRIEVAL is harvested — never a gate's verdict, a reflection, or an
+error payload, all three of which can hand the model's own words back to it
+(see _harvestable).
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -202,7 +204,7 @@ async def invoke(
             logger.exception("could not roll back after %s failed", tool_name)
 
     # 3) trace (auto-extract evidence refs)
-    refs = extract_evidence_refs(result) if _harvestable(tool, status) else []
+    refs = extract_evidence_refs(result) if _harvestable(tool, status, result) else []
     try:
         await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
@@ -217,8 +219,12 @@ async def invoke(
     return result
 
 
-def _harvestable(tool: Tool, status: str) -> bool:
+def _harvestable(tool: Tool, status: str, result: dict) -> bool:
     """Whether a call's return value may contribute evidence to the trail.
+
+    Evidence is what a tool RETRIEVED. Everything below is that one sentence
+    read against the ways a return value can fail to be a retrieval, and each
+    clause was written after a payload got through the previous set:
 
     A GATE's output is never evidence — it is the session's verdict on evidence
     — and its REJECTION payload is actively poisonous: invalid_citations echoes
@@ -228,12 +234,25 @@ def _harvestable(tool: Tool, status: str) -> bool:
     check, leaving only _exists_in_db between a made-up id and an accepted
     answer, and materialize_pack wrote them into the run's evidence pack.
 
+    A REFLECTION is the model talking to itself; think returns the thought
+    verbatim, so any id-shaped string the model typed became evidence it had
+    "retrieved". An ERROR PAYLOAD is a refusal, and the three that name their
+    argument back — unknown_job, unknown_portfolio, not_your_portfolio — carry
+    an id the model supplied rather than one a lookup produced.
+
+    Two rules for three vectors, deliberately: a per-tool exclusion list would
+    have to be extended by whoever writes the fourth echoing tool, and they will
+    not know to. Nothing legitimate is lost — no error return anywhere in the
+    tool layer carries a citable id that a successful call does not also carry.
+
     Note this closes the fabricated-id loop and nothing else: the explicit
     {type,id} branch and the calc_id/fact_id key branch are separate ingestion
     paths, and one malformed id from before V1's alert-prefix fix is still
     sitting in agent_steps.evidence_refs by way of the former.
     """
-    return status == "completed" and tool.tool_class != GATE
+    if status != "completed" or tool.tool_class in (GATE, REFLECTION):
+        return False
+    return not (isinstance(result, dict) and "error" in result)
 
 
 def _step_type(tool: Tool) -> str:
