@@ -277,6 +277,31 @@ pointers intact, and each guard refusing without writing.
 
 ### Known limits
 
+V3 added five, and they are limits of the verification layer rather than of the
+service — worth knowing precisely because the layer above them is now strong
+enough that people will trust it.
+
+- **Numeric verification is an existence check, not a correctness check.** It
+  proves a number appears in the evidence cited for it. It cannot prove the
+  number answers the question asked: swapping two real figures within one answer,
+  both drawn from the same citation, passes.
+- **Citations to prose are checked scale-blind.** A `chunk_`/`src_` citation is
+  verified by whether the digits appear verbatim in the passage, because a filing
+  table's scale usually sits in a header the chunk does not carry.
+- **Two evidence-ingestion paths remain open.** The explicit `{type,id}` branch
+  and the `calc_id`/`fact_id` key branch can still put an unciteable id into the
+  trail. One malformed id from before V1's alert-prefix fix is in the live trail
+  through the first of them.
+- **MCP is on the older budget regime and is worse off than chat.** It never
+  claims a turn, so a per-turn counter would never reset for it; it keeps the
+  lifetime budget until it has a face of its own.
+- **The context pre-check will rarely fire.** It cannot see a session's first
+  turn, and a full turn measures in the low thousands of tokens against an
+  80,000 limit. The provider-side mapping is the one that would actually catch an
+  overrun.
+
+Carried from V2, unchanged:
+
 Each of these is a decision, not an oversight. They are here so that the next
 person to touch this — including me — does not have to rediscover them.
 - **A portfolio's own risk limits do nothing.** `check_limits` takes a

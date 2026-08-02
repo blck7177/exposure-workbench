@@ -580,3 +580,50 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 ### 明确不做
 
 k8s/微服务/消息中间件(Redis/Celery)、企业 SSO、组织/团队模型、用户间共享、组合原地编辑与删除流、agent 写组合工具、非美市场、分库分表、alembic。
+
+---
+
+## M15 — Harness 组件补全(2026-08-02 完成)
+
+> **状态**:Verify / Context / Memory / Evals 四个组件全部落地,13 commits。
+> 277 offline + 89 live 全绿;终验数字与实测证据见 [spikes/V3_COVERAGE.md](spikes/V3_COVERAGE.md),
+> 执行计划见 [IMPLEMENTATION_PLAN_V3.md](IMPLEMENTATION_PLAN_V3.md)。
+
+背景:把系统对到 agent harness 的标准组件清单(loop / tools / context / guardrails /
+verification / memory / observability / evals)上之后,V2 之前散着的一堆问题合并成了一句话:
+**这个系统的"可信"靠的是「引用的 ID 为真」+「计算可回放」,而这两条都不管"回答里的那个数字对不对"。**
+
+### 设计上值得记住的四条
+
+- **验证的判据是「写法精度的半个 ulp」,不是相对容差**。语义是"真值必须能四舍五入成模型写下的
+  那个数"。相对容差两头都错:正确的舍入被拒(0.04061908 写成 `4.1%` 相对误差 0.94%),
+  末位篡改被接受(`$82.886B` 的 rtol 开出 ±$414M 窗口)。
+- **单位由 schema 推导,不猜**。fact 的 `unit` 列、calc 的 `operation` 名、run 子表的列名
+  各自决定单位类;只有 PERCENT↔RATIO 换算,系数恰好 100。曾经写进计划的"缩放族"
+  `{v, v/1e3, v/1e6, v/1e9, v*100}` 是五路"我不知道单位",在无 fallback 的模块里尤其不能要 ——
+  实测反例:一行 risk_alert 同时有 0.158 / 0.15 / 0.792,缩放族会把"用到限额的 15.8%"当成对的。
+- **gate 的产物不是证据**。`respond` 拒绝时会把它刚拒掉的 id 回显在 `problems[]` 里,而这次调用
+  是 `completed` —— 于是伪造 id 被 harvest 进 trail,重试时就过了 trail 检查。GATE 类工具的
+  返回值一律不 harvest。
+- **抽取器要拿真语料建,不能拿想出来的例子建**。四个 bug 全是跑真实 `agent_messages` /
+  `issuer_briefs` 才暴露的,其中最危险的一个让 `AAPL 15.8%` 被当成 `Microsoft 365` 那样的
+  产品名豁免掉 —— 真实回答里三个 issuer 权重被吞了两个。
+
+### 与既有模块的接缝
+
+- M3 计算代数新增 `series` 恒等原语。看着冗余,实则必要:季度序列里的**派生 Q4**
+  (年度 − Q1 − Q2 − Q3)在任何表里都没有对应行,它携带的四个 fact id 各自是**别的数**,
+  所以"引用正确且数字正确"在结构上无法验证。给它一个自己的 calc id 才关掉这个误拒类别。
+- M9/M10 的 gate 增加第二道:引用 ID 为真之后,再查数字。chat 走整条回答,brief **按 block 用
+  该 block 自己的引用** —— 合并检查会让 market_context 的数字被 financial_summary 的引用"担保",
+  那正是一份内部自洽、逐条无据的 brief 的成因。
+- M11 审计面新增 `agent_messages.meta`:gate 失败标记与 prompt token 数。**不能复用 `role`** ——
+  `_load_history` 把 role 原样喂进 provider 的 messages 数组。
+- ★ M5 的"检索质量实测后再议"结清了:24 query 基线已记录。**首次实测最有价值的产出不是分数,
+  而是 recall@5 = 1.000 说明这个指标在本语料上饱和、测不出回归**,故回归守的是 precision@k。
+
+### 明确不做(V3 范围)
+
+B3 上下文摘要(B0 实测显示一整轮只有几千 token 对 80k 上限,现在建等于猜)、LLM-as-judge
+评测(确定性检查还没用尽)、passage 级检索标注(要人读 3,078 个 chunk)、MCP 自己的 face
+(属 MCP_BOUNDARY_PLAN)。
