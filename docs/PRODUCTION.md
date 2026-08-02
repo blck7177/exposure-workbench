@@ -148,8 +148,12 @@ counting only the caller, which is a fail-*open* backstop and worse than none.
 
 Defaults are per user per UTC day: 10 chat turns, 3 research runs, 10 readiness,
 20 exposure runs, 10 market syncs; the global pools are 200/30/100/200/50. All
-env-overridable. The per-session budgets (40 tool calls, 5 external searches) are
-a different, orthogonal layer — they bound one conversation, these bound one day.
+env-overridable. The tool budgets are a different, orthogonal layer — they bound
+one conversation, these bound one day — and since V3-B2 they run on two tracks:
+**15 tool calls per TURN** for a conversation (reset when the turn is claimed,
+which is what an over-long answer runs into) and **40 per SESSION** as the
+lifetime ceiling, which is the only track a research run and the MCP host are on.
+External search stays a sub-budget of 5 per session.
 
 **Removes.** The unbounded bill. A refusal happens at the gate, before any
 provider call: measured at 14ms.
@@ -290,6 +294,15 @@ enough that people will trust it.
   claim needs a percent, which is what stops short digit strings matching by
   coincidence — but not by magnitude, because a filing table's scale usually sits
   in a header the chunk does not carry.
+- **Per-portfolio risk limits are loaded, passed, and never read.** The workflow
+  reads `risk_limits` for the portfolio and hands them to `check_limits` as
+  `db_limits`; the function body does not reference the parameter once, so every
+  alert comes from the global YAML thresholds. On the demo book that silently
+  discards twelve rows, several of them TIGHTER than the defaults (LLY at
+  0.12/0.18 against a 0.15/0.20 default; Financials at 0.20/0.30 against
+  0.40/0.50) — a limit the desk sets does nothing. Found during V3-R while
+  correcting a note that claimed the opposite. Not fixed here: honouring them
+  changes which alerts exist, which is a decision rather than a repair.
 - **Two evidence-ingestion paths remain open.** The explicit `{type,id}` branch
   and the `calc_id`/`fact_id` key branch can still put an unciteable id into the
   trail. One malformed id from before V1's alert-prefix fix is in the live trail

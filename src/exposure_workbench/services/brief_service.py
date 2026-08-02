@@ -23,6 +23,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import IssuerBrief
 
 _BLOCKS = ("financial_summary", "key_changes", "management_explanation",
@@ -49,6 +50,16 @@ async def latest_visible(db: AsyncSession, company_id: str) -> dict | None:
     return {
         "brief_id": brief.id,               # a plain field: NOT a citable ref
         "created_at": brief.created_at,
+        # Whose reading this is. RLS shows a caller its own briefs AND the public
+        # demo ones, so "I can see it" and "I commissioned it" are different
+        # facts, and without this the agent reports the demo's conclusions back
+        # to a user as though they had paid for them. Same field name and same
+        # reasoning as the portfolio snapshot's is_own — semantic, not security.
+        "is_own": brief.owner_id is not None and brief.owner_id == current_user_id(),
+        # The run this came out of: an rrun_ is not citable evidence, but it is
+        # what get_task_status takes, so the agent can say when it was produced
+        # and what else that run did.
+        "research_run_id": brief.research_run_id,
         "blocks": {
             name: {
                 "text": getattr(brief, name),

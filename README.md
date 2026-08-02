@@ -7,9 +7,12 @@ pgvector filing retrieval, an evidence-gated Issuer Risk Brief, and a single
 meta-agent the user talks to — every factual answer traceable to a fact, a
 calculation, a filing passage or a research source.
 
-The agent tool surface is exposed identically over REST (for the UI) and MCP (for an
-external agent host), with budget / citation / audit enforcement in one wrapper below
-the transport.
+The agent tool surface is exposed over REST (for the UI) and MCP (for an external
+agent host) from ONE registry, with budget / citation / audit enforcement in a
+single wrapper below the transport. The two faces are not yet identical: the MCP
+host advertises the meta-agent face and `faces.available()` trims it to the 16
+tools that registry has, dropping the 4 delegation and gate tools. A test pins
+the gap at exactly that, and MCP_BOUNDARY_PLAN closes it.
 
 ## Quick Start
 

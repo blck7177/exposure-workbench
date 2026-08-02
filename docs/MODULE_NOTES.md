@@ -386,6 +386,8 @@ Brief 的 LLM 后处理/改写规则、多轮人工审批流、brief 版本 diff
 ### 已定决策(默认采纳)
 
 1. 会话总预算:**40 次工具调用/会话**(含 think 与提交门往返;外部搜索 5 次是子预算),进配置。
+   ★ V3-B2 起改为双轨:对话是 **15 次/轮**(claim_turn 时归零),40 次退为终身上限;
+   research 与 MCP host 只走终身那一轨(V3-R6 才让后者真的如此)。
 2. readiness 步序 MVP 串行。
 
 ### 明确不做
@@ -525,7 +527,11 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 > 执行计划见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md),生产口径见 [PRODUCTION.md](PRODUCTION.md)。
 > 实现期推翻的两条原设计已在下文就地标 ★ 改写(重投白名单、配额不进 wrapper);
 > 尚未做完的部分集中记在 V2_COVERAGE 的「Known gaps」一节(`owner_id NOT NULL` 收紧、
-> Clerk 仍是 dev 实例;删号路径与 `check_limits` 死参数已在 V2-H 关闭)。**公网链接前仍需人工完成**:DNS 记录 +
+> Clerk 仍是 dev 实例;删号路径已在 V2-H 关闭,**`check_limits` 的死参数没有**——
+> ★ V3-R 复核:`db_limits` 由 workflow 装载并传入,函数体一次都没读它,所以
+> `risk_limits` 表里的 per-portfolio / per-entity 阈值(demo book 有 12 行,含
+> LLY 0.12/0.18、Financials 0.20/0.30 这类比 YAML 更紧的)对告警毫无作用。
+> 这是行为缺陷不是文档问题,修它会改变告警集合,单独定夺,记入 PRODUCTION known limits)。**公网链接前仍需人工完成**:DNS 记录 +
 > 机器上的 `/etc/caddy/Caddyfile`(样例在 `infra/Caddyfile.example`)。
 
 背景:项目定位是个人展示,但要呈现 production/deployment-ready。讨论结论:展示型项目的"生产就绪"是叙事资产——每个会坏的边界上有一个能指出来的正交模块,而不是堆基础设施。既有优势直接入账:审计轨迹、预算强制、append-only、幂等 upsert、任务 claim 已是 `FOR UPDATE SKIP LOCKED`(task_service.py)。

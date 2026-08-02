@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 _TOP_SECTORS = 8
 _TOP_ISSUERS = 10
+# The full-book read is bounded too — see positions_with_weights. 50 rows is
+# comfortably inside the 6000-character summariser and above every real book on
+# this system; the CSV importer's own ceiling is 200.
+_POSITION_ROW_LIMIT = 50
 
 DEMO_PORTFOLIO_ID = "port_001"
 # tickers that are funds even when no position metadata names them (U1 covered set)
@@ -460,6 +464,15 @@ async def positions_with_weights(db: AsyncSession, portfolio_id: str) -> dict | 
         )).scalars().all()
         priced = {r.ticker: r for r in rows}
 
+    # A hard row cap, and the truncation is REPORTED. The CSV importer accepts
+    # 200 rows and a tool result is summarised at 6000 characters, so a large
+    # book would be cut mid-JSON by the summariser — the model would read a
+    # broken object, or worse, a plausible one that stops at "AAP". A count the
+    # model can see is a fact it can act on ("showing 50 of 137"); a silent cut
+    # is a wrong answer it cannot know is wrong.
+    total = len(positions)
+    positions = positions[:_POSITION_ROW_LIMIT]
+
     holdings = []
     for pos in positions:
         # pos_id is what makes the quantity answerable: it is the only number on
@@ -481,6 +494,8 @@ async def positions_with_weights(db: AsyncSession, portfolio_id: str) -> dict | 
         "positions_as_of": positions[0].as_of_date if positions else None,
         "holdings": holdings,
         "count": len(holdings),
+        "total_holdings": total,
+        **({"truncated": True} if total > len(holdings) else {}),
         **({"unpriced": unpriced} if unpriced else {}),
         **({} if latest is not None else
            {"note": "no completed run: quantities are real, market values and weights are "

@@ -315,7 +315,9 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_portfolio_positions",
-        description="Every holding in a portfolio: ticker, quantity, sector, market value and weight. "
+        description="Every holding in a portfolio: pos_id, ticker, quantity, sector, market value "
+                    "and weight. Cite the pos_id for a share count. Capped at 50 rows — when "
+                    "truncated is set, total_holdings is the real number and say so. "
                     "get_portfolio_snapshot only carries the largest few.",
         json_schema={"type": "object", "properties": {
             "portfolio_id": {"type": "string"},

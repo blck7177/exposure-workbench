@@ -206,6 +206,26 @@ def test_an_id_is_exempt_whole_not_digit_by_digit():
     assert raw_forms(extract_numbers("calc_50c612fc9f59 gives 16.2%")) == ["16.2%"]
 
 
+def test_a_decimal_written_without_its_leading_zero_is_not_ten_times_bigger():
+    """The literal had to start on a digit, so ".5%" was read as "5%" — the
+    number the model wrote, off by a factor of ten, silently verified against
+    whatever ten times it happens to be near. A missed extraction is a hole; a
+    misread magnitude is a wrong answer with a citation on it."""
+    n = _one("a .5% move")
+    assert n.value == pytest.approx(0.005)
+    assert _one("$.50 per share").value == pytest.approx(0.50)
+
+
+def test_a_scale_letter_that_starts_another_word_is_not_a_scale():
+    """"3 M&A deals" is three deals, not three million, and "10 T-bills" is ten
+    bills. The boundary looks for the compound the letter belongs to; a range
+    like "$5B-10B" is left alone, because there the hyphen separates numbers
+    rather than starting a word."""
+    assert [n.value for n in extract_numbers("3 M&A deals closed")] == [3.0]
+    assert [n.value for n in extract_numbers("10 T-bills matured")] == [10.0]
+    assert extract_numbers("$5B-10B of buybacks")[0].value == pytest.approx(5e9)
+
+
 def test_a_number_free_reply_yields_nothing():
     assert extract_numbers("Sure — what would you like to know about the portfolio?") == []
     assert extract_numbers("") == []
@@ -286,17 +306,23 @@ def test_truncating_instead_of_rounding_is_refused():
     assert verify(extract_numbers("a margin of 32.3%"), [_val(0.322753)]) == []
 
 
-def test_a_percent_may_not_be_matched_against_an_unrelated_scale():
-    """The reason unit classes exist, taken from a real risk_alerts row that
-    carries current_value 0.158, limit_value 0.15 and utilization 0.792 at once.
-    A scale-blind rule accepts "at 15.8% of its limit" when the answer is 79.2%;
-    here 15.8% meets the 0.158 ratio and nothing else, and a claim ABOUT
-    utilization has to cite the number that is the utilization."""
+def test_a_class_is_checked_against_its_own_class_and_no_further():
+    """Both halves of what unit classes are worth, on a real risk_alerts row
+    that carries current_value 0.158, limit_value 0.15 and utilization 0.792 at
+    once.
+
+    What they buy: $0.16 is money, this row holds only ratios, and no amount of
+    digit similarity makes them meet.
+
+    What they do not: "AAPL is at 15.8%" is ACCEPTED, because 0.158 is one of
+    the three numbers the row holds — even if the sentence is about utilization,
+    which is 79.2%. A1 is an existence check on the number, not a reading of the
+    claim around it. This assertion is the honest one; the test used to be named
+    for a scale separation it does not perform."""
     alert = [_val(0.15840195, RATIO, "current_value"),
              _val(0.15, RATIO, "limit_value"),
              _val(0.79200974, RATIO, "utilization")]
     assert verify(extract_numbers("AAPL is at 15.8%"), alert) == []
-    # and money never meets a ratio, whatever the digits look like
     assert verify(extract_numbers("AAPL is at $0.16"), alert) != []
 
 

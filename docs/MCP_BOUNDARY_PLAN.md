@@ -40,8 +40,8 @@
 
 | 事实 | 坐标 |
 |---|---|
-| MCP server 存在,stdio,lowlevel `Server`,12 只读工具 | `apps/mcp/server.py`(129 行) |
-| 意图给 meta face,被 `faces.available()` **静默裁剪**成 12 | `server.py:39-40` + `faces.py:41-43` |
+| MCP server 存在,stdio,lowlevel `Server`,**16** 只读工具(★ V3-R 复核:V3-C 加了 4 个读工具,原记的 12 已过期) | `apps/mcp/server.py` |
+| 意图给 meta face(20),被 `faces.available()` **静默裁剪**成 16 —— 掉的是 4 个 delegation/gate 工具(★ 原记"裁剪成 12 / 掉 8") | `server.py:39-40` + `faces.py:41-43` |
 | 自开 engine,`DATABASE_URL`(**owner 角色,RLS 不绑定**) | `server.py:43-49` |
 | 进程全局单 session,`owner_id=None` | `server.py:65-70` |
 | `build_http_app()` 死代码且 schema 坏(FastMCP 推导出 `{"kwargs": string}`) | `server.py:97-115` |

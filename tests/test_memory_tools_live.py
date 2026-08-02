@@ -10,6 +10,7 @@ actually in this book, and what is A minus B.
 from __future__ import annotations
 
 import os
+import uuid
 
 import pytest
 from dotenv import load_dotenv
@@ -49,6 +50,13 @@ async def test_a_brief_can_be_read_back_with_the_evidence_under_each_block():
             assert out["brief_id"].startswith("brief_")
             assert out["blocks"], "a brief with no readable block is not a brief"
             assert out["citations"], "the flat citation list is always present"
+            # V3-R8: whose reading this is, and which run produced it. RLS shows
+            # a caller its own briefs AND the public demo ones, so "I can see
+            # it" and "I commissioned it" are different facts — without is_own
+            # the agent hands a user the demo's conclusions as if they had paid
+            # for them.
+            assert out["is_own"] is False, "no authenticated user here"
+            assert out["research_run_id"].startswith("rrun_")
     finally:
         await engine.dispose()
 
@@ -129,6 +137,13 @@ async def test_every_holding_is_listed_and_priced_from_the_run_not_the_position(
                 assert h["weight"] is not None and h["quantity"] is not None
             # the field the snapshot does not carry at all
             assert all("quantity" in h for h in out["holdings"])
+            # V3-R8: bounded, and the bound is legible. A tool result is
+            # summarised at 6000 characters, so an unbounded book would be cut
+            # mid-JSON — the model would read a broken object, or a plausible
+            # one that stops at "AAP".
+            assert out["count"] <= 50
+            assert out["total_holdings"] >= out["count"]
+            assert ("truncated" in out) == (out["total_holdings"] > out["count"])
     finally:
         await engine.dispose()
 
@@ -150,3 +165,116 @@ async def test_free_cash_flow_is_finally_a_ledgered_calculation():
             assert bad["error"] == "unsupported_op"
     finally:
         await engine.dispose()
+
+
+# ── V3-R8: the visibility claims, asserted through the RLS role ───────────────
+# brief_service.latest_visible and status_of("rrun_...") carry no owner filter,
+# and both say so in their docstrings: RLS is what scopes them. Asserting that
+# through the `exposure` connection above proves nothing — the table owner has
+# rolbypassrls, so every policy is inert for it and these tests would pass with
+# row-level security switched off entirely. These connect as `app_rls` and set
+# the tenant transaction-locally, exactly as the API does.
+
+APP_URL = os.getenv(
+    "DATABASE_URL_LOCAL_APP",
+    "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench",
+)
+TAG = uuid.uuid4().hex[:8]
+TENANT_A = f"user_v3c_A_{TAG}"
+TENANT_B = f"user_v3c_B_{TAG}"
+
+
+@pytest.fixture
+async def two_tenants():
+    """A owns a private brief and a research run on a company nobody else has
+    written about; the same company also carries a public brief."""
+    engine = create_async_engine(URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    ids = {"co": f"co_{TAG}", "brief_a": f"brief_{TAG}a", "brief_pub": f"brief_{TAG}p",
+           "rrun_a": f"rrun_{TAG}a", "rrun_pub": f"rrun_{TAG}p"}
+    async with mk() as db, db.begin():
+        for uid in (TENANT_A, TENANT_B):
+            await db.execute(text("INSERT INTO users (id, email) VALUES (:u, :e)"),
+                             {"u": uid, "e": f"{uid}@example.test"})
+        await db.execute(text("INSERT INTO companies (id, ticker, name) VALUES (:c, :t, 'V3R Probe Inc')"),
+                         {"c": ids["co"], "t": f"ZZ{TAG[:2].upper()}"})
+        await db.execute(text("""INSERT INTO research_runs (id, company_id, status, owner_id)
+                                 VALUES (:r, :c, 'completed', :a)"""),
+                         {"r": ids["rrun_a"], "c": ids["co"], "a": TENANT_A})
+        await db.execute(text("""INSERT INTO research_runs (id, company_id, status, owner_id)
+                                 VALUES (:r, :c, 'completed', NULL)"""),
+                         {"r": ids["rrun_pub"], "c": ids["co"]})
+        # created_at is set explicitly, and A's private brief is the NEWER of
+        # the two, so that these tests cannot pass vacuously: latest_visible
+        # takes the newest row it can see, so a reader that bypasses RLS gets
+        # A's. Left to the default both rows would share one timestamp — now()
+        # is transaction time — and the ordering would decide nothing.
+        await db.execute(text("""INSERT INTO issuer_briefs
+                                 (id, research_run_id, company_id, financial_summary, owner_id,
+                                  is_public, created_at)
+                                 VALUES (:b, :r, :c, 'The public read', NULL, TRUE,
+                                         now() - interval '1 hour')"""),
+                         {"b": ids["brief_pub"], "r": ids["rrun_pub"], "c": ids["co"]})
+        await db.execute(text("""INSERT INTO issuer_briefs
+                                 (id, research_run_id, company_id, financial_summary, owner_id,
+                                  is_public, created_at)
+                                 VALUES (:b, :r, :c, 'A private read', :a, FALSE, now())"""),
+                         {"b": ids["brief_a"], "r": ids["rrun_a"], "c": ids["co"], "a": TENANT_A})
+    try:
+        yield ids
+    finally:
+        async with mk() as db, db.begin():
+            await db.execute(text("DELETE FROM issuer_briefs WHERE id IN (:x, :y)"),
+                             {"x": ids["brief_a"], "y": ids["brief_pub"]})
+            await db.execute(text("DELETE FROM research_runs WHERE id IN (:r, :p)"),
+                             {"r": ids["rrun_a"], "p": ids["rrun_pub"]})
+            await db.execute(text("DELETE FROM companies WHERE id = :c"), {"c": ids["co"]})
+            await db.execute(text("DELETE FROM users WHERE id IN (:a, :b)"),
+                             {"a": TENANT_A, "b": TENANT_B})
+        await engine.dispose()
+
+
+async def _as_tenant(uid: str | None, fn):
+    engine = create_async_engine(APP_URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with mk() as db, db.begin():
+            if uid is not None:
+                await db.execute(text("SELECT set_config('app.user_id', :u, true)"), {"u": uid})
+            return await fn(db)
+    finally:
+        await engine.dispose()
+
+
+async def test_a_brief_is_visible_to_its_owner_and_to_nobody_else(two_tenants):
+    """Three readers, one company. The owner sees their own; another tenant and
+    an anonymous reader see the public one and have no way to learn that the
+    private one exists — invisibility rather than a refusal, which is the whole
+    reason this is a policy and not a WHERE clause."""
+    co = two_tenants["co"]
+
+    mine = await _as_tenant(TENANT_A, lambda db: brief_service.latest_visible(db, co))
+    theirs = await _as_tenant(TENANT_B, lambda db: brief_service.latest_visible(db, co))
+    anon = await _as_tenant(None, lambda db: brief_service.latest_visible(db, co))
+
+    assert mine["brief_id"] == two_tenants["brief_a"]
+    assert theirs["brief_id"] == two_tenants["brief_pub"]
+    assert anon["brief_id"] == two_tenants["brief_pub"]
+
+
+async def test_another_tenants_research_run_is_an_unknown_job_not_a_denied_one(two_tenants):
+    """status_of has no owner filter for rrun_ and says RLS scopes it. Under the
+    app role it does: B's query returns no row, so the tool answers unknown_job
+    — the same answer it gives for an id that was never minted, which is the
+    point. A "denied" would confirm the run exists."""
+    rrun = two_tenants["rrun_a"]
+
+    mine = await _as_tenant(TENANT_A, lambda db: job_status_service.status_of(db, rrun))
+    assert mine["kind"] == "research_run" and mine["status"] == "completed"
+
+    theirs = await _as_tenant(TENANT_B, lambda db: D._get_task_status(db, rrun))
+    never = await _as_tenant(TENANT_B, lambda db: D._get_task_status(db, "rrun_neverminted"))
+    assert theirs == {"error": "unknown_job", "job_id": rrun}
+    # the same shape, key for key, as an id that was never minted: nothing in the
+    # answer distinguishes "not yours" from "does not exist"
+    assert set(theirs) == set(never) and theirs["error"] == never["error"]

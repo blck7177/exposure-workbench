@@ -12,14 +12,21 @@ measured against the live corpus first:
   1. UNIT CLASSES, not a scaling family. The tempting rule is "accept the number
      at any magnitude" — {v, v/1e3, v/1e6, v/1e9, v*100}. That is a five-way "I
      do not know the unit", i.e. a fallback in the one module whose whole job is
-     refusing. It also opens a real hole: one live risk_alerts row carries
-     current_value 0.158, limit_value 0.15 and utilization 0.792 at once, so a
-     scale-blind check accepts "at 15.8% of its limit" when the answer is 79.2%.
-     Every unit here is derivable — from the fact's `unit` column, from the calc
-     `operation` name, from which column of which run child table — so it is
-     derived, and only PERCENT<->RATIO converts, by an exact factor of 100.
-     Measured on 95 real numbers: last-digit corruption accepted 53.7% under the
-     scaling family, 3.2% under this rule.
+     refusing, and it multiplies every acceptance window by five. Every unit here
+     is derivable — from the fact's `unit` column, from the calc `operation`
+     name, from which column of which run child table — so it is derived, and
+     only PERCENT<->RATIO converts, by an exact factor of 100. Measured on 95
+     real numbers: last-digit corruption accepted 53.7% under the scaling family,
+     3.2% under this rule.
+
+     What this does NOT close is confusion WITHIN a class, and it is worth being
+     exact about that rather than implying otherwise. One live risk_alerts row
+     carries current_value 0.158, limit_value 0.15 and utilization 0.792 at once,
+     and "AAPL is at 15.8% of its limit" is ACCEPTED — 0.158 is one of the three
+     numbers that row holds — when the utilization is 79.2%. A1 checks that a
+     number exists in the cited evidence; it does not read the sentence around
+     it. The limit is recorded in V3_COVERAGE, and the test below asserts what
+     actually happens rather than what would be nicer to claim.
 
   2. HALF AN ULP OF THE WRITTEN PRECISION, not a relative tolerance. rtol=0.005
      is simultaneously too tight and too loose: a weight of 0.04061908 written as
@@ -108,7 +115,11 @@ _ID_PREFIXES_ANY = (
 
 # A number literal that cannot end on a thousands separator: "$10,406,776, with"
 # must yield "$10,406,776", not a surface with the sentence's comma glued on.
-_LIT = r"\d(?:[\d,]*\d)?(?:\.\d+)?"
+# The second branch is the leading-zero-less decimal: without it ".5%" was read
+# as "5%", because the literal had to begin on a digit and the re-parse started
+# at the first one it found. A number silently ten times too big is worse than a
+# number that goes unextracted.
+_LIT = r"(?:\d(?:[\d,]*\d)?(?:\.\d+)?|\.\d+)"
 
 # Anything that marks the number as a measurement. Used as a negative lookahead
 # by the designator exemption: "H200" is a name, "AAPL 15.8%" is a claim, and the
@@ -129,9 +140,13 @@ _SPACED_DESIGNATORS = (
 _SPACED_ALT = "|".join(re.escape(n).replace(r"\ ", r"\s+") for n in _SPACED_DESIGNATORS)
 
 # A scale word, with the boundary that stops "M&A" and "T-bills" from being read
-# as millions and trillions. Used by the year exemption to tell "1950 million"
-# (a quantity) from "in 1950" (a year).
-_SCALE_WORD = rf"(?i:{_SCALE_ALT})\b(?![&-])"
+# as millions and trillions: the letter is a scale only when it is not the head
+# of a compound. A hyphen followed by a LETTER starts one ("T-bills"); a hyphen
+# followed by a digit is a range ("$5B-10B"), and blocking that would read the
+# first figure as five dollars — the same class of silent misread the
+# case-insensitivity fix closed. Used by the scaled patterns and by the year
+# exemption, which needs it to tell "1950 million" from "in 1950".
+_SCALE_WORD = rf"(?i:{_SCALE_ALT})\b(?:(?![&])(?!-[A-Za-z]))"
 
 _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     (name, re.compile(pattern, flags))
@@ -193,11 +208,11 @@ _SIGN = r"(?:(?<![\w.])[+-])?"
 _NUMBER_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     (name, re.compile(pattern, flags))
     for name, pattern, flags in (
-        ("money_scaled", rf"{_SIGN}\$\s?{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
+        ("money_scaled", rf"{_SIGN}\$\s?{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
         ("money_plain", rf"{_SIGN}\$\s?{_LIT}", 0),
         ("percent", rf"{_SIGN}{_LIT}\s*%", 0),
         ("multiple", rf"{_SIGN}{_LIT}\s?x\b", 0),
-        ("scaled", rf"{_SIGN}{_LIT}\s*(?:{_SCALE_ALT})\b", re.IGNORECASE),
+        ("scaled", rf"{_SIGN}{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
         ("bare", rf"{_SIGN}{_LIT}", 0),
     )
 )
