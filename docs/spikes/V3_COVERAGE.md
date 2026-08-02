@@ -237,6 +237,42 @@ reliable copy of the thing being graded.
 
 ---
 
+## Live acceptance — against the rebuilt stack, not the test suite
+
+All four containers rebuilt and restarted on V3 code, migration already applied.
+
+**The tiktoken bake works.** First `get_encoding` in a freshly started container:
+**0.435s**, against **1.77s** measured before the bake, and with no network fetch
+at all — the BPE table is now an image layer rather than something downloaded
+into a container's `/tmp` after every restart.
+
+**A real chat turn, end to end.** *"What is the demo portfolio total market value
+and its largest issuer weight?"* answered in **4.9s** with
+`$10,406,776` and `16.2%`, citing `run_0b2d88d81dc0`, and `meta.prompt_tokens`
+5121. It passing at all is the acceptance: those numbers had to be resolved
+through `exposure_metrics` and `issuer_exposures`, because the run row itself
+holds no numbers, and a citation that resolved to nothing would have refused a
+correct answer.
+
+**A0-3 in production.** The `respond` step in that turn's trace recorded
+`evidence_refs = 0`. Before V3 the gate's own output was harvested, so the
+citations it was validating came back into the trail through it.
+
+**B2 in production.** The session was created with `turn_tool_budget = 15` and
+`tool_budget = 40`, and finished the turn at `turn_tools_used = 2`,
+`tools_used = 2` — the enforced counter and the lifetime counter, both real.
+
+**B1 in production, all three properties at once.** With
+`CONTEXT_SOFT_LIMIT_TOKENS` lowered to 2000, the next turn on that session
+returned **413** with `projected_tokens: 5127`; `usage_daily.used` for
+`chat_turn` stayed at **1** across the refusal, so it was not charged; and
+`agent_sessions.turn_started_at` came back **NULL** — the lease released by the
+transaction rollback, with no `release_turn` call anywhere on that path.
+
+Both temporary settings (the lowered limit, and the blanked `azp` needed to use
+a browserless token) were restored afterwards and re-verified: the limit is back
+to 80,000 and a token without an `azp` claim is refused again.
+
 ## 拍板点 1, re-argued on the measurement
 
 The user approved **full-strict** numeric matching (a number must have come
