@@ -1,9 +1,71 @@
-"""Limit checking — compare computed metrics against risk limits and generate alerts."""
+"""Limit checking — compare computed metrics against risk limits and generate alerts.
+
+This module owns WHICH checks exist and WHAT their alerts look like. It owns no
+threshold numbers and has no way to obtain one: the thresholds arrive from the
+portfolio's risk_limits rows and there is no second source to fall back on. In
+particular it must never import `limit_defaults` — that module is for seeding a
+new portfolio, and the missing import is the only thing standing between "a run
+uses the desk's policy" and "a run quietly uses a number from the source tree".
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+
+
+class MissingLimit(LookupError):
+    """No risk_limits row backs a check that is about to run.
+
+    Braces, not belt: a run reaches step 8 only after step 3 has confirmed the
+    portfolio's limit set is complete, so this should be unraisable. It exists
+    so that if that ever stops being true the run stops instead of inventing a
+    threshold. Do not catch it.
+    """
+
+    def __init__(self, limit_type: str, entity_id: str | None):
+        self.limit_type, self.entity_id = limit_type, entity_id
+        super().__init__(
+            f"no risk_limits row for {limit_type}"
+            + (f" / {entity_id}" if entity_id else "")
+        )
+
+
+@dataclass(frozen=True)
+class LimitSpec:
+    """One check the engine can run.
+
+    scope        "portfolio" — one threshold for the book, looked up with no
+                 entity. "entity" — looked up per sector / issuer / scenario,
+                 with the portfolio-wide row as the fallback.
+    entity_type  What lands on the alert. Authoritative over the row's own
+                 column, because the two genuinely disagree: stress_loss is
+                 keyed by scenario name yet its alert is about the whole book.
+    label        The alert's human prefix, with `{entity}` where the entity
+                 name belongs. Portfolio-scoped labels have no placeholder.
+    """
+
+    scope: str
+    entity_type: str
+    label: str
+
+
+LIMIT_SPECS: dict[str, LimitSpec] = {
+    "daily_loss":             LimitSpec("portfolio", "portfolio", "Daily portfolio loss"),
+    "var_95":                 LimitSpec("portfolio", "portfolio", "1-day 95% VaR"),
+    "expected_shortfall_95":  LimitSpec("portfolio", "portfolio", "Expected Shortfall (95%)"),
+    "rolling_volatility_30d": LimitSpec("portfolio", "portfolio", "30d rolling volatility (annualised)"),
+    "gross_exposure":         LimitSpec("portfolio", "portfolio", "Gross exposure % NAV"),
+    "sector_concentration":   LimitSpec("entity",    "sector",    "Sector {entity}"),
+    "issuer_concentration":   LimitSpec("entity",    "issuer",    "Issuer {entity}"),
+    # Keyed per scenario, reported against the portfolio — the disagreement that
+    # is the reason entity_type comes from here and never from the row.
+    "stress_loss":            LimitSpec("entity",    "portfolio", "Stress scenario: {entity}"),
+}
+
+# Every limit type a portfolio must carry a row for. Absence is a hard error at
+# validation time, never a number supplied on the portfolio's behalf.
+REQUIRED_LIMIT_TYPES = frozenset(LIMIT_SPECS)
 
 
 @dataclass
