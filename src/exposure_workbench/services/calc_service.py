@@ -178,6 +178,41 @@ async def combine(
             **_series_payload(res), "quality_flags": flags}
 
 
+async def series(
+    db: AsyncSession, spec: SeriesSpec, invoked_by: str = "recipe"
+) -> dict:
+    """The identity primitive: a period-aligned series, ledgered like any other.
+
+    It looks redundant — the points come straight from financial_facts — and it
+    is not, because of the derived Q4. Issuers file three quarterly facts a year,
+    so load_fact_series computes Q4 = annual - Q1 - Q2 - Q3. That number is equal
+    to no row in any table: it carries the four input fact ids, and each of those
+    facts holds a DIFFERENT value. A model quoting the Q4 figure and citing the
+    facts it came from is quoting correctly and citing correctly, and V3-A1's
+    numeric check would refuse it for ever — measured as four refusals in one
+    live brief. Recording the series gives that value an id of its own.
+    """
+    points, flags = await load_fact_series(db, spec)
+    res = so.SeriesResult(operation="series", points=points, quality_flags=flags)
+    calc_id = await _record(
+        db, spec.ticker, res.operation, {"series": spec.as_params()},
+        _series_payload(res), res.input_fact_ids(), flags, invoked_by,
+    )
+    # Richer than the ledger payload on purpose: the caller shows per-point fact
+    # ids so a reader can drill from a period straight to the filings behind it,
+    # while the ledger row stays the same shape as every other primitive's.
+    return {
+        "calc_id": calc_id, "operation": res.operation,
+        "points": [
+            {"period_end": p.period_end.isoformat(), "value": p.value,
+             "fact_ids": list(p.input_fact_ids),
+             **({"flags": p.quality_flags} if p.quality_flags else {})}
+            for p in points
+        ],
+        "quality_flags": flags,
+    }
+
+
 async def change(
     db: AsyncSession, spec: SeriesSpec, mode: str, invoked_by: str = "recipe"
 ) -> dict:

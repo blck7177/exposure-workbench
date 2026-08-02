@@ -68,19 +68,17 @@ def _spec(ticker: str, metric: str, period_type: str, last_n: int | None) -> cs.
 
 async def _get_fact_series(db: AsyncSession, ticker: str, metric: str,
                            period_type: str = "quarterly", last_n: int = 12) -> dict:
+    # Ledgered, not just returned. A quarterly series contains a DERIVED Q4
+    # (annual minus the three filed quarters) whose value equals no row anywhere:
+    # the fact ids beside it point at four different numbers. Without a calc id
+    # of its own, quoting Q4 correctly AND citing it correctly is unverifiable by
+    # construction — four such refusals in one live brief.
     try:
-        points, flags = await cs.load_fact_series(db, _spec(ticker, metric, period_type, last_n))
+        out = await cs.series(db, _spec(ticker, metric, period_type, last_n),
+                              invoked_by=current_session_id())
     except cs.UnknownMetric as e:
         return {"error": "metric_unavailable", "detail": str(e)}
-    return {
-        "ticker": ticker.upper(), "metric": metric, "period_type": period_type,
-        "points": [
-            {"period_end": p.period_end.isoformat(), "value": p.value,
-             "fact_ids": p.input_fact_ids, **({"flags": p.quality_flags} if p.quality_flags else {})}
-            for p in points
-        ],
-        "quality_flags": flags,
-    }
+    return {"ticker": ticker.upper(), "metric": metric, "period_type": period_type, **out}
 
 
 async def _compute_change(db: AsyncSession, ticker: str, metric: str, mode: str,
