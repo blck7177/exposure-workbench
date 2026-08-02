@@ -165,6 +165,16 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
         if not ok:
             return {"error": "invalid_citations", "problems": problems,
                     "detail": "cited ids must come from tool results you called this session"}
+        # The ids are real; now the numbers standing next to them have to be.
+        stated = numeric.extract_numbers(text)
+        if stated:
+            values, quoted = await numeric.resolve_cited_values(db, citation_ids)
+            bad = numeric.verify(stated, values, quoted)
+            if bad:
+                return {"error": "unverified_numbers", "problems": bad,
+                        "detail": "each number must match a value held by the evidence you "
+                                  "cited; re-cite the id that actually carries it, or compute "
+                                  "it with a tool so it has one"}
     else:
         # Zero citations used to skip validation entirely, so a reply made
         # entirely of numbers passed the gate untouched — the one shape the gate

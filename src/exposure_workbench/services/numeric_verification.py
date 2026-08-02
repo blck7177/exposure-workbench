@@ -39,8 +39,8 @@ measured against the live corpus first:
      rejections in seven live answers ("H200", "the S&P 500", "42.4% over the
      last 1 year"), so the categories below are the ones the corpus demanded.
 
-Pure functions, no DB, no I/O. resolve_cited_values() adds the only database
-dependency and lives below.
+Extraction and matching are pure functions and testable without a database;
+resolve_cited_values() is the only part that reads one.
 """
 
 from __future__ import annotations
@@ -48,6 +48,21 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Iterable
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from exposure_workbench.db.models import (
+    CalcLedger,
+    ExposureMetrics,
+    FactorAttribution,
+    FilingChunk,
+    FinancialFact,
+    IssuerExposure,
+    ResearchSource,
+    RiskAlert,
+    SectorExposure,
+)
 
 # ── unit classes ───────────────────────────────────────────────────────────────
 # What a number MEANS, so that comparison is between commensurable things. The
@@ -232,6 +247,19 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
     return found
 
 
+def quoted_keys(text: str) -> set[str]:
+    """The digit sequences a passage literally contains.
+
+    The prose route, used for chunk_ and src_ citations. It is an EXISTENCE check
+    on the digits, not a magnitude check: a filing table's scale ("in millions")
+    lives in a header the chunker may not have kept, so the passage cannot always
+    say what its own numbers mean. Recorded as A1's irreducible limit rather than
+    papered over — a scale-blind accept is still strictly narrower than accepting
+    any number that has a citation attached, which is what happened before.
+    """
+    return {m.group(0).replace(",", "").lstrip("+-") for m in _DIGITS.finditer(text or "")}
+
+
 def raw_forms(numbers: Iterable[ExtractedNumber]) -> list[str]:
     """The surfaces, deduped BY SPAN, in encounter order — what to show the model.
 
@@ -247,3 +275,211 @@ def raw_forms(numbers: Iterable[ExtractedNumber]) -> list[str]:
         seen.add(n.span)
         out.append(n.surface)
     return out
+
+
+# ══ resolving what the cited evidence actually holds ═══════════════════════════
+# Everything below this line touches the database. Above it is pure.
+
+
+@dataclass(frozen=True)
+class EvidenceValue:
+    """One number a cited row actually holds, with what it means and where from.
+
+    `label` is the correction signal: "you wrote 15.8%, the nearest thing this
+    alert holds is 79.2% (utilization)" is actionable, where a bare float is not.
+    """
+
+    value: float
+    unit_class: str
+    label: str
+    source_id: str
+
+
+# Which written class may be compared with which stored class. A bare number
+# states no unit, so it may match anything; a percent may only meet a ratio; and
+# money may only meet money. This table IS the safety property — see the module
+# docstring for the live row that a scale-blind rule mis-reads.
+_COMPATIBLE: dict[str, tuple[str, ...]] = {
+    PERCENT: (RATIO,),
+    MULTIPLE: (RATIO,),
+    MONEY: (MONEY,),
+    COUNT: (RATIO, MONEY, COUNT),
+}
+
+# A calc's unit is fully determined by its operation name and nothing else.
+# Ratio-valued operations divide two commensurable things or measure change;
+# everything else carries the unit of the metric underneath, which for every
+# citable fact in this database is USD.
+_CALC_RATIO_OPS = frozenset({
+    "change.yoy", "change.qoq", "change.pct", "combine.divide",
+    "stat.cagr", "window_return", "window_return.relative",
+})
+
+# run_ resolves through its children: exposure_runs itself has no numeric column.
+# (model, column, unit_class) — the label names the row so the model can tell
+# which of ten issuer weights it nearly matched.
+_RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], ...] = (
+    (ExposureMetrics,
+     ("portfolio_market_value", "daily_pnl", "gross_exposure", "net_exposure"),
+     ("daily_return", "gross_exposure_pct", "net_exposure_pct", "rolling_vol_30d",
+      "rolling_vol_60d", "var_95_1d", "expected_shortfall_95", "max_drawdown",
+      "stress_loss_tech", "stress_loss_rates", "stress_loss_credit", "stress_loss_market"),
+     None),
+    (IssuerExposure, ("market_value", "daily_pnl"),
+     ("weight", "weight_change", "daily_return"), "ticker"),
+    (SectorExposure, ("market_value",), ("weight", "weight_change"), "sector"),
+    (FactorAttribution, (), ("beta", "factor_return", "contribution", "r_squared"), "factor_name"),
+)
+
+
+def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
+    """Numeric leaves of a JSONB blob, as COUNT values.
+
+    Used for calc quality_flags, which is where a real live answer's "the series
+    only returned 2 recent points" comes from: the 2 is genuinely in the cited
+    calc row, under insufficient_history.have.
+    """
+    if isinstance(payload, dict):
+        for k, v in payload.items():
+            _numbers_in(v, f"{prefix}.{k}", out, source_id)
+    elif isinstance(payload, list):
+        for i, v in enumerate(payload):
+            _numbers_in(v, f"{prefix}[{i}]", out, source_id)
+    elif isinstance(payload, (int, float)) and not isinstance(payload, bool):
+        out.append(EvidenceValue(float(payload), COUNT, prefix, source_id))
+
+
+async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], set[str]]:
+    row = (await db.execute(select(CalcLedger).where(CalcLedger.id == cid))).scalar_one_or_none()
+    if row is None:
+        return [], set()
+    unit = RATIO if row.operation in _CALC_RATIO_OPS else MONEY
+    result = row.result or {}
+    values: list[EvidenceValue] = []
+    if "points" in result:
+        for p in result.get("points") or []:
+            v = (p or {}).get("value")
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                values.append(EvidenceValue(
+                    float(v), unit, f"{row.operation}@{(p or {}).get('period_end')}", cid))
+    v = result.get("value")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        values.append(EvidenceValue(float(v), unit, row.operation, cid))
+    _numbers_in(result.get("quality_flags") or {}, "quality_flags", values, cid)
+    return values, set()
+
+
+async def _from_fact(db: AsyncSession, fid: str) -> tuple[list[EvidenceValue], set[str]]:
+    row = (await db.execute(select(FinancialFact).where(FinancialFact.id == fid))).scalar_one_or_none()
+    if row is None or row.value is None:
+        return [], set()
+    # Facts are stored in absolute units with no scaling applied anywhere; `unit`
+    # is the only magnitude-bearing column. Every fact that can reach a tool
+    # result is USD (the non-USD rows have no normalized_metric, and the loader
+    # filters on it), so anything else is reported as unitless rather than
+    # guessed at.
+    unit = MONEY if (row.unit or "").upper() == "USD" else COUNT
+    return [EvidenceValue(float(row.value), unit,
+                          f"{row.normalized_metric or row.raw_concept}@{row.period_end}", fid)], set()
+
+
+async def _from_alert(db: AsyncSession, aid: str) -> tuple[list[EvidenceValue], set[str]]:
+    row = (await db.execute(select(RiskAlert).where(RiskAlert.id == aid))).scalar_one_or_none()
+    if row is None:
+        return [], set()
+    out = [
+        EvidenceValue(float(getattr(row, col)), RATIO, col, aid)
+        for col in ("current_value", "limit_value", "utilization")
+        if getattr(row, col) is not None
+    ]
+    return out, set()
+
+
+async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], set[str]]:
+    """exposure_runs has no numeric columns — every number lives on a child."""
+    out: list[EvidenceValue] = []
+    for model, abs_cols, ratio_cols, name_col in _RUN_CHILDREN:
+        rows = (await db.execute(select(model).where(model.run_id == rid))).scalars().all()
+        for row in rows:
+            who = f".{getattr(row, name_col)}" if name_col else ""
+            for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO)):
+                for col in cols:
+                    v = getattr(row, col, None)
+                    if v is not None:
+                        out.append(EvidenceValue(
+                            float(v), unit, f"{model.__tablename__}{who}.{col}", rid))
+    return out, set()
+
+
+async def _from_chunk(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], set[str]]:
+    row = (await db.execute(select(FilingChunk).where(FilingChunk.id == cid))).scalar_one_or_none()
+    return ([], quoted_keys(row.text)) if row is not None else ([], set())
+
+
+async def _from_source(db: AsyncSession, sid: str) -> tuple[list[EvidenceValue], set[str]]:
+    row = (await db.execute(select(ResearchSource).where(ResearchSource.id == sid))).scalar_one_or_none()
+    if row is None:
+        return [], set()
+    return [], quoted_keys(f"{row.title or ''} {row.snippet or ''}")
+
+
+# Data, not an if-chain: the symmetry test asserts this covers every prefix the
+# citation gate accepts, so a newly citable prefix cannot arrive without a value
+# source and be reported as the model's fault.
+_VALUE_SOURCES = {
+    "calc_": _from_calc,
+    "fact_": _from_fact,
+    "alert_": _from_alert,
+    "run_": _from_run,
+    "chunk_": _from_chunk,
+    "src_": _from_source,
+}
+
+
+async def resolve_cited_values(
+    db: AsyncSession, citation_ids: Iterable[str]
+) -> tuple[list[EvidenceValue], set[str]]:
+    """Every number the cited rows hold, plus the digits their prose contains."""
+    values: list[EvidenceValue] = []
+    quoted: set[str] = set()
+    for cid in citation_ids:
+        for prefix, fn in _VALUE_SOURCES.items():
+            if cid.startswith(prefix):
+                v, q = await fn(db, cid)
+                values.extend(v)
+                quoted |= q
+                break
+    return values, quoted
+
+
+def verify(
+    numbers: Iterable[ExtractedNumber],
+    values: Iterable[EvidenceValue],
+    quoted: set[str] | None = None,
+) -> list[dict]:
+    """Problems, one per number that no cited evidence supports.
+
+    A number is supported when some compatible evidence value is within half an
+    ulp of what was written, or when its digits appear verbatim in a cited
+    passage. Each problem carries the nearest compatible value, because the point
+    is for the model to re-cite or re-fetch, not to guess again.
+    """
+    quoted = quoted or set()
+    values = list(values)
+    problems: list[dict] = []
+
+    for n in numbers:
+        if n.key in quoted:
+            continue
+        allowed = _COMPATIBLE.get(n.unit_class, ())
+        candidates = [v for v in values if v.unit_class in allowed]
+        if any(abs(v.value - n.value) <= n.atol for v in candidates):
+            continue
+        nearest = min(candidates, key=lambda v: abs(v.value - n.value), default=None)
+        problems.append({
+            "number": n.surface,
+            "reason": "not_in_cited_evidence",
+            "nearest": None if nearest is None else {"value": nearest.value, "label": nearest.label,
+                                                     "id": nearest.source_id},
+        })
+    return problems

@@ -177,3 +177,100 @@ async def test_every_refused_number_is_reported_so_the_model_can_fix_them():
     out = await _respond(None, "Technology is 32.9% of the book, with AAPL 15.8%.", None)
     assert out["error"] == "citations_required"
     assert out["numbers_found"] == ["32.9%", "15.8%"]
+
+
+# ── group D: matching a number against the evidence (A1) ──────────────────────
+
+from exposure_workbench.services.numeric_verification import (  # noqa: E402
+    RATIO,
+    EvidenceValue,
+    quoted_keys,
+    resolve_cited_values,
+    verify,
+)
+
+
+def _val(v: float, unit: str = RATIO, label: str = "x") -> EvidenceValue:
+    return EvidenceValue(value=v, unit_class=unit, label=label, source_id="calc_1")
+
+
+def test_a_correctly_rounded_number_is_accepted():
+    """0.04061908 written as "4.1%" is 0.94% off in relative terms and would be
+    refused by rtol=0.005. It is the correct rounding, and half an ulp says so."""
+    assert verify(extract_numbers("a weight of 4.1%"), [_val(0.04061908)]) == []
+
+
+def test_a_corrupted_last_digit_is_refused():
+    """The other half of the same rule: rtol on "$82.886B" opens a ±$414M window,
+    so an $82.887B corruption slips through. Half an ulp of the written precision
+    is ±$500k, and 82.887 does not round to 82.886."""
+    numbers = extract_numbers("cash of $82.886B")
+    assert verify(numbers, [_val(82_887_000_000.0, MONEY)]) != []
+    assert verify(numbers, [_val(82_886_000_000.0, MONEY)]) == []
+
+
+def test_truncating_instead_of_rounding_is_refused():
+    """A live brief writes 32.2% for a true 32.2753% operating margin. Half an ulp
+    of one decimal is 0.0005, and the gap is 0.00075 — so this is a refusal by
+    design, not an accident: the rule is that the true value must ROUND to what
+    was written."""
+    assert verify(extract_numbers("a margin of 32.2%"), [_val(0.322753)]) != []
+    assert verify(extract_numbers("a margin of 32.3%"), [_val(0.322753)]) == []
+
+
+def test_a_percent_may_not_be_matched_against_an_unrelated_scale():
+    """The reason unit classes exist, taken from a real risk_alerts row that
+    carries current_value 0.158, limit_value 0.15 and utilization 0.792 at once.
+    A scale-blind rule accepts "at 15.8% of its limit" when the answer is 79.2%;
+    here 15.8% meets the 0.158 ratio and nothing else, and a claim ABOUT
+    utilization has to cite the number that is the utilization."""
+    alert = [_val(0.15840195, RATIO, "current_value"),
+             _val(0.15, RATIO, "limit_value"),
+             _val(0.79200974, RATIO, "utilization")]
+    assert verify(extract_numbers("AAPL is at 15.8%"), alert) == []
+    # and money never meets a ratio, whatever the digits look like
+    assert verify(extract_numbers("AAPL is at $0.16"), alert) != []
+
+
+def test_money_and_ratio_never_meet():
+    assert verify(extract_numbers("revenue of $81.6B"), [_val(81.6, RATIO)]) != []
+    assert verify(extract_numbers("a weight of 81.6%"), [_val(81_600_000_000.0, MONEY)]) != []
+
+
+def test_a_bare_number_may_match_anything_because_it_claims_no_unit():
+    assert verify(extract_numbers("the series returned 2 points"), [_val(2.0, COUNT)]) == []
+    assert verify(extract_numbers("it was 81600000000"), [_val(81.6e9, MONEY)]) == []
+
+
+def test_a_figure_quoted_verbatim_from_a_cited_passage_is_accepted():
+    """The prose route. It is an existence check on the digits, not a magnitude
+    check — a filing table's scale often lives in a header the chunk does not
+    carry — and that limit is recorded rather than hidden."""
+    passage = "Total net sales increased to 111,184 for the quarter"
+    assert verify(extract_numbers("net sales of 111,184"), [], quoted_keys(passage)) == []
+    assert verify(extract_numbers("net sales of 111,185"), [], quoted_keys(passage)) != []
+
+
+def test_every_refusal_names_the_nearest_thing_the_evidence_held():
+    """Without it the model can only guess again. With it, "you wrote $58.3B, the
+    nearest value this citation holds is $61.157B (gross_profit)" points straight
+    at the missing citation — which is the real live case this was measured on."""
+    problems = verify(extract_numbers("net income of $58.3B"),
+                      [_val(61_157_000_000.0, MONEY, "gross_profit@2026-04-26")])
+    assert len(problems) == 1
+    assert problems[0]["reason"] == "not_in_cited_evidence"
+    assert problems[0]["nearest"]["label"] == "gross_profit@2026-04-26"
+
+
+def test_no_evidence_at_all_reports_nearest_none_rather_than_crashing():
+    problems = verify(extract_numbers("revenue of $81.6B"), [])
+    assert problems[0]["nearest"] is None
+
+
+def test_every_citable_prefix_has_a_value_source():
+    """A prefix the gate accepts but the verifier cannot resolve would report the
+    model's correct number as unverified, blaming it for a hole in this table.
+    run_ and chunk_/src_ were both missing from the first design."""
+    from exposure_workbench.services import evidence_trail_service as trail
+    from exposure_workbench.services.numeric_verification import _VALUE_SOURCES
+    assert set(trail._RESOLVERS) == set(_VALUE_SOURCES)

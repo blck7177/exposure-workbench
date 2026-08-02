@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
 from exposure_workbench.services import evidence_trail_service as trail
+from exposure_workbench.services import numeric_verification as numeric
 from exposure_workbench.services import research_search_service as rss
 from exposure_workbench.tools.registry import DELEGATION, GATE, Tool, ToolRegistry, current_session_id
 from exposure_workbench.utils.ids import new_brief_id
@@ -84,6 +85,26 @@ async def _submit_brief(db: AsyncSession, **blocks) -> dict:
         return {"error": "invalid_citations", "problems": problems,
                 "detail": "cited ids must be in this session's evidence trail and resolve in the DB"}
 
+    # Per block, against THAT block's own citations. Pooling them would let a
+    # figure in market_context be justified by an id cited only under
+    # financial_summary — which is how a brief ends up internally consistent and
+    # individually unsupported.
+    unverified: dict[str, list[dict]] = {}
+    for name in _CITED_BLOCKS:
+        block = blocks.get(name) or {}
+        stated = numeric.extract_numbers(block.get("text") or "")
+        if not stated:
+            continue
+        block_ids = [c for c in (block.get("citations") or []) if isinstance(c, str)]
+        values, quoted = await numeric.resolve_cited_values(db, block_ids)
+        bad = numeric.verify(stated, values, quoted)
+        if bad:
+            unverified[name] = bad
+    if unverified:
+        return {"error": "unverified_numbers", "blocks": unverified,
+                "detail": "each figure must match a value held by the evidence cited in the "
+                          "SAME block; re-cite the id that carries it, or drop the figure"}
+
     brief_id = new_brief_id()
     all_citations = sorted(set(citation_ids))
     db.add(IssuerBrief(
@@ -96,6 +117,8 @@ async def _submit_brief(db: AsyncSession, **blocks) -> dict:
         portfolio_implications=(blocks.get("portfolio_implications") or {}).get("text"),
         open_questions=(blocks.get("open_questions") or {}).get("text"),
         citations=all_citations,
+        block_citations={n: [c for c in ((blocks.get(n) or {}).get("citations") or [])
+                             if isinstance(c, str)] for n in _CITED_BLOCKS},
         confidence_flags=blocks.get("confidence_flags") or {},
     ))
     await db.flush()
