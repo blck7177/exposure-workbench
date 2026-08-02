@@ -56,3 +56,18 @@ def test_offsets_point_at_real_source_text():
     # every chunk's span should overlap the region its text came from
     for c in chunks:
         assert text[c.char_start:c.char_end].strip(), "span must map onto real source text"
+
+
+def test_the_chunker_constants_are_pinned_because_the_golden_set_depends_on_them():
+    """V3-D1. Retrieval labels are SEC item codes rather than chunk ids, which
+    survives re-ingest — but the chunk BOUNDARIES that decide which item a
+    retrieved passage reports are a function of these four numbers. Changing one
+    silently re-scores all 24 golden queries against a corpus that is no longer
+    the one they were measured on, so a change goes red here and the baseline is
+    regenerated deliberately."""
+    from exposure_workbench.services import section_chunker as sc
+
+    assert (sc.TARGET_CHARS, sc.MAX_CHARS, sc.OVERLAP_CHARS, sc.MIN_CHUNK_CHARS) == (1500, 2400, 150, 80), (
+        "chunker geometry changed: re-run scripts/eval_retrieval.py --write-baseline "
+        "and record the before/after in V3_COVERAGE"
+    )

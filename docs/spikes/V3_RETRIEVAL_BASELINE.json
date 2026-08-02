@@ -1,0 +1,412 @@
+{
+  "queries": 24,
+  "scored": 24,
+  "skipped": [],
+  "recall_at_5": 1.0,
+  "recall_at_10": 1.0,
+  "precision_at_5": 0.7917,
+  "precision_at_10": 0.7083,
+  "by_intent": {
+    "financials": {
+      "n": 8,
+      "recall_at_5": 1.0,
+      "precision_at_5": 0.7
+    },
+    "mdna": {
+      "n": 8,
+      "recall_at_5": 1.0,
+      "precision_at_5": 0.825
+    },
+    "risk": {
+      "n": 8,
+      "recall_at_5": 1.0,
+      "precision_at_5": 0.85
+    }
+  },
+  "detail": [
+    {
+      "id": "aapl_risk",
+      "ticker": "AAPL",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 1.0,
+      "returned_items": [
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Part II, Item 1A"
+      ]
+    },
+    {
+      "id": "aapl_mdna",
+      "ticker": "AAPL",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.6,
+      "precision_at_10": 0.5,
+      "returned_items": [
+        "Part I, Item 2",
+        "Item 7",
+        "Part II, Item 1A",
+        "Part I, Item 2",
+        "Item 8"
+      ]
+    },
+    {
+      "id": "aapl_financials",
+      "ticker": "AAPL",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Part I, Item 1",
+        "Part I, Item 1",
+        "Item 8",
+        "Part I, Item 1",
+        "Item 8"
+      ]
+    },
+    {
+      "id": "msft_risk",
+      "ticker": "MSFT",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 1.0,
+      "returned_items": [
+        "Part II, Item 1A",
+        "Item 1A",
+        "Part II, Item 1A",
+        "Item 1A",
+        "Part II, Item 1A"
+      ]
+    },
+    {
+      "id": "msft_mdna",
+      "ticker": "MSFT",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.6,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Part I, Item 2",
+        "Item 8",
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Part I, Item 1"
+      ]
+    },
+    {
+      "id": "msft_financials",
+      "ticker": "MSFT",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.8,
+      "returned_items": [
+        "Part I, Item 1",
+        "Part I, Item 1",
+        "Item 8",
+        "Item 8",
+        "Item 8"
+      ]
+    },
+    {
+      "id": "nvda_risk",
+      "ticker": "NVDA",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 1.0,
+      "returned_items": [
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A"
+      ]
+    },
+    {
+      "id": "nvda_mdna",
+      "ticker": "NVDA",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.9,
+      "returned_items": [
+        "Part I, Item 2",
+        "Item 7",
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Part I, Item 2"
+      ]
+    },
+    {
+      "id": "nvda_financials",
+      "ticker": "NVDA",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.2,
+      "precision_at_10": 0.2,
+      "returned_items": [
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Item 7",
+        "Part I, Item 1",
+        "Part I, Item 2"
+      ]
+    },
+    {
+      "id": "googl_risk",
+      "ticker": "GOOGL",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.9,
+      "returned_items": [
+        "Part II, Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A"
+      ]
+    },
+    {
+      "id": "googl_mdna",
+      "ticker": "GOOGL",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.8,
+      "precision_at_10": 0.9,
+      "returned_items": [
+        "Item 1A",
+        "Part I, Item 2",
+        "Item 7",
+        "Item 7",
+        "Part I, Item 2"
+      ]
+    },
+    {
+      "id": "googl_financials",
+      "ticker": "GOOGL",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.6,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Part I, Item 2",
+        "Item 8",
+        "Item 7",
+        "Part I, Item 1",
+        "Part I, Item 1"
+      ]
+    },
+    {
+      "id": "amzn_risk",
+      "ticker": "AMZN",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 1.0,
+      "returned_items": [
+        "Item 1A",
+        "Part II, Item 1A",
+        "Item 1A",
+        "Part II, Item 1A",
+        "Item 1A"
+      ]
+    },
+    {
+      "id": "amzn_mdna",
+      "ticker": "AMZN",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.6,
+      "precision_at_10": 0.6,
+      "returned_items": [
+        "Item 7",
+        "Part II, Item 1A",
+        "Item 1A",
+        "Item 7",
+        "Part I, Item 2"
+      ]
+    },
+    {
+      "id": "amzn_financials",
+      "ticker": "AMZN",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.8,
+      "precision_at_10": 0.6,
+      "returned_items": [
+        "Part I, Item 1",
+        "Item 8",
+        "Item 8",
+        "Part I, Item 1",
+        "Part I, Item 2"
+      ]
+    },
+    {
+      "id": "jpm_risk",
+      "ticker": "JPM",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.4,
+      "precision_at_10": 0.4,
+      "returned_items": [
+        "Item 1A",
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Item 1A",
+        "Item 7"
+      ]
+    },
+    {
+      "id": "jpm_mdna",
+      "ticker": "JPM",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.9,
+      "returned_items": [
+        "Part I, Item 2",
+        "Item 7",
+        "Part I, Item 2",
+        "Item 7",
+        "Item 7"
+      ]
+    },
+    {
+      "id": "jpm_financials",
+      "ticker": "JPM",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.2,
+      "precision_at_10": 0.2,
+      "returned_items": [
+        "Item 7",
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Item 7",
+        "Item 8"
+      ]
+    },
+    {
+      "id": "xom_risk",
+      "ticker": "XOM",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.4,
+      "precision_at_10": 0.5,
+      "returned_items": [
+        "Item 1A",
+        "Item 1A",
+        "Part I, Item 2",
+        "Part I, Item 2",
+        "Item 1C"
+      ]
+    },
+    {
+      "id": "xom_mdna",
+      "ticker": "XOM",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.8,
+      "returned_items": [
+        "Item 7",
+        "Item 7",
+        "Item 7",
+        "Part I, Item 2",
+        "Item 7"
+      ]
+    },
+    {
+      "id": "xom_financials",
+      "ticker": "XOM",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Item 8",
+        "Item 8",
+        "Item 8",
+        "Item 8",
+        "Item 8"
+      ]
+    },
+    {
+      "id": "lly_risk",
+      "ticker": "LLY",
+      "intent": "risk",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Part II, Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A",
+        "Item 1A"
+      ]
+    },
+    {
+      "id": "lly_mdna",
+      "ticker": "LLY",
+      "intent": "mdna",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 1.0,
+      "precision_at_10": 0.6,
+      "returned_items": [
+        "Item 7",
+        "Item 7",
+        "Item 7",
+        "Part I, Item 2",
+        "Item 7"
+      ]
+    },
+    {
+      "id": "lly_financials",
+      "ticker": "LLY",
+      "intent": "financials",
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "precision_at_5": 0.8,
+      "precision_at_10": 0.7,
+      "returned_items": [
+        "Part I, Item 1",
+        "Item 8",
+        "Item 8",
+        "Part I, Item 2",
+        "Part I, Item 1"
+      ]
+    }
+  ]
+}
