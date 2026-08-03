@@ -35,6 +35,36 @@ def _factory(store: list):
     return lambda: _FakeSession(store)
 
 
+def _stub_tools(monkeypatch, result: dict, tools: list | None = None):
+    """Stand in for the turn's tool session.
+
+    These tests are about what the loop does with a tool RESULT — publishing an
+    ungated answer, marking an exhausted gate — so the tools themselves are the
+    part to hold still. The seam moved out one layer when the loop stopped
+    calling invoke() directly and started calling a client (MCP_PLAN P3); it is
+    still one substitution, and it is still the whole tool face.
+    """
+    from contextlib import asynccontextmanager
+
+    class _Session:
+        def __init__(self):
+            self.tools = tools or []
+            self.calls: list[tuple[str, dict]] = []
+
+        async def call(self, name, args):
+            self.calls.append((name, args))
+            return result
+
+    session = _Session()
+
+    @asynccontextmanager
+    async def _fake(*_a, **_k):
+        yield session
+
+    monkeypatch.setattr(meta_agent, "tool_session", _fake)
+    return session
+
+
 @pytest.mark.asyncio
 async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(monkeypatch):
     """The path that mattered most: on the final turn the loop used to assign the
@@ -61,11 +91,8 @@ async def test_a_loop_that_never_reaches_respond_says_so_in_the_same_words(monke
     async def _always_thinks(**_kw):
         return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}], {})
 
-    async def _invoke(*_a, **_k):
-        return {"noted": True}
-
     monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _always_thinks)
-    monkeypatch.setattr(meta_agent, "invoke", _invoke)
+    _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     out = await handle_message(_factory(store), "sess_2", "how did NVDA do?", max_turns=2)
 
@@ -99,11 +126,8 @@ async def test_an_accepted_answer_carries_no_marker(monkeypatch):
         return ("", [{"id": "c1", "function": {"name": "respond",
                                                "arguments": '{"text":"Hello.","citations":[]}'}}], {})
 
-    async def _invoke(*_a, **_k):
-        return {"responded": True, "text": "Hello.", "citations": []}
-
     monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _responds)
-    monkeypatch.setattr(meta_agent, "invoke", _invoke)
+    _stub_tools(monkeypatch, {"responded": True, "text": "Hello.", "citations": []})
     store: list = []
     out = await handle_message(_factory(store), "sess_4", "hi", max_turns=4)
 

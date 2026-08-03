@@ -6,6 +6,10 @@ exits by calling respond. The system prompt states the role and the evidence
 discipline's WHY — it is not a rulebook, because the architecture (ids required
 to cite, wrapper-enforced budget/trace) is what actually constrains behaviour.
 
+Its tools arrive over an MCP client on an in-memory transport (MCP_PLAN P3):
+the same registry behind the same wrapper, reached the way this architecture
+has said the agent face is reached since M10 — which until now it was not.
+
 History is persisted as agent_messages so a session survives across turns.
 """
 
@@ -16,14 +20,14 @@ import logging
 
 from sqlalchemy import update
 
-from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.agents.tool_session import tool_session
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.llm import client as llm_client
 from exposure_workbench.services import context_budget
 from exposure_workbench.tools import faces, registry as R
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.meta_tools import register_meta_tools
-from exposure_workbench.tools.registry import invoke
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
@@ -93,10 +97,6 @@ async def handle_message(
 ) -> dict:
     """Run one user turn. Persists the user + assistant messages; returns the reply."""
     registry = registry or build_meta_registry()
-    settings = get_settings()
-    face = faces.resolve(registry, faces.FACE_META_AGENT)
-    tools = registry.schemas(face)
-
     message_id = new_id("msg_")
     async with db_factory() as db:
         db.add(AgentMessage(id=new_id("msg_"), session_id=session_id, role="user", content=user_text))
@@ -111,39 +111,46 @@ async def handle_message(
     # what a ceiling is about. B1 reads this back to decide the next turn.
     prompt_peak = 0
 
-    for turn in range(max_turns):
-        prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
-        content, tool_calls, _usage = await llm_client.chat_with_tools(messages=messages, tools=tools)
-        assistant_msg: dict = {"role": "assistant", "content": content or ""}
-        if tool_calls:
-            assistant_msg["tool_calls"] = tool_calls
-        messages.append(assistant_msg)
+    # One server-and-client pair for the turn. It carries the identity the turn
+    # runs under, so the tenant does not depend on which task the transport
+    # happens to schedule a handler in.
+    async with tool_session(
+        registry, faces.FACE_META_AGENT, db_factory=db_factory, session_id=session_id,
+        user_id=current_user_id(), message_id=message_id,
+    ) as tools_session:
+        tools = tools_session.tools
 
-        if not tool_calls:
-            if turn >= max_turns - 1:
-                # Deliberately NOT `reply_text = content`. Substituting the raw
-                # model text here handed the user an answer that had passed no
-                # gate, with citations=[], rendered exactly like a verified one.
+        for turn in range(max_turns):
+            prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
+            content, tool_calls, _usage = await llm_client.chat_with_tools(messages=messages, tools=tools)
+            assistant_msg: dict = {"role": "assistant", "content": content or ""}
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+            messages.append(assistant_msg)
+
+            if not tool_calls:
+                if turn >= max_turns - 1:
+                    # Deliberately NOT `reply_text = content`. Substituting the raw
+                    # model text here handed the user an answer that had passed no
+                    # gate, with citations=[], rendered exactly like a verified one.
+                    break
+                messages.append({"role": "user", "content": "Call respond to reply to the user."})
+                continue
+
+            for tc in tool_calls:
+                name = tc["function"]["name"]
+                try:
+                    args = json.loads(tc["function"]["arguments"] or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                result = await tools_session.call(name, args)
+                messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                 "content": json.dumps(result, default=str)[:6000]})
+                if name == "respond" and result.get("responded"):
+                    reply_text, reply_citations = result["text"], result.get("citations", [])
+
+            if reply_text is not None:
                 break
-            messages.append({"role": "user", "content": "Call respond to reply to the user."})
-            continue
-
-        for tc in tool_calls:
-            name = tc["function"]["name"]
-            try:
-                args = json.loads(tc["function"]["arguments"] or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            async with db_factory() as db:
-                result = await invoke(registry, db, session_id, name, args, message_id=message_id)
-                await db.commit()
-            messages.append({"role": "tool", "tool_call_id": tc["id"],
-                             "content": json.dumps(result, default=str)[:6000]})
-            if name == "respond" and result.get("responded"):
-                reply_text, reply_citations = result["text"], result.get("citations", [])
-
-        if reply_text is not None:
-            break
 
     # The single convergence point for both ungated paths. The turn is still a
     # 200 and the message is still persisted: the chat_turn quota was charged and

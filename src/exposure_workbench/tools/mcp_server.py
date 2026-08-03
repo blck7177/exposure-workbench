@@ -62,6 +62,17 @@ def build_mcp_server(
     not have raises here rather than serving a quietly smaller surface.
     """
     tool_names = faces.resolve(registry, face)
+    # The face scopes what can be CALLED, not only what is listed. Dispatching
+    # against the whole registry made the face a description of what the model
+    # had been told about: a research session, offered fourteen tools by a
+    # registry holding eighteen, could still call read_issuer_brief — the
+    # meta-only read that faces.py excludes from that face precisely because
+    # citing a previous brief is a loop rather than a source.
+    #
+    # A view rather than a check, so there is no second place that decides what
+    # exists. invoke() answers for a name it does not hold, already, in the same
+    # shape and with the same trace row.
+    scoped = R.ToolRegistry(tools={name: registry.tools[name] for name in tool_names})
     server = Server(SERVER_NAME, instructions=INSTRUCTIONS)
 
     @server.list_tools()
@@ -71,9 +82,9 @@ def build_mcp_server(
         # order an auditor reads the face in.
         return [
             types.Tool(
-                name=registry.get(name).name,
-                description=registry.get(name).description,
-                inputSchema=registry.get(name).json_schema,
+                name=scoped.get(name).name,
+                description=scoped.get(name).description,
+                inputSchema=scoped.get(name).json_schema,
             )
             for name in tool_names
         ]
@@ -94,7 +105,7 @@ def build_mcp_server(
             # tenant mechanism.
             current_user_ctx.set(user_id)
         async with db_factory() as db:
-            result = await R.invoke(registry, db, session_id, name, arguments or {},
+            result = await R.invoke(scoped, db, session_id, name, arguments or {},
                                     message_id=message_id)
             await db.commit()
         # isError marks a refusal as one for a client that cares, while the
