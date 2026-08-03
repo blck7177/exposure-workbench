@@ -40,6 +40,11 @@ dependencies = [
     # today, and context measurement is not something to leave at the mercy of
     # another package's dependency resolution.
     "tiktoken>=0.7",          # prompt-size measurement (o200k_base, pinned)
+    # ─── MCP plan (P1.2) ──────────────────────────────────────────────────────
+    # Same reasoning as tiktoken: it is in the environment transitively today,
+    # and the gate's argument check is not something to leave to another
+    # package's resolver.
+    "jsonschema>=4.20",       # tool argument validation at invoke() (Draft 2020-12)
 ]
 
 [project.optional-dependencies]

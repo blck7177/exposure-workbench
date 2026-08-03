@@ -184,3 +184,60 @@ async def test_reflection_tool_is_free():
             assert out.get("noted") is True
     finally:
         await engine.dispose()
+
+
+# ── P1.2: arguments are checked before anything is spent ─────────────────────
+
+async def test_bad_arguments_cost_nothing_and_still_leave_a_trace():
+    """The ordering claim, stated as behaviour.
+
+    A call the tool could never have run must not take a slot out of fifteen —
+    otherwise a model that mistypes an argument three times has spent a fifth of
+    its turn on nothing. It is recorded all the same, with the same 'rejected'
+    status a budget refusal gets: a refusal the agent provoked is exactly the
+    kind of thing the desk should be able to see.
+    """
+    engine, mk = await _mk()
+    try:
+        reg = build_read_registry()
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta")
+            await db.commit()
+            sid = s.id
+
+        async with mk() as db:
+            out = await R.invoke(reg, db, sid, "get_fact_series", {"ticker": "NVDA"})  # no metric
+            await db.commit()
+        assert out["error"] == "invalid_arguments"
+        assert [p["field"] for p in out["problems"]] == ["metric"]
+
+        async with mk() as db:
+            row = (await db.execute(
+                select(AgentSession).where(AgentSession.id == sid)
+            )).scalar_one()
+            assert row.tools_used == 0, "a call that never ran spent budget"
+
+            steps = (await db.execute(
+                select(AgentStep).where(AgentStep.session_id == sid)
+            )).scalars().all()
+            assert [(s.tool_name, s.status) for s in steps] == [("get_fact_series", "rejected")]
+    finally:
+        await engine.dispose()
+
+
+async def test_a_valid_call_is_unaffected_by_the_check():
+    """The other half: validation must not have narrowed a working call."""
+    engine, mk = await _mk()
+    try:
+        reg = build_read_registry()
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta")
+            await db.commit()
+            sid = s.id
+        async with mk() as db:
+            out = await R.invoke(reg, db, sid, "get_fact_series",
+                                 {"ticker": "NVDA", "metric": "revenue"})
+            await db.commit()
+        assert "error" not in out, out
+    finally:
+        await engine.dispose()

@@ -1,11 +1,12 @@
 """ToolRegistry + wrapper (M10) — the single enforcement point.
 
 A tool is a five-tuple: {name, json_schema, fn, tool_class, budget_key}.
-The wrapper does three things automatically around every LLM-driven call:
+The wrapper does four things automatically around every LLM-driven call:
 
-  1. reserve budget (agent_session_service) — before the tool runs
-  2. run the fn, catching failures as structured results (never crashes the loop)
-  3. record a trace step (trace_service) — success, rejection, or error alike,
+  1. validate the arguments against the tool's own schema — before any spend
+  2. reserve budget (agent_session_service) — before the tool runs
+  3. run the fn, catching failures as structured results (never crashes the loop)
+  4. record a trace step (trace_service) — success, rejection, or error alike,
      auto-extracting evidence_refs from the return value
 
 Evidence-ref extraction is automatic: any returned id-shaped field (fact_/chunk_/
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import trace_service
+from exposure_workbench.tools.arg_validation import validate_args
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +173,23 @@ async def invoke(
         )
         return {"error": "unknown_tool", "tool": tool_name}
 
-    # 1) reserve budget (reflection tools are free by design)
+    # 1) validate the arguments — before anything is spent.
+    #
+    # Ordering is the point: a call the tool could never have run must not cost
+    # the session a slot out of fifteen. It is traced anyway, with the same
+    # 'rejected' status a budget refusal gets, because a refusal is something
+    # the desk should be able to see the agent having provoked.
+    problems = validate_args(tool.json_schema, args)
+    if problems:
+        await trace_service.record_step(
+            db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
+            result_summary=f"invalid arguments: {len(problems)} problem(s)", evidence_refs=[],
+            status="rejected", duration_ms=int((time.monotonic() - started) * 1000),
+            message_id=message_id,
+        )
+        return {"error": "invalid_arguments", "problems": problems}
+
+    # 2) reserve budget (reflection tools are free by design)
     if tool.tool_class != REFLECTION:
         try:
             await sess.reserve(db, session_id, is_external_search=(tool.budget_key == "external_search"))
@@ -183,7 +201,7 @@ async def invoke(
             )
             return {"error": "budget_exceeded", "kind": e.kind, "used": e.used, "limit": e.limit}
 
-    # 2) run the fn, catching failures as structured results
+    # 3) run the fn, catching failures as structured results
     status = "completed"
     try:
         result = await tool.fn(db, **args)
@@ -204,7 +222,7 @@ async def invoke(
         except Exception:  # noqa: BLE001 — nothing left to salvage either way
             logger.exception("could not roll back after %s failed", tool_name)
 
-    # 3) trace (auto-extract evidence refs)
+    # 4) trace (auto-extract evidence refs)
     refs = extract_evidence_refs(result) if _harvestable(tool, status, result) else []
     try:
         await trace_service.record_step(
