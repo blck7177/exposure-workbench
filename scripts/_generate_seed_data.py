@@ -1,6 +1,13 @@
 """
 Generate demo seed data files using yfinance.
 Run this once to create data/demo/*.csv and data/demo/previous_runs_seed.json
+
+Market observations only. Risk thresholds used to be emitted here as
+risk_limits_seed.csv, which put policy numbers in a file whose whole reason for
+existing is that its contents come from a price feed — and the copy promptly
+drifted, carrying a `stress_loss_tech` row no code has ever looked up. They now
+live in analytics/limit_defaults.SEED_DEFAULTS, which seed_demo_db.py reads
+directly. Do not add them back.
 """
 
 from __future__ import annotations
@@ -136,44 +143,6 @@ def generate_factor_prices_seed(factor_prices: pd.DataFrame) -> None:
     print(f"  factor_prices_seed.csv — {len(df)} rows")
 
 
-def generate_risk_limits_seed() -> None:
-    """risk_limits_seed.csv — portfolio-level and issuer/sector limits."""
-    rows = [
-        # Portfolio-level
-        {"portfolio_id": "port_001", "limit_type": "var_95", "entity_type": "portfolio", "entity_id": None,
-         "warning_level": 0.025, "breach_level": 0.035, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "expected_shortfall_95", "entity_type": "portfolio", "entity_id": None,
-         "warning_level": 0.035, "breach_level": 0.050, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "daily_loss", "entity_type": "portfolio", "entity_id": None,
-         "warning_level": 0.020, "breach_level": 0.030, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "rolling_volatility_30d", "entity_type": "portfolio", "entity_id": None,
-         "warning_level": 0.18, "breach_level": 0.25, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "stress_loss_tech", "entity_type": "portfolio", "entity_id": None,
-         "warning_level": 0.060, "breach_level": 0.080, "unit": "fraction"},
-        # Sector limits
-        {"portfolio_id": "port_001", "limit_type": "sector_concentration", "entity_type": "sector", "entity_id": "Technology",
-         "warning_level": 0.40, "breach_level": 0.50, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "sector_concentration", "entity_type": "sector", "entity_id": "Consumer_Discretionary",
-         "warning_level": 0.15, "breach_level": 0.20, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "sector_concentration", "entity_type": "sector", "entity_id": "Financials",
-         "warning_level": 0.20, "breach_level": 0.30, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "sector_concentration", "entity_type": "sector", "entity_id": "Fixed_Income",
-         "warning_level": 0.20, "breach_level": 0.30, "unit": "fraction"},
-        # Issuer limits
-        {"portfolio_id": "port_001", "limit_type": "issuer_concentration", "entity_type": "issuer", "entity_id": "NVDA",
-         "warning_level": 0.15, "breach_level": 0.20, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "issuer_concentration", "entity_type": "issuer", "entity_id": "AAPL",
-         "warning_level": 0.15, "breach_level": 0.20, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "issuer_concentration", "entity_type": "issuer", "entity_id": "MSFT",
-         "warning_level": 0.15, "breach_level": 0.20, "unit": "fraction"},
-        {"portfolio_id": "port_001", "limit_type": "issuer_concentration", "entity_type": "issuer", "entity_id": "LLY",
-         "warning_level": 0.12, "breach_level": 0.18, "unit": "fraction"},
-    ]
-    df = pd.DataFrame(rows)
-    df.to_csv(DATA_DIR / "risk_limits_seed.csv", index=False)
-    print(f"  risk_limits_seed.csv — {len(df)} rows")
-
-
 def generate_previous_runs_seed(prices: pd.DataFrame) -> None:
     """previous_runs_seed.json — 2 previous run snapshots."""
     sorted_dates = sorted(prices.index)
@@ -233,7 +202,6 @@ def main() -> None:
     generate_positions_seed(holding_prices)
     generate_market_prices_seed(holding_prices)
     generate_factor_prices_seed(factor_prices)
-    generate_risk_limits_seed()
     generate_previous_runs_seed(holding_prices)
 
     print(f"\nSeed data written to {DATA_DIR}")

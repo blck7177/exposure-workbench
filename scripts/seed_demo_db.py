@@ -34,11 +34,14 @@ import yaml
 from psycopg2.extras import execute_values
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from exposure_workbench.analytics.limit_defaults import DEMO_OVERRIDES, SEED_DEFAULTS
+from exposure_workbench.analytics.limits import LIMIT_SPECS
 from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
 from exposure_workbench.services.market_data_ingestion_service import (
     ingest_factor_prices,
     ingest_market_prices,
 )
+from exposure_workbench.utils.ids import new_id
 
 DATA_DIR = ROOT / "data" / "demo"
 
@@ -218,27 +221,90 @@ def seed_positions(conn, holdings: list[dict]) -> date:
     return snap
 
 
+DEMO_PORTFOLIO_ID = "port_001"
+
+# The risk_limits column order, written down once. build_demo_limit_rows() returns
+# dicts so a test can compare them by field name; this tuple is what turns a dict
+# back into the positional row execute_values wants, AND it generates the INSERT's
+# own column list below — so the two orders cannot drift apart and silently swap
+# warning_level with breach_level.
+RISK_LIMIT_COLUMNS = (
+    "id", "portfolio_id", "limit_type", "entity_type", "entity_id",
+    "warning_level", "breach_level", "unit", "is_active",
+)
+
+
+def build_demo_limit_rows() -> list[dict]:
+    """port_001's whole limit set as plain dicts. No database, no file, no clock.
+
+    Split out of seed_risk_limits so a test can RUN it. The guarantee that matters
+    is not "the source text mentions LIMIT_SPECS" — a substring check for that is
+    satisfied by any one use of the name, including one in a branch that does not
+    build the row you care about. It is "every row carries the entity_type the
+    engine will report on the alert, and the numbers limit_defaults holds". Only
+    calling the function shows that, so tests/test_risk_limits_parity.py calls it
+    and compares every field.
+
+    entity_type comes from LIMIT_SPECS and never from a literal: stress_loss is
+    keyed per scenario but reported against the whole book, and that disagreement
+    is settled in exactly one place.
+
+    `id` is the one impure field — new_id() is random per call — so a caller
+    comparing rows must compare the other eight.
+    """
+    specced = [
+        {"limit_type": lt, "entity_id": None, "warning_level": w, "breach_level": b}
+        for lt, (w, b) in SEED_DEFAULTS.items()
+    ] + [
+        {"limit_type": lt, "entity_id": entity_id, "warning_level": w, "breach_level": b}
+        for (lt, entity_id), (w, b) in DEMO_OVERRIDES.items()
+    ]
+    return [
+        {
+            "id": new_id("rl_"),
+            "portfolio_id": DEMO_PORTFOLIO_ID,
+            "entity_type": LIMIT_SPECS[row["limit_type"]].entity_type,
+            # The only value ck_risk_limits_unit admits. _check_one compares raw
+            # floats, so a row on any other scale is a limit that cannot fire.
+            "unit": "fraction",
+            "is_active": True,
+            **row,
+        }
+        for row in specced
+    ]
+
+
 def seed_risk_limits(conn) -> None:
-    rows = []
-    with open(DATA_DIR / "risk_limits_seed.csv") as f:
-        for row in csv.DictReader(f):
-            rows.append((
-                str(uuid.uuid4()), row["portfolio_id"], row["limit_type"],
-                row.get("entity_type", "portfolio"),
-                row["entity_id"] if row.get("entity_id") else None,
-                float(row["warning_level"]), float(row["breach_level"]),
-                row.get("unit", "fraction"), True,
-            ))
+    """Write port_001's limit set from limit_defaults — the same numbers a new
+    portfolio is created with, plus the demo book's four tighter overrides.
+
+    This used to read data/demo/risk_limits_seed.csv, which is now deleted. The
+    CSV was a third copy of thresholds that also lived in a YAML and in
+    check_limits' literals, and it had drifted: it carried a `stress_loss_tech`
+    row no code has ever looked up and no `gross_exposure` row at all. Once
+    risk_limits is the only source a run reads — the engine has not been switched
+    over yet — a seed missing a required default will be a portfolio that cannot
+    complete a run, so the eight defaults come from SEED_DEFAULTS itself rather
+    than from a file beside it.
+
+    The rows themselves are built by build_demo_limit_rows(); this function is
+    only the write.
+
+    DELETE-then-INSERT, not upsert, is deliberate and stays: this is a seed
+    script and port_001 is demo data that must land in a known state. Note that
+    running it does NOT reset any other portfolio.
+    """
+    rows = [tuple(row[column] for column in RISK_LIMIT_COLUMNS)
+            for row in build_demo_limit_rows()]
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM risk_limits WHERE portfolio_id = 'port_001'")
-        execute_values(cur, """
-            INSERT INTO risk_limits
-                (id, portfolio_id, limit_type, entity_type, entity_id,
-                 warning_level, breach_level, unit, is_active)
+        cur.execute("DELETE FROM risk_limits WHERE portfolio_id = %s", (DEMO_PORTFOLIO_ID,))
+        execute_values(cur, f"""
+            INSERT INTO risk_limits ({", ".join(RISK_LIMIT_COLUMNS)})
             VALUES %s
         """, rows)
     conn.commit()
-    print(f"  risk_limits: {len(rows)} rows")
+    print(f"  risk_limits: {len(SEED_DEFAULTS)} defaults + {len(DEMO_OVERRIDES)} overrides "
+          f"= {len(rows)} rows")
 
 
 def seed_previous_runs(conn, snapshot: date) -> None:

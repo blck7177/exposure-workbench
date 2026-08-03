@@ -6,8 +6,8 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, Float, ForeignKey,
-    Integer, Numeric, String, Text, UniqueConstraint,
+    BigInteger, Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey,
+    Index, Integer, Numeric, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -129,8 +129,43 @@ class FactorPrice(Base):
 # ─── Risk Limits ──────────────────────────────────────────────────────────────
 
 class RiskLimit(Base):
+    """The table that is becoming the single runtime source of every threshold.
+
+    Not yet: analytics/limits.py still reads its thresholds from the cfg()
+    closure it is handed and still ignores the db_limits it is passed. The
+    constraints below land before that switch, not after it — they are what has
+    to replace the git review a YAML edit used to get once a row here is the
+    number in force.
+
+    The four constraints below mirror infra/init.sql exactly — character for
+    character in their predicate text, which tests/test_risk_limits_parity.py
+    compares against init.sql, and init.sql in turn against the ADDs in
+    infra/migrations/v2_multiuser.sql. They are declared here as well because this
+    class is what a reader consults to learn what a valid row looks like, and a
+    rule that lives only in the DDL is a rule the next person writing an INSERT
+    never sees. See the init.sql block for why each one exists.
+    """
+
     __tablename__ = "risk_limits"
-    __table_args__ = (UniqueConstraint("portfolio_id", "limit_type", "entity_id"),)
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "limit_type", "entity_id"),
+        # NULLS DISTINCT on PG 16 lets the UNIQUE above admit two contradictory
+        # portfolio-wide defaults for one check; this forbids the second.
+        Index("ux_risk_limits_default", "portfolio_id", "limit_type", unique=True,
+              postgresql_where=text("entity_id IS NULL")),
+        # Strict `>`: breach == warning kills the warning tier just as surely as
+        # breach < warning does, because _check_one tests breach first. Excludes
+        # the two mechanical own-goals only — it cannot tell whether a number is
+        # sensible for its check, and nothing else does either.
+        CheckConstraint("warning_level > 0 AND breach_level > warning_level",
+                        name="ck_risk_limits_levels"),
+        # `unit` is nullable and a CHECK whose predicate is NULL passes, so the
+        # IS NOT NULL half is what stops an explicit unit=NULL row.
+        CheckConstraint("unit IS NOT NULL AND unit = 'fraction'",
+                        name="ck_risk_limits_unit"),
+        CheckConstraint("is_active OR entity_id IS NOT NULL",
+                        name="ck_risk_limits_default_active"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     portfolio_id: Mapped[str] = mapped_column(String(64), ForeignKey("portfolios.id", ondelete="CASCADE"))

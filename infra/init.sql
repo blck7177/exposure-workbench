@@ -101,8 +101,63 @@ CREATE TABLE IF NOT EXISTS risk_limits (
     unit            VARCHAR(16) DEFAULT 'fraction',
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (portfolio_id, limit_type, entity_id)
+    UNIQUE (portfolio_id, limit_type, entity_id),
+
+    -- These three exist because this table is BECOMING the only place a
+    -- threshold comes from. It is not that yet: analytics/limits.py still reads
+    -- every number out of the cfg() closure it is handed and still ignores the
+    -- db_limits it is passed, so a wrong alert today is traced to
+    -- configs/risk_limits.yaml — or, in the API container, which has no
+    -- /app/configs, to the 16 literals inside cfg() — and not to a row here.
+    -- Once the engine is switched over, the numbers stop passing through git
+    -- review on their way in: a YAML edit is reviewed, a row typed into the
+    -- database at 3am is not. So the guarantees review used to provide have to
+    -- become constraints, and they have to be in place BEFORE that switch rather
+    -- than after it.
+    --
+    -- Levels: this excludes exactly two mechanical own-goals, each of which
+    -- disables a tier outright.
+    --   * warning_level <= 0 makes every positive reading an alert, because
+    --     _check_one's only floor is its `current_value <= 0` early return.
+    --   * breach_level <= warning_level kills the warning tier, because
+    --     _check_one tests breach first — a value that should have warned is
+    --     reported as a breach instead. Equality does this exactly as
+    --     thoroughly as inversion, which is why the comparison is strict.
+    -- breach > warning > 0 also keeps breach_level off zero, and zero is what
+    -- would pin every utilization on the row to 0.0.
+    --
+    -- It does NOT judge whether a number is sensible for the check it belongs
+    -- to, and deliberately does not try: breach_level = 9.99 on daily_loss
+    -- satisfies this constraint and can never fire. A ceiling would have to be
+    -- per-check — gross_exposure legitimately sits above 1.0 (1.10/1.20 seeded,
+    -- higher for a levered book) — and a per-check ceiling is threshold numbers
+    -- back in the schema, which is the fourth source of truth this change
+    -- deletes. Nothing catches an implausible-but-legal number today: the
+    -- limits endpoint shows it, and no code judges it.
+    CONSTRAINT ck_risk_limits_levels
+        CHECK (warning_level > 0 AND breach_level > warning_level),
+    -- Unit: nothing reads this column and _check_one compares raw floats, so
+    -- unit='percent', warning=15, breach=20 is a limit that can never fire.
+    -- The IS NOT NULL half is not redundant. The column is nullable, and a CHECK
+    -- whose predicate evaluates to NULL is satisfied — so `unit = 'fraction'`
+    -- alone lets an explicit unit=NULL row through and leaves the percent-scale
+    -- error class this constraint exists to close wide open.
+    CONSTRAINT ck_risk_limits_unit
+        CHECK (unit IS NOT NULL AND unit = 'fraction'),
+    -- app_rls has no DELETE, so is_active=false is the only way a user can
+    -- retire a limit. Aimed at a required portfolio-wide default it would arm a
+    -- run failure for later — "deactivate" and "fail every future run" must not
+    -- be the same button. Per-entity overrides stay deactivatable.
+    CONSTRAINT ck_risk_limits_default_active
+        CHECK (is_active OR entity_id IS NOT NULL)
 );
+
+-- The UNIQUE above is NULLS DISTINCT on PG 16, so it does not stop a portfolio
+-- from holding two contradictory entity_id-NULL defaults for the same check.
+-- Without this index the read path would need a tie-break over duplicates, and
+-- that tie-break is exactly the shape of patch this schema exists to delete.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_risk_limits_default
+    ON risk_limits (portfolio_id, limit_type) WHERE entity_id IS NULL;
 
 -- ─── Exposure Runs ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS exposure_runs (
