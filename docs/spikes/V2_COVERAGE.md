@@ -231,11 +231,15 @@ fresh session, and re-verified with the same injection.
   an owner-role operator script — 22 tables in FK order, four refuse-before-write
   guards, shared company evidence untouched. See PRODUCTION.md and
   `tests/test_account_deletion_live.py`.
-- **A portfolio's own risk limits do nothing.** `check_limits` takes a
-  `db_limits` argument it never reads; only the YAML defaults fire, while
-  `_load_inputs` queries for them every run and new portfolios get a copied
-  template. Wire it up or delete the copy path — a configurable-looking interface
-  that is ignored is worse than none.
+- ~~**A portfolio's own risk limits do nothing.**~~ Closed in V2-H4 (step ④ of
+  V2-H, deferred once for V3 and once more for V3-R). `check_limits` reads a
+  `LimitBook` built from the portfolio's rows and has no other source —
+  `limits_config`, `db_limits`, the cfg() closure with its 16 literals and
+  `configs/risk_limits.yaml` are all deleted. Completeness is a database fact
+  (partial unique index + three CHECKs + an idempotent backfill) and a missing
+  required row fails the run at step 3 alongside a stale price. Behaviour
+  change, pre-approved: the demo rerun gained one alert, LLY at 0.13809 against
+  its own 0.12 override.
 - **`owner_id NOT NULL` still deferred.** Ownerless rows are fail-closed, so this
   is safe, but it is a loose end.
 - **Every exposure run now calls the price provider once per holding.** The cost

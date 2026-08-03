@@ -527,11 +527,13 @@ failed 红色+error_message 原文;skipped-by-request 灰色;未就绪给 [Load 
 > 执行计划见 [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md),生产口径见 [PRODUCTION.md](PRODUCTION.md)。
 > 实现期推翻的两条原设计已在下文就地标 ★ 改写(重投白名单、配额不进 wrapper);
 > 尚未做完的部分集中记在 V2_COVERAGE 的「Known gaps」一节(`owner_id NOT NULL` 收紧、
-> Clerk 仍是 dev 实例;删号路径已在 V2-H 关闭,**`check_limits` 的死参数没有**——
-> ★ V3-R 复核:`db_limits` 由 workflow 装载并传入,函数体一次都没读它,所以
-> `risk_limits` 表里的 per-portfolio / per-entity 阈值(demo book 有 12 行,含
-> LLY 0.12/0.18、Financials 0.20/0.30 这类比 YAML 更紧的)对告警毫无作用。
-> 这是行为缺陷不是文档问题,修它会改变告警集合,单独定夺,记入 PRODUCTION known limits)。**公网链接前仍需人工完成**:DNS 记录 +
+> Clerk 仍是 dev 实例;删号路径已在 V2-H 关闭,**`check_limits` 的死参数已在 V2-H4 关闭**——
+> ★ 这句话曾经是假的,被 V3-R 复核当场戳穿(`db_limits` 由 workflow 装载并传入,函数体
+> 一次都没读),现在才成立。V2-H4 把 `risk_limits` 行做成运行时唯一的阈值来源:
+> `LimitBook` 没有第三参数,`limits_config` / `db_limits` / cfg() 的 16 个字面量 /
+> `configs/risk_limits.yaml` 全部删除,缺行在步骤 3 与价格陈旧同一次抛出。行为变更已实证:
+> demo 重跑多出一条 LLY 0.13809 vs 它自己的 0.12(此前被 0.15 默认值盖掉)。见 §M16)。
+> **公网链接前仍需人工完成**:DNS 记录 +
 > 机器上的 `/etc/caddy/Caddyfile`(样例在 `infra/Caddyfile.example`)。
 
 背景:项目定位是个人展示,但要呈现 production/deployment-ready。讨论结论:展示型项目的"生产就绪"是叙事资产——每个会坏的边界上有一个能指出来的正交模块,而不是堆基础设施。既有优势直接入账:审计轨迹、预算强制、append-only、幂等 upsert、任务 claim 已是 `FOR UPDATE SKIP LOCKED`(task_service.py)。
@@ -659,3 +661,58 @@ B3 上下文摘要(B0 实测显示一整轮只有几千 token 对 80k 上限,现
 `alert<hex>`(V1)、seed 的 `str(uuid.uuid4())` 位置(V3-R,10 行 demo 持仓)是同一个 bug 的
 第一次和第三次。四方对称测试(harvest / gate / resolver / numeric)挡住了"prefix 只加三处",
 但挡不住"铸造点不走 `new_id`"——后者现在由 live 语料断言(`positions` 全表必须 `pos_` 形)守。
+
+---
+
+## M16 — risk_limits 收口成单一真相(2026-08-03 完成)
+
+> **状态**:V2-H 步④,被 V3 与 V3-R 各推迟一次,现已落地。8 个 commit
+> (`c5a9997`…`ff7b631` + 文档),313 → 410 offline / 98 → 102 live 全绿。
+> 迁移已应用到活库(`risk_limits` 78 → 104 行),demo 已在重建后的栈上重跑验证。
+
+**问题**:`check_limits` 声明 `db_limits`、workflow 每次运行都专门查库把它建出来并传进去,
+**函数体一次都没读过**。真正生效的阈值来自 `configs/risk_limits.yaml`,以及函数自己 `cfg()`
+闭包里的 16 个硬编码字面量 —— 而 API 容器**根本没有 `/app/configs`**,配置文件缺失时的处理
+是打一行 warning 返回 `{}`,于是那 16 个字面量被静默提升为线上阈值。后果不是"死参数"这么轻:
+用户在产品里设的限额完全无效,`GET /portfolios/{id}/limits` 却一直把它们当"生效中的政策"展示。
+
+### 设计上值得记住的四条
+
+- **删掉别的路,而不是加优先级规则**。`LimitBook` 没有第三参数;`limits_config`、`db_limits`、
+  `cfg()` 与 16 个字面量、`configs/risk_limits.yaml` **整体删除**而非置空。置空是不够的:
+  容器无 `/app/configs`,那条 `文件不存在 → warn + {}` 的路径已经在把 16 个字面量喂给每一次调用,
+  一个"清空 config 但保留 cfg()"的半切换在实测上完全不可见。
+- **种子常量与引擎之间那条缺失的 import 边,就是全部保证**。`analytics/limits.py` 不许 import
+  `limit_defaults`;由**解析 import 图**的测试守(不是 grep 字符串 —— 模块 docstring 自己要写明
+  这条禁令,子串检查会把那句话判成违规,同时漏掉 `importlib.import_module`)。
+- **完整性是数据库事实,不是读取时的仲裁**。partial unique index 让"一个 check 只能有一条默认行"
+  成为约束;缺行在**步骤 3** 与价格陈旧同一次抛出(不在 `check_limits` 里 —— 那时 run 已经付过
+  价格同步、因子回归、压力测试的代价)。`MissingLimit` 是保险丝,永不该响,不许 catch。
+- **行存在 ≠ 检查执行**。八个 check 各自守在输入是否存在上,而一个短历史持仓会通过
+  `pivot.ffill().dropna()` 截断整条收益序列,静默让 VaR/ES/波动三项不运行 —— run 照样绿、
+  页面照样写"所有限额在范围内"。现在 run 认证"8 行齐备"之后,读者更会把它当成"8 项已执行",
+  所以 `check_limits` 额外返回 `evaluated` 并写进事件的 `payload_summary`。
+
+### 约束能做的与不能做的(如实)
+
+三条 CHECK 排除的是两类**机械性自摆乌龙**:warning 非正;两档相等或倒挂(都会杀掉 warning 档,
+因为 breach 先测)。它们**不能**判断一个数字对这个 check 而言是否合理 —— `daily_loss` 的 breach
+填 9.99 满足全部约束且永不触发。上界必须 per-check(`gross_exposure` 合法地 >1),而 per-check
+上界等于把阈值数字写回 schema,正是这次删掉的第四份来源。所以今天没有任何东西抓它,文档如实写着。
+
+### 方法上的两条(承自 V3-R,这次又各印证一次)
+
+- **先红后绿**:`test_limit_completeness_live.py` 在迁移前跑出三条红,输出直接进了 commit
+  message —— 它顺带独立推翻了侦察报告的说法:缺默认行的是**全部 7 个组合**(6 个各缺 4 条、
+  `port_rvprobe` 缺全部 8 条),不是 1 个。
+- **改完要拿变异证明测试有牙齿**。切引擎前跑了三次变异全部转红:override 查到了却不用
+  (原始 bug 逐字复刻)、某个 check 不再查表、entity 作用域的限额按整本书查。第三条是漂移钉
+  **断言 scope 而不只是名字**的理由 —— 投影掉 `entity_id` 的版本会在"所有 override 全部失效"时
+  保持绿,而那正是这次要修的状态。
+
+### 实证(重建后的栈)
+
+demo 重跑 11 步全绿,告警从 2 条变 3 条:AAPL 0.16187 / JPM 0.15402 原样(对全局 0.15),
+**新增 LLY 0.13809 对它自己的 0.12** —— per-portfolio 阈值第一次真正生效。事件 payload 记下
+8 个 check 共 27 个 (check, entity) 对,`inert_overrides` 为空。匿名红线(`/`、`/issuer/NVDA`、
+`latest-brief`、run 详情)全部 200。

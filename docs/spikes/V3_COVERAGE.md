@@ -455,6 +455,8 @@ not perform.
   per-portfolio `risk_limits` and passes them; the body never reads the name, so
   every alert comes from the global YAML and the demo book's twelve rows —
   several TIGHTER than the defaults — do nothing.
+  *(Closed in V2-H4, after this review. The row is now the only source of a
+  threshold and the demo book's LLY limit fires for the first time.)*
 
 ### Deliberately not done
 
@@ -464,7 +466,7 @@ not perform.
 | Tightening COUNT compatibility | A bare number claiming no unit is the design; changing it is a semantics decision, not a repair |
 | Removing `think`'s echo | Closed at the harvest layer instead, which also covers the next echoing tool nobody has written yet |
 | The sixth review dimension | Stopped on instruction; the risk it would have covered is recorded above |
-| Honouring `db_limits` | Changes which alerts exist — a decision, not a repair |
+| Honouring `db_limits` | Changes which alerts exist — a decision, not a repair. *Taken in V2-H4: the decision had already been pre-approved, and the deferral was mine.* |
 | MCP face explicitness | Belongs to MCP_BOUNDARY_PLAN |
 
 ---
@@ -486,9 +488,10 @@ not perform.
   claims none, so COUNT compares against ratios, money and counts alike. That is
   the design and not an oversight; tightening it would refuse "the series
   returned 2 points", and it is recorded here because the review asked.
-- **Per-portfolio risk limits are loaded, passed, and never read.** See
-  PRODUCTION's known limits: `check_limits` ignores its `db_limits` argument, so
-  every alert comes from the global YAML thresholds.
+- ~~**Per-portfolio risk limits are loaded, passed, and never read.**~~ Closed
+  in V2-H4. What replaced it in PRODUCTION's known limits is narrower and worth
+  reading: no constraint judges whether a threshold is *sensible* for its check,
+  and a check that did not run still looks like one that passed.
 - **A1 is an existence check, not a correctness check.** It proves a number
   appears in the cited evidence. It cannot prove the number *answers the
   question* — cross-swapping two figures within one answer, both of which are
@@ -511,6 +514,7 @@ not perform.
 - **Retrieval is measured at section level.** A run returning the right SEC item
   and the wrong paragraph scores as a hit. Passage-level labels need a human to
   read 3,078 chunks and are the next step if this number stops discriminating.
-- Carried from V2 and untouched by V3: `check_limits`' dead `db_limits`
-  argument, factor prices outside the freshness checks, no request-rate limiting,
-  `owner_id NOT NULL` still deferred, Clerk still a development instance.
+- Carried from V2 and untouched by V3: factor prices outside the freshness
+  checks, no request-rate limiting, `owner_id NOT NULL` still deferred, Clerk
+  still a development instance. (`check_limits`' dead `db_limits` argument was on
+  this list until V2-H4 closed it.)

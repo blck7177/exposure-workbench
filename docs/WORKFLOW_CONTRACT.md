@@ -8,12 +8,12 @@ Each step writes a `workflow_events` record with `status: running | completed | 
 |------|------|-------------|
 | 1 | `sync_prices` | Refresh bars for every held ticker over the run's own `[as_of - 90d, as_of]` window; record symbols the provider has nothing for and continue |
 | 2 | `load_inputs` | Load positions, market prices, factor prices, limits from DB |
-| 3 | `validate_inputs` | Fail the run if any holding has no price on or before `as_of`, or its newest price is older than `PRICE_STALENESS_DAYS`. Names every offender, not the first |
+| 3 | `validate_inputs` | Fail the run if any holding has no price on or before `as_of`, or its newest price is older than `PRICE_STALENESS_DAYS`, **or the portfolio is missing a required risk-limit row, or holds one naming a check that does not exist**. Names every offender in one raise, not the first |
 | 4 | `calculate_exposure` | Market value, weights, sector/issuer exposure |
 | 5 | `calculate_pnl` | Daily P&L, returns, top contributors/detractors |
 | 6 | `calculate_attribution` | Factor regression, explained/residual return |
 | 7 | `calculate_risk` | Rolling volatility, VaR, expected shortfall, stress |
-| 8 | `check_limits` | Compare metrics against risk_limits config → generate alerts |
+| 8 | `check_limits` | Compare metrics against **the portfolio's `risk_limits` rows** → alerts. Records which (check, entity) pairs it evaluated, and any override the book never consulted, in the event's `payload_summary` |
 | 9 | `compare_previous_run` | Delta analysis vs previous completed run (non-fatal) |
 | 10 | `persist_outputs` | Write all results to DB, mark run completed |
 | 11 | `generate_report` | LLM generates executive summary + markdown report (non-fatal) |

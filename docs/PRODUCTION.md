@@ -294,15 +294,30 @@ enough that people will trust it.
   claim needs a percent, which is what stops short digit strings matching by
   coincidence — but not by magnitude, because a filing table's scale usually sits
   in a header the chunk does not carry.
-- **Per-portfolio risk limits are loaded, passed, and never read.** The workflow
-  reads `risk_limits` for the portfolio and hands them to `check_limits` as
-  `db_limits`; the function body does not reference the parameter once, so every
-  alert comes from the global YAML thresholds. On the demo book that silently
-  discards twelve rows, several of them TIGHTER than the defaults (LLY at
-  0.12/0.18 against a 0.15/0.20 default; Financials at 0.20/0.30 against
-  0.40/0.50) — a limit the desk sets does nothing. Found during V3-R while
-  correcting a note that claimed the opposite. Not fixed here: honouring them
-  changes which alerts exist, which is a decision rather than a repair.
+- ~~**Per-portfolio risk limits are loaded, passed, and never read.**~~ Closed in
+  V2-H4. `check_limits` reads the portfolio's `risk_limits` rows through a
+  `LimitBook` and there is no other source: `limits_config`, `db_limits` and the
+  16 literals in the cfg() closure are deleted, and so is
+  `configs/risk_limits.yaml`. A missing required row fails the run at step 3, in
+  the same raise as a stale price. The demo rerun that proved it gained one
+  alert — LLY at 0.13809 against its own 0.12, previously discarded in favour of
+  the 0.15 default.
+- **No constraint judges whether a threshold is SENSIBLE for its check.**
+  `ck_risk_limits_levels` excludes the two mechanical own-goals (a non-positive
+  warning; tiers that coincide or invert, both of which kill the warning tier
+  because breach is tested first). It cannot exclude `breach_level = 9.99` on
+  `daily_loss`, which satisfies every constraint and can never fire. A ceiling
+  would have to be per-check — `gross_exposure` legitimately sits above 1.0 —
+  and a per-check ceiling is threshold numbers back in the schema, the fourth
+  source of truth V2-H4 removed. The limits endpoint displays such a row; no
+  code judges it.
+- **A check that did not run looks the same as one that passed, in the UI.**
+  Every check sits behind a guard on its input, and one short-history holding
+  truncates the whole return series through `pivot.ffill().dropna()`, so
+  `var_95`, `expected_shortfall_95` and `rolling_volatility_30d` silently do not
+  run while the timeline says step 8 completed and the page reads "all limits
+  within bounds". The run now records which checks it evaluated in the
+  `check_limits` event's `payload_summary`; nothing surfaces it yet.
 - **Two evidence-ingestion paths remain open.** The explicit `{type,id}` branch
   and the `calc_id`/`fact_id` key branch can still put an unciteable id into the
   trail. One malformed id from before V1's alert-prefix fix is in the live trail
@@ -322,11 +337,9 @@ Carried from V2, unchanged:
 
 Each of these is a decision, not an oversight. They are here so that the next
 person to touch this — including me — does not have to rediscover them.
-- **A portfolio's own risk limits do nothing.** `check_limits` takes a
-  `db_limits` argument it never reads; only the YAML defaults fire, while every
-  run queries for them and every new portfolio gets a copied template. Either
-  wire it up or delete the copy path — an interface that pretends to be
-  configurable is worse than none.
+- ~~**A portfolio's own risk limits do nothing.**~~ Closed in V2-H4: the
+  `risk_limits` row is the only source of a threshold, and provisioning a
+  portfolio without a complete set now raises instead of succeeding quietly.
 - **Every exposure run calls the price provider once per holding.** That is the
   cost of `sync_prices`, and it is not separately rate-limited.
 - **A quota-rejected delegation call is refunded its session tool budget.** The
