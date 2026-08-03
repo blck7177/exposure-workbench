@@ -92,3 +92,29 @@ def test_a_schema_with_no_constraints_accepts_anything():
     """think's argument is prose. An empty schema must not be turned into a
     refusal by the mere presence of a validator."""
     assert validate_args({"type": "object"}, {"thought": "anything at all"}) == []
+
+
+# ── the trace of a refusal must not be the thing that crashes the call ────────
+
+def test_redacting_a_non_dict_payload_does_not_raise():
+    """invoke() promises never to raise to its caller, and the rejection path it
+    gained in P1.2 hands record_step whatever the model sent — which, for
+    `json.loads('"NVDA"')`, is a str. redact_args did `(args or {}).items()`.
+
+    The payload is kept rather than dropped: what the model actually sent is the
+    one thing an auditor reading that rejection wants to see.
+    """
+    from exposure_workbench.services.trace_service import redact_args
+
+    assert redact_args("NVDA") == {"_raw": "NVDA"}
+    assert redact_args([1, 2]) == {"_raw": "[1, 2]"}
+    assert redact_args(5) == {"_raw": "5"}
+    assert redact_args(None) == {}
+    assert redact_args({"api_key": "sk-x", "ticker": "NVDA"}) == {
+        "api_key": "[REDACTED]", "ticker": "NVDA"}
+
+
+def test_a_huge_non_dict_payload_is_bounded():
+    from exposure_workbench.services.trace_service import redact_args
+
+    assert len(redact_args("x" * 50_000)["_raw"]) == 2000

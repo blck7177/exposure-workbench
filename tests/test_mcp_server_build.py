@@ -27,7 +27,7 @@ def _never_called():
 
 
 def _build(face=None):
-    from apps.mcp.server import build_mcp_server
+    from exposure_workbench.tools.mcp_server import build_mcp_server
 
     registry = register_meta_tools(build_read_registry())
     return build_mcp_server(
@@ -84,7 +84,7 @@ async def test_the_schemas_are_the_registrys_own():
 
 async def test_a_face_the_registry_cannot_satisfy_never_builds():
     with pytest.raises(faces.FaceNotRegistered):
-        from apps.mcp.server import build_mcp_server
+        from exposure_workbench.tools.mcp_server import build_mcp_server
 
         build_mcp_server(build_read_registry(), faces.FACE_META_AGENT,
                          db_factory=_never_called, session_id="sess_offline_probe")
@@ -109,7 +109,7 @@ def test_the_transport_does_not_validate_arguments_itself():
     """
     import inspect
 
-    from apps.mcp import server as mod
+    from exposure_workbench.tools import mcp_server as mod
 
     source = inspect.getsource(mod.build_mcp_server)
     assert "validate_input=False" in source

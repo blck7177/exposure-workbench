@@ -235,6 +235,19 @@ async def _think(db: AsyncSession, thought: str) -> dict:
 
 _TICKER = {"type": "string", "description": "Issuer ticker, e.g. NVDA"}
 
+# The forms a filing can actually HAVE, which is not the two anyone would list.
+# edgartools' get_filings defaults amendments=True and expands a requested form
+# to {form, form + '/A'}; ingest_filings_metadata records is_amendment and never
+# skips on it. So '10-K/A' reaches filing_chunks, a passage's own citation names
+# it — and with the old enum the model was refused for passing back the form the
+# previous call had just handed it. null is the "any form" the fn already means
+# by None.
+_FORM_TYPE = {
+    "type": ["string", "null"],
+    "enum": ["10-K", "10-Q", "10-K/A", "10-Q/A", None],
+    "description": "narrow to one form; omit for any",
+}
+
 
 def build_read_registry() -> ToolRegistry:
     reg = ToolRegistry()
@@ -348,7 +361,10 @@ def build_read_registry() -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
             "window": {"type": "string", "enum": ["1m", "3m", "6m", "1y"], "default": "1y"},
-            "benchmark": {"type": "string", "default": "SPY"},
+            # str | None in the signature: None means "no benchmark comparison",
+            # which calc_service branches on. Omitting and sending null are the
+            # same intent, and a model with non-strict function calling sends both.
+            "benchmark": {"type": ["string", "null"], "default": "SPY"},
         }, "required": ["ticker"]},
         fn=_get_market_stats, tool_class=READ,
     ))
@@ -357,9 +373,10 @@ def build_read_registry() -> ToolRegistry:
         description="Semantic search across an issuer's indexed 10-K/10-Q; returns passages with citation anchors.",
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER, "query": {"type": "string"},
-            "k": {"type": "integer", "default": 5, "maximum": 10},
-            "form_type": {"type": "string", "enum": ["10-K", "10-Q"]},
-            "item_code": {"type": "string", "description": "narrow to an Item, e.g. 'Item 1A'"},
+            "k": {"type": "integer", "default": 5, "minimum": 1, "maximum": 10},
+            "form_type": _FORM_TYPE,
+            "item_code": {"type": ["string", "null"], "minLength": 1,
+                          "description": "narrow to an Item, e.g. 'Item 1A'"},
         }, "required": ["ticker", "query"]},
         fn=_search_filing_passages, tool_class=READ,
     ))
@@ -367,8 +384,8 @@ def build_read_registry() -> ToolRegistry:
         name="get_filing_section",
         description="Read a whole SEC Item verbatim from the most recent filing (e.g. Item 1A Risk Factors).",
         json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "item_code": {"type": "string"},
-            "form_type": {"type": "string", "enum": ["10-K", "10-Q"]},
+            "ticker": _TICKER, "item_code": {"type": "string", "minLength": 1},
+            "form_type": _FORM_TYPE,
         }, "required": ["ticker", "item_code"]},
         fn=_get_filing_section, tool_class=READ,
     ))

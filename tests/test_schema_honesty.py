@@ -1,0 +1,140 @@
+"""P1.2b — the schemas say what the functions actually accept (offline).
+
+Turning on validation made every schema load-bearing at once, and seven of them
+were not true to their functions. They all failed the same way: a parameter the
+function declares `str | None = None` was typed `{"type": "string"}`, which
+Draft 2020-12 rejects an explicit `null` for. Omitting an optional argument and
+sending `null` for it are the same intent, and a model that has not been given
+`strict` function calling emits either — so a working call became
+`invalid_arguments`.
+
+The whole suite stayed green through it, which is the part worth keeping. Every
+existing test omits its optional arguments; none sends a null. So the guard here
+is not seven cases — it is derived from the functions themselves, and it covers
+the next optional parameter somebody adds without their having to remember this.
+"""
+
+from __future__ import annotations
+
+import inspect
+from typing import get_args, get_type_hints
+
+import pytest
+from jsonschema import Draft202012Validator
+
+from exposure_workbench.tools.arg_validation import validate_args
+from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.meta_tools import register_meta_tools
+from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+
+
+def _all_tools():
+    """Every registered tool, from both faces, deduped by name."""
+    out = {}
+    for registry in (register_meta_tools(build_read_registry()), build_research_registry()):
+        out.update(registry.tools)
+    return sorted(out.items())
+
+
+def _stub(schema: dict):
+    """A minimal value satisfying `schema`, so a test can vary one field.
+
+    Recursive because submit_brief's blocks are objects with their own required
+    fields — the only nested schema in the registry, and the one whose gate
+    matters most.
+    """
+    kind = schema.get("type")
+    if isinstance(kind, list):
+        kind = next((k for k in kind if k != "null"), "string")
+    if kind == "object":
+        props = schema.get("properties") or {}
+        return {name: _stub(props[name]) for name in (schema.get("required") or [])}
+    if kind == "array":
+        items = schema.get("items") or {"type": "string"}
+        return [_stub(items)] if schema.get("minItems") else []
+    if kind == "integer":
+        return schema.get("minimum", 1)
+    if kind == "number":
+        return float(schema.get("minimum", 1))
+    if kind == "boolean":
+        return True
+    enum = schema.get("enum")
+    if enum:
+        return next(v for v in enum if v is not None)
+    return "NVDA"
+
+
+def _nullable_params(tool):
+    """Parameters whose ANNOTATION admits None — the function's own claim.
+
+    The annotation, not the default. `benchmark: str | None = "SPY"` defaults to
+    a benchmark and still treats None as a real value ('no comparison'), while
+    `last_n: int = 12` is declared int and refusing a null for it is the schema
+    telling the truth. Reading the default instead gets both of those backwards.
+    """
+    try:
+        hints = get_type_hints(tool.fn)
+    except Exception:                       # unresolvable forward ref
+        hints = {}
+    out = []
+    for name, p in inspect.signature(tool.fn).parameters.items():
+        if name == "db" or p.kind in (p.VAR_KEYWORD, p.VAR_POSITIONAL):
+            continue
+        hint = hints.get(name)
+        admits_none = (
+            type(None) in get_args(hint) if hint is not None
+            else "None" in str(p.annotation)
+        )
+        if admits_none or p.default is None:
+            out.append(name)
+    return out
+
+
+@pytest.mark.parametrize("name, tool", _all_tools())
+def test_every_registered_schema_is_a_valid_schema(name, tool):
+    """Draft202012Validator is constructed per call inside invoke(). A malformed
+    schema — or a pattern that is not a valid Python regex, which jsonschema
+    compiles only when it validates — would raise straight out of the gate,
+    which promises never to raise to its caller."""
+    Draft202012Validator.check_schema(tool.json_schema)
+
+
+@pytest.mark.parametrize("name, tool", _all_tools())
+def test_an_optional_argument_accepts_the_null_its_function_accepts(name, tool):
+    """If the fn's signature admits None, null is a value it handles, and the
+    schema has to say so. Derived from the signature rather than listed, so the
+    next optional parameter is covered by having been written."""
+    base = _stub(tool.json_schema)
+    for param in _nullable_params(tool):
+        if param not in (tool.json_schema.get("properties") or {}):
+            continue
+        problems = validate_args(tool.json_schema, {**base, param: None})
+        assert problems == [], (
+            f"{name}.{param} defaults to None in the function but the schema "
+            f"refuses null: {problems}"
+        )
+
+
+@pytest.mark.parametrize("name, tool", _all_tools())
+def test_a_required_argument_is_one_the_function_does_not_default(name, tool):
+    """The other direction: `required` must not name something the fn defaults,
+    or the schema refuses a call the fn was written to accept."""
+    defaulted = {
+        p.name for p in inspect.signature(tool.fn).parameters.values()
+        if p.default is not inspect.Parameter.empty and p.name != "db"
+    }
+    if "blocks" in {p.name for p in inspect.signature(tool.fn).parameters.values()}:
+        return  # submit_brief takes **blocks; its contract is the schema itself
+    over_required = sorted(set(tool.json_schema.get("required") or []) & defaulted)
+    assert over_required == [], f"{name} requires what its function defaults: {over_required}"
+
+
+def test_the_forms_a_filing_can_actually_have_are_selectable():
+    """form_type's enum was ['10-K', '10-Q'], but amendments are ingested: the
+    provider asks edgartools for a form and gets '10-K/A' too, and nothing skips
+    them. So a passage's own citation could name a form the next call was then
+    refused for passing back."""
+    registry = build_read_registry()
+    for tool_name in ("search_filing_passages", "get_filing_section"):
+        enum = registry.get(tool_name).json_schema["properties"]["form_type"]["enum"]
+        assert {"10-K", "10-Q", "10-K/A", "10-Q/A"} <= set(enum), tool_name

@@ -226,7 +226,10 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         description="Enqueue a portfolio exposure run. Returns a run id immediately.",
         json_schema={"type": "object", "properties": {
             "portfolio_id": {"type": "string"},
-            "as_of_date": {"type": "string", "description":
+            # Nullable because the description tells the model to omit it, and
+            # a model that has decided not to use an optional argument says so
+            # with null about as often as by leaving it out.
+            "as_of_date": {"type": ["string", "null"], "description":
                 "YYYY-MM-DD. Omit unless the user asked for a specific date — "
                 "the server reports on the last completed session by default."},
             "reason": {"type": "string"},
@@ -240,7 +243,19 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
                     "clarifying question) may cite nothing. Whatever you cite must be real.",
         json_schema={"type": "object", "properties": {
             "text": {"type": "string"},
-            "citations": {"type": "array", "items": {"type": "string"}},
+            # The sharpest of the nullable cases: respond is the session's only
+            # exit, so a refusal here is not a tool error the model recovers
+            # from — it burns turns until the user gets the gate-exhausted
+            # message in answer to a greeting. `citations: list[str] | None`,
+            # and `citations or []` on the first line of the fn.
+            #
+            # items stays `string` deliberately. The gate resolves plain ids
+            # (`cid.startswith(...)`), so an object-shaped citation cannot be
+            # checked — and today the fn silently DROPS one, which is worse
+            # than refusing it.
+            "citations": {"type": ["array", "null"], "items": {"type": "string"},
+                          "description": "evidence ids (fact_/chunk_/calc_/src_/alert_/run_/pos_) "
+                                         "returned by tools you called this session"},
         }, "required": ["text"]},
         fn=_respond, tool_class=GATE,
     ))

@@ -23,9 +23,23 @@ from exposure_workbench.utils.ids import new_step_id
 _REDACT_HINTS = ("api_key", "apikey", "token", "secret", "password", "authorization", "identity")
 
 
-def redact_args(args: dict[str, Any]) -> dict[str, Any]:
+def redact_args(args: Any) -> dict[str, Any]:
+    """Redact key-class fields. Never raises — recording is not allowed to be
+    the thing that kills a call.
+
+    A non-dict payload is real: the agent loops build args with
+    `json.loads(tool_call.arguments)`, and a model that emits `"NVDA"` or `[1,2]`
+    produces a str or a list. Argument validation refuses those, and the
+    refusal is traced — so this function is on the path where the payload is,
+    by definition, not a dict. It used to do `(args or {}).items()` and raise
+    AttributeError straight out of invoke(), which promises never to raise.
+    Kept rather than dropped, because what the model actually sent is the one
+    thing an auditor reading that rejection wants.
+    """
+    if not isinstance(args, dict):
+        return {} if args is None else {"_raw": str(args)[:2000]}
     out: dict[str, Any] = {}
-    for k, v in (args or {}).items():
+    for k, v in args.items():
         if any(h in k.lower() for h in _REDACT_HINTS):
             out[k] = "[REDACTED]"
         else:

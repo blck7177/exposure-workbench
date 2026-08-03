@@ -156,18 +156,34 @@ def test_semantic_owner_filters_are_labelled():
     assert unlabelled == [], f"owner filters with no semantic/security label: {unlabelled}"
 
 
-def test_providers_do_not_import_upwards():
-    """Import direction is one-way: apps -> tools -> services -> providers/db.
-    A provider reaching back into services is how a transport detail ends up
-    deciding business behaviour."""
+# Import direction is one-way: apps -> tools -> services -> providers/db, and
+# agents -> tools. A layer reaching upwards is how a transport detail ends up
+# deciding business behaviour.
+#
+# The agents entry was added when the MCP face needed a home: it was written
+# under apps/mcp/ first, where the agents that consume it could not have
+# imported it without inverting the rule. The face belongs to the tool layer,
+# and this is what says so.
+_UPWARD = {
+    "providers": r"exposure_workbench\.(services|tools|agents|workflow)",
+    "analytics": r"exposure_workbench\.(services|tools|agents|workflow|providers)",
+    "agents": r"exposure_workbench\.(providers)",
+    "tools": r"exposure_workbench\.(agents|workflow)",
+}
+
+
+def test_no_layer_imports_upwards():
     offenders = []
-    for f in (ROOT / "src" / "exposure_workbench" / "providers").glob("*.py"):
-        for i, line in enumerate(f.read_text().splitlines(), 1):
-            if re.match(r"\s*(from|import)\s+.*exposure_workbench\.(services|tools|agents)", line):
-                offenders.append(f"{f.name}:{i} {line.strip()}")
-            if re.match(r"\s*(from|import)\s+apps\.", line):
-                offenders.append(f"{f.name}:{i} {line.strip()}")
-    assert offenders == [], f"providers importing upwards: {offenders}"
+    for package, upward in _UPWARD.items():
+        for f in (ROOT / "src" / "exposure_workbench" / package).rglob("*.py"):
+            for i, line in enumerate(f.read_text().splitlines(), 1):
+                where = f"{package}/{f.name}:{i} {line.strip()}"
+                if re.match(rf"\s*(from|import)\s+.*{upward}", line):
+                    offenders.append(where)
+                # apps/ is the top of the graph; nothing under src/ may reach it.
+                if re.match(r"\s*(from|import)\s+apps[\s.]", line):
+                    offenders.append(where)
+    assert offenders == [], f"layers importing upwards: {offenders}"
 
 
 def test_unbounded_growth_paths_carry_a_ceiling():
