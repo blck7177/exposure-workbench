@@ -16,11 +16,13 @@ import asyncio
 import logging
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics.limit_defaults import SEED_DEFAULTS
+from exposure_workbench.analytics.limits import LIMIT_SPECS, REQUIRED_LIMIT_TYPES
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import IssuerExposure, MarketPrice, Portfolio, Position, RiskLimit
 from exposure_workbench.services import exposure_run_service, security_master_service, usage_service
@@ -290,14 +292,183 @@ async def _enrich_new_meta(db: AsyncSession, tickers: list[str], meta: dict) -> 
         meta[t] = {"asset_class": "equity", "sector": sector or "Unclassified", "region": "US"}
 
 
-async def _copy_risk_limits(db: AsyncSession, src_id: str, dst_id: str) -> None:
-    limits = (await db.execute(select(RiskLimit).where(RiskLimit.portfolio_id == src_id))).scalars().all()
-    for lim in limits:
+# ── risk limits a new portfolio starts with ───────────────────────────────────
+
+class LimitProvisioningFailed(Exception):
+    """A portfolio does not carry the limit rows every run of it will need.
+
+    Raised inside the caller's transaction so the portfolio row goes back with
+    it: a book that cannot be valued is never handed to a user in the first
+    place. Nothing catches this. Its whole purpose is that provisioning stops
+    being able to half-succeed quietly.
+
+    `portfolio_id` is the book whose ROWS AN OPERATOR HAS TO GO FIX, which is
+    not always the book being created. A clone that trips over a bad override in
+    port_001 names port_001 here, because that is the row that will trip the
+    next clone too; the transient clone id is about to be rolled back and would
+    be a different value on every attempt, so anything grouping on this field
+    would see a stream of one-off ids instead of one recurring broken book. The
+    message carries both.
+    """
+
+    def __init__(self, portfolio_id: str, problem: str):
+        super().__init__(f"{portfolio_id}: {problem}")
+        self.portfolio_id = portfolio_id
+
+
+def _default_limit_rows(portfolio_id: str) -> list[dict]:
+    """One portfolio-wide row per check a run evaluates — eight of them today.
+
+    The numbers come from the SEED_DEFAULTS constant, not from port_001. A copy
+    is only ever as present as its source, and this source disappears on
+    purpose: scripts/seed_demo_db.py DELETEs port_001's limits before
+    reinserting them, so a portfolio created inside that window was handed an
+    empty set and told nobody. They come from a Python module rather than
+    configs/risk_limits.yaml because the API container has no /app/configs at
+    all — that missing file is what left check_limits reading its own literals.
+
+    entity_type is taken from LIMIT_SPECS and never typed here: stress_loss is
+    keyed per scenario yet reported against the whole book, and that
+    disagreement is settled in exactly one place.
+    """
+    return [
+        {"id": new_id("rl_"), "portfolio_id": portfolio_id, "limit_type": limit_type,
+         "entity_type": LIMIT_SPECS[limit_type].entity_type, "entity_id": None,
+         "warning_level": warning, "breach_level": breach,
+         "unit": "fraction", "is_active": True}
+        for limit_type, (warning, breach) in SEED_DEFAULTS.items()
+    ]
+
+
+async def _active_default_limit_types(db: AsyncSession, portfolio_id: str) -> set[str]:
+    """Which checks this book currently has a live portfolio-wide row for.
+
+    The same definition the run uses: entity_id IS NULL and is_active. A retired
+    default cannot legally exist (ck_risk_limits_default_active), but filtering
+    on the flag anyway means a row left over from before that constraint is
+    reported as missing — which, to the engine, is exactly what it is — instead
+    of counting as present and then never being read.
+    """
+    return set((await db.execute(
+        select(RiskLimit.limit_type).where(
+            RiskLimit.portfolio_id == portfolio_id,
+            RiskLimit.entity_id.is_(None),
+            RiskLimit.is_active.is_(True),
+        )
+    )).scalars().all())
+
+
+async def ensure_default_limits(db: AsyncSession, portfolio_id: str) -> None:
+    """Give this portfolio every portfolio-wide limit a run of it will look up.
+
+    Idempotent, and idempotent in the direction that matters: ON CONFLICT DO
+    NOTHING, so a threshold the desk has already tuned stays where the desk put
+    it. An upsert here would walk every edited number back to the seed value on
+    the next call, which is a policy change nobody asked for and nobody would
+    see.
+
+    It reads the table back and raises, because writing is the step that can
+    fail invisibly. The copy-from-port_001 this replaces could not fail at all:
+    an empty source produced an empty copy and returned successfully. Once the
+    engine is switched over to these rows — check_limits still reads every
+    threshold from its own cfg() closure today and still ignores the db_limits
+    it is handed — that same silence surfaces days later as "every run of this
+    book fails", with nothing pointing back at the creation that caused it.
+    Raising at creation time is what keeps that book from existing.
+    """
+    await db.execute(
+        pg_insert(RiskLimit)
+        .values(_default_limit_rows(portfolio_id))
+        # Arbitrated on the partial index, not on the table's UNIQUE: entity_id
+        # is NULL on every row here, and under NULLS DISTINCT that UNIQUE would
+        # wave the insert through and leave the book holding two contradictory
+        # defaults for one check.
+        .on_conflict_do_nothing(
+            index_elements=["portfolio_id", "limit_type"],
+            index_where=text("entity_id IS NULL"),
+        )
+    )
+    await db.flush()
+
+    missing = REQUIRED_LIMIT_TYPES - await _active_default_limit_types(db, portfolio_id)
+    if missing:
+        raise LimitProvisioningFailed(
+            portfolio_id,
+            "no active portfolio-wide limit for " + ", ".join(sorted(missing))
+            + " after provisioning — a run of this portfolio would have no "
+              "threshold to check those against",
+        )
+
+
+async def _copy_demo_overrides(db: AsyncSession, dst_id: str) -> None:
+    """Give a clone of the demo book the demo book's per-entity thresholds.
+
+    A clone, and only a clone: it holds the demo's positions, so "Financials
+    0.20/0.30" and "LLY 0.12/0.18" are about names it actually owns. This is why
+    create_portfolio copies nothing — an uploaded COST/SBUX/TGT book has no
+    business inheriting an LLY threshold, and three of the live user books share
+    not one entity with the rows they were given, because yfinance calls a
+    sector "Consumer Cyclical" where the seed said "Consumer_Discretionary".
+    Those rows could never match the thing they were meant to constrain.
+
+    entity_id IS NOT NULL keeps this away from the eight defaults, which
+    ensure_default_limits has already written from the constant. It also means
+    the legacy portfolio-wide `stress_loss_tech` row never reaches the guard
+    below: entity_id is NULL on it, so the WHERE clause drops it one step
+    earlier and silently. The guard is about per-entity rows only.
+
+    is_active is a filter and not a copied column: with no DELETE grant,
+    is_active=false is the only way a user retires an override, and propagating
+    that tombstone would hand every later clone a row whose only purpose is to
+    be ignored.
+    """
+    overrides = (await db.execute(select(RiskLimit).where(
+        RiskLimit.portfolio_id == DEMO_PORTFOLIO_ID,
+        RiskLimit.entity_id.isnot(None),
+        RiskLimit.is_active.is_(True),
+    ))).scalars().all()
+
+    for lim in overrides:
+        spec = LIMIT_SPECS.get(lim.limit_type)
+        if spec is None or spec.scope != "entity":
+            # Two ways a per-entity row is policy nothing will ever read, and the
+            # message says which because the two need different fixes.
+            #
+            # No such check: `stress_loss_tech`, shown to users as in force for a
+            # year while nothing looked it up. The row has to go or be renamed.
+            #
+            # A real check, but a portfolio-scoped one: check_limits looks var_95
+            # up with no entity, so var_95/LLY is stored, served by GET
+            # /portfolios/{id}/limits as policy in force, and never compared to
+            # anything. Same shape, different repair — the threshold belongs on
+            # the portfolio-wide row.
+            #
+            # limit_defaults asserts both rules over DEMO_OVERRIDES, but that
+            # constant is not what this reads: the rows come from the table, and
+            # nothing stops SQL putting one there. So the copy path checks both
+            # rather than inheriting the constant's guarantee.
+            raise LimitProvisioningFailed(
+                DEMO_PORTFOLIO_ID,
+                f"clone into {dst_id} stopped: this book has a "
+                f"{lim.limit_type!r} override for "
+                f"{lim.entity_id!r} and "
+                + ("no check of that name exists to read it" if spec is None else
+                   f"{lim.limit_type} is checked for the whole book, never per "
+                   "entity, so no run would ever look that row up"),
+            )
         db.add(RiskLimit(
             id=new_id("rl_"), portfolio_id=dst_id, limit_type=lim.limit_type,
-            entity_type=lim.entity_type, entity_id=lim.entity_id,
+            # From the spec, not from the source row, for the same reason the
+            # alert takes it from there: the two can disagree.
+            entity_type=spec.entity_type, entity_id=lim.entity_id,
             warning_level=lim.warning_level, breach_level=lim.breach_level,
-            unit=lim.unit, is_active=lim.is_active,
+            # The source's own unit rather than a literal 'fraction'. Under
+            # ck_risk_limits_unit the two cannot differ, so this is defence in
+            # depth for a volume older than that constraint: on such a database
+            # a 'percent' row copied as 'fraction' would become a hundredfold
+            # looser limit that reads as deliberate, where copying the unit
+            # keeps the row refusable by the constraint once it lands.
+            unit=lim.unit, is_active=True,
         ))
     await db.flush()
 
@@ -312,14 +483,27 @@ class TooManyPortfolios(Exception):
 # stay: the ceiling bounds how many rows one account can ever hold, the pool
 # bounds how fast it can get there. Nobody should earn ten more portfolios every
 # morning, and nobody should be able to spend their whole allowance in one
-# scripted loop either. Each creation also copies 13 risk-limit rows, and a
-# clone copies the demo's positions on top.
+# scripted loop either. Each creation also writes one portfolio-wide risk-limit
+# row per check — eight, the length of SEED_DEFAULTS — and a clone copies the
+# demo's positions and its per-entity overrides on top.
+#
+# A demo clone is 12 rows (8 SEED_DEFAULTS + 4 DEMO_OVERRIDES) — and that is a
+# statement about a database whose port_001 has already been reseeded from
+# limit_defaults, not about one that has not. Until scripts/seed_demo_db.py has
+# rerun, port_001 holds what the retired data/demo/risk_limits_seed.csv put
+# there: 13 rows, 8 of them per-entity and active (four — Technology, NVDA,
+# AAPL, MSFT — only restating the default, which is why the constant drops
+# them), so a clone taken against that book writes 16, not 12.
 MAX_PORTFOLIOS_PER_USER = 20
 
 
 async def create_portfolio(db: AsyncSession, owner_id: str, name: str) -> Portfolio:
-    """New empty portfolio owned by the user, with the demo's risk-limit template
-    (check_limits needs limits to evaluate)."""
+    """New empty portfolio owned by the user, carrying the eight portfolio-wide
+    limits every run looks up — and nothing else.
+
+    It inherits no per-entity threshold from the demo book. Those name the demo's
+    sectors and issuers, and a book with none of those holdings gets rows that
+    can never match; see _copy_demo_overrides for who does get them and why."""
     # semantic, not security: RLS already scopes this count to the caller; the
     # explicit owner filter is what makes it mean "mine" rather than "visible".
     owned = (await db.execute(
@@ -342,7 +526,7 @@ async def create_portfolio(db: AsyncSession, owner_id: str, name: str) -> Portfo
     )
     db.add(p)
     await db.flush()
-    await _copy_risk_limits(db, DEMO_PORTFOLIO_ID, p.id)
+    await ensure_default_limits(db, p.id)
     return p
 
 
@@ -410,8 +594,14 @@ async def upload_positions(
 
 async def clone_demo(db: AsyncSession, owner_id: str, name: str = "My Portfolio (demo copy)") -> Portfolio:
     """Create a user portfolio pre-filled with the demo's latest holdings — the
-    one-click way to get something runnable without uploading a CSV."""
+    one-click way to get something runnable without uploading a CSV.
+
+    The demo's per-entity limits come with the holdings, because here they are
+    about the same names. The eight portfolio-wide defaults arrive from
+    create_portfolio, not from port_001, so a clone taken while the demo is
+    mid-reseed still gets a complete set."""
     p = await create_portfolio(db, owner_id, name)
+    await _copy_demo_overrides(db, p.id)
     demo_positions = await get_positions_latest(db, DEMO_PORTFOLIO_ID)
     for pos in demo_positions:
         db.add(Position(
