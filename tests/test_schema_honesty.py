@@ -175,3 +175,53 @@ def test_nested_objects_forbid_unknown_arguments_too(name, tool):
     for prop, sub in (tool.json_schema.get("properties") or {}).items():
         if isinstance(sub, dict) and sub.get("type") == "object" and sub.get("properties"):
             assert sub.get("additionalProperties") is False, f"{name}.{prop}"
+
+
+_WINDOWED = {
+    "get_fact_series": "last_n", "compute_change": "last_n", "compute_ratio": "last_n",
+    "compute_combine": "last_n", "compute_stat": "last_n", "search_filing_passages": "k",
+}
+
+
+@pytest.mark.parametrize("name, param", sorted(_WINDOWED.items()))
+def test_a_window_size_has_a_floor_as_well_as_a_ceiling(name, param):
+    """Each of these had a maximum and no minimum, and the floor is where the
+    damage was.
+
+    load_fact_series does `limit = min(last_n or 40, 40)` and then
+    `points[-limit:]`. So last_n=0 returned all forty points while the ledger
+    row recorded 0; last_n=-4 returned the series with its four OLDEST points
+    dropped, which is a window nobody asked for; and last_n=-20 on a
+    twelve-point series returned NOTHING — successfully, with a calc_id, which
+    the agent may then cite. A citable calculation backed by an empty series is
+    the class V3-R spent a week closing.
+    """
+    tool = dict(_all_tools())[name]
+    spec = tool.json_schema["properties"][param]
+    assert spec.get("minimum", 0) >= 1, f"{name}.{param} has no floor: {spec}"
+
+    base = _stub(tool.json_schema)
+    for bad in (0, -4, -20):
+        assert validate_args(tool.json_schema, {**base, param: bad}), \
+            f"{name}.{param}={bad} is accepted"
+
+
+@pytest.mark.parametrize("name, param", sorted(_WINDOWED.items()))
+def test_a_window_size_written_as_a_float_does_not_reach_the_slice(name, param):
+    """Draft 2020-12 counts 12.0 as an integer — deliberately, and jsonschema
+    implements it — so no keyword rejects one. It then reaches `points[-12.0:]`
+    and raises TypeError, which the wrapper reports as tool_error.
+
+    Since the schema cannot express this, the fn coerces, the way
+    filing_retrieval_service already did for k.
+    """
+    tool = dict(_all_tools())[name]
+    # A float that is in range for THIS parameter — k's ceiling is 10, last_n's
+    # is 40, and the point is the type, not the value.
+    in_range = float(tool.json_schema["properties"][param].get("minimum", 1))
+    assert validate_args(tool.json_schema, {**_stub(tool.json_schema), param: in_range}) == []
+
+    import inspect
+    source = inspect.getsource(inspect.getmodule(tool.fn))
+    assert f"int({param})" in source, \
+        f"nothing coerces {name}.{param}, and the schema cannot"

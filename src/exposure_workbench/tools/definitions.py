@@ -28,6 +28,14 @@ from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegist
 
 _PERIOD_TYPES = ["quarterly", "annual", "instant"]
 
+# A floor as well as a ceiling. load_fact_series does `min(last_n or 40, 40)`
+# and then `points[-limit:]`, so 0 asked for none and got all forty (with the
+# ledger recording 0), -4 silently dropped the four OLDEST points, and -20 on a
+# twelve-point series returned an empty series — successfully, with a calc_id
+# the agent could then cite.
+_LAST_N = {"type": "integer", "default": 12, "minimum": 1, "maximum": 40,
+           "description": "how many most-recent periods (cap 40)"}
+
 
 # ── company / snapshot ──────────────────────────────────────────────────────────
 
@@ -64,8 +72,15 @@ async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
 # ── financial data / calculations ───────────────────────────────────────────────
 
 def _spec(ticker: str, metric: str, period_type: str, last_n: int | None) -> cs.SeriesSpec:
+    # int(last_n), because the schema cannot say this. Draft 2020-12 counts 12.0
+    # as an integer — deliberately, and jsonschema implements it — so no keyword
+    # rejects the float a model writes when it means twelve. It would reach
+    # `points[-12.0:]` and raise TypeError, surfacing as tool_error. The single
+    # place last_n enters the series layer, and the same coercion
+    # filing_retrieval_service already does for k.
     return cs.SeriesSpec(ticker=ticker.upper(), metric=metric,
-                         period_type=period_type, last_n=last_n)
+                         period_type=period_type,
+                         last_n=None if last_n is None else int(last_n))
 
 
 async def _get_fact_series(db: AsyncSession, ticker: str, metric: str,
@@ -173,7 +188,10 @@ async def _search_filing_passages(db: AsyncSession, ticker: str, query: str, k: 
     if company.get("error"):
         return company
     try:
-        passages = await frs.search_passages(db, company["id"], query, k=k,
+        # int(k) here as well as in the retrieval service: the coercion belongs
+        # where the model's value enters the tool layer, so the rule reads the
+        # same for every window size (see _spec on why the schema cannot say it).
+        passages = await frs.search_passages(db, company["id"], query, k=int(k),
                                              form_type=form_type, item_code=item_code)
     except frs.NotIndexed:
         return {"error": "not_indexed", "ticker": ticker.upper(),
@@ -280,7 +298,7 @@ def build_read_registry() -> ToolRegistry:
             "ticker": _TICKER,
             "metric": {"type": "string", "description": "normalized metric, e.g. revenue, net_income, cost_of_revenue"},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+            "last_n": _LAST_N,
         }, "required": ["ticker", "metric"], "additionalProperties": False},
         fn=_get_fact_series, tool_class=READ,
     ))
@@ -291,7 +309,7 @@ def build_read_registry() -> ToolRegistry:
             "ticker": _TICKER, "metric": {"type": "string"},
             "mode": {"type": "string", "enum": ["yoy", "qoq", "pct", "abs"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+            "last_n": _LAST_N,
         }, "required": ["ticker", "metric", "mode"], "additionalProperties": False},
         fn=_compute_change, tool_class=READ,
     ))
@@ -301,7 +319,7 @@ def build_read_registry() -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER, "numerator": {"type": "string"}, "denominator": {"type": "string"},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+            "last_n": _LAST_N,
         }, "required": ["ticker", "numerator", "denominator"], "additionalProperties": False},
         fn=_compute_ratio, tool_class=READ,
     ))
@@ -313,7 +331,7 @@ def build_read_registry() -> ToolRegistry:
             "ticker": _TICKER, "metric_a": {"type": "string"}, "metric_b": {"type": "string"},
             "op": {"type": "string", "enum": ["add", "sub", "divide"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+            "last_n": _LAST_N,
         }, "required": ["ticker", "metric_a", "metric_b", "op"], "additionalProperties": False},
         fn=_compute_combine, tool_class=READ,
     ))
@@ -351,7 +369,7 @@ def build_read_registry() -> ToolRegistry:
             "ticker": _TICKER, "metric": {"type": "string"},
             "op": {"type": "string", "enum": ["cagr", "avg", "min", "max", "std", "sum", "latest"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": {"type": "integer", "default": 12, "maximum": 40},
+            "last_n": _LAST_N,
         }, "required": ["ticker", "metric", "op"], "additionalProperties": False},
         fn=_compute_stat, tool_class=READ,
     ))
