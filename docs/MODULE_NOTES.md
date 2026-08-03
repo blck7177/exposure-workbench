@@ -280,7 +280,7 @@ workflow 收尾步:物化 Evidence Trail,run completed
 
 ### submit_brief:门在工具里,不在事后
 
-- 六块结构(financial_summary / key_changes / management_explanation / market_context / portfolio_implications / open_questions)+ confidence_notes,tool-call 形态强制
+- 六块结构(financial_summary / key_changes / management_explanation / market_context / portfolio_implications / open_questions)+ `confidence_flags`(★ 2026-08-03 更正:此处原写 `confidence_notes`,schema 与 `issuer_briefs` 列名都是 `confidence_flags`。schema 收口前,照文档写的键会被 `**blocks` 静默丢弃;收口后是显式拒绝),tool-call 形态强制
 - 每块 `citations[]` 必填(唯一豁免:open_questions——问题不是事实断言)
 - **提交时同步校验**:每个 citation id 必须 ∈ 本会话 Evidence Trail 且 ∈ 数据库;不过 → 结构化错误(具体到哪个 id),agent 预算内修正重提;耗尽 → run failed
 - 这不是 fallback:错误反馈是会话内结构化对话,终局二值(合格 Brief 或可见失败),无"降级产物"第三态。相比 sm-master 的事后校验,门前移到提交时——hallucinated citation 在落库前拦死

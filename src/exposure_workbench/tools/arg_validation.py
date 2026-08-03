@@ -23,22 +23,40 @@ orders — an unreproducible trace and an unstable reply, for nothing.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
 
-def _field(error) -> str:
-    """The argument a problem is about.
+_QUOTED = re.compile(r"'([^']+)'")
 
-    For most errors that is the path into the payload. For `required` the path
-    is empty and the field name is in the validator's own value, which is the
-    difference between "mode" and "" in a reply the model has to act on.
-    """
-    if error.validator == "required" and not error.absolute_path:
-        missing = error.message.split("'")
-        return missing[1] if len(missing) > 1 else ""
+
+def _path(error) -> str:
     return ".".join(str(p) for p in error.absolute_path)
+
+
+def _fields(error) -> list[str]:
+    """The argument(s) a problem is about, fully qualified.
+
+    Most errors carry the path to the offending value and one name is enough.
+    Two do not, and both are reported against the CONTAINER:
+
+      required            path is the enclosing object, the missing name is in
+                          the message. Unqualified that reads 'financial_summary'
+                          for a block that is missing its text.
+      additionalProperties  path is the enclosing object too, and the unexpected
+                          keys are in the message — so without this every
+                          unknown argument would be filed under the empty
+                          string, which is both useless and sorts first, ahead
+                          of the real problems it is usually mixed with.
+    """
+    if error.validator in ("required", "additionalProperties", "unevaluatedProperties"):
+        names = _QUOTED.findall(error.message)
+        if names:
+            prefix = _path(error)
+            return [f"{prefix}.{n}" if prefix else n for n in names]
+    return [_path(error)]
 
 
 def validate_args(schema: dict, args: Any) -> list[dict]:
@@ -49,8 +67,9 @@ def validate_args(schema: dict, args: Any) -> list[dict]:
 
     validator = Draft202012Validator(schema)
     problems = [
-        {"field": _field(e), "problem": e.message}
+        {"field": field, "problem": e.message}
         for e in validator.iter_errors(args)
+        for field in _fields(e)
     ]
     # Stable across runs; ties broken by the message so two problems on one
     # field do not swap places either.

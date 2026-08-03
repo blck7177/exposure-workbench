@@ -151,13 +151,20 @@ async def _submit_brief(db: AsyncSession, **blocks) -> dict:
 # ── schema ────────────────────────────────────────────────────────────────────────
 
 def _block_schema(cited: bool) -> dict:
-    props: dict = {"text": {"type": "string"}}
+    props: dict = {"text": {"type": "string", "minLength": 1}}
     required = ["text"]
     if cited:
-        props["citations"] = {"type": "array", "items": {"type": "string"},
+        props["citations"] = {"type": "array", "items": {"type": "string"}, "minItems": 1,
                               "description": "evidence ids (fact_/calc_/chunk_/src_) supporting every claim"}
         required.append("citations")
-    return {"type": "object", "properties": props, "required": required}
+    # Closed, and it matters more here than anywhere else: _submit_brief takes
+    # **blocks, so an unknown key is not a TypeError — it is dropped in silence.
+    # `citations` on open_questions was accepted and then ignored, because the
+    # gate collects citations from the five cited blocks only. Ids that are never
+    # trail-checked, never stored and never shown, in the one tool whose whole
+    # job is citation discipline.
+    return {"type": "object", "properties": props, "required": required,
+            "additionalProperties": False}
 
 
 def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
@@ -169,7 +176,7 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
             "ticker": {"type": "string"},
             "query": {"type": "string"},
             "reason": {"type": "string", "description": "why this search is needed now"},
-        }, "required": ["ticker", "query", "reason"]},
+        }, "required": ["ticker", "query", "reason"], "additionalProperties": False},
         fn=_search_external_research, tool_class=DELEGATION, budget_key="external_search",
     ))
     reg.register(Tool(
@@ -184,7 +191,7 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
             "portfolio_implications": _block_schema(True),
             "open_questions": _block_schema(False),
             "confidence_flags": {"type": "object"},
-        }, "required": list(_ALL_BLOCKS)},
+        }, "required": list(_ALL_BLOCKS), "additionalProperties": False},
         fn=_submit_brief, tool_class=GATE,
     ))
     return reg

@@ -138,3 +138,40 @@ def test_the_forms_a_filing_can_actually_have_are_selectable():
     for tool_name in ("search_filing_passages", "get_filing_section"):
         enum = registry.get(tool_name).json_schema["properties"]["form_type"]["enum"]
         assert {"10-K", "10-Q", "10-K/A", "10-Q/A"} <= set(enum), tool_name
+
+
+@pytest.mark.parametrize("name, tool", _all_tools())
+def test_a_tool_without_kwargs_forbids_unknown_arguments(name, tool):
+    """`invoke()` calls `fn(db, **args)`. For a fn with no **kwargs an unknown key
+    is a TypeError — reported to the model as `tool_error` with a Python message,
+    after the budget was already spent. For the one fn that DOES take **kwargs,
+    submit_brief, it is worse: the key is silently dropped, so a mistyped block
+    name produces a brief that looks complete and is missing a section.
+
+    Derived from the signature so the next tool is covered by having been
+    written, rather than by somebody remembering this paragraph.
+    """
+    takes_kwargs = any(
+        p.kind is p.VAR_KEYWORD for p in inspect.signature(tool.fn).parameters.values()
+    )
+    assert tool.json_schema.get("additionalProperties") is False, (
+        f"{name} accepts unknown arguments; its fn "
+        + ("silently drops them" if takes_kwargs else "raises TypeError on them")
+    )
+
+
+@pytest.mark.parametrize("name, tool", _all_tools())
+def test_nested_objects_forbid_unknown_arguments_too(name, tool):
+    """submit_brief is the case: `citations` inside open_questions is accepted by
+    the schema and then ignored, because the gate collects citations from the
+    five cited blocks only. Ids that are never trail-checked, never stored and
+    never shown, in the one tool whose entire job is citation discipline.
+
+    Only objects that DECLARE properties are covered. An object with none is a
+    free-form map — confidence_flags is one, an open set of flags landing in a
+    JSONB column — and closing it would say 'no keys at all', which is a
+    different claim and a false one.
+    """
+    for prop, sub in (tool.json_schema.get("properties") or {}).items():
+        if isinstance(sub, dict) and sub.get("type") == "object" and sub.get("properties"):
+            assert sub.get("additionalProperties") is False, f"{name}.{prop}"

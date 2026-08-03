@@ -209,7 +209,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
             "reason": {"type": "string", "description": "why readiness is needed now"},
-        }, "required": ["ticker", "reason"]},
+        }, "required": ["ticker", "reason"], "additionalProperties": False},
         fn=_ensure_company_ready, tool_class=DELEGATION,
     ))
     reg.register(Tool(
@@ -218,7 +218,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
             "reason": {"type": "string"},
-        }, "required": ["ticker", "reason"]},
+        }, "required": ["ticker", "reason"], "additionalProperties": False},
         fn=_start_issuer_research, tool_class=DELEGATION,
     ))
     reg.register(Tool(
@@ -233,7 +233,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
                 "YYYY-MM-DD. Omit unless the user asked for a specific date — "
                 "the server reports on the last completed session by default."},
             "reason": {"type": "string"},
-        }, "required": ["portfolio_id", "reason"]},
+        }, "required": ["portfolio_id", "reason"], "additionalProperties": False},
         fn=_start_exposure_run, tool_class=DELEGATION,
     ))
     reg.register(Tool(
@@ -256,7 +256,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "citations": {"type": ["array", "null"], "items": {"type": "string"},
                           "description": "evidence ids (fact_/chunk_/calc_/src_/alert_/run_/pos_) "
                                          "returned by tools you called this session"},
-        }, "required": ["text"]},
+        }, "required": ["text"], "additionalProperties": False},
         fn=_respond, tool_class=GATE,
     ))
     return reg

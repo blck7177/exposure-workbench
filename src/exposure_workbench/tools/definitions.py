@@ -255,13 +255,13 @@ def build_read_registry() -> ToolRegistry:
     reg.register(Tool(
         name="get_issuer_snapshot",
         description="Company identity plus the list of financial metrics available for this issuer.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
+        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_get_issuer_snapshot, tool_class=READ,
     ))
     reg.register(Tool(
         name="list_available_data",
         description="Which financial metrics exist for this issuer and how many periods each has.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
+        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_list_available_data, tool_class=READ,
     ))
     reg.register(Tool(
@@ -270,7 +270,7 @@ def build_read_registry() -> ToolRegistry:
                     "and issuer weights, and active risk alerts. Takes no arguments — this is how "
                     "you discover holdings for a portfolio-level question. Each portfolio's numbers "
                     "carry the run_id that produced them; cite run_id (and alert ids) for portfolio claims.",
-        json_schema={"type": "object", "properties": {}},
+        json_schema={"type": "object", "properties": {}, "additionalProperties": False},
         fn=_get_portfolio_snapshot, tool_class=READ,
     ))
     reg.register(Tool(
@@ -281,7 +281,7 @@ def build_read_registry() -> ToolRegistry:
             "metric": {"type": "string", "description": "normalized metric, e.g. revenue, net_income, cost_of_revenue"},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
-        }, "required": ["ticker", "metric"]},
+        }, "required": ["ticker", "metric"], "additionalProperties": False},
         fn=_get_fact_series, tool_class=READ,
     ))
     reg.register(Tool(
@@ -292,7 +292,7 @@ def build_read_registry() -> ToolRegistry:
             "mode": {"type": "string", "enum": ["yoy", "qoq", "pct", "abs"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
-        }, "required": ["ticker", "metric", "mode"]},
+        }, "required": ["ticker", "metric", "mode"], "additionalProperties": False},
         fn=_compute_change, tool_class=READ,
     ))
     reg.register(Tool(
@@ -302,7 +302,7 @@ def build_read_registry() -> ToolRegistry:
             "ticker": _TICKER, "numerator": {"type": "string"}, "denominator": {"type": "string"},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
-        }, "required": ["ticker", "numerator", "denominator"]},
+        }, "required": ["ticker", "numerator", "denominator"], "additionalProperties": False},
         fn=_compute_ratio, tool_class=READ,
     ))
     reg.register(Tool(
@@ -314,7 +314,7 @@ def build_read_registry() -> ToolRegistry:
             "op": {"type": "string", "enum": ["add", "sub", "divide"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
-        }, "required": ["ticker", "metric_a", "metric_b", "op"]},
+        }, "required": ["ticker", "metric_a", "metric_b", "op"], "additionalProperties": False},
         fn=_compute_combine, tool_class=READ,
     ))
     reg.register(Tool(
@@ -323,7 +323,7 @@ def build_read_registry() -> ToolRegistry:
                     "that ensure_company_ready, start_exposure_run or start_issuer_research returned.",
         json_schema={"type": "object", "properties": {
             "job_id": {"type": "string", "description": "task_… / run_… / rrun_…"},
-        }, "required": ["job_id"]},
+        }, "required": ["job_id"], "additionalProperties": False},
         fn=_get_task_status, tool_class=READ,
     ))
     reg.register(Tool(
@@ -334,14 +334,14 @@ def build_read_registry() -> ToolRegistry:
                     "get_portfolio_snapshot only carries the largest few.",
         json_schema={"type": "object", "properties": {
             "portfolio_id": {"type": "string"},
-        }, "required": ["portfolio_id"]},
+        }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_get_portfolio_positions, tool_class=READ,
     ))
     reg.register(Tool(
         name="read_issuer_brief",
         description="The latest Issuer Risk Brief for a company, with the evidence ids behind "
                     "each block. Cite those ids, not the brief.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
+        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_read_issuer_brief, tool_class=READ,
     ))
     reg.register(Tool(
@@ -352,7 +352,7 @@ def build_read_registry() -> ToolRegistry:
             "op": {"type": "string", "enum": ["cagr", "avg", "min", "max", "std", "sum", "latest"]},
             "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
             "last_n": {"type": "integer", "default": 12, "maximum": 40},
-        }, "required": ["ticker", "metric", "op"]},
+        }, "required": ["ticker", "metric", "op"], "additionalProperties": False},
         fn=_compute_stat, tool_class=READ,
     ))
     reg.register(Tool(
@@ -365,7 +365,7 @@ def build_read_registry() -> ToolRegistry:
             # which calc_service branches on. Omitting and sending null are the
             # same intent, and a model with non-strict function calling sends both.
             "benchmark": {"type": ["string", "null"], "default": "SPY"},
-        }, "required": ["ticker"]},
+        }, "required": ["ticker"], "additionalProperties": False},
         fn=_get_market_stats, tool_class=READ,
     ))
     reg.register(Tool(
@@ -377,7 +377,7 @@ def build_read_registry() -> ToolRegistry:
             "form_type": _FORM_TYPE,
             "item_code": {"type": ["string", "null"], "minLength": 1,
                           "description": "narrow to an Item, e.g. 'Item 1A'"},
-        }, "required": ["ticker", "query"]},
+        }, "required": ["ticker", "query"], "additionalProperties": False},
         fn=_search_filing_passages, tool_class=READ,
     ))
     reg.register(Tool(
@@ -386,13 +386,13 @@ def build_read_registry() -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER, "item_code": {"type": "string", "minLength": 1},
             "form_type": _FORM_TYPE,
-        }, "required": ["ticker", "item_code"]},
+        }, "required": ["ticker", "item_code"], "additionalProperties": False},
         fn=_get_filing_section, tool_class=READ,
     ))
     reg.register(Tool(
         name="list_alerts",
         description="Portfolio risk alerts naming this issuer (concentration, etc.).",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"]},
+        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_list_alerts, tool_class=READ,
     ))
     reg.register(Tool(
@@ -400,7 +400,7 @@ def build_read_registry() -> ToolRegistry:
         description="Pause to write an analytical note before anchoring a conclusion. No side effect, no budget.",
         json_schema={"type": "object", "properties": {
             "thought": {"type": "string"},
-        }, "required": ["thought"]},
+        }, "required": ["thought"], "additionalProperties": False},
         fn=_think, tool_class=REFLECTION,
     ))
     return reg

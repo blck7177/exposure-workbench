@@ -47,6 +47,36 @@ def redact_args(args: Any) -> dict[str, Any]:
     return out
 
 
+# Wide enough that no real call is altered — the longest argument any tool takes
+# is a search query or a thought, and both are sentences.
+MAX_ARG_CHARS = 4096
+_TRUNCATED = "…[truncated]"
+
+
+def bound_args(args: dict[str, Any]) -> dict[str, Any]:
+    """Cap each string argument, so one row cannot be arbitrarily large.
+
+    result_summary beside it has been capped at 2000 all along; args was not,
+    and the arguments are the half that comes from the model. `think` takes free
+    prose (its own 400-char truncation protects the return value, not the row),
+    and validation made this cheaper to abuse rather than dearer: an argument
+    refused before the budget is reserved is still recorded.
+
+    Per-argument rather than per-row, so a long thought does not push the ticker
+    beside it out of the trace, and here rather than as maxLength in twenty-two
+    schemas because it is a property of the audit row, not of any one tool.
+    """
+    out: dict[str, Any] = {}
+    for k, v in args.items():
+        if isinstance(v, str) and len(v) > MAX_ARG_CHARS:
+            # The marker counts against the cap. A bound that the marker pushes
+            # past itself is not a bound.
+            out[k] = v[:MAX_ARG_CHARS - len(_TRUNCATED)] + _TRUNCATED
+        else:
+            out[k] = v
+    return out
+
+
 def _jsonable(v: Any) -> Any:
     if isinstance(v, (date, datetime)):
         return v.isoformat()
@@ -86,7 +116,7 @@ async def record_step(
             seq=next_seq,
             step_type=step_type,
             tool_name=tool_name,
-            args=_jsonable(redact_args(args or {})),
+            args=_jsonable(bound_args(redact_args(args))),
             result_summary=(result_summary or "")[:2000],
             evidence_refs=evidence_refs or [],
             status=status,

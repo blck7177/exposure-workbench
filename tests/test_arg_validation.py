@@ -118,3 +118,79 @@ def test_a_huge_non_dict_payload_is_bounded():
     from exposure_workbench.services.trace_service import redact_args
 
     assert len(redact_args("x" * 50_000)["_raw"]) == 2000
+
+
+# ── a problem has to name the field it is about ──────────────────────────────
+
+NESTED = {
+    "type": "object",
+    "properties": {
+        "financial_summary": {
+            "type": "object",
+            "properties": {"text": {"type": "string"}, "citations": {"type": "array"}},
+            "required": ["text", "citations"],
+            "additionalProperties": False,
+        },
+    },
+    "required": ["financial_summary"],
+    "additionalProperties": False,
+}
+
+
+def test_an_unknown_argument_is_reported_under_its_own_name():
+    """jsonschema reports additionalProperties against the CONTAINER, so the
+    path is empty and the key is buried in prose. Blank fields also sort first,
+    so every unknown key would outrank the missing ones it is usually mixed
+    with — which is the failure _field exists to prevent."""
+    problems = validate_args(SCHEMA, {"ticker": "NVDA", "mode": "yoy", "tickr": "NVDA"})
+    assert [p["field"] for p in problems] == ["tickr"]
+
+
+def test_several_unknown_arguments_are_reported_one_by_one():
+    problems = validate_args(SCHEMA, {"ticker": "N", "mode": "yoy", "aa": 1, "bb": 2})
+    assert [p["field"] for p in problems] == ["aa", "bb"]
+
+
+def test_a_nested_problem_names_the_leaf_not_the_block():
+    """'financial_summary' does not tell a brief-writing agent which of the two
+    fields it left out."""
+    problems = validate_args(NESTED, {"financial_summary": {"citations": []}})
+    assert [p["field"] for p in problems] == ["financial_summary.text"]
+
+
+def test_a_nested_unknown_argument_names_the_path_to_it():
+    problems = validate_args(
+        NESTED, {"financial_summary": {"text": "x", "citations": [], "confidence": "low"}})
+    assert [p["field"] for p in problems] == ["financial_summary.confidence"]
+
+
+def test_a_real_field_still_outranks_nothing():
+    """Ordering stays by field name; what changed is that no problem is filed
+    under the empty string any more."""
+    problems = validate_args(SCHEMA, {"zz": 1})
+    assert "" not in [p["field"] for p in problems]
+
+
+def test_a_recorded_argument_is_bounded():
+    """result_summary beside it is capped at 2000; args was not.
+
+    A tool's arguments come from the model, and `think` takes free prose with no
+    upper bound — its own 400-char truncation protects the RETURN value, not the
+    row. Rejection makes it worse rather than better: an argument refused before
+    the budget was spent is still written, so an unbounded payload costs nothing
+    to store repeatedly. The cap is here rather than in twenty-two schemas
+    because it is a property of the audit row, not of any one tool.
+    """
+    from exposure_workbench.services.trace_service import bound_args
+
+    out = bound_args({"thought": "x" * 50_000, "ticker": "NVDA"})
+    assert len(out["thought"]) <= 4096
+    assert out["ticker"] == "NVDA"
+    assert out["thought"].endswith("…[truncated]")
+
+
+def test_bounding_leaves_ordinary_arguments_untouched():
+    from exposure_workbench.services.trace_service import bound_args
+
+    args = {"ticker": "NVDA", "last_n": 12, "citations": ["fact_a", "fact_b"], "flag": None}
+    assert bound_args(args) == args
