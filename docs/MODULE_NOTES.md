@@ -116,7 +116,7 @@ chunk/embedding(M5)、任何计算(M3)、10-K/10-Q 之外表单、修正案(只�
   ① Workflow 标准 recipe:固定脚本序列(内容后议)
   ② 分析 agent:自由组合原语,预算硬顶
   ③ Meta-agent 交互问答
-  ④ 外部宿主经 MCP
+  ④ 外部宿主经 MCP(★ 2026-08-03 封存,见 M10——今天的消费者只有 ①②③)
 计算代数层(封闭原语集,每次调用自动落台账)
   combine_series(a, b, op ∈ {add, sub, divide})
   compute_change(series, mode ∈ {yoy, qoq, pct, abs})
@@ -158,7 +158,7 @@ chunk/embedding(M5)、任何计算(M3)、10-K/10-Q 之外表单、修正案(只�
 
 ### 待定(实现期)
 
-- 分析 agent 大脑位置:应用内 bounded loop vs 外部宿主(OpenClaw/Claude Code)经 MCP 驱动。架构两者都支持(强制与追踪沉在 transport 之下),MVP 先做哪个实现期定。
+- ~~分析 agent 大脑位置:应用内 bounded loop vs 外部宿主(OpenClaw/Claude Code)经 MCP 驱动~~ ★ 已定(2026-08-03):**应用内 bounded loop**(已实现为 `agents/research_session.py`);外部宿主出范围,见 M10 ★2026-08-03 拍板。"强制与追踪沉在 transport 之下"这半句仍然成立,也是 in-memory 迁移零强制改动的原因。
 
 ---
 
@@ -401,7 +401,7 @@ Brief 的 LLM 后处理/改写规则、多轮人工审批流、brief 版本 diff
 ### ToolRegistry:一份定义,四个消费者,两层强制
 
 - 工具五元组:`{name, json_schema, fn, class: read|delegation|reflection, budget_key}`,注册一次
-- 消费者:meta-agent / 分析 subagent / MCP 外部宿主 / workflow recipe(fn 直调)
+- 消费者:meta-agent / 分析 subagent(两者经 in-memory MCP client,★2026-08-03)/ workflow recipe(fn 直调);~~MCP 外部宿主~~ 已封存
 - **Registry wrapper 自动做三件事**:入参语义校验、预算记账(调用前扣减,超顶结构化拒绝)、轨迹落盘(agent_steps,evidence_refs 从返回值 id 字段自动抽取,不靠工具作者手动报)
 
 ### 工具面(face)是声明式配置
@@ -414,7 +414,7 @@ FACE_RESEARCH   = read 全集 + search_external_research + think + submit_brief
 FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM,无预算,只留台账)
 ```
 
-skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审计一眼看全。MCP 外部宿主拿 FACE_META_AGENT 同款——同权、同预算、同轨迹,无特权通道。
+skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审计一眼看全。任何消费者拿 face 同款——同权、同预算、同轨迹,无特权通道(★2026-08-03 起消费者 = 内部两个 agent;这句话对未来任何新消费者依然成立)。
 
 ### Meta-Agent:循环极薄,行为由 face + 门塑造
 
@@ -428,15 +428,15 @@ skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审
 
 ★ V3 两处更正:①「1 次重试」**从未实现**(`respond_retries` 同 M9,已删,见上);真实的界是 `max_turns=16` 加工具预算。②「`citations=[]` 合法(非事实性回复)」在 V3-A0-1 之后**只对不含数字的回复成立**:文本里出现实质数字而 citations 为空 → `citations_required`,问候与澄清反问仍可零引用。schema 的 `required` 仍只有 `text` —— 强制在 gate 语义层,因为把 citations 设成 schema 必填会连无数字回复一起堵死。
 
-### ★ 已定:MCP 双轨规则(2026-07-23,吸收 M12)
+### ★ 已定:MCP 双轨规则(2026-07-23 定稿;★ 2026-08-03 修订:消费者收敛为内部 agent)
 
 > **Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 
-- 凡 **LLM 生成**的工具调用一律走 MCP——内部 meta-agent 循环也作为 MCP client 连入,与外部宿主(OpenClaw/Claude Code)字面上同一 server 同一接口
+- 凡 **LLM 生成**的工具调用一律走 MCP——**meta-agent 与分析 subagent 均以 in-memory MCP client 连入**(每 chat turn / 每 research run 建一对 client-server,face registry、session、message_id、租户身份在建对时绑定;不挂任何 HTTP 端点,不加容器;会话预算状态在 DB,跨进程一致)
 - 凡**确定性代码**的调用(recipe/wrapper)直调 fn——代码无"生成调用"动作,不存在需生成时堵的错误类别,MCP 徒增序列化开销
 - 与 sm-master 分裂的本质区别:那是"两条 **agent** 通路、两套强制";这是"一条 agent 通路 + 一条代码通路、**一套强制**"(wrapper 是两轨共同关口)
-- 内部走 MCP 额外买到:大脑可换是构造不是声称(随时换 OpenClaw 当 meta-agent)、门面因日常流量不烂、审计口径唯一
-- MVP 部署:FastMCP 挂 FastAPI 进程内(ASGI `/mcp`),meta-agent 经 in-memory client 连;不加容器;会话预算状态在 DB,跨进程一致。独立 MCP 进程留给放量后
+- 内部走 MCP 买到:工具面的定义与消费解耦(大脑可换是构造不是声称)、门面因日常流量不烂、审计口径唯一
+- ★ 2026-08-03 拍板(取代 MCP_BOUNDARY_PLAN v1,该文件已删,内容在 git 历史):**本项目没有外部宿主消费者**——OpenClaw/Claude Code 不是本系统的大脑,此前"与外部宿主同一 server 同一接口"从目标降为架构副产品。HTTP 传输 / OAuth 边界 / staging 验收(旧计划 B1/B2/B5)整体封存,唤醒条件 = 出现真实远程消费或第三方产品目标;**公网部署与 MCP 自此解耦**。stdio 入口定位为 local-dev debug 门(env 显式身份,fail loud,非目标路径)。执行方案见 `docs/MCP_PLAN.md`
 - **M12(MCP Facade)作为独立模块取消**,并入本节
 
 ---
@@ -635,7 +635,7 @@ verification / memory / observability / evals)上之后,V2 之前散着的一堆
 
 B3 上下文摘要(B0 实测显示一整轮只有几千 token 对 80k 上限,现在建等于猜)、LLM-as-judge
 评测(确定性检查还没用尽)、passage 级检索标注(要人读 3,078 个 chunk)、MCP 自己的 face
-(属 MCP_BOUNDARY_PLAN)。
+(属 MCP 计划,现为 `docs/MCP_PLAN.md`;写此清单时的 MCP_BOUNDARY_PLAN 已于 2026-08-03 删除)。
 
 ### ★ V3-R —— 对抗式 review 的回答(2026-08-02,+7 commits)
 
