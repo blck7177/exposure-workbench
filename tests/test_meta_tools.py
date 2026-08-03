@@ -17,8 +17,7 @@ def test_meta_registry_has_delegation_and_respond():
 
 def test_full_meta_face_available_after_registration():
     reg = build_meta_registry()
-    avail = faces.available(reg, faces.FACE_META_AGENT)
-    assert set(avail) == set(faces.FACE_META_AGENT)      # every declared name now registered
+    assert faces.resolve(reg, faces.FACE_META_AGENT) == faces.FACE_META_AGENT
 
 
 def test_delegation_tools_require_reason():

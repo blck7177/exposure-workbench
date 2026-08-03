@@ -33,9 +33,9 @@ def test_get_portfolio_snapshot_registered_no_arg_read():
 def test_snapshot_is_meta_only_not_research():
     assert "get_portfolio_snapshot" in faces.FACE_META_AGENT
     assert "get_portfolio_snapshot" not in faces.FACE_RESEARCH
-    # and it is actually registered, so the meta face resolves it
+    # and it is actually registered, so the read registry resolves it
     reg = build_read_registry()
-    assert "get_portfolio_snapshot" in faces.available(reg, faces.FACE_META_AGENT)
+    assert "get_portfolio_snapshot" in faces.resolve(reg, faces.META_ONLY_READS)
 
 
 # ── evidence harvesting off the snapshot shape ────────────────────────────────

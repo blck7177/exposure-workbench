@@ -68,12 +68,21 @@ def test_required_judgment_fields_are_in_schema():
     assert set(gfs.json_schema["required"]) == {"ticker", "metric"}
 
 
-def test_face_available_filters_to_registered():
+def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
+    """Was test_face_available_filters_to_registered, and asserted the opposite.
+
+    Filtering to what happened to be registered was the P5 mechanism; the read
+    registry genuinely lacks the delegation/gate tools, and the old assertion
+    read that as a smaller face rather than as the wrong registry for this face.
+    """
+    import pytest
+
     reg = build_read_registry()
-    avail = faces.available(reg, faces.FACE_META_AGENT)
-    # P5 has only read core; delegation/gate names are declared but not yet registered
-    assert "get_fact_series" in avail
-    assert "start_issuer_research" not in avail   # registered later, in P7
+    assert "get_fact_series" in faces.resolve(reg, faces.READ_CORE)
+
+    with pytest.raises(faces.FaceNotRegistered) as exc:
+        faces.resolve(reg, faces.FACE_META_AGENT)
+    assert "start_issuer_research" in str(exc.value)   # registered by build_meta_registry, in P7
 
 
 def test_redact_args_masks_key_class_fields_only():

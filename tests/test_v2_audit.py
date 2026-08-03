@@ -272,23 +272,15 @@ def test_the_context_check_sits_before_the_charge_and_never_releases_the_turn():
 
 
 # ── V3-C5: a face may not promise a tool the registry does not have ──────────
-# faces.available() TRIMS silently by design (P5 had only READ_CORE registered),
-# which is fine as a mechanism and dangerous as a habit: a declaration nobody
-# checks drifts from the registry and the drift shows up as a capability the
-# model was told about and cannot call.
+# A declaration nobody checks drifts from the registry, and the drift shows up as
+# a capability the model was told about and cannot call.
 #
-# Asserted by EQUALITY, not containment, so an entry cannot outlive the drift it
-# documents. The single entry here is real and is NOT this phase's to fix: the
-# MCP server declares the meta-agent face while building only the read registry,
-# so its four delegation/gate tools are trimmed away. That belongs to
-# MCP_BOUNDARY_PLAN, which gives MCP a face of its own; pinning it here stops it
-# growing a fifth in the meantime.
-KNOWN_TRIMMED = {
-    ("apps/mcp/server.py", "FACE_META_AGENT", "build_read_registry"):
-        {"ensure_company_ready", "respond", "start_exposure_run", "start_issuer_research"},
-}
-
-
+# P1.1 moved the enforcement into faces.resolve(), which raises. This test used to
+# MEASURE the drift with available() and carry a KNOWN_TRIMMED entry for the one
+# real instance — apps/mcp/server.py declaring the meta face over the read
+# registry. Both are gone: the mechanism that made that state reachable was
+# deleted, and the server now declares the face it builds. What is left is the
+# structural sweep — every shipped (site, face, registry) triple, resolved.
 def _pairings():
     from exposure_workbench.agents.meta_agent import build_meta_registry
     from exposure_workbench.tools import faces
@@ -299,8 +291,8 @@ def _pairings():
          faces.FACE_META_AGENT, build_meta_registry()),
         ("issuer_research_workflow", "FACE_RESEARCH", "build_research_registry",
          faces.FACE_RESEARCH, build_research_registry()),
-        ("apps/mcp/server.py", "FACE_META_AGENT", "build_read_registry",
-         faces.FACE_META_AGENT, build_read_registry()),
+        ("apps/mcp/server.py", "READ_CORE + META_ONLY_READS", "build_read_registry",
+         faces.READ_CORE + faces.META_ONLY_READS, build_read_registry()),
     ]
 
 
@@ -309,11 +301,9 @@ def test_no_face_declares_a_tool_its_registry_does_not_register():
 
     drift = {}
     for site, face_name, builder, face, registry in _pairings():
-        missing = set(face) - set(faces.available(registry, face))
-        if missing:
-            drift[(site, face_name, builder)] = missing
+        try:
+            faces.resolve(registry, face)
+        except faces.FaceNotRegistered as e:
+            drift[(site, face_name, builder)] = str(e)
 
-    assert drift == KNOWN_TRIMMED, (
-        f"new drift: { {k: v for k, v in drift.items() if k not in KNOWN_TRIMMED} }; "
-        f"fixed but still listed: { {k: v for k, v in KNOWN_TRIMMED.items() if k not in drift} }"
-    )
+    assert drift == {}, f"a shipped face no longer resolves: {drift}"

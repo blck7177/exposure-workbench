@@ -58,7 +58,7 @@ async def run_research_session(
     not exist for this session, no in-loop 'if skip' branch."""
     settings = get_settings()
     model = settings.openai_model
-    available = faces.available(registry, face or faces.FACE_RESEARCH)
+    available = faces.resolve(registry, face or faces.FACE_RESEARCH)
     tools = registry.schemas(available)
 
     messages: list[dict] = [

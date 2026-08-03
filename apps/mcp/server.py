@@ -35,9 +35,13 @@ logger = logging.getLogger("mcp-server")
 
 SERVER_NAME = "exposure-workbench"
 
-# The MCP host plays the meta-agent role -> it sees the meta-agent face.
+# What this server declares is what it builds. It used to declare the meta-agent
+# face over the read registry, and available() quietly handed back the sixteen it
+# could find — the four delegation/gate tools were dropped on every startup. The
+# face below is the same sixteen, said out loud; expanding it to the meta face is
+# P1.3's, because delegation must not precede an identity to attribute it to.
 _registry = build_read_registry()
-_FACE = faces.available(_registry, faces.FACE_META_AGENT)
+_FACE = faces.resolve(_registry, faces.READ_CORE + faces.META_ONLY_READS)
 
 
 def _db_url() -> str:

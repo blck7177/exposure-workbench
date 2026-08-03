@@ -94,7 +94,7 @@ async def handle_message(
     """Run one user turn. Persists the user + assistant messages; returns the reply."""
     registry = registry or build_meta_registry()
     settings = get_settings()
-    face = faces.available(registry, faces.FACE_META_AGENT)
+    face = faces.resolve(registry, faces.FACE_META_AGENT)
     tools = registry.schemas(face)
 
     message_id = new_id("msg_")
