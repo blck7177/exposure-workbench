@@ -17,6 +17,8 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
+from exposure_workbench.analytics.limit_defaults import SEED_DEFAULTS
+from exposure_workbench.analytics.limits import LimitBook
 from exposure_workbench.app_state.settings import Settings, get_settings
 from exposure_workbench.workflow.exposure_workflow import ExposureWorkflow
 
@@ -24,10 +26,29 @@ AS_OF = date(2026, 7, 24)
 MAX_AGE = Settings().price_staleness_days
 
 
+def complete_limits() -> LimitBook:
+    """A book whose limits are in order, so these tests stay about prices.
+
+    _validate_inputs judges limit completeness in the same raise since V2-H4.
+    Supplying a full set here is what keeps a failure below meaning what its
+    name says; the limit half is tested in test_limit_completeness.py.
+    """
+    return LimitBook([
+        {"id": f"rl_{lt}", "limit_type": lt, "entity_id": None,
+         "warning_level": w, "breach_level": b, "unit": "fraction", "is_active": True}
+        for lt, (w, b) in SEED_DEFAULTS.items()
+    ])
+
+
 @pytest.fixture
 def validate():
     wf = ExposureWorkflow(configs_dir="/app/configs")   # configs are not read by this path
-    return wf._validate_inputs
+
+    def _validate(positions_df, prices_df, as_of_date, limits=None):
+        return wf._validate_inputs(positions_df, prices_df, as_of_date,
+                                   complete_limits() if limits is None else limits)
+
+    return _validate
 
 
 def positions(*tickers: str) -> pd.DataFrame:

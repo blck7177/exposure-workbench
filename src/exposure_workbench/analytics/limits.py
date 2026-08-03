@@ -80,16 +80,119 @@ class AlertResult:
     message: str
 
 
+class LimitBook:
+    """Every threshold a run may use, and no way to obtain one that is not here.
+
+    Built from the portfolio's risk_limits rows. There is no config argument, no
+    default parameter and no fallback: an absent row raises. That absence is the
+    repair. The previous engine took a `db_limits` list, never read it, and
+    supplied every threshold from 16 literals in its own source — so a desk that
+    tightened a limit in the product saw no change in its alerts, and the demo
+    book's twelve per-entity rows were displayed as policy in force while
+    affecting nothing.
+
+    A row with entity_id NULL is the portfolio-wide threshold for that check; a
+    row with an entity_id overrides it for that one sector, issuer or scenario.
+    Both live in the same table, and ux_risk_limits_default makes "exactly one
+    default" a database fact, so nothing here arbitrates between sources.
+    """
+
+    def __init__(self, rows: list[dict]):
+        """rows: ALL of the portfolio's risk_limits rows, active AND inactive.
+
+        Inactive rows are excluded from thresholds but still scanned for a
+        limit_type the engine cannot evaluate. If this only ever saw active
+        rows, `UPDATE risk_limits SET is_active = false` would become the
+        sanctioned way to hide a typo'd limit_type from the completeness check —
+        the same silent path one level down.
+        """
+        self._defaults: dict[str, tuple[float, float]] = {}
+        self._overrides: dict[tuple[str, str], tuple[float, float]] = {}
+        self.unknown_types = sorted(
+            {r["limit_type"] for r in rows if r["limit_type"] not in LIMIT_SPECS}
+        )
+        for r in rows:
+            if not r["is_active"] or r["limit_type"] not in LIMIT_SPECS:
+                continue
+            # Belt to the database's braces (ck_risk_limits_unit,
+            # ck_risk_limits_levels). A volume older than those constraints must
+            # not quietly load a row that can never fire; `breach <= warning` and
+            # not `<` because equal tiers are as dead as inverted ones, the
+            # breach test coming first.
+            if r["unit"] != "fraction":
+                raise ValueError(f"risk_limits row {r['id']} has unit={r['unit']!r}")
+            warning, breach = float(r["warning_level"]), float(r["breach_level"])
+            if warning <= 0 or breach <= warning:
+                raise ValueError(
+                    f"risk_limits row {r['id']} can never fire: "
+                    f"warning={warning} breach={breach}"
+                )
+            if r["entity_id"] is None:
+                if r["limit_type"] in self._defaults:
+                    raise ValueError(f"two default rows for {r['limit_type']}")
+                self._defaults[r["limit_type"]] = (warning, breach)
+            else:
+                self._overrides[(r["limit_type"], r["entity_id"])] = (warning, breach)
+
+        # Every (limit_type, entity_id) a run actually asked about. Recorded at
+        # lookup, which happens when a check RUNS — not when it alerts — so this
+        # separates "checked and fine" from "never checked at all".
+        self.looked_up: set[tuple[str, str | None]] = set()
+
+    def missing_required(self) -> list[str]:
+        """Required checks with no active portfolio-wide row. Absence is an
+        error the run reports, never a number supplied on its behalf."""
+        return sorted(REQUIRED_LIMIT_TYPES - set(self._defaults))
+
+    def get_portfolio(self, limit_type: str) -> tuple[float, float]:
+        if LIMIT_SPECS[limit_type].scope != "portfolio":
+            raise ValueError(f"{limit_type} is looked up per entity, not per book")
+        self.looked_up.add((limit_type, None))
+        try:
+            return self._defaults[limit_type]
+        except KeyError:
+            raise MissingLimit(limit_type, None) from None
+
+    def get_entity(self, limit_type: str, entity_id: str) -> tuple[float, float]:
+        if LIMIT_SPECS[limit_type].scope != "entity":
+            raise ValueError(f"{limit_type} is looked up per book, not per entity")
+        self.looked_up.add((limit_type, entity_id))
+        pair = self._overrides.get((limit_type, entity_id))
+        if pair is not None:
+            return pair
+        try:
+            return self._defaults[limit_type]
+        except KeyError:
+            raise MissingLimit(limit_type, entity_id) from None
+
+    def inert_overrides(self) -> list[str]:
+        """Overrides this run never consulted — a threshold set on a sector or
+        issuer the book does not hold. Not an error; the desk may be holding it
+        for a position it plans to take. Reported so it is visible rather than
+        silently doing nothing, which is the state this whole change is about."""
+        return sorted(f"{lt}:{eid}" for (lt, eid) in self._overrides
+                      if (lt, eid) not in self.looked_up)
+
+
+def evaluated_key(limit_type: str, entity_id: str | None) -> str:
+    """One string for a (check, entity) pair, for the run's payload_summary."""
+    return limit_type if entity_id is None else f"{limit_type}:{entity_id}"
+
+
 def _check_one(
     alert_type: str,
-    entity_type: str,
     entity_id: str,
     current_value: float,
     warning_level: float,
     breach_level: float,
-    label: str | None = None,
 ) -> AlertResult | None:
-    """Return an alert if current_value breaches warning or breach level, else None."""
+    """Return an alert if current_value breaches warning or breach level, else None.
+
+    entity_type and the human label come from LIMIT_SPECS, never from the row
+    that supplied the numbers: stress_loss is keyed per scenario yet reported
+    against the whole book, and a data model cannot reconcile that — the spec
+    states it instead.
+    """
     if current_value <= 0:
         return None
 
@@ -102,8 +205,10 @@ def _check_one(
     else:
         return None
 
+    spec = LIMIT_SPECS[alert_type]
+    entity_type = spec.entity_type
     utilization = current_value / breach_level if breach_level > 0 else 0.0
-    display_name = label or entity_id
+    display_name = spec.label.format(entity=entity_id)
     pct = f"{current_value * 100:.1f}%"
     limit_pct = f"{limit_value * 100:.1f}%"
     msg = f"{display_name}: {pct} vs limit {limit_pct} [{severity.upper()}]"
@@ -120,135 +225,87 @@ def _check_one(
     )
 
 
+
+
 def check_limits(
     risk_metrics_result: Any,           # RiskResult
     stress_result: Any,                 # StressResult
     exposure_result: Any,               # ExposureResult
     pnl_result: Any,                    # PnlResult
-    limits_config: dict,
-    db_limits: list[dict] | None = None,
-) -> list[AlertResult]:
-    """
-    Check all risk limits.
+    limits: LimitBook,
+) -> tuple[list[AlertResult], list[str]]:
+    """Compare this run's metrics against the portfolio's own thresholds.
 
-    limits_config: dict loaded from risk_limits.yaml
-    db_limits: optional list of per-portfolio overrides from the DB
+    Returns the alerts and the list of (check, entity) pairs that were actually
+    EVALUATED. The second half exists because row presence is not check
+    execution: every check below sits behind a guard on its input, and a book
+    with too little price history gets var_95, es_95 and vol_30d as None, so
+    three of the eight silently do not run while the timeline says the step
+    completed. Now that the run also certifies "eight limit rows present", a
+    reader would take that for "eight checks enforced". This is the difference,
+    written down.
+
+    Every threshold comes from `limits` and there is nowhere else to get one.
     """
     alerts: list[AlertResult] = []
 
-    def cfg(key: str, sub: str, default: float) -> float:
-        return float(limits_config.get(key, {}).get(sub, default))
+    def emit(alert_type: str, entity_id: str, value: float,
+             levels: tuple[float, float]) -> None:
+        a = _check_one(alert_type, entity_id, value, *levels)
+        if a:
+            alerts.append(a)
 
     # ── Portfolio-level limits ─────────────────────────────────────────────────
+    # Each guard is on whether the INPUT exists, not on whether it is
+    # interesting: a profitable day still ran the daily-loss check, and saying so
+    # is the point of `evaluated`. _check_one's `current_value <= 0` return is
+    # what keeps the alert list identical to before.
 
-    # Daily loss
-    if pnl_result and pnl_result.daily_return < 0:
-        daily_loss = -pnl_result.daily_return
-        a = _check_one(
-            "daily_loss", "portfolio", "portfolio",
-            daily_loss,
-            cfg("daily_loss", "warning", 0.02),
-            cfg("daily_loss", "breach", 0.03),
-            "Daily portfolio loss",
-        )
-        if a:
-            alerts.append(a)
+    if pnl_result is not None:
+        emit("daily_loss", "portfolio", -pnl_result.daily_return,
+             limits.get_portfolio("daily_loss"))
 
-    # VaR 95
-    if risk_metrics_result and risk_metrics_result.var_95_1d is not None:
-        a = _check_one(
-            "var_95", "portfolio", "portfolio",
-            risk_metrics_result.var_95_1d,
-            cfg("var_95", "warning", 0.025),
-            cfg("var_95", "breach", 0.035),
-            "1-day 95% VaR",
-        )
-        if a:
-            alerts.append(a)
+    if risk_metrics_result is not None:
+        if risk_metrics_result.var_95_1d is not None:
+            emit("var_95", "portfolio", risk_metrics_result.var_95_1d,
+                 limits.get_portfolio("var_95"))
+        if risk_metrics_result.es_95 is not None:
+            emit("expected_shortfall_95", "portfolio", risk_metrics_result.es_95,
+                 limits.get_portfolio("expected_shortfall_95"))
+        if risk_metrics_result.vol_30d is not None:
+            emit("rolling_volatility_30d", "portfolio", risk_metrics_result.vol_30d,
+                 limits.get_portfolio("rolling_volatility_30d"))
 
-    # Expected Shortfall
-    if risk_metrics_result and risk_metrics_result.es_95 is not None:
-        a = _check_one(
-            "expected_shortfall_95", "portfolio", "portfolio",
-            risk_metrics_result.es_95,
-            cfg("expected_shortfall_95", "warning", 0.035),
-            cfg("expected_shortfall_95", "breach", 0.05),
-            "Expected Shortfall (95%)",
-        )
-        if a:
-            alerts.append(a)
-
-    # Rolling vol 30d
-    if risk_metrics_result and risk_metrics_result.vol_30d is not None:
-        a = _check_one(
-            "rolling_volatility_30d", "portfolio", "portfolio",
-            risk_metrics_result.vol_30d,
-            cfg("rolling_volatility_30d", "warning", 0.18),
-            cfg("rolling_volatility_30d", "breach", 0.25),
-            "30d rolling volatility (annualised)",
-        )
-        if a:
-            alerts.append(a)
-
-    # Gross exposure
-    if exposure_result and exposure_result.portfolio_market_value > 0:
+    if exposure_result is not None:
         mv = exposure_result.portfolio_market_value
-        # Assume NAV ≈ portfolio_market_value for a long-only book
-        gross_pct = exposure_result.gross_exposure / mv
-        a = _check_one(
-            "gross_exposure", "portfolio", "portfolio",
-            gross_pct,
-            cfg("gross_exposure", "warning", 1.10),
-            cfg("gross_exposure", "breach", 1.20),
-            "Gross exposure % NAV",
-        )
-        if a:
-            alerts.append(a)
+        # NAV is taken to be market value for a long-only book. A zero-valued
+        # book has no ratio to compute, so the check genuinely cannot run and is
+        # not recorded as having run.
+        if mv > 0:
+            emit("gross_exposure", "portfolio", exposure_result.gross_exposure / mv,
+                 limits.get_portfolio("gross_exposure"))
 
-    # ── Sector concentration ────────────────────────────────────────────────────
-    if exposure_result:
+        # ── Per-entity limits ──────────────────────────────────────────────────
+        # Iterating the exposure maps and not the limit rows is what makes at
+        # most one alert per (check, entity) possible, and it is also why an
+        # override for a name the book does not hold is inert rather than an
+        # error.
         for sector, data in exposure_result.sector_map.items():
-            weight = data["weight"]
-            a = _check_one(
-                "sector_concentration", "sector", sector,
-                weight,
-                cfg("sector_concentration", "warning", 0.40),
-                cfg("sector_concentration", "breach", 0.50),
-                f"Sector {sector}",
-            )
-            if a:
-                alerts.append(a)
+            emit("sector_concentration", sector, data["weight"],
+                 limits.get_entity("sector_concentration", sector))
 
-    # ── Issuer concentration ────────────────────────────────────────────────────
-    if exposure_result:
         for ticker, data in exposure_result.issuer_map.items():
-            weight = data["weight"]
-            a = _check_one(
-                "issuer_concentration", "issuer", ticker,
-                weight,
-                cfg("issuer_concentration", "warning", 0.15),
-                cfg("issuer_concentration", "breach", 0.20),
-                f"Issuer {ticker}",
-            )
-            if a:
-                alerts.append(a)
+            emit("issuer_concentration", ticker, data["weight"],
+                 limits.get_entity("issuer_concentration", ticker))
 
-    # ── Stress losses ───────────────────────────────────────────────────────────
-    if stress_result:
+    if stress_result is not None:
         for scenario in stress_result.scenarios:
-            loss_pct = scenario.estimated_loss_pct
-            a = _check_one(
-                "stress_loss", "portfolio", scenario.name,
-                loss_pct,
-                cfg("stress_loss", "warning", 0.06),
-                cfg("stress_loss", "breach", 0.08),
-                f"Stress scenario: {scenario.name}",
-            )
-            if a:
-                alerts.append(a)
+            emit("stress_loss", scenario.name, scenario.estimated_loss_pct,
+                 limits.get_entity("stress_loss", scenario.name))
 
-    # Sort: breach first, then by entity type
+    # Sort: breach first, then by alert type
     severity_order = {"breach": 0, "warning": 1}
     alerts.sort(key=lambda a: (severity_order.get(a.severity, 2), a.alert_type))
 
-    return alerts
+    evaluated = sorted(evaluated_key(lt, eid) for lt, eid in limits.looked_up)
+    return alerts, evaluated

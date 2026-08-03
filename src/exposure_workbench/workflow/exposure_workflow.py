@@ -21,7 +21,7 @@ from exposure_workbench.analytics.pnl import calc_pnl, PnlResult
 from exposure_workbench.analytics.factor_model import calc_factor_attribution, FactorAttributionResult
 from exposure_workbench.analytics.risk_metrics import calc_risk_metrics, RiskResult
 from exposure_workbench.analytics.stress import calc_stress, StressResult
-from exposure_workbench.analytics.limits import check_limits, AlertResult
+from exposure_workbench.analytics.limits import AlertResult, LimitBook, check_limits
 from exposure_workbench.db.models import (
     ExposureMetrics, SectorExposure, IssuerExposure,
     FactorAttribution, RiskAlert, DailyReport,
@@ -48,7 +48,11 @@ class ExposureWorkflow:
 
     def __init__(self, configs_dir: str | Path = "/app/configs"):
         self.configs_dir = Path(configs_dir)
-        self._risk_limits_config: dict | None = None
+        # There is no risk-limits config. Thresholds come from the portfolio's
+        # own risk_limits rows and from nowhere else — see analytics.LimitBook.
+        # A YAML here would be a second source, and this loader's "file missing →
+        # warn and return {}" is what promoted check_limits' 16 hardcoded
+        # defaults to the live thresholds in a container that has no /app/configs.
         self._stress_config: dict | None = None
         self._factor_config: dict | None = None
 
@@ -63,7 +67,6 @@ class ExposureWorkflow:
             logger.warning("Config file not found: %s", p)
             return {}
 
-        self._risk_limits_config = _load("risk_limits.yaml")
         self._stress_config = _load("stress_scenarios.yaml")
         self._factor_config = _load("factor_config.yaml")
 
@@ -113,7 +116,7 @@ class ExposureWorkflow:
             ctx = _StepContext(db, run_id, "load_inputs", "Loading portfolio positions and market data")
             await ctx.__aenter__()
             try:
-                positions_df, prices_df, factor_prices_df, db_limits = await self._load_inputs(
+                positions_df, prices_df, factor_prices_df, limit_book = await self._load_inputs(
                     db, portfolio_id, as_of_date, positions=positions
                 )
                 await ctx.__aexit__(None, None, None)
@@ -126,7 +129,7 @@ class ExposureWorkflow:
             ctx = _StepContext(db, run_id, "validate_inputs", "Validating prices and position data")
             await ctx.__aenter__()
             try:
-                self._validate_inputs(positions_df, prices_df, as_of_date)
+                self._validate_inputs(positions_df, prices_df, as_of_date, limit_book)
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("validate_inputs")
             except Exception as e:
@@ -207,14 +210,23 @@ class ExposureWorkflow:
             ctx = _StepContext(db, run_id, "check_limits", "Checking risk limits and generating alerts")
             await ctx.__aenter__()
             try:
-                alerts: list[AlertResult] = check_limits(
+                alerts: list[AlertResult]
+                alerts, evaluated = check_limits(
                     risk_metrics_result=risk,
                     stress_result=stress,
                     exposure_result=exposure,
                     pnl_result=pnl,
-                    limits_config=self._risk_limits_config or {},
-                    db_limits=db_limits,
+                    limits=limit_book,
                 )
+                # What this step ACTUALLY did, in a form a query can read. The
+                # message says how many alerts; it cannot say that three of the
+                # eight checks never ran because the book has too little price
+                # history for a VaR. `inert_overrides` is the other half: a
+                # threshold the desk set on a name the book does not hold.
+                ctx.payload = {
+                    "evaluated": evaluated,
+                    "inert_overrides": limit_book.inert_overrides(),
+                }
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("check_limits")
             except Exception as e:
@@ -395,20 +407,26 @@ class ExposureWorkflow:
             db, factor_tickers, start_date, as_of_date
         )
 
-        # Load DB risk limits for the portfolio
-        limits = await portfolio_service.get_risk_limits(db, portfolio_id)
-        db_limits = [
+        # Every threshold this run will use. active_only=False on purpose: the
+        # LimitBook drops inactive rows from the thresholds itself, but it also
+        # has to see them to report a limit_type the engine cannot evaluate.
+        # Filtering here instead would make `is_active = false` the way to hide
+        # a typo'd limit_type from the completeness check.
+        rows = await portfolio_service.get_risk_limits(db, portfolio_id, active_only=False)
+        limit_book = LimitBook([
             {
+                "id": lim.id,
                 "limit_type": lim.limit_type,
-                "entity_type": lim.entity_type,
                 "entity_id": lim.entity_id,
-                "warning_level": float(lim.warning_level),
-                "breach_level": float(lim.breach_level),
+                "warning_level": lim.warning_level,
+                "breach_level": lim.breach_level,
+                "unit": lim.unit,
+                "is_active": lim.is_active,
             }
-            for lim in limits
-        ]
+            for lim in rows
+        ])
 
-        return positions_df, prices_df, factor_prices_df, db_limits
+        return positions_df, prices_df, factor_prices_df, limit_book
 
     # ── Validation ─────────────────────────────────────────────────────────────
 
@@ -417,8 +435,9 @@ class ExposureWorkflow:
         positions_df: pd.DataFrame,
         prices_df: pd.DataFrame,
         as_of_date: date,
+        limits: LimitBook,
     ) -> None:
-        """The single place a run decides its prices are good enough.
+        """The single place a run decides its inputs are good enough.
 
         Everything downstream may now assume every holding has a usable, recent
         price — which is what lets calc_exposure and calc_pnl drop their
@@ -428,8 +447,20 @@ class ExposureWorkflow:
         survivor at 100% instead of 71%, which is enough to fabricate a
         concentration breach out of nothing.
 
-        Both problems are reported as complete lists. Naming only the first
-        turns one fix-and-rerun cycle into as many as there are bad tickers.
+        Since V2-H4 it judges the portfolio's LIMITS by the same standard, in the
+        same raise. A missing threshold is an input problem exactly as a missing
+        price is: check_limits has no default to fall back on, so the run would
+        die at step 8 having already paid for a price sync, a factor regression
+        and a stress pass before learning its policy was incomplete. And a book
+        with both a stale price and a missing limit should cost one
+        fix-and-rerun cycle, not two.
+
+        All problems are reported as complete lists. Naming only the first turns
+        one fix-and-rerun cycle into as many as there are bad tickers.
+
+        This method stays PURE — no DB, no clock. The LimitBook is built in
+        _load_inputs and handed in, with no default: a default parameter here
+        would be a threshold source of its own.
         """
         if positions_df.empty:
             raise ValueError("No positions found for the given portfolio and date")
@@ -454,6 +485,23 @@ class ExposureWorkflow:
             problems.append(f"no price on or before {as_of_date} for: {', '.join(missing)}")
         if stale:
             problems.append(f"newest price older than {max_age} days for: {', '.join(stale)}")
+
+        missing_limits = limits.missing_required()
+        if missing_limits:
+            problems.append(
+                "no active risk-limit row for: " + ", ".join(missing_limits)
+                + " (each limit type needs one row with entity_id NULL;"
+                  " per-entity rows are overrides, not substitutes)"
+            )
+        # Reported from ALL rows, active or not — see _load_inputs. A row naming
+        # a check the engine cannot run is the stress_loss_tech failure: served
+        # to the user as policy in force, looked up by nothing.
+        if limits.unknown_types:
+            problems.append(
+                "risk-limit rows name checks that do not exist: "
+                + ", ".join(limits.unknown_types)
+            )
+
         if problems:
             raise ValueError(
                 "Cannot value this portfolio as of "

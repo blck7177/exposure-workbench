@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.analytics.exposure import ExposureResult
-from exposure_workbench.analytics.limits import AlertResult, check_limits
+from exposure_workbench.analytics.limits import AlertResult, LimitBook, check_limits
 from exposure_workbench.analytics.pnl import PnlResult
 from exposure_workbench.analytics.risk_metrics import RiskResult
 from exposure_workbench.analytics.stress import ScenarioResult, StressResult
@@ -44,6 +44,15 @@ THRESHOLDS: dict[str, tuple[float, float]] = {
 
 # ── the one seam this file allows the refactor to move ────────────────────────
 
+def book(pairs: dict[str, tuple[float, float]]) -> LimitBook:
+    """A complete set of portfolio-wide rows, in the shape the table stores."""
+    return LimitBook([
+        {"id": f"rl_{lt}", "limit_type": lt, "entity_id": None,
+         "warning_level": w, "breach_level": b, "unit": "fraction", "is_active": True}
+        for lt, (w, b) in pairs.items()
+    ])
+
+
 def _alerts(
     *,
     risk: RiskResult | None = None,
@@ -52,10 +61,17 @@ def _alerts(
     pnl: PnlResult | None = None,
     thresholds: dict[str, tuple[float, float]] | None = None,
 ) -> list[AlertResult]:
-    """Run check_limits against `thresholds`. THE ONLY THING THE REFACTOR EDITS."""
-    pairs = THRESHOLDS if thresholds is None else thresholds
-    limits_config = {lt: {"warning": w, "breach": b} for lt, (w, b) in pairs.items()}
-    return check_limits(risk, stress, exposure, pnl, limits_config)
+    """Run check_limits against `thresholds`. THE ONLY THING THE REFACTOR EDITED.
+
+    It used to build the `limits_config` dict the engine read from a YAML; it now
+    builds a LimitBook out of risk_limits rows. Not one assertion below moved,
+    which is the whole evidence that swapping the source of the numbers did not
+    change what the engine does with them.
+    """
+    return check_limits(
+        risk, stress, exposure, pnl,
+        book(THRESHOLDS if thresholds is None else thresholds),
+    )[0]
 
 
 # ── builders ──────────────────────────────────────────────────────────────────
