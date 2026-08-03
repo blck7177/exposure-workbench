@@ -217,8 +217,14 @@ async def list_agent_sessions(
     db: AsyncSession = Depends(get_db),
 ):
     # RLS scopes this to the caller's own sessions (owner_id = tenant).
+    #
+    # 'mcp' is the stdio debug door, which opens a session of its own under a
+    # real user. Excluding it would make the one surface built for watching a
+    # tool call land the one surface the monitor cannot show. 'research' stays
+    # out: a run's session is reached through the run, not this list.
     rows = (await db.execute(
-        select(AgentSession).where(AgentSession.kind == "meta").order_by(AgentSession.started_at.desc()).limit(50)
+        select(AgentSession).where(AgentSession.kind.in_(("meta", "mcp")))
+        .order_by(AgentSession.started_at.desc()).limit(50)
     )).scalars().all()
     return rows
 
