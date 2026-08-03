@@ -15,6 +15,7 @@ drifting, and drift is a thing that happens later.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 
@@ -35,6 +36,13 @@ pytestmark = pytest.mark.live
 
 URL = os.getenv("DATABASE_URL_LOCAL",
                 "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
+# The RUNTIME role. The parity tests read as the owner, which is fine for
+# comparing two routes; an isolation test must not, because the table owner has
+# rolbypassrls and its assertions cannot fail.
+APP_URL = os.getenv("DATABASE_URL_LOCAL_APP",
+                    "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
+
+registry_for_tenants = build_meta_registry()
 
 # The fields a consumer of the audit trail reads. id, session_id, seq and
 # duration_ms are excluded on purpose: the first three are per-row identity and
@@ -183,3 +191,94 @@ async def test_the_face_the_loop_is_given_is_the_face_it_can_call():
                 await db.execute(text("DELETE FROM agent_sessions WHERE id = :i"), {"i": session_id})
                 await db.commit()
         await engine.dispose()
+
+
+async def test_two_tenants_calling_at_once_do_not_see_each_other():
+    """The one genuinely new risk in moving to a transport.
+
+    The tenant is a contextvar, and a handler runs in whatever task the
+    transport schedules it in — so an identity that happened to be inherited
+    from the calling context would be a tenant mechanism that depends on how a
+    library schedules work. The server sets it per call instead, from the value
+    fixed when the pair was built.
+
+    Two things this test has to get right, both of which it got wrong first:
+
+    It runs on the app_rls connection, not the owner one the parity tests use.
+    The table owner has rolbypassrls, so an isolation assertion made through it
+    cannot fail — the first version of this test reported that B could see A's
+    private book, which was the owner connection showing everything to
+    everybody. Same trap V3-R found in the tenancy tests.
+
+    And it asserts the GUC is actually set, because db/session.py's listener is
+    registered by importing that module: a test that builds its own sessionmaker
+    without it gets no tenant at all, every read falls back to is_public, and
+    "B cannot see A" passes for the wrong reason.
+
+    Run CONCURRENTLY, because a shared contextvar shows there and not in two
+    sequential calls, where the last writer simply wins.
+    """
+    import asyncio
+    import uuid
+
+    from exposure_workbench.auth.context import current_user_ctx
+    from exposure_workbench.db import session as db_session   # registers the tenant listener
+
+    tag = uuid.uuid4().hex[:8]
+    a, b = f"user_par_a_{tag}", f"user_par_b_{tag}"
+    book = f"port_a_{tag}"
+
+    owner_engine = create_async_engine(URL)
+    app_engine = create_async_engine(APP_URL)
+    app_mk = async_sessionmaker(app_engine, class_=AsyncSession, expire_on_commit=False,
+                                autoflush=False)
+    sessions: dict[str, str] = {}
+    try:
+        async with owner_engine.begin() as c:
+            for uid in (a, b):
+                await c.execute(text(
+                    "INSERT INTO users (id, email) VALUES (:i, :e) ON CONFLICT DO NOTHING"),
+                    {"i": uid, "e": f"{uid}@example.test"})
+            # A owns a private book; B owns none. Each must see their own plus
+            # the public demo, and never the other's.
+            await c.execute(text(
+                "INSERT INTO portfolios (id, name, owner_id, is_public) "
+                "VALUES (:i, 'A book', :o, false)"), {"i": book, "o": a})
+
+        for uid in (a, b):
+            current_user_ctx.set(uid)
+            async with app_mk() as db:
+                s = await sess.create_session(db, kind="meta", owner_id=uid)
+                await db.commit()
+                sessions[uid] = s.id
+
+        # The mechanism is live: contextvar -> after_begin listener -> GUC. Without
+        # this the isolation assertions below pass because nobody sees anything.
+        current_user_ctx.set(a)
+        async with app_mk() as db:
+            guc = (await db.execute(text("SELECT current_setting('app.user_id', true)"))).scalar()
+        assert guc == a, f"the tenant listener is not applying: {guc!r}"
+
+        async def read_as(uid):
+            async with tool_session(registry_for_tenants, faces.FACE_META_AGENT,
+                                    db_factory=app_mk, session_id=sessions[uid],
+                                    user_id=uid) as tools:
+                return await tools.call("get_portfolio_snapshot", {})
+
+        # Deliberately a THIRD value: if anything is inherited rather than bound,
+        # both calls come back as this one.
+        current_user_ctx.set("user_neither_of_them")
+        for_a, for_b = await asyncio.gather(read_as(a), read_as(b))
+
+        assert book in json.dumps(for_a), "A could not see A's own book"
+        assert book not in json.dumps(for_b), "B saw A's book"
+        assert "port_001" in json.dumps(for_b), "B saw nothing at all, so scope proves nothing"
+    finally:
+        async with owner_engine.begin() as c:
+            for sid in sessions.values():
+                await c.execute(text("DELETE FROM agent_steps WHERE session_id = :i"), {"i": sid})
+                await c.execute(text("DELETE FROM agent_sessions WHERE id = :i"), {"i": sid})
+            await c.execute(text("DELETE FROM portfolios WHERE id = :i"), {"i": book})
+            await c.execute(text("DELETE FROM users WHERE id IN (:a, :b)"), {"a": a, "b": b})
+        await app_engine.dispose()
+        await owner_engine.dispose()
