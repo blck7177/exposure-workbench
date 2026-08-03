@@ -1,15 +1,16 @@
-"""P1.3 — the stdio door, against a real database (live).
+"""P1.3/P2 — the stdio door, over a real transport and a real database (live).
 
 Run with:  pytest -m live -k mcp_stdio
 
-The offline tests prove the module cannot construct a privileged connection and
-refuses to start without an identity. What they cannot prove is the part that
-matters: that a call arriving through this door is scoped by row-level security
-to the user named in the environment, and lands in the trace attributed to them.
-Proving that needs the real policies, so it runs here.
+The offline tests prove the module cannot construct a privileged connection,
+refuses to start without an identity, and serves the face it was given. What
+they cannot prove is the part that matters: that a call arriving through the
+transport is scoped by row-level security to the user named in the environment,
+lands in the trace attributed to them, and that a bad call is refused by the
+gate rather than by the transport.
 
-Everything goes through the module's own entry points — no test-only session, no
-test-only factory — because the thing under test is the wiring.
+So these go through a real MCP client session. Nothing here calls invoke()
+directly — the wiring is the thing under test.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ import uuid
 
 import pytest
 from dotenv import load_dotenv
+from mcp.shared.memory import create_connected_server_and_client_session
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -57,6 +59,8 @@ def app_factory_on_the_host(monkeypatch):
     engine = create_async_engine(APP_URL)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
     monkeypatch.setattr(server, "get_session_factory", lambda: factory)
+    monkeypatch.setattr(server, "_session", server._Session())
+    monkeypatch.setenv("MCP_STDIO_USER_ID", STDIO_USER)
     yield
 
 
@@ -83,6 +87,20 @@ async def two_users():
     await engine.dispose()
 
 
+async def _steps(session_id: str) -> list[tuple[str, str]]:
+    engine = create_async_engine(OWNER_URL)
+    try:
+        async with engine.connect() as c:
+            rows = (await c.execute(
+                text("SELECT tool_name, status FROM agent_steps WHERE session_id = :i "
+                     "ORDER BY created_at"),
+                {"i": session_id},
+            )).all()
+            return [(r.tool_name, r.status) for r in rows]
+    finally:
+        await engine.dispose()
+
+
 async def test_an_unknown_user_cannot_open_the_door(two_users):
     from apps.mcp import server
 
@@ -91,18 +109,18 @@ async def test_an_unknown_user_cannot_open_the_door(two_users):
     assert "users" in str(exc.value)
 
 
-async def test_a_call_is_attributed_and_tenant_scoped(two_users, monkeypatch):
+async def test_a_call_is_attributed_and_tenant_scoped(two_users):
     """One call, three claims: the session has an owner, the step is recorded
     under it, and the stranger's portfolio is not in the reply."""
     from apps.mcp import server
 
-    monkeypatch.setattr(server, "_session", server._Session())
-    monkeypatch.setenv("MCP_STDIO_USER_ID", STDIO_USER)
+    built = await server.build_stdio_server()
+    async with create_connected_server_and_client_session(built) as client:
+        out = await client.call_tool("get_portfolio_snapshot", {})
 
-    out = await server.call_tool("get_portfolio_snapshot", {})
-    payload = json.loads(out[0].text)
-    body = json.dumps(payload)
-
+    assert not out.isError, out.content
+    body = out.content[0].text
+    payload = json.loads(body)
     assert "error" not in payload, payload
     # Both halves, because either one alone is satisfied by a read that returned
     # nothing at all: the public demo book IS visible to any authenticated user,
@@ -121,13 +139,28 @@ async def test_a_call_is_attributed_and_tenant_scoped(two_users, monkeypatch):
         # per_turn=False: a process is not a conversation and never claims a turn,
         # so a per-turn counter would be spent once and never reset (V3-R6).
         assert row.turn_tool_budget is None
-
-        steps = (await c.execute(
-            text("SELECT tool_name, status FROM agent_steps WHERE session_id = :i"),
-            {"i": server._session.id},
-        )).all()
-        assert [(s.tool_name, s.status) for s in steps] == [("get_portfolio_snapshot", "completed")]
     await engine.dispose()
+
+    assert await _steps(server._session.id) == [("get_portfolio_snapshot", "completed")]
+
+
+async def test_a_bad_call_is_refused_by_the_gate_not_the_transport(two_users):
+    """The SDK would have validated inputSchema itself and returned one flat
+    string, leaving no trace step — the rejection would exist for the model and
+    not for the desk. This asserts the refusal that arrives is the gate's."""
+    from apps.mcp import server
+
+    built = await server.build_stdio_server()
+    async with create_connected_server_and_client_session(built) as client:
+        out = await client.call_tool("get_fact_series", {"ticker": "NVDA"})   # no metric
+
+    assert out.isError
+    payload = json.loads(out.content[0].text)
+    assert payload["error"] == "invalid_arguments"
+    assert [p["field"] for p in payload["problems"]] == ["metric"]
+    assert "Input validation error" not in out.content[0].text
+
+    assert await _steps(server._session.id) == [("get_fact_series", "rejected")]
 
 
 async def test_the_door_serves_the_whole_meta_face(two_users):
@@ -136,11 +169,14 @@ async def test_the_door_serves_the_whole_meta_face(two_users):
     from apps.mcp import server
     from exposure_workbench.tools import faces
 
-    tools = await server.list_tools()
-    assert [t.name for t in tools] == faces.FACE_META_AGENT
+    built = await server.build_stdio_server()
+    async with create_connected_server_and_client_session(built) as client:
+        listed = await client.list_tools()
+
+    assert [t.name for t in listed.tools] == faces.FACE_META_AGENT
     assert {"ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond"} <= {
-        t.name for t in tools
+        t.name for t in listed.tools
     }
     # and the schemas are the registry's own, not a signature-inspected stand-in
-    assert all(t.inputSchema.get("type") == "object" for t in tools)
-    assert "kwargs" not in json.dumps([t.inputSchema for t in tools])
+    assert all(t.inputSchema.get("type") == "object" for t in listed.tools)
+    assert "kwargs" not in json.dumps([t.inputSchema for t in listed.tools])
