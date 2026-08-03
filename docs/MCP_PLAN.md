@@ -1,5 +1,6 @@
 # MCP Plan — agent 面落地:内部 agent 经 in-memory MCP 消费工具面
 
+> **状态(2026-08-03)**:**P1–P4 已实现并提交**(9 commits,`9ebb85c`…`d7dbd7a`);测试 410/102 → **577 offline / 116 live** 全绿。P5 文档回写待 wording 过目。逐阶段实测见 §7。
 > **版本**:v2(2026-08-03)。取代并删除 `MCP_BOUNDARY_PLAN.md` v1(内容在 git 历史;其"第四入口/OAuth 产品化"重心与设计目标不符,见 §0 N1)。
 > **性质**:执行方案。目标 = 把 MODULE_NOTES §M10「MCP 双轨规则」从声明变为实现:**Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 > **一句话**:MCP server 装着工具面(tools+DB 在门后),消费者是**本项目自己写的 meta-agent 与 research subagent**,经 in-memory transport 连入。没有外部宿主,没有远程门,没有第三方。
@@ -149,3 +150,23 @@ P5(回归 + 文档)         ~0.5 天
 ```
 
 每阶段独立可合并、独立验收;任一阶段停下,系统都比之前更诚实(P1 后:无静默裁剪、无未校验入参、无特权 stdio;P2 后:无死代码传输、面构造单一来源;P3/P4 后:agent 通路 = MCP 通路,字面成立)。
+
+---
+
+## 7. 实测记录(2026-08-03,P1–P4 完成)
+
+| 阶段 | commit | 关键实测 |
+|---|---|---|
+| P1.1 | `754c550` | `faces.available()` 删除;`resolve()` 缺项即 raise。旧的 `KNOWN_TRIMMED`(stdio 静默掉 4 个 delegation/gate 工具)随之消失 |
+| P1.2a | `fda6aa9` | 校验进关口、先于预算。**全量 439/108 保持绿**——说明当时的 schema 太松,拒不动任何东西 |
+| P1.2b | `0bd13d4` | S2 审计(22 工具 / 6 agent)+ 对抗 critic 抓出:**校验合并后已有 7 条 live regression**(`respond{citations:null}` 最致命,它是会话唯一出口);`form_type` enum 少了 `10-K/A`;`redact_args` 对非 dict 抛 AttributeError,违反 invoke 的"永不抛出"契约。守卫改为**从函数标注推导**(annotation 而非 default) |
+| P1.2c | `ffc662a` | 22 个 schema 全部 `additionalProperties: false`;`_field()` 先修好 `additionalProperties`/嵌套 required 的字段归属(否则未知参数全落 `field:""` 且排在最前);args 存储上界移进 trace_service(schema 关键字堵不住拒绝路径) |
+| P1.2d | `840aa14` | `last_n`/`k` 补下界。原先 `last_n=-20` 在 12 点序列上返回**空序列 + 可引用的 calc_id**;float-integer 残留(Draft 2020-12 认 12.0 为整数)由工具层 coercion 收口 |
+| P1.3 | `8c36ccc` | stdio 门去 owner-engine、`MCP_STDIO_USER_ID` 必填、face 扩至全量 20;import-graph 守卫经变异测试 |
+| P2 | `d6ad3e1` | `build_mcp_server()` 参数化;`validate_input=False`(SDK 默认自校验会抢在关口前、且不留 trace);确定性排序;删 `build_http_app()` |
+| P3 | `4170c16` | meta-agent 每 turn 建 in-memory 对。**parity live test**:同调用两条路径的 payload 与 `agent_steps` 逐字段一致(`calc_` 因台账 append-only 每次新铸而归一,其余前缀必须精确相等)。顺带关闭一个**先于本计划存在的洞**:dispatch 原先打在完整 registry 上,face 只是"告诉模型有什么" |
+| P4 | `d7dbd7a` | research subagent 每 run 建对。live:24/40 预算、12 种工具、65 条证据、brief 21 条已验证引用 |
+
+**新增守卫(全部经变异测试或真语料确认)**:面严格解析 · schema 诚实性(null/required/additionalProperties/窗口下界,全部由函数签名推导)· 每个注册 schema 是合法 Draft 2020-12 schema · 传输 parity · agents 层不得绕过 transport 直调 `invoke` · 完整单向 import 规则(原先只盖 providers)。
+
+**范围外撞出、未做**:`search_filing_passages.query` 无 `minLength`(空串会走到 embedding);`citations` 元素无前缀 `pattern`(门已按 trail+DB 校验,加 pattern 等于把门的知识复制到第二处)。两者均记录于此,不静默。

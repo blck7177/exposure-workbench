@@ -323,3 +323,32 @@ def test_no_face_declares_a_tool_its_registry_does_not_register():
             drift[(site, face_name, builder)] = str(e)
 
     assert drift == {}, f"a shipped face no longer resolves: {drift}"
+
+
+def test_no_agent_reaches_a_tool_except_through_the_transport():
+    """MCP_PLAN P3/P4: there is one way from a model to a tool.
+
+    The claim is easy to state and easy to erode — the next loop, or a
+    'temporary' shortcut inside an existing one, calls invoke() directly and
+    everything still passes, because invoke() is where the enforcement is. What
+    would be lost is not enforcement but singularity: two ways in means the face
+    can differ between them, and the face is what caps agent depth at two and
+    keeps the meta-only reads away from the brief writer.
+
+    Read as an import graph rather than as text: tool_session's docstring names
+    invoke() to explain what it returns.
+    """
+    import ast
+
+    agents = ROOT / "src" / "exposure_workbench" / "agents"
+    offenders = []
+    for f in agents.glob("*.py"):
+        if f.name == "tool_session.py":
+            continue          # the one module whose job is to be that way in
+        tree = ast.parse(f.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and any(a.name == "invoke" for a in node.names):
+                offenders.append(f"{f.name}:{node.lineno} imports invoke")
+            if isinstance(node, ast.Attribute) and node.attr == "invoke":
+                offenders.append(f"{f.name}:{node.lineno} calls .invoke")
+    assert offenders == [], f"an agent reaching a tool outside the transport: {offenders}"
