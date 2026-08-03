@@ -672,6 +672,16 @@ class _StepContext:
         self.step_name = step_name
         self.message = message
         self._start_ms = 0
+        # A step's message is prose for a human reading the timeline; it cannot
+        # be queried, and "All limits within bounds" is exactly the sentence
+        # that hid the real defect — check_limits skips a check whenever its
+        # input is None, so a green run says nothing about which of the eight
+        # checks actually executed. `payload` is where a step records that in
+        # machine-readable form: the step body assigns or mutates it, and
+        # __aexit__ writes it to workflow_events.payload_summary. Empty here so
+        # a step that records nothing writes the same '{}' the column already
+        # defaults to.
+        self.payload: dict[str, Any] = {}
 
     async def __aenter__(self):
         self._start_ms = int(time.monotonic() * 1000)
@@ -687,7 +697,29 @@ class _StepContext:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         duration_ms = int(time.monotonic() * 1000) - self._start_ms
+        payload = self.payload
         if exc_type is None:
+            # A body that left something other than a dict here — usually None,
+            # from a helper that returned early — recorded nothing readable, and
+            # log_event's `payload_summary or {}` would quietly turn that into
+            # the same '{}' a step that recorded nothing writes. Two events that
+            # cannot be told apart for "recorded nothing" and "lost what it
+            # recorded" is the failure this attribute exists to end, so the
+            # assignment fails here instead of being normalised. {} stays legal:
+            # "recorded nothing" is a real state, not an error. Raising means
+            # this step lands no completed event; every call site in run() wraps
+            # the exit in try/except and re-enters __aexit__ with the exception,
+            # so what the timeline gets instead is a 'failed' event naming the
+            # malformation.
+            # step_context.step.__aexit__ carries this same check, deliberately
+            # identical; the parametrised tests in tests/test_step_payload.py
+            # run both wrappers through it so the two cannot drift.
+            if not isinstance(payload, dict):
+                raise TypeError(
+                    f"step '{self.step_name}' left a non-dict payload "
+                    f"({payload!r}); ctx.payload must be a dict, and {{}} is how "
+                    f"a step says it recorded nothing"
+                )
             status = "completed"
             msg = self.message
         else:
@@ -703,13 +735,37 @@ class _StepContext:
             # (No step had uncommitted DML at its failure point until
             # sync_prices, which is why this never bit before.)
             await self.db.rollback()
+            # The non-dict payload above is the same defect, but NOT raised
+            # here: the body already has an exception in flight, and raising
+            # during its handling would replace the real cause with a complaint
+            # about the evidence field — the same substitution the rollback just
+            # above exists to prevent, and the bigger loss of the two. It is
+            # recorded instead, so the event still cannot be confused with one
+            # from a step that recorded nothing.
+            if not isinstance(payload, dict):
+                logger.error(
+                    "step '%s' left a non-dict payload (%r) while failing; "
+                    "recording the malformation instead of the evidence",
+                    self.step_name, payload,
+                )
+                payload = {"payload_error": repr(payload)}
 
+        # The payload goes out on the failure path too, for the same reason the
+        # message does: this event is the run's only record of a step that died
+        # part-way, and what the step managed to record before dying is the
+        # first thing a reader needs — "which checks had run when it blew up" is
+        # a different diagnosis from "it blew up before doing anything".
+        # Dropping it here would be a silent deletion of evidence at exactly the
+        # moment evidence is scarce. It cannot be mistaken for a certification:
+        # the same row carries status='failed'. Note also that self.payload is
+        # in-process state, so the rollback above does not touch it.
         await workflow_event_service.log_event(
             db=self.db,
             run_id=self.run_id,
             step_name=self.step_name,
             status=status,
             message=msg,
+            payload_summary=payload,
             duration_ms=duration_ms,
         )
         await self.db.commit()
