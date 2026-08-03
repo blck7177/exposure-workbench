@@ -5,8 +5,9 @@ FACE_RESEARCH tools and finishes by calling submit_brief. The explorer IS the
 writer — no hand-off — so every number it writes is one it just fetched.
 
 Enforcement is inherited, not re-implemented: every tool call goes through the
-registry wrapper (budget, trace, evidence refs). The loop just relays tool
-results back to the model until submit_brief is accepted or the budget runs out.
+registry wrapper (budget, trace, evidence refs), reached over an MCP client on
+an in-memory transport (MCP_PLAN P4). The loop just relays tool results back to
+the model until submit_brief is accepted or the budget runs out.
 """
 
 from __future__ import annotations
@@ -16,10 +17,11 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.llm import client as llm_client
 from exposure_workbench.tools import faces, registry as R
-from exposure_workbench.tools.registry import invoke
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +60,6 @@ async def run_research_session(
     not exist for this session, no in-loop 'if skip' branch."""
     settings = get_settings()
     model = settings.openai_model
-    available = faces.resolve(registry, face or faces.FACE_RESEARCH)
-    tools = registry.schemas(available)
 
     messages: list[dict] = [
         {"role": "system", "content": _SYSTEM},
@@ -67,40 +67,50 @@ async def run_research_session(
     ]
 
     brief_id: str | None = None
-    for turn in range(max_turns):
-        content, tool_calls, usage = await llm_client.chat_with_tools(
-            messages=messages, tools=tools, model=model, temperature=0.2,
-        )
-        assistant_msg: dict = {"role": "assistant", "content": content or ""}
-        if tool_calls:
-            assistant_msg["tool_calls"] = tool_calls
-        messages.append(assistant_msg)
+    turn = 0
+    # One pair for the run, where a chat turn gets one per turn: a research
+    # session IS the unit of work, and its lifetime budget is spent inside it.
+    # The tenant comes from the run's own owner, which the worker set before
+    # calling — a research run outlives no request, so there is nothing
+    # ambient to inherit.
+    async with tool_session(
+        registry, face or faces.FACE_RESEARCH, db_factory=db_factory,
+        session_id=session_id, user_id=current_user_id(),
+    ) as tools_session:
+        tools = tools_session.tools
 
-        if not tool_calls:
-            # model stopped calling tools without submitting — nudge once, then stop
-            if turn >= max_turns - 1:
+        for turn in range(max_turns):
+            content, tool_calls, usage = await llm_client.chat_with_tools(
+                messages=messages, tools=tools, model=model, temperature=0.2,
+            )
+            assistant_msg: dict = {"role": "assistant", "content": content or ""}
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+            messages.append(assistant_msg)
+
+            if not tool_calls:
+                # model stopped calling tools without submitting — nudge once, then stop
+                if turn >= max_turns - 1:
+                    break
+                messages.append({"role": "user",
+                                 "content": "Continue with tools, then call submit_brief."})
+                continue
+
+            for tc in tool_calls:
+                name = tc["function"]["name"]
+                try:
+                    args = json.loads(tc["function"]["arguments"] or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                result = await tools_session.call(name, args)
+                messages.append({
+                    "role": "tool", "tool_call_id": tc["id"],
+                    "content": json.dumps(result, default=str)[:8000],
+                })
+                if name == "submit_brief" and result.get("accepted"):
+                    brief_id = result["brief_id"]
+
+            if brief_id:
                 break
-            messages.append({"role": "user",
-                             "content": "Continue with tools, then call submit_brief."})
-            continue
-
-        for tc in tool_calls:
-            name = tc["function"]["name"]
-            try:
-                args = json.loads(tc["function"]["arguments"] or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            async with db_factory() as db:
-                result = await invoke(registry, db, session_id, name, args)
-                await db.commit()
-            messages.append({
-                "role": "tool", "tool_call_id": tc["id"],
-                "content": json.dumps(result, default=str)[:8000],
-            })
-            if name == "submit_brief" and result.get("accepted"):
-                brief_id = result["brief_id"]
-
-        if brief_id:
-            break
 
     return {"brief_id": brief_id, "turns_used": turn + 1, "submitted": brief_id is not None}
