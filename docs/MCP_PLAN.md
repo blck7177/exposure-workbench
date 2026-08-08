@@ -1,155 +1,167 @@
-# MCP Plan — agent 面落地:内部 agent 经 in-memory MCP 消费工具面
+# MCP Plan — agent 面落地与常驻化:agent 经常驻 MCP server 消费工具面
 
-> **状态(2026-08-08)**:**P1–P5 完成**(`9ebb85c`…`e5a9c42` + SDK pin `6f0da2b` + 文档回写);测试 410/102 → **577 offline / 116 live** 全绿,运行栈实测见 §7 P5 行。遗留:mcp 2.0 迁移(§7)。
-> **版本**:v2(2026-08-03)。取代并删除 `MCP_BOUNDARY_PLAN.md` v1(内容在 git 历史;其"第四入口/OAuth 产品化"重心与设计目标不符,见 §0 N1)。
-> **性质**:执行方案。目标 = 把 MODULE_NOTES §M10「MCP 双轨规则」从声明变为实现:**Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
-> **一句话**:MCP server 装着工具面(tools+DB 在门后),消费者是**本项目自己写的 meta-agent 与 research subagent**,经 in-memory transport 连入。没有外部宿主,没有远程门,没有第三方。
+> **状态(2026-08-08)**:v2(P1–P5,in-memory 形态)**已完成并在运行栈实测**(§7);v3(R1–R6,常驻化)**方案已拍板,待执行**。测试 577 offline / 116 live 全绿。遗留:mcp 2.0 迁移(§7 P5 行;R4 完成后其最大障碍消失,建议紧随补做)。
+> **版本**:v3(2026-08-08)。取代 v2 的 N3/N5 两条决策(v2 全文在 git 历史;其阶段成果 P1–P5 与实测记录 §7 保留,是 v3 的地基而非弃案)。
+> **性质**:执行方案。目标 = 在 v2 已建立的「Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper」之上,把 MCP server 从**每 turn/run 现造**改为**常驻独立进程**,身份从**构造时绑定**改为**逐请求认证**。
+> **一句话**:一个常驻 exposure-mcp 容器装着工具面(tools+DB 在门后);api 的 meta-agent 与 worker 的 research subagent 作为 client,持内部 JWT 逐请求连入;LLM 调用仍在 loop 里,不进 MCP。
 
 ---
 
-## 0. 已定决策(2026-08-03,boss 拍板)
+## 0. 已定决策
+
+### v3(2026-08-08,boss 拍板)
 
 | # | 决策 | 内容 |
 |---|---|---|
-| **N1** | MCP = **agent 面**,不是产品入口 | 消费者 = 内部两个 loop(`agents/meta_agent.py` / `agents/research_session.py`)。OpenClaw / Claude Code / 任何外部宿主**不是**本系统的大脑,出范围。sm-master 类比只取其 server 侧模式(自家工具包进 MCP server 由 agent 消费),不取其消费者形态 |
-| **N2** | web 内置 chat **保留**(核心功能) | chat 面板是 meta-agent 的产品外壳;E 迁移对用户不可见,产品形态零变化 |
-| **N3** | E 形态 = **in-memory transport** | `mcp.shared.memory.create_connected_server_and_client_session`(SDK 1.28.1 实测可用,直接接受现有 lowlevel `Server`)。**每 chat turn / 每 research run 建一对 client-server**,face registry、session_id、message_id、租户身份在建对时绑定。无 HTTP 回环、无子进程 |
-| **N4** | tools-first;resources / prompts 后置 | 主通道只有 tools。可@引用的 resources、slash-command prompts 等增益层,等真实痛点出现再议 |
-| **N5** | 旧 B1/B2/B5 **封存** | HTTP 传输、OAuth 边界(Clerk/RFC 9728/8707/scope→face)、staging 验收整体封存(§5)。唤醒条件 = 出现真实远程消费或第三方产品目标。**公网部署与 MCP 自此解耦** |
+| **N6** | MCP server **常驻独立进程**(取代 N3) | 新容器 `exposure-mcp`,streamable HTTP,`stateless=True`,仅 compose 内网可达,不发布宿主端口。agent 调用任何工具必须向它发请求;agent 的 loop 本身不在 MCP 里 |
+| **N7** | 身份 = **逐请求内部 JWT,HS256 共享密钥** | 密钥 `MCP_INTERNAL_SECRET`(.env)。claims:`sub`=user_id、`sid`=session_id、`mid`=message_id(可选)、`face`、`exp`。api 每 turn 铸、worker 每 run 铸。中间件是**唯一**解 token 的地方;缺任何 claim / 坏签 / 过期 = 结构化拒绝整个请求;**禁止 token passthrough**(不转发给任何上游) |
+| **N8** | token 有效期 = **30min,与 task lease 对齐** | 同 `TASK_LEASE_SECONDS=1800`:token 活得过最长合法 run,死得比僵尸 run 早。验签留 60s 时钟余量 |
+| **N9** | face 保持**物理**:每 face 一个挂载点 | `/mcp/meta`、`/mcp/research` 各自用 `build_mcp_server` 构造、进程内常驻。**拒绝**"单端点 + token 选 face"——那是 `faces.available()` 静默裁剪的复活形态。token 的 `face` claim 必须与挂载点一致,双保险 |
+| **N10** | 工具执行**搬进 mcp 容器** | tools fn 随 server 走:`exposure-mcp` 需要 `DATABASE_URL_APP`、`TAVILY_API_KEY`、`EDGAR_IDENTITY`、`OPENAI_API_KEY`(检索 embedding 在工具内)与 `./data` 卷。api/worker 各自保留 OPENAI key——**LLM completion 仍在 loop 里,不穿 MCP** |
+| **N11** | 生产路径**唯一** | `tool_session` 内部换 `streamablehttp_client`;in-memory helper 降级为**纯测试 fixture**,import 守卫禁止 agents 层再碰。无双轨、无回退 |
+| **N12** | **B2 仍封存**(部分取代 N5) | 内部 JWT ≠ 对外 OAuth 边界。B1 于本日以**内部形态**唤醒(boss 拍板:常驻是期望架构,原"真实远程消费者出现"唤醒条件对 B1 作废);B2/B5 唤醒条件不变 |
 
-**从 v1 继承、仍然成立的判断**:配额同池(委派经 `task_service.create_task` 扣当前 user,内部路径本来如此,零改动);stdio 凭证从环境取(spec 2025-11-25 规范形);无 per-call turn lease(并发正确性由预算扣减的事务性保证);状态全部走 server-minted 句柄(`run_id`/`fact_id`/`calc_id` 当普通参数)——此形状已被 spec 2026-07-28 改版钦定(protocol session 整体移除,SEP-2567),**无迁移债**。
+### v2(2026-08-03,boss 拍板;N3/N5 已被 v3 取代,其余仍然成立)
+
+| # | 决策 | 内容 |
+|---|---|---|
+| **N1** | MCP = **agent 面**,不是产品入口 | 消费者 = 内部两个 loop(`agents/meta_agent.py` / `agents/research_session.py`)。外部宿主不是本系统的大脑,出范围 |
+| **N2** | web 内置 chat **保留**(核心功能) | chat 面板是 meta-agent 的产品外壳;迁移对用户不可见,产品形态零变化 |
+| ~~**N3**~~ | ~~E 形态 = in-memory transport,每 turn/run 建对,身份在建对时绑定~~ | 被 **N6/N7** 取代。in-memory 阶段完成了它的历史任务:先让"agent 通路 = MCP 通路"字面成立并全量实测,再动拓扑 |
+| **N4** | tools-first;resources / prompts 后置 | 主通道只有 tools,增益层等真实痛点 |
+| ~~**N5**~~ | ~~旧 B1/B2/B5 封存~~ | 被 **N12** 取代:B1 以内部形态唤醒;B2/B5 仍封存 |
+
+**从 v1/v2 继承、仍然成立的判断**:配额同池;stdio 凭证从环境取;无 per-call turn lease(并发正确性由预算扣减的事务性保证);状态全部走 server-minted 句柄(`run_id`/`fact_id`/`calc_id` 当普通参数)——spec 2026-07-28 已钦定此形状(protocol session 移除,SEP-2567)。**常驻 + stateless 与该改版方向一致。**
 
 ---
 
-## 1. 现状基线(2026-08-03,全部实测/实读)
+## 1. 现状基线(2026-08-08,全部实读/实测)
 
 | 事实 | 坐标 |
 |---|---|
-| meta-agent 直接函数调用关口:`invoke(registry, db, session_id, name, args, message_id=…)` | `agents/meta_agent.py:137-138` |
-| research subagent 同样直调 invoke;face 裁剪 = skip 语义 | `agents/research_session.py`(loop 内) |
-| 工具面实测:read registry **16**,meta registry **20**(meta-only = `ensure_company_ready` / `start_issuer_research` / `start_exposure_run` / `respond`) | `tools/definitions.py:239` / `tools/meta_tools.py:205` |
-| `invoke()` 是唯一关口(全仓 `.fn(` 一处),预算+trace 已强制,**零入参 schema 校验** | `tools/registry.py:149` |
-| `faces.available()` 静默裁剪(意图 20 → stdio 实拿 16) | `tools/faces.py:41-43` + `apps/mcp/server.py:39-40` |
-| stdio server 自开 engine(`DATABASE_URL`,owner 角色,RLS 不绑定)+ 进程全局匿名 session | `apps/mcp/server.py:43-49, 65-70` |
-| stdio server 已显式 `per_turn=False`(V3-R6) | `apps/mcp/server.py:67` |
-| `build_http_app()` 死代码且 schema 坏(推导成 `{"kwargs": string}`) | `apps/mcp/server.py:97-115` |
-| in-memory helper 存在:`create_connected_server_and_client_session(server: Server\|FastMCP, …)` | venv `mcp` 1.28.1 实测 |
-| `jsonschema` 4.26.0 已在 venv,未进 pyproject | 待提显式依赖 |
+| server 每 turn/run 现造;face/session/租户身份是**构造参数** | `tools/mcp_server.py:50-58` |
+| `call_tool` handler 内已有**显式身份绑定**(P2 机制,contextvar set)——v3 保留该站,只换来源 | `tools/mcp_server.py:106` |
+| 消费者经 `tool_session`(list_tools 一次 + call;transport 错误结构化返回,loop 永不炸) | `agents/tool_session.py:83-100` |
+| 消息是真 JSON-RPC(`tools/list`/`tools/call`),parity 测试钉"传输不改记录" | `tests/test_transport_parity_live.py` |
+| 双租户并发正确性已实测(构造绑定形态下) | commit `e5a9c42` |
+| stdio 调试门:同一构造器,`MCP_STDIO_USER_ID` 显式身份,借 app_rls factory | `apps/mcp/server.py` |
+| 工具执行发生在 api/worker **进程内**(server 对象在进程里) | — |
+| SDK 1.29.0(pin `mcp>=1.28,<2`);`StreamableHTTPSessionManager` 与 `streamablehttp_client` 实测可用,支持 `stateless=True` | 2026-08-08 实测 |
+| 运行栈全链路已验:chat turn(数字验证门拒→重试→过)+ research run(30 工具调用、brief 21 引用) | §7 P5 行 + 本日实测 |
 
-**Gap 一句话**:关口、面、预算、RLS、审计全部存在且在用;缺的只是——agent 的调用没有穿协议层,而 stdio server 站在身份机制外面。本计划 = 给既有关口套上 MCP 外衣并让两个 loop 从外衣走,不发明任何新强制。
+**Gap 一句话**:server 已是"参数化构造、关口在内"的正确形状,缺的只是——让它长命、把"构造时绑定身份"换成"逐请求认证身份",并把消费者从内存流搬到 HTTP。
 
 ---
 
-## 2. 目标拓扑
+## 2. 目标拓扑(执行后)
 
 ```
-web chat 用户                     worker(task 行承接身份)
-   │ (产品外壳,零变化)                │
-   ▼                                  ▼
-meta-agent loop                  research subagent loop
-   │ 每 turn 建对                     │ 每 run 建对
-   ▼                                  ▼
-in-memory MCP client ──────────  in-memory MCP client
-   │  tools/list · tools/call         │
-   ▼                                  ▼
-MCP Server(build_mcp_server(registry, face, session, identity…) 参数化构造)
-   │  call_tool → invoke()  ← 一行不改的六站关口
-   ▼
-invoke():face 严格 → schema 校验 → 预算先扣 → tool.fn → evidence 采收 → trace 落盘
-   ▼
-services → get_session_factory()(app_rls,SET LOCAL app.user_id)→ Postgres RLS
+┌──────────┐   ┌─────────────────┐        ┌─────────────────────────────┐
+│ 浏览器    │──▶│ exposure-api     │        │ exposure-mcp(新容器,常驻)   │
+└──────────┘   │  meta-agent loop │        │  streamable HTTP, stateless  │
+               │  (LLM 调用在此)   │        │                              │
+               │                  │ Bearer │  中间件:验内部 JWT →         │
+               │  每 turn 铸 token │──────▶│  绑 user/session/message ctx │
+               └────────┬─────────┘ HTTP   │       │                      │
+                        │ 入队        JSON-RPC     ▼                      │
+               ┌────────▼─────────┐        │  /mcp/meta   (20 工具,物理) │
+               │ exposure-worker   │        │  /mcp/research(研究面,物理) │
+               │  research loop    │ Bearer │       │                      │
+               │  (LLM 调用在此)   │──────▶│       ▼                      │
+               │  每 run 铸 token  │ HTTP   │  invoke() 六站关口(不动)    │
+               └──────────────────┘        │       ▼                      │
+                                           │  tools fn → services         │
+                                           │  (工具执行在本容器)           │
+                                           └──────────┬──────────────────┘
+                                                      ▼
+                                    Postgres(app_rls + SET LOCAL → RLS)
 
 旁路(不变):recipe / REST wrapper / workflow 代码直调 fn(代码通路,只留台账)
-侧门(降级):stdio 入口 = local-dev debug 门,同一构造器,MCP_STDIO_USER_ID 显式身份
+侧门(不变):stdio 调试门 = 同一构造器,进程内,MCP_STDIO_USER_ID 显式身份
+封存(不变):B2 对外 OAuth——内部 JWT ≠ 对外边界,唤醒条件依旧
 ```
+
+**构造器拆分**:`build_mcp_server(registry, face, db_factory)` 变长命(去掉 per-session 参数);请求上下文(user/session/message)由中间件逐请求写入 contextvar,`call_tool` handler 的显式绑定站保留原样、只换来源。stdio 门的"请求上下文"= 启动时环境变量一次设定,行为不变。
 
 ---
 
-## 3. 阶段计划
+## 3. 阶段计划(R1 → R6;R1–R3 纯新增不切流量,R4 才切)
 
-依赖链:**P1 → P2 → P3 → P4 → P5**。P1 三项彼此独立可并行;P1 无 MCP 依赖、单独有价值,先行合并。
+### R1 — 内部身份件(~0.5 天)
 
-### P1 — 关口硬化(原 v1 B0 三件,全部保留;与消费拓扑无关的实债)
+- `auth/internal_token.py`:`mint(user_id, session_id, face, message_id=None)` / `verify(token) -> Claims`。HS256,`MCP_INTERNAL_SECRET`,`exp` = 30min,验签 60s leeway。
+- HTTP 中间件:`Authorization: Bearer` → verify → 写请求级 contextvar(user/session/message/face)。中间件是唯一解 token 处。
+- 验收(offline):坏签 / 过期 / 缺 claim / face 与挂载点不匹配 → 全部结构化拒绝,负例矩阵逐条测。(live,R4 后补):**双租户并发 HTTP 实测**,同 P5 形状。
 
-**P1.1 faces 严格解析**(消灭:面静默漂移)
-- `faces.py` 新增 `resolve(registry, face) -> list[str]`:face 中任一工具未注册 → **raise** 并列出缺项,不裁剪。`available()` 仅留给真实 build-order 容忍场景,审计现有调用点能换尽换。
-- 测试:意图面含未注册工具 → 启动失败,错误信息列出缺项。
+### R2 — 构造器拆分 + 常驻 app(~1 天)
 
-**P1.2 invoke 入参 schema 校验**(消灭:未经校验的 args 直达 `tool.fn`)
-- 前置 S2 盘点:遍历 20 个工具 schema 的严格度(`additionalProperties` / `required` / 类型如实性),产出修订清单;过松的**改 schema 使其如实**,不放松校验。
-- `invoke()` 预算扣减前 `jsonschema.validate(args, tool.json_schema)`(Draft 2020-12);失败 → `{"error": "invalid_arguments", "problems": [...]}`,照常落 trace step(拒绝也留痕)。`jsonschema` 提为 pyproject 显式依赖。
-- 测试:meta / research / stdio 三条路径各一条坏参用例 → 统一错误形状 + trace 落盘。全量跑既有 410+102,预期若有破裂 = schema 不如实,修 schema。
-- ⚠️ 排程注意:本项与 harness 收口批(evidence 采收单一路径)同在 `registry.py`,**相邻排程**,一次回归。
+- `tools/mcp_server.py`:`build_mcp_server(registry, face, db_factory)`;handler 从请求 contextvar 取身份与 session。确定性排序、`validate_input=False`、错误透传形状全保持。
+- `apps/mcp/http.py` 新入口:Starlette + `StreamableHTTPSessionManager(stateless=True)`,`/mcp/meta` 与 `/mcp/research` 各挂一个构造出的 server。
+- stdio 门(`apps/mcp/server.py`)改走新构造器签名,行为不变。
+- 验收(offline):两挂载点 tools/list 面正确且逐字节确定;registry schema ↔ MCP tool schema 逐字段 diff 保持;stdio 门回归绿。
 
-**P1.3 stdio 门去特权 + 降级定位**(消灭:owner-role 特权连接 + 匿名会话)
-- 删 `_db_url()` / 自开 engine / `_State` 全局;改用 `db/session.get_session_factory()`(`app_rls`,GUC 生效)。
-- `MCP_STDIO_USER_ID` env **必填**,启动时校验 users 表存在该行;未设/不存在 → 启动失败并说明。无 DEMO 回退。
-- 文档定位:local-dev **debug 门**(人工用 Inspector 之类连上排查),非目标路径,不做验收矩阵。
+### R3 — infra(~0.5 天)
 
-P1 验收(offline):faces strict / 三路径坏参 / 410+102 全绿。(live):stdio 连上调 `get_issuer_snapshot`,session 有 owner,RLS 只见该 user + is_public。
+- `infra/Dockerfile.mcp` + compose service:仅内网(不发布宿主端口),env 按 N10,`./data` 卷,healthcheck(`/mcp/meta` 握手或专用 `/healthz`),`depends_on: postgres healthy`;api/worker `depends_on: exposure-mcp`。
+- 验收:栈起;容器内无 token 调用 = 拒;宿主机 curl 不可达(端口未发布)。
 
-### P2 — Server 适配层(一份适配代码,两个入口用)
+### R4 — 消费者迁移(~1 天)
 
-- `apps/mcp/server.py` 重构为参数化构造器:`build_mcp_server(registry, face, *, db_factory, session_id, message_id=None) -> Server`。现在的"硬编码 read registry + 进程全局 session"形状废除;stdio 门与 in-memory 对都调这个构造器。
-- face 用 P1.1 的 `faces.resolve` 严格解析;`tools/list` **确定性排序**(spec 2026-07-28 SHOULD,利宿主 prompt cache)。
-- server instructions 写证据纪律的 why(与两个 system prompt 同源,不新增行为规则清单)。
-- `call_tool` handler:显式设置绑定身份(`current_user_ctx.set`,与 stdio 门同型,**不赌 contextvar 跨任务快照**)→ `invoke()` → 结果按 MCP content 规范返回;`invalid_arguments` / `budget_exhausted` 等结构化错误以 `isError` + 原 payload 透传,信息不降级。
-- 删除 `build_http_app()` 全部(死代码 + `{"kwargs": string}` schema bug 一起走)。
-- 验收(offline):构造器对 META/RESEARCH 两 face 出面正确(数量以 `faces.resolve` 为准);tools/list 两次调用逐字节一致;registry schema ↔ MCP tool schema 逐字段 diff 测试(吸收 v1 的"非 kwargs 退化形"验收);错误透传形状测试。
+- `agents/tool_session.py` 内部:`create_connected_server_and_client_session` → `streamablehttp_client(MCP_URL_<FACE>, headers=Bearer)` + `ClientSession`;对 loop 的接口(tools 列表 + `call`)不变。
+- `handle_message` 每 turn 铸 token;`run_research_session` 每 run 铸(身份仍来自 task 行)。
+- 生产路径删 in-memory;helper 移为测试 fixture。
+- 验收(live):栈上真 chat turn + 真 issuer research run,行为与 2026-08-08 实测逐项一致(数字验证门、submit 门、预算、RLS)。
 
-### P3 — E 迁移:meta-agent 改走 in-memory client
+### R5 — 守卫与回归(~1 天)
 
-- `handle_message` 每 turn:`build_mcp_server(meta_registry, FACE_META_AGENT, db_factory=…, session_id=…, message_id=…)` → `create_connected_server_and_client_session(server)` 建对;`tools` 改从 `client.list_tools()` 取(→ OpenAI tools 参数的映射函数,带保真测试);`meta_agent.py:137-138` 的 `invoke(...)` 改 `client.call_tool(name, args)`;respond 判定、`_GATE_EXHAUSTED_TEXT` 收敛点、prompt_peak 记账全部不变。
-- 异常路径:对的生命周期跟 turn,`finally` 关闭;in-memory 无网络断连类错误。
-- 验收(offline):loop 相关单测改造后全绿。**parity(本阶段核心验收)**:同一问句 before/after 两跑 → `agent_steps` 逐字段一致(工具名 / args 摘要 / evidence_refs / 预算扣减序列),仅时间戳异。(live):web chat 一轮带引用全程通过,Agent Monitor 穿透正常;**双用户交替**(A/B 轮流发消息)→ RLS 隔离与身份绑定无串扰。
+- parity 测试升级:直调 invoke vs HTTP 全链路,`agent_steps` 逐字段一致。
+- face 物理性负例:对 `/mcp/research` 调 meta-only 工具 = 未知工具(物理不存在,非 403)。
+- 双租户并发 HTTP 实测(R1 验收的 live 半)。
+- import 规则更新:agents 层不得 import in-memory helper;`llm/` 仍不触库。
+- 每 call 延迟实测钉数(预期 1–3ms/call,量级依据:30 call/run)。
+- 全量回归 offline+live 绿;新守卫经变异测试。
 
-### P4 — E 迁移:research subagent 同法
+### R6 — 文档(~0.5 天,wording 先过 boss 再落)
 
-- `run_research_session` 每 run 建对;face 裁剪(skip 语义)不变——建对时传裁剪后的 face,能力仍是"物理不存在"而非 in-loop if。
-- 验收(live):完整 issuer research 跑通,brief 六块引用全过 submit 门,终身 40 预算扣减正常;worker 进程内建对(身份来自 task 行)与 API 进程内行为一致。
-
-### P5 — 收尾
-
-- 全量回归 410+102 + 新增测试全绿;parity 测试进常驻回归(防两轨漂移的持续证明)。
-- 文档回写:本文件状态标注、README 的 MCP 段、`TARGET_ARCHITECTURE.md` §2/§8 残留的"外部宿主(OpenClaw / Claude Code)"字样清理(**wording 全部先过 boss 再落**)。
-- MODULE_NOTES §M10 已于 2026-08-03 同步(先于实现,文档先行)。
+- `TARGET_ARCHITECTURE.md` §2/§8:in-memory 拓扑 → 常驻拓扑;§3 目录列表补 `apps/mcp/http.py`。
+- README MCP 段;MODULE_NOTES §M10 同步;本文件状态标注 + §7 追加 R 行。
 
 ---
 
 ## 4. 风险与退路
 
-- **contextvar 跨任务边界**:不依赖"建对时快照恰好带上身份"——P2 在 `call_tool` handler 里**显式 set 绑定身份**,与 stdio 门同型;双用户交替 live 测试钉死。此为本计划唯一真正的新技术点。
-- **每 turn 建对的开销**:task spawn + initialize 握手,进程内量级微小。若实测可感 → 退路:per-session 复用对 + 每 call 重绑 message_id(构造器结构已预留)。**先测后优化,不预付复杂度。**
-- **schema 映射保真**:`registry.json_schema` → MCP tool → OpenAI tools 参数,两跳都有逐字段 diff 测试;任何一跳退化(如 `kwargs` 形)= 测试红。
-- **P1.2 引发既有用例破裂**:预期内,按"schema 不如实则修 schema"处理;确需自由形状的工具(当前认知:无)才允许显式豁免 + 注释理由,无静默豁免。
-- **协议版本**:SDK 1.28.1 = spec 2025-11-25 系;本计划全部特性(tools、in-memory、stdio)不触碰 2026-07-28 移除的能力(protocol session / handshake 依赖),升级 SDK 时无结构性迁移。
+- **新 SPOF**:mcp 容器挂 = 所有 agent 转不动。缓解:restart policy + healthcheck;`tool_session.call` 的结构化错误契约保证 loop 不炸只降级;`stateless=True` 使将来多副本平凡。
+- **换掉的保证**:v2 的"构造时绑定 → 物理上不可能弄错租户"换成"中间件必须正确"。这是常驻化的**真实价格**,用三层补偿:中间件唯一解 token 处 + 负例矩阵 + 双租户并发实测。
+- **token 生命期**:30min 与 task lease 同长;同机部署时钟偏差可忽略,仍留 60s。密钥轮换(双密钥验证窗口)**后置**,不进本计划。
+- **延迟**:进程内 → loopback HTTP。R5 实测钉数,超预期再议(先测后优化,不预付复杂度)。
+- **mcp 2.0 迁移面**:R4 删掉生产路径的 in-memory 后,2.0 的 breaking(helper 被删)只剩测试 fixture 一处。建议 R6 后紧随做 2.0 迁移,带验收。
+- **成本洞正交**:usage 不穿 MCP(LLM 调用在 loop 里),常驻化不改变成本入账讨论(A/B)的任何前提;那是另一个待拍板件。
 
 ---
 
-## 5. 封存件(原 v1 B1/B2/B5,设计见 git 历史)
+## 5. 封存件
 
-| 件 | 一句话 | 唤醒条件 |
+| 件 | 状态 | 一句话 |
 |---|---|---|
-| B1 HTTP 传输 | `StreamableHTTPSessionManager(stateless=True)` 挂 `/mcp`,flag 默认关,flag off 不 mount | 出现真实远程消费者 |
-| B2 OAuth 边界 | Clerk AS + RFC 9728 metadata + RFC 8707 aud 绑定 + scope→face(read=读面 / act=全量面)+ (owner,'mcp',UTC日) 日会话 | 同上;若第三方成为产品目标则全套唤醒 |
-| B5 staging 验收 | 负例矩阵 + 真宿主 E2E | 随 B1/B2 |
-
-唤醒时注意:①spec 已到 2026-07-28(protocol session 移除、DCR 弃用改 CIMD),v1 设计按 2025-11-25 写成,需重校;②唤醒的那一刻起,公网部署重新成为其验收前置——在那之前两者无耦合。
+| B1 HTTP 传输 | **2026-08-08 以内部形态唤醒**(N6) | 常驻 streamable HTTP 落地于 R2/R3;对外形态仍随 B2 |
+| B2 OAuth 边界 | 封存 | Clerk AS + RFC 9728 + RFC 8707 + scope→face。唤醒条件不变:真实第三方消费者/产品目标。唤醒时按 spec 2026-07-28 重校(DCR→CIMD 等);公网部署是其验收前置 |
+| B5 staging 验收 | 封存 | 真宿主 E2E 随 B2;内部负例矩阵已被 R1/R5 吸收 |
 
 ---
 
 ## 6. 工作量粗估
 
 ```
-P1(S2 + 三件硬化)      ~1.5 天   ← 与 harness 收口批相邻排程(同在 registry.py)
-P2(Server 适配层)       ~0.5 天
-P3(meta-agent 迁移)     ~1 天
-P4(research 迁移)       ~0.5 天
-P5(回归 + 文档)         ~0.5 天
-                          合计 ~4 天(harness 收口批另属 harness 线,~1 天)
+R1(内部身份件)          ~0.5 天
+R2(构造器拆分+常驻 app) ~1 天
+R3(infra)               ~0.5 天
+R4(消费者迁移)          ~1 天
+R5(守卫与回归)          ~1 天
+R6(文档)                ~0.5 天
+                          合计 ~4.5 天
 ```
 
-每阶段独立可合并、独立验收;任一阶段停下,系统都比之前更诚实(P1 后:无静默裁剪、无未校验入参、无特权 stdio;P2 后:无死代码传输、面构造单一来源;P3/P4 后:agent 通路 = MCP 通路,字面成立)。
+R1–R3 纯新增,任一阶段停下系统不劣于现状;R4 起切流量,R4 完成即可栈上验收。
 
 ---
 
@@ -166,8 +178,8 @@ P5(回归 + 文档)         ~0.5 天
 | P2 | `d6ad3e1` | `build_mcp_server()` 参数化;`validate_input=False`(SDK 默认自校验会抢在关口前、且不留 trace);确定性排序;删 `build_http_app()` |
 | P3 | `4170c16` | meta-agent 每 turn 建 in-memory 对。**parity live test**:同调用两条路径的 payload 与 `agent_steps` 逐字段一致(`calc_` 因台账 append-only 每次新铸而归一,其余前缀必须精确相等)。顺带关闭一个**先于本计划存在的洞**:dispatch 原先打在完整 registry 上,face 只是"告诉模型有什么" |
 | P4 | `d7dbd7a` | research subagent 每 run 建对。live:24/40 预算、12 种工具、65 条证据、brief 21 条已验证引用 |
-| P5 | `6f0da2b` | 运行栈重建撞出 **mcp 2.0.0 删除 `create_connected_server_and_client_session`**(镜像按 `mcp>=1.2` 现场解析拉到 2.0;venv=1.28.1)→ 钉 `mcp>=1.28,<2`,重建后容器落 1.29.0。api/worker 两容器内 MCP 通路实测:20 工具全量 face、`get_fact_series` 真实 ledgered calc(铸 calc_id、引 6 条 fact refs)、未知参数结构化拒绝、trace 三行落盘,两容器逐项一致。LLM 层未在栈上验:OpenAI 额度耗尽(对已建、tools 已列,失败点在 provider 调用之上无 MCP 成分)。**遗留:mcp 2.0 迁移**——helper 被删非搬家,升级是带验收的迁移,非依赖 bump |
+| P5 | `6f0da2b` | 运行栈重建撞出 **mcp 2.0.0 删除 `create_connected_server_and_client_session`**(镜像按 `mcp>=1.2` 现场解析拉到 2.0;venv=1.28.1)→ 钉 `mcp>=1.28,<2`,重建后容器落 1.29.0。api/worker 两容器内 MCP 通路实测:20 工具全量 face、`get_fact_series` 真实 ledgered calc(铸 calc_id、引 6 条 fact refs)、未知参数结构化拒绝、trace 三行落盘,两容器逐项一致。LLM 层未在栈上验:OpenAI 额度耗尽(对已建、tools 已列,失败点在 provider 调用之上无 MCP 成分)。**遗留:mcp 2.0 迁移**——helper 被删非搬家,升级是带验收的迁移,非依赖 bump。后补:额度恢复后栈上全链路验通(chat turn 数字验证门拒→重试→过;research run 1m33s、30 工具调用、brief 六块 21 引用) |
 
 **新增守卫(全部经变异测试或真语料确认)**:面严格解析 · schema 诚实性(null/required/additionalProperties/窗口下界,全部由函数签名推导)· 每个注册 schema 是合法 Draft 2020-12 schema · 传输 parity · agents 层不得绕过 transport 直调 `invoke` · 完整单向 import 规则(原先只盖 providers)。
 
-**范围外撞出、未做**:`search_filing_passages.query` 无 `minLength`(空串会走到 embedding);`citations` 元素无前缀 `pattern`(门已按 trail+DB 校验,加 pattern 等于把门的知识复制到第二处)。两者均记录于此,不静默。
+**范围外撞出、未做**:`search_filing_passages.query` 无 `minLength`(空串会走到 embedding);`citations` 元素无前缀 `pattern`(门已按 trail+DB 校验,加 pattern 等于把门的知识复制到第二处);`issuer_briefs` 成本三列为化石列、agent 路径 LLM 开销全系统无账(2026-08-08 发现,修法 A/B 待拍板,与本计划正交)。均记录于此,不静默。
