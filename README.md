@@ -7,12 +7,14 @@ pgvector filing retrieval, an evidence-gated Issuer Risk Brief, and a single
 meta-agent the user talks to — every factual answer traceable to a fact, a
 calculation, a filing passage or a research source.
 
-The agent tool surface is exposed over REST (for the UI) and MCP (for an external
-agent host) from ONE registry, with budget / citation / audit enforcement in a
-single wrapper below the transport. The two faces are not yet identical: the MCP
-host advertises the meta-agent face and `faces.available()` trims it to the 16
-tools that registry has, dropping the 4 delegation and gate tools. A test pins
-the gap at exactly that, and MCP_BOUNDARY_PLAN closes it.
+Every LLM-generated tool call travels over MCP: the meta-agent (per chat turn)
+and the research subagent (per run) each open an in-memory MCP client-server
+pair built from ONE registry, with budget / schema / citation / audit
+enforcement in a single wrapper below the transport. The face an agent sees is
+the registry its server was built with — there is no trimming step — and a
+standing parity test pins that a direct call and an MCP call produce identical
+trace rows. Deterministic code (recipes, REST wrappers) calls the same
+functions through the same wrapper directly. See docs/MCP_PLAN.md.
 
 ## Quick Start
 
@@ -59,8 +61,10 @@ Design docs: [docs/TARGET_ARCHITECTURE.md](docs/TARGET_ARCHITECTURE.md) (v3),
 [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) (P0–P9),
 [docs/spikes/P9_COVERAGE.md](docs/spikes/P9_COVERAGE.md) (final validation).
 
-The MCP server (same tool face as the UI) runs standalone via
-`python -m apps.mcp.server`.
+A stdio debug door onto the same tool face runs via
+`MCP_STDIO_USER_ID=user_... python -m apps.mcp.server` — the same server
+constructor the agents use; the identity is required and checked against the
+users table.
 
 ## Architecture
 

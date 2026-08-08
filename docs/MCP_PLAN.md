@@ -1,6 +1,6 @@
 # MCP Plan — agent 面落地:内部 agent 经 in-memory MCP 消费工具面
 
-> **状态(2026-08-03)**:**P1–P4 已实现并提交**(9 commits,`9ebb85c`…`d7dbd7a`);测试 410/102 → **577 offline / 116 live** 全绿。P5 文档回写待 wording 过目。逐阶段实测见 §7。
+> **状态(2026-08-08)**:**P1–P5 完成**(`9ebb85c`…`e5a9c42` + SDK pin `6f0da2b` + 文档回写);测试 410/102 → **577 offline / 116 live** 全绿,运行栈实测见 §7 P5 行。遗留:mcp 2.0 迁移(§7)。
 > **版本**:v2(2026-08-03)。取代并删除 `MCP_BOUNDARY_PLAN.md` v1(内容在 git 历史;其"第四入口/OAuth 产品化"重心与设计目标不符,见 §0 N1)。
 > **性质**:执行方案。目标 = 把 MODULE_NOTES §M10「MCP 双轨规则」从声明变为实现:**Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 > **一句话**:MCP server 装着工具面(tools+DB 在门后),消费者是**本项目自己写的 meta-agent 与 research subagent**,经 in-memory transport 连入。没有外部宿主,没有远程门,没有第三方。
@@ -153,7 +153,7 @@ P5(回归 + 文档)         ~0.5 天
 
 ---
 
-## 7. 实测记录(2026-08-03,P1–P4 完成)
+## 7. 实测记录(2026-08-03 P1–P4;2026-08-08 P5)
 
 | 阶段 | commit | 关键实测 |
 |---|---|---|
@@ -166,6 +166,7 @@ P5(回归 + 文档)         ~0.5 天
 | P2 | `d6ad3e1` | `build_mcp_server()` 参数化;`validate_input=False`(SDK 默认自校验会抢在关口前、且不留 trace);确定性排序;删 `build_http_app()` |
 | P3 | `4170c16` | meta-agent 每 turn 建 in-memory 对。**parity live test**:同调用两条路径的 payload 与 `agent_steps` 逐字段一致(`calc_` 因台账 append-only 每次新铸而归一,其余前缀必须精确相等)。顺带关闭一个**先于本计划存在的洞**:dispatch 原先打在完整 registry 上,face 只是"告诉模型有什么" |
 | P4 | `d7dbd7a` | research subagent 每 run 建对。live:24/40 预算、12 种工具、65 条证据、brief 21 条已验证引用 |
+| P5 | `6f0da2b` | 运行栈重建撞出 **mcp 2.0.0 删除 `create_connected_server_and_client_session`**(镜像按 `mcp>=1.2` 现场解析拉到 2.0;venv=1.28.1)→ 钉 `mcp>=1.28,<2`,重建后容器落 1.29.0。api/worker 两容器内 MCP 通路实测:20 工具全量 face、`get_fact_series` 真实 ledgered calc(铸 calc_id、引 6 条 fact refs)、未知参数结构化拒绝、trace 三行落盘,两容器逐项一致。LLM 层未在栈上验:OpenAI 额度耗尽(对已建、tools 已列,失败点在 provider 调用之上无 MCP 成分)。**遗留:mcp 2.0 迁移**——helper 被删非搬家,升级是带验收的迁移,非依赖 bump |
 
 **新增守卫(全部经变异测试或真语料确认)**:面严格解析 · schema 诚实性(null/required/additionalProperties/窗口下界,全部由函数签名推导)· 每个注册 schema 是合法 Draft 2020-12 schema · 传输 parity · agents 层不得绕过 transport 直调 `invoke` · 完整单向 import 规则(原先只盖 providers)。
 

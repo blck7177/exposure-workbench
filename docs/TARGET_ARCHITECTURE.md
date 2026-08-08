@@ -47,28 +47,29 @@
                     ▼            ▼                         ▼
 ┌────────────────────────┐  ┌──────────────┐  ┌─────────────────────┐
 │ Meta-Agent             │  │ REST Wrappers │  │ 只读 API             │
-│ (FastAPI 进程内循环,    │  │ 纯参数校验+入队│  │ (/api/evidence/{id} │
-│  以 MCP client 连工具面)│  └──────┬───────┘  │  等,零判断)         │
-└──────────┬─────────────┘         │          └─────────────────────┘
-           │                       │
-外部宿主(OpenClaw / Claude Code)   │
-           │  同一 MCP 端点         │
+│ (FastAPI 进程内循环)     │  │ 纯参数校验+入队│  │ (/api/evidence/{id} │
+└──────────┬─────────────┘  └──────┬───────┘  │  等,零判断)         │
+    每 turn 建对                    │          └─────────────────────┘
            ▼                       ▼
 ┌─────────────────────┐   ┌──────────────────────────────────────┐
-│ MCP Server           │   │ Task Queue(tasks 表)→ Worker        │
-│ (FastMCP 挂 /mcp)    │   │  ├ exposure_update(现有,不动)       │
-│ 所有 LLM 生成的调用   │   │  ├ company_readiness(能力 A,新)     │
-└──────────┬──────────┘   │  └ issuer_research(能力 C,新):      │
-           │              │     readiness 前置 → 分析 subagent 会话 │
-           │              │     (worker 内 MCP client 连 /mcp)     │
-           │              │     → finalize                         │
-           ▼              └──────────────────┬────────────────────┘
+│ in-memory MCP 对     │   │ Task Queue(tasks 表)→ Worker        │
+│ client ↔ server      │   │  ├ exposure_update(现有,不动)       │
+│ build_mcp_server(    │   │  ├ company_readiness(能力 A,recipe) │
+│  registry, face,     │   │  └ issuer_research(能力 C):         │
+│  session, identity)  │   │     readiness 前置 → 分析 subagent    │
+│ 参数化构造;所有 LLM   │   │     (worker 进程内每 run 建对,        │
+│ 生成的调用            │   │      同一 in-memory 通路)→ finalize   │
+└──────────┬──────────┘   └──────────────────┬────────────────────┘
+           │  tools/call → invoke()          │
+           ▼                                 │
 ┌──────────────────────────────────────────┐ │
 │ Registry Wrapper(唯一关口)               │◀┘ recipe/wrapper 代码直调 fn
 │  入参语义校验 / 预算记账 / 轨迹+台账自动落盘 │
 └──────────┬───────────────────────────────┘
            ▼
    tools fn → services(ingestion 写 / query 读)→ providers / analytics / db
+
+侧门(local-dev debug):stdio 入口 = 同一构造器,MCP_STDIO_USER_ID 显式身份
 ══════════════════════════════════════════════════════════════════════
  Observability Plane(横切):agent_sessions/messages/steps + workflow_events
  + calc ledger + evidence 四库 ──▶ Chat 面板 / Agent Monitor / Run 时间线 / 引用抽屉
@@ -90,7 +91,8 @@ src/exposure_workbench/
   db/            models + session(现有)
 
 apps/
-  api/           FastAPI:REST wrappers + 只读 API + FastMCP 挂载(/mcp)
+  api/           FastAPI:REST wrappers + 只读 API
+  mcp/           stdio 调试门入口(同一 build_mcp_server 构造器)
   worker/        任务轮询(现有)+ 新 handler 注册
   web/           Next.js 薄客户端
 ```
@@ -192,7 +194,7 @@ FACE_RESEARCH   = read 全集 + search_external_research + think + submit_brief(
 FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM 无预算,只留台账)
 ```
 
-"agent 能干什么"的答案在一处配置;外部宿主拿 FACE_META_AGENT 同款,无特权通道。
+"agent 能干什么"的答案在一处配置;face 即建 server 时传入的 registry,能力是"物理不存在"而非 in-loop if;stdio 调试门同一构造器,无特权通道。
 
 ### 预算(数值全在配置)
 
@@ -208,16 +210,16 @@ FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM 无预算,只留台账)
 
 > **Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 
-- 凡 **LLM 生成**的工具调用一律走 MCP——内部 meta-agent 与分析 subagent 均以 MCP client 连入,与外部宿主字面上同一 server(FastMCP 挂 FastAPI `/mcp`)同一接口
+- 凡 **LLM 生成**的工具调用一律走 MCP——meta-agent 每 chat turn、research subagent 每 run,以 in-memory transport 建一对 client-server(`build_mcp_server(registry, face, session, identity…)` 参数化构造);face 与租户身份在建对时绑定、call_tool 内显式重绑,对随 turn/run 消亡
 - 凡**确定性代码**的调用(recipe/REST wrapper)直调 fn——代码无"生成调用"动作,不存在需生成时堵的错误类别
 - 与 sm-master 分裂教训的区别:那是"两条 **agent** 通路、两套强制";这是"一条 agent 通路 + 一条代码通路、**一套强制**"(wrapper 是共同关口)
-- 内部走 MCP 买到:大脑可换是构造不是声称(随时换 OpenClaw/Claude Code 当 meta-agent)、门面因日常流量不烂、审计口径唯一
-- 部署:MVP 不加容器(FastMCP 挂 API 进程;worker 内会话经 HTTP 连 `/mcp`);独立 MCP 进程留给放量后,搬走的只是挂载点
+- 内部走 MCP 买到:门面因日常流量不烂、schema 诚实由协议层强制曝光、审计口径唯一;传输不改变记录内容由常驻 parity 测试钉死
+- 侧门:stdio 入口 = local-dev debug 门,同一构造器,MCP_STDIO_USER_ID 显式身份(users 表校验),借 app_rls factory,无特权通道
 
 ## 9. Observability Plane(金融级审计面,横切)
 
 1. **事实由机器记,叙述由 agent 记,分色呈现**:工具调用由 wrapper 自动落 `agent_steps`(实线);think/respond 文本是 agent 自述(虚线)。
-2. **追踪沉在 transport 之下**:落盘点在 wrapper,三种驱动(内部 agent/外部宿主/按钮)产生同构轨迹。
+2. **追踪沉在 transport 之下**:落盘点在 wrapper,三种驱动(内部 agent/stdio 调试门/按钮)产生同构轨迹。
 3. **轨迹存引用不存副本**:agent_steps 存工具名/脱敏入参(MVP 只脱 key 类)/一行摘要/evidence_refs/耗时/token;完整证据体在四库,append-only 保证 refs 永久有效。
 4. **每个事实输出可双击穿透**:全系统一个解析器 `GET /api/evidence/{id}`(前缀路由 fact_/chunk_/calc_/src_/alert_,统一信封含 provenance 与上游链接);chip/抽屉/Brief/Monitor 共用一个组件。
 5. **成本与模型版本入账**:token 行级落库,session/run 汇总 = SQL 视图;账全、看板薄。
