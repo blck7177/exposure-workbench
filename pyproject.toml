@@ -32,9 +32,12 @@ dependencies = [
     "edgartools>=3.0",        # SEC filings + XBRL facts (M2)
     "tavily-python>=0.5",     # external market research (M6)
     "pgvector>=0.3",          # filing_chunks.embedding column type (M5)
-    # 2.0.0 deleted mcp.shared.memory.create_connected_server_and_client_session,
-    # the in-memory transport both agent loops are built on (M10). Everything is
-    # validated against 1.28.x; lifting the cap is a migration, not a bump.
+    # 2.0.0 deleted mcp.shared.memory.create_connected_server_and_client_session.
+    # It stopped being the agent transport in R4 — the loops reach the resident
+    # face over HTTP now, on an API 2.0 still has — and survives only as the
+    # fixture the offline mount tests build a server with. So the cap guards the
+    # test suite rather than the product, and lifting it is a migration those
+    # tests have to be rewritten for, not a bump.
     "mcp>=1.28,<2",
     # ─── Multi-user (V2-A) ────────────────────────────────────────────────────
     "pyjwt[crypto]>=2.8",     # verify Clerk RS256 session JWTs against JWKS

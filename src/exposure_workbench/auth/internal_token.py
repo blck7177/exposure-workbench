@@ -166,8 +166,14 @@ def verify(token: str, *, expected_face: str) -> InternalClaims:
     if face != expected_face:
         raise InternalAuthError(f"face_mismatch:token={face}")
 
+    # .strip(), matching mint's _text: the two halves of this module have to
+    # agree on what an identifier is, or a hand-made token carries a mid of
+    # spaces all the way to trace_service.record_step, where it becomes a
+    # message_id that resolves to nothing and a step nobody can attribute.
+    # Unreachable from this repo's callers — only mint produces tokens — which
+    # is exactly why the asymmetry would have survived unnoticed.
     mid = claims.get("mid")
-    if mid is not None and (not isinstance(mid, str) or not mid):
+    if mid is not None and (not isinstance(mid, str) or not mid.strip()):
         raise InternalAuthError("bad_mid")
 
     # mint() always writes deny, so a signed token without it was produced by
