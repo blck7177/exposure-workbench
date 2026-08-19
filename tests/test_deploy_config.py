@@ -131,3 +131,37 @@ def test_a_one_time_backfill_cannot_undo_a_deliberate_zero():
     assert sweeps, "expected the tool_budget backfill to still be present"
     for stmt in sweeps:
         assert "started_at" in stmt, f"unbounded one-time backfill: {stmt}"
+
+
+def test_the_tool_face_is_never_published_beyond_loopback():
+    """R3/N6. exposure-mcp is the whole tool surface — every registry tool and
+    the database behind them — with one HS256 bearer in front of it.
+
+    A host port exists deliberately (the live parity guard runs from the host
+    and cannot assert anything about a face it cannot reach), and 127.0.0.1 is
+    the entire mitigation: Docker publishes a 0.0.0.0 bind straight past ufw, so
+    a bare "8104:8000" here would put the agent tool face on the public internet
+    the way a bare "5433:5432" once put Postgres there. Same trap, larger blast
+    radius — this one accepts a bearer rather than a password, and mints
+    evidence rows under whatever tenant that bearer names.
+    """
+    compose = COMPOSE.read_text()
+    block = compose.split("exposure-mcp:", 1)[1].split("\n  exposure-", 1)[0]
+    published = re.findall(r'-\s*"([^"]+):8000"', block)
+    assert published, "exposure-mcp publishes no port; the live suite cannot reach the face"
+    for spec in published:
+        assert spec.startswith("127.0.0.1:"), (
+            f"exposure-mcp published on {spec!r}: the tool face must bind loopback only"
+        )
+
+
+def test_the_loops_are_told_where_the_face_is_and_how_to_sign_for_it():
+    """A missing MCP_URL sends the api at a default that resolves to nothing;
+    a missing MCP_INTERNAL_SECRET makes it mint tokens the face refuses. Both
+    are startup-silent and first show up as every tool call failing, so they are
+    read out of the compose file instead."""
+    compose = COMPOSE.read_text()
+    for service in ("exposure-api:", "exposure-worker:"):
+        block = compose.split(service, 1)[1].split("\n  exposure-", 1)[0]
+        assert "MCP_URL" in block, f"{service} is not told where the tool face is"
+        assert "MCP_INTERNAL_SECRET" in block, f"{service} cannot sign for the tool face"

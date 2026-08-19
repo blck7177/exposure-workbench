@@ -27,6 +27,7 @@ load_dotenv(ROOT / ".env")
 
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_ctx
+from exposure_workbench.auth import internal_token
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.services import exposure_run_service, research_run_service, task_service
 from exposure_workbench.services.task_service import claim_next_task, complete_task, fail_task
@@ -216,6 +217,11 @@ async def reap_stale_leases() -> None:
 
 async def run_worker() -> None:
     settings = get_settings()
+    # Same reasoning as the api's lifespan check (R5): a research run mints an
+    # internal bearer, so no key means no run — and without this the discovery
+    # happens on the first task, after its quota is spent, with the run marked
+    # failed for a reason that has nothing to do with the issuer.
+    internal_token.require_secret()
     poll_interval = settings.worker_poll_interval
     logger.info(f"Worker started — polling every {poll_interval}s")
 

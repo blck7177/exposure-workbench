@@ -12,6 +12,7 @@ import pytest
 
 from exposure_workbench.agents import meta_agent
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
+from exposure_workbench.tools import faces
 
 
 class _FakeResult:
@@ -41,8 +42,15 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None):
     These tests are about what the loop does with a tool RESULT — publishing an
     ungated answer, marking an exhausted gate — so the tools themselves are the
     part to hold still. The seam moved out one layer when the loop stopped
-    calling invoke() directly and started calling a client (MCP_PLAN P3); it is
-    still one substitution, and it is still the whole tool face.
+    calling invoke() directly and started calling a client (MCP_PLAN P3), and
+    out again at R4, when that client became a connection to another process
+    carrying a minted identity. It is still one substitution, and it is still
+    the whole tool face.
+
+    Every test in this file stands one in now, including the ones whose model
+    never calls a tool: the loop opens the session before its first turn, so
+    without this they would mint a token and reach for a container. That is not
+    an inconvenience to work around — it is R4's point arriving in the tests.
     """
     from contextlib import asynccontextmanager
 
@@ -74,6 +82,7 @@ async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(
         return ("NVDA revenue was $999.9B and margins are expanding.", None, {})
 
     monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     out = await handle_message(_factory(store), "sess_1", "how did NVDA do?", max_turns=1)
 
@@ -110,6 +119,7 @@ async def test_the_failure_is_persisted_and_marked_not_swallowed(monkeypatch):
         return ("whatever", None, {})
 
     monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     await handle_message(_factory(store), "sess_3", "hello?", max_turns=1)
 
@@ -146,6 +156,11 @@ async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
         return ("whatever", None, {})
 
     monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    # The real face, because the count is the thing under test and an empty tool
+    # list would pass the assertion below for the wrong reason — by being small
+    # enough to fail it. This is the list the mount serves for FACE_META_AGENT.
+    _stub_tools(monkeypatch, {"noted": True},
+                tools=meta_agent.build_meta_registry().schemas(faces.FACE_META_AGENT))
     store: list = []
     out = await handle_message(_factory(store), "sess_5", "hello?", max_turns=1)
 

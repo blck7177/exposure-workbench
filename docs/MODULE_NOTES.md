@@ -401,7 +401,7 @@ Brief 的 LLM 后处理/改写规则、多轮人工审批流、brief 版本 diff
 ### ToolRegistry:一份定义,四个消费者,两层强制
 
 - 工具五元组:`{name, json_schema, fn, class: read|delegation|reflection, budget_key}`,注册一次
-- 消费者:meta-agent / 分析 subagent(两者经 in-memory MCP client,★2026-08-03)/ workflow recipe(fn 直调);~~MCP 外部宿主~~ 已封存
+- 消费者:meta-agent / 分析 subagent(两者经 MCP client 连常驻 exposure-mcp,★2026-08-03 起走 MCP,★MCP_PLAN R4 起走 HTTP)/ workflow recipe(fn 直调);~~MCP 外部宿主~~ 已封存
 - **Registry wrapper 自动做三件事**:入参语义校验、预算记账(调用前扣减,超顶结构化拒绝)、轨迹落盘(agent_steps,evidence_refs 从返回值 id 字段自动抽取,不靠工具作者手动报)
 
 ### 工具面(face)是声明式配置
@@ -415,6 +415,8 @@ FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM,无预算,只留台账)
 ```
 
 skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审计一眼看全。任何消费者拿 face 同款——同权、同预算、同轨迹,无特权通道(★2026-08-03 起消费者 = 内部两个 agent;这句话对未来任何新消费者依然成立)。
+
+★ MCP_PLAN R1/R4:face 现在还有一个**名字**(`FACE_NAME_META="meta"` / `FACE_NAME_RESEARCH="research"`),因为它同时是挂载点路径、token 的 `face` claim 和构造 server 的名字——三处拼同一个字面量,拼错时报的会是签名不符,查起来指向错的方向。裁剪也换了地方:发起方不再自己裁 face(那意味着两处裁同一个面),而是在 token 里带一张 `deny` 名单,挂载点服务的是**自己的面减去 deny**,只削不加。`skip_external_research` 因此仍是"能力不存在",只是不存在这件事由门口决定。
 
 ### Meta-Agent:循环极薄,行为由 face + 门塑造
 
@@ -432,12 +434,21 @@ skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审
 
 > **Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 
-- 凡 **LLM 生成**的工具调用一律走 MCP——**meta-agent 与分析 subagent 均以 in-memory MCP client 连入**(每 chat turn / 每 research run 建一对 client-server,face registry、session、message_id、租户身份在建对时绑定;不挂任何 HTTP 端点,不加容器;会话预算状态在 DB,跨进程一致)
+- 凡 **LLM 生成**的工具调用一律走 MCP——**meta-agent 与分析 subagent 均以 MCP client 连入常驻的 `exposure-mcp`**(streamable HTTP + `stateless=True`,仅 compose 内网 + 宿主 loopback(127.0.0.1,live 套件用);每 chat turn / 每 research run 铸一枚内部 bearer,不再建 client-server 对;会话预算状态在 DB,跨进程一致——这条是常驻化零成本的前提,预算从来不在进程里)
 - 凡**确定性代码**的调用(recipe/wrapper)直调 fn——代码无"生成调用"动作,不存在需生成时堵的错误类别,MCP 徒增序列化开销
 - 与 sm-master 分裂的本质区别:那是"两条 **agent** 通路、两套强制";这是"一条 agent 通路 + 一条代码通路、**一套强制**"(wrapper 是两轨共同关口)
 - 内部走 MCP 买到:工具面的定义与消费解耦(大脑可换是构造不是声称)、门面因日常流量不烂、审计口径唯一
 - ★ 2026-08-03 拍板(取代 MCP_BOUNDARY_PLAN v1,该文件已删,内容在 git 历史):**本项目没有外部宿主消费者**——OpenClaw/Claude Code 不是本系统的大脑,此前"与外部宿主同一 server 同一接口"从目标降为架构副产品。HTTP 传输 / OAuth 边界 / staging 验收(旧计划 B1/B2/B5)整体封存,唤醒条件 = 出现真实远程消费或第三方产品目标;**公网部署与 MCP 自此解耦**。stdio 入口定位为 local-dev debug 门(env 显式身份,fail loud,非目标路径)。执行方案见 `docs/MCP_PLAN.md`
 - **M12(MCP Facade)作为独立模块取消**,并入本节
+
+### ★ 已定:server 按挂载点构造,身份逐请求(MCP_PLAN R1–R4,2026-08-08 落地)
+
+- **server 是构造出来的,现在按 MOUNT 构造、按 REQUEST 认身份**:`build_mcp_server(registry, face, *, db_factory, face_name)`。in-memory 阶段每 turn 现造一个,身份是构造参数,所以"弄错租户"在物理上不可能;常驻把这条换掉了——一个活过所有 turn 的 server 服务这张桌子的所有租户,user/session/message 就不可能是它的属性。它们成了请求的属性:`apps/mcp/middleware.py` 验 bearer 并绑 contextvar,`call_tool` 里那个 P2 就有的显式绑定站原样留着、只换来源,库看到的仍是同一个 GUC。这是常驻的**真实价格**(构造时绑定 → 中间件必须正确),用"唯一解 token 处 + 负例矩阵 + 双租户并发实测"三层补偿
+- **两个 face 两个挂载点,一个进程**:`/mcp/meta`(20 工具)与 `/mcp/research`(14 工具)各自 registry、各自 server 对象、各自门。拒绝"单端点 + token 选 face",那是 `available()` 静默裁剪换个签名回来
+- **工具执行搬进 mcp 容器**(N10):tools fn、它们的库连接与 provider 凭证都在门后;**LLM completion 没有搬**,仍在 api / worker 的 loop 里,门后只有工具自己发起的检索 embedding
+- **agents 层剩下什么**:一个 face 名和一枚铸出的 token。没有 registry、没有 db_factory、没有 server —— 这句话是"工具面是一个容器"的具体形状
+- **传输故障不穿工具错误的衣服**:工具拒绝仍是结构化返回、loop 照常继续;连不上或 401 则在 `async with tool_session(...)` 处抛出,不喂给模型。一个 401 不是"某个工具失败了",是这一轮丢了身份,而它没有第二个身份可试
+- **B1 以内部形态唤醒,B2/B5 仍封存**(MCP_PLAN N12):上一节"HTTP 传输 / OAuth 边界整体封存"里的 HTTP 半句自此作废——HTTP 已经在内网落地。但内部 bearer 不是对外边界:两端都是本仓库、同批部署、共享密钥,token 不向任何上游转发,B2 的唤醒条件一字未变
 
 ---
 

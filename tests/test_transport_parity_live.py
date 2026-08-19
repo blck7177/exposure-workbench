@@ -1,6 +1,19 @@
-"""P3 — the transport does not change what is recorded (live).
+"""P3/R5 — the transport does not change what is recorded (live).
 
 Run with:  pytest -m live -k transport_parity
+
+Route 2 is a real request to the resident face now (R4), so this file needs the
+stack up. Two things have to be true of it and neither is checkable from here:
+exposure-mcp must be reachable at MCP_URL_LOCAL — the loopback port compose
+publishes for exactly this, since the service name only resolves inside the
+network — and this suite's DATABASE_URL_LOCAL must be the same database that
+container writes to, or the two routes are compared across two ledgers. Both
+sides sign with the MCP_INTERNAL_SECRET in .env.
+
+That is also why the sessions below are owned by a real user where they used to
+be ownerless: the face runs its work under app_rls, and a session with no tenant
+is a session whose rows RLS will not let it write. Residency made "whose turn is
+this" load-bearing at a point where the in-memory pair let it stay None.
 
 The agents reach their tools through an MCP client now. The claim that makes
 that safe is that enforcement never lived in the transport: budget, argument
@@ -41,8 +54,26 @@ URL = os.getenv("DATABASE_URL_LOCAL",
 # rolbypassrls and its assertions cannot fail.
 APP_URL = os.getenv("DATABASE_URL_LOCAL_APP",
                     "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
+# Every session these tests open belongs to somebody: see the module docstring.
+PARITY_USER = os.getenv("PARITY_USER_ID", "user_demo_system")
+# The face, from the host. The agents inside compose reach it by service name,
+# which resolves nowhere out here; this is the loopback port the mcp service
+# publishes so that this guard can exist at all.
+MCP_URL_LOCAL = os.getenv("MCP_URL_LOCAL", "http://127.0.0.1:8104")
 
-registry_for_tenants = build_meta_registry()
+
+@pytest.fixture(autouse=True)
+def the_face_on_the_host(monkeypatch):
+    """Point tool_session at the published port, and nothing else.
+
+    On the settings object rather than the environment, because settings are
+    read once per process: an os.environ write here would take effect or not
+    depending on which test module imported them first.
+    """
+    from exposure_workbench.app_state.settings import get_settings
+
+    monkeypatch.setattr(get_settings(), "mcp_url", MCP_URL_LOCAL)
+
 
 # The fields a consumer of the audit trail reads. id, session_id, seq and
 # duration_ms are excluded on purpose: the first three are per-row identity and
@@ -96,8 +127,8 @@ async def test_both_routes_record_the_same_step(tool_name, args, what):
     registry = build_meta_registry()
     try:
         async with mk() as db:
-            direct = await sess.create_session(db, kind="meta")
-            through = await sess.create_session(db, kind="meta")
+            direct = await sess.create_session(db, kind="meta", owner_id=PARITY_USER)
+            through = await sess.create_session(db, kind="meta", owner_id=PARITY_USER)
             await db.commit()
             direct_id, through_id = direct.id, through.id
 
@@ -106,9 +137,10 @@ async def test_both_routes_record_the_same_step(tool_name, args, what):
             direct_result = await R.invoke(registry, db, direct_id, tool_name, args)
             await db.commit()
 
-        # route 2 — the same wrapper, reached over the transport
-        async with tool_session(registry, faces.FACE_META_AGENT, db_factory=mk,
-                                session_id=through_id) as tools:
+        # route 2 — the same wrapper, reached over the resident face: a real
+        # request, a real bearer, a different process, a different DB role.
+        async with tool_session(faces.FACE_NAME_META, session_id=through_id,
+                                user_id=PARITY_USER) as tools:
             through_result = await tools.call(tool_name, args)
 
         assert _normalise(direct_result) == _normalise(through_result), \
@@ -130,16 +162,15 @@ async def test_the_budget_is_spent_the_same_way_through_the_transport():
     All three are decisions invoke() makes, and none of them should become a
     decision the transport makes."""
     engine, mk = await _mk()
-    registry = build_meta_registry()
     session_id = None
     try:
         async with mk() as db:
-            s = await sess.create_session(db, kind="meta")
+            s = await sess.create_session(db, kind="meta", owner_id=PARITY_USER)
             await db.commit()
             session_id = s.id
 
-        async with tool_session(registry, faces.FACE_META_AGENT, db_factory=mk,
-                                session_id=session_id) as tools:
+        async with tool_session(faces.FACE_NAME_META, session_id=session_id,
+                                user_id=PARITY_USER) as tools:
             await tools.call("get_issuer_snapshot", {"ticker": "NVDA"})      # +1
             await tools.call("think", {"thought": "free"})                   # +0
             await tools.call("get_fact_series", {"ticker": "NVDA"})          # +0, refused
@@ -162,16 +193,19 @@ async def test_the_face_the_loop_is_given_is_the_face_it_can_call():
     at all. Face trimming is how skip-flags work, so this is the property that
     makes 'the capability does not exist for this session' true."""
     engine, mk = await _mk()
-    registry = build_meta_registry()
     session_id = None
     try:
         async with mk() as db:
-            s = await sess.create_session(db, kind="meta")
+            s = await sess.create_session(db, kind="meta", owner_id=PARITY_USER)
             await db.commit()
             session_id = s.id
 
-        async with tool_session(registry, faces.READ_CORE, db_factory=mk,
-                                session_id=session_id) as tools:
+        # A face is the mount's now, and a client narrows it with deny rather
+        # than by naming a different list — which is the same property from the
+        # other side: what the token removes is not there to be called.
+        async with tool_session(faces.FACE_NAME_META, session_id=session_id,
+                                user_id=PARITY_USER,
+                                deny=("start_issuer_research",)) as tools:
             names = {t["function"]["name"] for t in tools.tools}
             assert "start_issuer_research" not in names
             out = await tools.call("start_issuer_research", {"ticker": "NVDA", "reason": "x"})
@@ -199,8 +233,12 @@ async def test_two_tenants_calling_at_once_do_not_see_each_other():
     The tenant is a contextvar, and a handler runs in whatever task the
     transport schedules it in — so an identity that happened to be inherited
     from the calling context would be a tenant mechanism that depends on how a
-    library schedules work. The server sets it per call instead, from the value
-    fixed when the pair was built.
+    library schedules work. R4 raised the stakes rather than settling them: the
+    server outlives every turn now and serves both tenants below from the same
+    process, so the binding is not "fixed when the pair was built" any more. It
+    is the bearer each request carries, verified at the door and bound there.
+    What this test proves is therefore no longer a property of construction but
+    of the door, which is the one thing residency bought at a price.
 
     Two things this test has to get right, both of which it got wrong first:
 
@@ -260,13 +298,13 @@ async def test_two_tenants_calling_at_once_do_not_see_each_other():
         assert guc == a, f"the tenant listener is not applying: {guc!r}"
 
         async def read_as(uid):
-            async with tool_session(registry_for_tenants, faces.FACE_META_AGENT,
-                                    db_factory=app_mk, session_id=sessions[uid],
+            async with tool_session(faces.FACE_NAME_META, session_id=sessions[uid],
                                     user_id=uid) as tools:
                 return await tools.call("get_portfolio_snapshot", {})
 
-        # Deliberately a THIRD value: if anything is inherited rather than bound,
-        # both calls come back as this one.
+        # Deliberately a THIRD value, and now it lives in a DIFFERENT PROCESS
+        # from the one that answers: if either side inherited a tenant instead
+        # of reading the token, both calls come back as this one.
         current_user_ctx.set("user_neither_of_them")
         for_a, for_b = await asyncio.gather(read_as(a), read_as(b))
 

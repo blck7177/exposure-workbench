@@ -6,8 +6,9 @@
   3. finalize            — materialize the evidence trail, mark the run
 
 The agent session is deliberately NOT idempotent — each run is a fresh judgment
-and a fresh brief. skip flags trim the session's face (capability removed), never
-an in-loop branch.
+and a fresh brief. skip flags remove capability from the session's face, never
+an in-loop branch; since R4 the removal is stated once, to the mount, as a deny
+list.
 """
 
 from __future__ import annotations
@@ -24,7 +25,6 @@ from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import company_service
 from exposure_workbench.services import evidence_trail_service as trail
 from exposure_workbench.services import research_run_service
-from exposure_workbench.tools import faces
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.research_tools import register_research_tools
 from exposure_workbench.workflow.readiness_workflow import run_readiness
@@ -77,15 +77,18 @@ async def run_issuer_research(
         await db.commit()
         session_id = agent_session.id
 
-    registry = build_research_registry()
-    face = list(faces.FACE_RESEARCH)
-    if skip_external_research:
-        face = [t for t in face if t != "search_external_research"]
+    # skip flags remove capability rather than branch inside a tool. The face
+    # belongs to the mount now, so the removal travels there in the token as a
+    # deny list (R4/N7): what is served is FACE_RESEARCH minus deny, and a run
+    # started with skip_external_research meets a face where the tool is
+    # physically absent. Nothing is trimmed on this side as well — two places
+    # narrowing one face is the error class the move deletes.
+    deny = ("search_external_research",) if skip_external_research else ()
 
     async with db_factory() as db:
         async with step(db, run_id, "agent_session",
                         f"Research agent analysing {ticker}"):
-            result = await run_research_session(db_factory, session_id, ticker, registry, face=face)
+            result = await run_research_session(session_id, ticker, deny=deny)
             if not result["submitted"]:
                 raise RuntimeError(
                     f"research agent did not submit a brief within budget "

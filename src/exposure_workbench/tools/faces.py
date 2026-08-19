@@ -55,6 +55,15 @@ FACE_META_AGENT = READ_CORE + META_ONLY_READS + [
 ]
 FACE_RESEARCH = READ_CORE + ["search_external_research", "submit_brief"]
 
+# What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
+# at /mcp/<name> and every token carries the name it was minted for, so the same
+# string is spelled by the mount, by the minting caller and by the verifier. Three
+# literals would let a token minted for "research" be spent on a mount that calls
+# itself "research_face" — verify() would reject it, correctly, and the operator
+# would go looking for a signature problem.
+FACE_NAME_META = "meta"
+FACE_NAME_RESEARCH = "research"
+
 
 class FaceNotRegistered(RuntimeError):
     """A face names a tool its registry does not register."""

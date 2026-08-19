@@ -28,6 +28,24 @@ class Settings(BaseSettings):
     clerk_issuer: str = ""                 # e.g. https://xxxx.clerk.accounts.dev
     clerk_authorized_parties: str = ""     # comma-sep origins allowed as azp, e.g. http://localhost:3103
 
+    # The resident tool server (MCP_PLAN R1/R3). Compose-internal name: the
+    # exposure-mcp service publishes no host port, so this resolves inside the
+    # network and nowhere else.
+    mcp_url: str = "http://exposure-mcp:8000"
+    # HS256 secret for the internal bearer (N7), shared by api, worker and
+    # exposure-mcp. Empty is not a development mode: auth/internal_token.py
+    # refuses to mint or verify without it, because an unsigned internal bearer
+    # is not a degraded tool face, it is an open one.
+    mcp_internal_secret: str = ""
+    # A token must outlive the longest legal run and not much more, which is the
+    # same interval task_lease_seconds already picks. Shorter, and a research run
+    # still inside its lease loses its tool face mid-flight — every remaining
+    # call 401s and the loop has no way to re-mint, since the token was minted
+    # once per run by the worker. Longer, and a run whose lease has already been
+    # handed to somebody else still holds a working tool face. R5 pins
+    # mcp_token_ttl_seconds >= task_lease_seconds with a test.
+    mcp_token_ttl_seconds: int = 1800
+
     # Agent budgets (env-overridable; see IMPLEMENTATION_PLAN §0.5)
     session_tool_budget: int = 40       # tool calls per SESSION (research; and any
                                         # session with no per-turn budget of its own)

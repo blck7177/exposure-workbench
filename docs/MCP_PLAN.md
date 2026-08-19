@@ -1,6 +1,6 @@
 # MCP Plan — agent 面落地与常驻化:agent 经常驻 MCP server 消费工具面
 
-> **状态(2026-08-08)**:v2(P1–P5,in-memory 形态)**已完成并在运行栈实测**(§7);v3(R1–R6,常驻化)**方案已拍板,待执行**。测试 577 offline / 116 live 全绿。遗留:mcp 2.0 迁移(§7 P5 行;R4 完成后其最大障碍消失,建议紧随补做)。
+> **状态(2026-08-19)**:v2(P1–P5,in-memory 形态)已完成并在运行栈实测(§7);v3 的 **R1–R4 已落地**(2026-08-08:内部身份件 / 构造器拆分 + 常驻 app / infra / 消费者迁移)——生产路径上已无 in-memory transport,两个 loop 都经内部 bearer 连常驻 `exposure-mcp`。**R5(守卫与回归)与 R6(文档)本批同步**;逐阶段 commit 与实测计数见 §8(待填)。遗留见 §8 尾;mcp 2.0 迁移(§7 P5 行)的最大障碍已随 R4 消失,只剩测试 fixture 一处。
 > **版本**:v3(2026-08-08)。取代 v2 的 N3/N5 两条决策(v2 全文在 git 历史;其阶段成果 P1–P5 与实测记录 §7 保留,是 v3 的地基而非弃案)。
 > **性质**:执行方案。目标 = 在 v2 已建立的「Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper」之上,把 MCP server 从**每 turn/run 现造**改为**常驻独立进程**,身份从**构造时绑定**改为**逐请求认证**。
 > **一句话**:一个常驻 exposure-mcp 容器装着工具面(tools+DB 在门后);api 的 meta-agent 与 worker 的 research subagent 作为 client,持内部 JWT 逐请求连入;LLM 调用仍在 loop 里,不进 MCP。
@@ -13,7 +13,7 @@
 
 | # | 决策 | 内容 |
 |---|---|---|
-| **N6** | MCP server **常驻独立进程**(取代 N3) | 新容器 `exposure-mcp`,streamable HTTP,`stateless=True`,仅 compose 内网可达,不发布宿主端口。agent 调用任何工具必须向它发请求;agent 的 loop 本身不在 MCP 里 |
+| **N6** | MCP server **常驻独立进程**(取代 N3) | 新容器 `exposure-mcp`,streamable HTTP,`stateless=True`。容器间走 compose 内网;另发布 **127.0.0.1 一个端口**(`MCP_HOST_PORT`,默认 8104)——live parity 守卫从宿主跑,够不到的面钉不住任何东西,而 loopback 绑定与已发布的 Postgres 同姿态(Docker 只有 0.0.0.0 绑定才穿透 ufw)。agent 调用任何工具必须向它发请求;agent 的 loop 本身不在 MCP 里 |
 | **N7** | 身份 = **逐请求内部 JWT,HS256 共享密钥** | 密钥 `MCP_INTERNAL_SECRET`(.env)。claims:`sub`=user_id、`sid`=session_id、`mid`=message_id(可选)、`face`、`exp`。api 每 turn 铸、worker 每 run 铸。中间件是**唯一**解 token 的地方;缺任何 claim / 坏签 / 过期 = 结构化拒绝整个请求;**禁止 token passthrough**(不转发给任何上游) |
 | **N8** | token 有效期 = **30min,与 task lease 对齐** | 同 `TASK_LEASE_SECONDS=1800`:token 活得过最长合法 run,死得比僵尸 run 早。验签留 60s 时钟余量 |
 | **N9** | face 保持**物理**:每 face 一个挂载点 | `/mcp/meta`、`/mcp/research` 各自用 `build_mcp_server` 构造、进程内常驻。**拒绝**"单端点 + token 选 face"——那是 `faces.available()` 静默裁剪的复活形态。token 的 `face` claim 必须与挂载点一致,双保险 |
@@ -102,7 +102,7 @@
 
 ### R3 — infra(~0.5 天)
 
-- `infra/Dockerfile.mcp` + compose service:仅内网(不发布宿主端口),env 按 N10,`./data` 卷,healthcheck(`/mcp/meta` 握手或专用 `/healthz`),`depends_on: postgres healthy`;api/worker `depends_on: exposure-mcp`。
+- `infra/Dockerfile.mcp` + compose service:容器间内网 + 宿主 loopback 端口(R5 的 live 守卫前置;test_deploy_config 钉死 127.0.0.1 绑定),env 按 N10,`./data` 卷,healthcheck(`/mcp/meta` 握手或专用 `/healthz`),`depends_on: postgres healthy`;api/worker `depends_on: exposure-mcp`。
 - 验收:栈起;容器内无 token 调用 = 拒;宿主机 curl 不可达(端口未发布)。
 
 ### R4 — 消费者迁移(~1 天)
@@ -183,3 +183,27 @@ R1–R3 纯新增,任一阶段停下系统不劣于现状;R4 起切流量,R4 完
 **新增守卫(全部经变异测试或真语料确认)**:面严格解析 · schema 诚实性(null/required/additionalProperties/窗口下界,全部由函数签名推导)· 每个注册 schema 是合法 Draft 2020-12 schema · 传输 parity · agents 层不得绕过 transport 直调 `invoke` · 完整单向 import 规则(原先只盖 providers)。
 
 **范围外撞出、未做**:`search_filing_passages.query` 无 `minLength`(空串会走到 embedding);`citations` 元素无前缀 `pattern`(门已按 trail+DB 校验,加 pattern 等于把门的知识复制到第二处);`issuer_briefs` 成本三列为化石列、agent 路径 LLM 开销全系统无账(2026-08-08 发现,修法 A/B 待拍板,与本计划正交)。均记录于此,不静默。
+
+---
+
+## 8. R 阶段落地记录(commit 与实测待填)
+
+> 「落地」列是 2026-08-19 对源码的实读结果,不是计划复述;commit 与实测两列由 boss 填。
+
+| 阶段 | commit | 落地(实读) | 实测记录 |
+|---|---|---|---|
+| R1 | | `auth/internal_token.py`:`mint()`/`verify(token, *, expected_face)`,HS256,claims `sub`/`sid`/`mid`/`face`/`deny`/`iat`/`exp`,ttl 1800s,验签 60s leeway,`require_secret()` 缺密钥即 raise;`apps/mcp/middleware.py`:纯 ASGI `bearer_identity(app, *, expected_face)`(不是 `BaseHTTPMiddleware`,否则 contextvar 落在别的 task 里);`tools/mcp_request.py`:逐请求 claims contextvar,未绑即 `NoMcpRequestBound`;`faces.FACE_NAME_META/RESEARCH`;settings 增 `mcp_url` / `mcp_internal_secret` / `mcp_token_ttl_seconds` | |
+| R2 | | `build_mcp_server(registry, face, *, db_factory, face_name)`——`session_id`/`user_id`/`message_id` 三参删除,handler 改读 claims;`_served(deny)` 一处算 scoped registry,list_tools 与 call_tool 同读它;server 名为 `exposure-workbench-<face>`。新增 `apps/mcp/http.py`:`MOUNTS` 表、每挂载点一个 `StreamableHTTPSessionManager(stateless=True)`、`AsyncExitStack` lifespan、免凭证 `GET /healthz`、`Route`(不是 `Mount`,避免 `/mcp/meta` 307 到带斜杠)。stdio 门改绑 `InternalClaims`,不铸 token | |
+| R3 | | `infra/Dockerfile.mcp`(CMD = `uvicorn apps.mcp.http:app`)+ compose service `exposure-mcp`:**无 `ports`**、env 按 N10、`./data` 与 `./configs` 卷、healthcheck 用 `python -c urlopen /healthz`、`depends_on: postgres healthy`;api 与 worker 加 `MCP_URL`/`MCP_INTERNAL_SECRET` 并 `depends_on: exposure-mcp healthy`;`.env.example` 增 MCP 段 | |
+| R4 | | `tool_session(face_name, *, session_id, user_id, message_id=None, deny=())`:铸 token → `httpx.AsyncClient(Authorization: Bearer)` → `streamable_http_client(f"{mcp_url}/mcp/{face_name}")` → `ClientSession`;`create_connected_server_and_client_session` 与 `build_mcp_server` 在 agents 层不再出现。`handle_message` 去掉 `registry` 参数;`run_research_session(session_id, ticker, deny=(), max_turns=30)` 去掉 `db_factory`/`registry`/`face`;`issuer_research_workflow` 的 skip flag 由裁 face 改为 `deny=("search_external_research",)`,本地裁剪那三行删除 | |
+| R5 | | | |
+| R6 | | `TARGET_ARCHITECTURE.md` §2 总图重画 + §3 目录 + §8 双轨规则 + §9.2;`MODULE_NOTES.md` M10;`README.md` MCP 段与 stdio 行;本文件状态行与本表 | |
+
+**执行中记录下来的事(不静默)**:
+
+1. **R4 用的传输函数是 `streamable_http_client`,不是 §3 R4 行写的 `streamablehttp_client`**。后者在装机版本(mcp 1.28.1)已 deprecated,每次调用发一条 DeprecationWarning,并在 mcp 2.0 里被删除;前者在 `>=1.28,<2` 整段区间与 2.0 里都存在。代价是 header 挂在本模块自建的 `httpx.AsyncClient` 上(因此有了 `_TIMEOUT` 常量)。结果是**生产路径已经在 2.0 的 API 上**,§7 P5 那条遗留只剩测试 fixture 挡路。
+2. **§4 的错误契约缓解需要更正**。`tool_session.call` 的结构化返回覆盖"服务端答复的一切"(未知工具、拒绝的参数、炸掉的 handler),**不覆盖传输本身**:401 或连不上会掐掉流的 task group,`call()` 里那个 await 收到的是 `CancelledError`,真因以 `ExceptionGroup` 出现在 `async with tool_session(...)` 处(R4 实测,非推断)。所以 mcp 容器挂掉时 loop 是**炸**而不是降级,且这个异常当前会经 `apps/api/routes/agent.py` 变成浏览器看到的 500。要不要一个可读的失败面、放在哪(两个 loop 的 `async with` 处收一个窄口,而不是把 `call()` 的 except 放宽),是待拍板件。
+3. **`build_meta_registry()` 生产路径已无调用者**(它在 `agents/meta_agent.py`,现在只剩测试引用),meta face 的 registry 因此在两处拼写——`apps/mcp/http.py` 内联的是 `register_meta_tools(build_read_registry())`。不能让 http.py 直接 import 它:那会把 `llm/client.py` 拖进工具容器,与 N10 冲突。搬到 tools 层还是连测试一起删,待拍板。
+4. `pyproject.toml` 里 `mcp>=1.28,<2` 的注释仍称 in-memory helper 是"两个 agent loop 的传输";R4 之后它只是测试 fixture,注释该改。
+5. ~~**"空 `MCP_INTERNAL_SECRET` 三个容器都起不来"只对 mcp 容器成立**~~ → **已收口**:api 的 lifespan 与 worker 的 `run_worker()` 各加一次 `require_secret()`,文档措辞因此成真。放启动期而非第一次 `mint()`,是因为后者发生在配额已扣已提交之后,用户拿到的是 500 而部署看起来健康;放 lifespan 而非 import 期,是因为 offline 套件会 import api app,不该为工具面的密钥而收集失败。
+6. **§3/§6 的"R1–R3 纯新增不切流量"对 R2 不字面成立**:R2 改了构造器签名,`tool_session` 在 R2 落地到 R4 落地之间是坏的。两阶段同批落所以没有真实窗口,但下次拆阶段时,改签名的那一阶段和迁调用方的那一阶段必须绑在一起。

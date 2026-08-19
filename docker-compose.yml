@@ -20,6 +20,66 @@ services:
       timeout: 5s
       retries: 10
 
+  exposure-mcp:
+    # MCP_PLAN R3. The agent tool face, resident: /mcp/meta and /mcp/research,
+    # streamable HTTP, stateless. Tool execution lives here (N10), so this
+    # container needs the providers and the database the tools reach.
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.mcp
+    container_name: exposure-mcp
+    restart: unless-stopped
+    ports:
+      # Loopback only, and for one reason: the live suite runs from the host and
+      # the parity guard — a direct invoke() and the same call over HTTP record
+      # the same row — is not a guard if it cannot reach this face. The posture
+      # is the one Postgres already has two services up: bound to 127.0.0.1 so
+      # Docker cannot publish it past ufw, and behind a credential (there, the
+      # role password; here, an HS256 bearer signed with MCP_INTERNAL_SECRET).
+      # Anything wider would put the whole tool surface on a public interface.
+      - "127.0.0.1:${MCP_HOST_PORT:-8104}:8000"
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://exposure:exposure@postgres:5432/exposure_workbench"
+      DATABASE_URL_APP: "${DATABASE_URL_APP:-postgresql+asyncpg://app_rls:app_rls_pw@postgres:5432/exposure_workbench}"
+      # Retrieval embeds inside the tools; completion does not happen here at
+      # all — the LLM call stays in the api and worker loops.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-5.4-mini}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
+      EDGAR_IDENTITY: "${EDGAR_IDENTITY:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      # N7. The one key the middleware verifies bearers with. Empty is refused
+      # at startup: an unverified tool face is worse than a dead one.
+      MCP_INTERNAL_SECRET: "${MCP_INTERNAL_SECRET:-}"
+      # The delegation tools charge quota through task_service, which now runs
+      # in this container. These pools must be the same numbers as in the api
+      # or the two disagree about the same user's day.
+      DAILY_CHAT_TURNS: "${DAILY_CHAT_TURNS:-10}"
+      DAILY_RESEARCH_RUNS: "${DAILY_RESEARCH_RUNS:-3}"
+      DAILY_READINESS: "${DAILY_READINESS:-10}"
+      DAILY_EXPOSURE_RUNS: "${DAILY_EXPOSURE_RUNS:-20}"
+      DAILY_MARKET_SYNCS: "${DAILY_MARKET_SYNCS:-10}"
+      GLOBAL_DAILY_CHAT_TURNS: "${GLOBAL_DAILY_CHAT_TURNS:-200}"
+      GLOBAL_DAILY_RESEARCH_RUNS: "${GLOBAL_DAILY_RESEARCH_RUNS:-30}"
+      GLOBAL_DAILY_READINESS: "${GLOBAL_DAILY_READINESS:-100}"
+      GLOBAL_DAILY_EXPOSURE_RUNS: "${GLOBAL_DAILY_EXPOSURE_RUNS:-200}"
+      GLOBAL_DAILY_MARKET_SYNCS: "${GLOBAL_DAILY_MARKET_SYNCS:-50}"
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+    healthcheck:
+      # A python-slim image has neither curl nor wget, and installing one to
+      # run a probe is a package the runtime never uses otherwise. /healthz is
+      # unauthenticated by design; urlopen raises on anything but 2xx.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   exposure-api:
     build:
       context: .
@@ -42,6 +102,11 @@ services:
       REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
       DEMO_MODE: "${DEMO_MODE:-true}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      # MCP_PLAN R3/N7. The meta-agent mints a bearer per turn from this secret
+      # and reaches the tool face over the compose network. An empty secret is
+      # a startup failure, not a request sent unsigned.
+      MCP_URL: "${MCP_URL:-http://exposure-mcp:8000}"
+      MCP_INTERNAL_SECRET: "${MCP_INTERNAL_SECRET:-}"
       # Same-origin production needs no entry here at all; these are the dev origins.
       CORS_ORIGINS: "${CORS_ORIGINS-http://localhost:${WEB_HOST_PORT:-3103},http://127.0.0.1:${WEB_HOST_PORT:-3103}}"
       CLERK_ISSUER: "${CLERK_ISSUER:-}"
@@ -67,6 +132,8 @@ services:
       - ./data:/app/data
     depends_on:
       postgres:
+        condition: service_healthy
+      exposure-mcp:
         condition: service_healthy
 
   exposure-worker:
@@ -94,11 +161,18 @@ services:
       TASK_LEASE_SECONDS: "${TASK_LEASE_SECONDS:-1800}"
       TASK_MAX_RETRIES: "${TASK_MAX_RETRIES:-3}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      # MCP_PLAN R3/N7. The research subagent mints a bearer per run from this
+      # secret, whose 30-minute ttl is TASK_LEASE_SECONDS above. An empty
+      # secret is a startup failure, not a request sent unsigned.
+      MCP_URL: "${MCP_URL:-http://exposure-mcp:8000}"
+      MCP_INTERNAL_SECRET: "${MCP_INTERNAL_SECRET:-}"
     volumes:
       - ./data:/app/data
       - ./configs:/app/configs
     depends_on:
       postgres:
+        condition: service_healthy
+      exposure-mcp:
         condition: service_healthy
 
   exposure-web:

@@ -6,22 +6,21 @@ writer — no hand-off — so every number it writes is one it just fetched.
 
 Enforcement is inherited, not re-implemented: every tool call goes through the
 registry wrapper (budget, trace, evidence refs), reached over an MCP client on
-an in-memory transport (MCP_PLAN P4). The loop just relays tool results back to
-the model until submit_brief is accepted or the budget runs out.
+the resident tool face (MCP_PLAN P4, R4). The loop just relays tool results back
+to the model until submit_brief is accepted or the budget runs out.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Sequence
 
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.llm import client as llm_client
-from exposure_workbench.tools import faces, registry as R
+from exposure_workbench.tools import faces
 
 logger = logging.getLogger(__name__)
 
@@ -45,19 +44,23 @@ those ids and resubmit — do not invent ids."""
 
 
 async def run_research_session(
-    db_factory,
     session_id: str,
     ticker: str,
-    registry: R.ToolRegistry,
-    face: list[str] | None = None,
+    deny: Sequence[str] = (),
     max_turns: int = 30,
 ) -> dict:
-    """Drive the loop. db_factory() yields a fresh AsyncSession per tool call so
-    each call commits independently (trace + ledger persist as they happen).
+    """Drive the loop. No registry and no db_factory: the tools and the database
+    they commit into are behind the mount now, one session per tool call there
+    exactly as before, so trace and ledger still persist as they happen.
 
-    `face` is the tool-name subset the agent may use — trimming it (e.g. removing
-    search_external_research) is how skip-flags work: the capability simply does
-    not exist for this session, no in-loop 'if skip' branch."""
+    `deny` is the tool names removed from the research face for this run — how
+    skip-flags work, unchanged in kind and moved in mechanism. The mount serves
+    FACE_RESEARCH minus deny, so dropping search_external_research still means
+    the capability does not exist for this session rather than an in-loop 'if
+    skip' branch. What moved is where the narrowing is said: it travels in the
+    token instead of in a face this side constructs, because the face itself no
+    longer lives here and two places trimming one face is the error class R4
+    removes."""
     settings = get_settings()
     model = settings.openai_model
 
@@ -68,14 +71,15 @@ async def run_research_session(
 
     brief_id: str | None = None
     turn = 0
-    # One pair for the run, where a chat turn gets one per turn: a research
+    # One connection for the run, where a chat turn gets one per turn: a research
     # session IS the unit of work, and its lifetime budget is spent inside it.
-    # The tenant comes from the run's own owner, which the worker set before
-    # calling — a research run outlives no request, so there is nothing
-    # ambient to inherit.
+    # Which also fixes the token's lifetime — minted once here, and N8 sized its
+    # 30 minutes against the task lease for exactly this run. The tenant comes
+    # from the run's own owner, which the worker set before calling; a research
+    # run outlives no request, so there is nothing ambient to inherit.
     async with tool_session(
-        registry, face or faces.FACE_RESEARCH, db_factory=db_factory,
-        session_id=session_id, user_id=current_user_id(),
+        faces.FACE_NAME_RESEARCH, session_id=session_id,
+        user_id=current_user_id(), deny=deny,
     ) as tools_session:
         tools = tools_session.tools
 

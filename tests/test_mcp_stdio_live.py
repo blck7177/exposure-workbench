@@ -11,6 +11,13 @@ gate rather than by the transport.
 
 So these go through a real MCP client session. Nothing here calls invoke()
 directly — the wiring is the thing under test.
+
+create_connected_server_and_client_session is what makes that cheap, and since
+MCP_PLAN R4 this file is the reason it is still installed. It is a TEST FIXTURE
+now, not a transport: the production path is HTTP against the resident mount,
+and test_v2_audit keeps this import out of every shipped module. Here it is the
+right tool, because a stdio door genuinely has no socket — a server object and a
+client speaking to it in memory is what stdio is.
 """
 
 from __future__ import annotations
@@ -142,6 +149,28 @@ async def test_a_call_is_attributed_and_tenant_scoped(two_users):
     await engine.dispose()
 
     assert await _steps(server._session.id) == [("get_portfolio_snapshot", "completed")]
+
+
+async def test_the_door_binds_the_identity_its_handlers_read(two_users):
+    """R2. The constructor no longer takes an identity, so the door states one.
+
+    Same InternalClaims an HTTP request arrives with, bound once at startup
+    because a stdio process is exactly one caller for its whole life — and never
+    reset, because an HTTP request ends and a stdio connection does not. That is
+    what keeps ONE identity mechanism in the system: this door differs from a
+    mount only in where the claims come from, not in what reads them.
+    """
+    from apps.mcp import server
+    from exposure_workbench.tools import faces, mcp_request
+
+    await server.build_stdio_server()
+
+    claims = mcp_request.current()
+    assert (claims.user_id, claims.session_id) == (STDIO_USER, server._session.id)
+    assert claims.face == faces.FACE_NAME_META
+    # A skip flag belongs to a research run; this door opens the whole meta face
+    # by definition, so there is nothing for it to deny.
+    assert claims.deny == ()
 
 
 async def test_a_bad_call_is_refused_by_the_gate_not_the_transport(two_users):

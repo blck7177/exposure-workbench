@@ -18,6 +18,15 @@ no tenant to scope to. MCP_STDIO_USER_ID is required, checked against the users
 table before the first request, and there is no demo fallback: a debug door is
 always opened by somebody.
 
+What it can do is unchanged by MCP_PLAN R2, but how it says who it is is not.
+The constructor no longer takes an identity, so this door binds the same
+InternalClaims the HTTP mounts bind — once, at startup, because a stdio process
+is exactly one caller for its whole life. It mints no token: there is no request
+to authenticate here, and a self-issued one would let the process hand itself an
+identity other than the one it just checked against the users table. So there is
+still exactly one identity mechanism, read from one place, and the door only
+differs in where the claims come from.
+
 Run standalone over stdio:
     MCP_STDIO_USER_ID=user_... python -m apps.mcp.server
 """
@@ -37,10 +46,11 @@ from mcp.server.lowlevel import Server
 from sqlalchemy import select
 
 from exposure_workbench.auth.context import current_user_ctx
+from exposure_workbench.auth.internal_token import InternalClaims
 from exposure_workbench.db.models import User
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.services import agent_session_service as sess
-from exposure_workbench.tools import faces
+from exposure_workbench.tools import faces, mcp_request
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.mcp_server import build_mcp_server
 from exposure_workbench.tools.meta_tools import register_meta_tools
@@ -108,12 +118,24 @@ async def build_stdio_server() -> Server:
     if _session.id is None:
         _session.user_id = stdio_user_id()
         _session.id = await _open(_session.user_id)
+    # The claims the handlers read, stated by the process instead of arriving in
+    # a header, and bound on every build rather than only on the first: whoever
+    # runs the server this returns has to be holding the binding, and that is
+    # not necessarily the task that opened the session. Never reset — an HTTP
+    # request ends and a stdio connection does not, so there is nothing to
+    # unwind and no second caller to unwind it for. deny is empty because a skip
+    # flag belongs to a research run, and this door opens the whole meta face by
+    # definition.
+    mcp_request.bind(InternalClaims(
+        user_id=_session.user_id,
+        session_id=_session.id,
+        face=faces.FACE_NAME_META,
+    ))
     return build_mcp_server(
         register_meta_tools(build_read_registry()),
         faces.FACE_META_AGENT,
         db_factory=get_session_factory(),
-        session_id=_session.id,
-        user_id=_session.user_id,
+        face_name=faces.FACE_NAME_META,
     )
 
 

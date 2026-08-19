@@ -5,13 +5,17 @@ tools' exact JSON schemas are what a client sees and every call goes through the
 same wrapper — argument validation, budget, citation-linked trace — no matter
 who is connected.
 
-The server is BUILT, not imported. apps/mcp/server.py used to be a script: a
-registry chosen at import time, a face computed at import time, one
+The server is BUILT, not imported, and since MCP_PLAN R2 it is built per MOUNT
+while its identity arrives per REQUEST. apps/mcp/server.py used to be a script:
+a registry chosen at import time, a face computed at import time, one
 process-global session, and the identity of whoever was calling nowhere in the
-picture. That shape fits exactly one caller, and there are three — the stdio
-debug door, the meta-agent, and the research session — each with its own
-registry, face, session and tenant. Those are arguments because they differ per
-caller; enforcement is not an argument, because it does not.
+picture. Making it a constructor answered the first half — registry, face and
+db_factory differ per face, so they are arguments. Residency answered the second
+half by taking three arguments away: a server that outlives every turn in it
+serves every tenant this desk has, so user, session and message cannot be
+properties of the object. They are properties of the request, verified once at
+the door (apps/mcp/middleware.py) and read here out of tools/mcp_request.py.
+Enforcement was never an argument and still is not.
 
 This lives in the tool layer rather than under apps/ because the agents connect
 to it. Import direction is one-way (apps -> tools -> services), so a face the
@@ -26,7 +30,7 @@ from mcp import types
 from mcp.server.lowlevel import Server
 
 from exposure_workbench.auth.context import current_user_ctx
-from exposure_workbench.tools import faces, registry as R
+from exposure_workbench.tools import faces, mcp_request, registry as R
 
 SERVER_NAME = "exposure-workbench"
 
@@ -52,41 +56,65 @@ def build_mcp_server(
     face: list[str],
     *,
     db_factory,
-    session_id: str,
-    user_id: str | None = None,
-    message_id: str | None = None,
+    face_name: str,
 ) -> Server:
-    """An MCP server over `face` of `registry`, recording under `session_id`.
+    """An MCP server over `face` of `registry`, serving under the name `face_name`.
 
-    `face` is resolved strictly (P1.1): a face naming a tool the registry does
-    not have raises here rather than serving a quietly smaller surface.
+    `face` is resolved strictly (P1.1) and ONCE, here: a face naming a tool the
+    registry does not have raises at build time rather than serving a quietly
+    smaller surface. Note that the per-request deny list is deliberately NOT
+    resolved this way — see _served().
+
+    `face_name` is what the mount is called ("meta" / "research", from faces.py).
+    Both faces are resident in one process now, so two servers introducing
+    themselves identically at initialize would make a captured handshake, a
+    client log line and a future second replica all unable to say which face
+    answered.
     """
     tool_names = faces.resolve(registry, face)
-    # The face scopes what can be CALLED, not only what is listed. Dispatching
-    # against the whole registry made the face a description of what the model
-    # had been told about: a research session, offered fourteen tools by a
-    # registry holding eighteen, could still call read_issuer_brief — the
-    # meta-only read that faces.py excludes from that face precisely because
-    # citing a previous brief is a loop rather than a source.
-    #
-    # A view rather than a check, so there is no second place that decides what
-    # exists. invoke() answers for a name it does not hold, already, in the same
-    # shape and with the same trace row.
-    scoped = R.ToolRegistry(tools={name: registry.tools[name] for name in tool_names})
-    server = Server(SERVER_NAME, instructions=INSTRUCTIONS)
+    server = Server(f"{SERVER_NAME}-{face_name}", instructions=INSTRUCTIONS)
+
+    def _served(deny: tuple[str, ...]) -> R.ToolRegistry:
+        """The face this one request gets: the mount's face minus its deny list.
+
+        The face scopes what can be CALLED, not only what is listed. Dispatching
+        against the whole registry made the face a description of what the model
+        had been told about: a research session, offered fourteen tools by a
+        registry holding eighteen, could still call read_issuer_brief — the
+        meta-only read that faces.py excludes from that face precisely because
+        citing a previous brief is a loop rather than a source.
+
+        A view rather than a check, so there is no second place that decides what
+        exists. invoke() answers for a name it does not hold, already, in the
+        same shape and with the same trace row. Both handlers read this one
+        function for the same reason: a list_tools that advertised a tool
+        call_tool would refuse is a disagreement that cannot arise while the two
+        are one computation.
+
+        A deny naming something this face does not contain is a no-op, not an
+        error. deny narrows and may only narrow, so a caller that skips
+        search_external_research must be able to say so to a mount that never
+        offered it — refusing would turn the already-safer request into the
+        failing one.
+        """
+        return R.ToolRegistry(
+            tools={name: registry.tools[name] for name in tool_names if name not in deny}
+        )
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         # Declared order, which is both stable across calls — the 2026-07-28
         # spec asks for that so a consumer keeps its prompt cache — and the
-        # order an auditor reads the face in.
+        # order an auditor reads the face in. The deny list only removes, so it
+        # cannot reshuffle what remains.
+        scoped = _served(mcp_request.current().deny)
         return [
             types.Tool(
-                name=scoped.get(name).name,
-                description=scoped.get(name).description,
-                inputSchema=scoped.get(name).json_schema,
+                name=tool.name,
+                description=tool.description,
+                inputSchema=tool.json_schema,
             )
-            for name in tool_names
+            for tool in scoped.tools.values()
         ]
 
     # validate_input=False: the decorator otherwise runs its own jsonschema check
@@ -96,17 +124,18 @@ def build_mcp_server(
     # enforcement point has to stay single.
     @server.call_tool(validate_input=False)
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
-        if user_id is not None:
-            # Before the session opens: db/session.py sets the tenant GUC when a
-            # transaction begins, so setting it afterwards leaves the first query
-            # tenant-less. Set per call rather than inherited from the calling
-            # context — a handler runs in whatever task the transport gives it,
-            # and a tenant that depends on how a library schedules work is not a
-            # tenant mechanism.
-            current_user_ctx.set(user_id)
+        claims = mcp_request.current()
+        # Before the session opens: db/session.py sets the tenant GUC when a
+        # transaction begins, so setting it afterwards leaves the first query
+        # tenant-less. Set per call rather than inherited from the calling
+        # context — a handler runs in whatever task the transport gives it,
+        # and a tenant that depends on how a library schedules work is not a
+        # tenant mechanism.
+        current_user_ctx.set(claims.user_id)
+        scoped = _served(claims.deny)
         async with db_factory() as db:
-            result = await R.invoke(scoped, db, session_id, name, arguments or {},
-                                    message_id=message_id)
+            result = await R.invoke(scoped, db, claims.session_id, name, arguments or {},
+                                    message_id=claims.message_id)
             await db.commit()
         # isError marks a refusal as one for a client that cares, while the
         # structured payload — problems[], budget numbers, the tool's own error —

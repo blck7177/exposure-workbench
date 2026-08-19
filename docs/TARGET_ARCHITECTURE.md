@@ -49,27 +49,44 @@
 │ Meta-Agent             │  │ REST Wrappers │  │ 只读 API             │
 │ (FastAPI 进程内循环)     │  │ 纯参数校验+入队│  │ (/api/evidence/{id} │
 └──────────┬─────────────┘  └──────┬───────┘  │  等,零判断)         │
-    每 turn 建对                    │          └─────────────────────┘
-           ▼                       ▼
-┌─────────────────────┐   ┌──────────────────────────────────────┐
-│ in-memory MCP 对     │   │ Task Queue(tasks 表)→ Worker        │
-│ client ↔ server      │   │  ├ exposure_update(现有,不动)       │
-│ build_mcp_server(    │   │  ├ company_readiness(能力 A,recipe) │
-│  registry, face,     │   │  └ issuer_research(能力 C):         │
-│  session, identity)  │   │     readiness 前置 → 分析 subagent    │
-│ 参数化构造;所有 LLM   │   │     (worker 进程内每 run 建对,        │
-│ 生成的调用            │   │      同一 in-memory 通路)→ finalize   │
-└──────────┬──────────┘   └──────────────────┬────────────────────┘
-           │  tools/call → invoke()          │
-           ▼                                 │
-┌──────────────────────────────────────────┐ │
-│ Registry Wrapper(唯一关口)               │◀┘ recipe/wrapper 代码直调 fn
-│  入参语义校验 / 预算记账 / 轨迹+台账自动落盘 │
-└──────────┬───────────────────────────────┘
-           ▼
-   tools fn → services(ingestion 写 / query 读)→ providers / analytics / db
+    每 turn 铸 token               │          └─────────────────────┘
+           │                       ▼
+           │              ┌──────────────────────────────────────┐
+           │              │ Task Queue(tasks 表)→ Worker         │
+           │              │  ├ exposure_update(现有,不动)        │
+           │              │  ├ company_readiness(能力 A,recipe)  │
+           │              │  └ issuer_research(能力 C):          │
+           │              │     readiness 前置 → 分析 subagent   │
+           │              │     LLM 调用在此,每 run 铸 token     │
+           │              │     连 /mcp/research → finalize      │
+           │              └───────────────┬──────────────────────┘
+           │  Bearer + JSON-RPC / HTTP    │  仅 compose 内网可达
+           ▼                              ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ exposure-mcp(常驻容器,streamable HTTP,stateless,仅 loopback 暴露)        │
+│   中间件:验内部 JWT → 逐请求绑 user/session/message/face                 │
+│           唯一解 token 处;验不过 = 整个请求 401,不进传输                 │
+│   门后无 completion:LLM 调用留在 api / worker 的 loop 里                 │
+│                                                                          │
+│   /mcp/meta(20 工具)            /mcp/research(14 工具)                   │
+│     face = 挂载点,物理;token 的 deny 只削不加(skip flag)                 │
+│                      │ tools/call                                        │
+│                      ▼                                                   │
+│   ┌──────────────────────────────────────────────────┐                   │
+│   │ Registry Wrapper(唯一关口)                       │                   │
+│   │  入参语义校验 / 预算记账 / 轨迹+台账自动落盘     │                   │
+│   └──────────────────┬───────────────────────────────┘                   │
+│                      ▼                                                   │
+│   tools fn → services(ingestion 写 / query 读)→ providers / analytics    │
+└──────────────────────┬───────────────────────────────────────────────────┘
+                       ▼
+   Postgres(app_rls + SET LOCAL → RLS;租户 = 本请求 claims 的 sub)
 
-侧门(local-dev debug):stdio 入口 = 同一构造器,MCP_STDIO_USER_ID 显式身份
+代码通路(不变):recipe / REST wrapper / workflow 在 api / worker 进程内直调 fn
+            (只留台账);常驻化搬的是 agent 通路的执行位置,不是这条
+侧门(不变):stdio 调试门 = 同一构造器、进程内、MCP_STDIO_USER_ID 显式身份,
+            绑与 HTTP 请求同一个 claims 对象
+封存(不变):B2 对外 OAuth —— 内部 bearer 不是对外边界,唤醒条件不变
 ══════════════════════════════════════════════════════════════════════
  Observability Plane(横切):agent_sessions/messages/steps + workflow_events
  + calc ledger + evidence 四库 ──▶ Chat 面板 / Agent Monitor / Run 时间线 / 引用抽屉
@@ -85,19 +102,25 @@ src/exposure_workbench/
   services/      摄取(写库)与查询(读库)分离;语义校验的家
   analytics/     纯函数(现有五模块不动;新增 period_ladder 等确定性组件)
   workflow/      确定性编排(ExposureWorkflow 不动;readiness/research 两个新编排)
-  agents/        meta-agent 循环 + 分析 subagent 会话。只 import tools 客户端与 llm
-  tools/         ToolRegistry:工具五元组 + wrapper(强制与追踪的唯一关口)
+  agents/        meta-agent 循环 + 分析 subagent 会话。生产路径不持 registry、
+                 不持 db_factory:只有一个 face 名和一枚铸出的 token
+  tools/         ToolRegistry:工具五元组 + wrapper(强制与追踪的唯一关口);
+                 mcp_server.py 按挂载点构造 MCP 面,mcp_request.py 存逐请求身份
+  auth/          两种凭证不共用异常:clerk.py 是浏览器带来的用户身份,
+                 internal_token.py 是 api/worker → exposure-mcp 的内部 bearer
   llm/           chat_complete + embed_texts,provider 可插拔
   db/            models + session(现有)
 
 apps/
   api/           FastAPI:REST wrappers + 只读 API
-  mcp/           stdio 调试门入口(同一 build_mcp_server 构造器)
+  mcp/           http.py = 常驻工具面(两个挂载点 + bearer 中间件 + 免凭证 /healthz);
+                 middleware.py = 唯一解 token 处;server.py = stdio 调试门。
+                 http.py 与 server.py 共用 tools/mcp_server.py 的同一个构造器
   worker/        任务轮询(现有)+ 新 handler 注册
   web/           Next.js 薄客户端
 ```
 
-**依赖单向规则**(code review 硬卡):`apps → tools → services → providers/db`;`agents → tools(经 MCP)`;`analytics` 不依赖任何上层;禁止 routes/agents/analytics/tools 中 import edgar/yfinance/tavily。
+**依赖单向规则**(code review 硬卡):`apps → tools → services → providers/db`;`agents →(内部 bearer + HTTP MCP)→ exposure-mcp → tools`,agents 生产路径不持 registry;`analytics` 不依赖任何上层;禁止 routes/agents/analytics/tools 中 import edgar/yfinance/tavily。
 
 ## 4. Database 层:四区 + Runtime 区
 
@@ -210,16 +233,20 @@ FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM 无预算,只留台账)
 
 > **Agent 面 = MCP,唯一;代码面 = fn 直调;两面共穿一个 wrapper。**
 
-- 凡 **LLM 生成**的工具调用一律走 MCP——meta-agent 每 chat turn、research subagent 每 run,以 in-memory transport 建一对 client-server(`build_mcp_server(registry, face, session, identity…)` 参数化构造);face 与租户身份在建对时绑定、call_tool 内显式重绑,对随 turn/run 消亡
+- 凡 **LLM 生成**的工具调用一律走 MCP——meta-agent 每 chat turn、research subagent 每 run,向常驻的 `exposure-mcp` 容器发 streamable HTTP 请求(stateless;容器间内网,对宿主只开 127.0.0.1 一个端口给 live 守卫用);api/worker 侧只剩一个 client(`agents/tool_session.py`),工具连同它们的库与 provider 凭证都在门后
+- **身份逐请求,不逐构造**:`build_mcp_server(registry, face, *, db_factory, face_name)` 每个挂载点构造一次、活得比任何 turn 长,所以 user/session/message 不能是它的属性,只能是请求的属性。它们由内部 HS256 JWT 携带(`sub`/`sid`/`mid`/`face`/`deny`,30min,与 `TASK_LEASE_SECONDS` 同长,验签留 60s 余量),中间件是唯一解 token 处:验不过 = 整个请求 401,不进传输。`call_tool` 里的显式重绑站原样保留、只换来源,库看到的租户仍是同一个 GUC
+- **face 仍然是物理的**:一个 face 一个挂载点(`/mcp/meta` 20 工具、`/mcp/research` 14 工具),各自的 registry、各自的 server 对象。skip flag 由 token 的 `deny` 表达,服务的面 = 挂载点的面减去 deny,**只削不加**——被 skip 的能力在 `tools/list` 里根本不存在,而不是存在且拒绝;"单端点 + token 选 face"被拒,那是 `faces.available()` 静默裁剪的复活形态
 - 凡**确定性代码**的调用(recipe/REST wrapper)直调 fn——代码无"生成调用"动作,不存在需生成时堵的错误类别
 - 与 sm-master 分裂教训的区别:那是"两条 **agent** 通路、两套强制";这是"一条 agent 通路 + 一条代码通路、**一套强制**"(wrapper 是共同关口)
-- 内部走 MCP 买到:门面因日常流量不烂、schema 诚实由协议层强制曝光、审计口径唯一;传输不改变记录内容由常驻 parity 测试钉死
-- 侧门:stdio 入口 = local-dev debug 门,同一构造器,MCP_STDIO_USER_ID 显式身份(users 表校验),借 app_rls factory,无特权通道
+- 内部走 MCP 买到:门面因日常流量不烂、schema 诚实由协议层强制曝光、审计口径唯一;传输不改变记录内容由常驻 parity 测试钉死。**常驻**另外买到:工具面只有一个地址、一套 provider 凭证、一条重启策略、一处排障入口;`stateless=True` 让"第二个副本"是扩容决定而不是正确性决定
+- **LLM 调用不进 MCP**:completion 留在 api 与 worker 的 loop 里,门后只有工具自己发起的检索 embedding。成本入账(A/B)因此与常驻化正交,前提一条没变
+- 侧门:stdio 入口 = local-dev debug 门,同一构造器,MCP_STDIO_USER_ID 显式身份(users 表校验),借 app_rls factory,无特权通道。它绑的是与 HTTP 请求同一个 claims 对象——由进程自己声明,不铸 token(自铸等于让进程给自己发一个刚校验过的身份之外的身份),所以身份机制仍然只有一套
+- 对外边界仍封存:内部 bearer 不是 B2。两端都是本仓库、同批部署,共享密钥就够;真实第三方消费者出现才谈 OAuth,且 token 绝不向上游转发
 
 ## 9. Observability Plane(金融级审计面,横切)
 
 1. **事实由机器记,叙述由 agent 记,分色呈现**:工具调用由 wrapper 自动落 `agent_steps`(实线);think/respond 文本是 agent 自述(虚线)。
-2. **追踪沉在 transport 之下**:落盘点在 wrapper,三种驱动(内部 agent/stdio 调试门/按钮)产生同构轨迹。
+2. **追踪沉在 transport 之下**:落盘点在 wrapper,三种驱动(内部 agent/stdio 调试门/按钮)产生同构轨迹。常驻化后 agent 通路的落盘发生在 `exposure-mcp` 容器里、按钮通路发生在 api/worker 里——同一份 wrapper 代码,轨迹同构与进程无关。
 3. **轨迹存引用不存副本**:agent_steps 存工具名/脱敏入参(MVP 只脱 key 类)/一行摘要/evidence_refs/耗时/token;完整证据体在四库,append-only 保证 refs 永久有效。
 4. **每个事实输出可双击穿透**:全系统一个解析器 `GET /api/evidence/{id}`(前缀路由 fact_/chunk_/calc_/src_/alert_,统一信封含 provenance 与上游链接);chip/抽屉/Brief/Monitor 共用一个组件。
 5. **成本与模型版本入账**:token 行级落库,session/run 汇总 = SQL 视图;账全、看板薄。

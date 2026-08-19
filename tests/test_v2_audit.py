@@ -297,32 +297,59 @@ def test_the_context_check_sits_before_the_charge_and_never_releases_the_turn():
 # registry. Both are gone: the mechanism that made that state reachable was
 # deleted, and the server now declares the face it builds. What is left is the
 # structural sweep — every shipped (site, face, registry) triple, resolved.
-def _pairings():
-    from exposure_workbench.agents.meta_agent import build_meta_registry
+#
+# MCP_PLAN R4 moved the sites. The agents no longer pair a face with a registry
+# at all: they hold a face NAME and a minted token, and the pairing happens in
+# the container. So the two mounts are read out of apps/mcp/http.py's own MOUNTS
+# table rather than restated here — a copy of it would agree until somebody
+# edited one of them.
+def _pairings(monkeypatch):
+    from tests.mcp_mount import use_secret
+
+    # http.py refuses to import without a signing key, deliberately: an
+    # unverified tool face must not be able to come up. That is asserted where
+    # it belongs (test_internal_token); here it is just a precondition.
+    use_secret(monkeypatch)
+    from apps.mcp import http
+
     from exposure_workbench.tools import faces
     from exposure_workbench.tools.definitions import build_read_registry
-    from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+    from exposure_workbench.tools.meta_tools import register_meta_tools
+
     return [
-        ("apps/api (chat)", "FACE_META_AGENT", "build_meta_registry",
-         faces.FACE_META_AGENT, build_meta_registry()),
-        ("issuer_research_workflow", "FACE_RESEARCH", "build_research_registry",
-         faces.FACE_RESEARCH, build_research_registry()),
-        ("apps/mcp/server.py", "READ_CORE + META_ONLY_READS", "build_read_registry",
-         faces.READ_CORE + faces.META_ONLY_READS, build_read_registry()),
+        (f"apps/mcp/http.py mount /mcp/{name}", name, registry, face)
+        for name, (registry, face) in http.MOUNTS.items()
+    ] + [
+        ("apps/mcp/server.py (stdio)", "FACE_META_AGENT",
+         register_meta_tools(build_read_registry()), faces.FACE_META_AGENT),
     ]
 
 
-def test_no_face_declares_a_tool_its_registry_does_not_register():
+def test_no_face_declares_a_tool_its_registry_does_not_register(monkeypatch):
     from exposure_workbench.tools import faces
 
     drift = {}
-    for site, face_name, builder, face, registry in _pairings():
+    for site, face_name, registry, face in _pairings(monkeypatch):
         try:
             faces.resolve(registry, face)
         except faces.FaceNotRegistered as e:
-            drift[(site, face_name, builder)] = str(e)
+            drift[(site, face_name)] = str(e)
 
     assert drift == {}, f"a shipped face no longer resolves: {drift}"
+
+
+def test_the_shipped_mounts_are_the_two_agent_faces(monkeypatch):
+    """N9 is a claim about how many doors there are, and it is only true while
+    the mount table says so. A third mount, or one face served at two paths,
+    would make 'the face is physical' a sentence rather than a fact."""
+    from exposure_workbench.tools import faces
+
+    mounts = {name: face for _site, name, _registry, face in _pairings(monkeypatch)
+              if name in (faces.FACE_NAME_META, faces.FACE_NAME_RESEARCH)}
+    assert mounts == {
+        faces.FACE_NAME_META: faces.FACE_META_AGENT,
+        faces.FACE_NAME_RESEARCH: faces.FACE_RESEARCH,
+    }
 
 
 def test_no_agent_reaches_a_tool_except_through_the_transport():
@@ -352,3 +379,118 @@ def test_no_agent_reaches_a_tool_except_through_the_transport():
             if isinstance(node, ast.Attribute) and node.attr == "invoke":
                 offenders.append(f"{f.name}:{node.lineno} calls .invoke")
     assert offenders == [], f"an agent reaching a tool outside the transport: {offenders}"
+
+
+def test_no_agent_imports_the_in_memory_transport():
+    """R4/N11: there is one production transport, and it is the resident face.
+
+    The in-memory helper is not gone — tests still build a server and talk to it
+    without a container, which is the right way to assert what a handler does.
+    What it must never be again is a second way for a LOOP to reach tools. It
+    would work, too: same constructor, same wrapper, same trace. That is exactly
+    what makes it dangerous — a turn served in-process is a turn whose tools ran
+    under the api's own database role and whose identity never crossed a door,
+    and nothing in its output would say so.
+
+    An import graph rather than a call graph: the helper cannot be used without
+    being imported, and naming it in agents/ is the moment to stop.
+    """
+    import ast
+
+    agents = ROOT / "src" / "exposure_workbench" / "agents"
+    offenders = []
+    for f in agents.glob("*.py"):
+        tree = ast.parse(f.read_text())
+        for node in ast.walk(tree):
+            mod = getattr(node, "module", None) or ""
+            if isinstance(node, ast.ImportFrom) and mod.startswith("mcp.shared.memory"):
+                offenders.append(f"{f.name}:{node.lineno}")
+            if isinstance(node, ast.Import):
+                offenders += [f"{f.name}:{node.lineno}" for a in node.names
+                              if a.name.startswith("mcp.shared.memory")]
+    assert offenders == [], (
+        f"an agent loop reaching tools in-process instead of through the face: {offenders}"
+    )
+
+
+# MCP_PLAN N11: one production path to the tool face, and it is HTTP.
+#
+# mcp.shared.memory.create_connected_server_and_client_session built every agent
+# tool session from P3 until R4. It did its job — it made "the agent path IS the
+# MCP path" literally true before the topology moved — and R4 replaced it with a
+# client against the resident mount. What is left of it is a TEST FIXTURE: the
+# stdio door's live tests drive a server object that has no socket, which is
+# exactly what an in-memory pair is for.
+#
+# The reason it needs a guard rather than a note is that it is the perfect
+# shortcut. It is one import away, it needs no container, and a loop rebuilt on
+# it would pass every functional test in this repo while running the tools back
+# inside api or worker — no bearer, no door, no single place the tool face lives.
+# Two transports is the shape this plan exists to prevent, and the second one
+# would arrive looking like a convenience.
+_IN_MEMORY_TRANSPORT = "mcp.shared.memory"
+_IN_MEMORY_HELPER = "create_connected_server_and_client_session"
+
+
+def _production_modules():
+    """Everything that ships, which is src/ plus the three app entry points.
+
+    apps/web is a Next app; it has no Python and its node_modules would make
+    this sweep a filesystem walk of somebody else's dependencies.
+    """
+    yield from (ROOT / "src" / "exposure_workbench").rglob("*.py")
+    for package in ("api", "mcp", "worker"):
+        yield from (ROOT / "apps" / package).rglob("*.py")
+
+
+def test_no_shipped_module_reaches_the_tools_through_the_in_memory_helper():
+    """N11's guard. Named for the agents layer, swept over the whole production
+    tree, because the helper has no legitimate caller anywhere outside tests and
+    a second production transport is no better for being in workflow/."""
+    import ast
+
+    offenders = []
+    for f in _production_modules():
+        tree = ast.parse(f.read_text())
+        for node in ast.walk(tree):
+            module = getattr(node, "module", None) or ""
+            if isinstance(node, ast.ImportFrom) and module.startswith(_IN_MEMORY_TRANSPORT):
+                offenders.append(f"{f.relative_to(ROOT)}:{node.lineno} imports {module}")
+            if isinstance(node, ast.Import) and any(
+                a.name.startswith(_IN_MEMORY_TRANSPORT) for a in node.names
+            ):
+                offenders.append(f"{f.relative_to(ROOT)}:{node.lineno} imports the helper's module")
+            if isinstance(node, ast.Name) and node.id == _IN_MEMORY_HELPER:
+                offenders.append(f"{f.relative_to(ROOT)}:{node.lineno} calls {_IN_MEMORY_HELPER}")
+    assert offenders == [], f"a second, in-process transport to the tool face: {offenders}"
+
+
+def test_the_agents_hold_a_face_name_and_a_token_and_nothing_else():
+    """The other half of R4, and the reason the guard above can be absolute.
+
+    A client that still held a registry would be holding the thing it is
+    supposed to be reaching through, and a client holding a db_factory would be
+    the tools' database open inside api and worker — the two duplications the
+    resident face exists to remove. Both are absences now, and an absence is
+    what a test has to keep.
+    """
+    import ast
+    import inspect
+
+    from exposure_workbench.agents.tool_session import tool_session
+
+    parameters = inspect.signature(tool_session).parameters
+    assert list(parameters) == ["face_name", "session_id", "user_id", "message_id", "deny"]
+
+    agents = ROOT / "src" / "exposure_workbench" / "agents"
+    offenders = []
+    for f in agents.glob("*.py"):
+        tree = ast.parse(f.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and (node.module or "").endswith("tools.registry"):
+                offenders.append(f"{f.name}:{node.lineno} imports the registry")
+            if isinstance(node, ast.ImportFrom) and any(
+                a.name in ("build_mcp_server", "get_session_factory") for a in node.names
+            ):
+                offenders.append(f"{f.name}:{node.lineno} imports {node.names[0].name}")
+    assert offenders == [], f"an agent still holding what lives behind the mount: {offenders}"

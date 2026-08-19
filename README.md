@@ -7,20 +7,33 @@ pgvector filing retrieval, an evidence-gated Issuer Risk Brief, and a single
 meta-agent the user talks to — every factual answer traceable to a fact, a
 calculation, a filing passage or a research source.
 
-Every LLM-generated tool call travels over MCP: the meta-agent (per chat turn)
-and the research subagent (per run) each open an in-memory MCP client-server
-pair built from ONE registry, with budget / schema / citation / audit
-enforcement in a single wrapper below the transport. The face an agent sees is
-the registry its server was built with — there is no trimming step — and a
-standing parity test pins that a direct call and an MCP call produce identical
-trace rows. Deterministic code (recipes, REST wrappers) calls the same
-functions through the same wrapper directly. See docs/MCP_PLAN.md.
+Every LLM-generated tool call travels over MCP to a container of its own.
+`exposure-mcp` is resident — streamable HTTP, stateless, reachable only on the
+compose network — and serves one mount per face: `/mcp/meta` for the meta-agent,
+`/mcp/research` for the research subagent, each with its own registry built from
+the one set of tool definitions and budget / schema / citation / audit
+enforcement in a single wrapper below the transport. The loops are clients: the
+api mints an internal 30-minute bearer per chat turn, the worker per research
+run, and a middleware in front of each mount verifies it and binds that
+request's tenant —
+identity travels with the request, because a server that outlives the turn
+cannot hold the turn's tenant. The face an agent sees is the mount it reached
+minus whatever its token denies, so a skip flag takes `search_external_research`
+out of the tool list rather than leaving a tool that refuses. The LLM call stays
+in the loop and never crosses MCP. Deterministic code (recipes, REST wrappers)
+calls the same functions through the same wrapper directly, in process, and a
+standing parity test pins that both produce identical trace rows.
+See docs/MCP_PLAN.md.
 
 ## Quick Start
 
 ```bash
 # 1. Copy env and add keys. Needs (real data, no mocks): OPENAI_API_KEY,
 #    TAVILY_API_KEY, EDGAR_IDENTITY ("Name email@domain"). See .env.example.
+#    MCP_INTERNAL_SECRET is required too (openssl rand -hex 32): it signs the
+#    bearer the agent loops carry to the tool container. Left empty,
+#    exposure-mcp refuses to start and the api and the worker refuse to mint
+#    one on the first turn or run — nothing runs unsigned.
 #    Clerk keys are OPTIONAL: leave them blank and the app runs as an anonymous
 #    read-only demo. Fill them in to enable sign-in and per-user portfolios.
 cp .env.example .env
@@ -63,8 +76,9 @@ Design docs: [docs/TARGET_ARCHITECTURE.md](docs/TARGET_ARCHITECTURE.md) (v3),
 
 A stdio debug door onto the same tool face runs via
 `MCP_STDIO_USER_ID=user_... python -m apps.mcp.server` — the same server
-constructor the agents use; the identity is required and checked against the
-users table.
+constructor the mounts use, in process, over stdio; the identity is required,
+checked against the users table, and bound as the same claims object an HTTP
+request arrives with.
 
 ## Architecture
 
@@ -83,6 +97,10 @@ users table.
                    ExposureWorkflow (deterministic, 11 steps)
                       ├── analytics/
                       └── agents/ (LLM report)
+
+     FastAPI and Worker ──Bearer──▶ exposure-mcp (the agent tool face:
+        /mcp/meta + /mcp/research; compose network, plus a loopback-only
+        host port so the live parity guard can reach it)
 ```
 
 In production the UI and the API share one origin, so the browser never makes a

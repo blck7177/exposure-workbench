@@ -131,3 +131,29 @@ def test_the_dead_http_app_is_gone():
     from apps.mcp import server
 
     assert not hasattr(server, "build_http_app")
+
+
+def test_the_door_states_its_identity_the_way_a_request_would():
+    """R2. The constructor stopped taking an identity, so this door has to bind
+    the same InternalClaims an HTTP request arrives with — once, at startup,
+    because a stdio process is exactly one caller for its whole life.
+
+    Read as a graph for the usual reason: the module docstring explains the
+    binding, and a substring check would count the explanation.
+    """
+    used = _names_used(ast.parse(SERVER.read_text()))
+    assert {"InternalClaims", "bind"} <= used, (
+        "the stdio door must bind the claims its handlers read, or the first tool "
+        "call raises NoMcpRequestBound"
+    )
+
+
+def test_the_door_does_not_issue_itself_a_bearer():
+    """There is no request to authenticate here and no second party to prove
+    anything to. A self-minted token would let the process hand itself an
+    identity other than the one it just checked against the users table — a
+    second source of truth about who is at the door, in the one place the answer
+    is already known for certain."""
+    used = _names_used(ast.parse(SERVER.read_text()))
+    forbidden = sorted(used & {"mint", "verify", "bearer_identity", "require_secret"})
+    assert not forbidden, f"the stdio door has no bearer to mint or verify: {forbidden}"

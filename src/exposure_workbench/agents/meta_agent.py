@@ -6,9 +6,10 @@ exits by calling respond. The system prompt states the role and the evidence
 discipline's WHY — it is not a rulebook, because the architecture (ids required
 to cite, wrapper-enforced budget/trace) is what actually constrains behaviour.
 
-Its tools arrive over an MCP client on an in-memory transport (MCP_PLAN P3):
-the same registry behind the same wrapper, reached the way this architecture
-has said the agent face is reached since M10 — which until now it was not.
+Its tools arrive over an MCP client from the resident tool face (MCP_PLAN P3,
+R4): the same registry behind the same wrapper, reached the way this
+architecture has said the agent face is reached since M10 — which until P3 it
+was not, and which since R4 is a request to a container of its own.
 
 History is persisted as agent_messages so a session survives across turns.
 """
@@ -92,11 +93,9 @@ async def handle_message(
     db_factory,
     session_id: str,
     user_text: str,
-    registry: R.ToolRegistry | None = None,
     max_turns: int = 16,
 ) -> dict:
     """Run one user turn. Persists the user + assistant messages; returns the reply."""
-    registry = registry or build_meta_registry()
     message_id = new_id("msg_")
     async with db_factory() as db:
         db.add(AgentMessage(id=new_id("msg_"), session_id=session_id, role="user", content=user_text))
@@ -111,11 +110,14 @@ async def handle_message(
     # what a ceiling is about. B1 reads this back to decide the next turn.
     prompt_peak = 0
 
-    # One server-and-client pair for the turn. It carries the identity the turn
-    # runs under, so the tenant does not depend on which task the transport
-    # happens to schedule a handler in.
+    # One connection for the turn, carrying the identity the turn runs under.
+    # That identity used to be fixed when the pair was built and is now minted
+    # into a token and sent with every request, which is what a resident face
+    # requires: the server outlives the turn, so it cannot hold the turn's
+    # tenant. The tenant still does not depend on which task the transport
+    # schedules a handler in — the door binds it per request instead.
     async with tool_session(
-        registry, faces.FACE_META_AGENT, db_factory=db_factory, session_id=session_id,
+        faces.FACE_NAME_META, session_id=session_id,
         user_id=current_user_id(), message_id=message_id,
     ) as tools_session:
         tools = tools_session.tools
