@@ -47,9 +47,17 @@ async def _try(label: str, coro):
 
 
 async def run_standard_recipe(
-    db: AsyncSession, ticker: str, invoked_by: str = "recipe"
+    db: AsyncSession, ticker: str, as_of: date, invoked_by: str = "recipe"
 ) -> dict:
-    """Compute the baseline set for one issuer. Returns {label: result-or-unavailable}."""
+    """Compute the baseline set for one issuer. Returns {label: result-or-unavailable}.
+
+    `as_of` anchors the return windows and has no default. The ledger's whole
+    claim is that a calc_id can be replayed to the same number, and date.today()
+    broke that for the six return rows: the same ticker recomputed a day later
+    wrote a different 1m return under the same recipe version, with nothing in
+    `params` to say the window had moved. A default here would be the clock
+    again, one layer down.
+    """
     out: dict[str, dict] = {}
     # Flow metrics (revenue, income, cash flow) are DURATION facts -> quarterly.
     # Balance-sheet metrics (assets, cash, debt) are INSTANT facts with no
@@ -94,15 +102,16 @@ async def run_standard_recipe(
     )
 
     # 6) market returns, absolute and benchmark-relative
-    today = date.today()
     for label, days in _RETURN_WINDOWS:
-        start = today - timedelta(days=days)
+        start = as_of - timedelta(days=days)
         out[f"return_{label}"] = await cs.window_return(
-            db, ticker, start, today, invoked_by=invoked_by
+            db, ticker, start, as_of, invoked_by=invoked_by
         )
         out[f"return_{label}_vs_{BENCHMARK}"] = await cs.window_return(
-            db, ticker, start, today, benchmark=BENCHMARK, invoked_by=invoked_by
+            db, ticker, start, as_of, benchmark=BENCHMARK, invoked_by=invoked_by
         )
 
-    out["_meta"] = {"recipe_version": RECIPE_VERSION, "ticker": ticker}
+    out["_meta"] = {
+        "recipe_version": RECIPE_VERSION, "ticker": ticker, "as_of": as_of.isoformat(),
+    }
     return out

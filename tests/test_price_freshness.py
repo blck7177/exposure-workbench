@@ -44,9 +44,17 @@ def complete_limits() -> LimitBook:
 def validate():
     wf = ExposureWorkflow(configs_dir="/app/configs")   # configs are not read by this path
 
-    def _validate(positions_df, prices_df, as_of_date, limits=None):
-        return wf._validate_inputs(positions_df, prices_df, as_of_date,
-                                   complete_limits() if limits is None else limits)
+    def _validate(positions_df, prices_df, as_of_date, limits=None,
+                  factor_prices_df=None, factor_tickers=()):
+        # No factors configured by default, so these stay tests about holdings.
+        # The factor half is exercised below, by the same rule and the same raise.
+        if factor_prices_df is None:
+            factor_prices_df = pd.DataFrame(columns=["ticker", "price_date", "close"])
+        return wf._validate_inputs(
+            positions_df, prices_df, as_of_date,
+            complete_limits() if limits is None else limits,
+            factor_prices_df, list(factor_tickers),
+        )
 
     return _validate
 
@@ -131,3 +139,55 @@ def test_empty_inputs_still_fail_first(validate):
 
 def test_threshold_comes_from_settings_not_a_literal():
     assert get_settings().price_staleness_days == MAX_AGE
+
+
+# ── the factor panel is judged by the same rule (V5) ──────────────────────────
+#
+# Nothing judged it before and nothing refreshed it either: factor_prices was
+# written once by the seed script and never again. The regression inner-joins on
+# date, so a stale factor panel silently moved the WHOLE attribution — and the
+# stress scenarios propagated through its betas — back to whatever day the seed
+# last saw. Measured on the live database: factor prices four days behind the
+# newest holding price, with nothing anywhere saying so.
+
+def factor_prices(*rows: tuple[str, date, float]) -> pd.DataFrame:
+    return pd.DataFrame([{"ticker": t, "price_date": pd.Timestamp(d), "close": c}
+                         for t, d, c in rows])
+
+
+def test_fresh_factor_prices_pass(validate):
+    validate(positions("AAPL"), prices(("AAPL", AS_OF, 200.0)), AS_OF,
+             factor_prices_df=factor_prices(("SPY", AS_OF, 600.0)),
+             factor_tickers=["SPY"])
+
+
+def test_a_stale_factor_fails_the_run(validate):
+    with pytest.raises(ValueError) as e:
+        validate(positions("AAPL"), prices(("AAPL", AS_OF, 200.0)), AS_OF,
+                 factor_prices_df=factor_prices(
+                     ("SPY", AS_OF - timedelta(days=MAX_AGE + 3), 600.0)),
+                 factor_tickers=["SPY"])
+    msg = str(e.value)
+    assert "factor price" in msg and "SPY" in msg
+    assert f"{MAX_AGE + 3}d old" in msg
+
+
+def test_a_factor_with_no_prices_fails_instead_of_shrinking_the_model(validate):
+    """The silent `if t in df.columns` filter used to drop it, leaving a smaller
+    regression that reported itself with the same confidence as a full one."""
+    with pytest.raises(ValueError) as e:
+        validate(positions("AAPL"), prices(("AAPL", AS_OF, 200.0)), AS_OF,
+                 factor_prices_df=factor_prices(("SPY", AS_OF, 600.0)),
+                 factor_tickers=["SPY", "TLT"])
+    msg = str(e.value)
+    assert "no factor price" in msg and "TLT" in msg
+
+
+def test_a_holding_problem_and_a_factor_problem_surface_in_the_same_raise(validate):
+    """Same rule as the holdings half: one fix-and-rerun cycle, not two."""
+    with pytest.raises(ValueError) as e:
+        validate(positions("AAPL", "STALE"), prices(("AAPL", AS_OF, 200.0)), AS_OF,
+                 factor_prices_df=factor_prices(("SPY", AS_OF, 600.0)),
+                 factor_tickers=["SPY", "GLD"])
+    msg = str(e.value)
+    assert "STALE" in msg and "GLD" in msg

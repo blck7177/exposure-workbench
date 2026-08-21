@@ -83,6 +83,10 @@ CREATE TABLE IF NOT EXISTS factor_prices (
     ticker          VARCHAR(16) NOT NULL,
     price_date      DATE NOT NULL,
     close           NUMERIC(18, 4) NOT NULL,
+    -- Returns are measured on adj_close, market values on close. Nullable
+    -- because rows written before V5 have no adjusted price and must be
+    -- re-ingested rather than assumed equal to close.
+    adj_close       NUMERIC(18, 4),
     daily_return    NUMERIC(12, 8),
     source          VARCHAR(32) DEFAULT 'seed',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -700,7 +700,8 @@ B3 上下文摘要(B0 实测显示一整轮只有几千 token 对 80k 上限,现
   成为约束;缺行在**步骤 3** 与价格陈旧同一次抛出(不在 `check_limits` 里 —— 那时 run 已经付过
   价格同步、因子回归、压力测试的代价)。`MissingLimit` 是保险丝,永不该响,不许 catch。
 - **行存在 ≠ 检查执行**。八个 check 各自守在输入是否存在上,而一个短历史持仓会通过
-  `pivot.ffill().dropna()` 截断整条收益序列,静默让 VaR/ES/波动三项不运行 —— run 照样绿、
+  收益面板的取交集(V5 前是 `pivot.ffill().dropna()`,现为 `total_return_panel` 的
+  `dropna`)截断整条收益序列,静默让 VaR/ES/波动三项不运行 —— run 照样绿、
   页面照样写"所有限额在范围内"。现在 run 认证"8 行齐备"之后,读者更会把它当成"8 项已执行",
   所以 `check_limits` 额外返回 `evaluated` 并写进事件的 `payload_summary`。
 

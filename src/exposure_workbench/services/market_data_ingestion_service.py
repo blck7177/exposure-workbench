@@ -50,18 +50,29 @@ def build_market_rows(bars: list[PriceBar], source: str) -> list[dict]:
 
 
 def build_factor_rows(bars: list[PriceBar], source: str) -> list[dict]:
-    """Factor rows carry close + daily_return (computed from the close series)."""
+    """Factor rows carry close, adj_close and daily_return.
+
+    daily_return is computed from the ADJUSTED series, like every other return in
+    the system. Computed from `close` it was short by each distribution TLT and
+    HYG paid, and on any split it was the split.
+    """
     ordered = sorted(bars, key=lambda b: b.price_date)
     rows: list[dict] = []
     prev: float | None = None
     for b in ordered:
-        daily_return = (b.close - prev) / prev if (prev is not None and prev != 0) else None
-        prev = b.close
+        adj = b.adj_close
+        daily_return = (
+            (adj - prev) / prev
+            if (adj is not None and prev is not None and prev != 0)
+            else None
+        )
+        prev = adj
         rows.append(
             {
                 "ticker": b.ticker,
                 "price_date": b.price_date,
                 "close": b.close,
+                "adj_close": adj,
                 "daily_return": daily_return,
                 "source": source,
             }
@@ -129,6 +140,7 @@ async def ingest_factor_prices(
             index_elements=["ticker", "price_date"],
             set_={
                 "close": stmt.excluded.close,
+                "adj_close": stmt.excluded.adj_close,
                 "daily_return": stmt.excluded.daily_return,
                 "source": stmt.excluded.source,
             },

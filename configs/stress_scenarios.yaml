@@ -1,37 +1,49 @@
 # Stress Scenario Configuration
-# Each scenario defines hypothetical 1-day sector/factor shocks.
-# shock values are expressed as decimal returns (e.g., -0.05 = -5%).
+#
+# A scenario says what the FACTORS do, in decimal 1-day returns (-0.05 = -5%).
+# It does NOT say what the portfolio does — that comes from the betas estimated
+# in the attribution step, so one scenario means the same thing for every book
+# and each book answers it with its own sensitivities.
+#
+# Every key under factor_shocks MUST be a ticker in configs/factor_config.yaml.
+# A scenario naming a factor the model does not estimate is reported as
+# unevaluated, never as a zero loss (analytics/stress.py).
+#
+# Sector-name shocks used to live here too and were matched against the book's
+# sector labels. They are gone: a shock that reaches the answer through two
+# different naming conventions reaches it twice, and TLT — both a factor and a
+# holding — was counted through both. An idiosyncratic sector move on TOP of the
+# factor move is a real thing to want to model and is not expressible this way;
+# it needs a residual-risk model, which this system does not have yet.
 
 tech_selloff:
   description: "Technology sector selloff — sharp repricing of growth assets"
-  shocks:
-    Technology: -0.05
-    Communication_Services: -0.03
-    Consumer_Discretionary: -0.02
+  factor_shocks:
     SPY: -0.025
     QQQ: -0.06
+    IWM: -0.03
     TLT: 0.01
+    HYG: -0.01
 
 rates_shock_up:
   description: "Rates up 50bps — duration sell-off scenario"
-  shocks:
+  factor_shocks:
     TLT: -0.04
     HYG: -0.015
-    Financials: 0.01
-    Real_Estate: -0.03
-    Utilities: -0.025
+    SPY: -0.01
+    GLD: -0.01
 
 credit_spread_widening:
   description: "High yield spread widening 200bps — credit stress"
-  shocks:
+  factor_shocks:
     HYG: -0.04
-    Financials: -0.02
-    Energy: -0.015
     SPY: -0.015
+    IWM: -0.025
+    TLT: 0.01
 
 market_downside:
   description: "Broad market correction -10% — equity risk-off"
-  shocks:
+  factor_shocks:
     SPY: -0.10
     QQQ: -0.12
     IWM: -0.11
@@ -40,7 +52,7 @@ market_downside:
 
 energy_shock:
   description: "Oil price crash -20% — energy sector stress"
-  shocks:
+  factor_shocks:
     USO: -0.20
-    Energy: -0.08
     SPY: -0.02
+    QQQ: -0.01

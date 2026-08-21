@@ -70,6 +70,20 @@ class ExposureWorkflow:
         self._stress_config = _load("stress_scenarios.yaml")
         self._factor_config = _load("factor_config.yaml")
 
+    def _factor_tickers(self) -> list[str]:
+        """The factor set, resolved in ONE place.
+
+        Three call sites used to inline the same comprehension over the config —
+        the price load, the regression, and the ticker list handed to the
+        provider — so a factor could be loaded and not regressed, or regressed
+        and not refreshed, without anything disagreeing out loud.
+        """
+        return [
+            cfg["ticker"]
+            for cfg in (self._factor_config or {}).get("factors", {}).values()
+            if "ticker" in cfg
+        ]
+
     # ── Step helpers ───────────────────────────────────────────────────────────
 
     async def _step(
@@ -98,13 +112,16 @@ class ExposureWorkflow:
             # timeline. The window is the RUN's own [as_of - lookback, as_of] —
             # using date.today() here would refresh a stretch the rest of the run
             # never reads, which looks like a fix and is not one.
-            ctx = _StepContext(db, run_id, "sync_prices", "Refreshing prices for held tickers")
+            ctx = _StepContext(db, run_id, "sync_prices", "Refreshing prices for held tickers and factors")
             await ctx.__aenter__()
             try:
                 positions, synced, unavailable = await self._sync_prices(db, portfolio_id, as_of_date)
+                factors_synced, factors_unavailable = await self._sync_factor_prices(db, as_of_date)
                 ctx.message = (
                     f"Refreshed prices for {synced} of {len(positions)} holdings"
-                    + (f"; provider had no data for {', '.join(unavailable)}" if unavailable else "")
+                    f" and {factors_synced} of {len(self._factor_tickers())} factors"
+                    + (f"; provider had no data for {', '.join(unavailable + factors_unavailable)}"
+                       if (unavailable or factors_unavailable) else "")
                 )
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("sync_prices")
@@ -129,7 +146,10 @@ class ExposureWorkflow:
             ctx = _StepContext(db, run_id, "validate_inputs", "Validating prices and position data")
             await ctx.__aenter__()
             try:
-                self._validate_inputs(positions_df, prices_df, as_of_date, limit_book)
+                self._validate_inputs(
+                    positions_df, prices_df, as_of_date, limit_book,
+                    factor_prices_df, self._factor_tickers(),
+                )
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("validate_inputs")
             except Exception as e:
@@ -165,22 +185,37 @@ class ExposureWorkflow:
                 portfolio_returns = market_data_service.build_portfolio_returns(
                     positions_df, prices_df
                 )
-                factor_tickers = [
-                    cfg["ticker"]
-                    for cfg in (self._factor_config or {}).get("factors", {}).values()
-                    if "ticker" in cfg
-                ]
                 factor_returns_df = market_data_service.build_factor_returns_df(factor_prices_df)
-                # Only keep factor tickers that exist in the df
-                available_factors = [t for t in factor_tickers if t in factor_returns_df.columns]
-                factor_returns_subset = factor_returns_df[available_factors] if available_factors else pd.DataFrame()
+                # No "keep whatever happens to be present" filter here any more.
+                # Step 3 has already refused the run unless every configured
+                # factor has a fresh price, so the columns ARE the factor set —
+                # and if they somehow are not, that is a fact worth raising over
+                # rather than quietly regressing a smaller model.
+                factor_returns_subset = factor_returns_df[self._factor_tickers()]
 
+                regression_cfg = (self._factor_config or {}).get("regression", {})
                 factor_result: FactorAttributionResult = calc_factor_attribution(
                     portfolio_returns,
                     factor_returns_subset,
                     self._factor_config or {},
-                    lookback=int((self._factor_config or {}).get("regression", {}).get("window_days", 60)),
+                    lookback=int(regression_cfg.get("window_days", 60)),
+                    min_observations=int(regression_cfg.get("min_observations", 30)),
+                    include_intercept=bool(regression_cfg.get("include_intercept", True)),
                 )
+                # What the regression actually was, in a form a query can read.
+                # `collinear` is the honest caveat on every individual beta on
+                # the page: SPY/QQQ/IWM are ~0.9 correlated, so the fit is
+                # well-determined as a whole and each coefficient is not.
+                ctx.payload = {
+                    "observations": factor_result.observations,
+                    "r_squared": factor_result.r_squared,
+                    "alpha": factor_result.alpha,
+                    "max_vif": factor_result.max_vif,
+                    "collinear": factor_result.collinear,
+                    "attribution_date": (
+                        factor_result.as_of.isoformat() if factor_result.as_of else None
+                    ),
+                }
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("calculate_attribution")
             except Exception as e:
@@ -192,14 +227,25 @@ class ExposureWorkflow:
             await ctx.__aenter__()
             try:
                 risk: RiskResult = calc_risk_metrics(portfolio_returns)
-                sector_weights = {s: d["weight"] for s, d in exposure.sector_map.items()}
-                issuer_weights = {t: d["weight"] for t, d in exposure.issuer_map.items()}
+                # Scenarios reach the book through the betas estimated in step 6
+                # and through nothing else — see analytics/stress.py for what
+                # matching shocks against sector labels used to produce.
                 stress: StressResult = calc_stress(
-                    sector_weights,
-                    issuer_weights,
                     exposure.portfolio_market_value,
                     self._stress_config or {},
+                    factor_result.betas(),
                 )
+                # A scenario that could not be propagated is NOT a scenario with
+                # zero loss, and the limit engine only sees the ones that were.
+                ctx.payload = {
+                    "scenarios_evaluated": {
+                        s.name: {"factors_held_flat": s.factors_held_flat}
+                        for s in stress.scenarios
+                    },
+                    "scenarios_unevaluated": [
+                        {"name": u.name, "reason": u.reason} for u in stress.unevaluated
+                    ],
+                }
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("calculate_risk")
             except Exception as e:
@@ -365,6 +411,42 @@ class ExposureWorkflow:
                 raise
         return positions, synced, unavailable
 
+    async def _sync_factor_prices(
+        self,
+        db: AsyncSession,
+        as_of_date: date,
+    ) -> tuple[int, list[str]]:
+        """Refresh the factor panel over the run's own window.
+
+        Nothing refreshed factor_prices before this. The table was populated once
+        by scripts/seed_demo_db.py and never again, so the "most recent day
+        factor return" that every 1-day attribution is built from was whatever
+        day the seed last saw — measured on the live database, four days older
+        than the newest holding price, and drifting further with every day the
+        seed was not re-run. The regression is an inner join on date, so the
+        whole attribution silently described an older session than the run it was
+        filed under. Step 3 judges the result; this only fetches.
+        """
+        tickers = self._factor_tickers()
+        if not tickers:
+            return 0, []
+
+        provider = YFinanceMarketDataProvider()
+        start_date = as_of_date - timedelta(days=_LOOKBACK_DAYS)
+        synced, unavailable = 0, []
+        for ticker in tickers:
+            try:
+                counts = await market_data_ingestion_service.ingest_factor_prices(
+                    db, [ticker], start_date, as_of_date, provider,
+                )
+                synced += 1 if counts.get(ticker) else 0
+            except market_data_ingestion_service.MarketDataUnavailable:
+                unavailable.append(ticker)
+            except Exception:
+                await db.rollback()
+                raise
+        return synced, unavailable
+
     async def _load_inputs(
         self,
         db: AsyncSession,
@@ -398,13 +480,8 @@ class ExposureWorkflow:
         )
 
         # Load factor prices
-        factor_tickers = [
-            cfg["ticker"]
-            for cfg in (self._factor_config or {}).get("factors", {}).values()
-            if "ticker" in cfg
-        ]
         factor_prices_df = await market_data_service.get_factor_prices_df(
-            db, factor_tickers, start_date, as_of_date
+            db, self._factor_tickers(), start_date, as_of_date
         )
 
         # Every threshold this run will use. active_only=False on purpose: the
@@ -430,12 +507,19 @@ class ExposureWorkflow:
 
     # ── Validation ─────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _newest_by_ticker(prices_df: pd.DataFrame, as_of_ts: pd.Timestamp) -> pd.Series:
+        usable = prices_df[prices_df["price_date"] <= as_of_ts]
+        return usable.groupby("ticker")["price_date"].max()
+
     def _validate_inputs(
         self,
         positions_df: pd.DataFrame,
         prices_df: pd.DataFrame,
         as_of_date: date,
         limits: LimitBook,
+        factor_prices_df: pd.DataFrame,
+        factor_tickers: list[str],
     ) -> None:
         """The single place a run decides its inputs are good enough.
 
@@ -458,6 +542,16 @@ class ExposureWorkflow:
         All problems are reported as complete lists. Naming only the first turns
         one fix-and-rerun cycle into as many as there are bad tickers.
 
+        Since V5 the FACTOR panel is judged by the same rule as the holdings.
+        Nothing judged it before, and nothing refreshed it either, so a factor
+        whose newest bar was months old passed straight into the regression and
+        the stress propagation built on it — and a factor missing entirely was
+        dropped from the regression by a silent `if t in df.columns` filter,
+        leaving a smaller model that reported itself with the same confidence.
+        The two failures are the same shape as a stale holding price, so they get
+        the same answer: name them all, refuse the run, let step 1's refresh fix
+        it on the re-run.
+
         This method stays PURE — no DB, no clock. The LimitBook is built in
         _load_inputs and handed in, with no default: a default parameter here
         would be a threshold source of its own.
@@ -469,11 +563,10 @@ class ExposureWorkflow:
 
         held = set(positions_df["ticker"].astype(str))
         as_of_ts = pd.Timestamp(as_of_date)
-        usable = prices_df[prices_df["price_date"] <= as_of_ts]
-        newest = usable.groupby("ticker")["price_date"].max()
+        max_age = get_settings().price_staleness_days
+        newest = self._newest_by_ticker(prices_df, as_of_ts)
 
         missing = sorted(held - set(newest.index.astype(str)))
-        max_age = get_settings().price_staleness_days
         stale = sorted(
             f"{ticker} ({(as_of_ts - newest[ticker]).days}d old)"
             for ticker in held & set(newest.index.astype(str))
@@ -485,6 +578,31 @@ class ExposureWorkflow:
             problems.append(f"no price on or before {as_of_date} for: {', '.join(missing)}")
         if stale:
             problems.append(f"newest price older than {max_age} days for: {', '.join(stale)}")
+
+        wanted_factors = set(factor_tickers)
+        if wanted_factors:
+            factor_newest = (
+                self._newest_by_ticker(factor_prices_df, as_of_ts)
+                if not factor_prices_df.empty
+                else pd.Series(dtype="datetime64[ns]")
+            )
+            have = set(factor_newest.index.astype(str))
+            factors_missing = sorted(wanted_factors - have)
+            factors_stale = sorted(
+                f"{ticker} ({(as_of_ts - factor_newest[ticker]).days}d old)"
+                for ticker in wanted_factors & have
+                if (as_of_ts - factor_newest[ticker]).days > max_age
+            )
+            if factors_missing:
+                problems.append(
+                    f"no factor price on or before {as_of_date} for: "
+                    + ", ".join(factors_missing)
+                )
+            if factors_stale:
+                problems.append(
+                    f"newest factor price older than {max_age} days for: "
+                    + ", ".join(factors_stale)
+                )
 
         missing_limits = limits.missing_required()
         if missing_limits:

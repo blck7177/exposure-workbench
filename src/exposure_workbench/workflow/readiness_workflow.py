@@ -41,6 +41,11 @@ async def run_readiness(
     """Execute the readiness steps for one issuer. Raises on failure (fail-loud)."""
     ticker = ticker.upper()
     filing_provider = EdgarToolsFilingProvider()
+    # ONE clock reading for the whole run. The price refresh and the recipe's
+    # return windows have to agree on what "now" is, or the recipe measures a
+    # window whose last day was never ingested — and a run that straddles
+    # midnight would use two different days for the two steps.
+    as_of = date.today()
 
     # 1) resolve + enrich company identity (EDGAR is the write-path authority)
     async with step(db, run_id, "resolve_company", f"Resolving {ticker} via EDGAR"):
@@ -67,7 +72,7 @@ async def run_readiness(
 
     # 4) XBRL facts
     async with step(db, run_id, "extract_facts", f"Extracting XBRL facts for {ticker}"):
-        since = date.today() - timedelta(days=_FACTS_SINCE_DAYS)
+        since = as_of - timedelta(days=_FACTS_SINCE_DAYS)
         n_facts = await fis.ingest_financial_facts(db, company_id, company.cik, filing_provider, since=since)
         await db.commit()
 
@@ -86,14 +91,13 @@ async def run_readiness(
     else:
         async with step(db, run_id, "refresh_market_data", f"Refreshing prices for {ticker} + SPY"):
             provider = YFinanceMarketDataProvider()
-            end = date.today()
-            start = end - timedelta(days=400)
-            await mds.ingest_market_prices(db, [ticker, "SPY"], start, end, provider)
+            start = as_of - timedelta(days=400)
+            await mds.ingest_market_prices(db, [ticker, "SPY"], start, as_of, provider)
             await db.commit()
 
     # 7) baseline recipe (ledgered)
     async with step(db, run_id, "standard_recipe", f"Computing baseline metrics for {ticker}"):
-        await recipe.run_standard_recipe(db, ticker, invoked_by="recipe")
+        await recipe.run_standard_recipe(db, ticker, as_of=as_of, invoked_by="recipe")
         await db.commit()
 
     return {"ticker": ticker, "company_id": company_id, "facts": n_facts, "chunks": n_chunks}

@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import period_ladder as pl
 from exposure_workbench.analytics import series_ops as so
-from exposure_workbench.db.models import CalcLedger, Company, FinancialFact, MarketPrice
+from exposure_workbench.db.models import CalcLedger, Company, Filing, FinancialFact, MarketPrice
 from exposure_workbench.utils.ids import new_calc_id
 
 logger = logging.getLogger(__name__)
@@ -62,17 +62,37 @@ async def load_fact_series(db: AsyncSession, spec: SeriesSpec) -> tuple[list[so.
 
     Quarterly series automatically include the derived Q4, because issuers file
     only three quarterly facts per year.
+
+    CONSOLIDATED FACTS ONLY. An XBRL filing tags the same concept many times: once
+    for the whole company and again per segment, geography or product line, and
+    those dimensioned facts carry the same raw_concept, the same period_end and a
+    smaller value. They differ only in `dimensions`, which is exactly why
+    dimensions_hash is in the unique key rather than being deduplicated away. Left
+    unfiltered they land in the same period bucket as the consolidated fact, and
+    `_pick_latest` — which resolves restatements, not scopes — would hand back
+    whichever happened to be filed last: a segment's revenue served as the
+    company's. Consolidated is the empty-dimensions row, and the column is NOT NULL
+    DEFAULT '' (infra/init.sql), so the empty string is the whole test.
+
+    filing_date is joined in because period_ladder's restatement rule prefers it
+    and falls back to the accession string. Never selecting it made the fallback
+    the only branch that ever ran, so "most recently filed" silently meant
+    "highest accession number". The join is OUTER: a fact whose filing row is
+    absent still loads and still gets the accession ordering it had before.
     """
     company_id = await _company_id(db, spec.ticker)
     rows = (
         await db.execute(
             select(
                 FinancialFact.id, FinancialFact.period_start, FinancialFact.period_end,
-                FinancialFact.value, FinancialFact.source_accession,
-            ).where(
+                FinancialFact.value, FinancialFact.source_accession, Filing.filing_date,
+            )
+            .outerjoin(Filing, Filing.id == FinancialFact.filing_id)
+            .where(
                 FinancialFact.company_id == company_id,
                 FinancialFact.normalized_metric == spec.metric,
                 FinancialFact.value.is_not(None),
+                FinancialFact.dimensions_hash == "",
             )
         )
     ).all()
@@ -82,9 +102,9 @@ async def load_fact_series(db: AsyncSession, spec: SeriesSpec) -> tuple[list[so.
     facts = [
         pl.FactPoint(
             fact_id=fid, period_end=pe, value=float(val),
-            period_start=ps, source_accession=acc,
+            period_start=ps, source_accession=acc, filing_date=fd,
         )
-        for fid, ps, pe, val, acc in rows
+        for fid, ps, pe, val, acc, fd in rows
     ]
 
     ladder = pl.build_ladder(facts, spec.metric, spec.period_type)

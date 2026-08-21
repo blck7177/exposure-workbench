@@ -29,17 +29,24 @@ class PnlResult:
 
 
 def _last_bar(prices_df: pd.DataFrame, ticker: str, on_or_before: pd.Timestamp):
-    """(close, bar_date) of the newest bar at or before a date, or (None, None).
+    """(close, adj_close, bar_date) of the newest bar at or before a date.
+
+    (None, None, None) when there is no such bar.
 
     The date comes back with the price because a daily move needs two DIFFERENT
     bars. Returning only the number made it impossible to tell "flat day" from
     "both lookups landed on the same bar", and those are not the same fact.
+
+    Both prices come back because this function feeds two different questions:
+    what the position is worth (close) and what it returned (adj_close).
     """
     sub = prices_df[(prices_df["ticker"] == ticker) & (prices_df["price_date"] <= on_or_before)]
     if sub.empty:
-        return None, None
+        return None, None, None
     last = sub.sort_values("price_date").iloc[-1]
-    return float(last["close"]), last["price_date"]
+    adj = last["adj_close"] if "adj_close" in sub.columns else None
+    adj = float(adj) if adj is not None and adj == adj else None   # NaN -> None
+    return float(last["close"]), adj, last["price_date"]
 
 
 def calc_pnl(
@@ -51,7 +58,21 @@ def calc_pnl(
     Compute daily P&L for the portfolio.
 
     positions_df columns: ticker, quantity, sector [, market_value]
-    prices_df columns: ticker, price_date, close
+    prices_df columns: ticker, price_date, close, adj_close
+
+    Market value is as-traded (close); the daily move is the adjusted return
+    applied to yesterday's market value. The two prices answer two questions and
+    mixing them up produces a specific, large error: on the day a stock splits
+    4:1 the close falls 75% while nothing has happened to the holder, and a
+    close-to-close P&L reports the book losing three quarters of that position.
+    Dividends are the same error one order of magnitude smaller and far more
+    often — every ex-date became a loss.
+
+    What this does NOT fix: `positions.quantity` is a snapshot and is not
+    split-adjusted either, so on a split day the market value is still computed
+    from a pre-split share count. That is a holdings-data problem, not a price
+    one, and it is named in docs/IMPLEMENTATION_PLAN_V5.md rather than papered
+    over here.
     """
     as_of = pd.Timestamp(as_of_date)
     prev_date = as_of - pd.tseries.offsets.BDay(1)  # previous business day
@@ -69,8 +90,8 @@ def calc_pnl(
         qty = float(row["quantity"])
         sector = str(row.get("sector", "Unknown") or "Unknown")
 
-        curr_price, curr_bar = _last_bar(prices_df, ticker, as_of)
-        prev_price, prev_bar = _last_bar(prices_df, ticker, prev_date)
+        curr_price, curr_adj, curr_bar = _last_bar(prices_df, ticker, as_of)
+        prev_price, prev_adj, prev_bar = _last_bar(prices_df, ticker, prev_date)
 
         if curr_price is None:
             # No fallback to the position's stored price or cost basis. That
@@ -81,10 +102,17 @@ def calc_pnl(
             # exists, so reaching here means a caller skipped it.
             raise ValueError(f"calc_pnl called with no price for {ticker} as of {as_of_date}")
 
+        if curr_adj is None or (prev_price is not None and prev_adj is None):
+            raise ValueError(
+                f"calc_pnl called with no adjusted close for {ticker} as of "
+                f"{as_of_date} — re-ingest market prices"
+            )
+
         if prev_price is None:
             # Genuinely fine: nothing existed before this bar, e.g. a listing
             # younger than the comparison window. No prior close, no move.
             prev_price = curr_price
+            prev_adj = curr_adj
         elif prev_bar == curr_bar:
             # Both lookups landed on the SAME bar, so there is no move to
             # measure — most often because as_of is today and today has not
@@ -93,9 +121,12 @@ def calc_pnl(
 
         curr_mv = qty * curr_price
         prev_mv = qty * prev_price
-        pnl = curr_mv - prev_mv
 
-        ticker_return = (curr_price / prev_price - 1) if prev_price > 0 else 0.0
+        # The move is measured on the adjusted series and then applied to what
+        # the position was actually worth yesterday. curr_mv - prev_mv would be
+        # the close-to-close difference again, split and dividend included.
+        ticker_return = (curr_adj / prev_adj - 1) if prev_adj > 0 else 0.0
+        pnl = prev_mv * ticker_return
         total_pnl += pnl
         curr_portfolio_mv += curr_mv
         prev_portfolio_mv += prev_mv

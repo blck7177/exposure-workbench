@@ -121,6 +121,7 @@ class FactorPrice(Base):
     ticker: Mapped[str] = mapped_column(String(16), nullable=False)
     price_date: Mapped[date] = mapped_column(Date, nullable=False)
     close: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    adj_close: Mapped[float | None] = mapped_column(Numeric(18, 4))
     daily_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
     source: Mapped[str | None] = mapped_column(String(32), default="seed")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

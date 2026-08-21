@@ -30,8 +30,23 @@ async def get_prices_df(
     end_date: date,
 ) -> pd.DataFrame:
     """
-    Return a DataFrame of close prices for the given tickers and date range.
-    Columns: ticker, price_date, close
+    Return a DataFrame of prices for the given tickers and date range.
+    Columns: ticker, price_date, close, adj_close
+
+    BOTH price columns travel together, and each consumer names the one it means.
+    They answer different questions and the system needs both:
+
+      close      — what the position is worth. Market value, gross/net exposure,
+                   concentration. As-traded, ties to a statement.
+      adj_close  — what the position RETURNED. Volatility, VaR, ES, drawdown,
+                   betas, P&L. Split- and dividend-adjusted.
+
+    Returning only `close` was not a simplification, it was a silent choice of
+    convention for every consumer at once — and the wrong one for all the return
+    consumers. A 4:1 split is a −75% close-to-close move; fed to a 60-observation
+    VaR it becomes the tail. The calc ledger had already chosen adj_close for its
+    own price series (calc_service.load_price_series), so the two halves of one
+    system were measuring different returns for the same stock.
     """
     result = await db.execute(
         select(MarketPrice)
@@ -44,13 +59,14 @@ async def get_prices_df(
     )
     rows = result.scalars().all()
     if not rows:
-        return pd.DataFrame(columns=["ticker", "price_date", "close"])
+        return pd.DataFrame(columns=["ticker", "price_date", "close", "adj_close"])
 
     return pd.DataFrame([
         {
             "ticker": r.ticker,
             "price_date": pd.Timestamp(r.price_date),
             "close": float(r.close),
+            "adj_close": float(r.adj_close) if r.adj_close is not None else float("nan"),
         }
         for r in rows
     ])
@@ -63,8 +79,15 @@ async def get_factor_prices_df(
     end_date: date,
 ) -> pd.DataFrame:
     """
-    Return a DataFrame of factor close prices for the given tickers.
-    Columns: ticker, price_date, close, daily_return
+    Return a DataFrame of factor prices for the given tickers.
+    Columns: ticker, price_date, close, adj_close, daily_return
+
+    Same two-column convention as get_prices_df, for the same reason. It matters
+    more here than it looks: two of the eight factors are TLT and HYG, which
+    distribute several percent a year. On close alone their measured returns are
+    short by exactly those distributions, so every beta estimated against them is
+    biased — and the portfolio side is now on a total-return basis, which would
+    make the regression a comparison between two different definitions of return.
     """
     result = await db.execute(
         select(FactorPrice)
@@ -77,17 +100,74 @@ async def get_factor_prices_df(
     )
     rows = result.scalars().all()
     if not rows:
-        return pd.DataFrame(columns=["ticker", "price_date", "close", "daily_return"])
+        return pd.DataFrame(
+            columns=["ticker", "price_date", "close", "adj_close", "daily_return"]
+        )
 
     return pd.DataFrame([
         {
             "ticker": r.ticker,
             "price_date": pd.Timestamp(r.price_date),
             "close": float(r.close),
+            "adj_close": float(r.adj_close) if r.adj_close is not None else float("nan"),
             "daily_return": float(r.daily_return) if r.daily_return is not None else None,
         }
         for r in rows
     ])
+
+
+# A return is a ONE-day return or it is not usable. Weekends span 3 calendar
+# days and a holiday-extended weekend 4, so anything past 5 is a hole in the
+# panel, not a market closure pattern.
+_MAX_RETURN_SPAN_DAYS = 5
+
+
+def total_return_panel(prices_df: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
+    """date × ticker adjusted closes, for exactly `tickers`, no fabricated cells.
+
+    Every return series in the system is built from this one function, so
+    "which price, and what happens to a missing bar" has a single answer.
+
+    A missing bar leaves a hole and the whole date is dropped, because a
+    portfolio return needs every leg priced on the same day. What it must NEVER
+    do is carry the previous close forward: ffill() does not fill a gap, it
+    manufactures a day on which the stock did not move. Those synthetic zeros
+    are indistinguishable from real flat days to every estimator downstream, and
+    they all read the same way — variance computed over a sample padded with
+    zeros is biased down, so a book with a patchy price feed reports itself
+    calmer than it is, and reports it through VaR into the limit checks.
+    """
+    if "adj_close" not in prices_df.columns:
+        raise ValueError(
+            "price frame has no adj_close column — returns are measured on the "
+            "adjusted series and there is no second convention to fall back to"
+        )
+
+    panel = (
+        prices_df.pivot(index="price_date", columns="ticker", values="adj_close")
+        .sort_index()
+    )
+    panel.columns = [str(c) for c in panel.columns]
+
+    absent = sorted(set(tickers) - set(panel.columns))
+    if absent:
+        raise ValueError(
+            "Cannot build a return series without every holding: "
+            f"no usable price history for {', '.join(absent)}"
+        )
+
+    panel = panel[list(tickers)]
+    unadjusted = sorted(t for t in tickers if panel[t].isna().all())
+    if unadjusted:
+        # Distinct from "absent": the bars are there, they just predate the
+        # provider writing adj_close. Silently reading `close` instead would put
+        # the unadjusted convention back, on exactly the rows most likely to be
+        # old enough to contain a split.
+        raise ValueError(
+            f"No adjusted close for {', '.join(unadjusted)} — re-ingest market "
+            "prices before measuring returns"
+        )
+    return panel.dropna()
 
 
 def build_portfolio_returns(
@@ -95,64 +175,78 @@ def build_portfolio_returns(
     prices_df: pd.DataFrame,
 ) -> pd.Series:
     """
-    Build a time series of daily portfolio returns from positions and prices.
+    Daily total return of the book, valued at fixed quantities.
 
-    positions_df: columns ticker, quantity (snapshot weights are fixed)
-    prices_df: columns ticker, price_date, close
+    positions_df: columns ticker, quantity
+    prices_df: columns ticker, price_date, close, adj_close
     Returns: pd.Series indexed by date, values = daily portfolio return
+
+    The book is revalued each day and the return is the change in its value.
+    That is equivalent to weighting each name's return by its share of YESTERDAY's
+    value, which is the only weighting a return series can honestly use.
+
+    What it replaces: weights computed from the LAST close in the window and then
+    applied to every day of it. Those weights are unknowable on any day but the
+    last one, so the series described a book assembled with hindsight — the
+    winners were held in the proportion they grew INTO, not the proportion they
+    were held at. The bias is systematic and one-directional: it overweights
+    whatever went up. Measured on the two-name case in the tests, a book that
+    genuinely returned 0.0% reported +1.0%.
+
+    Fixed quantities remain an assumption — `positions` holds one snapshot per
+    portfolio, so there is no holding history to replay and no way to know the
+    book was ever different. That assumption is stated, not hidden, and it is the
+    same one calc_pnl makes. The look-ahead was neither.
     """
     if prices_df.empty or positions_df.empty:
         return pd.Series(dtype=float)
 
-    # Pivot prices to wide format: date × ticker
-    pivot = prices_df.pivot(index="price_date", columns="ticker", values="close").sort_index()
-    pivot = pivot.ffill().dropna()
-
-    if pivot.empty:
-        return pd.Series(dtype=float)
-
-    # Every holding must be represented. Silently keeping only the ones that
-    # happen to have prices and renormalising their weights to 1.0 was a THIRD
-    # missing-price convention living alongside calc_exposure's zero-fill and
-    # calc_pnl's snapshot fallback — three different answers to one question,
-    # inside a single run. Risk metrics built from a subset of the book get fed
-    # straight into VaR and the limit checks, so this fails loudly instead.
     held = [str(t) for t in positions_df["ticker"].tolist()]
-    missing = sorted(set(held) - set(map(str, pivot.columns)))
-    if missing:
+    if not held:
+        return pd.Series(dtype=float)
+
+    panel = total_return_panel(prices_df, held)
+    if len(panel) < 2:
+        return pd.Series(dtype=float)
+
+    quantities = positions_df.set_index("ticker")["quantity"].reindex(held).astype(float)
+    if quantities.isna().any():
+        missing = ", ".join(sorted(quantities[quantities.isna()].index.astype(str)))
+        raise ValueError(f"Holdings with no quantity: {missing}")
+
+    book_value = panel.mul(quantities.values, axis=1).sum(axis=1)
+    if (book_value <= 0).any():
+        # pct_change across a zero or a sign flip produces a number with no
+        # meaning as a return, and it would flow straight into VaR.
         raise ValueError(
-            "Cannot build a portfolio return series without every holding: "
-            f"no usable price history for {', '.join(missing)}"
+            "Portfolio value is zero or negative on at least one day in the "
+            "window — a return series cannot be built from it"
         )
-    tickers = held
-    if not tickers:
-        return pd.Series(dtype=float)
 
-    # Build quantity weights using latest prices (approximation for historical returns)
-    last_prices = pivot[tickers].iloc[-1]
-    quantities = positions_df.set_index("ticker")["quantity"].reindex(tickers).fillna(0)
-    position_mv = quantities * last_prices
-    total_mv = position_mv.sum()
-    if total_mv <= 0:
-        return pd.Series(dtype=float)
-    weights = position_mv / total_mv
-
-    # Compute daily price returns for each ticker
-    ticker_returns = pivot[tickers].pct_change().dropna()
-
-    # Portfolio return = weighted sum
-    portfolio_returns = (ticker_returns * weights).sum(axis=1)
-    return portfolio_returns
+    returns = book_value.pct_change()
+    span = book_value.index.to_series().diff().dt.days
+    # A return over a gap is a multi-day move wearing a one-day label: it
+    # enlarges the tail of a VaR whose every other observation is one day long.
+    return returns[span <= _MAX_RETURN_SPAN_DAYS].dropna()
 
 
 def build_factor_returns_df(factor_prices_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Pivot factor prices into a date-indexed DataFrame of daily returns.
+    Pivot factor prices into a date-indexed DataFrame of daily total returns.
     Each column is a factor ticker.
+
+    Same panel rules as the portfolio side — adjusted closes, no ffill, no
+    return spanning a gap — because these two series are regressed against each
+    other and a difference in convention between them lands entirely in the betas.
     """
     if factor_prices_df.empty:
         return pd.DataFrame()
 
-    pivot = factor_prices_df.pivot(index="price_date", columns="ticker", values="close").sort_index()
-    returns = pivot.pct_change().dropna()
-    return returns
+    tickers = sorted({str(t) for t in factor_prices_df["ticker"].tolist()})
+    panel = total_return_panel(factor_prices_df, tickers)
+    if len(panel) < 2:
+        return pd.DataFrame()
+
+    returns = panel.pct_change()
+    span = panel.index.to_series().diff().dt.days
+    return returns[span <= _MAX_RETURN_SPAN_DAYS].dropna()

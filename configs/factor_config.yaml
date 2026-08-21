@@ -42,9 +42,11 @@ factors:
     description: "CBOE VIX — equity volatility / fear gauge"
     group: "macro"
 
+# Every key below is read by analytics/factor_model.py. `method: ewm` and
+# `ewm_halflife_days` used to sit here advertising a capability the code did not
+# have — the loader ignored them and always ran OLS, so the file described a
+# model that never ran. A config key with no reader is a claim, not a setting.
 regression:
   window_days: 60
   min_observations: 30
-  method: "ols"           # ols | ewm
-  ewm_halflife_days: 20
   include_intercept: true

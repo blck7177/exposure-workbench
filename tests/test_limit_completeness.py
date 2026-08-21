@@ -207,13 +207,18 @@ def test_the_engine_takes_no_argument_that_could_carry_a_threshold():
 
 # ── _validate_inputs judges limits in the same raise as prices ────────────────
 
+# These tests are about limits; no factors configured keeps the factor branch
+# of the same raise out of their messages.
+_NO_FACTORS = pd.DataFrame(columns=["ticker", "price_date", "close"])
+
+
 def _validate(limits: LimitBook, *, tickers=("AAPL",)):
     wf = ExposureWorkflow(configs_dir="/app/configs")
     positions_df = pd.DataFrame([{"ticker": t, "quantity": 10.0, "sector": "Tech",
                                   "asset_class": "equity"} for t in tickers])
     prices_df = pd.DataFrame([{"ticker": t, "price_date": pd.Timestamp(AS_OF),
                                "close": 100.0} for t in tickers])
-    wf._validate_inputs(positions_df, prices_df, AS_OF, limits)
+    wf._validate_inputs(positions_df, prices_df, AS_OF, limits, _NO_FACTORS, [])
 
 
 def test_a_complete_book_validates():
@@ -241,7 +246,7 @@ def test_a_price_problem_and_a_limit_problem_surface_in_the_same_raise():
                                "close": 100.0}])
     rows = [r for r in complete_rows() if r["limit_type"] != "var_95"]
     with pytest.raises(ValueError) as e:
-        wf._validate_inputs(positions_df, prices_df, AS_OF, LimitBook(rows))
+        wf._validate_inputs(positions_df, prices_df, AS_OF, LimitBook(rows), _NO_FACTORS, [])
     message = str(e.value)
     assert "ZZZZ" in message
     assert "var_95" in message

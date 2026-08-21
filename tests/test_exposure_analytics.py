@@ -32,9 +32,23 @@ def positions(*rows: tuple[str, float, str]) -> pd.DataFrame:
     )
 
 
-def prices(*rows: tuple[str, str, float]) -> pd.DataFrame:
+def prices(*rows) -> pd.DataFrame:
+    """(ticker, date, close) or (ticker, date, close, adj_close).
+
+    Three-element rows mean "no corporate action", i.e. adj_close == close. The
+    four-element form is how a split or a dividend is expressed: the two prices
+    diverge, and which of them a calculation reads becomes visible.
+    """
     return pd.DataFrame(
-        [{"ticker": t, "price_date": pd.Timestamp(d), "close": c} for t, d, c in rows]
+        [
+            {
+                "ticker": r[0],
+                "price_date": pd.Timestamp(r[1]),
+                "close": r[2],
+                "adj_close": r[3] if len(r) > 3 else r[2],
+            }
+            for r in rows
+        ]
     )
 
 
@@ -99,6 +113,34 @@ def test_pnl_measures_the_move_between_two_closes():
     assert out.daily_return == pytest.approx(0.10)
 
 
+def test_pnl_does_not_report_a_split_as_a_loss():
+    """4:1 split: the close falls 75%, the holder has lost nothing.
+
+    Close-to-close P&L reported this position down $30,000 on a $40,000 book —
+    the largest single-day loss the system could produce, from an event in which
+    no money moved. The move is read off the adjusted series instead.
+    """
+    out = calc_pnl(
+        positions(("AAPL", 100, "Tech")),
+        prices(("AAPL", "2026-07-23", 400.0, 100.0),
+               ("AAPL", "2026-07-24", 100.0, 100.0)),
+        AS_OF,
+    )
+    assert out.daily_pnl == pytest.approx(0.0)
+    assert out.daily_return == pytest.approx(0.0)
+
+
+def test_pnl_counts_a_dividend_instead_of_reporting_it_as_a_drop():
+    """Ex-date: close falls by the dividend, the total return is flat."""
+    out = calc_pnl(
+        positions(("XOM", 100, "Energy")),
+        prices(("XOM", "2026-07-23", 100.0, 99.0),
+               ("XOM", "2026-07-24", 99.0, 99.0)),
+        AS_OF,
+    )
+    assert out.daily_pnl == pytest.approx(0.0)
+
+
 def test_pnl_refuses_to_fall_back_to_the_stored_snapshot_price():
     """The fallback made a single run report market value from one universe and
     daily return from another: exposure said 20,000 while P&L's denominator was
@@ -157,14 +199,72 @@ def test_one_untraded_name_among_many_is_still_a_real_flat_position():
 
 # ── build_portfolio_returns ───────────────────────────────────────────────────
 
-def test_return_series_is_weighted_across_the_whole_book():
+def test_the_return_series_weights_by_yesterday_not_by_hindsight():
+    """The look-ahead case, stated as the number it used to get wrong.
+
+    100 shares of each name, both at $100 on day one: the book is exactly half in
+    each. One rises 10%, the other falls 10%, so the book is flat and the series
+    must say 0.0%.
+
+    It used to say +1.0%. Weights were computed from the LAST close in the
+    window — 11,000 vs 9,000, i.e. 55%/45% — and applied backwards to every day,
+    including the day before those closes existed. The bias is not noise: the
+    winner is always the one weighted up, so every book in the system reported a
+    return series flattered by exactly the dispersion of its own holdings.
+    """
     series = build_portfolio_returns(
         positions(("AAPL", 100, "Tech"), ("XOM", 100, "Energy")),
         prices(("AAPL", "2026-07-23", 100.0), ("AAPL", "2026-07-24", 110.0),
                ("XOM", "2026-07-23", 100.0), ("XOM", "2026-07-24", 90.0)),
     )
-    # equal market values at the last close (11,000 vs 9,000) -> 55% / 45%
-    assert series.iloc[-1] == pytest.approx(0.10 * 0.55 + -0.10 * 0.45)
+    assert series.iloc[-1] == pytest.approx(0.0)
+    assert series.iloc[-1] != pytest.approx(0.01), "the hindsight weights are back"
+
+
+def test_returns_are_measured_on_the_adjusted_series_not_the_close():
+    """A 4:1 split is a −75% close and a 0% return. VaR must see the 0%."""
+    series = build_portfolio_returns(
+        positions(("AAPL", 100, "Tech")),
+        prices(("AAPL", "2026-07-23", 400.0, 100.0),
+               ("AAPL", "2026-07-24", 100.0, 100.0)),
+    )
+    assert series.iloc[-1] == pytest.approx(0.0)
+
+
+def test_a_stale_bar_is_a_hole_not_a_flat_day():
+    """ffill() used to invent the middle day at AAPL's previous close.
+
+    The invented day carries a 0.0% return that no estimator can tell from a
+    real one, and it lands in the sample variance as if the market had been
+    quiet. Here the book genuinely has two observations, not three.
+    """
+    series = build_portfolio_returns(
+        positions(("AAPL", 100, "Tech"), ("XOM", 100, "Energy")),
+        prices(("AAPL", "2026-07-22", 100.0), ("AAPL", "2026-07-24", 110.0),
+               ("XOM", "2026-07-22", 100.0), ("XOM", "2026-07-23", 100.0),
+               ("XOM", "2026-07-24", 100.0)),
+    )
+    assert len(series) == 1, "only 07-22 -> 07-24 is priced on both legs"
+    assert series.index[-1] == pd.Timestamp("2026-07-24")
+
+
+def test_a_return_spanning_a_gap_is_dropped_rather_than_labelled_one_day():
+    """Two bars a month apart make a monthly move wearing a daily label."""
+    series = build_portfolio_returns(
+        positions(("AAPL", 100, "Tech")),
+        prices(("AAPL", "2026-06-24", 100.0), ("AAPL", "2026-07-24", 130.0)),
+    )
+    assert series.empty
+
+
+def test_a_long_weekend_is_still_a_one_day_return():
+    """The gap rule must not eat Friday-to-Monday, which is 3 calendar days."""
+    series = build_portfolio_returns(
+        positions(("AAPL", 100, "Tech")),
+        prices(("AAPL", "2026-07-24", 100.0), ("AAPL", "2026-07-27", 101.0)),
+    )
+    assert len(series) == 1
+    assert series.iloc[-1] == pytest.approx(0.01)
 
 
 def test_dropping_an_unpriced_holding_and_renormalising_is_refused():

@@ -206,7 +206,7 @@ git pull
 #   CLERK_AUTHORIZED_PARTIES=https://exposure.<domain>
 docker compose build
 
-# Schema BEFORE the new code sees the database. All three files are idempotent
+# Schema BEFORE the new code sees the database. All four files are idempotent
 # and safe to re-run in full, but the order is not optional: every V3 column is
 # read by V3 code, so an API that starts first answers 500 on the agent routes
 # until the ALTERs land. Bring postgres up alone, migrate, then start the rest.
@@ -215,6 +215,12 @@ docker compose build
 # no writer and no reader (V4-S2), so running it against the old code is
 # harmless — which is why it still belongs before `up -d` with the others,
 # rather than being the exception someone has to remember.
+#
+# v5_price_convention.sql adds factor_prices.adj_close and leaves it NULL on
+# purpose. The first exposure run after the deploy re-ingests factor prices and
+# fills it; until then the attribution step fails with a message naming the
+# tickers, which is the intended state — a backfill of `close` into `adj_close`
+# would assert that unadjusted history had been adjusted.
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
@@ -222,6 +228,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v3_harness.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v4_cost.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v5_price_convention.sql
 
 docker compose up -d
 
