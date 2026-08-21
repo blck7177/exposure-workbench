@@ -181,6 +181,21 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
         ("designator_spaced", rf"\b(?:{_SPACED_ALT})\b{_UNIT_MARKER}", re.IGNORECASE),
         # "over the last 3 months", "a 1-year relative return"
         ("duration", r"\b\d{1,3}[-\s](?:day|week|month|quarter|year)s?\b", 0),
+        # The same thing abbreviated and attached: "30d Annualised Vol",
+        # "60d", "1y return". The separator-and-full-word form above does not
+        # reach it, and the exposure report's own headings are written this way —
+        # so every report carried a guaranteed false rejection of the window
+        # label in its volatility line. _UNIT_MARKER is what keeps "30d" a label
+        # while leaving "30 %" a claim.
+        ("duration_abbrev", rf"\b\d{{1,3}}[dwmy]\b{_UNIT_MARKER}", 0),
+        # A confidence level is a PARAMETER of the measure, not a measurement:
+        # "VaR (95%, 1d)", "1-day 95% VaR", "95% confidence". Enumerated to the
+        # three levels anyone quotes and required to sit against the word it
+        # parameterises, because a bare "95%" elsewhere in a report is a claim
+        # about the book and must still be checked.
+        ("confidence_level",
+         r"\b(?:90|95|97\.5|99)%\s*(?:VaR|ES|CVaR|confidence|CI)\b"
+         r"|\b(?:VaR|ES|CVaR)\s*\(?\s*(?:90|95|97\.5|99)%", re.IGNORECASE),
         # A standalone calendar year. The lookahead rejects "2024.5" but must NOT
         # reject a year that ends a sentence — "shipping in 2027." is still a year.
         # A currency mark in front or a scale word behind means it was never a
@@ -435,9 +450,16 @@ _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], 
       "stress_loss_tech", "stress_loss_rates", "stress_loss_credit", "stress_loss_market"),
      None),
     (IssuerExposure, ("market_value", "daily_pnl"),
-     ("weight", "weight_change", "daily_return"), "ticker"),
+     ("weight", "weight_change", "daily_return", "contribution"), "ticker"),
     (SectorExposure, ("market_value",), ("weight", "weight_change"), "sector"),
     (FactorAttribution, (), ("beta", "factor_return", "contribution", "r_squared"), "factor_name"),
+    # A run's own alerts. Without this, `run_` alone could not support the limit
+    # levels the run itself set off — measured on a live report, citing the run
+    # left 14 of 45 numbers unverified and adding the run's three alert ids
+    # brought it to 8. The alert rows ARE children of the run; requiring them to
+    # be cited separately made a citation set that had to be assembled by hand
+    # out of two kinds of id to describe one run.
+    (RiskAlert, (), ("current_value", "limit_value", "utilization"), "alert_type"),
 )
 
 

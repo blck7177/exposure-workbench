@@ -206,7 +206,7 @@ git pull
 #   CLERK_AUTHORIZED_PARTIES=https://exposure.<domain>
 docker compose build
 
-# Schema BEFORE the new code sees the database. All four files are idempotent
+# Schema BEFORE the new code sees the database. All five files are idempotent
 # and safe to re-run in full, but the order is not optional: every V3 column is
 # read by V3 code, so an API that starts first answers 500 on the agent routes
 # until the ALTERs land. Bring postgres up alone, migrate, then start the rest.
@@ -221,6 +221,11 @@ docker compose build
 # fills it; until then the attribution step fails with a message naming the
 # tickers, which is the intended state — a backfill of `close` into `adj_close`
 # would assert that unadjusted history had been adjusted.
+#
+# v6_report_gate.sql adds issuer_exposures.contribution and does not backfill it
+# either: the value is derivable from stored columns only when every holding
+# priced on both days, so a computed backfill would write a silently wrong number
+# into an old run. NULL reads as "this run did not record it".
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
@@ -230,6 +235,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v4_cost.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v5_price_convention.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v6_report_gate.sql
 
 docker compose up -d
 

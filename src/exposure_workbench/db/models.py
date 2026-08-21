@@ -269,6 +269,11 @@ class IssuerExposure(Base):
     weight_change: Mapped[float | None] = mapped_column(Numeric(12, 8))
     daily_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
     daily_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    # Share of the BOOK's return this position accounts for: yesterday's weight
+    # times the position's return. calc_pnl has always computed it and this row
+    # has never held it, so the one figure a "top contributors" sentence is made
+    # of was the one figure nothing could check it against.
+    contribution: Mapped[float | None] = mapped_column(Numeric(12, 8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     run: Mapped["ExposureRun"] = relationship(back_populates="issuer_exposures")

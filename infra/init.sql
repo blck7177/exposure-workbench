@@ -228,6 +228,8 @@ CREATE TABLE IF NOT EXISTS issuer_exposures (
     weight_change   NUMERIC(12, 8),  -- vs previous run
     daily_pnl       NUMERIC(18, 2),
     daily_return    NUMERIC(12, 8),
+    -- Share of the book's return this position accounts for (V6).
+    contribution    NUMERIC(12, 8),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (run_id, ticker)
 );

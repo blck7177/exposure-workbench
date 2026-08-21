@@ -34,13 +34,42 @@ from exposure_workbench.services import (
     workflow_event_service,
     market_data_service,
     market_data_ingestion_service,
+    report_verification,
 )
 from exposure_workbench.utils.ids import new_alert_id, new_id
 from exposure_workbench.workflow.contracts import WorkflowInput, WorkflowOutput
 
 logger = logging.getLogger(__name__)
 
-_LOOKBACK_DAYS = 90   # calendar days of price history to load
+# Calendar days of price history to load. Three years, because that is where the
+# numbers stop moving. Measured on port_001 by rolling the window forward one day
+# at a time, sixty times, and reading the spread of stress_loss_market:
+#
+#     observations   roll range / mean   swing from 2 more obs   VaR tail obs
+#         60             61.7%                 17.7%                  3
+#        125             25.7%                  5.9%                  6
+#        250             14.0%                  1.5%                 12
+#        500              6.2%                  1.0%                 25
+#        750              3.7%                  0.7%                 37
+#
+# The 56% jump that V5 recorded between two runs was not an anomaly — 60
+# observations is simply a window whose answer moves that much. At 750 the same
+# measurement is 0.05pp, which is a number that can be quoted.
+#
+# What this does NOT fix, measured the same way: max VIF never falls below 5 at
+# ANY window length and RISES with it (14.6 at 60 obs, 18.8 at 750), because
+# corr(SPY, QQQ) goes from 0.920 to 0.948 over longer samples. Individual betas
+# stay unquotable; only shrinkage or a smaller factor set touches that.
+#
+# 1200 calendar days and not 1095, which is the three years the table above is
+# about. The regression asks for the last 750 observations, and three years of
+# calendar supplies about 756 — six to spare, which is not a margin. A market
+# closure, or one holding missing a bar, comes off the top of the panel and the
+# regression would start quietly running on less than it asked for. That is the
+# state V5 shipped: 90 calendar days yielded 61 observations against a window of
+# 60, and nobody noticed the two numbers were coupled. The extra three months
+# buys ~10% slack; tests/test_factor_and_stress.py holds the pair to it.
+_LOOKBACK_DAYS = 1200
 
 
 class ExposureWorkflow:
@@ -237,7 +266,16 @@ class ExposureWorkflow:
                 )
                 # A scenario that could not be propagated is NOT a scenario with
                 # zero loss, and the limit engine only sees the ones that were.
+                # observations is what VaR, ES and max drawdown were computed
+                # over — the whole panel, not a tail of it. It is recorded
+                # because those three change MEANING with the window: at 61
+                # observations max_drawdown was "the worst fall in three months"
+                # and at 752 it is "the worst fall in three years", measured on
+                # this book as 5.9% against 17.7%. Same column, same name,
+                # different question, and only this number says which.
                 ctx.payload = {
+                    "observations": int(len(portfolio_returns)),
+                    "lookback_days": _LOOKBACK_DAYS,
                     "scenarios_evaluated": {
                         s.name: {"factors_held_flat": s.factors_held_flat}
                         for s in stress.scenarios
@@ -318,10 +356,17 @@ class ExposureWorkflow:
                 raise
 
             # ── Step 11: Generate report (best-effort) ─────────────────────────
+            # Best-effort means the RUN survives a refused report, not that the
+            # refusal is quiet: __aexit__ writes the exception into the step's
+            # message, so "3 of 45 numbers in the report are not supported by
+            # this run: ..." is on the timeline. The one thing that must never
+            # happen here is a persisted report nobody can tell from a checked
+            # one — which is what the two nested `except Exception` handlers
+            # this replaced were doing, 9 times in 19.
             ctx = _StepContext(db, run_id, "generate_report", "Generating LLM executive summary and report")
             await ctx.__aenter__()
             try:
-                report_id = await self._generate_report(
+                report_id, ctx.payload = await self._generate_report(
                     db, run_id, portfolio_id, as_of_date,
                     exposure, pnl, factor_result, risk, stress, alerts,
                 )
@@ -512,6 +557,28 @@ class ExposureWorkflow:
         usable = prices_df[prices_df["price_date"] <= as_of_ts]
         return usable.groupby("ticker")["price_date"].max()
 
+    @staticmethod
+    def _unadjusted_rows(prices_df: pd.DataFrame, as_of_ts: pd.Timestamp) -> list[str]:
+        """Tickers holding bars with no adjusted close, and how many.
+
+        A bar without adj_close is invisible to every return series — the panel
+        drops the date and says nothing. That is how a window can be three years
+        long and produce sixty observations: V5 added factor_prices.adj_close and
+        deliberately did not backfill it, so 233 of 295 rows were null the day
+        this window was widened. Step 1 refills them from the provider before
+        this runs, so reaching here means the refill did not happen, and the
+        alternative to refusing is a run that reports the sample size it wishes
+        it had.
+        """
+        if prices_df.empty or "adj_close" not in prices_df.columns:
+            return []
+        usable = prices_df[prices_df["price_date"] <= as_of_ts]
+        holes = usable[usable["adj_close"].isna()]
+        if holes.empty:
+            return []
+        counts = holes.groupby("ticker").size()
+        return sorted(f"{ticker} ({n})" for ticker, n in counts.items())
+
     def _validate_inputs(
         self,
         positions_df: pd.DataFrame,
@@ -579,6 +646,14 @@ class ExposureWorkflow:
         if stale:
             problems.append(f"newest price older than {max_age} days for: {', '.join(stale)}")
 
+        unadjusted = self._unadjusted_rows(prices_df, as_of_ts)
+        if unadjusted:
+            problems.append(
+                "bars with no adjusted close (they are invisible to every return "
+                "series, so the window would silently shrink) for: "
+                + ", ".join(unadjusted)
+            )
+
         wanted_factors = set(factor_tickers)
         if wanted_factors:
             factor_newest = (
@@ -602,6 +677,12 @@ class ExposureWorkflow:
                 problems.append(
                     f"newest factor price older than {max_age} days for: "
                     + ", ".join(factors_stale)
+                )
+            factors_unadjusted = self._unadjusted_rows(factor_prices_df, as_of_ts)
+            if factors_unadjusted:
+                problems.append(
+                    "factor bars with no adjusted close for: "
+                    + ", ".join(factors_unadjusted)
                 )
 
         missing_limits = limits.missing_required()
@@ -699,6 +780,7 @@ class ExposureWorkflow:
                 weight_change=None,
                 daily_pnl=pos_pnl.daily_pnl if pos_pnl else None,
                 daily_return=pos_pnl.daily_return if pos_pnl else None,
+                contribution=pos_pnl.contribution if pos_pnl else None,
             ))
 
         # FactorAttribution rows
@@ -744,87 +826,112 @@ class ExposureWorkflow:
         risk: RiskResult,
         stress: StressResult,
         alerts: list[AlertResult],
-    ) -> str | None:
-        try:
-            from exposure_workbench.agents.report_agent import get_report_agent
-            from exposure_workbench.agents.schemas import ReportInput
+    ) -> tuple[str, dict]:
+        """The report, or a raise naming why there is none.
 
-            report_input = ReportInput(
-                portfolio_id=portfolio_id,
-                as_of_date=str(as_of_date),
-                portfolio_market_value=exposure.portfolio_market_value,
-                daily_pnl=pnl.daily_pnl,
-                daily_return=pnl.daily_return,
-                top_contributors=[
-                    {"ticker": p.ticker, "contribution": p.contribution, "daily_return": p.daily_return}
-                    for p in pnl.top_contributors
-                ],
-                top_detractors=[
-                    {"ticker": p.ticker, "contribution": p.contribution, "daily_return": p.daily_return}
-                    for p in pnl.top_detractors
-                ],
-                sector_exposures={s: d["weight"] for s, d in exposure.sector_map.items()},
-                var_95_1d=risk.var_95_1d,
-                vol_30d=risk.vol_30d,
-                max_drawdown=risk.max_drawdown,
-                factor_attributions=[
-                    {
-                        "factor_name": fr.factor_name,
-                        "beta": fr.beta,
-                        "factor_return": fr.factor_return,
-                        "contribution": fr.contribution,
-                    }
-                    for fr in factor_result.factors[:5]
-                ],
-                stress_scenarios=[
-                    {
-                        "name": s.name,
-                        "description": s.description,
-                        "loss_pct": s.estimated_loss_pct,
-                    }
-                    for s in stress.scenarios
-                ],
-                alerts=[
-                    {
-                        "type": a.alert_type,
-                        "severity": a.severity,
-                        "entity": a.entity_id,
-                        "message": a.message,
-                    }
-                    for a in alerts
-                ],
+        It no longer swallows. There used to be two nested `except Exception`
+        handlers around this — one here returning None, one at the call site —
+        and between them any reason a report failed became a log line. The step
+        context already writes the exception into the timeline's message, so the
+        call site's handler is the ONE place a refusal is recorded, and this
+        method's job is to make sure the refusal has a sentence in it.
+        """
+        from exposure_workbench.agents.direct_llm_agent import ReportUnavailable
+        from exposure_workbench.agents.report_agent import get_report_agent
+        from exposure_workbench.agents.schemas import ReportInput
+
+        report_input = ReportInput(
+            portfolio_id=portfolio_id,
+            as_of_date=str(as_of_date),
+            portfolio_market_value=exposure.portfolio_market_value,
+            daily_pnl=pnl.daily_pnl,
+            daily_return=pnl.daily_return,
+            top_contributors=[
+                {"ticker": p.ticker, "contribution": p.contribution, "daily_return": p.daily_return}
+                for p in pnl.top_contributors
+            ],
+            top_detractors=[
+                {"ticker": p.ticker, "contribution": p.contribution, "daily_return": p.daily_return}
+                for p in pnl.top_detractors
+            ],
+            sector_exposures={s: d["weight"] for s, d in exposure.sector_map.items()},
+            var_95_1d=risk.var_95_1d,
+            vol_30d=risk.vol_30d,
+            max_drawdown=risk.max_drawdown,
+            factor_attributions=[
+                {
+                    "factor_name": fr.factor_name,
+                    "beta": fr.beta,
+                    "factor_return": fr.factor_return,
+                    "contribution": fr.contribution,
+                }
+                for fr in factor_result.factors[:5]
+            ],
+            stress_scenarios=[
+                {
+                    "name": s.name,
+                    "description": s.description,
+                    "loss_pct": s.estimated_loss_pct,
+                }
+                for s in stress.scenarios
+            ],
+            alerts=[
+                {
+                    "type": a.alert_type,
+                    "severity": a.severity,
+                    "entity": a.entity_id,
+                    "message": a.message,
+                }
+                for a in alerts
+            ],
+        )
+
+        agent = get_report_agent()
+        report_output = await agent.generate(report_input)
+
+        # THE GATE. Every number the report states has to be a value of a
+        # deterministic row of this same run. Nothing is persisted unless all
+        # of them are, because the alternative — storing a report that is
+        # known to contain a figure the run does not support — is the thing
+        # this whole path was rebuilt to stop. There is no retry: a report is
+        # one completion, which is the premise of this module's exemption
+        # from the llm_session rule, and daily_reports' three cost columns
+        # are scalar (see services/report_verification.py).
+        verdict = await report_verification.verify_report(db, run_id, report_output)
+        if not verdict.accepted:
+            raise ReportUnavailable(
+                f"{len(verdict.problems)} of {verdict.checked} numbers in the "
+                "report are not supported by this run: "
+                + "; ".join(
+                    f"{p.get('number')} (nearest: "
+                    f"{(p.get('nearest') or {}).get('label', 'nothing comparable')})"
+                    for p in verdict.problems[:5]
+                )
             )
 
-            agent = get_report_agent()
-            report_output = await agent.generate(report_input)
+        report_id = new_id("report_")
+        from exposure_workbench.app_state.settings import get_settings
+        settings = get_settings()
 
-            report_id = new_id("report")
-            from exposure_workbench.app_state.settings import get_settings
-            settings = get_settings()
-
-            db.add(DailyReport(
-                id=report_id,
-                run_id=run_id,
-                portfolio_id=portfolio_id,
-                as_of_date=as_of_date,
-                agent_mode=settings.report_agent_mode,
-                executive_summary=report_output.executive_summary,
-                key_movements=report_output.key_movements,
-                factor_explanation=report_output.factor_explanation,
-                risk_alert_explanation=report_output.risk_alert_explanation,
-                recommended_actions=report_output.recommended_actions,
-                markdown_report=report_output.markdown_report,
-                confidence_flags=report_output.confidence_flags or {},
-                llm_model=report_output.llm_model,
-                prompt_tokens=report_output.prompt_tokens,
-                completion_tokens=report_output.completion_tokens,
-            ))
-            await db.flush()
-            return report_id
-
-        except Exception as e:
-            logger.warning("Report generation failed: %s", e)
-            return None
+        db.add(DailyReport(
+            id=report_id,
+            run_id=run_id,
+            portfolio_id=portfolio_id,
+            as_of_date=as_of_date,
+            agent_mode=settings.report_agent_mode,
+            executive_summary=report_output.executive_summary,
+            key_movements=report_output.key_movements,
+            factor_explanation=report_output.factor_explanation,
+            risk_alert_explanation=report_output.risk_alert_explanation,
+            recommended_actions=report_output.recommended_actions,
+            markdown_report=report_output.markdown_report,
+            confidence_flags=report_output.confidence_flags or {},
+            llm_model=report_output.llm_model,
+            prompt_tokens=report_output.prompt_tokens,
+            completion_tokens=report_output.completion_tokens,
+        ))
+        await db.flush()
+        return report_id, verdict.as_payload()
 
 
 # ── Step context manager ───────────────────────────────────────────────────────

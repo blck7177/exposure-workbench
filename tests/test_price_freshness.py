@@ -183,6 +183,58 @@ def test_a_factor_with_no_prices_fails_instead_of_shrinking_the_model(validate):
     assert "no factor price" in msg and "TLT" in msg
 
 
+# ── a bar with no adjusted close is a hole, and the run must not paper over it ──
+#
+# V5 added factor_prices.adj_close and deliberately left it NULL rather than
+# backfilling `close` into it. Then V6 widened the window to three years and the
+# two facts met: 233 of 295 factor rows had no adjusted close, every one of those
+# dates is dropped by the return panel, and the run would have reported a
+# three-year window that produced sixty observations. Step 1 refills them; this
+# is what happens when it did not.
+
+def priced(*rows: tuple[str, date, float, float | None]) -> pd.DataFrame:
+    """(ticker, date, close, adj_close) — adj_close None becomes NaN, as the DB read does."""
+    return pd.DataFrame([
+        {"ticker": t, "price_date": pd.Timestamp(d), "close": c,
+         "adj_close": float("nan") if a is None else a}
+        for t, d, c, a in rows
+    ])
+
+
+def test_a_holding_bar_with_no_adjusted_close_fails_the_run(validate):
+    with pytest.raises(ValueError) as e:
+        validate(positions("AAPL"),
+                 priced(("AAPL", AS_OF - timedelta(days=1), 200.0, None),
+                        ("AAPL", AS_OF, 201.0, 201.0)),
+                 AS_OF)
+    msg = str(e.value)
+    assert "adjusted close" in msg and "AAPL (1)" in msg, "name the ticker and how many bars"
+
+
+def test_a_factor_bar_with_no_adjusted_close_fails_the_run(validate):
+    with pytest.raises(ValueError) as e:
+        validate(positions("AAPL"), prices(("AAPL", AS_OF, 200.0)), AS_OF,
+                 factor_prices_df=priced(("SPY", AS_OF - timedelta(days=1), 600.0, None),
+                                         ("SPY", AS_OF, 601.0, 601.0)),
+                 factor_tickers=["SPY"])
+    assert "factor bars with no adjusted close" in str(e.value)
+
+
+def test_fully_adjusted_bars_pass(validate):
+    validate(positions("AAPL"),
+             priced(("AAPL", AS_OF - timedelta(days=1), 200.0, 199.0),
+                    ("AAPL", AS_OF, 201.0, 201.0)),
+             AS_OF)
+
+
+def test_bars_after_as_of_are_not_judged_for_adjustment(validate):
+    """The window is [start, as_of]; a later bar is not this run's problem."""
+    validate(positions("AAPL"),
+             priced(("AAPL", AS_OF, 201.0, 201.0),
+                    ("AAPL", AS_OF + timedelta(days=1), 202.0, None)),
+             AS_OF)
+
+
 def test_a_holding_problem_and_a_factor_problem_surface_in_the_same_raise(validate):
     """Same rule as the holdings half: one fix-and-rerun cycle, not two."""
     with pytest.raises(ValueError) as e:

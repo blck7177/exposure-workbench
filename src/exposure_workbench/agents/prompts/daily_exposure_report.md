@@ -21,6 +21,24 @@ Return a JSON object with exactly these fields:
 }
 ```
 
+## Every number you write is checked
+
+This report is verified against the risk system's own stored rows before it is
+published. Every figure in it must match one of the values you were given. Two
+rules follow, and a report that breaks either is discarded rather than shown:
+
+- **Copy figures exactly as supplied, including the minus sign.** Do not put the
+  direction in a word and drop the sign from the number: write "P&L of
+  -$141,973", never "a loss of $141,973". The check compares signed values and
+  cannot read "loss" — a figure whose sign lives in a verb is refused, because
+  in this domain an inverted number is the error that costs the most.
+- **Do not compute.** No sums, differences, averages, annualisations or
+  rescalings of your own, however obvious. If a number you want is not in the
+  data, say what you can with the numbers that are.
+
+Window labels ("30d volatility"), confidence levels ("95% VaR"), dates and
+tickers are not figures and are not checked.
+
 ## Guidelines
 
 - Be concise and precise. PMs do not want verbose prose.

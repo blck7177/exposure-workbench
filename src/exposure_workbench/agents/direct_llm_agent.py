@@ -76,62 +76,31 @@ def _build_user_message(inp: ReportInput) -> str:
     return "\n".join(lines)
 
 
-def _mock_output(inp: ReportInput) -> ReportOutput:
-    """Fallback mock when LLM is unavailable."""
-    pct = lambda x: f"{x * 100:.2f}%" if x is not None else "N/A"
-    usd = lambda x: f"${x:,.0f}" if x is not None else "N/A"
+class ReportUnavailable(RuntimeError):
+    """The report could not be produced, with a reason a person can read.
 
-    alert_note = ""
-    if inp.alerts:
-        alert_note = f" {len(inp.alerts)} risk alert(s) require attention."
+    Every branch that used to end in a fabricated report ends here instead. The
+    three it replaces were not equally bad, they were bad in the same way: each
+    returned something shaped exactly like a report, and the caller persisted it
+    because a caller cannot tell the difference between "here is the report" and
+    "here is what I made up when I could not produce one".
 
-    summary = (
-        f"Portfolio {inp.portfolio_id} reported a daily P&L of {usd(inp.daily_pnl)} "
-        f"({pct(inp.daily_return)}) on {inp.as_of_date} with total market value of "
-        f"{usd(inp.portfolio_market_value)}.{alert_note}"
-    )
+    Measured on the live database before this existed: 9 of 19 stored reports
+    were the mock template, and its own disclaimer read "LLM API key not
+    configured" — which was true for none of them. The key was configured; the
+    model had returned something the parser did not expect, and the bare
+    `except Exception` reported that as a missing key.
+    """
 
-    top_c = ", ".join(f"{c['ticker']} ({pct(c.get('contribution'))})" for c in inp.top_contributors)
-    top_d = ", ".join(f"{d['ticker']} ({pct(d.get('contribution'))})" for d in inp.top_detractors)
-    key_mvt = f"Top contributors: {top_c or 'N/A'}. Top detractors: {top_d or 'N/A'}."
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
 
-    alert_text = ""
-    if inp.alerts:
-        alert_text = "; ".join(a["message"] for a in inp.alerts[:3])
-    else:
-        alert_text = "No risk limits breached or warned."
 
-    md = f"""## Daily Exposure Briefing — {inp.as_of_date}
-
-### Portfolio Summary
-{summary}
-
-### P&L Attribution
-{key_mvt}
-
-### Risk Metrics
-- VaR (95%, 1-day): {pct(inp.var_95_1d)}
-- 30d Volatility (annualised): {pct(inp.vol_30d)}
-- Max Drawdown: {pct(inp.max_drawdown)}
-
-### Risk Alerts
-{alert_text}
-
-*Note: This report was generated in mock mode — LLM API key not configured.*
-"""
-
-    return ReportOutput(
-        executive_summary=summary,
-        key_movements=key_mvt,
-        factor_explanation="Factor attribution model ran successfully. Configure LLM for detailed explanation.",
-        risk_alert_explanation=alert_text,
-        recommended_actions="Review factor attribution and ensure LLM API key is configured for full reports.",
-        markdown_report=md,
-        confidence_flags={"mock_mode": True, "llm_unavailable": True},
-        llm_model=None,
-        prompt_tokens=None,
-        completion_tokens=None,
-    )
+_REQUIRED_FIELDS = (
+    "executive_summary", "key_movements", "factor_explanation",
+    "risk_alert_explanation", "recommended_actions", "markdown_report",
+)
 
 
 class DirectLlmAgent:
@@ -140,8 +109,7 @@ class DirectLlmAgent:
     async def generate(self, inp: ReportInput) -> ReportOutput:
         client = llm_client.get_openai_client()
         if client is None:
-            logger.info("LLM client unavailable — using mock report output")
-            return _mock_output(inp)
+            raise ReportUnavailable("no LLM client is configured")
 
         system_prompt = _load_system_prompt()
         user_message = _build_user_message(inp)
@@ -152,48 +120,44 @@ class DirectLlmAgent:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.3,
                 max_tokens=2048,
             )
-
-            # Parse JSON response
-            # Strip markdown code fences if present
-            text = content.strip()
-            if text.startswith("```"):
-                lines = text.split("\n")
-                text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-            data = json.loads(text)
-
-            return ReportOutput(
-                executive_summary=data.get("executive_summary", ""),
-                key_movements=data.get("key_movements", ""),
-                factor_explanation=data.get("factor_explanation", ""),
-                risk_alert_explanation=data.get("risk_alert_explanation", ""),
-                recommended_actions=data.get("recommended_actions", ""),
-                markdown_report=data.get("markdown_report", ""),
-                confidence_flags={"mock_mode": False},
-                llm_model=model_name,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-            )
-
-        except json.JSONDecodeError as e:
-            logger.warning("LLM returned non-JSON response: %s", e)
-            # Fall back to using raw content as markdown_report
-            return ReportOutput(
-                executive_summary="Report generated — see full report for details.",
-                key_movements="",
-                factor_explanation="",
-                risk_alert_explanation="",
-                recommended_actions="",
-                markdown_report=content,
-                confidence_flags={"json_parse_error": True},
-                llm_model=model_name,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-            )
-
         except Exception as e:
-            logger.error("LLM call failed: %s", e)
-            return _mock_output(inp)
+            raise ReportUnavailable(f"the LLM call failed: {e}") from e
+
+        # Strip markdown code fences if present
+        text = content.strip()
+        if text.startswith("```"):
+            lines = text.split("\n")
+            text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ReportUnavailable(f"the model did not return JSON: {e}") from e
+        if not isinstance(data, dict):
+            # Valid JSON that is a list, a string or null. This used to reach
+            # `data.get`, raise AttributeError, and land in the bare except that
+            # blamed a missing API key.
+            raise ReportUnavailable(
+                f"the model returned JSON that is not an object ({type(data).__name__})"
+            )
+
+        # Every field is required and non-empty. `.get(k, "")` accepted a report
+        # missing five of its six sections and flagged it clean.
+        missing = [k for k in _REQUIRED_FIELDS if not str(data.get(k) or "").strip()]
+        if missing:
+            raise ReportUnavailable(f"the report is missing: {', '.join(missing)}")
+
+        return ReportOutput(
+            executive_summary=data["executive_summary"],
+            key_movements=data["key_movements"],
+            factor_explanation=data["factor_explanation"],
+            risk_alert_explanation=data["risk_alert_explanation"],
+            recommended_actions=data["recommended_actions"],
+            markdown_report=data["markdown_report"],
+            confidence_flags={},
+            llm_model=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )

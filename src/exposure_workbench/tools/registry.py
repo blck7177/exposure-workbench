@@ -116,12 +116,24 @@ def extract_evidence_refs(result: Any) -> list[dict]:
 
     def walk(node: Any, key_hint: str | None = None):
         if isinstance(node, dict):
-            if "type" in node and "id" in node and isinstance(node["id"], str):
+            # Both branches below now go through _looks_like_id, which is the
+            # ONE definition of "this string is an evidence id". They were the
+            # two ways around it, and each trusted something other than the id
+            # itself: the first trusted a sibling "type" key, the second trusted
+            # the key's own name.
+            #
+            # Caught live, one row: list_alerts returns {"id": ..., "type":
+            # alert_type}, so `alertb41eec529430` — an id from before the
+            # alert-prefix fix, with no underscore — was harvested under
+            # ref_type "issuer_concentration", which is an alert TYPE and not an
+            # evidence type at all. It can never be cited, never resolved and
+            # never valued: all three resolver tables key on `id.startswith`.
+            # So it was a permanent dead entry in a session's evidence trail,
+            # put there by a path that existed to make ids easier to find.
+            if "type" in node and _looks_like_id(node.get("id")):
                 add(str(node["type"]), node["id"])
             for k, v in node.items():
-                if k in ("calc_id",) and isinstance(v, str):
-                    add("calc", v)
-                elif k in ("fact_id", "chunk_id") and isinstance(v, str):
+                if k in ("calc_id", "fact_id", "chunk_id") and _looks_like_id(v):
                     add(k.replace("_id", ""), v)
                 else:
                     walk(v, k)

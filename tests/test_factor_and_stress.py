@@ -212,6 +212,37 @@ def test_the_loss_is_the_sum_over_shocked_factors_and_nothing_else():
     assert out.scenarios[0].estimated_loss_pct == pytest.approx(expected)
 
 
+def test_the_load_window_can_actually_supply_the_regression_window():
+    """Two knobs, wired to different estimators, that have to agree.
+
+    `_LOOKBACK_DAYS` decides how much history is loaded; the regression then takes
+    `.tail(window_days)` of it. Set the second above what the first can supply and
+    the regression silently runs on less than it asks for — which is exactly the
+    state V5 shipped in: 90 calendar days yield 61 observations and window_days
+    was 60, one to spare, so nobody noticed the two numbers were coupled at all.
+
+    A calendar year holds about 252 trading days, and a margin is required rather
+    than a bare fit: a market closure or one ticker's missing bar costs
+    observations off the top of the panel, and the regression must not start
+    quietly shrinking the first time that happens.
+    """
+    import yaml
+    from pathlib import Path
+    from exposure_workbench.workflow.exposure_workflow import _LOOKBACK_DAYS
+
+    root = Path(__file__).resolve().parents[1]
+    reg = yaml.safe_load((root / "configs" / "factor_config.yaml").read_text())["regression"]
+
+    supply = _LOOKBACK_DAYS * 252 / 365
+    assert reg["window_days"] <= supply * 0.95, (
+        f"window_days={reg['window_days']} but {_LOOKBACK_DAYS} calendar days "
+        f"supply only about {supply:.0f} observations"
+    )
+    assert reg["min_observations"] <= reg["window_days"], (
+        "the floor cannot exceed the window the regression is allowed to use"
+    )
+
+
 def test_every_shipped_scenario_names_only_configured_factors():
     """A scenario naming a factor the model does not estimate can never be
     evaluated, so the two config files have to agree. They are edited separately

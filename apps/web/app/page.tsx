@@ -391,6 +391,28 @@ function RightPanel({
   const factorAttributions: FactorAttribution[] = run?.factor_attributions ?? [];
   const alerts: RiskAlert[] = run?.risk_alerts ?? [];
 
+  // A KPI is coloured by what the limit engine DECIDED about it, never by a
+  // threshold written here. Each card used to carry its own copy of the seed
+  // defaults — VaR red above 3.5%, vol red above 25% — which made this file a
+  // fourth source of thresholds behind risk_limits, the LimitBook and the seed,
+  // and a stale one: a desk that overrides a limit on its own portfolio still
+  // saw colours computed from someone else's numbers.
+  // `value` is required, and green means "checked and inside the limit". A metric
+  // the run could not compute — too few observations leaves var_95_1d null — has
+  // no alert either, and colouring THAT green would say the check passed when it
+  // never ran. Absence of an alert is only good news when there was a number to
+  // judge.
+  const alertHighlight = (
+    alertType: string,
+    value: number | null | undefined,
+  ): "red" | "neutral" | "green" => {
+    if (value == null) return "neutral";
+    const hit = alerts.filter(a => a.alert_type === alertType);
+    if (hit.some(a => a.severity === "breach")) return "red";
+    if (hit.length > 0) return "neutral";
+    return "green";
+  };
+
   // Fallback for sector/issuer when no run yet
   const totalMV = positions.reduce((s, p) => s + (p.market_value ?? 0), 0);
   const fallbackSectors = Object.entries(
@@ -451,25 +473,25 @@ function RightPanel({
           label="VaR (95%, 1d)"
           value={hasMetrics ? fPct(metrics!.var_95_1d) : "—"}
           sub={hasMetrics ? `ES: ${fPct(metrics!.expected_shortfall_95)}` : "Run to compute"}
-          highlight={hasMetrics && metrics!.var_95_1d != null
-            ? (metrics!.var_95_1d > 0.035 ? "red" : metrics!.var_95_1d > 0.025 ? "neutral" : "green")
-            : "neutral"}
+          highlight={alertHighlight("var_95", metrics?.var_95_1d)}
         />
         <KpiCard
           label="30d Volatility"
           value={hasMetrics ? fPct(metrics!.rolling_vol_30d) : "—"}
           sub={hasMetrics ? `60d: ${fPct(metrics!.rolling_vol_60d)}` : "Annualised"}
-          highlight={hasMetrics && metrics!.rolling_vol_30d != null
-            ? (metrics!.rolling_vol_30d > 0.25 ? "red" : metrics!.rolling_vol_30d > 0.18 ? "neutral" : "green")
-            : "neutral"}
+          highlight={alertHighlight("rolling_volatility_30d", metrics?.rolling_vol_30d)}
         />
         <KpiCard
           label="Max Drawdown"
           value={hasMetrics ? fPct(metrics!.max_drawdown) : "—"}
-          sub="From peak"
-          highlight={hasMetrics && metrics!.max_drawdown != null
-            ? (metrics!.max_drawdown > 0.1 ? "red" : "neutral")
-            : "neutral"}
+          sub="Worst fall from a peak, over the whole loaded window"
+          /* No highlight: max drawdown is not one of the eight limit checks, so
+             nothing has judged it and this card must not appear to have. The
+             threshold that used to live here — red above 10% — was also a copy
+             of a number the portfolio's own risk_limits rows are supposed to be
+             the only source of, and it would now fire on every book: over a
+             three-year window this book's drawdown is 17.7%, where over three
+             months it was 5.9%. */
         />
         <KpiCard
           label="Positions"

@@ -46,7 +46,23 @@ factors:
 # `ewm_halflife_days` used to sit here advertising a capability the code did not
 # have — the loader ignored them and always ran OLS, so the file described a
 # model that never ran. A config key with no reader is a claim, not a setting.
+#
+# window_days and _LOOKBACK_DAYS are TWO knobs wired to different estimators, and
+# both had to move. _LOOKBACK_DAYS decides how much history is loaded, and
+# calc_risk_metrics consumes all of it — VaR, ES and max drawdown. The regression
+# then takes .tail(window_days) of that, so at the old pair (90 calendar days
+# yielding 61 observations, window_days 60) the regression ran on 60 observations
+# with exactly one to spare, and raising the load window alone would not have
+# moved a single beta. The stress scenarios propagate through those betas.
+#
+# min_observations is 250 rather than 30 because below roughly a year of joint
+# history the estimate is not a number worth printing: at 125 observations the
+# same rolling measurement spreads 25.7% around its mean. A book that cannot
+# reach the floor gets no betas, which means every scenario lands in
+# `unevaluated` and says so — the house rule that a check which did not run must
+# not look like one that passed. It does not lose VaR or volatility; those have
+# their own, lower floor in analytics/risk_metrics.py.
 regression:
-  window_days: 60
-  min_observations: 30
+  window_days: 750
+  min_observations: 250
   include_intercept: true

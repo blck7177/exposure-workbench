@@ -159,7 +159,24 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
     The empty-citations branch never touches `db`, which is what makes the
     refusal testable without one.
     """
-    citation_ids = [c for c in (citations or []) if isinstance(c, str)]
+    # A non-string citation is REFUSED, not dropped. Dropping it was the worse
+    # of the two, and the schema comment below already said so: tool results are
+    # object-shaped ({"type": ..., "id": ...}), so a model citing what it just
+    # read back is the likely author of one — and the silent filter turned that
+    # into an answer with NO citations, which then failed the numbers gate with
+    # "call a tool to get them first" when it had already called one. The model
+    # was told to do the thing it had done.
+    malformed = [c for c in (citations or []) if not isinstance(c, str)]
+    if malformed:
+        return {
+            "error": "invalid_citations",
+            "problems": [
+                {"citation": repr(c), "reason": "not_a_string"} for c in malformed
+            ],
+            "detail": "cite the plain id string, e.g. 'alert_1a2b3c', not the object it came in",
+        }
+
+    citation_ids = list(citations or [])
     if citation_ids:
         ok, problems = await trail.validate_citations(db, current_session_id(), citation_ids)
         if not ok:
@@ -251,8 +268,8 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             #
             # items stays `string` deliberately. The gate resolves plain ids
             # (`cid.startswith(...)`), so an object-shaped citation cannot be
-            # checked — and today the fn silently DROPS one, which is worse
-            # than refusing it.
+            # checked. Since V6 the fn REFUSES one with a named error rather
+            # than dropping it, which is what this comment used to complain of.
             "citations": {"type": ["array", "null"], "items": {"type": "string"},
                           "description": "evidence ids (fact_/chunk_/calc_/src_/alert_/run_/pos_) "
                                          "returned by tools you called this session"},
