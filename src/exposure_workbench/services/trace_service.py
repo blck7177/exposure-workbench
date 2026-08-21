@@ -5,6 +5,13 @@ rejection, or error). Recording lives below the transport, so the in-process
 meta-agent, a worker research session, and an external MCP host all produce the
 same trace — you can't tell which drove it, and none can skip it.
 
+There is a second writer since V4-S2, and it is not an exception to that: the
+completion that DECIDES on a tool call happens on the agent's side of the MCP
+door, so the wrapper cannot see it and something on that side has to record it.
+agents/llm_session is that something, and it is the agents layer's only route to
+a provider for exactly this reason. Its rows are step_type 'llm_call' and they
+are the only rows with the token columns filled.
+
 Key-class arguments are redacted before persistence (MVP scope: only key-shaped
 fields; the user's own messages are audit subjects and stored verbatim).
 """
@@ -91,7 +98,10 @@ async def record_step(
     db: AsyncSession,
     session_id: str,
     *,
-    step_type: str,                  # 'tool_call' | 'think' | 'delegation' | 'respond'
+    # 'llm_call' is the odd one and the reason the token columns below have a
+    # writer at last (V4-S2): every other step_type is something the agent did
+    # with a tool, this one is the completion that decided to do it.
+    step_type: str,                  # 'tool_call' | 'think' | 'delegation' | 'respond' | 'llm_call'
     tool_name: str | None,
     args: dict | None,
     result_summary: str | None,

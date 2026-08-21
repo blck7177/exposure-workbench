@@ -82,7 +82,7 @@ def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
         faces.resolve(reg, faces.FACE_META_AGENT)
-    assert "start_issuer_research" in str(exc.value)   # registered by build_meta_registry, in P7
+    assert "start_issuer_research" in str(exc.value)   # tools/registries.build_meta_registry, P7
 
 
 def test_redact_args_masks_key_class_fields_only():

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.agents.meta_agent import handle_message
+from exposure_workbench.agents.tool_session import ToolFaceUnavailable
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
@@ -158,6 +159,35 @@ async def post_message(
 
     try:
         return await handle_message(factory, session_id, body.text)
+    except ToolFaceUnavailable as e:
+        # The tool face is down or refused this turn's bearer (S1). Before this
+        # clause the group anyio raises came out as a bare 500 — the user's quota
+        # spent, the reason unreadable, and nothing to distinguish infrastructure
+        # from a bug in the agent. 503 is the honest one: the request was fine,
+        # the thing behind it was not, and "try again" is real advice here in a
+        # way it never is for a 500.
+        #
+        # Nothing is written to the transcript on this path. handle_message
+        # persists the assistant message only after the loop, so the failure
+        # leaves the user's message standing there unanswered — which is what
+        # happened. Writing a synthetic "sorry, tools are down" reply would be
+        # text reaching a user without passing the respond gate, and that gate is
+        # the reason every other answer in this system can be trusted.
+        #
+        # The quota is NOT refunded (plan decision D2), same as the 413 below:
+        # the charge is committed before the loop by design, so a refund would
+        # need a rule for how much of a turn that died mid-completion was already
+        # paid for, and no such rule exists that is not a guess. The turn slot is
+        # freed by the finally, which already covers every exit from here.
+        #
+        # str(e) names the face and the internal URL; the body deliberately does
+        # not. tool_session logs that line for the operator.
+        raise HTTPException(503, {
+            "error": "tool_face_unavailable",
+            "detail": "the tool service this assistant runs on could not be reached, so "
+                      "your message was not answered; it is still in the conversation — "
+                      "try again shortly",
+        }) from e
     except Exception as e:      # noqa: BLE001 — narrowed immediately below
         # Defence in depth for the case the pre-check cannot see: the FIRST turn
         # of a session has no measurement to project from, and a single 8k-char
@@ -190,6 +220,12 @@ class StepOut(BaseModel):
     result_summary: str | None
     evidence_refs: list
     created_at: datetime
+    # V4-S2. Null on every step type but llm_call, where they are what the turn
+    # cost. Carried here rather than only in the views because the trace panel
+    # is where a person is already asking what this turn did, and a spend the
+    # audit surface can only answer by opening psql is one nobody looks at.
+    prompt_tokens: int | None
+    completion_tokens: int | None
 
     model_config = {"from_attributes": True}
 

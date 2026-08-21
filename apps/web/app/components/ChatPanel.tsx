@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MessageSquare, Plus, Send, X, Wrench, Brain, Send as SendIcon } from "lucide-react";
+import { MessageSquare, Plus, Send, X, Wrench, Brain, Receipt, Send as SendIcon } from "lucide-react";
 import { createSession, postMessage, getSessionDetail, type AgentStep } from "../../lib/issuer";
 import { getMyUsage } from "@/lib/api";
 import { apiErrorDetail, type ApiError } from "@/lib/http";
@@ -19,6 +19,31 @@ type ChatMsg = { role: string; text: string; citations: string[]; gateFailed?: b
 // One step in the live trace — machine-recorded (tool/delegation) solid, agent
 // narration (think/respond) dashed, matching the audit "who recorded what" split.
 function TraceLine({ s }: { s: AgentStep }) {
+  // A third kind, and it belongs to neither side of that split. A tool call is
+  // something the agent DID; a think is something it SAID. An llm_call is what
+  // the turn cost — nobody chose it, nothing was retrieved, and it is recorded
+  // on the way past rather than by anyone deciding to (V4-S2). So it is quieter
+  // than both and does not borrow the wrench: it is not a tool.
+  //
+  // result_summary carries the model version the provider actually served and
+  // how many calls it asked for; the tokens come from the step's own columns.
+  // Both halves on one line because "which model" and "how much" is one
+  // question — a version with no cost beside it invites the next reader to go
+  // and look it up somewhere else.
+  if (s.step_type === "llm_call") {
+    const tokens =
+      s.prompt_tokens === null && s.completion_tokens === null
+        ? null
+        : `${s.prompt_tokens ?? 0} in / ${s.completion_tokens ?? 0} out`;
+    return (
+      <div className="flex items-start gap-1.5 text-[10px] py-0.5 text-slate-600">
+        <Receipt className="w-3 h-3 mt-0.5 shrink-0 opacity-40" />
+        <span className="font-mono">{s.result_summary}</span>
+        {tokens && <span className="font-mono tabular-nums opacity-60">{tokens}</span>}
+      </div>
+    );
+  }
+
   const machine = s.step_type === "tool_call" || s.step_type === "delegation";
   const Icon = s.step_type === "think" ? Brain : s.step_type === "respond" ? SendIcon : Wrench;
   return (

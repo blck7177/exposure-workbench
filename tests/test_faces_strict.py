@@ -64,8 +64,7 @@ def test_every_shipped_face_resolves_against_its_own_registry(face_name, face, b
     This is test_v2_audit's drift check restated as the behaviour rather than a
     measurement — after P1.1 the drift cannot be observed, it raises.
     """
-    from exposure_workbench.agents.meta_agent import build_meta_registry
-    from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+    from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
     builder = {"build_meta_registry": build_meta_registry,
                "build_research_registry": build_research_registry}[builder_name]

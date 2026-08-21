@@ -25,7 +25,7 @@ import json
 import pytest
 
 from exposure_workbench.tools import faces
-from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+from exposure_workbench.tools.registries import build_research_registry
 from tests.mcp_mount import RecordingDb, connected, mounted, use_secret
 
 FACE = faces.FACE_NAME_RESEARCH

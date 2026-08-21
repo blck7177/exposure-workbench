@@ -313,15 +313,18 @@ def _pairings(monkeypatch):
     from apps.mcp import http
 
     from exposure_workbench.tools import faces
-    from exposure_workbench.tools.definitions import build_read_registry
-    from exposure_workbench.tools.meta_tools import register_meta_tools
+    from exposure_workbench.tools.registries import build_meta_registry
 
+    # S4 moved the builders to tools/registries.py, so the stdio coordinate names
+    # the module that DEFINES the meta face rather than a copy of the expression
+    # that builds it. The distinction is the whole point of this sweep: a triple
+    # assembled here out of parts nobody ships is an audit of the test file.
     return [
         (f"apps/mcp/http.py mount /mcp/{name}", name, registry, face)
         for name, (registry, face) in http.MOUNTS.items()
     ] + [
         ("apps/mcp/server.py (stdio)", "FACE_META_AGENT",
-         register_meta_tools(build_read_registry()), faces.FACE_META_AGENT),
+         build_meta_registry(), faces.FACE_META_AGENT),
     ]
 
 
@@ -494,3 +497,156 @@ def test_the_agents_hold_a_face_name_and_a_token_and_nothing_else():
             ):
                 offenders.append(f"{f.name}:{node.lineno} imports {node.names[0].name}")
     assert offenders == [], f"an agent still holding what lives behind the mount: {offenders}"
+
+
+# S4/N10: the tool container is defined by what tools/registries.py can reach.
+#
+# apps/mcp imports that module at startup to build both mounts, so its transitive
+# import graph IS the container's contents. Until S4 the research builder lived in
+# workflow/issuer_research_workflow, which imports agents/research_session, which
+# calls chat_with_tools — so the research loop and the completion call were inside
+# the tool container, imported and never used. Nothing failed, and nothing was
+# going to: an unused import is invisible to every functional test in this suite.
+#
+# That is why this walks the graph instead of reading the top of one file. The
+# import that breaks N10 will not be in tools/; it will be three modules down,
+# added by someone with an unrelated reason, and the file it lands in will look
+# like the right place for it.
+def _reachable_from(module: str) -> dict[str, Path]:
+    """Every shipped module reachable from `module`, by import, at any depth."""
+    import ast
+
+    src = ROOT / "src"
+
+    def path_of(mod: str):
+        p = src.joinpath(*mod.split(".")).with_suffix(".py")
+        if p.exists():
+            return p
+        p = src.joinpath(*mod.split(".")) / "__init__.py"
+        return p if p.exists() else None
+
+    def imports_of(path) -> set[str]:
+        out = set()
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                out |= {a.name for a in node.names}
+            # `from x import y` names a module OR a name inside it, and which one
+            # is not decidable here — both spellings are tried against the tree.
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                out |= {node.module} | {f"{node.module}.{a.name}" for a in node.names}
+        return {m for m in out if m.startswith("exposure_workbench")}
+
+    start = path_of(module)
+    assert start is not None, f"{module} is not a module under src/"
+
+    found, stack = {module: start}, [module]
+    while stack:
+        for dep in imports_of(found[stack.pop()]):
+            if path_of(dep) is None:
+                dep = dep.rsplit(".", 1)[0]     # it was a name, not a module
+            path = path_of(dep)
+            if path is None or dep in found:
+                continue
+            found[dep] = path
+            stack.append(dep)
+    return found
+
+
+def test_the_tool_container_cannot_reach_an_agent_loop():
+    reached = _reachable_from("exposure_workbench.tools.registries")
+
+    loops = sorted(m for m in reached
+                   if m.startswith("exposure_workbench.agents")
+                   or m.startswith("exposure_workbench.workflow"))
+    assert loops == [], f"the tool face reaches the layer that calls it: {loops}"
+
+
+def test_no_completion_call_is_reachable_from_the_tool_faces():
+    """The half of N10 that is about the model, stated as the model call.
+
+    llm.client IS reachable and stays reachable: filing_retrieval_service embeds
+    its own query, which is the carve-out N10 names. So asserting the module
+    absent would be asserting the wrong thing — and would have to be deleted the
+    first time someone read it. What may never be reachable is completion.
+    """
+    import ast
+
+    completion = {"chat_with_tools", "chat_complete"}
+    offenders = []
+    for module, path in sorted(_reachable_from("exposure_workbench.tools.registries").items()):
+        for node in ast.walk(ast.parse(path.read_text())):
+            name = (node.attr if isinstance(node, ast.Attribute)
+                    else node.id if isinstance(node, ast.Name)
+                    else node.name if isinstance(node, ast.alias)
+                    else None)
+            if name in completion:
+                offenders.append(f"{module}:{node.lineno} {name}")
+    assert offenders == [], f"the completion call is inside the tool container: {offenders}"
+
+
+# ── V4-S2/D1: one way from an agent to the provider ──────────────────────────
+# A completion returns text, tool_calls and usage. Two of those have something
+# waiting for them — the respond/submit_brief gate, and invoke(), which traces
+# every tool call whether the loop cooperates or not. usage had nothing waiting,
+# so both loops discarded it and the only action in the system that actually
+# costs money was the only one with no record.
+#
+# agents/llm_session.py is the answer: its chat() returns (content, tool_calls)
+# and writes the llm_call row on the way through, so there is nothing left for a
+# loop to discard. That only holds while it is the ONLY way out of agents/ to
+# the provider — the moment a second loop imports llm.client directly it gets
+# usage back, and the discard returns as a one-line convenience nobody reviews.
+# Structural enforcement (D1) is exactly this test; without it the module is a
+# suggestion.
+_PROVIDER_LAYER = "exposure_workbench.llm"
+
+# D3, and the reason is stated rather than implied — an exemption nobody can
+# read is indistinguishable from an oversight.
+_MAY_REACH_THE_PROVIDER = {
+    # The verb itself. It imports the provider in order to be the thing that
+    # records it.
+    "llm_session.py",
+    # The exposure report path, which already keeps its own books: one report IS
+    # one completion (the v2 shape), and daily_reports.llm_model /
+    # prompt_tokens / completion_tokens are written on every run. It opens no
+    # agent_session, so there is no agent_steps row for an llm_call to be —
+    # migrating it would move a working record into a table it has no row in and
+    # buy nothing.
+    "direct_llm_agent.py",
+}
+
+
+def test_no_agent_reaches_the_provider_except_through_llm_session():
+    import ast
+
+    agents = ROOT / "src" / "exposure_workbench" / "agents"
+    offenders = []
+    for f in agents.glob("*.py"):
+        if f.name in _MAY_REACH_THE_PROVIDER:
+            continue
+        for node in ast.walk(ast.parse(f.read_text())):
+            module = getattr(node, "module", None) or ""
+            if isinstance(node, ast.ImportFrom) and module.startswith(_PROVIDER_LAYER):
+                offenders.append(f"{f.name}:{node.lineno} imports {module}")
+            if isinstance(node, ast.Import) and any(
+                a.name.startswith(_PROVIDER_LAYER) for a in node.names
+            ):
+                offenders.append(f"{f.name}:{node.lineno} imports the provider")
+            # The third spelling, and the one a guard usually misses: the package
+            # named as a NAME rather than as a module path. It reaches exactly the
+            # same client, so leaving it out would make this test something to
+            # route around rather than something to satisfy.
+            if (isinstance(node, ast.ImportFrom) and module == "exposure_workbench"
+                    and any(a.name == "llm" for a in node.names)):
+                offenders.append(f"{f.name}:{node.lineno} imports the provider package")
+    assert offenders == [], (
+        f"an agent loop holding the provider directly, and with it the usage it "
+        f"can discard: {offenders}"
+    )
+
+
+def test_the_provider_exemptions_are_modules_that_still_exist():
+    """An exemption for a deleted module is a hole with a reason attached to it."""
+    agents = ROOT / "src" / "exposure_workbench" / "agents"
+    missing = {name for name in _MAY_REACH_THE_PROVIDER if not (agents / name).exists()}
+    assert missing == set(), f"exempted from a law they are no longer subject to: {missing}"

@@ -24,14 +24,13 @@ from jsonschema import Draft202012Validator
 
 from exposure_workbench.tools.arg_validation import validate_args
 from exposure_workbench.tools.definitions import build_read_registry
-from exposure_workbench.tools.meta_tools import register_meta_tools
-from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
 
 def _all_tools():
     """Every registered tool, from both faces, deduped by name."""
     out = {}
-    for registry in (register_meta_tools(build_read_registry()), build_research_registry()):
+    for registry in (build_meta_registry(), build_research_registry()):
         out.update(registry.tools)
     return sorted(out.items())
 

@@ -27,7 +27,7 @@ export type Brief = {
 };
 export type Evidence = { type: string; id: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
 export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; started_at: string | null; completed_at: string | null };
-export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string };
+export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string; prompt_tokens: number | null; completion_tokens: number | null };
 // meta carries out-of-band facts about the turn. {"gate":"exhausted"} means the
 // loop ended without the citation gate accepting an answer — a refusal, not a reply.
 export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: Record<string, unknown> };

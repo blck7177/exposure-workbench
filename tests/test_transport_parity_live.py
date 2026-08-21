@@ -39,11 +39,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 load_dotenv(".env", override=True)
 
-from exposure_workbench.agents.meta_agent import build_meta_registry
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.db.models import AgentStep
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.tools import faces, registry as R
+from exposure_workbench.tools.registries import build_meta_registry
 
 pytestmark = pytest.mark.live
 

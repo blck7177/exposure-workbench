@@ -51,9 +51,8 @@ from exposure_workbench.db.models import User
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.tools import faces, mcp_request
-from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.mcp_server import build_mcp_server
-from exposure_workbench.tools.meta_tools import register_meta_tools
+from exposure_workbench.tools.registries import build_meta_registry
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("mcp-server")
@@ -132,7 +131,7 @@ async def build_stdio_server() -> Server:
         face=faces.FACE_NAME_META,
     ))
     return build_mcp_server(
-        register_meta_tools(build_read_registry()),
+        build_meta_registry(),
         faces.FACE_META_AGENT,
         db_factory=get_session_factory(),
         face_name=faces.FACE_NAME_META,

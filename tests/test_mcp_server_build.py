@@ -28,7 +28,7 @@ import pytest
 from exposure_workbench.auth.internal_token import InternalClaims
 from exposure_workbench.tools import faces, mcp_request
 from exposure_workbench.tools.definitions import build_read_registry
-from exposure_workbench.tools.meta_tools import register_meta_tools
+from exposure_workbench.tools.registries import build_meta_registry
 
 
 def _never_called():
@@ -38,7 +38,7 @@ def _never_called():
 def _build(face=None, face_name=faces.FACE_NAME_META):
     from exposure_workbench.tools.mcp_server import build_mcp_server
 
-    registry = register_meta_tools(build_read_registry())
+    registry = build_meta_registry()
     return build_mcp_server(
         registry, face or faces.FACE_META_AGENT,
         db_factory=_never_called, face_name=face_name,
@@ -101,7 +101,7 @@ async def test_the_schemas_are_the_registrys_own():
     because FastMCP inferred schemas from a **kwargs handler. A transport that
     describes the tools differently from the registry is a second source of
     truth about what an argument is."""
-    registry = register_meta_tools(build_read_registry())
+    registry = build_meta_registry()
     tools = await _list(_build())
 
     for tool in tools:

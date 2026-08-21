@@ -25,17 +25,11 @@ from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import company_service
 from exposure_workbench.services import evidence_trail_service as trail
 from exposure_workbench.services import research_run_service
-from exposure_workbench.tools.definitions import build_read_registry
-from exposure_workbench.tools.research_tools import register_research_tools
 from exposure_workbench.workflow.readiness_workflow import run_readiness
 from exposure_workbench.workflow.step_context import step
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
-
-
-def build_research_registry():
-    return register_research_tools(build_read_registry())
 
 
 async def _is_ready(db: AsyncSession, company_id: str) -> bool:
@@ -88,7 +82,7 @@ async def run_issuer_research(
     async with db_factory() as db:
         async with step(db, run_id, "agent_session",
                         f"Research agent analysing {ticker}"):
-            result = await run_research_session(session_id, ticker, deny=deny)
+            result = await run_research_session(db_factory, session_id, ticker, deny=deny)
             if not result["submitted"]:
                 raise RuntimeError(
                     f"research agent did not submit a brief within budget "

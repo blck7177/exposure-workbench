@@ -103,6 +103,10 @@ async def chat_with_tools(
         ]
     usage = response.usage
     usage_dict = {
+        # The version the provider actually served, not settings.openai_model —
+        # that is an alias, it moves under the account without a deploy, and a
+        # cost row stamped with it cannot answer "which model charged this".
+        "model": response.model,
         "prompt_tokens": usage.prompt_tokens if usage else 0,
         "completion_tokens": usage.completion_tokens if usage else 0,
     }

@@ -16,10 +16,10 @@ import json
 import logging
 from typing import Sequence
 
+from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
-from exposure_workbench.llm import client as llm_client
 from exposure_workbench.tools import faces
 
 logger = logging.getLogger(__name__)
@@ -44,14 +44,21 @@ those ids and resubmit — do not invent ids."""
 
 
 async def run_research_session(
+    db_factory,
     session_id: str,
     ticker: str,
     deny: Sequence[str] = (),
     max_turns: int = 30,
 ) -> dict:
-    """Drive the loop. No registry and no db_factory: the tools and the database
-    they commit into are behind the mount now, one session per tool call there
-    exactly as before, so trace and ledger still persist as they happen.
+    """Drive the loop. No registry: the tools and the database they commit into
+    are behind the mount now, one session per tool call there exactly as before,
+    so trace and ledger still persist as they happen.
+
+    db_factory came back at V4-S2, and it is not the tools' database returning
+    with it. Nothing on this side reaches a tool through it; it writes one row —
+    the completion this loop just paid for — and a completion is the one event
+    the mount never sees, because it happens on this side of the door. R4's
+    absence was about the tools; this is the ledger for what R4 does not cover.
 
     `deny` is the tool names removed from the research face for this run — how
     skip-flags work, unchanged in kind and moved in mechanism. The mount serves
@@ -80,11 +87,15 @@ async def run_research_session(
     async with tool_session(
         faces.FACE_NAME_RESEARCH, session_id=session_id,
         user_id=current_user_id(), deny=deny,
-    ) as tools_session:
+    ) as tools_session, llm_session(db_factory, session_id) as llm:
         tools = tools_session.tools
 
         for turn in range(max_turns):
-            content, tool_calls, usage = await llm_client.chat_with_tools(
+            # No message_id: a research run has no message to hang a cost on. The
+            # session IS the unit of work, and the run reaches it through
+            # research_runs.agent_session_id — which is how the per-run view adds
+            # these up (V4-S2).
+            content, tool_calls = await llm.chat(
                 messages=messages, tools=tools, model=model, temperature=0.2,
             )
             assistant_msg: dict = {"role": "assistant", "content": content or ""}

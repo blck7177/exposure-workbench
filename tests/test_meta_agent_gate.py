@@ -13,6 +13,7 @@ import pytest
 from exposure_workbench.agents import meta_agent
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
 from exposure_workbench.tools import faces
+from exposure_workbench.tools.registries import build_meta_registry
 
 
 class _FakeResult:
@@ -73,15 +74,35 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None):
     return session
 
 
+def _stub_llm(monkeypatch, chat):
+    """Stand in for the turn's provider session.
+
+    The same substitution as _stub_tools and for the same reason — these tests
+    are about what the loop does with an answer, not about getting one. The seam
+    moved here at V4-S2: the loop used to call chat_with_tools and drop the
+    usage, and now calls a session that returns (content, tool_calls) and writes
+    the cost row itself. Stubbing that session is what keeps these tests about
+    the gate; the row it would have written is asserted in test_llm_cost_trace.
+    """
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    @asynccontextmanager
+    async def _fake(*_a, **_k):
+        yield SimpleNamespace(chat=chat)
+
+    monkeypatch.setattr(meta_agent, "llm_session", _fake)
+
+
 @pytest.mark.asyncio
 async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(monkeypatch):
     """The path that mattered most: on the final turn the loop used to assign the
     raw model content as the answer. It reached the user with citations=[],
     rendered identically to a verified reply, having passed no gate at all."""
     async def _no_tools(**_kw):
-        return ("NVDA revenue was $999.9B and margins are expanding.", None, {})
+        return ("NVDA revenue was $999.9B and margins are expanding.", None)
 
-    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    _stub_llm(monkeypatch, _no_tools)
     _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     out = await handle_message(_factory(store), "sess_1", "how did NVDA do?", max_turns=1)
@@ -98,9 +119,9 @@ async def test_a_loop_that_never_reaches_respond_says_so_in_the_same_words(monke
     used to emit "(no response produced)", which reads as a crash rather than as
     a refusal, and carried no marker at all."""
     async def _always_thinks(**_kw):
-        return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}], {})
+        return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}])
 
-    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _always_thinks)
+    _stub_llm(monkeypatch, _always_thinks)
     _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     out = await handle_message(_factory(store), "sess_2", "how did NVDA do?", max_turns=2)
@@ -116,9 +137,9 @@ async def test_the_failure_is_persisted_and_marked_not_swallowed(monkeypatch):
     done, and dropping the turn would leave the user's question in the
     transcript with no reply and nothing to explain it."""
     async def _no_tools(**_kw):
-        return ("whatever", None, {})
+        return ("whatever", None)
 
-    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    _stub_llm(monkeypatch, _no_tools)
     _stub_tools(monkeypatch, {"noted": True})
     store: list = []
     await handle_message(_factory(store), "sess_3", "hello?", max_turns=1)
@@ -134,9 +155,9 @@ async def test_an_accepted_answer_carries_no_marker(monkeypatch):
     """The marker must mean something, so it has to be absent on the happy path."""
     async def _responds(**_kw):
         return ("", [{"id": "c1", "function": {"name": "respond",
-                                               "arguments": '{"text":"Hello.","citations":[]}'}}], {})
+                                               "arguments": '{"text":"Hello.","citations":[]}'}}])
 
-    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _responds)
+    _stub_llm(monkeypatch, _responds)
     _stub_tools(monkeypatch, {"responded": True, "text": "Hello.", "citations": []})
     store: list = []
     out = await handle_message(_factory(store), "sess_4", "hi", max_turns=4)
@@ -153,14 +174,14 @@ async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
     request and appear nowhere in `messages` — a bare system prompt already costs
     thousands of tokens once they are counted."""
     async def _no_tools(**_kw):
-        return ("whatever", None, {})
+        return ("whatever", None)
 
-    monkeypatch.setattr(meta_agent.llm_client, "chat_with_tools", _no_tools)
+    _stub_llm(monkeypatch, _no_tools)
     # The real face, because the count is the thing under test and an empty tool
     # list would pass the assertion below for the wrong reason — by being small
     # enough to fail it. This is the list the mount serves for FACE_META_AGENT.
     _stub_tools(monkeypatch, {"noted": True},
-                tools=meta_agent.build_meta_registry().schemas(faces.FACE_META_AGENT))
+                tools=build_meta_registry().schemas(faces.FACE_META_AGENT))
     store: list = []
     out = await handle_message(_factory(store), "sess_5", "hello?", max_turns=1)
 

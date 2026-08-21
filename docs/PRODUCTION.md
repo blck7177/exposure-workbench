@@ -206,15 +206,22 @@ git pull
 #   CLERK_AUTHORIZED_PARTIES=https://exposure.<domain>
 docker compose build
 
-# Schema BEFORE the new code sees the database. Both files are idempotent and
-# safe to re-run in full, but the order is not optional: every V3 column is read
-# by V3 code, so an API that starts first answers 500 on the agent routes until
-# the ALTERs land. Bring postgres up alone, migrate, then start the rest.
+# Schema BEFORE the new code sees the database. All three files are idempotent
+# and safe to re-run in full, but the order is not optional: every V3 column is
+# read by V3 code, so an API that starts first answers 500 on the agent routes
+# until the ALTERs land. Bring postgres up alone, migrate, then start the rest.
+#
+# v4_cost.sql is the one file that DROPs. Its three issuer_briefs columns have
+# no writer and no reader (V4-S2), so running it against the old code is
+# harmless — which is why it still belongs before `up -d` with the others,
+# rather than being the exception someone has to remember.
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v3_harness.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v4_cost.sql
 
 docker compose up -d
 

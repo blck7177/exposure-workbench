@@ -102,6 +102,10 @@ export interface DailyReport {
   recommended_actions: string | null;
   markdown_report: string | null;
   confidence_flags: Record<string, unknown>;
+  // Alive, and rendered (page.tsx). Not the field V4-S2 deleted: a daily report
+  // really is one completion, so direct_llm_agent writes this on every run. The
+  // brief's identically named column was the same idea applied to a 30-turn
+  // session, where it could never be filled — that one is gone, this one stays.
   llm_model: string | null;
   created_at: string;
 }

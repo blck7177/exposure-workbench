@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from exposure_workbench.agents.meta_agent import build_meta_registry
 from exposure_workbench.tools import faces
+from exposure_workbench.tools.registries import build_meta_registry
 from exposure_workbench.tools.registry import DELEGATION, GATE
 
 

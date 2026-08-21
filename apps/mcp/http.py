@@ -47,10 +47,8 @@ from apps.mcp.middleware import bearer_identity
 from exposure_workbench.auth import internal_token
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.tools import faces
-from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.mcp_server import build_mcp_server
-from exposure_workbench.tools.meta_tools import register_meta_tools
-from exposure_workbench.workflow.issuer_research_workflow import build_research_registry
+from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -71,7 +69,7 @@ internal_token.require_secret()
 # token and the path it answers on are one value read three times rather than
 # three literals that agree until somebody edits one.
 MOUNTS = {
-    faces.FACE_NAME_META: (register_meta_tools(build_read_registry()), faces.FACE_META_AGENT),
+    faces.FACE_NAME_META: (build_meta_registry(), faces.FACE_META_AGENT),
     faces.FACE_NAME_RESEARCH: (build_research_registry(), faces.FACE_RESEARCH),
 }
 

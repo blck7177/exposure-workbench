@@ -652,7 +652,7 @@ class AgentStep(Base):
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"))
     message_id: Mapped[str | None] = mapped_column(String(64))
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
-    step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|think|delegation|respond
+    step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|think|delegation|respond|llm_call
     tool_name: Mapped[str | None] = mapped_column(String(64))
     args: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     result_summary: Mapped[str | None] = mapped_column(Text)
@@ -699,7 +699,10 @@ class IssuerBrief(Base):
     # it is written separately. NULL on briefs written before V3.
     block_citations: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    llm_model: Mapped[str | None] = mapped_column(String(64))
-    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
-    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    # No llm_model/prompt_tokens/completion_tokens (V4-S2, dropped in
+    # infra/migrations/v4_cost.sql). They were a fossil of the v2 shape where one
+    # artifact was one completion — still true of daily_reports, which fills its
+    # copies, and never true of a brief: a brief is what a 30-turn session ends
+    # with. Nothing ever wrote them. The session's llm_call rows are the real
+    # number, and llm_cost_by_research_run is where to ask for it.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

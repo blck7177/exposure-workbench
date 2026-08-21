@@ -21,14 +21,12 @@ import logging
 
 from sqlalchemy import update
 
+from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
-from exposure_workbench.llm import client as llm_client
 from exposure_workbench.services import context_budget
-from exposure_workbench.tools import faces, registry as R
-from exposure_workbench.tools.definitions import build_read_registry
-from exposure_workbench.tools.meta_tools import register_meta_tools
+from exposure_workbench.tools import faces
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
@@ -77,10 +75,6 @@ _GATE_EXHAUSTED_TEXT = (
 _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 
-def build_meta_registry() -> R.ToolRegistry:
-    return register_meta_tools(build_read_registry())
-
-
 async def _load_history(db, session_id: str) -> list[dict]:
     from sqlalchemy import select
     rows = (await db.execute(
@@ -119,12 +113,19 @@ async def handle_message(
     async with tool_session(
         faces.FACE_NAME_META, session_id=session_id,
         user_id=current_user_id(), message_id=message_id,
-    ) as tools_session:
+    ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
         tools = tools_session.tools
 
         for turn in range(max_turns):
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
-            content, tool_calls, _usage = await llm_client.chat_with_tools(messages=messages, tools=tools)
+            # No usage comes back. It used to, under the name `_usage`, and the
+            # underscore was the whole problem: the turn's only real cost was a
+            # value this loop was free to ignore. It is an llm_call row now,
+            # written on the way through (V4-S2). prompt_peak above stays exactly
+            # as it is — a tiktoken estimate bounding the NEXT turn is a different
+            # number from what the provider says it charged for this one, and
+            # B1 refuses on the estimate.
+            content, tool_calls = await llm.chat(messages=messages, tools=tools)
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:
                 assistant_msg["tool_calls"] = tool_calls
