@@ -93,7 +93,16 @@ export function ChatPanel() {
     if (sid) { setSessionId(sid); getSessionDetail(sid).then((d) => {
       setMessages(d.messages.filter(m => m.content).map(m => ({ role: m.role, text: m.content || "", citations: m.citations || [] })));
       setSteps(d.steps);
-    }).catch(() => localStorage.removeItem(LS_KEY)); }
+    }).catch(() => {
+      // BOTH, or the id lives on in state and every send goes to a session the
+      // server cannot see. Clearing only storage looks like a fix and behaves
+      // like one after a reload, which is the worst combination: the tab you
+      // are in stays broken and the bug reads as intermittent. The realistic
+      // way in is signing in as a different user — the id is per origin, the
+      // session is per tenant, and RLS makes the other tenant's session a 404.
+      localStorage.removeItem(LS_KEY);
+      setSessionId(null);
+    }); }
   }, []);
 
   const ensureSession = useCallback(async (): Promise<string> => {
@@ -172,6 +181,23 @@ export function ChatPanel() {
         );
         setSessionId(null);
         localStorage.removeItem(LS_KEY);
+      } else if (status === 404) {
+        // The session the server is being asked about does not exist for this
+        // user — most often a stale id from a previous account or a wiped
+        // database. Same shape as the exhausted branch above: say it, drop the
+        // id, and let the next send open a fresh one, because there is nothing
+        // here for the user to fix by hand.
+        setNotice("That conversation is no longer available — send your message again to start a new one.");
+        setSessionId(null);
+        localStorage.removeItem(LS_KEY);
+      } else if (detail?.error === "tool_face_unavailable") {
+        // V4-S1. The tool service is down or refused this turn; the API answers
+        // 503 and the turn is over. The server's own sentence is shown rather
+        // than a second wording of it: it was written for this reader, and two
+        // copies would be two things to keep in step. The session is NOT
+        // cleared — nothing is wrong with it, and the message is still in the
+        // transcript because handle_message commits it before the loop starts.
+        setNotice(String(detail.detail ?? "The analysis service is briefly unavailable — try again shortly."));
       } else if (detail?.error === "quota_exceeded") {
         // An account. Show the numbers as the server reported them rather than
         // paraphrasing: the user wants to know what they spent and when it resets.
