@@ -3,6 +3,18 @@ services:
     image: pgvector/pgvector:pg16   # Postgres 16 + pgvector (filing_chunks.embedding)
     container_name: exposure-postgres
     restart: unless-stopped
+    # V7-D10. The default 100 is not a budget anyone chose: every process here
+    # holds pool_size=10 + max_overflow=20, so api + mcp + three workers can ask
+    # for 150 and the sixth replica to start would be refused by the database
+    # rather than by anything that knows why. 200 costs a few MB of shared
+    # memory on a box with 3.8 GB. shared_buffers moves with it — 128MB is the
+    # image default, not a reading of this machine.
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
     environment:
       POSTGRES_USER: exposure
       POSTGRES_PASSWORD: exposure
@@ -141,6 +153,16 @@ services:
     # fail on a name collision. Replicas get the compose-generated name, and
     # WORKER_ID (socket.gethostname() = the 12-char container id) differs per
     # replica with no code change.
+    #
+    # V7-D10: three of them. process_one handles ONE task at a time, and a cold
+    # issuer_research is minutes of EDGAR ingest plus a thirty-turn agent loop —
+    # with one replica the third user to press Investigate waits behind two runs
+    # that have nothing to do with them. Safe because claim_next_task takes the
+    # row FOR UPDATE SKIP LOCKED and dates the lease from the SERVER clock, so
+    # replicas never claim the same task and never disagree about when a lease
+    # expired. The number is a scheduling choice, not a correctness one.
+    deploy:
+      replicas: 3
     restart: unless-stopped
     build:
       context: .
