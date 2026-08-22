@@ -10,16 +10,17 @@
 # retries in the background and logs failures, which is noise at best and a
 # reload that surprises you at worst.
 #
-#   A   exposure   <this machine's public IP>    (DNS-only / grey cloud on Cloudflare)
+#   A     @     <this machine's public IP>    (DNS-only / grey cloud on Cloudflare)
+#   CNAME www   desk-for-one.com               (same)
 #
 # Then, before the first build, in .env:
 #   NEXT_PUBLIC_API_URL=            # empty = same origin; see apps/web/lib/http.ts
 #   CORS_ORIGINS=                   # nothing cross-origin left to allow
-#   CLERK_AUTHORIZED_PARTIES=https://exposure.example.com
+#   CLERK_AUTHORIZED_PARTIES=https://desk-for-one.com
 # and rebuild the web image, because NEXT_PUBLIC_* is inlined at build time —
 # changing it in the environment of a running container does nothing.
 
-exposure.example.com {
+desk-for-one.com {
 	encode gzip
 
 	# Refuse oversized bodies at the edge. This is not belt-and-braces: FastAPI
@@ -43,18 +44,27 @@ exposure.example.com {
 	}
 
 	log {
-		output file /var/log/caddy/exposure.log
-		format json
+		output file /var/log/caddy/desk-for-one.log {
+			roll_size 10mb
+			roll_keep 5
+		}
 	}
+}
+
+# www is a redirect, not a second copy of the site: two hostnames serving the
+# same pages is two of everything a browser keys on origin — sessions, storage,
+# and the azp claim Clerk checks.
+www.desk-for-one.com {
+	redir https://desk-for-one.com{uri} permanent
 }
 
 # Smoke checks after reload (all from another machine, not this one):
 #
-#   curl -sS https://exposure.example.com/api/health           -> {"status":"ok"}
-#   curl -sS https://exposure.example.com/api/portfolios       -> the public demo only
+#   curl -sS https://desk-for-one.com/api/health           -> {"status":"ok"}
+#   curl -sS https://desk-for-one.com/api/portfolios       -> the public demo only
 #   curl -sS -o /dev/null -w '%{http_code}\n' \
-#        -X POST https://exposure.example.com/api/agent/sessions   -> 401
-#   curl -sS https://exposure.example.com/ | grep -c localhost:8103 -> 0
+#        -X POST https://desk-for-one.com/api/agent/sessions   -> 401
+#   curl -sS https://desk-for-one.com/ | grep -c localhost:8103 -> 0
 #
 # The last one matters most: the API base is baked into the client bundle at
 # build time, so a stale image looks completely healthy from the server side and
