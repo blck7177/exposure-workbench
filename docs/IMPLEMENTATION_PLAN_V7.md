@@ -34,6 +34,8 @@
 - **D7(boss)** OpenAI dashboard 设月度硬上限(provider 侧第二道护栏,5 分钟)。
 - **D8** 磁盘:79% 满、剩 8.1G(镜像构建缓存吃的),`docker builder prune` 一次;否则再建几次镜像就满。
 - **D9** 备份(若 DP3 要):每日 `pg_dump` cron + 保留 7 份。
+- **D10** worker 扩到 2–3 副本 + 连接预算。1 副本串行处理,冷 ticker research 几分钟,第三个同时 Investigate 的用户要排队;`claim_next_task` 的 `FOR UPDATE SKIP LOCKED` + 服务器时钟租约使多副本按构造安全。每进程池上限 30(`pool_size=10, max_overflow=20`),api+mcp+3 worker = 150 > `max_connections=100`:扩副本同时 `max_connections=200` 或调小 worker 池。
+- **D11** 一次 `ANALYZE`:大批量 seed 后统计信息陈旧(`pg_stat_user_tables` 报 `filing_chunks` 0 行,实际 3,078)。
 
 ---
 
@@ -54,6 +56,21 @@
 
 ---
 
-## 3. 与既有 backlog 的关系
+## 3. 数据库 / 用户隔离 / 并行能力审计(2026-08-22,全部实测)
+
+**结论:三块均无上线阻塞项。** 隔离是结构性的(20 张租户表 RLS、`app_rls` 无 bypass、GUC 逐事务注入、MCP 逐请求绑定经跨进程并发实测、成本视图 `security_invoker`);并发模型按构造正确(turn lease / 配额 / 任务领取全是 DB 事务);库 99 MB、默认配置、当前 6 连接。
+
+**故意不隔离、有理由的**:公司级证据表(公共事实);`tasks` 与 `usage_daily`(队列与全局池天然跨租户,worker 以 `app_rls` 不设租户领任务,有 RLS 就看不到 pending 行)——靠路由层 WHERE,代码注释写明 `semantic, not security`。
+
+**上线后三条卫生(不阻塞)**:
+1. `agent_sessions` 277/559 行 NULL owner(测试与 V2 前遗留;策略下对所有租户不可见,无泄漏,但成本视图出 NULL 桶)→ 清理 + `owner_id NOT NULL`,先让仍造无主会话的 live 测试改有主。
+2. `tasks` / `usage_daily` 的隔离靠纪律:补一条守卫测试——所有触碰这两表的路由必须带 owner 过滤(与 import-graph 守卫同型)。
+3. `filing_chunks.embedding` 无向量索引(仅三个 btree),精确扫描;3k 行毫秒级,**过百家公司**再加 HNSW。
+
+**与 D6 的关系**:`research_runs` 按 owner 隔离 → 两用户同时 Investigate 同一 ticker 互不可见 → 两个 run 并行对共享证据表 ingest,而 `filing_chunks` 无 UNIQUE(挂起区"三份 schema 同落")→ 重复 chunk。这是 D6 singleflight 广发前必做的实证。
+
+---
+
+## 4. 与既有 backlog 的关系
 
 本文件只覆盖"到可注册 production"的路。以下照旧躺在 BOARD/topic 页,不因上线改变优先级:S3 重跑(mcp 2.0,租约扩三文件)、research 侧 `llm_session` 栈上验证(1 次配额可顺带并入 D5 smoke)、harness 线(loop / evidence 单一路径)、A1 存在性 vs 正确性、已挂起四件。
