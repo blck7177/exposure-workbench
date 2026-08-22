@@ -188,3 +188,70 @@ async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
     assert out["meta"]["prompt_tokens"] > 1000, "tool schemas must be in the count"
     assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
     assert assistant[0].meta["prompt_tokens"] == out["meta"]["prompt_tokens"]
+
+
+@pytest.mark.asyncio
+async def test_the_refusal_does_not_claim_a_cause_it_did_not_see(monkeypatch):
+    """V7-Q2. The sentence asserted WHY: "every attempt either cited evidence I
+    had not actually retrieved or stated a figure I could not trace back to a
+    source." On the path this test drives, there was no attempt at all — the
+    model never reached the gate — so the user was told, confidently, about a
+    citation failure that never happened.
+
+    That is not a wording nit. It is what a reader takes away from a system whose
+    entire claim is that it does not state things it cannot support: the one
+    sentence it emits when it fails was the one sentence nothing checked. It was
+    also actively misleading in the incident that prompted this — the gate had
+    refused for an exhausted tool budget, and the user went looking at citations.
+
+    The refusal still converges on ONE wording, which is the property the rest of
+    this module pins. What changed is that the wording now describes the BAR
+    rather than diagnosing the miss, so it is true however the turn ended."""
+    async def _no_tools(**_kw):
+        return ("NVDA revenue was $999.9B.", None)
+
+    _stub_llm(monkeypatch, _no_tools)
+    _stub_tools(monkeypatch, {"noted": True})
+    out = await handle_message(_factory([]), "sess_cause", "how did NVDA do?", max_turns=1)
+
+    assert out["meta"]["gate"] == "exhausted"
+    assert "cited evidence I had not actually retrieved" not in out["text"]
+    assert "stated a figure I could not trace" not in out["text"]
+    # And it still says the two things a person needs: it did not get there, and
+    # what to do next.
+    assert "narrow the question" in out["text"]
+
+
+@pytest.mark.asyncio
+async def test_what_the_gate_actually_refused_is_recorded_for_the_desk(monkeypatch):
+    """The cause leaves the sentence and lands in meta, where it is machine
+    readable and cannot mislead anybody.
+
+    Diagnosing the incident meant reconstructing the turn from agent_steps by
+    hand, because the persisted message said only `gate: exhausted` — the marker
+    recorded THAT the gate never opened and never what it said. These codes are
+    exactly what would have answered it in one query."""
+    async def _always_responds(**_kw):
+        return ("", [{"id": "c1", "function": {"name": "respond",
+                                               "arguments": '{"text":"x","citations":[]}'}}])
+
+    _stub_llm(monkeypatch, _always_responds)
+    _stub_tools(monkeypatch, {"error": "unverified_numbers", "problems": [{"value": "999.9"}]})
+    out = await handle_message(_factory([]), "sess_codes", "how did NVDA do?", max_turns=3)
+
+    assert out["meta"]["gate"] == "exhausted"
+    assert out["meta"]["gate_refusals"] == ["unverified_numbers"] * 3
+
+
+@pytest.mark.asyncio
+async def test_a_turn_that_never_reached_the_gate_records_no_refusals(monkeypatch):
+    """Empty, not absent: "the gate said nothing" and "nobody recorded what the
+    gate said" must not look the same to whoever reads this next."""
+    async def _always_thinks(**_kw):
+        return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}])
+
+    _stub_llm(monkeypatch, _always_thinks)
+    _stub_tools(monkeypatch, {"noted": True})
+    out = await handle_message(_factory([]), "sess_norefuse", "how did NVDA do?", max_turns=2)
+
+    assert out["meta"]["gate_refusals"] == []

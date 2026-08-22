@@ -66,11 +66,23 @@ not fetch: call the tool that produces it, then cite what comes back."""
 # content as the answer — an ungated reply, with citations=[], indistinguishable
 # from a verified one — and the second used to emit "(no response produced)",
 # which reads like a bug rather than a refusal.
+# ONE wording for both paths — that convergence is the property above, and it
+# stays. What this sentence must NOT do is diagnose: it used to end "every
+# attempt either cited evidence I had not actually retrieved or stated a figure
+# I could not trace back to a source", which is a claim about a cause, asserted
+# by the one code path nothing checks. On the first path there is no attempt to
+# describe. And in the turn that prompted this (V7-Q2) the real cause was an
+# exhausted tool budget, so the user was pointed at citations that were never
+# the problem — a system whose whole claim is that it does not say what it
+# cannot support, saying exactly that, in its failure message.
+#
+# So it states the BAR and that the turn did not clear it, which is true however
+# the turn ended. The cause is not lost, it moves to meta, where it is machine
+# readable and cannot mislead a reader.
 _GATE_EXHAUSTED_TEXT = (
-    "I could not produce an answer I can stand behind for this turn — every "
-    "attempt either cited evidence I had not actually retrieved or stated a "
-    "figure I could not trace back to a source. Ask again, or narrow the "
-    "question to one issuer or one metric."
+    "I could not produce an answer I can stand behind for this turn — everything "
+    "I state has to trace back to evidence I actually retrieved, and I did not "
+    "get there. Ask again, or narrow the question to one issuer or one metric."
 )
 _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
@@ -98,6 +110,10 @@ async def handle_message(
 
     messages = [{"role": "system", "content": _SYSTEM}, *history]
     reply_text, reply_citations = None, []
+    # What the gate refused, in order. Empty is a fact, not a gap: it means the
+    # turn never reached the gate, which is a different failure from one the gate
+    # turned away, and the two must not read the same afterwards.
+    gate_refusals: list[str] = []
 
     # The PEAK, not the first: messages grow with every tool result inside the
     # turn, so the largest request is the last one, and the largest request is
@@ -149,8 +165,15 @@ async def handle_message(
                 result = await tools_session.call(name, args)
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
                                  "content": json.dumps(result, default=str)[:6000]})
-                if name == "respond" and result.get("responded"):
-                    reply_text, reply_citations = result["text"], result.get("citations", [])
+                if name == "respond":
+                    if result.get("responded"):
+                        reply_text, reply_citations = result["text"], result.get("citations", [])
+                    elif result.get("error"):
+                        # Every refusal, in order. Diagnosing V7-Q2 meant
+                        # rebuilding the turn out of agent_steps by hand, because
+                        # the marker recorded that the gate never opened and
+                        # never what it said.
+                        gate_refusals.append(str(result["error"]))
 
             if reply_text is not None:
                 break
@@ -163,7 +186,7 @@ async def handle_message(
     meta: dict = {"prompt_tokens": prompt_peak}
     if reply_text is None:
         reply_text, reply_citations = _GATE_EXHAUSTED_TEXT, []
-        meta |= _GATE_EXHAUSTED_META
+        meta |= _GATE_EXHAUSTED_META | {"gate_refusals": gate_refusals}
 
     async with db_factory() as db:
         db.add(AgentMessage(id=message_id, session_id=session_id, role="assistant",

@@ -50,6 +50,13 @@ DELEGATION = "delegation"
 REFLECTION = "reflection"
 GATE = "gate"                # respond / submit_brief — session exits
 
+# The classes that cost no budget, because neither retrieves anything: a
+# reflection is the model talking to itself, a gate is the turn's exit. Named
+# rather than inlined at the one site that reads it, so a test can assert WHICH
+# classes are free — and so that adding one is a decision somebody makes here,
+# once, rather than a tuple that drifts.
+BUDGET_FREE_CLASSES = (REFLECTION, GATE)
+
 # Exactly the prefixes the citation gate can resolve (evidence_trail_service.
 # _RESOLVERS), and the symmetry is the point: harvesting an id the gate can never
 # accept hands the model something it can retrieve, quote and then be refused
@@ -201,8 +208,26 @@ async def invoke(
         )
         return {"error": "invalid_arguments", "problems": problems}
 
-    # 2) reserve budget (reflection tools are free by design)
-    if tool.tool_class != REFLECTION:
+    # 2) reserve budget. REFLECTION and GATE are free by design, for the same
+    # reason stated two different ways: the budget bounds how much EVIDENCE a
+    # turn gathers, and neither of these retrieves any. A reflection is the model
+    # talking to itself; a gate is the turn's verdict and its only exit.
+    #
+    # The gate was charged here until V7-Q2, and the failure it produced was not
+    # a degraded answer — it was a turn that could not end. Once the counter hit
+    # its limit, respond was refused for lacking budget it needed in order to
+    # spend nothing, and the loop then burned every remaining round trip at ~12k
+    # prompt tokens each on a state where no outcome existed, before telling the
+    # user their citations had been the problem. Reproduced from
+    # sess_d90c19451151 and pinned in test_turn_budget_live.
+    #
+    # Exempting it is not a hole: a gate ENDS the turn, so there is nothing left
+    # for an unbudgeted call to go on to do. What running out of budget now means
+    # is the right thing — answer with the evidence you managed to gather.
+    #
+    # Derived from tool_class, never from a name: the property is being an exit,
+    # and any exit written later inherits this without anybody remembering to.
+    if tool.tool_class not in BUDGET_FREE_CLASSES:
         try:
             await sess.reserve(db, session_id, is_external_search=(tool.budget_key == "external_search"))
         except sess.BudgetExceeded as e:

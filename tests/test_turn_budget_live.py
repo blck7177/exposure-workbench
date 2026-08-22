@@ -154,3 +154,65 @@ async def test_the_mcp_host_session_keeps_the_lifetime_budget_the_docs_promise()
             assert c.turn_tool_budget == get_settings().turn_tool_budget
     finally:
         await engine.dispose()
+
+
+async def test_the_exit_is_not_charged_against_the_budget_it_needs(monkeypatch):
+    """V7-Q2 — reproduced from a real conversation before it was fixed.
+
+    `sess_d90c19451151`, "why there is large drawdowns? do some research and
+    explain": the model spent all fifteen calls gathering (one snapshot, eight
+    read_issuer_brief, six start_issuer_research), then called respond — and the
+    gate was refused for `turn_tool budget exhausted: 15/15`. respond is the only
+    way a turn ends, so the turn could no longer end at all: six more round trips
+    at ~12k prompt tokens each, every one of them structurally incapable of
+    producing an outcome, until max_turns ran out.
+
+    The budget bounds how much EVIDENCE a turn gathers. A gate retrieves nothing
+    — it is the turn's verdict and its exit — so charging it against that budget
+    is charging someone's right to stop talking against their speaking time.
+    Reflection tools were already free here for the same reason; the gate was the
+    case nobody had had to think about, because nothing else can be refused into
+    a state with no way out.
+    """
+    from exposure_workbench.tools import registry as reg
+
+    engine, mk = await _session()
+    try:
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta", owner_id=None)
+            sid = s.id
+            await db.commit()
+            assert await sess.claim_turn(db, sid) is not None
+            for _ in range(get_settings().turn_tool_budget):
+                await sess.reserve(db, sid, is_external_search=False)
+            await db.commit()
+
+            ran: list[str] = []
+
+            async def _fn(_db, **kw):
+                ran.append(kw.get("who", "?"))
+                return {"ok": True}
+
+            r = reg.ToolRegistry()
+            r.register(reg.Tool(name="a_read", description="", json_schema={}, fn=_fn,
+                                tool_class=reg.READ))
+            r.register(reg.Tool(name="an_exit", description="", json_schema={}, fn=_fn,
+                                tool_class=reg.GATE))
+
+            # The budget still works — that is the half that must not regress.
+            refused = await reg.invoke(r, db, sid, "a_read", {"who": "read"})
+            assert refused.get("error") == "budget_exceeded", refused
+            await db.commit()
+
+            # ...and the exit still opens.
+            out = await reg.invoke(r, db, sid, "an_exit", {"who": "exit"})
+            await db.commit()
+            assert out.get("error") != "budget_exceeded", (
+                "the gate was refused for lack of the budget it needs to spend nothing"
+            )
+            assert out == {"ok": True} and ran == ["exit"]
+    finally:
+        async with mk() as db, db.begin():
+            await db.execute(text("DELETE FROM agent_steps WHERE session_id = :s"), {"s": sid})
+            await db.execute(text("DELETE FROM agent_sessions WHERE id = :s"), {"s": sid})
+        await engine.dispose()

@@ -164,3 +164,39 @@ async def test_a_tool_that_echoes_its_argument_is_not_evidence():
 
     # And the successful read this is not allowed to break.
     assert _harvestable(read, "completed", {"job_id": "run_real", "state": "completed"}) is True
+
+
+def test_only_the_classes_that_retrieve_nothing_are_free_of_budget():
+    """V7-Q2. The budget bounds how much EVIDENCE a turn gathers, so the classes
+    exempt from it are exactly the ones that gather none.
+
+    GATE belongs here for a reason stronger than symmetry with REFLECTION: it is
+    the only way a turn ENDS. Charged against a counter that can run out, it
+    produced a turn that could not finish — respond refused for lacking budget it
+    needed in order to spend nothing, then every remaining round trip burned at
+    ~12k prompt tokens on a state with no possible outcome. Exempting it costs
+    nothing, because after a gate runs there is nothing left for the turn to do.
+
+    The other half is what must not regress: READ and DELEGATION are the calls
+    the budget exists to bound, and a tuple that quietly grew to include them
+    would turn the whole limit off with every test still green."""
+    from exposure_workbench.tools.registry import (
+        BUDGET_FREE_CLASSES, DELEGATION, GATE, READ, REFLECTION,
+    )
+    assert set(BUDGET_FREE_CLASSES) == {REFLECTION, GATE}
+    assert READ not in BUDGET_FREE_CLASSES and DELEGATION not in BUDGET_FREE_CLASSES
+
+
+def test_both_faces_reach_their_exit_through_the_gate_class():
+    """The exemption is derived from the class, so an exit that is not declared
+    one is an exit that can be refused into a turn with no way out. Asserted for
+    both faces because research's exit is on the session budget, not the turn's,
+    and 25-32 tool calls against a limit of 40 is not a wide margin."""
+    from exposure_workbench.tools.registry import GATE
+    from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
+
+    for build, exit_name in ((build_meta_registry, "respond"), (build_research_registry, "submit_brief")):
+        reg = build()
+        assert reg.get(exit_name).tool_class == GATE, f"{exit_name} is not declared a gate"
+        gates = {n for n, t in reg.tools.items() if t.tool_class == GATE}
+        assert gates == {exit_name}, f"more than one exit on this face: {sorted(gates)}"
