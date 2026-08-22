@@ -1,56 +1,178 @@
-# Implementation Plan V5 — 上线批:公网可注册 + 前 10 分钟
+# Implementation Plan V5 — 量化正确性批:一种价格、一次回归、一条传导路径
 
-> **状态(2026-08-21)**:**待办记录,未拍板**。范围与规模已和 boss 对齐,拍板点见 §0;拍板后本文件升级为执行方案(补验收与阶段依赖)。
-> **性质**:两个可并行的批——**D(部署)**把栈放上公网,**U(产品)**把一个陌生人注册后的前 10 分钟做通。代码内核(agent 面、RLS、配额、成本账、失败语义)已完工并在栈上实测,本批不动架构。
-> **一句话**:差的全在部署层和"第一次使用"的交互层,不在功能内核。
+> **状态(2026-08-21)**:**Q1–Q8 全部完成**。offline 697 全绿(批前 672),live 118 全绿,合计 **815**。
+> 真实栈实测两次(`run_596da8f1382c`、`run_7acab5fa14e6`,port_001 @ 2026-08-20,yfinance 实时价),
+> 11 步全通过。迁移 `v5_price_convention.sql` 已在本地库重放。
+> **版本**:v5(2026-08-21)。与 V4 正交:V4 收的是 agent 面到达工具之后的洞,V5 收的是
+> 确定性 analytics 层**算错的数**。
+> **性质**:缺陷修复方案 + 实测记录。不是模型升级 —— 升级(收缩估计、肥尾、久期、FX)在 §6 列为待拍板。
+> **一句话**:这批修的不是"不够专业",是**八处会给出错误数字的地方**;其中最严重的一处,
+> 让 −10% 股灾在一个 80% 股票的账本上报出盈利,并且让一条风险限额永远不响。
 
 ---
 
-## 0. 拍板点(全部待 boss)
+## 0. 执行期决策(2026-08-21,**待 boss 追认**)
 
-| # | 决策 | 候选与默认倾向 |
+boss 拍板的是"先修 P0 正确性 bug,开工"。以下四条是修复过程中无法回避的取舍,均已实施,列此备查——
+每一条都不是新增能力,而是"修这个 bug 只能这么修"。
+
+| # | 决策 | 内容与理由 |
 |---|---|---|
-| **DP1** | Clerk 用 dev 实例先上,还是直接 production 实例 | 倾向 **dev 先上**(零额外工作;水印/用户数上限对朋友级 demo 无碍;升级=换 issuer/keys+重建 web,无返工)。production 实例需 boss 在 dashboard 建实例 + 配 CNAME(~30 分钟) |
-| **DP2** | Caddy 块并入 `/etc/caddy/Caddyfile` 由谁执行 | 机器上还服务着 micosai.com 与 noclosedform.com,错一处全站塌。流程含备份 + `caddy validate` 关卡;boss 授权后可由 agent 执行,或 boss 手动 |
-| **DP3** | 备份要不要 | 用户数据只有 portfolios/positions(其余可重 ingest)。最小方案 = 每日 `pg_dump` + 保留 7 份(几 MB);不做也可,demo 级 |
-| **DP4** | U 批范围照 §2 开工,还是砍/加 | 建议 U 批与 D 批**并行**,在真域名上验收 |
+| **D1** | **收益一律用 `adj_close`,市值一律用 `close`** | 两列并行返回,每个消费者点名自己要哪一个。只返回 `close` 不是简化,是**替所有消费者一次性选了约定**,而对全部"收益类"消费者都选错了。注:`MODULE_NOTES.md:177`(M4)早就写着"收益计算用 adj_close" —— **规则写下来了,代码没照做**,这是本批最便宜也最尴尬的一处 |
+| **D2** | **压力情景只声明因子冲击,经 beta 传导** | 原按名字匹配 sector 标签与持仓 ticker,匹配不上贡献 0。改 beta 传导后,`sector_shocks` 必须删除:同一冲击若能经两条命名路径抵达答案,就会抵达两次(TLT 既是因子又是持仓,原来两条都走)。**代价**:失去表达"行业特异性冲击"的能力,那需要残差风险模型,本系统没有,不假装有 |
+| **D3** | **`factor_prices` 的 `adj_close` 不回填 `close`** | 迁移只加列、留 NULL。回填等于在数据里断言"未复权的历史是复权过的" —— 正是本批要消灭的静默约定。读路径按 ticker 点名报错,步骤 1 下次 run 自动重灌,一次 run 自愈 |
+| **D4** | **因子价格缺失/陈旧 = 与持仓价格同一条 raise** | 原来缺因子被 `if t in df.columns` 静默丢掉,留下一个更小的模型,报告自己时的置信度和完整模型一样。风险:某个 yfinance 符号(如 `^VIX`)长期抽风会拦下所有 run。取舍理由:那是**配置决定**(从 factor_config 移除),不该是静默降级 |
 
 ---
 
-## 1. D 批 — 部署(~半天,多数是 boss 手动步骤)
+## 1. 现状基线(2026-08-21,全部实读/实测)
 
-### MUST(不做就没有公网产品)
-
-- **D1(boss)** Cloudflare A 记录:`exposure` → `100.49.167.5`,**grey cloud**(DNS 必须先于 Caddy reload,否则 Caddy 起证书失败在后台重试)。
-- **D2** Caddy:`infra/Caddyfile.example` 块并入 `/etc/caddy/Caddyfile`(先备份 → `caddy validate` → reload)。执行者见 DP2。
-- **D3** 生产 .env 三值 + **重建 web 镜像**(NEXT_PUBLIC_* 是 build 期内联,改环境变量对运行中的容器无效):`NEXT_PUBLIC_API_URL=`(空=同源)、`CORS_ORIGINS=`(空)、`CLERK_AUTHORIZED_PARTIES=https://exposure.noclosedform.com`。
-- **D4(boss)** Clerk dashboard 把 `https://exposure.noclosedform.com` 加进允许 origins。
-- **D5** 公网 smoke:真浏览器注册新账号 → chat 一轮(顺带目视 llm_call 行)→ Investigate → 配额头显示。**这是"上线完成"的定义**;顺带盖掉悬着的两项 UI 目视(llm_call 行样式、503 呈现)。
-
-### SHOULD(开放给陌生人之前,当天可补)
-
-- **D6** ingest singleflight:两用户并发 Investigate 同一 ticker 会重复 ingest。方案早已设计(`ingest_lock_service` advisory lock + `run_readiness` 包锁 + `await_ingest` 时间线步),是 harness 收口批里唯一的 doc-code 双重欠账。~半天。**朋友级流量可后置,广发链接前必须有**。
-- **D7(boss)** OpenAI dashboard 设月度硬上限(provider 侧第二道护栏,5 分钟)。
-- **D8** 磁盘:79% 满、剩 8.1G(镜像构建缓存吃的),`docker builder prune` 一次;否则再建几次镜像就满。
-- **D9** 备份(若 DP3 要):每日 `pg_dump` cron + 保留 7 份。
-
----
-
-## 2. U 批 — 产品交互:陌生人的前 10 分钟(~3 天)
-
-按用户旅程排优先级;全部有具体坐标,不动后端架构。
-
-- **U1(~1 天)Research 等待叙事 + 失败人话上屏**。issuer 页目前只有一个 spinner(`issuer/[ticker]/page.tsx:81`,3s 轮询):热 ticker 25s 尚可,**冷 ticker 要先 EDGAR ingest + embedding,几分钟只有 spinner = 用户必然认为挂了**。叙事数据全都有(`workflow_events` 外层时间线 + `agent_steps` 内层),§9 的"Run 时间线"就是为这一刻设计的,渲染出来。失败侧:`error_message` 已是人话(V4-S1)、API 已返回、web 类型已有(`lib/issuer.ts:29`),**UI 只显示红字 "research failed"(page.tsx:84)——那句人话从没到过用户眼前**,S1 的价值目前只有 psql 看得到。
-- **U2(~0.5–1 天)First-run 空态 + chat 示例提问**。新用户登录后是 demo 组合 + "New portfolio" 按钮,无任何引导;"Clone demo" 藏在弹窗里(`PortfolioModal.tsx:202`)。空租户主面板给一句话 + 两动作(Clone demo / 上传 CSV)+ 一条示例提问;ChatPanel 空态给 3 条可点示例(正确的第一问不显然)。
-- **U3(~0.5 天)`port_001` 硬编码 + issuer 页错误人话**。`startResearch` 把 `portfolio_id` 硬编码为 demo 组合(`lib/issuer.ts:48`)——签入用户发起的 research 归属错误组合,brief 的 portfolio_implications 按错误语境写。issuer 页错误处理只特判 409(`page.tsx:55`),429 等给用户看原始 JSON;与 ChatPanel 的人话分支抽成共享映射。
-- **U4(~0.5 天)`evaluated` 露出**。`payload_summary.evaluated` 前端零露出——**没运行的 check 和通过的 check 在报告里长得一样**;对以"每个失败可解释"为卖点的产品,这是唯一一处 UI 在沉默夸大。未运行标灰。harness observability 线顺带销账。
-
-### 记录、不进首批
-
-移动端适配(三栏桌面布局)、chat session 历史列表(现只恢复最近一个)、返回用户首屏竞态(8/3 标记观察)、用户侧成本页(数据与视图已有,做不做是产品选择)。
+| 事实 | 坐标 |
+|---|---|
+| 组合收益序列建在**未复权 `close`** 上,而 calc ledger 的价格序列用 `adj_close` —— 一个系统两套约定 | `market_data_service.py:141`(旧) vs `calc_service.py:120` |
+| 权重 = **今天数量 × 最后一根收盘价**,再回溯套用到整段历史 | `market_data_service.py:131-138`(旧) |
+| `pivot.ffill().dropna()` 制造零收益日 | `market_data_service.py:109`(旧) |
+| 八个**单变量** `polyfit` 的 beta 直接相加当"已解释"; `r_squared` 来自另一个多元拟合 | `factor_model.py:80,107,115-124`(旧) |
+| 压力测试按名字匹配 sector/ticker,未匹配者贡献 0;sector 与 ticker 同名会**加两次** | `stress.py:48-61`(旧) |
+| `factor_prices` 只由 `scripts/seed_demo_db.py:153` 写过,无人刷新、无人检验;实测比持仓价旧 4 天 | 2026-08-21 DB 实测:factor max `2026-07-23` vs market max `2026-07-27` |
+| recipe 的收益窗口用 `date.today()`,与 ledger 的可重放目标冲突 | `recipe.py:97`(旧) |
+| `load_fact_series` 不过滤 `dimensions_hash`,分部/地区维度事实可与合并口径进同一期桶;`filing_date` 未 select,复述选择退化为 accession 字符串排序 | `calc_service.py:69-88`(旧) · `period_ladder.py:87-98` |
+| `factor_model.py` 与 `stress.py` **测试覆盖为零** | 批前 `tests/` 全文 grep |
+| 全库 `market_prices.adj_close` 无一 NULL(10,296 行),故"收益必须有复权价"可以硬失败 | 2026-08-21 DB 实测 |
+| demo 组合 90 天窗口的价格面板**完全矩形**(62 天 × 10 ticker),故删 `ffill` 在该数据上零代价 | 2026-08-21 DB 实测 |
 
 ---
 
-## 3. 与既有 backlog 的关系
+## 2. 修复清单
 
-本文件只覆盖"到可注册 production"的路。以下照旧躺在 BOARD/topic 页,不因上线改变优先级:S3 重跑(mcp 2.0,租约扩三文件)、research 侧 `llm_session` 栈上验证(1 次配额可顺带并入 D5 smoke)、harness 线(loop / evidence 单一路径)、A1 存在性 vs 正确性、已挂起四件。
+| # | 修复 | 落点 |
+|---|---|---|
+| **Q1** | 价格约定统一:`get_prices_df` / `get_factor_prices_df` 同时返回 `close` 与 `adj_close`;收益消费者点名 `adj_close` | `market_data_service.py` · `pnl.py` |
+| **Q2** | 消除 look-ahead:固定数量重估值,`return_t = V_t / V_{t-1} − 1`,等价于按**昨日**权重加权 | `market_data_service.build_portfolio_returns` |
+| **Q3** | 删 `ffill`;并丢弃跨越 >5 日历日的收益(多日移动不得挂一日标签) | `market_data_service.total_return_panel` |
+| **Q4** | 因子模型改**单次多元 OLS**;betas 为偏系数,contributions 加总即拟合值,residual 是回归自己的;per-factor `r_squared` 明确标注为"该因子单独" | `factor_model.py`(重写) |
+| **Q5** | 压力测试改 **beta 传导**;情景只声明 `factor_shocks`;不可传导的情景进 `unevaluated` 而非报 0 损失 | `stress.py`(重写) · `configs/stress_scenarios.yaml` |
+| **Q6** | 步骤 1 新增 `_sync_factor_prices`;步骤 3 用**同一条 raise**judge 因子面板的缺失与陈旧 | `exposure_workflow.py` |
+| **Q7** | recipe 的 `as_of` 提为**必填参数**(无默认——默认就是把时钟藏低一层) | `recipe.py` · `readiness_workflow.py` |
+| **Q8** | `load_fact_series` 只取合并口径(`dimensions_hash = ''`),并 outer join `filings` 取回 `filing_date` | `calc_service.py` |
+| **附** | `factor_prices.adj_close` 迁移 + ingest 写入,`daily_return` 改由复权序列算 | `v5_price_convention.sql` · `market_data_ingestion_service.py` |
+| **附** | 删 `factor_config.yaml` 中无读者的 `method` / `ewm_halflife_days`;`min_observations` / `include_intercept` 改为**真的被读** | `configs/factor_config.yaml` |
+
+---
+
+## 3. 实测记录(2026-08-21,port_001 @ 2026-08-20,真实 yfinance 价)
+
+### 3.1 压力测试:修复前后同一账本、同一天
+
+旧代码取自 `git show HEAD:analytics/stress.py`,喂以本次 run 实际持久化的权重。
+
+| 情景 | 修复前 | 修复后 | 说明 |
+|---|---:|---:|---|
+| `market_downside` (−10% 股市) | **−0.182%**(赚 $19,749) | **+3.985%**(亏 $432k) | **本批的头号 bug**。旧代码只匹配上 TLT(权重 6.07%,冲击 +3%),八只个股一个都没匹配上 |
+| `credit_spread_widening` | +0.654% | **+6.873%** | 越过 `stress_loss` 的 warning 档(6%),**触发了一条此前永不可能响的告警** |
+| `rates_shock_up` | +0.207% | +3.118% | |
+| `tech_selloff` | +2.154% | +0.298% | 唯一变小的:旧值靠 Technology/Comm/Cons-Disc 三个 sector 名直接命中权重,与 QQQ 冲击**重复计数** |
+| `energy_shock` | +0.368% | (已评估) | |
+
+告警对比:修复后该 run 产生 3 条告警,其中 `stress_loss:credit_spread_widening` 是新的。
+修复前该 check 的最大输入是 2.154%,低于 6% warning 档 —— 即**这条限额自上线以来从未有过触发的可能**。
+
+### 3.2 因子回归诊断(新增,写进 `workflow_events.payload_summary`)
+
+```
+{"alpha": -0.0000418, "max_vif": 10.55, "collinear": true,
+ "r_squared": 0.661, "observations": 58, "attribution_date": "2026-08-20"}
+```
+
+### 3.3 独立验证:多元 beta 之和 vs 单变量市场 beta
+
+不信任新数就得能证伪它。独立脚本量得:
+
+* 组合对 SPY 的**单变量** beta = **0.53**
+* 本次 run 八个**多元**偏 beta 之和 = **0.54**
+
+两者一致,说明多元拟合并未扭曲聚合暴露 —— 而 `market_downside` 对 SPY/QQQ/IWM 的冲击大小相近
+(−10/−12/−11%),其传导量正是这个和。**结论:3.985% 这个数可信,尽管构成它的单个 beta 不可信。**
+
+---
+
+### 3.4 上线实测(2026-08-21):部署路径 + 一个新证据
+
+镜像重建、容器重启后,经**真实 worker 路径**(task 队列 → handler → workflow)跑通一次
+`run_v5deploy0001`,11 步全绿。configs 在 worker 是 volume 挂载(`./configs:/app/configs`),
+api 容器不挂 —— 它不跑 workflow,这是对的。
+
+顺带得到一个**比本批任何一处修复都更该看的数字**:
+
+| run | 观测数 | max VIF | `stress_loss_market` |
+|---|---:|---:|---:|
+| `run_7acab5fa14e6` | 58 | 10.55 | **3.985%** |
+| `run_v5deploy0001` | 60 | 12.14 | **6.231%** |
+| 重跑一次(同数据) | 60 | 12.14 | **6.231%** |
+
+同一账本、同一 `as_of`,**多两个观测,头号压力数字从 3.99% 变成 6.23%(+56%)**。
+第三行证明代码本身是确定性的 —— 差异全部来自面板数据(早前那次因子面板少两天,后续重灌补齐)。
+
+这不是缺陷,是**估计量的方差**:58 个观测、8 个高度共线的因子,betas 本就不稳,而
+压力传导直接建在 betas 上。它把 §6 第 1 条(回看窗口)从"应该做"变成"**必须先做**":
+在样本量修好之前,压力数字的**符号**可信(股灾是亏损),**量级**不可引用。
+
+---
+
+## 4. 执行期发现,以及它改变了什么
+
+### 4.1 诊断阈值选错了一次(实测纠正,非推断)
+
+初版用**设计矩阵条件数**、阈值 30 做共线性标志。真实数据上条件数 **9.06** → 标志不响;
+而同一次拟合的 beta 是 SPY **+1.39** 对 QQQ **−0.67**,VIF 分别为 **10.55 / 7.84**。
+
+条件数回答的是关于矩阵的问题,而页面上要打的是**每个系数**的问号。改为 **max VIF,阈值 5**,
+在真实数据上正确触发。这条写进 `factor_model.py` 的注释,连同实测数字。
+
+因子相关矩阵(58 obs)对此的解释:SPY–QQQ **0.92**,SPY–IWM 0.79,SPY–HYG 0.80。
+
+### 4.2 我自己的修复留下了一个同形状的隐含假设
+
+beta 传导修好了"冲击抵达不了账本"。但情景只冲击 8 个因子中的一部分,**其余被隐式按 0 处理** ——
+这与"名字匹配不上就贡献 0"是同一种病:一个断言(「股灾中信用不动」)伪装成一处沉默。
+
+实测:`market_downside` 让 **HYG 保持不动**,而该账本对 HYG 的 beta 是 1.29(第二大)。
+
+未擅自编造情景数字(那是建模判断,不是 bug 修复)。改为**记录**:每个情景把 `factors_held_flat`
+写进步骤事件,与 `evaluated` / `inert_overrides` 同一机制。让假设可见,不让它可见地消失。
+
+```
+"market_downside": {"factors_held_flat": ["HYG", "USO", "^VIX"]}
+```
+
+### 4.3 旧测试把 bug 编码成了预期值
+
+`test_return_series_is_weighted_across_the_whole_book` 断言的 **+1.0%** 正是 look-ahead 产物:
+两只等额持仓一涨 10% 一跌 10%,真实收益 **0.0%**。测试改写并改名,把这个数字留在注释里当反例。
+
+`factor_model.py` 与 `stress.py` 此前零覆盖 —— 这正是两个 bug 得以存活的原因。新增
+`tests/test_factor_and_stress.py`(14 例),含一条**跨配置一致性**检查:任何情景冲击的因子
+必须在 `factor_config.yaml` 里存在(两份配置分开编辑,此前无物核对)。
+
+---
+
+## 5. 本批**不做**、但已确认存在的问题(如实)
+
+| 问题 | 为什么这次不做 |
+|---|---|
+| `positions.quantity` 不做拆股调整 | 拆股日市值仍按拆股前股数算。这是**持仓数据**问题(需要公司行动数据),不是价格约定问题。P&L 已不再报假亏,市值仍会错 |
+| 情景未冲击的因子按 0 处理 | 见 §4.2。要修需要因子协方差矩阵推导条件移动,是建模工作 |
+| 单个 beta 不可信(VIF 10.55) | 需要收缩估计 / 因子正交化 / 缩减因子集,均改变页面上数字的含义,应由 boss 拍板 |
+| 回看窗口仍是 90 日历日(≈58 obs),95% 尾部仅 ~3 个观测 | P1。修完正确性再谈样本量 |
+| `factor_prices.daily_return` 有存储值,读路径仍另行计算 | 两处答案同一问题的味道。已让两者口径一致(都用复权),但列的去留是另一次迁移 |
+
+---
+
+## 6. 下一批候选(P1,待拍板)
+
+1. **样本量(已升为最高优先,依据 §3.4)**:回看窗口 90 日历日 → 2–3 年复权收益;
+   波动率改 EWMA;VaR 加 Kupiec 回测。实测:多两个观测让头号压力数字动了 56%
+2. **因子集**:缩减或正交化,让单个 beta 可引用;或引入 Ledoit-Wolf 收缩
+3. **情景完整性**:未冲击因子由协方差矩阵推条件移动,消灭 §4.2 的隐含 0
+4. **基本面深度**:杠杆类目前只有 `current_ratio` 与 `cash_to_long_term_debt`;缺 total debt / EBITDA / 利息覆盖
+5. **工具面**:`asset_class` 全程被存储且从未被使用;TLT/HYG 无久期、无 look-through
