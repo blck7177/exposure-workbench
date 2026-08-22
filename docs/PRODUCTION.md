@@ -193,6 +193,28 @@ docker exec exposure-postgres psql -U exposure -d exposure_workbench -c \
 
 ---
 
+## Backups
+
+`scripts/backup_db.sh`, nightly at 03:30 UTC from the host crontab, keeps seven
+days in `/home/ubuntu/backups`. It dumps the whole database — measured 27 MB
+compressed, mostly filing_chunks' embeddings — writes to a `.partial` name and
+only moves it into place after `gzip -t` passes, because a dump interrupted half
+way is a file that looks like a backup until the moment someone needs it.
+
+What it protects against is a bad migration, a dropped table, a wrong DELETE.
+**Not** losing the disk: the dumps sit on the same volume as the database. That
+is a stated limit rather than an oversight — off-site storage is a decision with
+a cost and it has not been taken. Almost everything here is re-ingestable from
+EDGAR and yfinance anyway; what is not is what a user typed (portfolios,
+positions) and the conversation and run history that makes an answer traceable.
+
+Restore, for when it is needed and nobody is calm:
+
+```bash
+gunzip -c /home/ubuntu/backups/ew-YYYY-MM-DD.sql.gz \
+  | docker exec -i exposure-postgres psql -U exposure -d exposure_workbench
+```
+
 ## Deploying
 
 ```bash
