@@ -1,6 +1,6 @@
 # Implementation Plan V7 — 上线批:公网可注册 + 前 10 分钟
 
-> **状态(2026-08-22)**:**B 线(U1–U5)、D0、D6、D9 全部完成并在栈上验收**;747 offline / 118 live 全绿。**A 线卡在 boss 两件**:D1(Cloudflare A 记录)与 D4(Clerk 加 origin);之后 D2/D3/D5 由我接。逐阶段实测见 §8,执行期发现见 §9。
+> **状态(2026-08-22)**:**已上公网 → https://desk-for-one.com**(证书自签发成功,免登录部分的 smoke 全过)。B 线 U1–U5 与 D0/D2/D3/D6/D9 全部完成;747 offline / 118 live 全绿。**只剩 D4 卡在 boss**:Clerk dashboard 允许 origins 加 `https://desk-for-one.com`——D5 需要登录的那一半在等它。逐阶段实测见 §8,执行期发现见 §9。
 > **编号勘误**:本批曾以 V5 之名提交(`01c5cdd`)并误覆盖了量化正确性批的 V5 文档,已自 `ac167d6` 全量恢复。V5=量化正确性批、V6=窗口+报告门批(另一 session,2026-08-21),本批顺延为 V7。
 > **性质**:两条可并行的线——**A 线(部署)**把栈放上公网,**B 线(产品)**把一个陌生人注册后的前 10 分钟做通;外加**今日零风险三件**与**广发前三件**。代码内核(agent 面、RLS、配额、成本账、失败语义、数值正确性)已完工并在栈上实测,本批**不动架构**。
 > **一句话**:差的全在部署层和"第一次使用"的交互层,不在功能内核;每一条都有文件坐标,没有一条需要新设计。
@@ -85,11 +85,11 @@ D0 今日(我,30 min,零风险,不依赖任何拍板)
 
 | # | 谁 | 动作 | 验收 |
 |---|---|---|---|
-| **D3** | 我 | `.env`:`NEXT_PUBLIC_API_URL=`(空=同源)、`CORS_ORIGINS=`(空)、`CLERK_AUTHORIZED_PARTIES=http://localhost:3103,https://exposure.noclosedform.com`(逗号列表,`clerk_authorized_parties_list` 已支持——**两个都留**,否则本机 3103 的登录立刻被 `bad_azp` 拒);`docker compose build exposure-web && up -d exposure-web exposure-api` | `test_deploy_config` 绿;本机 3103 登录仍可用 |
-| **D1** | **boss** | Cloudflare:A 记录 `exposure` → `100.49.167.5`,**grey cloud**(DNS-only) | `dig +short exposure.noclosedform.com` = 该 IP。**必须先于 D2**:Caddy 对不解析的名字会在后台反复申证失败 |
-| **D2** | 我(DP2) | `sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak.$(date +%F)` → 把 `infra/Caddyfile.example` 的块(域名改 `exposure.noclosedform.com`)追加到文件末尾 → `sudo caddy validate --config /etc/caddy/Caddyfile` → 仅在 validate 通过后 `sudo systemctl reload caddy` | `curl -sI https://exposure.noclosedform.com/api/health` 200;`noclosedform.com` 仍 200(**不能伤及同机其他站**) |
-| **D4** | **boss** | Clerk dashboard(dev 实例)→ 允许 origins 加 `https://exposure.noclosedform.com` | 该域名上 Sign in 弹窗能完成登录 |
-| **D5** | 双方 | **上线完成的定义**:真浏览器在该域名注册新账号 → chat 问一句带数字的话 → Investigate 一个 ticker 跑完 research → 配额头显示。顺带盖三项悬案:**research 侧 `llm_session` 栈上验证**(`llm_cost_by_research_run` 该 run 非零)、llm_call 行样式、503 呈现(可选:停 mcp 再发一条) | 全部人眼 + psql 核对 |
+| **D3** | ✅ 我 | `.env`:`NEXT_PUBLIC_API_URL=`(空=同源)、`CORS_ORIGINS=`(空)、`CLERK_AUTHORIZED_PARTIES=http://localhost:3103,https://desk-for-one.com`——**两个都留**,否则本机 3103 的登录当场 `bad_azp`。空值≠不设:compose 读 `${VAR-default}`,只在**未设**时才回落。重建 web 镜像 | 通过:线上 bundle 里 `localhost:8103` 出现 **0** 次 |
+| **D1** | ✅ boss | **域名改了**:不是计划里的 `exposure.noclosedform.com`,而是独立域名 **`desk-for-one.com`**(apex A → `100.49.167.5`,grey cloud;另 `www` CNAME → apex) | `dig` 两名皆解析到该 IP,与本机公网 IP 实测一致 |
+| **D2** | ✅ 我(DP2) | 备份 `Caddyfile.bak.2026-08-22-1341` → 追加 apex 块(request_body 2MB;`/api/*` → 8103 **不剥前缀**;其余 → 3103;独立 log)+ `www` 301 到 apex → `caddy validate` **通过后才** reload | `noclosedform.com` reload 后仍 **200**。`micosai.com` 是 **502**,**与本次无关**:其配置与备份逐字节相同,且 `127.0.0.1:6001` 无进程在听——后端本就没跑。已报告,未擅动 |
+| **D4** | ⏳ **boss** | Clerk dashboard(dev 实例)允许 origins 加 **`https://desk-for-one.com`** | 该域名上 Sign in 能走完 |
+| **D5** | 🟡 一半 | 公网 smoke **已过**:`/api/health`=ok;匿名 `/api/portfolios` 只见公共 demo;无鉴权 POST `/api/agent/sessions`=**401**;bundle 内 `localhost:8103`=**0**(这条最要命:服务端看着完全健康,而每个访客都是坏的);`www` 301→apex;`http` 308→`https`;证书自动签发成功。**需要登录的那一半**(注册 → chat 一轮 → Investigate 冷 ticker → 配额头)**卡在 D4** | 见左 |
 
 ---
 
