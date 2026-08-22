@@ -67,10 +67,11 @@ class ReportVerdict:
         }
 
 
-# The fields whose text a reader sees. `markdown_report` is included even though
-# no UI renders it today: it is served by the API and is the field the other five
-# summarise, so a number that is wrong only there is still a wrong number the
-# system published.
+# The fields whose text a reader sees. `markdown_report` was included when no UI
+# rendered it, on the grounds that the API served it and it is the long form the
+# other five summarise — a number wrong only there is still a number the system
+# published. V7-U5 put it on the page, so the gate now covers what a person
+# actually reads rather than only what was reachable.
 _CHECKED_FIELDS = (
     "executive_summary",
     "key_movements",

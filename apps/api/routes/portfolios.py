@@ -41,6 +41,15 @@ class PortfolioOut(BaseModel):
     benchmark: str | None
     manager: str | None
     is_active: bool
+    # V7-U2. The list endpoint answers "mine plus public" (RLS, and
+    # list_visible above it), and without this field the two are
+    # indistinguishable on the wire: a stranger who owns nothing and a desk
+    # whose only book happens to be the shared demo produced byte-identical
+    # responses. The web needs to tell them apart to know when to offer a way
+    # in at all — and owner_id is not the answer to that question, because it
+    # would put another tenant's identifier in front of every anonymous
+    # visitor to say something this boolean says without naming anyone.
+    is_public: bool
 
     model_config = {"from_attributes": True}
 

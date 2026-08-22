@@ -9,6 +9,11 @@ export interface Portfolio {
   benchmark: string | null;
   manager: string | null;
   is_active: boolean;
+  // V7-U2. True for the shared demo book, which every visitor sees whether or
+  // not they own anything. "The list is not empty" is therefore not the same
+  // question as "this person has a portfolio", and the first-run card on the
+  // left panel turns on the second one.
+  is_public: boolean;
 }
 
 export interface Position {
@@ -31,6 +36,12 @@ export interface WorkflowEvent {
   status: "running" | "completed" | "failed" | "skipped";
   message: string | null;
   duration_ms: number | null;
+  // What the step DECIDED, not just that it finished (V7-U4): `evaluated` from
+  // check_limits, `scenarios_unevaluated` / `scenarios_evaluated` from
+  // calculate_risk. Untyped on purpose — each step writes its own keys and a
+  // union here would have to be edited by anyone adding one, which is how the
+  // column would quietly go back to being unread.
+  payload_summary: Record<string, unknown>;
   created_at: string;
 }
 

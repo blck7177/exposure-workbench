@@ -7,10 +7,23 @@ import { getMyUsage } from "@/lib/api";
 import { type ApiError } from "@/lib/http";
 import { explainApiError } from "@/lib/errors";
 import type { Usage } from "@/lib/types";
-import { CitationChip, openEvidence } from "./Evidence";
+import { CitationChip } from "./Evidence";
 import { AuthGate } from "./Auth";
 
 const LS_KEY = "ew_agent_session";
+
+// The empty state's job is to show what this analyst is FOR, and the previous
+// one line of prose could not: it named two questions of the same kind (a fact
+// about one issuer) and neither could be clicked. These three are one per
+// capability the product actually has — the book (portfolio tools), an issuer
+// against filed evidence, and a delegated research run that comes back with a
+// brief — so a stranger's first question lands somewhere the agent can answer
+// from, instead of on the shape of question it has to refuse.
+const SUGGESTIONS = [
+  "What is my largest exposure?",
+  "Why did NVDA move this week?",
+  "Give me a brief on MSFT",
+];
 
 // gateFailed: the loop ended without the citation gate accepting an answer.
 // Rendered as a refusal, because a paragraph saying "I could not produce an
@@ -87,6 +100,7 @@ export function ChatPanel() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // restore session across page navigations / refresh
   useEffect(() => {
@@ -207,9 +221,32 @@ export function ChatPanel() {
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <div className="text-xs text-slate-600 mt-8 text-center px-4">
-            Ask about any issuer — e.g. &ldquo;What is NVDA&rsquo;s gross margin?&rdquo; or &ldquo;Give me a brief on MSFT.&rdquo;
-            <br />Every factual answer cites its evidence.
+          <div className="mt-8 px-4">
+            <p className="text-xs text-slate-600 text-center">
+              Ask about your book or any issuer. Every factual answer cites its evidence.
+            </p>
+            {/* Gated for the same reason the composer below is: a signed-out
+                visitor has no input to fill, so an ungated suggestion would be a
+                click that visibly does nothing.
+                They fill the box rather than send. Two reasons, and the second
+                is the load-bearing one: a ticker in a suggestion is a
+                placeholder — the name the reader came here about is almost
+                never MSFT — and a send charges a chat turn against a daily
+                quota, so a mis-click would cost them one of a countable number
+                of questions before they had asked anything they meant. */}
+            <AuthGate fallback={null}>
+              <div className="mt-3 space-y-1.5">
+                {SUGGESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                    className="w-full text-left text-xs text-slate-500 hover:text-slate-300 border border-[#21262d] hover:border-[#30363d] rounded-md px-2.5 py-1.5 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </AuthGate>
           </div>
         )}
         {messages.map((m, i) => (
@@ -248,7 +285,7 @@ export function ChatPanel() {
         }
       >
         <div className="border-t border-[#21262d] p-2 flex gap-2 shrink-0">
-          <input value={input} onChange={(e) => setInput(e.target.value)}
+          <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()} disabled={busy}
             placeholder="Ask about an issuer…"
             className="flex-1 bg-[#161b22] border border-[#21262d] rounded px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-blue-600 disabled:opacity-50" />
