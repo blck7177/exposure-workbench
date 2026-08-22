@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Activity, BarChart3, RefreshCw, AlertTriangle, CheckCircle2,
-  Clock, Loader2, ChevronRight, TrendingUp, TrendingDown,
+  Loader2, ChevronRight, TrendingUp, TrendingDown,
   ShieldAlert, FileText, ChevronDown, ChevronUp, Search, Plus,
 } from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
+import { RunTimeline } from "./components/RunTimeline";
 import { EvidenceDrawer } from "./components/Evidence";
 import { AuthControls } from "./components/Auth";
 import { PortfolioModal } from "./components/PortfolioModal";
@@ -17,8 +18,8 @@ import type {
 } from "@/lib/types";
 import { listPortfolios, getPositions, createRun, getRun, listRuns } from "@/lib/api";
 import {
-  formatCurrency, formatDate, formatDateTime, formatDuration,
-  statusBg, statusColor,
+  formatCurrency, formatDate, formatDateTime,
+  statusBg,
 } from "@/lib/formatting";
 
 // ─── Utility formatters ────────────────────────────────────────────────────────
@@ -39,13 +40,6 @@ const fSignPct = (v: number | null | undefined, dec = 2) => {
 };
 
 // ─── Step icon ──────────────────────────────────────────────────────────────
-
-function StepIcon({ status }: { status: string }) {
-  if (status === "completed") return <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />;
-  if (status === "running")   return <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />;
-  if (status === "failed")    return <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />;
-  return <Clock className="w-4 h-4 text-slate-500 shrink-0" />;
-}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -208,15 +202,6 @@ function MiddlePanel({
     }
   };
 
-  const uniqueSteps = run
-    ? Object.values(
-        run.workflow_events.reduce<Record<string, (typeof run.workflow_events)[0]>>((acc, ev) => {
-          acc[ev.step_name] = ev;
-          return acc;
-        }, {})
-      )
-    : [];
-
   const report = run?.daily_report;
   const alerts = run?.risk_alerts ?? [];
   const breachCount = alerts.filter(a => a.severity === "breach").length;
@@ -274,26 +259,7 @@ function MiddlePanel({
               <p className="text-xs font-semibold text-slate-300">Pipeline</p>
               <span className="text-[10px] text-slate-500">{formatDate(run.as_of_date)}</span>
             </div>
-            {uniqueSteps.length === 0 ? (
-              <p className="text-xs text-slate-600">Waiting for worker...</p>
-            ) : (
-              <div className="space-y-2">
-                {uniqueSteps.map((ev) => (
-                  <div key={ev.id} className="flex items-start gap-2">
-                    <StepIcon status={ev.status} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-300 leading-tight">{ev.message || ev.step_name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[10px] ${statusColor(ev.status)}`}>{ev.status}</span>
-                        {ev.duration_ms && (
-                          <span className="text-[10px] text-slate-600">{formatDuration(ev.duration_ms)}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <RunTimeline events={run.workflow_events} />
           </div>
         )}
 

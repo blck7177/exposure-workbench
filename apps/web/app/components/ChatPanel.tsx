@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageSquare, Plus, Send, X, Wrench, Brain, Receipt, Send as SendIcon } from "lucide-react";
 import { createSession, postMessage, getSessionDetail, type AgentStep } from "../../lib/issuer";
 import { getMyUsage } from "@/lib/api";
-import { apiErrorDetail, type ApiError } from "@/lib/http";
+import { type ApiError } from "@/lib/http";
+import { explainApiError } from "@/lib/errors";
 import type { Usage } from "@/lib/types";
 import { CitationChip, openEvidence } from "./Evidence";
 import { AuthGate } from "./Auth";
@@ -157,7 +158,6 @@ export function ChatPanel() {
       setSteps(d.steps);
     } catch (e) {
       const status = (e as ApiError).status;
-      const detail = apiErrorDetail(e);
 
       // The gate (401/404/409/429) rejects before handle_message runs, and
       // handle_message is what commits the user's message — so on any 4xx the
@@ -166,48 +166,15 @@ export function ChatPanel() {
       // had already started, so the message IS persisted and the bubble stays.
       if (status && status < 500) setMessages((m) => m.slice(0, -1));
 
-      if (detail?.error === "turn_in_flight") {
-        // A concurrency signal, not an account — say it in words. The realistic
-        // cause is a second tab (the session id lives in localStorage, shared
-        // per origin) or a previous turn whose process died and whose lease has
-        // not expired yet.
-        setNotice("This session already has a turn running — it may be open in another tab. Wait for it to finish, or start a new session.");
-      } else if (detail?.error === "session_context_exhausted") {
-        // Not an account problem and not a transient one: this conversation is
-        // finished. Say which, and say what to do — the only fix is a new session.
-        setNotice(
-          "This conversation has grown too long for one turn. Start a new session to carry on — " +
-          "your earlier answers stay in the history."
-        );
+      // One mapping from a server refusal to a sentence, shared with the issuer
+      // page (lib/errors.ts). It also answers what to do about local state:
+      // dropSession means this id will never be accepted again, so keeping it
+      // would make every later send repeat this same failure.
+      const { notice, dropSession } = explainApiError(e);
+      setNotice(notice);
+      if (dropSession) {
         setSessionId(null);
         localStorage.removeItem(LS_KEY);
-      } else if (status === 404) {
-        // The session the server is being asked about does not exist for this
-        // user — most often a stale id from a previous account or a wiped
-        // database. Same shape as the exhausted branch above: say it, drop the
-        // id, and let the next send open a fresh one, because there is nothing
-        // here for the user to fix by hand.
-        setNotice("That conversation is no longer available — send your message again to start a new one.");
-        setSessionId(null);
-        localStorage.removeItem(LS_KEY);
-      } else if (detail?.error === "tool_face_unavailable") {
-        // V4-S1. The tool service is down or refused this turn; the API answers
-        // 503 and the turn is over. The server's own sentence is shown rather
-        // than a second wording of it: it was written for this reader, and two
-        // copies would be two things to keep in step. The session is NOT
-        // cleared — nothing is wrong with it, and the message is still in the
-        // transcript because handle_message commits it before the loop starts.
-        setNotice(String(detail.detail ?? "The analysis service is briefly unavailable — try again shortly."));
-      } else if (detail?.error === "quota_exceeded") {
-        // An account. Show the numbers as the server reported them rather than
-        // paraphrasing: the user wants to know what they spent and when it resets.
-        setNotice(
-          `Daily limit reached: ${detail.used}/${detail.limit} ${String(detail.kind).replace(/_/g, " ")}s` +
-          (detail.scope === "global" ? " across all users" : "") +
-          `. Resets ${new Date(String(detail.resets_at)).toLocaleString()}.`
-        );
-      } else {
-        setMessages((m) => [...m, { role: "assistant", text: `error: ${(e as Error).message}`, citations: [] }]);
       }
     } finally {
       setBusy(false);

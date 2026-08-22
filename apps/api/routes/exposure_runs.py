@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
+from apps.api.schemas import WorkflowEventOut
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import (
@@ -20,17 +21,6 @@ router = APIRouter()
 
 
 # ─── Nested response models ───────────────────────────────────────────────────
-
-class WorkflowEventOut(BaseModel):
-    id: int
-    step_name: str
-    status: str
-    message: str | None
-    duration_ms: int | None
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
 
 class ExposureMetricsOut(BaseModel):
     portfolio_market_value: float | None
