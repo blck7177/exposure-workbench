@@ -46,6 +46,8 @@
 - **U3(~0.5 天)`port_001` 硬编码 + issuer 页错误人话**。`startResearch` 把 `portfolio_id` 硬编码为 demo 组合(`lib/issuer.ts:48`)——签入用户发起的 research 归属错误组合,brief 的 portfolio_implications 按错误语境写。issuer 页错误处理只特判 409(`page.tsx:55`),429 等给用户看原始 JSON;与 ChatPanel 的人话分支抽成共享映射。
 - **U4(~0.5 天)`evaluated` 露出**。`payload_summary.evaluated` 前端零露出——**没运行的 check 和通过的 check 在报告里长得一样**;对以"每个失败可解释"为卖点的产品,这是唯一一处 UI 在沉默夸大。未运行标灰。harness observability 线顺带销账。
 
+- **U5(~0.5 天)报告渲染补全**。V6 §4 记录:UI 只渲染 exposure 报告 7 个字段中的 3 个,`markdown_report` 无渲染器——V6-G 刚给它上了 79 数字全过的门,而用户看不到这段被门保护的文字。把门的成果端到用户眼前,与 U4(`evaluated` 露出)同属"诚实性上屏"。
+
 ### 记录、不进首批
 
 移动端适配(三栏桌面布局)、chat session 历史列表(现只恢复最近一个)、返回用户首屏竞态(8/3 标记观察)、用户侧成本页(数据与视图已有,做不做是产品选择)。
