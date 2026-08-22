@@ -14,6 +14,10 @@ export interface Portfolio {
   // question as "this person has a portfolio", and the first-run card on the
   // left panel turns on the second one.
   is_public: boolean;
+  // V7-Q: whether the CALLER owns this book. Independent of is_public — the
+  // shared demo can be both public and somebody's. `!is_public` used to stand
+  // in for this and stopped being true the moment the demo was handed over.
+  is_own: boolean;
 }
 
 export interface Position {
@@ -179,6 +183,10 @@ export interface UsagePool {
   used: number;
   limit: number;
   remaining: number;
+  // V7-Q: this account is exempt from the refusal (it is still counted). The
+  // badge must say so, or an exempt tester reads "0/10" while turns keep going
+  // through and has no way to tell that from a broken counter.
+  unlimited?: boolean;
 }
 
 export interface Usage {

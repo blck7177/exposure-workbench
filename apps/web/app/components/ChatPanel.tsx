@@ -75,17 +75,21 @@ function TraceLine({ s }: { s: AgentStep }) {
 function QuotaBadge({ usage }: { usage: Usage | null }) {
   const pool = usage?.pools.find((p) => p.kind === "chat_turn");
   if (!pool) return null;
-  const spent = pool.remaining === 0;
+  const spent = !pool.unlimited && pool.remaining === 0;
   return (
     <span
-      title={`${pool.used} of ${pool.limit} chat turns used today — resets ${new Date(usage!.resets_at).toLocaleString()}`}
+      title={
+        pool.unlimited
+          ? `${pool.used} chat turns today — this account is exempt from the daily limit`
+          : `${pool.used} of ${pool.limit} chat turns used today — resets ${new Date(usage!.resets_at).toLocaleString()}`
+      }
       className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
         spent
           ? "text-amber-400 border-amber-900/60 bg-amber-950/30"
           : "text-slate-500 border-[#21262d]"
       }`}
     >
-      {pool.remaining}/{pool.limit}
+      {pool.unlimited ? `${pool.used}/∞` : `${pool.remaining}/${pool.limit}`}
     </span>
   );
 }

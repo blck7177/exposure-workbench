@@ -178,3 +178,38 @@ D0 今日(我,30 min,零风险,不依赖任何拍板)
 4. **计划里的两处坐标是错的**:Investigate 链接在 page.tsx **562/581**(计划写 596/615);`WorkflowEvent.run_id` 在 `models.py:417` 声明了库里没有的外键(P0 去掉的,挂起区已登记,只记不动)。
 5. **U1 的冷 ticker 路径尚未在栈上验**:现有 run 都是热 ticker,时间线只有 3 步(readiness_precheck/agent_session/finalize)。真正要它的是冷 ticker 的 6 步 ingest 叙事——那需要一次真冷 run,并入 D5 smoke。
 6. **lane-main 未做计划里 U2 的第三个元素**(示例提问打开 chat 并预填):它判断那要跨组件预填管线,而 chip 集已经住在面板里。同意,记录。
+
+---
+
+## 10. V7-Q — 上线后的测试通道(2026-08-22,boss 拍板四条)
+
+> **起因**:boss 要在**用户拿到的那套部署上**测 chat 与其余功能并反馈,为此需要「无限额度 + 用现在的 default portfolio」。四个决定当场拍:D4 由 agent 代跑、额度走**白名单**而非整体调高、`port_001` **过户**而非克隆、D7 **不做**先记账。
+
+| # | 落地 | 事实 |
+|---|---|---|
+| **D4** | ✅ | `PATCH /v1/instance` 把 `https://desk-for-one.com` 写进 Clerk `allowed_origins`(原为 `null`)。**同时写进 `http://localhost:3103`**:显式设置该字段会取代 dev 实例默认放行 localhost 的行为,漏掉它等于顺手关掉本机登录——与 `CLERK_AUTHORIZED_PARTIES` 保留 localhost 是同一条理由 |
+| **Q1** | ✅ | `QUOTA_UNLIMITED_USERS`:按 user id 的**具名豁免**,只解除**拒绝**,不解除**计数**。两行照写(用户行 + `_global` 行),所以 `/api/me/usage`、成本审计、backstop 读到的都还是真值。**代价明写**:被豁免的测试者**能替所有人耗尽 global 池**——因为平台确实花了那笔钱 |
+| **Q2** | ✅ | `port_001` 过户给 boss 的真账号,`is_public` 不动。依据是实读的策略:`exposure_runs` 是 `EXISTS(… p.owner_id = 我 OR p.is_public)`,所以**公开组合的 run 对所有人可见**——过户对访客零影响,实测匿名仍看到该组合与它的 20 条 run(含 V6 的 `run_96d1614775e7`)。403 的判据只是 owner,过户后 boss 能直接跑现有 demo 书。一条 UPDATE 可逆;只有重新 seed 会改回(`seed_demo_db.py:119`) |
+| **D7** | ⏳ | OpenAI 月度硬上限**仍未做**。额度豁免生效后,这个账号这条路径上**没有任何上限**。已记进 BOARD,广发前必做 |
+
+### 顺带修的两处既存缺陷(先于本批存在)
+
+1. **compose 的注释是假的**:`docker-compose.yml` 写着配额池「tunable without a rebuild」,而 V2-H 追加的三个池(`DAILY_PORTFOLIO_CREATES` / `DAILY_POSITION_UPLOADS` / `DAILY_AGENT_SESSIONS` 及三个 `GLOBAL_*`)**从没接进 compose**。最咬人的是 `daily_agent_sessions=5`:一天只能开 5 个 chat 会话,而且不改文件就调不了。六个变量已补进 **api 与 mcp**,默认值一字不变。
+   > 我第一遍写成「api 与 worker」并据此报了一个假缺陷。**正确的拓扑**:扣费点有两处——api 的路由,与 **mcp 容器里的委派工具**(MCP 重定位后 `create_task` 在那里执行),所以配额 env 出现在这两个服务上。**worker 一个扣费点都不可达**(实测 `grep` 全零):它执行的是**入队时已经付过费**的工作,给它配额 env 才是错的。
+2. **「默认值」测试读的是这台机器的 `.env`**:`Settings` 的 `model_config` 带 `env_file=".env"`,所以 `Settings()` 会吃本地配置。`test_nobody_is_exempt_by_default` 一写完就被我自己刚加的 `.env` 行照红——**这正是它该有的行为,但对一个声称在钉「默认」的断言就是错的**。改为断言字段声明(`Settings.model_fields[...].default`),沿用 `test_p0_schema.py::test_no_credentials_baked_into_code_defaults` 早就写下的同一条理由。同类隐患仍留在 `test_pool_defaults_match_the_published_plan` 的数字断言上(它们只是因为 `.env` 恰好不设那些键才绿),已登记未动。
+
+### 判据(为什么这么写,不那么写)
+
+- **豁免不是 fallback**:它是配置里点名的 id,默认空,且 `charge()` 里那两个 `ValueError`(空 user / 保留的 `_global` id)**在豁免分支之上**——豁免不是一条变匿名的路。
+- **两条 SQL,不是一条把 WHERE 模板化**:`WHERE usage_daily.used < :limit` 就是整个机制;一个以格式参数到达的上限,就是一个可以**缺席**到达的上限。测试逐字钉住「记录那条没有 WHERE、扣费那条还有」。
+- **`unlimited` 单独上 wire,不折进 `limit`**:被豁免的用户的上限不是一个更大的数,是**不存在**;徽章显示 `47 of 10` 会是读者判定配额账目坏掉的第一个证据。前端因此显示 `used/∞`。
+- **`is_unlimited` 每次调用读 settings**:在 import 时捕获会让「加一个 id」从重启变成重建。
+
+### 过户当场撞出的两处(都不是噪声)
+
+3. **`is_public` 一直在替 `is_own` 当代用品**。web 用 `!p.is_public` 判断「这是我的」([page.tsx:984](../apps/web/app/page.tsx#L984)、[:1063](../apps/web/app/page.tsx#L1063))——这个替换只在「public ⇒ 别人的」成立时才对,而过户让 `port_001` **同时是他的和 public 的**,于是首页既不选中他唯一拥有的书,又对着这本书的主人说「你的桌子是空的」。两边各自自洽,没有任何东西会红。修根因:`PortfolioOut` 增 `is_own`(computed field,谓词与 snapshot/brief 早就在用的 `owner_id == current_user_id()` **逐字相同**),`owner_id` 只为算它而携带并**排除出 wire**(理由就写在它上面那段注释里:租户标识不该出现在每个匿名访客面前)。新 `tests/test_portfolio_ownership.py` 5+3 条,含一条跨语言守卫:`page.tsx` 里**不许再出现 `is_public`**。
+   > 顺带修了 mirror 守卫本身:它比的是 `model_fields`,而正确的比法是**响应真正携带的字段**(去掉 excluded、加上 computed)。按旧比法,一个两边完全一致的 wire 会被报成两处不匹配。
+4. **一条 live 测试借了 demo 的归属**。`test_phase_two_marks_the_run_failed_under_the_tasks_own_tenant` 把任务的 owner 写死成 `user_demo_system`,过户后 reaper 写不进 run 而红。**红得对**:`exposure_runs` 的策略是**有意不对称**的——`USING` 带 `OR p.is_public`(公开书的 run 谁都能读),`WITH CHECK` 不带(只有主人能写),这正是 demo 只读的实现。改成从书上读 owner,测试从此不依赖谁拥有 demo。
+   > **过户前先查过线上风险**:无主任务共 12 条**全部已结案**(11 completed / 1 failed),系统零 pending/running,且 6 个 `create_task` 调用点**全部**传 owner——今天不可能再产生无主任务,所以过户不会复活 V2-E1 的 stuck-run。
+
+**验收**:764 offline 全绿(批前 747,+17);新增 live 一条(豁免用户越过上限 3 次仍计数、global 同步走高、**同一刻未列入的用户照样被拒**——「豁免把守卫对所有人关掉了」才是这里唯一要命的失败)。tsc 干净;`npx eslint` 对改动文件无新增问题(ChatPanel 那条 `set-state-in-effect` 是 §9.2 记过的既存 6 条之一,只是行号被推移)。

@@ -127,6 +127,37 @@ ON CONFLICT (user_id, day, kind) DO UPDATE
 RETURNING used
 """)
 
+# The same upsert WITHOUT the guard. Not a variant of _CHARGE_SQL with the WHERE
+# templated out: the WHERE is the whole mechanism, and a limit that arrives as a
+# format argument is a limit that can arrive missing. Two statements, each
+# readable on its own, and a test pins that this one has no WHERE and that one
+# still does.
+_RECORD_SQL = text("""
+INSERT INTO usage_daily (user_id, day, kind, used)
+VALUES (:user_id, :day, :kind, 1)
+ON CONFLICT (user_id, day, kind) DO UPDATE
+    SET used = usage_daily.used + 1
+RETURNING used
+""")
+
+
+def is_unlimited(user_id: str) -> bool:
+    """Whether this user is exempt from the REFUSAL (never from the count).
+
+    Read through get_settings() on every call rather than captured at import, so
+    that adding an id is a restart and not a rebuild.
+    """
+    return user_id in get_settings().quota_unlimited_users_set
+
+
+async def _record_one(db: AsyncSession, user_id: str, kind: str, day: date) -> int:
+    """Count an action that will not be refused. Same row, same transaction, same
+    arithmetic as _charge_one — only the limit is absent."""
+    row = (await db.execute(
+        _RECORD_SQL, {"user_id": user_id, "day": day, "kind": kind}
+    )).first()
+    return row[0]
+
 
 async def _charge_one(db: AsyncSession, user_id: str, kind: str, limit: int, scope: str,
                       day: date) -> int:
@@ -157,14 +188,27 @@ async def charge(db: AsyncSession, user_id: str | None, kind: str) -> None:
     A None user_id raises rather than passing through — an uncharged action is
     exactly the hole this exists to close. System paths (the worker, seeds) do
     not call this at all.
+
+    QUOTA_UNLIMITED_USERS lifts the refusal for named ids and nothing else: both
+    rows are still written, so an exempted user is visible in usage_daily,
+    /api/me/usage and the backstop exactly as an ordinary one is. The two guards
+    above still apply to them — an exemption is not a way to become anonymous.
     """
     if not user_id:
         raise ValueError(f"charge({kind!r}) needs a user_id; refusing to let an action through uncounted")
     if user_id == GLOBAL_SCOPE:
         raise ValueError(f"{GLOBAL_SCOPE!r} is the reserved backstop row, not a user")
 
-    user_limit, global_limit = limits_for(kind)
     day = today_utc()
+    if is_unlimited(user_id):
+        # Both rows still move. An exemption that skipped the write would make
+        # the counters lie about spend that really happened, which is a worse
+        # thing to carry into production than a quota that can be lifted.
+        await _record_one(db, user_id, kind, day)
+        await _record_one(db, GLOBAL_SCOPE, kind, day)
+        return
+
+    user_limit, global_limit = limits_for(kind)
     await _charge_one(db, user_id, kind, user_limit, "user", day)
     await _charge_one(db, GLOBAL_SCOPE, kind, global_limit, "global", day)
 
@@ -185,6 +229,10 @@ class PoolStatus:
     kind: str
     used: int
     limit: int
+    # V7-Q. Carried rather than folded into `limit`, because an exempted user's
+    # limit is not a bigger number — it is absent, and a badge reading "47 of
+    # 10" is a reader's first evidence that quota accounting is broken.
+    unlimited: bool = False
 
     @property
     def remaining(self) -> int:
@@ -204,7 +252,9 @@ async def summary_for(db: AsyncSession, user_id: str) -> list[PoolStatus]:
         )
     )).all()
     used_by_kind = {k: u for k, u in rows}
+    exempt = is_unlimited(user_id)
     return [
-        PoolStatus(kind=kind, used=int(used_by_kind.get(kind, 0)), limit=limits_for(kind)[0])
+        PoolStatus(kind=kind, used=int(used_by_kind.get(kind, 0)), limit=limits_for(kind)[0],
+                   unlimited=exempt)
         for kind in POOLS
     ]

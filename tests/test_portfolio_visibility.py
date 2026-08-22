@@ -64,9 +64,15 @@ def test_the_web_type_is_still_a_mirror_of_the_response_model():
     # Field lines only: `  name: string;`. Comment lines are the file's voice and
     # are deliberately not parsed as anything.
     declared = set(re.findall(r"^\s{2}(\w+)[?]?:", body.group(1), re.MULTILINE))
-    assert declared == set(PortfolioOut.model_fields), (
-        f"web-only: {sorted(declared - set(PortfolioOut.model_fields))}, "
-        f"api-only: {sorted(set(PortfolioOut.model_fields) - declared)}"
+    # What the RESPONSE carries, not what the model declares: `owner_id` is
+    # declared so is_own can be answered and excluded so it never reaches a
+    # client, and `is_own` is computed rather than declared. Comparing
+    # model_fields alone would report both of those as mismatches while the two
+    # sides agreed perfectly on the wire.
+    sent = ({n for n, f in PortfolioOut.model_fields.items() if not f.exclude}
+            | set(PortfolioOut.model_computed_fields))
+    assert declared == sent, (
+        f"web-only: {sorted(declared - sent)}, api-only: {sorted(sent - declared)}"
     )
 
 

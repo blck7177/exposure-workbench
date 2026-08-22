@@ -981,7 +981,7 @@ export default function Home() {
     signedIn === null || portfolios.length === 0
       ? null
       : signedIn
-        ? (portfolios.find((p) => !p.is_public)?.id ?? null)
+        ? (portfolios.find((p) => p.is_own)?.id ?? null)
         : portfolios[0].id;
   const selectedPortfolioId = chosenPortfolioId ?? defaultPortfolioId;
   const [positions, setPositions] = useState<Position[]>([]);
@@ -1060,7 +1060,7 @@ export default function Home() {
   // Signed in, and everything visible belongs to somebody else. Computed here
   // because it decides what gets SELECTED as well as what gets rendered, and a
   // flag two components work out separately is a flag they can disagree about.
-  const ownsNothing = !!signedIn && portfolios.length > 0 && portfolios.every((p) => p.is_public);
+  const ownsNothing = !!signedIn && portfolios.length > 0 && !portfolios.some((p) => p.is_own);
 
   return (
     <div className="h-screen flex flex-col bg-[#0d1117]">

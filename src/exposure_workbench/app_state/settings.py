@@ -110,6 +110,19 @@ class Settings(BaseSettings):
     global_daily_position_uploads: int = 100
     global_daily_agent_sessions: int = 100
 
+    # A NAMED exemption from the refusal, for testing against the deployment the
+    # users get (V7-Q). Comma-separated user ids; EMPTY by default, and the
+    # defaults test pins it empty — a populated default is the one edit that
+    # would make the spend guard absent while every quota test still passed.
+    #
+    # It lifts the REFUSAL only. An exempted user's actions are still counted,
+    # into their own row and into the shared backstop, because the ledger and
+    # the limit are different jobs: /api/me/usage, the cost audit and the
+    # backstop all keep reading the truth. The consequence is deliberate and
+    # worth stating — an exempted tester CAN exhaust the global pool for
+    # everybody else, since the platform really did spend that.
+    quota_unlimited_users: str = ""
+
     # Price freshness (V2-E5). Calendar days, so ~10 covers a long weekend plus a
     # holiday and still catches a genuinely dead ticker. A holding whose newest
     # bar is older than this fails the run instead of being valued at a stale
@@ -131,6 +144,10 @@ class Settings(BaseSettings):
     @property
     def clerk_authorized_parties_list(self) -> list[str]:
         return [p.strip() for p in self.clerk_authorized_parties.split(",") if p.strip()]
+
+    @property
+    def quota_unlimited_users_set(self) -> frozenset[str]:
+        return frozenset(u.strip() for u in self.quota_unlimited_users.split(",") if u.strip())
 
 
 _settings: Settings | None = None

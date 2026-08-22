@@ -157,6 +157,45 @@ async def test_global_backstop_counts_across_users(owner, app_rls):
         )
 
 
+async def test_an_exempted_user_is_counted_past_the_limit_and_never_refused(owner, app_rls, monkeypatch):
+    """V7-Q. The whole claim, against the real upsert: the exempted user sails
+    past their limit, the row keeps climbing (so the ledger stays true), the
+    shared row climbs with it, and a user who is NOT on the list is still
+    refused while the list is populated — the failure that would matter is an
+    exemption that turned the guard off for everybody."""
+    from exposure_workbench.app_state import settings as settings_mod
+    boss, stranger = f"{USER}_boss", f"{USER}_stranger"
+    limit, _ = usage_service.limits_for(KIND)
+    monkeypatch.setattr(
+        settings_mod, "_settings",
+        settings_mod.Settings(quota_unlimited_users=f"other_id,{boss}"),
+    )
+
+    async with app_rls() as db:
+        before_global = await usage_service.get_used(db, usage_service.GLOBAL_SCOPE, KIND)
+
+    over = limit + 3
+    for _ in range(over):
+        async with app_rls() as db, db.begin():
+            await usage_service.charge(db, boss, KIND)
+
+    async with app_rls() as db:
+        assert await usage_service.get_used(db, boss, KIND) == over, (
+            "an exemption lifts the refusal, not the count"
+        )
+        assert await usage_service.get_used(db, usage_service.GLOBAL_SCOPE, KIND) == before_global + over, (
+            "the backstop must see spend that really happened, whoever spent it"
+        )
+
+    for _ in range(limit):
+        async with app_rls() as db, db.begin():
+            await usage_service.charge(db, stranger, KIND)
+    with pytest.raises(usage_service.QuotaExceeded) as e:
+        async with app_rls() as db, db.begin():
+            await usage_service.charge(db, stranger, KIND)
+    assert e.value.scope == "user"
+
+
 async def test_two_callers_cannot_both_take_the_last_unit(owner, app_rls):
     """The race the conditional upsert exists for. Both start at limit-1 used."""
     user = f"{USER}_race"

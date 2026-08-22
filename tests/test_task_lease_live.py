@@ -151,7 +151,19 @@ async def test_phase_two_marks_the_run_failed_under_the_tasks_own_tenant(owner, 
                     VALUES (:id, :p, 'running', CURRENT_DATE)"""),
             {"id": run_id, "p": DEMO_PORTFOLIO},
         )
-    task_id = await _plant(owner, "p2", "exposure_update",
+    # The task's owner is READ FROM THE BOOK rather than assumed to be DEMO_USER.
+    # That assumption held only while nobody had been handed the demo, and it is
+    # not the invariant under test: exposure_runs' policy is asymmetric ON
+    # PURPOSE — USING carries `OR p.is_public` so anyone may read a public book's
+    # runs, WITH CHECK does not, so only its owner may write them. Production
+    # always satisfies that, because the task carries the id of whoever enqueued
+    # it and only an owner can enqueue (V7-Q handed port_001 to a real account
+    # and this test went red on the borrowed ownership, not on the mechanism).
+    async with owner() as db:
+        book_owner = (await db.execute(
+            text("SELECT owner_id FROM portfolios WHERE id = :p"), {"p": DEMO_PORTFOLIO}
+        )).scalar_one()
+    task_id = await _plant(owner, "p2", "exposure_update", owner_user_id=book_owner,
                            payload={"run_id": run_id, "portfolio_id": DEMO_PORTFOLIO})
 
     async with app_rls() as db, db.begin():

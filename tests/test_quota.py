@@ -155,3 +155,78 @@ def test_market_sync_is_bounded_so_one_unit_cannot_buy_the_afternoon():
     fields = market_data.SyncRequest.model_fields
     assert any(getattr(m, "max_length", None) == market_data.MAX_SYNC_TICKERS
                for m in fields["tickers"].metadata), "ticker list must carry a cap"
+
+
+# ── QUOTA_UNLIMITED_USERS (V7-Q) ──────────────────────────────────────────────
+#
+# A named exemption from the refusal. What has to be true of it: nobody is
+# exempt unless an operator wrote their id down, the exemption lifts only the
+# refusal, and the two guards that keep an action from going through
+# unattributed still apply to an exempted user.
+
+
+def test_nobody_is_exempt_by_default():
+    """Asserted on the DECLARATION, not an instance: Settings() legitimately
+    loads .env, and on a machine that has an operator in the list an
+    instance-based pin would go green for the wrong reason and red for the
+    right one. Same idiom, same reason, as
+    test_no_credentials_baked_into_code_defaults in test_p0_schema.py.
+
+    This is the one setting where 'off unless somebody wrote an id down' is the
+    entire safety property — every other assertion in this file stays green
+    with it populated."""
+    assert Settings.model_fields["quota_unlimited_users"].default == ""
+    assert Settings(quota_unlimited_users="").quota_unlimited_users_set == frozenset()
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("", frozenset()),
+    ("user_a", frozenset({"user_a"})),
+    (" user_a , user_b ", frozenset({"user_a", "user_b"})),
+    ("user_a,,user_b,", frozenset({"user_a", "user_b"})),
+    ("   ", frozenset()),
+])
+def test_the_list_parses_the_way_an_operator_would_type_it(raw, expected):
+    """A trailing comma or a stray space must not enrol an empty-string user —
+    `charge` refuses a falsy user_id, but a set containing '' would still be a
+    membership test that no real id can satisfy while looking populated."""
+    assert Settings(quota_unlimited_users=raw).quota_unlimited_users_set == expected
+
+
+def test_is_unlimited_reads_settings_at_call_time(monkeypatch):
+    """Captured at import, adding an id would need a rebuild rather than a
+    restart — and the value would differ between a test and the process it is
+    meant to describe."""
+    from exposure_workbench.app_state import settings as settings_mod
+    monkeypatch.setattr(settings_mod, "_settings", Settings(quota_unlimited_users="user_boss"))
+    assert usage_service.is_unlimited("user_boss") is True
+    assert usage_service.is_unlimited("user_someone_else") is False
+
+
+def test_the_exemption_is_not_a_way_to_become_anonymous(monkeypatch):
+    """The two ValueErrors sit ABOVE the exemption branch. An empty id and the
+    reserved backstop id must still raise, whatever the list says."""
+    from exposure_workbench.app_state import settings as settings_mod
+    monkeypatch.setattr(
+        settings_mod, "_settings",
+        Settings(quota_unlimited_users=f"{usage_service.GLOBAL_SCOPE},user_boss"),
+    )
+    import asyncio
+    with pytest.raises(ValueError):
+        asyncio.run(usage_service.charge(None, None, "chat_turn"))
+    with pytest.raises(ValueError):
+        asyncio.run(usage_service.charge(None, usage_service.GLOBAL_SCOPE, "chat_turn"))
+
+
+def test_the_recording_statement_has_no_limit_and_the_charging_one_still_does():
+    """The guard is the WHERE. These are two statements rather than one with the
+    clause templated in, because a limit that arrives as a format argument is a
+    limit that can arrive missing — and the failure would be silent."""
+    charging = str(usage_service._CHARGE_SQL)
+    recording = str(usage_service._RECORD_SQL)
+    assert "WHERE usage_daily.used < :limit" in charging
+    assert "WHERE" not in recording
+    assert ":limit" not in recording
+    # Same row, same arithmetic: the only difference is the guard.
+    assert "SET used = usage_daily.used + 1" in charging
+    assert "SET used = usage_daily.used + 1" in recording

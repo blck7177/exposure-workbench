@@ -77,6 +77,18 @@ services:
       GLOBAL_DAILY_READINESS: "${GLOBAL_DAILY_READINESS:-100}"
       GLOBAL_DAILY_EXPOSURE_RUNS: "${GLOBAL_DAILY_EXPOSURE_RUNS:-200}"
       GLOBAL_DAILY_MARKET_SYNCS: "${GLOBAL_DAILY_MARKET_SYNCS:-50}"
+      # V2-H added three pools and stopped here, so the comment above ("tunable
+      # without a rebuild") was false for exactly the three that bound a tester
+      # first: 5 chat sessions a day cannot be raised without editing this file.
+      DAILY_PORTFOLIO_CREATES: "${DAILY_PORTFOLIO_CREATES:-5}"
+      DAILY_POSITION_UPLOADS: "${DAILY_POSITION_UPLOADS:-10}"
+      DAILY_AGENT_SESSIONS: "${DAILY_AGENT_SESSIONS:-5}"
+      GLOBAL_DAILY_PORTFOLIO_CREATES: "${GLOBAL_DAILY_PORTFOLIO_CREATES:-100}"
+      GLOBAL_DAILY_POSITION_UPLOADS: "${GLOBAL_DAILY_POSITION_UPLOADS:-100}"
+      GLOBAL_DAILY_AGENT_SESSIONS: "${GLOBAL_DAILY_AGENT_SESSIONS:-100}"
+      # V7-Q. Comma-separated user ids exempt from the REFUSAL — still counted.
+      # Empty here and empty in Settings: two places, both off by default.
+      QUOTA_UNLIMITED_USERS: "${QUOTA_UNLIMITED_USERS:-}"
     volumes:
       - ./data:/app/data
       - ./configs:/app/configs
@@ -140,6 +152,18 @@ services:
       GLOBAL_DAILY_READINESS: "${GLOBAL_DAILY_READINESS:-100}"
       GLOBAL_DAILY_EXPOSURE_RUNS: "${GLOBAL_DAILY_EXPOSURE_RUNS:-200}"
       GLOBAL_DAILY_MARKET_SYNCS: "${GLOBAL_DAILY_MARKET_SYNCS:-50}"
+      # V2-H added three pools and stopped here, so the comment above ("tunable
+      # without a rebuild") was false for exactly the three that bound a tester
+      # first: 5 chat sessions a day cannot be raised without editing this file.
+      DAILY_PORTFOLIO_CREATES: "${DAILY_PORTFOLIO_CREATES:-5}"
+      DAILY_POSITION_UPLOADS: "${DAILY_POSITION_UPLOADS:-10}"
+      DAILY_AGENT_SESSIONS: "${DAILY_AGENT_SESSIONS:-5}"
+      GLOBAL_DAILY_PORTFOLIO_CREATES: "${GLOBAL_DAILY_PORTFOLIO_CREATES:-100}"
+      GLOBAL_DAILY_POSITION_UPLOADS: "${GLOBAL_DAILY_POSITION_UPLOADS:-100}"
+      GLOBAL_DAILY_AGENT_SESSIONS: "${GLOBAL_DAILY_AGENT_SESSIONS:-100}"
+      # V7-Q. Comma-separated user ids exempt from the REFUSAL — still counted.
+      # Empty here and empty in Settings: two places, both off by default.
+      QUOTA_UNLIMITED_USERS: "${QUOTA_UNLIMITED_USERS:-}"
     volumes:
       - ./data:/app/data
     depends_on:

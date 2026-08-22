@@ -25,6 +25,7 @@ class PoolOut(BaseModel):
     used: int
     limit: int
     remaining: int
+    unlimited: bool = False
 
 
 class UsageOut(BaseModel):
@@ -50,6 +51,7 @@ async def my_usage(
     return UsageOut(
         day=today_utc().isoformat(),
         resets_at=usage_service.next_reset_at(),
-        pools=[PoolOut(kind=p.kind, used=p.used, limit=p.limit, remaining=p.remaining)
+        pools=[PoolOut(kind=p.kind, used=p.used, limit=p.limit, remaining=p.remaining,
+                       unlimited=p.unlimited)
                for p in pools],
     )

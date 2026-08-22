@@ -147,13 +147,30 @@ tenants; any `user_id = current_setting(...)` policy would quietly reduce it to
 counting only the caller, which is a fail-*open* backstop and worse than none.
 
 Defaults are per user per UTC day: 10 chat turns, 3 research runs, 10 readiness,
-20 exposure runs, 10 market syncs; the global pools are 200/30/100/200/50. All
-env-overridable. The tool budgets are a different, orthogonal layer — they bound
+20 exposure runs, 10 market syncs, plus 5 portfolio creates, 10 position uploads
+and 5 agent sessions; the global pools are 200/30/100/200/50 and 100/100/100. All
+env-overridable — the last three only since V7-Q, which found them declared in
+settings and absent from compose, i.e. unreachable without editing the file.
+The quota env belongs on **api and mcp**: those are the two processes that reach a
+charge point (routes, and the delegation tools that run inside the MCP server).
+The worker reaches none — it executes work that was already paid for at enqueue. The tool budgets are a different, orthogonal layer — they bound
 one conversation, these bound one day — and since V3-B2 they run on two tracks:
 **15 tool calls per TURN** for a conversation (reset when the turn is claimed,
 which is what an over-long answer runs into) and **40 per SESSION** as the
 lifetime ceiling, which is the only track a research run and the MCP host are on.
 External search stays a sub-budget of 5 per session.
+
+`QUOTA_UNLIMITED_USERS` (V7-Q) is a comma-separated list of user ids exempt from
+the **refusal** — never from the count. Both rows are still written, so
+`/api/me/usage`, the cost audit and the `_global` backstop keep reading the truth,
+and `/api/me/usage` reports `unlimited: true` for those pools rather than a limit
+the caller is already past. It exists so the operator can exercise the deployment
+users actually get. Two consequences to hold on to:
+
+  * an exempted tester **can exhaust the global pool for everyone else**, because
+    the platform really did spend that;
+  * with a name in this list, that account has **no ceiling** on this side. The
+    provider-side monthly cap is the only thing under it — set one.
 
 **Removes.** The unbounded bill. A refusal happens at the gate, before any
 provider call: measured at 14ms.

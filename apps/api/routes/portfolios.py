@@ -6,11 +6,12 @@ from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
+from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.services import (
     exposure_run_service, portfolio_csv, portfolio_service, usage_service,
@@ -50,6 +51,31 @@ class PortfolioOut(BaseModel):
     # would put another tenant's identifier in front of every anonymous
     # visitor to say something this boolean says without naming anyone.
     is_public: bool
+    # Carried to answer is_own and EXCLUDED from the wire, for the reason the
+    # comment above gives: a tenant identifier must not travel to every visitor.
+    owner_id: str | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def is_own(self) -> bool:
+        """Whether the caller owns this book — the same predicate the portfolio
+        snapshot and the brief already answer (`owner_id == current_user_id()`),
+        answered once here so all five routes returning this model agree.
+
+        V7-Q. `is_public` was standing in for this, and the substitution was only
+        ever true while public implied somebody else's: handing port_001 to a
+        real account made it that account's book AND public, and the web then
+        both refused to open it and told its owner the desk was empty. Ownership
+        and publicness are independent facts and are now carried as two.
+
+        Serialised inside the request, so the contextvar is set. Outside one it
+        reads None and this is False — fail-closed, and the same shape as
+        brief_service's.
+
+        semantic, not security: this decides what the UI opens on and what it
+        offers; RLS decides what the caller can see at all. A row that reached
+        this model was already cleared by the database."""
+        return self.owner_id is not None and self.owner_id == current_user_id()
 
     model_config = {"from_attributes": True}
 
