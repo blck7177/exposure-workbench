@@ -1,6 +1,6 @@
 # Implementation Plan V7 — 上线批:公网可注册 + 前 10 分钟
 
-> **状态(2026-08-22)**:**执行方案,boss 已拍板(§0 四项全按默认),待开工。** 实测记录见 §7(待填)。
+> **状态(2026-08-22)**:**B 线(U1–U5)、D0、D6、D9 全部完成并在栈上验收**;747 offline / 118 live 全绿。**A 线卡在 boss 两件**:D1(Cloudflare A 记录)与 D4(Clerk 加 origin);之后 D2/D3/D5 由我接。逐阶段实测见 §8,执行期发现见 §9。
 > **编号勘误**:本批曾以 V5 之名提交(`01c5cdd`)并误覆盖了量化正确性批的 V5 文档,已自 `ac167d6` 全量恢复。V5=量化正确性批、V6=窗口+报告门批(另一 session,2026-08-21),本批顺延为 V7。
 > **性质**:两条可并行的线——**A 线(部署)**把栈放上公网,**B 线(产品)**把一个陌生人注册后的前 10 分钟做通;外加**今日零风险三件**与**广发前三件**。代码内核(agent 面、RLS、配额、成本账、失败语义、数值正确性)已完工并在栈上实测,本批**不动架构**。
 > **一句话**:差的全在部署层和"第一次使用"的交互层,不在功能内核;每一条都有文件坐标,没有一条需要新设计。
@@ -149,15 +149,32 @@ D0 今日(我,30 min,零风险,不依赖任何拍板)
 
 ---
 
-## 8. 实测记录(待填)
+## 8. 实测记录(2026-08-22)
 
-| 阶段 | commit | 落地 | 实测 |
-|---|---|---|---|
-| D0 | | | |
-| A 线 D3/D2/D5 | | | |
-| U1 | | | |
-| U3 | | | |
-| U2 | | | |
-| U4 | | | |
-| U5 | | | |
-| D6 / D9 | | | |
+> **B 线与广发前件全部完成**;A 线待 boss 的 D1(DNS)与 D4(Clerk origins)。
+> **747 offline / 118 live 全绿**(批前 717/118),tsc 干净,`next build` 干净,四镜像已重建、栈已在新代码上。
+
+| 阶段 | commit | 落地与实测 |
+|---|---|---|
+| **D0** | `2e4650e`^ | 盘 79%→**71%**(回收 4.0 GB build cache);`ANALYZE` 后统计回真(`filing_chunks` 报 0 → 3,078);postgres `max_connections=200` / `shared_buffers=256MB`,**worker 3 副本**各自起来。连接预算:api 30 + mcp 30 + 3×30 = 120 < 200。重建 postgres 容器后 118 live 复跑全绿 |
+| **prep** | `09deca6` | 共享面重构,零行为变化:`WorkflowEventOut` 抽进 `apps/api/schemas.py` **并带上 `payload_summary`**(U4 的数据自此在 wire 上);`RunTimeline` 组件从 page.tsx 抽出;`explainApiError` 从 ChatPanel 抽出。**做在两条 lane 之前**,因为这三处各自横跨两条 lane 的文件——V4 批并行撞车两次的教训 |
+| **D6** | `2e4650e` | 会话级 advisory lock + 专用连接(readiness 每步自提交,事务级锁跨不过去);步骤 2–6 在锁内,步骤 1(产出 key)与步骤 7(append-only 台账)在外;等待期间 `await_ingest` 步**开着**。5 条守卫,含一条读源码钉住锁的边界。**比计划更小**:`index_filing` 已有 `is_indexed` 短路,串行化后逐步幂等自然生效,不需要再查一次 `_is_ready`——而且 `_is_ready` 在 `issuer_research_workflow`,反向 import 会循环 |
+| **D9** | `c4fee16` | `scripts/backup_db.sh` + cron 03:30 UTC,实跑通过(**27 MB**,`gzip -t` 通过);写 `.partial` 再改名、成功后才裁剪。**计划里"几 MB"是我估错的**,按实测改注释:7 份 ≈190 MB 对 12 GB 可用。PRODUCTION.md 新增恢复命令,并写明**与库同盘**(挡得住误迁移/误删,挡不住掉盘) |
+| **U1** | `f92b4d9` | research run 返回 `workflow_events`(**手写查询非关系加载**:`workflow_events.run_id` 对三种父多态,库里无 FK——lane 读了 init.sql 与 delete_user.py 才确认)。栈上实测:completed run 6 事件、failed run 4 事件且 `error_message` 到位(`the research tool face at ... could not be reached (connect_error)`)。判断:run 一存在面板即出现(空态"Queued…");结束后**不自动隐藏**(定时器会跟注意力赛跑,失败时这是唯一写原因的地方);排序 `created_at, id`(同秒的 running/completed 反了会让完成的步永远转圈) |
+| **U3** | `f92b4d9` | `port_001` 从 `apps/web` 彻底消失,portfolio 从 URL 取。**顺带修了我 prep 造成的回归**:共享件带走了 chat 的 404 措辞,于是打错 ticker 会说"你的对话已过期"并丢掉无关 session。根因是三个拒绝仍是散文,共享件只能按状态码猜——现已带码(`unknown_session`/`unknown_ticker`/`not_investigable`),并加**跨语言守卫**(UI 解释的每个码必须真有人抛;这是该故障沉默的那一半:两边各自自洽,分支永不触发)。又修了 3s 轮询无 catch——U1 之后冻住的时间线读起来像"run 挂了"而非"页面失联" |
+| **U2** | `a2b292a` | `PortfolioOut` 增 `is_public`(web 此前根本分不清 demo 与自有)。栈上实测:probe 用户 `[('port_001','US Growth & Income', True)]` → first-run 卡判定为 **True**。卡在列表**上方**不替换列表(浏览 demo 是新账号唯一能做的另一件事);匿名橱窗字节不变。chat 三条建议**填入不发送**——建议里的 ticker 是占位符,误点会花掉可数日配额里的一次 |
+| **U4** | `a2b292a` | 栈上实测 payload 键真实存在:`check_limits: ['evaluated','inert_overrides']`、`calculate_risk: [...,'scenarios_evaluated','scenarios_unevaluated']`。放在告警摘要**正下方的无框弱化文字**,不是第四张卡——旁注只有贴着它所限定的断言才读得出是旁注;装进框里会与告警争同一眼而输,正如它作为无人渲染的列输掉一样。跑了却没记的 run 渲染"This run did not record what it evaluated",而不是留白 |
+| **U5** | `a2b292a` | `markdown_report` 上屏(V6-G 的门刚护住 79 个数字,而没有 UI 渲染它),折叠,**开关上带着门的判词**(`numbers_checked`)。react-markdown 10.1.0 默认转义原始 HTML 且未传插件,不需额外 sanitizer |
+
+^ D0 的 compose 改动与 D6 在同一批推送。
+
+---
+
+## 9. 执行期发现(不静默)
+
+1. **`next build` 在 Next 16 / Turbopack 下不跑 eslint**——我在两条 lane 的验收指令里写的"未使用的 import 只有 build 才看得出"是**错的**,只有 `npx eslint` 抓得到。已实测确认;lane-main 据此清掉 6 个 warning。
+2. **6 个 lint error 先于本批存在**(stash 对照:改动前 12 problems/6 errors,改动后 6/6):`ChatPanel.tsx:108` 与 `PortfolioModal.tsx:41` 的 `react-hooks/set-state-in-effect`,`lib/issuer.ts` 的 4 个 `no-explicit-any`。**临部署不动**:`CalcRow.result` 有真实消费者(`r.result?.value`/`?.points`),改 `unknown` 会连锁;两个 set-state 是行为重构。记入上线后卫生。
+3. **D3 推迟到 D2 割接时**:`NEXT_PUBLIC_API_URL=`(空=同源)是 build 期内联,提前翻掉会让 `localhost:3103` 去调自己不存在的 `/api`,毁掉 B 线正在用的验证环境,而 DNS 在 boss 手上。
+4. **计划里的两处坐标是错的**:Investigate 链接在 page.tsx **562/581**(计划写 596/615);`WorkflowEvent.run_id` 在 `models.py:417` 声明了库里没有的外键(P0 去掉的,挂起区已登记,只记不动)。
+5. **U1 的冷 ticker 路径尚未在栈上验**:现有 run 都是热 ticker,时间线只有 3 步(readiness_precheck/agent_session/finalize)。真正要它的是冷 ticker 的 6 步 ingest 叙事——那需要一次真冷 run,并入 D5 smoke。
+6. **lane-main 未做计划里 U2 的第三个元素**(示例提问打开 chat 并预填):它判断那要跨组件预填管线,而 chip 集已经住在面板里。同意,记录。
