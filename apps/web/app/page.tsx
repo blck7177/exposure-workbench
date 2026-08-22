@@ -11,7 +11,7 @@ import {
 import { ChatPanel } from "./components/ChatPanel";
 import { RunTimeline } from "./components/RunTimeline";
 import { EvidenceDrawer } from "./components/Evidence";
-import { AuthControls, AuthGate } from "./components/Auth";
+import { AuthControls, AuthGate, SignedInProbe } from "./components/Auth";
 import { PortfolioModal } from "./components/PortfolioModal";
 import type {
   Portfolio, ExposureRun, ExposureRunSummary, Position, RiskAlert,
@@ -104,10 +104,12 @@ function SeverityBadge({ severity }: { severity: string }) {
  * someone who already knows what they want.
  */
 function FirstRunCard({
-  onCreated, onUploadCsv,
+  onCreated, onUploadCsv, prompt,
 }: {
   onCreated: (p: Portfolio) => void;
   onUploadCsv: () => void;
+  /** The sentence above the buttons; null where the surrounding copy said it. */
+  prompt?: React.ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -131,11 +133,12 @@ function FirstRunCard({
 
   return (
     <div className="m-2 rounded-lg border border-dashed border-[#30363d] bg-[#161b22] p-3">
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        Nothing here is yours yet — the book below is the shared demo. Take a copy of it,
-        or bring your own holdings.
-      </p>
-      <div className="mt-3 space-y-1.5">
+      {prompt !== null && (
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          {prompt ?? <>Nothing here is yours yet — the book below is the shared demo. Take a copy of it, or bring your own holdings.</>}
+        </p>
+      )}
+      <div className={`${prompt === null ? "" : "mt-3"} space-y-1.5`}>
         <button
           onClick={clone}
           disabled={busy}
@@ -161,7 +164,12 @@ function FirstRunCard({
 function LeftPanel({
   portfolios, selectedPortfolioId, onSelectPortfolio,
   runs, selectedRunId, onSelectRun, onPortfolioCreated,
+  showFirstRunCard, setModalOpen,
 }: {
+  /** True only while the empty desk is being explained somewhere ELSE than here. */
+  showFirstRunCard: boolean;
+  /** Opening only. The dialog itself belongs to Home, which has two callers. */
+  setModalOpen: (v: boolean) => void;
   portfolios: Portfolio[];
   selectedPortfolioId: string | null;
   onSelectPortfolio: (id: string) => void;
@@ -170,13 +178,6 @@ function LeftPanel({
   onSelectRun: (id: string) => void;
   onPortfolioCreated: (p: Portfolio) => void;
 }) {
-  const [modalOpen, setModalOpen] = useState(false);
-
-  // "Owns nothing" is not "the list is empty": the demo is public and comes back
-  // for everyone. The length guard is what stops the card flashing on for one
-  // paint before the first listPortfolios() resolves — `every` on [] is true.
-  const ownsNothing = portfolios.length > 0 && portfolios.every((p) => p.is_public);
-
   return (
     <aside className="w-56 flex-shrink-0 border-r border-[#21262d] flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-[#21262d]">
@@ -192,21 +193,19 @@ function LeftPanel({
           </button>
         </div>
       </div>
-      <PortfolioModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreated={(p) => { setModalOpen(false); onPortfolioCreated(p); }}
-      />
-
       <div className="flex-1 overflow-y-auto">
-        {/* AuthGate, not a portfolios check: an anonymous visitor cannot own a
+        {/* Only while the main panel is showing something else. An empty desk is
+            explained in the centre now, where the eye already is; repeating the
+            same two buttons in the sidebar at the same moment would be one
+            prompt too many. It comes back the moment the reader clicks into the
+            shared demo to look around — that is exactly when they need a way to
+            take a copy, and the centre is no longer free to offer it.
+
+            AuthGate, not a portfolios check: an anonymous visitor cannot own a
             book, so telling them their desk is empty would be nonsense, and the
-            shop-window has to stay exactly what it is today. Above the list
-            rather than in place of it — the demo row stays selectable, because
-            looking at it is the only thing a brand-new account can do while it
-            decides whether any of this is for them. */}
+            shop-window stays exactly what it is today. */}
         <AuthGate fallback={null}>
-          {ownsNothing && (
+          {showFirstRunCard && (
             <FirstRunCard
               onCreated={onPortfolioCreated}
               onUploadCsv={() => setModalOpen(true)}
@@ -589,8 +588,11 @@ function MiddlePanel({
 // ─── Right panel — dashboard ─────────────────────────────────────────────────
 
 function RightPanel({
-  portfolio, positions, run,
+  portfolio, positions, run, firstRun, onCloned, onUploadCsv,
 }: {
+  firstRun: boolean;
+  onCloned: (p: Portfolio) => void;
+  onUploadCsv: () => void;
   portfolio: Portfolio | null;
   positions: Position[];
   run: ExposureRun | null;
@@ -637,12 +639,32 @@ function RightPanel({
   const pnlPositive = (metrics?.daily_pnl ?? 0) >= 0;
 
   if (!portfolio) {
+    // Two different empties, and they must not look alike. "Pick one" is only
+    // useful advice when there IS one; for an account that owns nothing it is
+    // an instruction with no object, and the reader is left to guess whether
+    // something failed to load. So the first-run case says what is true — the
+    // desk is empty — and carries the two actions that end it.
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <BarChart3 className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-          <p className="text-slate-500 text-sm">Select a portfolio to view the dashboard</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center p-8">
+        {firstRun ? (
+          <div className="max-w-sm w-full text-center">
+            <BarChart3 className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+            <p className="text-slate-300 text-sm font-medium">Your desk is empty</p>
+            <p className="text-slate-500 text-xs mt-2 leading-relaxed">
+              Take a copy of the shared demo book to see the whole workflow on real
+              holdings, or upload your own. Either way the numbers on this screen
+              will be yours.
+            </p>
+            <div className="mt-5 text-left">
+              <FirstRunCard onCreated={onCloned} onUploadCsv={onUploadCsv} prompt={null} />
+            </div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <BarChart3 className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">Select a portfolio to view the dashboard</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -924,7 +946,44 @@ function RightPanel({
 
 export default function Home() {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | null>(null);
+  // The reader's explicit choice, and only that. What is actually shown is
+  // derived below: null here means "has not chosen", which is a different thing
+  // from "nothing is open".
+  const [chosenPortfolioId, setChosenPortfolioId] = useState<string | null>(null);
+  // null until the probe reports: "not known yet" and "signed out" must stay
+  // distinguishable, see the selection effect below.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  // Lifted out of the sidebar: the main panel's first-run prompt opens the same
+  // dialog, and a dialog owned by one of its two callers is a dialog the other
+  // one has to reach for sideways.
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Derived while rendering, not set from an effect: the default is a function
+  // of who is asking and what came back, so computing it here means there is
+  // never a paint with nothing open followed by a correction.
+  //
+  // Picking the first row was right while every visitor was anonymous and the
+  // first row was the shared demo — the shop window opening on something. It
+  // stopped being right the moment accounts existed. A signed-in user who owns
+  // nothing had the demo opened FOR them, and the panel that fills the screen
+  // showed $10.8M and a -$141,973 day with nothing on it saying whose. The
+  // sidebar said "the book below is the shared demo"; the numbers did not, and
+  // the numbers are where the eye goes. Showing one person's money as another's
+  // is the one thing this product must never do, even for the seconds it takes
+  // to read the sidebar.
+  //
+  // So: anonymous opens on the demo, a user with books of their own opens on
+  // one of those, and a user with none opens on nothing and is told why.
+  // signedIn === null means the answer has not arrived; nothing opens until it
+  // has, because guessing "anonymous" is what produces the flash of somebody
+  // else's portfolio this exists to prevent.
+  const defaultPortfolioId =
+    signedIn === null || portfolios.length === 0
+      ? null
+      : signedIn
+        ? (portfolios.find((p) => !p.is_public)?.id ?? null)
+        : portfolios[0].id;
+  const selectedPortfolioId = chosenPortfolioId ?? defaultPortfolioId;
   const [positions, setPositions] = useState<Position[]>([]);
   const [runs, setRuns] = useState<ExposureRunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -933,12 +992,10 @@ export default function Home() {
 
   useEffect(() => {
     listPortfolios()
-      .then((data) => {
-        setPortfolios(data);
-        if (data.length > 0) setSelectedPortfolioId(data[0].id);
-      })
+      .then(setPortfolios)
       .catch((e) => setError(e.message));
   }, []);
+
 
   useEffect(() => {
     if (!selectedPortfolioId) return;
@@ -992,7 +1049,7 @@ export default function Home() {
     // reload the (now auth-scoped) list and jump to the new portfolio
     listPortfolios().then((data) => {
       setPortfolios(data);
-      setSelectedPortfolioId(created.id);
+      setChosenPortfolioId(created.id);
       setCurrentRun(null);
       setSelectedRunId(null);
       setRuns([]);
@@ -1000,6 +1057,10 @@ export default function Home() {
   }, []);
 
   const selectedPortfolio = portfolios.find((p) => p.id === selectedPortfolioId) ?? null;
+  // Signed in, and everything visible belongs to somebody else. Computed here
+  // because it decides what gets SELECTED as well as what gets rendered, and a
+  // flag two components work out separately is a flag they can disagree about.
+  const ownsNothing = !!signedIn && portfolios.length > 0 && portfolios.every((p) => p.is_public);
 
   return (
     <div className="h-screen flex flex-col bg-[#0d1117]">
@@ -1020,11 +1081,19 @@ export default function Home() {
 
       {/* Three-panel workspace */}
       <div className="flex-1 flex overflow-hidden">
+        <SignedInProbe onChange={setSignedIn} />
+        <PortfolioModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onCreated={(p) => { setModalOpen(false); handlePortfolioCreated(p); }}
+        />
         <LeftPanel
+          showFirstRunCard={ownsNothing && !!selectedPortfolio}
+          setModalOpen={setModalOpen}
           portfolios={portfolios}
           selectedPortfolioId={selectedPortfolioId}
           onSelectPortfolio={(id) => {
-            setSelectedPortfolioId(id);
+            setChosenPortfolioId(id);
             setCurrentRun(null);
             setSelectedRunId(null);
             setRuns([]);
@@ -1045,6 +1114,9 @@ export default function Home() {
           portfolio={selectedPortfolio}
           positions={positions}
           run={currentRun}
+          firstRun={ownsNothing}
+          onCloned={handlePortfolioCreated}
+          onUploadCsv={() => setModalOpen(true)}
         />
       </div>
       <EvidenceDrawer />

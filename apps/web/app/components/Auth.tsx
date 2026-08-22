@@ -50,6 +50,38 @@ function AuthGateInner({
   return <>{isSignedIn ? children : fallback}</>;
 }
 
+function SignedInProbeInner({ onChange }: { onChange: (v: boolean) => void }) {
+  const { isSignedIn } = useAuth();
+  useEffect(() => { onChange(!!isSignedIn); }, [isSignedIn, onChange]);
+  return null;
+}
+
+function SignedInProbeDisabled({ onChange }: { onChange: (v: boolean) => void }) {
+  // No Clerk means no accounts, so every visitor is anonymous. Reported rather
+  // than left undefined: a caller waiting to hear would otherwise wait forever,
+  // and "we never found out" and "nobody is signed in" would be the same
+  // silence.
+  useEffect(() => { onChange(false); }, [onChange]);
+  return null;
+}
+
+/**
+ * Reports whether someone is signed in, for logic that is not a render branch.
+ *
+ * AuthGate covers the common case — show this to signed-in visitors, that to
+ * everyone else — but a decision like "which portfolio should be selected when
+ * the page loads" is state, not markup, and it cannot be expressed by choosing
+ * between two subtrees. A component rather than a hook for the reason the whole
+ * file is shaped this way: useAuth throws without a ClerkProvider, and the
+ * provider is deliberately absent when no publishable key is configured, so the
+ * hook has to live behind a component that is simply not rendered then.
+ */
+export function SignedInProbe({ onChange }: { onChange: (v: boolean) => void }) {
+  return clerkEnabled
+    ? <SignedInProbeInner onChange={onChange} />
+    : <SignedInProbeDisabled onChange={onChange} />;
+}
+
 /**
  * Gate interactive (write) UI behind sign-in. Auth disabled (public demo) →
  * children render as-is. Enabled → signed-out users see the fallback.
