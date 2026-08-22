@@ -21,6 +21,7 @@ from exposure_workbench.db.models import Company, Filing
 from exposure_workbench.providers.edgartools_filing_provider import EdgarToolsFilingProvider
 from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
 from exposure_workbench.services import company_service
+from exposure_workbench.services.ingest_lock_service import ingest_lock
 from exposure_workbench.services import document_index_service as dix
 from exposure_workbench.services import filing_ingestion_service as fis
 from exposure_workbench.services import market_data_ingestion_service as mds
@@ -61,39 +62,61 @@ async def run_readiness(
         await db.commit()
         company_id = company.id
 
-    # 2) filings metadata + 3) text sections (one transaction per filing)
-    async with step(db, run_id, "ingest_filings", f"Ingesting 10-K/10-Q for {ticker}"):
-        filings = await fis.ingest_filings_metadata(db, company_id, company.cik, filing_provider)
-        await db.commit()
-        for f in filings:
-            fresh = (await db.execute(select(Filing).where(Filing.id == f.id))).scalar_one()
-            await fis.ingest_filing_text(db, fresh, filing_provider)
+    # Steps 2-6 write SHARED tables — filings, sections, facts, chunks, prices —
+    # and two runs reach them whenever two users investigate the same cold
+    # issuer at once. Each step is written to be re-runnable, but re-runnable is
+    # not concurrent-safe: both check "already done", both see nothing, and both
+    # write. Serialising per company is what makes the idempotence they already
+    # claim actually hold (V7-D6, services/ingest_lock_service.py).
+    #
+    # Step 1 stays outside because company_id is what it produces, and the lock
+    # is keyed on it. Step 7 stays outside deliberately: the calc ledger is
+    # append-only by design, so two runs minting their own calc ids is the
+    # intended behaviour, not a collision, and holding a lock across it would
+    # serialise work that has no reason to wait.
+    async with ingest_lock(
+        company_id,
+        # Only entered when someone else holds the lock, and held open for the
+        # whole wait: an EDGAR ingest is minutes, and a page showing nothing
+        # cannot be told from a page that has hung.
+        announce_wait=lambda: step(
+            db, run_id, "await_ingest",
+            f"{ticker} is already being ingested by another run; waiting",
+        ),
+    ):
+        # 2) filings metadata + 3) text sections (one transaction per filing)
+        async with step(db, run_id, "ingest_filings", f"Ingesting 10-K/10-Q for {ticker}"):
+            filings = await fis.ingest_filings_metadata(db, company_id, company.cik, filing_provider)
+            await db.commit()
+            for f in filings:
+                fresh = (await db.execute(select(Filing).where(Filing.id == f.id))).scalar_one()
+                await fis.ingest_filing_text(db, fresh, filing_provider)
+                await db.commit()
+
+        # 4) XBRL facts
+        async with step(db, run_id, "extract_facts", f"Extracting XBRL facts for {ticker}"):
+            since = as_of - timedelta(days=_FACTS_SINCE_DAYS)
+            n_facts = await fis.ingest_financial_facts(db, company_id, company.cik, filing_provider, since=since)
             await db.commit()
 
-    # 4) XBRL facts
-    async with step(db, run_id, "extract_facts", f"Extracting XBRL facts for {ticker}"):
-        since = as_of - timedelta(days=_FACTS_SINCE_DAYS)
-        n_facts = await fis.ingest_financial_facts(db, company_id, company.cik, filing_provider, since=since)
-        await db.commit()
+        # 5) index filings (embeddings)
+        async with step(db, run_id, "index_filings", f"Indexing filings for {ticker}"):
+            filing_rows = (await db.execute(select(Filing).where(Filing.company_id == company_id))).scalars().all()
+            n_chunks = 0
+            for f in filing_rows:
+                fresh = (await db.execute(select(Filing).where(Filing.id == f.id))).scalar_one()
+                n_chunks += await dix.index_filing(db, fresh)
+                await db.commit()
 
-    # 5) index filings (embeddings)
-    async with step(db, run_id, "index_filings", f"Indexing filings for {ticker}"):
-        filing_rows = (await db.execute(select(Filing).where(Filing.company_id == company_id))).scalars().all()
-        n_chunks = 0
-        for f in filing_rows:
-            fresh = (await db.execute(select(Filing).where(Filing.id == f.id))).scalar_one()
-            n_chunks += await dix.index_filing(db, fresh)
-            await db.commit()
-
-    # 6) refresh market data (skippable by explicit request)
-    if skip_market_refresh:
-        await mark_skipped(db, run_id, "refresh_market_data", "skipped by request")
-    else:
-        async with step(db, run_id, "refresh_market_data", f"Refreshing prices for {ticker} + SPY"):
-            provider = YFinanceMarketDataProvider()
-            start = as_of - timedelta(days=400)
-            await mds.ingest_market_prices(db, [ticker, "SPY"], start, as_of, provider)
-            await db.commit()
+        # 6) refresh market data (skippable by explicit request)
+        if skip_market_refresh:
+            await mark_skipped(db, run_id, "refresh_market_data", "skipped by request")
+        else:
+            async with step(db, run_id, "refresh_market_data", f"Refreshing prices for {ticker} + SPY"):
+                provider = YFinanceMarketDataProvider()
+                start = as_of - timedelta(days=400)
+                await mds.ingest_market_prices(db, [ticker, "SPY"], start, as_of, provider)
+                await db.commit()
 
     # 7) baseline recipe (ledgered)
     async with step(db, run_id, "standard_recipe", f"Computing baseline metrics for {ticker}"):
