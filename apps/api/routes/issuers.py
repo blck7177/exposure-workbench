@@ -26,7 +26,7 @@ async def _company(db: AsyncSession, ticker: str) -> Company:
     try:
         return await company_service.get_by_ticker(db, ticker.upper())
     except company_service.CompanyNotFound:
-        raise HTTPException(404, f"unknown ticker {ticker.upper()}")
+        raise HTTPException(404, {"error": "unknown_ticker", "ticker": ticker.upper()})
 
 
 # ── evidence resolver (the drill-through endpoint) ────────────────────────────────

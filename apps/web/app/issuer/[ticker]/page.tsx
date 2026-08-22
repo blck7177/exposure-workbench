@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, use, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Play, Loader2, FileText, ExternalLink } from "lucide-react";
 import {
   getSnapshot, getFinancials, getFilings, getSection, getResearchSources, getLatestBrief,
   startResearch, getResearchRun,
-  type Snapshot, type CalcRow, type FilingRow, type SourceRow, type Brief,
+  type Snapshot, type CalcRow, type FilingRow, type SourceRow, type Brief, type ResearchRun,
 } from "../../../lib/issuer";
+import { explainApiError } from "../../../lib/errors";
 import { CitationChip, EvidenceDrawer } from "../../components/Evidence";
+import { RunTimeline } from "../../components/RunTimeline";
 import { ChatPanel } from "../../components/ChatPanel";
 
 const TABS = ["Snapshot", "Financials", "Filings", "Research", "Brief"] as const;
@@ -35,33 +38,69 @@ function latestPeriod(r: CalcRow): string {
   return "";
 }
 
+// useSearchParams below bails the client tree out of prerendering up to the
+// closest Suspense boundary, and a production build with no such boundary fails
+// outright rather than degrading. The boundary is this shell, which renders the
+// page's own background so the bail-out cannot flash white.
 export default function IssuerPage({ params }: { params: Promise<{ ticker: string }> }) {
+  return (
+    <Suspense fallback={<div className="h-screen bg-[#0d1117]" />}>
+      <IssuerView params={params} />
+    </Suspense>
+  );
+}
+
+function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = use(params);
   const tk = ticker.toUpperCase();
+  // Which book the reader came from. Absent is a real answer — a hand-typed URL,
+  // an anonymous visitor, someone with no portfolio yet — and stays absent: the
+  // literal demo id this used to send made every run a signed-in user started
+  // read as the demo's, and the brief reasoned about the wrong holdings.
+  const portfolioId = useSearchParams().get("portfolio") ?? undefined;
   const [tab, setTab] = useState<Tab>("Snapshot");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [runStatus, setRunStatus] = useState<string | null>(null);
+  // The whole run, not just its status: the timeline and the failure sentence
+  // both arrive on it, and one poll already carries all three.
+  const [run, setRun] = useState<ResearchRun | null>(null);
+  const runId = run?.id ?? null;
+  const runStatus = run?.status ?? null;
 
   useEffect(() => { getSnapshot(tk).then(setSnap).catch((e) => setError(e.message)); }, [tk]);
 
   const runResearch = async () => {
+    setError(null);
     try {
-      const r = await startResearch(tk);
-      setRunId(r.id); setRunStatus(r.status);
+      setRun(await startResearch(tk, portfolioId));
     } catch (e) {
-      const m = (e as Error).message;
-      setError(m.includes("409") ? "A research run is already active for this issuer." : m);
+      setError(explainApiError(e).notice);
     }
   };
 
+  // A poll that throws used to be an unhandled rejection, and the timeline
+  // simply stopped moving on whatever step it had reached. That was survivable
+  // when the page showed a spinner; now that the steps ARE the narrative, a
+  // frozen one is worse than no narrative, because it reads as a run that hung
+  // rather than a page that lost contact.
+  //
+  // It keeps polling rather than giving up on the first failure: a worker
+  // restart or a brief 503 is a normal few seconds, and abandoning a live run
+  // over one would be the more common wrong answer. What it will not do is stay
+  // quiet — after two consecutive failures the panel says the state may be out
+  // of date, which is the honest description of what is on screen.
+  const [staleSince, setStaleSince] = useState(0);
   useEffect(() => {
     if (!runId || runStatus === "completed" || runStatus === "failed") return;
     const iv = setInterval(async () => {
-      const r = await getResearchRun(runId);
-      setRunStatus(r.status);
-      if (r.status === "completed" || r.status === "failed") clearInterval(iv);
+      try {
+        const r = await getResearchRun(runId);
+        setStaleSince(0);
+        setRun(r);
+        if (r.status === "completed" || r.status === "failed") clearInterval(iv);
+      } catch {
+        setStaleSince((n) => n + 1);
+      }
     }, 3000);
     return () => clearInterval(iv);
   }, [runId, runStatus]);
@@ -90,6 +129,31 @@ export default function IssuerPage({ params }: { params: Promise<{ ticker: strin
       </header>
 
       {error && <div className="px-4 py-2 text-xs text-red-400 bg-red-950/30 border-b border-red-900/40">{error}</div>}
+
+      {/* The panel appears as soon as a run exists and STAYS once it settles.
+          Both halves are about someone who looked away: before the first event
+          lands there is nothing to show but the fact that the run was accepted,
+          so it says that rather than rendering an empty box, which reads as a
+          click that missed; and it does not auto-hide, because a timer would
+          race the reader's attention and on a failed run this is the only place
+          the reason is written. Starting the next run replaces it. */}
+      {run && (
+        <div className="px-4 py-3 border-b border-[#21262d] shrink-0">
+          <div className="text-[10px] uppercase text-slate-500 mb-2">Research run</div>
+          <div className="max-h-48 overflow-y-auto">
+            <RunTimeline events={run.workflow_events}
+              emptyText="Queued — a worker picks this up within a few seconds." />
+          </div>
+          {run.status === "failed" && run.error_message && (
+            <div className="mt-2 text-xs text-red-300">{run.error_message}</div>
+          )}
+          {staleSince >= 2 && (
+            <div className="mt-2 text-[10px] text-amber-400/80">
+              Lost contact with the run — the steps above may be out of date. Reload to check.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="border-b border-[#21262d] flex px-4 gap-1 shrink-0">
         {TABS.map((t) => (

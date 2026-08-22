@@ -3,6 +3,7 @@
 // ensure-ready) carry the Clerk bearer token, same as lib/api.
 
 import { apiFetch as j } from "./http";
+import type { TimelineEvent } from "@/app/components/RunTimeline";
 
 // ─── types ──────────────────────────────────────────────────────────────────
 export type CompanyRow = { ticker: string; name: string; sector: string | null; is_investigable: boolean };
@@ -26,7 +27,9 @@ export type Brief = {
   citations: string[]; confidence_flags: Record<string, unknown>; created_at: string | null;
 };
 export type Evidence = { type: string; id: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
-export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; started_at: string | null; completed_at: string | null };
+// workflow_events is the run's outer timeline (V7-U1). It arrives empty from the
+// POST — the run has only just been enqueued — and fills in on the polls.
+export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; started_at: string | null; completed_at: string | null; workflow_events: TimelineEvent[] };
 export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string; prompt_tokens: number | null; completion_tokens: number | null };
 // meta carries out-of-band facts about the turn. {"gate":"exhausted"} means the
 // loop ended without the citation gate accepting an answer — a refusal, not a reply.
@@ -45,7 +48,16 @@ export const getEvidence = (id: string) => j<Evidence>(`/api/evidence/${id}`);
 
 // ─── runs / agent ─────────────────────────────────────────────────────────────
 export const ensureReady = (t: string) => j<{ task_id: string; status: string }>(`/api/companies/${t}/ensure-ready`, { method: "POST", body: JSON.stringify({ ticker: t }) });
-export const startResearch = (t: string) => j<ResearchRun>("/api/research-runs", { method: "POST", body: JSON.stringify({ ticker: t, portfolio_id: "port_001" }) });
+// portfolio_id is omitted when the caller has no portfolio in hand rather than
+// defaulted: this used to send the demo book's id literally, so every run a
+// signed-in user started from their own book was recorded against the demo and
+// the brief's portfolio_implications was written about somebody else's holdings.
+// The API has always taken it as optional.
+export const startResearch = (t: string, portfolioId?: string) =>
+  j<ResearchRun>("/api/research-runs", {
+    method: "POST",
+    body: JSON.stringify(portfolioId ? { ticker: t, portfolio_id: portfolioId } : { ticker: t }),
+  });
 export const getResearchRun = (id: string) => j<ResearchRun>(`/api/research-runs/${id}`);
 
 export const createSession = () => j<{ id: string }>("/api/agent/sessions", { method: "POST", body: "{}" });

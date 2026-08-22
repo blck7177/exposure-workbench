@@ -68,12 +68,39 @@ export function explainApiError(e: unknown): ExplainedError {
     };
   }
 
-  // The session (or whatever was addressed) does not exist for this user —
-  // most often a stale id from a previous account or a wiped database. Say it,
-  // drop the id, and let the next attempt open a fresh one: there is nothing
-  // here a person can fix by hand.
-  if (status === 404) {
+  // The chat session does not exist for this user — most often a stale id from
+  // a previous account or a wiped database. Say it, drop the id, and let the
+  // next attempt open a fresh one: there is nothing here a person can fix by
+  // hand.
+  //
+  // Keyed on the CODE and not on the 404, which is the shape this branch had
+  // when the chat panel was the only caller. The issuer page answers 404 for an
+  // unknown ticker, and under the old branch a mistyped symbol told the user
+  // their conversation had expired and then threw away an unrelated session id.
+  if (detail?.error === "unknown_session") {
     return { notice: "That conversation is no longer available — send your message again to start a new one.", dropSession: true };
+  }
+
+  // A symbol that is not in the security master at all. The user typed it, so
+  // the user can fix it — which is the whole difference between this and the
+  // generic branch at the bottom.
+  if (detail?.error === "unknown_ticker") {
+    const t = detail.ticker ? String(detail.ticker) : "that symbol";
+    return { notice: `${t} is not a symbol this desk knows. Check the spelling, or search for it from the portfolio page.` };
+  }
+
+  // Known, but deliberately out of scope for research — not a failure and not
+  // something retrying will change.
+  if (detail?.error === "not_investigable") {
+    const t = detail.ticker ? String(detail.ticker) : "That issuer";
+    return { notice: `${t} is not set up for issuer research. Equities with SEC filings are; funds and indices are not.` };
+  }
+
+  // Something addressed by id is gone, and nothing above claimed it. Neutral on
+  // purpose: this branch cannot know what the caller was asking for, so it must
+  // not name one, and it must not drop a session it knows nothing about.
+  if (status === 404) {
+    return { notice: "That is no longer available — reload the page to see the current state." };
   }
 
   if (status === 401) {

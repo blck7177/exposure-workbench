@@ -13,8 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
+from apps.api.schemas import WorkflowEventOut
 from exposure_workbench.auth.clerk import UserClaims
-from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
+from exposure_workbench.db.models import IssuerBrief, WorkflowEvent
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 
@@ -43,9 +44,9 @@ async def ensure_ready(
     try:
         await company_service.require_investigable(db, tk)
     except company_service.CompanyNotFound:
-        raise HTTPException(404, f"unknown ticker {tk}")
+        raise HTTPException(404, {"error": "unknown_ticker", "ticker": tk})
     except company_service.NotInvestigable:
-        raise HTTPException(422, f"{tk} is not investigable")
+        raise HTTPException(422, {"error": "not_investigable", "ticker": tk})
     try:
         task = await task_service.create_task(
             db, task_type="company_readiness",
@@ -76,6 +77,11 @@ class ResearchRunOut(BaseModel):
     error_message: str | None
     started_at: datetime | None
     completed_at: datetime | None
+    # V7-U1. The outer timeline of the run, so the page can say which of the
+    # minutes-long readiness steps is under way instead of spinning. Empty from
+    # POST by construction — a run that was only just enqueued has no events —
+    # and filled by the GET the page polls.
+    workflow_events: list[WorkflowEventOut] = []
 
     model_config = {"from_attributes": True}
 
@@ -90,9 +96,9 @@ async def create_research_run(
     try:
         company = await company_service.require_investigable(db, tk)
     except company_service.CompanyNotFound:
-        raise HTTPException(404, f"unknown ticker {tk}")
+        raise HTTPException(404, {"error": "unknown_ticker", "ticker": tk})
     except company_service.NotInvestigable:
-        raise HTTPException(422, f"{tk} is not investigable")
+        raise HTTPException(422, {"error": "not_investigable", "ticker": tk})
 
     # Check for an active run BEFORE enqueuing (V2-E3). create_run raises
     # ActiveRunExists after the fact, and charging quota for a request that is
@@ -133,7 +139,24 @@ async def get_research_run(run_id: str, db: AsyncSession = Depends(get_db)):
     run = await research_run_service.get_run(db, run_id)
     if run is None:
         raise HTTPException(404, "run not found")
-    return run
+    # An explicit query, not a relationship load like the exposure route's: the
+    # database has no FK on workflow_events.run_id (it is polymorphic over
+    # exposure runs, research runs and tasks — see the policy in init.sql), so
+    # ResearchRun has no navigation to load, matching the issuer-intelligence
+    # models' deliberate no-relationship rule.
+    #
+    # id breaks the tie on created_at because a step writes 'running' and then
+    # 'completed', the client keeps only the LAST row per step name, and both
+    # rows can land on the same timestamp — reversed, a finished step would sit
+    # on the page spinning forever.
+    events = (await db.execute(
+        select(WorkflowEvent)
+        .where(WorkflowEvent.run_id == run_id)
+        .order_by(WorkflowEvent.created_at, WorkflowEvent.id)
+    )).scalars().all()
+    out = ResearchRunOut.model_validate(run)
+    out.workflow_events = [WorkflowEventOut.model_validate(e) for e in events]
+    return out
 
 
 class BriefOut(BaseModel):

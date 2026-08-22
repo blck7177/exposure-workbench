@@ -117,7 +117,7 @@ async def post_message(
     """
     s = await agent_session_service.get_session(db, session_id)
     if s is None:
-        raise HTTPException(404, "unknown session")
+        raise HTTPException(404, {"error": "unknown_session"})
 
     factory = get_session_factory()
 
@@ -273,7 +273,7 @@ async def get_agent_session(
 ):
     s = await agent_session_service.get_session(db, session_id)
     if s is None:
-        raise HTTPException(404, "unknown session")
+        raise HTTPException(404, {"error": "unknown_session"})
     msgs = (await db.execute(
         select(AgentMessage).where(AgentMessage.session_id == session_id).order_by(AgentMessage.created_at)
     )).scalars().all()
