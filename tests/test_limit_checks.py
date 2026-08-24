@@ -283,3 +283,43 @@ def test_thresholds_are_read_per_limit_type_not_shared():
 
 def test_nothing_at_all_is_no_alerts():
     assert _alerts() == []
+
+
+# ── V8-P3: an alert names the check that produced it ──────────────────────────
+
+def test_a_fired_alert_names_a_check_that_actually_ran():
+    """The invariant that makes `limit_checks` truthful.
+
+    `evaluated` keys a portfolio-wide check as `daily_loss` and a per-entity one
+    as `issuer_concentration:LLY` — the entity is part of the key only when the
+    check is looked up per entity. An alert carries neither of those: its
+    `entity_id` comes from LIMIT_SPECS ("portfolio" for a book-wide check, the
+    scenario name for stress_loss), deliberately, because "entity_type and the
+    human label come from LIMIT_SPECS, never from the row that supplied the
+    numbers".
+
+    So a writer joining alerts to evaluated by rebuilding the string gets it
+    wrong in two different ways at once, and the failure is silent and
+    inverted: every check reads as "ran and did not fire" while three alerts sit
+    beside it. Reproduced exactly that way on the live book — 27 checks recorded
+    clear while LLY, MSFT and market_downside were all alerting.
+
+    The key therefore comes from the checker, derived from the same spec scope
+    that decides which getter is legal, and this is the assertion that it lines
+    up with what `looked_up` recorded.
+    """
+    alerts, evaluated = check_limits(
+        risk(), stress(("market_downside", 0.09)),
+        exposure(issuers={"LLY": 0.30}, sectors={"Healthcare": 0.30}),
+        pnl(-0.05),
+        book(THRESHOLDS),
+    )
+    assert alerts, "fixture produced no alerts; the invariant would hold vacuously"
+    keys = {a.check_key for a in alerts}
+    assert keys <= set(evaluated), (
+        f"alerts name checks that never ran: {sorted(keys - set(evaluated))}"
+    )
+    # And the two shapes really are different, so the test above is not trivial.
+    assert any(":" in k for k in keys) and any(":" not in k for k in keys), (
+        "fixture did not exercise both a per-entity and a book-wide alert"
+    )

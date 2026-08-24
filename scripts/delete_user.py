@@ -77,7 +77,12 @@ DELETION_ORDER: list[tuple[str, str]] = [
     ("workflow_events", "run_id = ANY(%(events)s)"),          # no FK; polymorphic over three id prefixes
     ("evidence_packs", "session_id = ANY(%(sessions)s) OR research_run_id = ANY(%(research_runs)s)"),
     ("daily_reports", "run_id = ANY(%(runs)s)"),              # filter the FK column, not the RLS policy's portfolio_id
+    # V8-P3 before risk_alerts: limit_checks names the alert its check produced,
+    # by id and without a foreign key, so removing the alerts first would leave
+    # rows pointing at nothing for as long as they lived.
+    ("limit_checks", "run_id = ANY(%(runs)s)"),
     ("risk_alerts", "run_id = ANY(%(runs)s)"),
+    ("stress_results", "run_id = ANY(%(runs)s)"),
     ("factor_residuals", "run_id = ANY(%(runs)s)"),
     ("factor_attributions", "run_id = ANY(%(runs)s)"),
     ("issuer_exposures", "run_id = ANY(%(runs)s)"),

@@ -82,6 +82,7 @@ from exposure_workbench.db.models import (
     ResearchSource,
     RiskAlert,
     SectorExposure,
+    StressResult as StressResultRow,
 )
 
 # ── unit classes ───────────────────────────────────────────────────────────────
@@ -458,6 +459,10 @@ _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], 
     (IssuerExposure, ("market_value", "daily_pnl"),
      ("weight", "weight_change", "daily_return", "contribution"), "ticker"),
     (SectorExposure, ("market_value",), ("weight", "weight_change"), "sector"),
+    # V8-P2. A scenario's loss, labelled by scenario so ten losses do not look
+    # alike. An unevaluated scenario holds NULLs and therefore contributes no
+    # value here — which is the correct behaviour: there is no number to quote.
+    (StressResultRow, ("loss_usd",), ("loss_pct",), "scenario"),
     (FactorAttribution, (), ("beta", "factor_return", "contribution", "r_squared"), "factor_name"),
     # A run's own alerts. Without this, `run_` alone could not support the limit
     # levels the run itself set off — measured on a live report, citing the run

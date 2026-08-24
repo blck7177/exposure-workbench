@@ -78,6 +78,14 @@ class AlertResult:
     limit_value: float
     utilization: float     # current / limit (breach_level used as denominator)
     message: str
+    # V8-P3. The key `evaluated` uses for the check this alert came out of, so a
+    # writer joining the two never has to rebuild the string. It cannot rebuild
+    # it correctly: the entity belongs in the key only when the check is looked
+    # up per entity, while `entity_id` above comes from LIMIT_SPECS and says
+    # "portfolio" for a book-wide check and the scenario name for stress_loss.
+    # Reconstructing it produced 27 checks reading "ran and did not fire" on a
+    # book that was alerting on three of them.
+    check_key: str = ""
 
 
 class LimitBook:
@@ -179,6 +187,18 @@ def evaluated_key(limit_type: str, entity_id: str | None) -> str:
     return limit_type if entity_id is None else f"{limit_type}:{entity_id}"
 
 
+def check_key_for(limit_type: str, entity_id: str) -> str:
+    """The key `evaluated` will hold for this check.
+
+    Derived from the spec's scope rather than from a list somebody maintains,
+    because the scope is already the fact that decides which getter is legal —
+    get_portfolio records (type, None), get_entity records (type, entity). Read
+    it from anywhere else and the two can disagree while both look right.
+    """
+    scope_entity = LIMIT_SPECS[limit_type].scope == "entity"
+    return evaluated_key(limit_type, entity_id if scope_entity else None)
+
+
 def _check_one(
     alert_type: str,
     entity_id: str,
@@ -222,6 +242,9 @@ def _check_one(
         limit_value=limit_value,
         utilization=utilization,
         message=msg,
+        # Set here because this is the ONE place an alert is constructed, so
+        # there is no alert that can exist without naming its check.
+        check_key=check_key_for(alert_type, entity_id),
     )
 
 

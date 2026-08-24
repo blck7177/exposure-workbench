@@ -280,6 +280,80 @@ class SectorExposure(Base):
 
 # ─── Issuer Exposures ─────────────────────────────────────────────────────────
 
+# ─── Stress results / limit checks (V8-P2, V8-P3) ─────────────────────────────
+
+class StressResult(Base):
+    """One scenario, evaluated or refused, as a row.
+
+    `calc_stress` already produced everything here; all of it went into
+    workflow_events.payload_summary, which the evidence resolver does not read
+    and which has no id prefix — so the two most load-bearing facts a stress
+    number carries could not be cited:
+
+      * `factors_held_flat` — factors the model HAS a beta for and this scenario
+        says nothing about. Zero is an assertion ("credit does not move in an
+        equity crash"), not an absence of one. On the live book market_downside
+        holds HYG flat while HYG carries the second-largest beta the book has.
+      * the refusals — a scenario is evaluated only when EVERY factor it shocks
+        has a beta, because dropping the unknown legs understates the loss, and
+        understating a stress loss is the one direction that matters.
+
+    The CHECK is what stops that refusal being undone at the last step: an
+    unevaluated scenario stored with loss 0.0 reads as "this book is safe in a
+    rates shock", which is exactly the sentence calc_stress refuses to produce.
+    """
+
+    __tablename__ = "stress_results"
+    __table_args__ = (
+        UniqueConstraint("run_id", "scenario"),
+        CheckConstraint("status IN ('evaluated', 'unevaluated')", name="ck_stress_status"),
+        CheckConstraint(
+            "(status = 'evaluated' AND loss_pct IS NOT NULL AND reason IS NULL) OR "
+            "(status = 'unevaluated' AND loss_pct IS NULL AND loss_usd IS NULL "
+            " AND reason IS NOT NULL)",
+            name="ck_stress_unevaluated_has_no_loss",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    scenario: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    # The shocks that were APPLIED, carried from the computation rather than
+    # re-read from config at write time — V8-P1's lesson about the regression
+    # window, in its second instance.
+    shocks: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    loss_pct: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    loss_usd: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    factors_held_flat: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LimitCheck(Base):
+    """One limit that RAN, and whether it fired.
+
+    `check_limits` has always returned `(alerts, evaluated)`. The alerts became
+    rows; the evaluated list became nothing. So "three limits breached" was
+    supportable and "and the other five were checked and clear" was not — the
+    reassuring half of the answer was the unciteable half, which is the wrong
+    half to lose.
+    """
+
+    __tablename__ = "limit_checks"
+    __table_args__ = (UniqueConstraint("run_id", "limit_type"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
+    limit_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Not nullable: a check either fired or it did not, and a third state would
+    # be the ambiguity this table exists to remove.
+    fired: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    alert_id: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class IssuerExposure(Base):
     __tablename__ = "issuer_exposures"
     __table_args__ = (UniqueConstraint("run_id", "ticker"),)

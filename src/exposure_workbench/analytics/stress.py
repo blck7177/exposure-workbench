@@ -46,6 +46,12 @@ class ScenarioResult:
     # book, market_downside leaves HYG flat while the book's beta to HYG is the
     # second largest it has.
     factors_held_flat: list[str] = field(default_factory=list)
+    # The shocks that were APPLIED. Carried rather than looked up again by
+    # whoever persists this: a config reloaded between compute and write, or a
+    # lookup keyed on the wrong scenario, records shocks that were never applied
+    # — and the row would look perfectly well-formed. Same lesson as the
+    # regression window in V8-P1.
+    shocks: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -114,6 +120,7 @@ def calc_stress(
             estimated_loss_pct=estimated_loss_pct,
             estimated_loss_usd=estimated_loss_pct * portfolio_market_value,
             factors_held_flat=sorted(set(betas) - set(shocks)),
+            shocks=dict(shocks),
         ))
 
     # Sort by loss descending (worst first)

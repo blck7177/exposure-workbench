@@ -26,6 +26,11 @@ TENANT_TABLES = {
     "exposure_metrics", "sector_exposures", "issuer_exposures",
     "factor_attributions", "factor_residuals", "risk_alerts", "workflow_events",
     "agent_messages", "agent_steps", "evidence_packs",
+    # V8-P2/P3. Children of a run, so they carry whatever the run's portfolio
+    # carries — the same reasoning as issuer_exposures beside them, and the same
+    # policy. A run child left out of RLS is one tenant's stress losses readable
+    # by every other.
+    "stress_results", "limit_checks",
 }
 
 # Shared on purpose. Each is a considered decision, not an omission:

@@ -24,7 +24,11 @@ from exposure_workbench.analytics.stress import calc_stress, StressResult
 from exposure_workbench.analytics.limits import AlertResult, LimitBook, check_limits
 from exposure_workbench.db.models import (
     ExposureMetrics, SectorExposure, IssuerExposure,
-    FactorAttribution, RiskAlert, DailyReport,
+    FactorAttribution, RiskAlert, DailyReport, LimitCheck,
+    # Aliased: this module already has a `StressResult` — the analytics
+    # dataclass the workflow computes with. Two names for two different things
+    # is how one of them silently becomes the other.
+    StressResult as StressResultRow,
 )
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
@@ -345,7 +349,7 @@ class ExposureWorkflow:
             try:
                 await self._persist_outputs(
                     db, run_id, portfolio_id, as_of_date,
-                    exposure, pnl, factor_result, risk, stress, alerts,
+                    exposure, pnl, factor_result, risk, stress, alerts, evaluated,
                     prev_sector_weights,
                 )
                 await db.commit()
@@ -722,6 +726,7 @@ class ExposureWorkflow:
         risk: RiskResult,
         stress: StressResult,
         alerts: list[AlertResult],
+        evaluated: list[str],
         prev_sector_weights: dict[str, float],
     ) -> None:
         # ExposureMetrics (one row per run)
@@ -808,10 +813,19 @@ class ExposureWorkflow:
                 r_squared=fr.r_squared,
             ))
 
-        # RiskAlert rows
+        # RiskAlert rows. The id is kept rather than discarded so the limit
+        # check below can name the alert it produced — otherwise "this check
+        # fired" and "here is what it said" are two facts with nothing joining
+        # them.
+        # Keyed by CHECK, not by alert_type: one alert_type covers many checks
+        # (issuer_concentration runs once per holding), so keying by type would
+        # attach the first LLY alert to every issuer check that fired.
+        alert_ids: dict[str, str] = {}
         for alert in alerts:
+            aid = new_alert_id()
+            alert_ids[alert.check_key] = aid
             db.add(RiskAlert(
-                id=new_alert_id(),   # alert_<hex> — must match the evidence prefix (alert_)
+                id=aid,   # alert_<hex> — must match the evidence prefix (alert_)
                 run_id=run_id,
                 alert_type=alert.alert_type,
                 severity=alert.severity,
@@ -821,6 +835,53 @@ class ExposureWorkflow:
                 limit_value=alert.limit_value,
                 utilization=alert.utilization,
                 message=alert.message,
+            ))
+
+        # StressResult rows (V8-P2). Every scenario the step considered, in both
+        # outcomes — the refusals included, and carrying WHY. An unevaluated
+        # scenario cannot hold a loss here (CHECK constraint), because storing
+        # it as 0.0 would turn calc_stress's refusal back into "this book is
+        # safe in a rates shock" at the last possible step.
+        for sc in stress.scenarios:
+            db.add(StressResultRow(
+                run_id=run_id,
+                scenario=sc.name,
+                description=sc.description,
+                shocks=dict(sc.shocks),
+                loss_pct=sc.estimated_loss_pct,
+                loss_usd=sc.estimated_loss_usd,
+                factors_held_flat=list(sc.factors_held_flat),
+                status="evaluated",
+                reason=None,
+            ))
+        for un in stress.unevaluated:
+            db.add(StressResultRow(
+                run_id=run_id,
+                scenario=un.name,
+                description=None,
+                shocks={},
+                loss_pct=None,
+                loss_usd=None,
+                factors_held_flat=[],
+                status="unevaluated",
+                reason=un.reason,
+            ))
+
+        # LimitCheck rows (V8-P3). The affirmative negative: every check that
+        # RAN, and whether it fired. check_limits has always returned this list
+        # and nothing has ever stored it, so "the other five were checked and
+        # clear" was the half of the answer that could not be supported.
+        # Joined on the key the CHECKER produced (AlertResult.check_key), never
+        # on one rebuilt here: the entity belongs in the key only for per-entity
+        # checks, while an alert's entity_id comes from LIMIT_SPECS and reads
+        # "portfolio" for a book-wide one. Rebuilding it recorded 27 checks as
+        # clear on a book that was alerting on three of them.
+        for limit_type in evaluated:
+            db.add(LimitCheck(
+                run_id=run_id,
+                limit_type=limit_type,
+                fired=limit_type in alert_ids,
+                alert_id=alert_ids.get(limit_type),
             ))
 
         await db.flush()
