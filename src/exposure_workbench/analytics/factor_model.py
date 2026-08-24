@@ -48,7 +48,20 @@ class FactorAttributionResult:
     residual: float = 0.0          # portfolio_return - alpha - total_explained
     r_squared: float = 0.0         # the one model's R²
     alpha: float = 0.0             # intercept: average daily return the factors miss
+    # V8-P1. The return this attribution explains, carried because it is NOT
+    # pnl.daily_return and the difference is structural, not rounding. This one
+    # revalues the book at total-return prices on both days; pnl applies the
+    # adjusted return to yesterday's as-traded market value. Both are correct
+    # for their purpose and they differ by however much dividend history the
+    # holdings carry (measured 2.4e-6 on the demo book, all of it MSFT).
+    # `residual` closes against THIS number and against no other.
+    portfolio_return: float = 0.0
     observations: int = 0
+    # V8-P1. The window the fit actually used, carried rather than looked up
+    # again by whoever persists this: `lookback` is an argument, and an argument
+    # is not a record. A writer reading it back out of config can record a
+    # window the regression never ran over, and nothing would disagree.
+    window_days: int = 0
     as_of: date | None = None      # the day the 1-day attribution describes
     max_vif: float | None = None
     collinear: bool = False
@@ -167,6 +180,8 @@ def calc_factor_attribution(
         # explain on average, so putting it in the explained pile would be the
         # old double-count in a different disguise.
         residual=latest_port_return - alpha - total_explained,
+        portfolio_return=latest_port_return,
+        window_days=lookback,
         r_squared=max(0.0, min(1.0, r_squared)),
         alpha=alpha,
         observations=len(combined),

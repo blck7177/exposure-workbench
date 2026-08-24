@@ -445,9 +445,15 @@ _CALC_RATIO_OPS = frozenset({
 _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], ...] = (
     (ExposureMetrics,
      ("portfolio_market_value", "daily_pnl", "gross_exposure", "net_exposure"),
+     # V8-P1 adds the regression's own numbers to the ratio group. None of them
+     # is an amount of money, and a bare figure is written as COUNT, which
+     # _COMPATIBLE lets meet a stored RATIO — so "58 observations" verifies
+     # while "58%" correctly does not.
      ("daily_return", "gross_exposure_pct", "net_exposure_pct", "rolling_vol_30d",
       "rolling_vol_60d", "var_95_1d", "expected_shortfall_95", "max_drawdown",
-      "stress_loss_tech", "stress_loss_rates", "stress_loss_credit", "stress_loss_market"),
+      "stress_loss_tech", "stress_loss_rates", "stress_loss_credit", "stress_loss_market",
+      "attribution_portfolio_return", "alpha", "residual", "model_r_squared", "observations",
+      "regression_window_days", "max_vif"),
      None),
     (IssuerExposure, ("market_value", "daily_pnl"),
      ("weight", "weight_change", "daily_return", "contribution"), "ticker"),

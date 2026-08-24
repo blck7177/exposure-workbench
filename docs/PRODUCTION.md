@@ -265,6 +265,13 @@ docker compose build
 # either: the value is derivable from stored columns only when every holding
 # priced on both days, so a computed backfill would write a silently wrong number
 # into an old run. NULL reads as "this run did not record it".
+#
+# v8_skill_reads.sql adds the regression's own record (alpha, residual, model R²,
+# observations, window, VIF, collinearity, attribution date) to exposure_metrics
+# and does not backfill either, for the third time and the same reason: a run
+# that never recorded the window it was fitted over does not acquire one by
+# being asked later. The next run fills them; until then the read tools report
+# the absence rather than a guess.
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
@@ -276,6 +283,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v5_price_convention.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v6_report_gate.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v8_skill_reads.sql
 
 docker compose up -d
 

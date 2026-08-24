@@ -232,6 +232,30 @@ class ExposureMetrics(Base):
     stress_loss_rates: Mapped[float | None] = mapped_column(Numeric(12, 8))
     stress_loss_credit: Mapped[float | None] = mapped_column(Numeric(12, 8))
     stress_loss_market: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    # V8-P1: what the regression behind the betas actually was. Computed by
+    # factor_model on every run and, until now, written only to
+    # workflow_events.payload — which the evidence resolver does not read, so
+    # the numbers that say how much of the day the factors explain could not be
+    # stated by the agent at all. `residual` was worse: computed and persisted
+    # nowhere, so "how much of this move do you not explain" survived one
+    # function call. Columns here rather than a new table because this row is
+    # already the run's one-per-run scalar record (UNIQUE(run_id)).
+    # NOT daily_return: this one revalues the book at total-return prices, which
+    # is what the betas were fitted against. `residual` closes against it, and
+    # the gap to daily_return is a valuation convention with a name rather than
+    # an unexplained remainder.
+    attribution_portfolio_return: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    alpha: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    residual: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    model_r_squared: Mapped[float | None] = mapped_column(Numeric(12, 8))
+    observations: Mapped[int | None] = mapped_column(Integer)
+    regression_window_days: Mapped[int | None] = mapped_column(Integer)
+    max_vif: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    # The caveat that belongs beside every individual beta on the page: SPY/QQQ/
+    # IWM are ~0.9 correlated, so the fit is well determined as a whole and each
+    # coefficient is not.
+    collinear: Mapped[bool | None] = mapped_column(Boolean)
+    attribution_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     run: Mapped["ExposureRun"] = relationship(back_populates="metrics")

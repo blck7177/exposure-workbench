@@ -201,6 +201,17 @@ CREATE TABLE IF NOT EXISTS exposure_metrics (
     stress_loss_rates       NUMERIC(12, 8),
     stress_loss_credit      NUMERIC(12, 8),
     stress_loss_market      NUMERIC(12, 8),
+    -- V8-P1: the regression behind the betas, as columns rather than as a line
+    -- in workflow_events.payload (which the evidence resolver cannot read).
+    attribution_portfolio_return NUMERIC(12, 8),
+    alpha                   NUMERIC(12, 8),
+    residual                NUMERIC(12, 8),
+    model_r_squared         NUMERIC(12, 8),
+    observations            INTEGER,
+    regression_window_days  INTEGER,
+    max_vif                 NUMERIC(12, 6),
+    collinear               BOOLEAN,
+    attribution_date        DATE,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (run_id)
 );

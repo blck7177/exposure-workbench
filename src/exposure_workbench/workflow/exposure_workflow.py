@@ -751,6 +751,19 @@ class ExposureWorkflow:
             stress_loss_credit=next(
                 (s.estimated_loss_pct for s in stress.scenarios if s.name == "credit_spread_widening"), None
             ),
+            # V8-P1. The same eight numbers the step already logs to its event
+            # payload — but as columns, where the evidence resolver can reach
+            # them. Read off `factor_result` and from nowhere else, so what is
+            # recorded is what was fitted.
+            attribution_portfolio_return=factor_result.portfolio_return,
+            alpha=factor_result.alpha,
+            residual=factor_result.residual,
+            model_r_squared=factor_result.r_squared,
+            observations=factor_result.observations,
+            regression_window_days=factor_result.window_days,
+            max_vif=factor_result.max_vif,
+            collinear=factor_result.collinear,
+            attribution_date=factor_result.as_of,
             stress_loss_market=next(
                 (s.estimated_loss_pct for s in stress.scenarios if s.name == "market_downside"), None
             ),
