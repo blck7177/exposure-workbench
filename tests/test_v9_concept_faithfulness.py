@@ -118,3 +118,71 @@ def test_the_unsplit_multi_concept_metrics_are_named_and_few():
                      "operating_cash_flow", "capex"}, (
         f"a metric grew or lost a second concept without a decision: {sorted(multi)}"
     )
+
+
+# ── V9-M1b: the credit metrics the corpus was already carrying ────────────────
+
+@pytest.mark.parametrize("metric, concept, cos", [
+    # flows
+    ("interest_expense", "InterestExpense", 8),
+    ("income_tax_expense", "IncomeTaxExpenseBenefit", 8),
+    ("depreciation_amortization", "DepreciationDepletionAndAmortization", 5),
+    ("depreciation", "Depreciation", 6),
+    ("amortization_of_intangibles", "AmortizationOfIntangibleAssets", 6),
+    ("interest_paid", "InterestPaidNet", 5),
+    # balances
+    ("total_assets", "Assets", 8),
+    ("total_liabilities", "Liabilities", 6),
+    ("stockholders_equity", "StockholdersEquity", 8),
+    ("stockholders_equity_including_noncontrolling",
+     "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", 2),
+    ("noncontrolling_interest", "MinorityInterest", 2),
+    ("accounts_receivable", "AccountsReceivableNetCurrent", 7),
+    ("inventory", "InventoryNet", 6),
+    ("accounts_payable", "AccountsPayableCurrent", 6),
+    ("commercial_paper", "CommercialPaper", 6),
+    ("operating_lease_liability_total", "OperatingLeaseLiability", 8),
+    ("operating_lease_liability_current", "OperatingLeaseLiabilityCurrent", 6),
+    ("operating_lease_liability_noncurrent", "OperatingLeaseLiabilityNoncurrent", 7),
+])
+def test_the_credit_metrics_map(metric, concept, cos):
+    """`cos` is the measured issuer coverage in this corpus on 2026-08-24, kept
+    in the parameter list so the number a decision was made on stays next to
+    the decision."""
+    assert cm.normalize_concept(f"us-gaap:{concept}") == metric
+    assert len(cm._METRIC_CONCEPTS[metric]) == 1
+
+
+def test_ebit_has_every_input_it_needs():
+    """SEC C&DI 103.01: EBIT and EBITDA start from NET INCOME, not operating
+    income — "measures that are calculated differently ... should not be
+    characterized as EBIT or EBITDA". All three inputs are mapped and all three
+    are 8/8 in this corpus, so EBIT is computable for every issuer held.
+    EBITDA adds D&A, which is 5/8, and that is what bounds it.
+    See docs/spikes/V9_FORMULA_BASIS.md §1."""
+    for m in ("net_income", "interest_expense", "income_tax_expense"):
+        assert m in cm.SUPPORTED_METRICS
+    assert "depreciation_amortization" in cm.SUPPORTED_METRICS
+
+
+@pytest.mark.parametrize("wrong_concept, why", [
+    ("InterestIncomeExpenseNet",
+     "a bank's net interest income is revenue, not an interest expense"),
+    ("InterestExpenseNonoperating",
+     "a component of interest expense, not a synonym for it"),
+    ("AccumulatedDepreciationDepletionAndAmortizationPropertyPlantAndEquipment",
+     "an accumulated balance, not the period's charge"),
+    ("FiniteLivedIntangibleAssetsAmortizationExpenseNextTwelveMonths",
+     "a forward-looking disclosure, not an incurred expense"),
+    ("FiniteLivedIntangibleAssetsAccumulatedAmortization",
+     "an accumulated balance again"),
+    ("DepreciationAndAmortization",
+     "NVDA reports it alongside DepreciationDepletionAndAmortization, so mapping "
+     "both to one metric would give one issuer two values for one period"),
+])
+def test_the_lookalikes_stay_unmapped(wrong_concept, why):
+    """Four different things in this corpus contain the word Depreciation or
+    Amortization and only one of them is the period's D&A charge. Coverage is
+    the temptation — mapping the accumulated balance would take D&A from 5/8 to
+    8/8 and every number after it would be wrong by an order of magnitude."""
+    assert cm.normalize_concept(f"us-gaap:{wrong_concept}") is None, why

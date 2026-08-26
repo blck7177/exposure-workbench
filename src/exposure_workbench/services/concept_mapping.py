@@ -143,6 +143,102 @@ _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
     "short_term_borrowings": (
         "ShortTermBorrowings",
     ),
+    # ── V9-M1b: the credit lines the corpus was already carrying ──────────────
+    # Every one of these was stored with normalized_metric NULL since ingest —
+    # mapping status never decided storage — so adding them is a backfill, not a
+    # re-ingest. Issuer coverage measured on 2026-08-24 (8 issuers, consolidated
+    # facts) is quoted per line: it is why each concept was chosen and, for the
+    # ones that fall short, what bounds the metrics built on them.
+
+    # Accrual interest expense. NOT InterestIncomeExpenseNet (a bank's net
+    # interest income is revenue, not an expense — mapping it would show 8/8
+    # coverage over two different economics) and NOT InterestExpenseNonoperating
+    # (a component). 8/8.
+    "interest_expense": (
+        "InterestExpense",
+    ),
+    # Cash interest actually paid, which is not the accrued charge. 5/8.
+    "interest_paid": (
+        "InterestPaidNet",
+    ),
+    # 8/8. With net_income and interest_expense this completes EBIT for every
+    # issuer held — SEC C&DI 103.01 puts net income at the start of EBIT and
+    # EBITDA, so the corpus supports the correctly-named measure rather than an
+    # operating-income lookalike.
+    "income_tax_expense": (
+        "IncomeTaxExpenseBenefit",
+    ),
+    # The period's D&A charge. 5/8 — GOOGL, JPM and MSFT do not report it, and
+    # that is what bounds EBITDA. Four other concepts in this corpus contain
+    # "Depreciation" or "Amortization" and none of them is this: two are
+    # ACCUMULATED balances, one is a five-year forward disclosure, and
+    # DepreciationAndAmortization is filed by NVDA alongside this one. Mapping
+    # any of them would raise coverage and destroy the number.
+    "depreciation_amortization": (
+        "DepreciationDepletionAndAmortization",
+    ),
+    # Depreciation alone (6/8) and intangible amortization alone (6/8). They are
+    # NOT summed into D&A here: their sum is not guaranteed to be the issuer's
+    # reported D&A, and a number carrying that name has to be that number. They
+    # are mapped so an absence can say what the issuer does report instead.
+    "depreciation": (
+        "Depreciation",
+    ),
+    "amortization_of_intangibles": (
+        "AmortizationOfIntangibleAssets",
+    ),
+
+    # Balance sheet. 8/8, 6/8, 8/8.
+    "total_assets": (
+        "Assets",
+    ),
+    "total_liabilities": (
+        "Liabilities",
+    ),
+    # Attributable to the parent. The including-NCI version is a different
+    # quantity and gets its own name, for the same reason NetIncomeLoss and
+    # ProfitLoss do (V9-M1). 8/8 and 2/8.
+    "stockholders_equity": (
+        "StockholdersEquity",
+    ),
+    "stockholders_equity_including_noncontrolling": (
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+    ),
+    "noncontrolling_interest": (
+        "MinorityInterest",
+    ),
+
+    # Working capital. 7/8, 6/8, 6/8.
+    "accounts_receivable": (
+        "AccountsReceivableNetCurrent",
+    ),
+    "inventory": (
+        "InventoryNet",
+    ),
+    "accounts_payable": (
+        "AccountsPayableCurrent",
+    ),
+
+    # Commercial paper (6/8) — short-dated debt outside the term structure, and
+    # a component of debt_current_total rather than a synonym for it.
+    "commercial_paper": (
+        "CommercialPaper",
+    ),
+
+    # Operating lease liabilities nest exactly as term debt does: measured on
+    # MSFT at 2026-03-31, the total is 22.238bn against 16.703bn noncurrent. So
+    # three names, and a caller that wants the total asks for the total. 8/8,
+    # 6/8, 7/8.
+    "operating_lease_liability_total": (
+        "OperatingLeaseLiability",
+    ),
+    "operating_lease_liability_current": (
+        "OperatingLeaseLiabilityCurrent",
+    ),
+    "operating_lease_liability_noncurrent": (
+        "OperatingLeaseLiabilityNoncurrent",
+    ),
+
     "current_assets": (
         "AssetsCurrent",
     ),
