@@ -1,6 +1,6 @@
 # Implementation Plan V8 — Skill 层第一批:产物读 + 方法工具 + 轨迹判据
 
-> **状态(2026-08-23)**:计划定稿,待执行。
+> **状态(2026-08-24 更新)**:**V8-P(P1–P4 中的 P1/P2/P3)已完成并部署**(`b4064e6`、`96ac20f`)。**A–D 暂停**:boss 拍板优先上线报表类 credit/fundamental 分析(见 `IMPLEMENTATION_PLAN_V9.md`),量化产物读与归因让位。P 批的持久化保留,V9 不依赖它。P4(COUNT 扩展)随 A 批一起暂停。
 > **性质**:把确定性层已算好的分析产物接到 agent 面上(产物读),把"解释涨跌"的方法冻结成一次调用(方法工具),并给 respond 门加上轨迹判据。**不动架构、不动 web、不加新 LLM 路径。**
 > **一句话**:门早就认识的数字(`_RUN_CHILDREN` 里的因子 beta/贡献、逐持仓贡献),agent 终于读得到;15 步爆预算的问题变成 3 步;事故那类回答从"被劝阻"变成"被机械拒绝"。
 > **上游依据**:`dev_note/portfolio-demo/analyst-skills/` 01–11(尤其 07 目录、08 批评 F1–F11、09 结论、11 组合语法)。事故复盘见 `IMPLEMENTATION_PLAN_V7.md` §11(V7-Q2)。
