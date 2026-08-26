@@ -96,9 +96,16 @@ async def run_standard_recipe(
         "current_ratio",
         cs.combine(db, bal("current_assets"), bal("current_liabilities"), "divide", invoked_by=invoked_by),
     )
-    out["cash_to_long_term_debt"] = await _try(
-        "cash_to_long_term_debt",
-        cs.combine(db, bal("cash_and_equivalents"), bal("long_term_debt"), "divide", invoked_by=invoked_by),
+    # V9-M1 renamed the denominator. `long_term_debt` accepted both LongTermDebt
+    # (current maturities included) and LongTermDebtNoncurrent (excluded) and
+    # served whichever was filed last, so this ratio silently changed base
+    # between issuers and between quarters. It now names the noncurrent balance,
+    # which is what "long-term debt" means on a balance sheet, and the key says
+    # so — a reader of this number can no longer be wrong about which it is.
+    out["cash_to_long_term_debt_noncurrent"] = await _try(
+        "cash_to_long_term_debt_noncurrent",
+        cs.combine(db, bal("cash_and_equivalents"), bal("long_term_debt_noncurrent"),
+                   "divide", invoked_by=invoked_by),
     )
 
     # 6) market returns, absolute and benchmark-relative

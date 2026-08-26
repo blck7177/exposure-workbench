@@ -9,9 +9,20 @@ from exposure_workbench.services import concept_mapping as cm
 from exposure_workbench.services import filing_ingestion_service as fis
 
 
-def test_many_concepts_map_to_one_metric():
-    assert cm.normalize_concept("us-gaap:Revenues") == "revenue"
+def test_many_concepts_map_to_one_metric_only_when_they_are_one_quantity():
+    """The rule this test used to state was "many concepts map to one metric",
+    with `Revenues` and `RevenueFromContractWithCustomerExcludingAssessedTax` as
+    the example. V9-M1 found that example to be the counter-example: `Revenues`
+    is the whole top line and contract revenue is a subset of it, measured 5.2%
+    apart on XOM, and mapping both to `revenue` let period_ladder serve
+    whichever was filed last.
+
+    The rule survives with its condition made explicit. SalesRevenueNet is the
+    pre-ASC-606 tag for the same quantity as the 606 one, so those two really
+    are one metric; `Revenues` is its own."""
     assert cm.normalize_concept("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax") == "revenue"
+    assert cm.normalize_concept("us-gaap:SalesRevenueNet") == "revenue"
+    assert cm.normalize_concept("us-gaap:Revenues") == "total_revenues"
 
 
 def test_unmapped_and_foreign_taxonomy_return_none():

@@ -32,7 +32,14 @@ async def test_every_calc_writes_a_traceable_ledger_row():
     engine, mk = await _session()
     try:
         async with mk() as db:
-            spec = cs.SeriesSpec("NVDA", "revenue", period_type="quarterly", last_n=8)
+            # `total_revenues`, not `revenue`: NVDA changed its tagging in 2022
+            # from RevenueFromContractWithCustomerExcludingAssessedTax to
+            # Revenues, and V9-M1 stopped treating those as one metric because
+            # they are not (the top line may carry non-contract income — 5.2%
+            # apart on XOM). NVDA's contract-revenue series is genuinely three
+            # periods long; its top line is forty-three. These tests are about
+            # the ledger, so they take the series that exists.
+            spec = cs.SeriesSpec("NVDA", "total_revenues", period_type="quarterly", last_n=8)
             out = await cs.change(db, spec, "yoy", invoked_by="test")
             await db.commit()
             assert out["calc_id"].startswith("calc_")
@@ -54,7 +61,8 @@ async def test_margin_number_is_reproducible_from_the_same_facts():
     try:
         async with mk() as db:
             gp = cs.SeriesSpec("NVDA", "gross_profit", period_type="quarterly", last_n=8)
-            rev = cs.SeriesSpec("NVDA", "revenue", period_type="quarterly", last_n=8)
+            # See the note in the test above on why this is total_revenues.
+            rev = cs.SeriesSpec("NVDA", "total_revenues", period_type="quarterly", last_n=8)
             out = await cs.combine(db, gp, rev, "divide", invoked_by="test")
             await db.commit()
 
