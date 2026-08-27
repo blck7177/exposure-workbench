@@ -15,6 +15,7 @@ panel has grown logic of its own.
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
@@ -134,17 +135,54 @@ async def test_a_bank_is_refused_before_any_number_is_produced():
 
 
 async def test_every_line_carries_its_definition_and_its_source():
+    """The panel carries what varies per issuer; the source travels with the formula.
+
+    V11-T moved `note` and `source_url` off the panel lines: identical bytes for
+    every issuer on every call, 2.0kB of an 8.2kB payload, and the overflow cost
+    the model four whole lines silently. The guarantee is unchanged, so this
+    checks it where it now lives — a source url for every line the panel names,
+    from evaluate_formula.
+    """
     engine, mk = await _mk()
     try:
         async with mk() as db:
             panel = await svc.build_panel(db, "AAPL")
+            sources = {name: await svc.evaluate_formula(db, "AAPL", name)
+                       for name in panel["lines"]}
             await db.commit()
     finally:
         await engine.dispose()
     assert panel["judgement"].startswith("none")
+    assert "evaluate_formula" in panel["per_formula_sources"]
     for name, line in panel["lines"].items():
         assert line.get("definition"), f"{name} has no definition"
+        assert "note" not in line and "source_url" not in line, f"{name} still ships registry prose"
+        assert sources[name]["source_url"].startswith("http"), f"{name} has no source"
         if not line.get("error"):
             assert line["basis"], f"{name} states no period basis"
-            assert line["source_url"].startswith("http")
             assert line["calc_id"].startswith(("calc_", "fact_"))
+
+
+async def test_the_panel_fits_the_context_cap_for_every_issuer():
+    """No issuer's panel may need truncating.
+
+    The cap is real and dropping entries is honest, but a payload that overflows
+    on every call is a design fault, not an accident to be reported: NVDA's panel
+    was 8235 bytes against a 6000-byte cap and lost net_debt every time.
+    """
+    from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
+    from exposure_workbench.utils.json import dumps_capped
+
+    engine, mk = await _mk()
+    try:
+        async with mk() as db:
+            panels = {t: await svc.build_panel(db, t)
+                      for t in ("NVDA", "MSFT", "AAPL", "AMZN", "GOOGL", "LLY", "XOM")}
+            await db.commit()
+    finally:
+        await engine.dispose()
+    for ticker, panel in panels.items():
+        capped = dumps_capped(panel, TOOL_RESULT_LIMIT)
+        assert "truncated" not in json.loads(capped), (
+            f"{ticker}'s panel needs truncating at {TOOL_RESULT_LIMIT}: "
+            f"{len(json.dumps(panel, default=str))} bytes")

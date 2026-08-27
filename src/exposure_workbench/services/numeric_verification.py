@@ -572,8 +572,12 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
     # margin series — the op says nothing about what it was taken over — and
     # the recorded type can.
     recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
-    if recorded in ("money", "ratio"):
-        unit = RATIO if recorded == "ratio" else MONEY
+    if recorded in ("money", "ratio", "count"):
+        # V11-T. "count" arrives from calc.scalar.scale, the only producer of a
+        # quantity whose unit a constant decided: days_inventory is a ratio until
+        # it is multiplied by 365. Typed MONEY by the fallthrough below, the days
+        # figures the panel prints could be quoted by nothing.
+        unit = {"ratio": RATIO, "money": MONEY, "count": COUNT}[recorded]
     else:
         unit = RATIO if row.operation in _CALC_RATIO_OPS else MONEY
     result = row.result or {}

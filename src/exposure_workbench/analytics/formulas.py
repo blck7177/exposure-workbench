@@ -40,7 +40,7 @@ class Formula:
     source_url: str
     source_quote: str = ""
     note: str = ""
-    unit_class: str = "money"            # money | ratio
+    unit_class: str = "money"            # money | ratio | count
     signs: tuple[int, ...] = field(default_factory=tuple)   # for `difference`
     # Other metrics that answer the same question when the primary is not
     # reported. NOT a silent fallback: whichever is used is named in the
@@ -166,20 +166,20 @@ FORMULAS: dict[str, Formula] = {
         expression="accounts receivable ÷ revenue × 365",
         inputs=("accounts_receivable", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="count", source_url=SEC_NON_GAAP,
         note=("Ending balance, not an average: an average needs two dates and doubles the "
               "surface a missing quarter can remove. Stated in the result."),
     ),
     "days_inventory": Formula(
         expression="inventory ÷ cost of revenue × 365",
         inputs=("inventory", "cost_of_revenue"), op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="count", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
     "days_payable": Formula(
         expression="accounts payable ÷ cost of revenue × 365",
         inputs=("accounts_payable", "cost_of_revenue"), op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="count", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
 }

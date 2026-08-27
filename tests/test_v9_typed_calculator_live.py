@@ -31,7 +31,7 @@ import os
 
 import pytest
 from dotenv import load_dotenv
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 load_dotenv(".env", override=True)
@@ -227,3 +227,46 @@ async def test_a_calc_from_before_types_existed_is_refused_not_assumed():
         await engine.dispose()
 
     assert got["error"] == "untyped_operand"
+
+
+# ── V11-T: a constant with a unit ─────────────────────────────────────────────
+
+async def test_scale_records_the_multiplication_the_panel_used_to_do_in_python():
+    """days_inventory prints 143.67; the ledger has to hold 143.67, not 0.3936.
+
+    Until V11 the x365 happened in the caller and no row recorded it, so the
+    panel published a figure its own calc_id could not support and the gate
+    refused it — measured three times in the agent battery.
+    """
+    engine, mk = await _mk()
+    try:
+        async with mk() as db:
+            total, current, _cp = await _aapl_debt_ids(db)
+            ratio = await tc.calculate(db, "divide", current, total)
+            scaled = await tc.scale(db, ratio["calc_id"], 365.0,
+                                    unit_class=tc.COUNT, quantity="days_inventory")
+            await db.commit()
+            row = (await db.execute(
+                select(CalcLedger).where(CalcLedger.id == scaled["calc_id"])
+            )).scalar_one()
+    finally:
+        await engine.dispose()
+
+    assert scaled["value"] == ratio["value"] * 365.0
+    assert row.operation == "calc.scalar.scale"
+    assert row.params["factor"] == 365.0
+    assert row.input_refs == [ratio["calc_id"]]
+    assert row.params["result_type"]["unit_class"] == "count"
+    # The scaled row keeps the ratio's basis: multiplying by a constant does not
+    # move a quantity in time.
+    assert row.params["result_type"]["basis"] == ratio["type"]["basis"]
+
+
+async def test_scale_refuses_an_id_it_cannot_type():
+    engine, mk = await _mk()
+    try:
+        async with mk() as db:
+            got = await tc.scale(db, "calc_does_not_exist", 365.0, unit_class=tc.COUNT)
+    finally:
+        await engine.dispose()
+    assert got.get("error")

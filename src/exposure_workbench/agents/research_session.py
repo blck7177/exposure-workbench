@@ -21,6 +21,7 @@ from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.tools import faces
+from exposure_workbench.utils import json as ejson
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ async def run_research_session(
                 result = await tools_session.call(name, args)
                 messages.append({
                     "role": "tool", "tool_call_id": tc["id"],
-                    "content": json.dumps(result, default=str)[:8000],
+                    "content": ejson.dumps_capped(result, 8000),
                 })
                 if name == "submit_brief" and result.get("accepted"):
                     brief_id = result["brief_id"]

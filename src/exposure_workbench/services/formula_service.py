@@ -205,7 +205,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             return {"error": "input_unavailable", "formula": name,
                     "missing": deepest or i,
                     "detail": got.get("detail") or got.get("error"),
-                    "definition": f.expression}
+                    "definition": f.expression,
+                    "source_url": f.source_url}
         operands.append(got)
 
     if f.op == "sum":
@@ -214,7 +215,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             step = await tc.calculate(db, "add", acc["id"], nxt["id"], invoked_by=invoked_by)
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
-                        "detail": step["detail"], "definition": f.expression}
+                        "detail": step["detail"], "definition": f.expression,
+                    "source_url": f.source_url}
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     elif f.op == "difference":
         acc = operands[0]
@@ -223,18 +225,30 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                       acc["id"], nxt["id"], invoked_by=invoked_by)
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
-                        "detail": step["detail"], "definition": f.expression}
+                        "detail": step["detail"], "definition": f.expression,
+                    "source_url": f.source_url}
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     else:  # divide
         step = await tc.calculate(db, "divide", operands[0]["id"], operands[1]["id"],
                                   invoked_by=invoked_by)
         if step.get("error"):
             return {"error": "not_combinable", "formula": name,
-                    "detail": step["detail"], "definition": f.expression}
+                    "detail": step["detail"], "definition": f.expression,
+                    "source_url": f.source_url}
         acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
         if name in fm.DAYS_FORMULAS:
-            acc = {"id": acc["id"], "value": acc["value"] * DAYS_IN_YEAR,
-                   "basis": acc["basis"], "scaled": DAYS_IN_YEAR}
+            # The x365 gets its own ledger row. Doing it here in Python was the
+            # first version, and it published a number no evidence could support:
+            # the panel printed 143.67 days beside a calc_id holding 0.3936.
+            scaled = await tc.scale(db, acc["id"], DAYS_IN_YEAR,
+                                    unit_class=tc.COUNT, quantity=name,
+                                    invoked_by=invoked_by)
+            if scaled.get("error"):
+                return {"error": "not_combinable", "formula": name,
+                        "detail": scaled["detail"], "definition": f.expression,
+                    "source_url": f.source_url}
+            acc = {"id": scaled["calc_id"], "value": scaled["value"],
+                   "basis": acc["basis"]}
 
     definition = f.expression
     for wanted, actual in used_instead.items():
@@ -244,9 +258,10 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
            "source_url": f.source_url, "note": f.note, "unit_class": f.unit_class}
     if used_instead:
         out["substituted_inputs"] = used_instead
-    if acc.get("scaled"):
-        out["definition"] = f"{f.expression} (the ratio's calc_id is before the × 365)"
     return out
+
+
+_REGISTRY_PROSE = ("note", "source_url")
 
 
 async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
@@ -261,11 +276,20 @@ async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
     for name in ("total_debt",) + fm.evaluation_order():
         if name in lines:
             continue
-        lines[name] = await evaluate_formula(db, ticker, name, months=months, at=at,
-                                             invoked_by=invoked_by)
+        line = await evaluate_formula(db, ticker, name, months=months, at=at,
+                                      invoked_by=invoked_by)
+        # `note` and `source_url` are registry prose: the same bytes for every
+        # issuer on every call, and 2.0kB of the 8.2kB NVDA panel. Shipping them
+        # sixteen times pushed the payload past the context cap and silently cost
+        # the model four whole lines, net_debt among them. What varies per issuer
+        # — the value, the period, which input was substituted — stays; the
+        # invariant prose is one evaluate_formula call away.
+        lines[name] = {k: v for k, v in line.items() if k not in _REGISTRY_PROSE}
     return {
         "ticker": ticker,
         "judgement": ("none: these are measured values with their definitions and period "
                       "bases. Thresholds and conclusions are the reader's."),
+        "per_formula_sources": ("call evaluate_formula(name=...) for a formula's source url "
+                                "and its caveats"),
         "lines": lines,
     }

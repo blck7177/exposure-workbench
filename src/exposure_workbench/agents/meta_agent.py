@@ -27,6 +27,7 @@ from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.services import context_budget
 from exposure_workbench.tools import faces
+from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,12 @@ _GATE_EXHAUSTED_TEXT = (
 _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 
+# How much of one tool result reaches the model. Entries come off the tail of
+# the largest container and are named in a `truncated` field, so a payload that
+# does not fit says so — see utils.json.dumps_capped.
+TOOL_RESULT_LIMIT = 6000
+
+
 async def _load_history(db, session_id: str) -> list[dict]:
     from sqlalchemy import select
     rows = (await db.execute(
@@ -187,7 +194,7 @@ async def handle_message(
                     args = {}
                 result = await tools_session.call(name, args)
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
-                                 "content": json.dumps(result, default=str)[:6000]})
+                                 "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
                 if name == "respond":
                     if result.get("responded"):
                         reply_text, reply_citations = result["text"], result.get("citations", [])

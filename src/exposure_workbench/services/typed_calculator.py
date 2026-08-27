@@ -41,25 +41,34 @@ from exposure_workbench.db.models import CalcLedger, FinancialFact
 from exposure_workbench.services import calc_service as cs
 
 OPS = ("add", "subtract", "multiply", "divide")
-MONEY, RATIO = "money", "ratio"
+# COUNT is what a ratio becomes when a constant with a unit is applied to it:
+# a fraction of a year times 365 is a number of days. It is never inferred —
+# only `scale` produces it, and only because its caller says so.
+MONEY, RATIO, COUNT = "money", "ratio", "count"
 
 
 @dataclass(frozen=True)
 class Typed:
     """A number and everything needed to decide what it may be combined with."""
     value: float
-    unit_class: str                       # money | ratio
+    unit_class: str                       # money | ratio | count
     instant: date | None = None           # a balance: as of this date
     interval: tuple[date, date] | None = None   # a flow: over these days
     quantity: str | None = None           # the metric, for containment
     source_id: str = ""
+    # What the ledger already said this operand's basis was. A `mixed` basis —
+    # a balance over a flow, which is what every ratio here is — decomposes into
+    # neither an instant nor an interval, so reading one back used to render it
+    # "unspecified" and a second operation on it lost the periods for good.
+    # Kept verbatim rather than recomputed: the row is the record.
+    recorded_basis: dict | None = None
 
     def basis(self) -> dict:
         if self.instant:
             return {"instant": self.instant.isoformat()}
         if self.interval:
             return {"interval": [self.interval[0].isoformat(), self.interval[1].isoformat()]}
-        return {"mixed": "unspecified"}
+        return self.recorded_basis or {"mixed": "unspecified"}
 
     def as_dict(self) -> dict:
         return {"unit_class": self.unit_class, "basis": self.basis(),
@@ -115,7 +124,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             instant=date.fromisoformat(basis["instant"]) if basis.get("instant") else None,
             interval=(date.fromisoformat(basis["interval"][0]),
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
-            quantity=t.get("quantity"), source_id=ref,
+            quantity=t.get("quantity"), source_id=ref, recorded_basis=basis or None,
         )
     return _err("unknown_operand", f"{ref} is not a fact_ or calc_ id")
 
@@ -298,6 +307,38 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     return {"calc_id": calc_id, "op": op, "value": value, "type": rt,
             "operands": [a, b],
             "basis": f"{_basis_str(left)} {op} {_basis_str(right)}"}
+
+
+async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
+                quantity: str | None = None, invoked_by: str = "agent") -> dict:
+    """Multiply one typed quantity by a constant, and record it.
+
+    A constant is not an operand — it has no id, no basis and nothing to check
+    against — so this is not `calculate`. It exists because the days formulas
+    finish with x365 and, until V11, that last step happened in the caller with
+    no ledger row: the panel published `days_inventory = 143.67` while the
+    calc_id it shipped alongside held 0.3936, the ratio before the scaling. The
+    number a tool prints has to be a number the ledger holds, or the gate refuses
+    what the desk itself computed — measured three times in the agent battery.
+
+    `unit_class` is the caller's to declare because a constant changes it:
+    inventory/cost-of-revenue is a ratio, and the same figure times 365 is a
+    count of days.
+    """
+    left = await _resolve(db, ref)
+    if isinstance(left, dict):
+        return left
+    value = left.value * factor
+    rt = {"unit_class": unit_class, "basis": left.basis(), "quantity": quantity}
+    calc_id = await cs._record(
+        db, None, "calc.scalar.scale",
+        {"op": "scale", "operands": [ref], "factor": factor,
+         "operand_types": [left.as_dict()], "result_type": rt},
+        {"value": value}, [ref], {}, invoked_by,
+    )
+    return {"calc_id": calc_id, "op": "scale", "value": value, "type": rt,
+            "operands": [ref], "factor": factor,
+            "basis": f"{_basis_str(left)} scaled by {factor:g}"}
 
 
 def _basis_str(t: Typed) -> str:
