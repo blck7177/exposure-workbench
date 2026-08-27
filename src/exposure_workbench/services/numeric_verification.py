@@ -438,6 +438,10 @@ _COMPATIBLE: dict[str, tuple[str, ...]] = {
 _CALC_RATIO_OPS = frozenset({
     "change.yoy", "change.qoq", "change.pct", "combine.divide",
     "stat.cagr", "window_return", "window_return.relative",
+    # V9-A5. Dividing two money quantities yields a ratio; without this the gate
+    # types its own product as MONEY and then refuses the leverage figure it
+    # just produced, reporting it as the model's fault.
+    "calc.scalar.divide",
 })
 
 # run_ resolves through its children: exposure_runs itself has no numeric column.

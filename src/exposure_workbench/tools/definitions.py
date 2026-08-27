@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, RiskAlert
 from exposure_workbench.services import brief_service
-from exposure_workbench.services import fundamentals_service
+from exposure_workbench.services import fundamentals_service, typed_calculator
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
@@ -77,6 +77,10 @@ async def _get_flow(db: AsyncSession, ticker: str, metric: str,
 async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = None) -> dict:
     return await fundamentals_service.get_balance_sheet(
         db, ticker, at=at, invoked_by=current_session_id())
+
+
+async def _calculate(db: AsyncSession, op: str, a: str, b: str) -> dict:
+    return await typed_calculator.calculate(db, op, a, b, invoked_by=current_session_id())
 
 
 # ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
@@ -329,6 +333,24 @@ def build_read_registry() -> ToolRegistry:
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD; defaults to latest"},
         }, "required": ["ticker"], "additionalProperties": False},
         fn=_get_balance_sheet, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="calculate",
+        description=(
+            "Add, subtract, multiply or divide two quantities you already have, by their "
+            "ids (fact_… or calc_…). Compose anything: EBIT, leverage, coverage, margins, "
+            "turnover — none of these needs to be a built-in. The result gets its own "
+            "calc_id and is citable. Combinations that would silently double-count are "
+            "refused with the reason: two balances from different dates, two flows over "
+            "overlapping periods added together, or a total added to something it already "
+            "contains. A balance divided by a flow is fine — that is what leverage is."
+        ),
+        json_schema={"type": "object", "properties": {
+            "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]},
+            "a": {"type": "string", "description": "fact_… or calc_… id"},
+            "b": {"type": "string", "description": "fact_… or calc_… id"},
+        }, "required": ["op", "a", "b"], "additionalProperties": False},
+        fn=_calculate, tool_class=READ,
     ))
     reg.register(Tool(
         name="list_available_data",

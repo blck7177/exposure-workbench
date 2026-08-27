@@ -30,6 +30,9 @@ READ_CORE = [
     # facts, which is what the research face is for too.
     "get_flow",
     "get_balance_sheet",
+    # V9-A5. The four operators, typed: they refuse the combinations the
+    # citation gate cannot see and allow every other one.
+    "calculate",
     "compute_change",
     "compute_ratio",
     "compute_combine",
