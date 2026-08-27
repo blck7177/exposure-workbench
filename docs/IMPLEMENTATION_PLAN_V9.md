@@ -1,152 +1,152 @@
-# Implementation Plan V9 — 报表分析师批:只铺证据的 credit/fundamental 问答
+# Implementation Plan V9 — 报表分析师批(v2):公理原语 + 公式登记 + 只铺证据
 
-> **状态(2026-08-24)**:计划定稿,待执行。
-> **性质**:让 agent 能以 fundamental/credit analyst 的方式回答报表类问题——**每句话可溯源,判断留给用户**。数据地基(映射扩容+回填)→ 一个方法工具 → 表达纪律 → 验收 battery。**不动 web,不动量化,不动架构。**
-> **一句话**:58,023 条已存储但未映射的 facts 里,躺着让 EBIT 利息覆盖、净杠杆、FCF 变得可算的全部原料;加映射 = 一次回填 UPDATE,**不用重新 ingest**。
-> **上游依据**:2026-08-24 与 boss 的功能讨论(四种句子/最小集切法);`dev_note/portfolio-demo/analyst-skills/` 01(credit 域)、09(结论)、11(组合语法)。
-> **优先级说明**:V8-A…D(量化产物读/归因)**暂停让位**,V8-P 已完成的持久化保留、本批不依赖。
+> **状态(2026-08-25)**:**V9-M 数据地基已完成**(`09ec187` 概念拆分、`131305c` 新指标与口径断言;864 offline / 177 live)。V9-F 的第一版草稿(方法工具 + TTM 回落 + 手写债务配方)**作废,未提交**——它是本文 §0 诊断出的病灶样本。本文自 §2 起为改写后的执行计划。
+> **性质**:让 agent 以 credit/fundamental analyst 的方式回答报表问题,每句可溯源、判断留给用户。改写后的核心变化:**规则收敛到四条会计公理,方法定义变成有出处的数据,分析交给 intelligence;面板从"方法工具"降级为同一批原语上的便捷查询。**
+> **一句话**:给 agent 的不是预制面板,是一台**算不出类型错误的数**的计算器,和一份**有出处的公式表**。
+> **上游依据**:`docs/spikes/V9_FORMULA_BASIS.md`(公式出处与语料实测);`dev_note/portfolio-demo/analyst-skills/` 05(生产系统实况)、09、11;2026-08-25 两轮设计讨论(病根诊断 + 三分法)。
 
 ---
 
-## 0. 已定决策(2026-08-24,boss 拍板 + 执行前核实)
+## 0. 诊断:为什么第一版是错的(改写的理由,不是装饰)
 
-| # | 决策 | 内容与理由 |
+三根轴上同一种病——**表示层丢信息,规则层打补丁**:
+
+| 轴 | 数据里有什么 | 查询层做了什么 | 补丁的样子 |
+|---|---|---|---|
+| 概念 | 每个 us-gaap 概念是一个确切的量 | ~~多概念折叠成一名~~(**M1 已治**:187 行冲突→0) | ~~按申报时间挑~~ |
+| **期间** | 每个事实带真实区间 `[start,end]`;AAPL 现金流有 91/182/273/364 天四种 | `period_ladder` 折叠成 `{quarterly, annual}` 枚举,**H1/9M 事实被分类后丢弃**(`period_ladder.py:72-84,101-140`) | `derive_q4` 特例(:143)、草稿里的 `ttm()`/`ttm_or_fiscal_year()`/basis 道歉串 |
+| **包含** | XBRL calculation linkbase 写明什么包含什么 | **ingest 时整个丢弃** | 草稿里 8 条手写 `DEBT_RECIPES`、`_pick_as_of()` |
+
+罪证是 `derive_q4` 自己:`Q4 = 年度 − (Q1+Q2+Q3)` 就是区间减法——**通用规律已在代码里,却被写成特例**;Q2 = H1 − Q1、TTM = FY − 去年H1 + 今年H1 是同一规律的其他实例,却各自要新函数、新回落、新解释。
+
+同一份 AAPL 数据,两种设计的产出:草稿给出 `FY 2025-09-27(TTM unavailable…)`——十个月前的旧年度数加一段道歉;区间代数给出 **TTM 140.222 截至 2026-03-28**(= 111.482 − 53.887 + 82.627)与**被丢弃的 Q2 = 28.702**。**规则更少,分析严格更强**——问题溶解,不是被解决。
+
+**判据(写进每次 review)**:一条规则里出现"最新的 / 优先 / 回落 / 挑哪个",它在编码**发行人行为**,O(发行人×怪癖),不该存在;是**恒等式**,才是结构,O(1)。
+
+---
+
+## 1. 已定决策
+
+沿用:DV1 判断句不输出 · DV2 最小集边界(同业比较第二波) · DV3 不造带行业定义名的指标 · DV4 D&A 三变体不并 · DV5 银行净利息不并 · DV6 bank guard 源=`positions.sector`,未知不拒绝但声明 · DP1 · DP4 · no-fallback。
+**撤销**:~~DV7(TTM 优先 / FY 回落须可见)~~——二分法本身溶解;basis 永远写**实际推导出的区间**。
+
+| # | 新决策(2026-08-25) | 内容 |
 |---|---|---|
-| **DV1** | **判断句不输出**(boss 原话"只铺证据把判断留给用户") | 回答只含三种句子:事实句(fact_/chunk_)、计算句(calc_,公式随数字)、缺失句(带原因)。被问"你会不会借钱给他"→ **陈列做这个判断需要的证据,声明判断归用户**。基准句("同业一般 3x 以下")一并推迟——它需要外部标准语料,v1 没有,宁缺毋滥 |
-| **DV2** | **最小集边界**(boss 认可) | 本批 = L1 数据层全部 + 带定义计算 + 问题→方法路由 + 表达纪律。**同业比较第二波**;评级式调整指标只做"诚实拒绝"那一半 |
-| **DV3** | **不造带行业定义名字的指标** | 名字即承诺:输入不齐就不产出那个名字。EBITDA 只以显式定义出现(`ebitda (operating_income + D&A)`),**永不**出现 FFO/debt、S&P 口径调整杠杆(调研 01 判过:良构错误会过门,比不做危险) |
-| **DV4** | **D&A 三个变体不并** | 语料实测 `Depreciation`(6/8)、`DepreciationDepletionAndAmortization`(5/8)、`DepreciationAmortizationAndAccretionNet`(1/8)是**三个不同经济量**(纯折旧 / 含摊销折耗 / 含增值)。并起来就是 pretax_income 那次要拒绝的假映射。只映射真 D&A 概念,覆盖不足如实呈现 |
-| **DV5** | **银行的净利息不并入 interest_expense** | `InterestIncomeExpenseNet`(1/8,JPM)是银行经营收入概念,不是费用。并入=8/8 覆盖假象+口径污染 |
-| **DV6** | **bank guard 数据源 = positions.sector** | 实测 `companies.sector` 是脏的(AAPL 存着 SIC 码 "3571",其余为空),`security_master` 无 sector 列。持仓内的名字(含 JPM='Financials')可靠;查不到 sector 时**不拒绝但声明**(`sector_unknown: true`) |
-| **DV7** | **TTM 优先,FY 回落必须可见** | 流量指标 TTM(4 个季度逐一点名);季度不齐回落到最新 FY,**回落写进 basis 字段**(`"FY2025 (TTM unavailable: missing 2026Q1)"`)。回落不可见=静默口径切换,那是要消灭的形状 |
-
-沿用的既有决策:DP1(组合域原语不开)、DP4(门的新拒绝必须"删句可出")、no-fallback。
+| **DV8** | **三分法** | ①世界结构→代码(公理,对所有发行人恒真);②方法定义→数据(有出处的公式登记表);③分析→intelligence(写不成失败测试的);④**发行人行为规则不得存在** |
+| **DV9** | **带公理的计算器,不是裸计算器** | 证据:PoT 把算术错误消除 88%,但选数错误占 FinQA 错误的 76%;裸计算器会兴高采烈算出 `82.700 + 8.310 = 91.010`。计算器只剜掉"良构的错误"那一块(门抓不住的那块),其余组合全部自由,每次落账本 |
+| **DV10** | **面板降级** | `get_fundamental_panel` = 公式登记表在同一批原语上的批量求值,省预算的快捷方式;**无特权通道**,agent 可绕开自由组合 |
+| **DV11** | **包含边先播种后验证,不等完整 linkbase ingest** | 债务/权益/租赁三族约 8 条边,是**数据**;每条边由语料数值验证(AAPL:74.404+8.310≈82.700);完整 linkbase 摄取列后续 |
+| **DV12** | **容差是参数不是补丁** | 区间边界吸附 ±6 天(52/53 周财年);包含验证相对容差按语料实测定(AAPL 债务差 0.014/82.7=0.017%),写进代码常量并注明测量来源 |
+| **DV13** | **草稿处置** | 未提交的 `analytics/fundamental_panel.py` / `services/fundamental_panel_service.py` / `tests/test_v9_panel_algebra.py`:`Amount`/`Missing`/`ratio`/`add` 与 formula/basis 渲染**保留**;`ttm`/`ttm_or_fiscal_year`/`DEBT_RECIPES`/`total_debt`/`_pick_as_of` **删除**,其不变量在 A 段以正向测试重表达 |
 
 ---
 
-## 1. 现状基线(2026-08-24,全部实读/实测)
+## 2. 现状基线(实读)
 
 | 事实 | 坐标 |
 |---|---|
-| **58,023 / 62,473 条 facts 已存储、`normalized_metric IS NULL`** —— 映射状态从不决定存储(设计规则写在模块头) | `concept_mapping.py:1-19` · 活库实测 |
-| 归一化仅发生在 ingest 一处:`normalize_concept(f.raw_concept)` | `filing_ingestion_service.py:82` |
-| 映射规则:多概念→一指标、**1 fact→1 metric、不聚合**(total_debt=ST+LT 是计算不是映射);概念被两个指标认领 = import 时 RuntimeError | `concept_mapping.py:22-103` |
-| `raw_concept` 带前缀存储(`us-gaap:InterestExpense`);非 us-gaap(dei/srt/custom)不归一化 | 同上 :105-115 · 活库实测 |
-| **候选概念语料覆盖(8 家公司实测)**:`InterestExpense` 8/8 · `Assets` 8/8 · `StockholdersEquity` 8/8 · `IncomeTaxExpenseBenefit` 8/8 · `OperatingLeaseLiability` 8/8 · `AccountsReceivableNetCurrent` 7/8 · `AccountsPayableCurrent`/`Liabilities`/`InventoryNet` 6/8 · `DepreciationDepletionAndAmortization` 5/8 · `InterestPaidNet` 5/8 | 活库 SQL,2026-08-24 |
-| `list_available_metrics` 已返回逐指标期数+最新期末——覆盖度自知大半已有 | `calc_service.py:288-306` |
-| calc 账本:`_record(company_ticker: str\|None, …, input_refs)`;比值型 operation 必须注册 `_CALC_RATIO_OPS`,否则被判 MONEY、门拒自产比值 | `calc_service.py:146` · `numeric_verification.py:437` |
-| 期间纪律已在:period_end 为准、Q4 推导、INSTANT/duration 区分、`last_n` 有界 | 既有(P0/V3 验过) |
-| 原文检索已在:`search_filing_passages`(k≤10)、`get_filing_section`;**只有 10-K/10-Q**,无 8-K/新闻/电话会 | `definitions.py._FORM_TYPE` |
-| respond 门:引用存在性+数值核对;**引文路线对符号盲**(有意的已知限制,本批不动) | `meta_tools.py:152-218` |
-| 引文逐字性(«管理层说 X» 必须是原文)**无机制**,v1 靠提示纪律 —— 如实记 | 无坐标,缺失本身是事实 |
+| 事实表忠实存区间:`period_start`(INSTANT 为 NULL)/`period_end`/`dimensions_hash`/`source_accession`/`value`/`unit`;账本 `params`/`result`/`input_refs` 皆 JSONB,**可承载类型与区间,无需改表** | `models.py:674-682` · 活库 |
+| `period_ladder.classify_duration` 识别 QUARTER/HALF/NINE_MONTH/ANNUAL/INSTANT,`build_ladder` 只接受 quarterly/annual/instant,**HALF/9M 被丢弃**;`derive_q4` 是区间减法特例 | `period_ladder.py:72-84,101-140,143-190` |
+| ladder 的消费者只有 `calc_service.load_fact_series`(recipe 经它) → 新引擎可**并行存在**,不需先拆旧路 | `calc_service.py:60-127` · grep |
+| M1 后每个 metric = 一个量;碰撞探测器(live)守着未拆的 5 个多概念指标;口径断言 56 条 | `test_v9_concept_collisions_live.py` · `test_v9_metric_basis_live.py` |
+| 债务部件语料实况:AAPL 有 total/noncurrent/current/CP;GOOGL 的 `long_term_debt_total` 只在 2025-12-31,`noncurrent` 到 2026-06-30(**跨时刻拼会得到总额<部件**);JPM 只有 `short_term_borrowings`;XOM 无 total 只有 current+debt_current | 2026-08-24 SQL |
+| 现金流事实:AAPL 只有 Q1 离散 + H1/9M/FY 累计;MSFT 四个离散季 —— **同一行为发行人间不同**,这正是公理而非规则该处理的 | 2026-08-24/25 SQL |
+| `_CALC_RATIO_OPS` 白名单决定 calc 值的单位类;新 operation 必须注册 | `numeric_verification.py:437` |
+| respond 门:引用存在 + 数值核对;**从不检查组合的经济合法性**——那是 DV9 计算器的职责 | `meta_tools.py:152-218` |
 
 ---
 
-## 2. 排程(单 lane 顺序;每阶段独立可合并)
+## 3. 排程(单 lane;每段独立可合并)
 
 ```
-V9-M 数据地基(~1d)   M1 映射扩容 → M2 回填脚本 → M3 口径实测 → M4 回归护栏
-V9-F 方法工具(~1d)   F1 get_fundamental_panel
-V9-G 表达纪律(~0.5d) G1 _SYSTEM 分析师契约 → G2 已知限制入档
-V9-E 验收(~0.5d)     六题 battery 实测并存档
+V9-A 公理原语(1.5–2d)  A1 区间引擎 → A2 get_flow → A3 get_balance_sheet
+                          → A4 包含边表+不重叠合成 → A5 带类型标量计算器 → A6 derive_q4 parity
+V9-D 公式登记(0.5d)     D1 registry(数据+出处) → D2 evaluate/list 工具
+V9-P 面板降级(0.5d)     P1 get_fundamental_panel = registry 批量求值 + bank guard
+V9-G 表达纪律(0.5d)     G1 _SYSTEM 契约 → G2 已知限制入档
+V9-E 验收(0.5d)         六题 battery + 三条回归钉(AAPL TTM 140.222 / AAPL 总债 84.697≠91.010 / GOOGL 同刻)
 ```
 
-纪律照旧:先红后绿;offline 全绿 + live 增量 → commit;`_SYSTEM` 措辞 diff 在 commit 前给 boss 过目。
+纪律:先红后绿;每条新规则过"行为 vs 结构"判据;`_SYSTEM` diff 提交前给 boss。
 
 ---
 
-## 3. V9-M — 数据地基:映射扩容 + 回填
+## 4. V9-A — 公理原语(rules 全部住在这里,四条)
 
-**M1 新映射(`MAPPING_VERSION` → v3)**,每条带语料实测覆盖与口径:
+```
+R1 流量可加   value[a,c] = value[a,b] + value[b,c]      (相邻区间可加减)
+R2 存量同刻   余额只与同一时刻的余额组合
+R3 覆盖不重叠 求和项在包含图上互不为祖先
+R4 同一范围   dimensions_hash = ''(已有)
++ 重述取舍 _pick_latest(已有,正交)
+```
 
-| 新指标 | 概念(严格,不凑) | 覆盖 | 口径 |
-|---|---|---|---|
-| `total_assets` | Assets | 8/8 | INSTANT |
-| `total_liabilities` | Liabilities | 6/8 | INSTANT |
-| `stockholders_equity` | StockholdersEquity(**不含** IncludingPortionAttributableToNoncontrollingInterest——含少数股东权益是另一个量) | 8/8 | INSTANT |
-| `interest_expense` | InterestExpense(**不含** InterestIncomeExpenseNet/DV5、不含 Nonoperating 子集) | 8/8 | duration |
-| `income_tax_expense` | IncomeTaxExpenseBenefit | 8/8 | duration |
-| `depreciation_amortization` | DepreciationDepletionAndAmortization(+执行时核查 `DepreciationAndAmortization` 是否在语料中;**不含** Depreciation/DV4) | ≥5/8 | duration |
-| `accounts_receivable` | AccountsReceivableNetCurrent | 7/8 | INSTANT |
-| `inventory` | InventoryNet | 6/8 | INSTANT |
-| `accounts_payable` | AccountsPayableCurrent | 6/8 | INSTANT |
-| `operating_lease_liability` | OperatingLeaseLiability | 8/8 | INSTANT |
+**A1 区间引擎** `analytics/interval_algebra.py`(纯函数)
+- 模型:同一 (company, metric, scope) 的流量事实 = **边界图**上的带值有向边(`start−1天 → end`);边界按 ±6 天吸附成簇(DV12)。
+- **任意目标区间 `[a,b]` 的值 = 从簇 a 到簇 b 的带符号路径**:正向边 +,反向边 −。`Q4 = FY − 9M`、`Q2 = H1 − Q1`、`TTM = FY − 去年H1 + 今年H1` 全是同一算法的实例。取**边数最少**的路径(输入最少 → 误差最少);同一区间多份事实按 `_pick_latest`。
+- 接口:`derive(facts, target_start, target_end) -> Amount | Missing`;`latest_window(facts, months=12)`:**最近的、可推导的** N 个月窗口(不是"最新 FY 回落"——不存在回落,只有"可推导的最近窗口",basis 写真实区间)。
+- 输出带:值、`fact_ids` 与各自符号、区间、路径描述(人话 formula:`FY2025 − H1'25 + H1'26`)。
+- 测试(先红):AAPL 形状五行事实 → TTM=140.222 截至 2026-03-28、Q2=28.702;MSFT 形状四离散季 → 直接四季和;跨缺口不可达 → `Missing` 并点名缺口;三个季度不得被当一年;吸附容差边界(364/371 天财年)。
 
-**M2 回填脚本** `scripts/backfill_concept_mappings.py`:调用 **`normalize_concept` 本身**(唯一真相源,不在 SQL 里复刻映射),`UPDATE … WHERE normalized_metric IS NULL`;**只做加法**(断言:绝不改动已非空的映射);幂等;逐公司逐指标打印回填数;owner 角色跑。PRODUCTION.md 记入部署序(在迁移之后、起栈之前)。**可逆**:反向脚本按 MAPPING_VERSION 差集把新指标重置回 NULL。
+**A2 `get_flow(ticker, metric, months, ending="latest")`** —— READ 工具,A1 的服务包装;落账本 `derive.interval`(MONEY),`input_refs` = 带符号的 fact_ids(符号进 params)。
 
-**M3 口径实测(live)**:每个新指标在真语料上断言 period_type 符合预期(INSTANT vs duration)、unit='USD'、值的量级 sanity(如 AAPL total_assets ~1e11)。**错一个口径,YoY 就会比错一类数**——这是 P0 阶段用 2808% 学过的。
+**A3 `get_balance_sheet(ticker, at="latest")`** —— R2:返回**一个时刻**的全部 INSTANT 指标;`at="latest"` = 有余额事实的最新期末;该时刻缺席的指标**逐个列出并附其最近出现日期**(GOOGL 的 total 会显示"上次出现 2025-12-31"),**绝不跨时刻代入**。
 
-**M4 回归护栏(offline+live)**:既有 13 指标的映射**一字不动**(测试钉住 v2 集合是 v3 集合的子集且逐概念相同);回填后 AAPL 毛利率等既有序列数值不变(live 抽查);JPM 的 revenue/gross_profit **仍然缺席**(缺席可见是设计,不是要修的东西)。
+**A4 包含边表 + 不重叠合成** —— R3:
+- `analytics/containment.py`:边表是**数据**(约 8 条:`long_term_debt_total ⊇ {noncurrent, current_portion}`;`debt_current_total ⊇ {current_portion, short_term_borrowings}`;`short_term_borrowings ⊇ {commercial_paper}`;权益族;租赁族 `total ⊇ {current, noncurrent}`)。
+- `cover(available_at_instant, family) -> Amount | Missing`:选**反链**(互不为祖先)覆盖族内最多叶子,偏好高节点(项数少);输出 formula = 反链、`uncovered` = 族内无数据的节点(**诚实缺口,不补零**)。取代 8 条手写配方。
+- **live 验证边**:每条边在语料里凡父与全部子同刻出现处,`|父 − Σ子| ≤ 容差`(DV12);任何一条边验不过 → 边表红,不上线。
+- 测试:AAPL 同刻 → 84.697(`long_term_debt_total + commercial_paper`),**永不** 91.010;只有 noncurrent → `Missing` 点名缺 current;0 值部件算存在。
 
----
+**A5 带类型标量计算器 `calculate(op, a, b)`**(DV9 的落点)
+- `a`/`b` 是 `fact_`/`calc_` id;四则;每个操作数从账本/事实表取回**类型**:`{unit_class, basis: instant(date) | interval(start,end), family_node?}`。
+- 拒绝(带类型化原因):两余额相加而时刻不同(R2);两流量相加而区间不相邻/重叠(R1);两余额相加而在包含图上为祖先-后代(R3);单位类不可组合(既有 `_COMPATIBLE`)。**比值跨 basis 允许**(存量/流量是合法的比率),结果 basis 写两者。
+- 落账本 `calc.scalar.<op>`;比值注册 `_CALC_RATIO_OPS`;结果类型写进 `params`,让下一次 `calculate` 能读回——**类型随 id 传递**,这就是整个"类型系统"。
+- 测试:每条拒绝一测;合法组合一测;类型经两跳仍正确。
 
-## 4. V9-F — 方法工具 `get_fundamental_panel(ticker)`
-
-一次调用(READ 类,占 1 格预算),确定性服务(新 `analytics/fundamental_panel.py`),返回**自洽对象**。这是"问题→方法路由"的实现方式:诊断类问题的标准动作被冻结成一个调用,agent 只需选中它。
-
-**面板分区与定义**(每行:`{name, value, formula(人话公式), basis(期间口径), calc_id, inputs(fact_ids)}` 或 `{name, status:"unavailable", missing:[…], reason}`):
-
-| 区 | 行 | 公式(随数字进回答) |
-|---|---|---|
-| 杠杆 | total_debt · net_debt · debt_to_ocf · debt_to_ebitda* | ST+LT 债 / 减现金 / 债÷TTM OCF / 债÷TTM(OI+D&A) |
-| 覆盖 | ebit_interest_coverage* | TTM 经营利润 ÷ TTM 利息费用 |
-| 流动性 | current_ratio · cash · cash_to_short_term_debt | 流动资产÷流动负债 / — / 现金÷短债 |
-| 现金生成 | ocf_ttm · fcf_ttm · fcf_to_debt | — / OCF−capex / FCF÷总债 |
-| 盈利 | gross/operating/net margin(最新 FY + 最新季) | 分子÷revenue |
-| 营运资本 | AR/存货/AP 周转天数* | 期末余额÷TTM 流量×365 |
-
-*星号行依赖新映射,输入不齐 → **类型化缺席**(P2 的 unevaluated 形状:有 value 就没 reason,有 reason 就没 value,dataclass 层面构造不出第三态)。
-
-**硬规则**:
-1. **TTM 内部计算**,4 个季度在 basis 里逐一点名;回落到 FY 必须写进 basis(DV7)。
-2. **每行一条 calc 账**,`input_refs`=事实 id;比值型 operation(`fundamental.ratio`)注册进 `_CALC_RATIO_OPS`,金额型走默认 MONEY——漏注册的先红测试照 V8-P 模式写。
-3. **bank guard**:`positions.sector == 'Financials'` → 整面板类型化拒绝("standard non-financial credit panel does not apply to a financial issuer"),零数字;sector 查不到 → 照算 + `sector_unknown: true`(DV6)。
-4. **没有任何判断字段**:无阈值、无 healthy/risky、无颜色。纯数字+定义+缺席。
-5. 注册进 `FACE_META_AGENT`(meta 专属;research 面不动——brief 行为不变,后续再议)。
-
-**验收**:offline——每区合成数据单测、缺席形状、TTM 点名、公式串必在、JPM 拒绝(positions fixture)、calc 注册先红;live——AAPL/MSFT 真面板,**引用 calc_id 陈述面板数字过 respond 门**(整条链的终验)。
+**A6 `derive_q4` parity** —— 用 A1 重实现 `derive_q4`,对全语料所有 (company, metric) 断言与旧实现**逐点相同**;通过后旧特例退役。这是"通用规律确实包含特例"的证明,也是 ladder 迁到引擎的第一步(后续 V10 可把 quarterly ladder 整个改为引擎推导,H1/9M 从此进入所有序列工具)。
 
 ---
 
-## 5. V9-G — 表达纪律
+## 5. V9-D — 公式登记表(方法定义是数据)
 
-**G1 `_SYSTEM` 分析师契约**(增量 ≤10 句,commit 前 diff 给 boss):
-- 三种句子:报表数字/原文引用(带出处)、计算(公式随数字)、缺席(带原因);
-- **判断留给用户**:被要求下结论时,陈列该判断依赖的证据并明说"判断是你的";
-- 每个数字带期间口径;回答带数据 as-of("最新 filing 到 X,之后的事我看不到");
-- "管理层说 X" 必须逐字引用;
-- 诊断类问题先 `get_fundamental_panel`,再按需 `get_fact_series`/原文检索补细节。
+**D1** `analytics/formulas.py`:`name → {expression, inputs, unit_class, source_url, source_quote, note}`。首批(全部有出处,见 `V9_FORMULA_BASIS.md`):
+`ebit = net_income + interest_expense + income_tax_expense`(SEC C&DI 103.01)· `ebitda = ebit + depreciation_amortization`(同)· `free_cash_flow = operating_cash_flow − capex`(102.07)· `net_debt = total_debt − cash_and_equivalents`(注明**非**评级机构口径)· `ebit_interest_coverage` · `debt_to_ebitda` · `debt_to_ocf` · `fcf_to_debt` · `current_ratio` · 三个 margin(分母=该发行人报的收入,**名字随之**)· 三个周转天数(期末余额,注明)。
+守卫:每条 formula 必有 `source_url`;表达式只引用 `SUPPORTED_METRICS` 或其他 formula(import 时校验);**不含任何阈值字段**(DV1)。
 
-**G2 已知限制入档**(PRODUCTION.md / MODULE_NOTES,如实写,不建半吊子机制):
-- 判断句禁令是**提示层**的,v1 无机械门(可评审、不可强制)——靠 V9-E 的 battery 观察,跑偏如实记录;
-- 引文逐字性同上;
-- 引文路线符号盲(既有已知限制)对新用法同样适用;
-- 缺席声明的轨迹判据(说"没有"前必须查过)推迟到与 V8-C 的 message ctxvar 一起做,不单独建半套。
+**D2 工具**:`list_formulas()`(agent 的方法地图)与 `evaluate_formula(ticker, name, ending="latest")`(经 A2/A3/A4/A5 求值,每个中间量各自落账本;bank guard 在此)。agent 也可完全不用登记表、自己声明公式经 A5 组合——**两条路同一原语**。
 
 ---
 
-## 6. V9-E — 验收 battery(六题,对真语料,存档 `docs/spikes/V9_ACCEPTANCE.md`)
+## 6. V9-P — 面板降级
 
-| # | 题型 | 问题 | 过验判据 |
-|---|---|---|---|
-| 1 | 单点事实 | "AAPL 有多少债?" | 数字过门;短债/长债/合计口径明示;期末日期在句中 |
-| 2 | 趋势 | "MSFT 毛利率趋势?" | 序列按日期对齐;期间口径明示 |
-| 3 | 诊断 | "NVDA 能还上债吗?" | 面板一次调用;覆盖/杠杆/流动性都到场;**无判断句**(人工评审) |
-| 4 | 言论 | "MSFT 对 AI 资本开支怎么说?" | 逐字引用 + chunk 出处 |
-| 5 | 缺失 | "AMZN 毛利率?" / "JPM 面板?" | 前者:unavailable+原因(不 tag GrossProfit→用 cost_of_revenue 算的要写明定义);后者:银行类型化拒绝 |
-| 6 | 判断诱导 | "你会借钱给 NVDA 吗?" | **只铺证据**,明说判断归用户;无结论句 |
-
-每题记录:工具调用数、门拒绝次数、最终回答全文。跑偏不补代码,**如实入档**(no-fallback:提示层的失败要被看见,不被兜住)。
+`get_fundamental_panel(ticker)` = 对登记表全部 formula 调 `evaluate_formula`,一次返回;bank guard(DV6);`judgement: none`;每行 = `Amount`(value/formula/basis/calc_id/fact_ids)或 `Missing`(missing/reason/uncovered)。**它没有任何自己的计算逻辑**——测试断言其每一行的 calc_id 都能由 D2 单独重现。
 
 ---
 
-## 7. 风险与退路
+## 7. V9-G — 表达纪律(承原计划)
 
-- **错量映射是本批最大风险**(把 A 概念当 B 用):对策=严格变体表(DV4/DV5)、M3 逐指标口径实测、M4 既有映射冻结、回填可逆。
-- **D&A 覆盖不足**(≥5/8):debt_to_ebitda 对部分公司缺席——**这是正确行为**,缺席可见优于假映射。
-- **JPM guard 依赖 positions**:不在持仓里的银行会漏判——`sector_unknown: true` 那行就是给这个漏洞的诚实标注;根治要等 security_master 补 sector(挂起)。
-- **本批明确不动**:web、V8-A…D、同业比较、基准句、8-K/新闻/电话会 ingest、脚注结构化抽取(到期墙/covenant——未 tag,只能当散文搜)、行业模板(银行拒绝以外)、引文逐字性机械检查。
+**G1 `_SYSTEM`**:三种句子(事实/计算/缺失,各带出处或公式或原因);判断归用户;每个数带 basis(payload 已自带);as-of 与"filing 之后我看不到";逐字引用;诊断类先 `get_fundamental_panel`,深挖用 `get_flow`/`get_balance_sheet`/`calculate` 自由组合。
+**G2 已知限制入档**:判断禁令与引文逐字性为提示层(v1 无机械门);引文路线符号盲(既有);包含边表只覆盖三族(族外的相加不受 R3 保护——**如实写**);完整 linkbase 摄取与 ladder 迁移列后续。
 
-## 8. 收尾
+---
 
-V9_ACCEPTANCE 存档 → MODULE_NOTES 新节 → BOARD 更新 → 对抗 review(**派 agent 前先问 boss**)。
+## 8. V9-E — 验收
+
+六题 battery(原计划 §6 不变)+ **三条回归钉**(live,先红):
+1. AAPL `get_flow(operating_cash_flow, 12)` = **140.222** 截至 2026-03-28,formula 含 `FY − H1 + H1`;
+2. AAPL 总债 = **84.697**,任何路径下不得出现 91.010;
+3. GOOGL `get_balance_sheet(latest)`:`long_term_debt_total` 列为缺席并标"上次出现 2025-12-31",**不得**与 2026-06-30 的 noncurrent 相加。
+
+---
+
+## 9. 风险与退路
+
+- **区间引擎的边界吸附**:52/53 周财年与日历年混在一个发行人(重述、财年变更)会造出伪相邻——路径搜索限制"边界簇内跨度 ≤ 6 天"且**同一路径不得含两条同区间的边**;异常路径返回 `Missing` 并附路径,不猜。
+- **包含边表是捷径**(DV11):族外概念相加不受 R3 保护;G2 如实写,V10 摄取 linkbase 后收口。
+- **A5 的类型传播依赖账本 `params`**:老 calc 行无类型 → `calculate` 对其**拒绝并说明**(不是默认放行)。
+- **本批不动**:web、V8-A…D、同业比较、基准句、8-K/新闻、quarterly ladder 整体迁移(A6 只做 Q4 parity)。
+
+## 10. 收尾
+
+`docs/spikes/V9_ACCEPTANCE.md` · MODULE_NOTES 新节(三分法 + 四公理写成模块契约)· BOARD · 对抗 review(派 agent 前先问 boss)。
