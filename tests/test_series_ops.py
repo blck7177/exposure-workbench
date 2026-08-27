@@ -16,36 +16,6 @@ def sp(end: str, v, ids=None) -> so.SeriesPoint:
 Q = ["2025-01-31", "2025-04-30", "2025-07-31", "2025-10-31", "2026-01-31"]
 
 
-def test_combine_divide_is_a_margin():
-    gp = [sp(Q[0], 50.0, ["f1"]), sp(Q[1], 60.0, ["f2"])]
-    rev = [sp(Q[0], 100.0, ["f3"]), sp(Q[1], 150.0, ["f4"])]
-    r = so.combine_series(gp, rev, "divide")
-    assert [p.value for p in r.points] == [0.5, 0.4]
-    assert r.operation == "combine.divide"
-    assert set(r.input_fact_ids()) == {"f1", "f2", "f3", "f4"}   # provenance preserved
-
-
-def test_combine_sub_is_free_cash_flow():
-    ocf = [sp(Q[0], 100.0)]
-    capex = [sp(Q[0], 30.0)]
-    assert so.combine_series(ocf, capex, "sub").points[0].value == 70.0
-
-
-def test_combine_skips_unmatched_periods_rather_than_zero_filling():
-    a = [sp(Q[0], 10.0), sp(Q[1], 20.0)]
-    b = [sp(Q[0], 5.0)]
-    r = so.combine_series(a, b, "add")
-    assert len(r.points) == 1
-    assert r.quality_flags["unmatched_periods"] == 1
-
-
-def test_combine_division_by_zero_is_none_not_inf():
-    r = so.combine_series([sp(Q[0], 10.0)], [sp(Q[0], 0.0)], "divide")
-    assert r.points[0].value is None
-    assert r.points[0].quality_flags["division_by_zero"] is True
-    assert r.quality_flags["division_by_zero_periods"] == 1
-
-
 def test_change_yoy_matches_one_year_back_by_date():
     s = [sp(Q[i], v) for i, v in enumerate([100.0, 110.0, 120.0, 130.0, 150.0])]
     r = so.compute_change(s, "yoy")
@@ -151,11 +121,3 @@ def test_window_return_without_prices_is_none():
     r = so.compute_window_return([], date(2026, 1, 1), date(2026, 2, 1))
     assert r.value is None and r.quality_flags["no_price_for_window"] is True
 
-
-def test_unsupported_ops_raise():
-    with pytest.raises(ValueError):
-        so.combine_series([], [], "multiply")
-    with pytest.raises(ValueError):
-        so.compute_change([], "mom")
-    with pytest.raises(ValueError):
-        so.compute_stat([], "median")

@@ -35,15 +35,15 @@ async def test_wrapper_writes_trace_and_extracts_refs():
             await db.commit()
             sid = s.id
         async with mk() as db:
-            out = await R.invoke(reg, db, sid, "compute_change",
-                                 {"ticker": "NVDA", "metric": "revenue", "mode": "yoy"})
+            out = await R.invoke(reg, db, sid, "get_flow",
+                                 {"ticker": "NVDA", "metric": "total_revenues", "months": 3, "last_n": 4})
             await db.commit()
             assert "calc_id" in out
         async with mk() as db:
             step = (await db.execute(
                 select(AgentStep).where(AgentStep.session_id == sid).order_by(AgentStep.seq.desc())
             )).scalars().first()
-            assert step.tool_name == "compute_change" and step.status == "completed"
+            assert step.tool_name == "get_flow" and step.status == "completed"
             assert any(r["type"] == "calc" for r in step.evidence_refs)
     finally:
         await engine.dispose()
@@ -64,11 +64,11 @@ async def test_budget_exhaustion_rejects_and_is_traced():
             await db.commit()
             sid = s.id
         async with mk() as db:
-            ok = await R.invoke(reg, db, sid, "get_issuer_snapshot", {"ticker": "NVDA"})
+            ok = await R.invoke(reg, db, sid, "describe_issuer", {"ticker": "NVDA"})
             await db.commit()
             assert not ok.get("error")
         async with mk() as db:
-            rej = await R.invoke(reg, db, sid, "get_issuer_snapshot", {"ticker": "NVDA"})
+            rej = await R.invoke(reg, db, sid, "describe_issuer", {"ticker": "NVDA"})
             await db.commit()
             assert rej["error"] == "budget_exceeded"
         async with mk() as db:
@@ -206,7 +206,7 @@ async def test_bad_arguments_cost_nothing_and_still_leave_a_trace():
             sid = s.id
 
         async with mk() as db:
-            out = await R.invoke(reg, db, sid, "get_fact_series", {"ticker": "NVDA"})  # no metric
+            out = await R.invoke(reg, db, sid, "get_flow", {"ticker": "NVDA"})  # no metric
             await db.commit()
         assert out["error"] == "invalid_arguments"
         assert [p["field"] for p in out["problems"]] == ["metric"]
@@ -220,7 +220,7 @@ async def test_bad_arguments_cost_nothing_and_still_leave_a_trace():
             steps = (await db.execute(
                 select(AgentStep).where(AgentStep.session_id == sid)
             )).scalars().all()
-            assert [(s.tool_name, s.status) for s in steps] == [("get_fact_series", "rejected")]
+            assert [(s.tool_name, s.status) for s in steps] == [("get_flow", "rejected")]
     finally:
         await engine.dispose()
 
@@ -235,8 +235,8 @@ async def test_a_valid_call_is_unaffected_by_the_check():
             await db.commit()
             sid = s.id
         async with mk() as db:
-            out = await R.invoke(reg, db, sid, "get_fact_series",
-                                 {"ticker": "NVDA", "metric": "revenue"})
+            out = await R.invoke(reg, db, sid, "get_flow",
+                                 {"ticker": "NVDA", "metric": "total_revenues"})
             await db.commit()
         assert "error" not in out, out
     finally:

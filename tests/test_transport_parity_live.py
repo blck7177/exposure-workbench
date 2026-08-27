@@ -99,11 +99,11 @@ def _normalise(value):
     return value
 
 CASES = [
-    ("get_issuer_snapshot", {"ticker": "NVDA"}, "a plain read"),
-    ("get_fact_series", {"ticker": "NVDA", "metric": "revenue", "last_n": 4}, "a ledgered calc"),
-    ("get_fact_series", {"ticker": "NVDA"}, "a refusal: missing required argument"),
-    ("get_fact_series", {"ticker": "NVDA", "metric": "revenue", "last_n": 0}, "a refusal: below the floor"),
-    ("get_issuer_snapshot", {"ticker": "NVDA", "period_type": "annual"}, "a refusal: unknown argument"),
+    ("describe_issuer", {"ticker": "NVDA"}, "a plain read"),
+    ("get_flow", {"ticker": "NVDA", "metric": "total_revenues", "months": 3, "last_n": 4}, "a ledgered calc"),
+    ("get_flow", {"ticker": "NVDA"}, "a refusal: missing required argument"),
+    ("get_flow", {"ticker": "NVDA", "metric": "total_revenues", "last_n": 0}, "a refusal: below the floor"),
+    ("describe_issuer", {"ticker": "NVDA", "period_type": "annual"}, "a refusal: unknown argument"),
     ("think", {"thought": "checking both routes"}, "a reflection, which spends no budget"),
 ]
 
@@ -171,9 +171,9 @@ async def test_the_budget_is_spent_the_same_way_through_the_transport():
 
         async with tool_session(faces.FACE_NAME_META, session_id=session_id,
                                 user_id=PARITY_USER) as tools:
-            await tools.call("get_issuer_snapshot", {"ticker": "NVDA"})      # +1
+            await tools.call("describe_issuer", {"ticker": "NVDA"})      # +1
             await tools.call("think", {"thought": "free"})                   # +0
-            await tools.call("get_fact_series", {"ticker": "NVDA"})          # +0, refused
+            await tools.call("get_flow", {"ticker": "NVDA"})          # +0, refused
 
         async with mk() as db:
             used = (await db.execute(text(

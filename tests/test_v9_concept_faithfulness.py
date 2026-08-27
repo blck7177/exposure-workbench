@@ -13,7 +13,7 @@ of debt, and the corpus proves it:
 
 So `LongTermDebt` INCLUDES current maturities and `LongTermDebtNoncurrent`
 excludes them: nested quantities, not synonyms. Both mapped to `long_term_debt`,
-and period_ladder._pick_latest resolves restatements rather than scopes, so the
+and the restatement rule resolves restatements rather than scopes, so the
 winner was whichever was filed last. Measured across the live corpus, 24
 (issuer, metric) pairs collided over 8 metrics and the worst disagreed by
 17,596%.

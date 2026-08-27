@@ -62,9 +62,9 @@ def test_schemas_are_valid_function_defs():
 
 
 def test_required_judgment_fields_are_in_schema():
-    """schema-as-interface: get_fact_series can't be called without ticker+metric."""
+    """schema-as-interface: get_flow can't be called without ticker+metric."""
     reg = build_read_registry()
-    gfs = reg.get("get_fact_series")
+    gfs = reg.get("get_flow")
     assert set(gfs.json_schema["required"]) == {"ticker", "metric"}
 
 
@@ -78,7 +78,7 @@ def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
     import pytest
 
     reg = build_read_registry()
-    assert "get_fact_series" in faces.resolve(reg, faces.READ_CORE)
+    assert "get_flow" in faces.resolve(reg, faces.READ_CORE)
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
         faces.resolve(reg, faces.FACE_META_AGENT)
@@ -110,7 +110,7 @@ def test_a_gates_own_output_is_never_harvested():
     assert {r["id"] for r in extract_evidence_refs(rejection)} == {"calc_fabricated", "fact_nope"}
 
     gate = Tool(name="respond", description="", json_schema={}, fn=None, tool_class=GATE)
-    read = Tool(name="get_fact_series", description="", json_schema={}, fn=None, tool_class=READ)
+    read = Tool(name="get_flow", description="", json_schema={}, fn=None, tool_class=READ)
     assert _harvestable(gate, "completed", rejection) is False
     assert _harvestable(read, "completed", {"calc_id": "calc_real"}) is True
     assert _harvestable(read, "error", {"error": "tool_error"}) is False

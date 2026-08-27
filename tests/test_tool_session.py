@@ -342,7 +342,7 @@ async def test_a_transport_failure_is_a_result_not_an_exception():
             raise RuntimeError("connection died mid-call")
 
     session = ToolSession(_Boom(), [])
-    out = await session.call("get_fact_series", {"ticker": "NVDA"})
+    out = await session.call("get_flow", {"ticker": "NVDA"})
     assert out["error"] == "tool_transport_error"
     assert "connection died" in out["detail"]
 

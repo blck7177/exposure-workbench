@@ -35,13 +35,6 @@ from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegist
 
 _PERIOD_TYPES = ["quarterly", "annual", "instant"]
 
-# A floor as well as a ceiling. load_fact_series does `min(last_n or 40, 40)`
-# and then `points[-limit:]`, so 0 asked for none and got all forty (with the
-# ledger recording 0), -4 silently dropped the four OLDEST points, and -20 on a
-# twelve-point series returned an empty series — successfully, with a calc_id
-# the agent could then cite.
-_LAST_N = {"type": "integer", "default": 12, "minimum": 1, "maximum": 40,
-           "description": "how many most-recent periods (cap 40)"}
 
 
 # ── company / snapshot ──────────────────────────────────────────────────────────
@@ -56,18 +49,6 @@ async def _resolve_company(db: AsyncSession, ticker: str) -> dict:
         "exchange": c.exchange, "sector": c.sector, "industry": c.industry,
         "is_investigable": c.is_investigable,
     }
-
-
-async def _get_issuer_snapshot(db: AsyncSession, ticker: str) -> dict:
-    company = await _resolve_company(db, ticker)
-    if company.get("error"):
-        return company
-    metrics = await cs.list_available_metrics(db, ticker.upper())
-    return {"company": company, "available_metrics": metrics["metrics"]}
-
-
-async def _list_available_data(db: AsyncSession, ticker: str) -> dict:
-    return await cs.list_available_metrics(db, ticker.upper())
 
 
 # ── V9-A2/A3: a flow over any window, and one instant's balance sheet ─────────
@@ -125,7 +106,7 @@ async def _get_flow(db: AsyncSession, ticker: str, metric: str,
                     months: int | None = None,
                     start: str | None = None, end: str | None = None,
                     last_n: int | None = None) -> dict:
-    # int(), for the reason the old _LAST_N carried: draft 2020-12 counts 12.0
+    # int(), because draft 2020-12 counts 12.0
     # as an integer, so the schema cannot refuse the float a model writes when
     # it means twelve, and it would reach a slice.
     return await fundamentals_service.get_flow(
@@ -141,14 +122,6 @@ async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = Non
 
 async def _calculate(db: AsyncSession, op: str, a: str, b: str) -> dict:
     return await typed_calculator.calculate(db, op, a, b, invoked_by=current_session_id())
-
-
-async def _list_formulas(db: AsyncSession) -> dict:
-    from exposure_workbench.analytics import formulas as _fm
-    return {"formulas": [
-        {"name": n, "definition": f.expression, "inputs": list(f.inputs),
-         "basis": f.basis, "source": f.source_url, "note": f.note}
-        for n, f in sorted(_fm.FORMULAS.items())]}
 
 
 async def _evaluate_formula(db: AsyncSession, ticker: str, name: str,
@@ -171,85 +144,12 @@ async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
 
 # ── financial data / calculations ───────────────────────────────────────────────
 
-def _spec(ticker: str, metric: str, period_type: str, last_n: int | None) -> cs.SeriesSpec:
-    # int(last_n), because the schema cannot say this. Draft 2020-12 counts 12.0
-    # as an integer — deliberately, and jsonschema implements it — so no keyword
-    # rejects the float a model writes when it means twelve. It would reach
-    # `points[-12.0:]` and raise TypeError, surfacing as tool_error. The single
-    # place last_n enters the series layer, and the same coercion
-    # filing_retrieval_service already does for k.
-    return cs.SeriesSpec(ticker=ticker.upper(), metric=metric,
-                         period_type=period_type,
-                         last_n=None if last_n is None else int(last_n))
-
-
-async def _get_fact_series(db: AsyncSession, ticker: str, metric: str,
-                           period_type: str = "quarterly", last_n: int = 12) -> dict:
-    # Ledgered, not just returned. A quarterly series contains a DERIVED Q4
-    # (annual minus the three filed quarters) whose value equals no row anywhere:
-    # the fact ids beside it point at four different numbers. Without a calc id
-    # of its own, quoting Q4 correctly AND citing it correctly is unverifiable by
-    # construction — four such refusals in one live brief.
-    try:
-        out = await cs.series(db, _spec(ticker, metric, period_type, last_n),
-                              invoked_by=current_session_id())
-    except cs.UnknownMetric as e:
-        return {"error": "metric_unavailable", "detail": str(e)}
-    return {"ticker": ticker.upper(), "metric": metric, "period_type": period_type, **out}
-
-
-async def _compute_change(db: AsyncSession, ticker: str, metric: str, mode: str,
-                          period_type: str = "quarterly", last_n: int = 12) -> dict:
-    try:
-        return await cs.change(db, _spec(ticker, metric, period_type, last_n), mode, invoked_by=current_session_id())
-    except cs.UnknownMetric as e:
-        return {"error": "metric_unavailable", "detail": str(e)}
-
-
-async def _compute_ratio(db: AsyncSession, ticker: str, numerator: str, denominator: str,
-                         period_type: str = "quarterly", last_n: int = 12) -> dict:
-    try:
-        return await cs.combine(
-            db, _spec(ticker, numerator, period_type, last_n),
-            _spec(ticker, denominator, period_type, last_n), "divide",
-            invoked_by=current_session_id(),
-        )
-    except cs.UnknownMetric as e:
-        return {"error": "metric_unavailable", "detail": str(e)}
-
-
-async def _compute_stat(db: AsyncSession, ticker: str, metric: str, op: str,
-                        period_type: str = "quarterly", last_n: int = 12) -> dict:
-    try:
-        return await cs.stat(db, _spec(ticker, metric, period_type, last_n), op, invoked_by=current_session_id())
-    except cs.UnknownMetric as e:
-        return {"error": "metric_unavailable", "detail": str(e)}
-
-
 async def _get_market_stats(db: AsyncSession, ticker: str, window: str = "1y", benchmark: str | None = "SPY") -> dict:
     days = {"1m": 30, "3m": 91, "6m": 182, "1y": 365}.get(window, 365)
     end = date.today()
     start = end - timedelta(days=days)
     return await cs.window_return(db, ticker.upper(), start, end, benchmark=benchmark,
                                   invoked_by=current_session_id())
-
-
-async def _compute_combine(db: AsyncSession, ticker: str, metric_a: str, metric_b: str, op: str,
-                           period_type: str = "quarterly", last_n: int = 12) -> dict:
-    """add / sub / divide over two metric series. compute_ratio is the divide case
-    under its domain name; the other two had been unreachable from every agent
-    face since M3, which is why free cash flow — operating_cash_flow minus capex,
-    the example in the module notes — could not be computed as a ledgered calc."""
-    if op not in ("add", "sub", "divide"):
-        return {"error": "unsupported_op", "op": op, "supported": ["add", "sub", "divide"]}
-    try:
-        return await cs.combine(
-            db, _spec(ticker, metric_a, period_type, last_n),
-            _spec(ticker, metric_b, period_type, last_n), op,
-            invoked_by=current_session_id(),
-        )
-    except cs.UnknownMetric as e:
-        return {"error": "metric_unavailable", "detail": str(e)}
 
 
 async def _get_task_status(db: AsyncSession, job_id: str) -> dict:
@@ -409,12 +309,6 @@ def build_read_registry() -> ToolRegistry:
     reg = ToolRegistry()
 
     reg.register(Tool(
-        name="get_issuer_snapshot",
-        description="Company identity plus the list of financial metrics available for this issuer.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
-        fn=_get_issuer_snapshot, tool_class=READ,
-    ))
-    reg.register(Tool(
         name="get_flow",
         description=(
             "A flow metric (revenue, net income, interest expense, operating cash flow, "
@@ -429,7 +323,7 @@ def build_read_registry() -> ToolRegistry:
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
             "metric": {"type": "string", "description": "a normalised metric name; "
-                                                        "list_available_data has them"},
+                                                        "describe_issuer has them"},
             "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120,
                        "description": "window length; defaults to 12"},
             "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, first day covered"},
@@ -522,17 +416,6 @@ def build_read_registry() -> ToolRegistry:
         fn=_calculate, tool_class=READ,
     ))
     reg.register(Tool(
-        name="list_formulas",
-        description=(
-            "The named measures this desk knows how to build, each with its definition, "
-            "its inputs and the authority for defining it that way (EBIT from net income "
-            "per SEC C&DI 103.01, free cash flow per 102.07). No thresholds — this desk "
-            "reports values and definitions; what counts as high or low is the reader's."
-        ),
-        json_schema={"type": "object", "properties": {}, "additionalProperties": False},
-        fn=_list_formulas, tool_class=READ,
-    ))
-    reg.register(Tool(
         name="evaluate_formula",
         description=(
             "One named measure for one issuer, built from the same primitives you could "
@@ -542,7 +425,7 @@ def build_read_registry() -> ToolRegistry:
         ),
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
-            "name": {"type": "string", "description": "a name from list_formulas"},
+            "name": {"type": "string", "description": "a name from describe_issuer's formulas"},
             "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120},
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
         }, "required": ["ticker", "name"], "additionalProperties": False},
@@ -566,12 +449,6 @@ def build_read_registry() -> ToolRegistry:
         fn=_get_fundamental_panel, tool_class=READ,
     ))
     reg.register(Tool(
-        name="list_available_data",
-        description="Which financial metrics exist for this issuer and how many periods each has.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
-        fn=_list_available_data, tool_class=READ,
-    ))
-    reg.register(Tool(
         name="get_portfolio_snapshot",
         description="The portfolio(s) this desk manages: latest exposure metrics, largest sector "
                     "and issuer weights, and active risk alerts. Takes no arguments — this is how "
@@ -579,50 +456,6 @@ def build_read_registry() -> ToolRegistry:
                     "carry the run_id that produced them; cite run_id (and alert ids) for portfolio claims.",
         json_schema={"type": "object", "properties": {}, "additionalProperties": False},
         fn=_get_portfolio_snapshot, tool_class=READ,
-    ))
-    reg.register(Tool(
-        name="get_fact_series",
-        description="A period-aligned series of one financial metric (values carry the fact ids they came from).",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER,
-            "metric": {"type": "string", "description": "normalized metric, e.g. revenue, net_income, cost_of_revenue"},
-            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": _LAST_N,
-        }, "required": ["ticker", "metric"], "additionalProperties": False},
-        fn=_get_fact_series, tool_class=READ,
-    ))
-    reg.register(Tool(
-        name="compute_change",
-        description="Growth of a metric: yoy / qoq / pct / abs. Writes a ledger entry; returns its calc_id.",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "metric": {"type": "string"},
-            "mode": {"type": "string", "enum": ["yoy", "qoq", "pct", "abs"]},
-            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": _LAST_N,
-        }, "required": ["ticker", "metric", "mode"], "additionalProperties": False},
-        fn=_compute_change, tool_class=READ,
-    ))
-    reg.register(Tool(
-        name="compute_ratio",
-        description="Ratio of two metrics (e.g. gross_profit / revenue = margin). Writes a ledger entry.",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "numerator": {"type": "string"}, "denominator": {"type": "string"},
-            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": _LAST_N,
-        }, "required": ["ticker", "numerator", "denominator"], "additionalProperties": False},
-        fn=_compute_ratio, tool_class=READ,
-    ))
-    reg.register(Tool(
-        name="compute_combine",
-        description="Combine two metric series: add / sub / divide "
-                    "(e.g. operating_cash_flow sub capex = free cash flow). Writes a ledger entry.",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "metric_a": {"type": "string"}, "metric_b": {"type": "string"},
-            "op": {"type": "string", "enum": ["add", "sub", "divide"]},
-            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": _LAST_N,
-        }, "required": ["ticker", "metric_a", "metric_b", "op"], "additionalProperties": False},
-        fn=_compute_combine, tool_class=READ,
     ))
     reg.register(Tool(
         name="get_task_status",
@@ -771,17 +604,6 @@ def build_read_registry() -> ToolRegistry:
             "trough": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
         }, "required": ["portfolio_id", "peak", "trough"], "additionalProperties": False},
         fn=_explain_episode, tool_class=READ,
-    ))
-    reg.register(Tool(
-        name="compute_stat",
-        description="A scalar statistic over a metric series: cagr / avg / min / max / std / sum / latest.",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "metric": {"type": "string"},
-            "op": {"type": "string", "enum": ["cagr", "avg", "min", "max", "std", "sum", "latest"]},
-            "period_type": {"type": "string", "enum": _PERIOD_TYPES, "default": "quarterly"},
-            "last_n": _LAST_N,
-        }, "required": ["ticker", "metric", "op"], "additionalProperties": False},
-        fn=_compute_stat, tool_class=READ,
     ))
     reg.register(Tool(
         name="get_market_stats",

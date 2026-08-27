@@ -64,7 +64,7 @@ async def _flow_facts(db: AsyncSession, company_id: str, metric: str) -> list[ia
 
 def _unknown_metric(metric: str) -> dict:
     return {"error": "unknown_metric", "metric": metric,
-            "detail": f"{metric} is not a normalised metric; call list_available_data"}
+            "detail": f"{metric} is not a normalised metric; describe_issuer lists them"}
 
 
 async def get_flow(
@@ -170,12 +170,11 @@ async def get_balance_sheet(
     if not rows:
         return {"error": "no_balance_sheet_data", "ticker": ticker}
 
-    from exposure_workbench.analytics.period_ladder import restatement_key
     best: dict[tuple[str, date], tuple] = {}
     for metric, pe, value, fid, acc, fd in rows:
         key = (metric, pe)
         prev = best.get(key)
-        if prev is None or restatement_key(fd, acc) > restatement_key(prev[4], prev[3]):
+        if prev is None or ia.restatement_key(fd, acc) > ia.restatement_key(prev[4], prev[3]):
             best[key] = (float(value), fid, pe, acc, fd)
 
     as_of = date.fromisoformat(at) if at else max(pe for _m, pe in best)
@@ -292,3 +291,24 @@ async def get_balance_series(
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "points": points,
             "basis": f"{metric} as reported at each of {len(points)} instants, "
                      f"{points[0]['as_of']}..{points[-1]['as_of']}; no value is carried across dates"}
+
+
+async def quarterly_points(db: AsyncSession, ticker: str, metric: str, *, last_n: int = 8):
+    """Derived quarters as (period_end, value, fact_ids), oldest first — for
+    in-process callers that need the series without a ledger row (the panel's
+    TTM is a sum it records itself). Unreachable slots are omitted here because
+    a caller summing quarters has no use for a slot with no value; the tool
+    face keeps them, where a reader can see the gap.
+
+    Raises LookupError when the issuer reports nothing under this metric, which
+    is the shape the panel already handled for the ladder.
+    """
+    company_id = await _company_id(db, ticker.upper())
+    if company_id is None:
+        raise LookupError(ticker)
+    facts = await _flow_facts(db, company_id, metric)
+    if not facts:
+        raise LookupError(metric)
+    return [(w.end, w.window.value, tuple(w.window.fact_ids))
+            for w in ia.consecutive_windows(facts, months=3, last_n=last_n)
+            if isinstance(w.window, ia.Derived)]

@@ -22,6 +22,7 @@ load_dotenv(".env", override=True)
 
 from exposure_workbench.db.models import AgentMessage
 from exposure_workbench.services import calc_service as cs
+from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import numeric_verification as nv
 
 pytestmark = pytest.mark.live
@@ -43,10 +44,9 @@ async def test_a_derived_q4_is_verifiable_only_because_the_series_is_ledgered():
     engine, mk = await _session()
     try:
         async with mk() as db:
-            out = await cs.series(db, cs.SeriesSpec("MSFT", "revenue", period_type="quarterly", last_n=8),
-                                  invoked_by="test")
+            out = await fs.get_flow(db, "MSFT", "revenue", months=3, last_n=8, invoked_by="test")
             await db.commit()
-            derived = [p for p in out["points"] if len(p["fact_ids"]) > 1]
+            derived = [p for p in out["points"] if len(p.get("fact_ids") or []) > 1]
             assert derived, "expected at least one derived Q4 point in a quarterly series"
 
             point = derived[-1]

@@ -24,7 +24,6 @@ from datetime import date, timedelta
 
 PRIMITIVE_VERSION = "v2"   # v2: yoy/qoq match by date, not list position
 
-COMBINE_OPS = ("add", "sub", "divide")
 CHANGE_MODES = ("yoy", "qoq", "pct", "abs")
 STAT_OPS = ("cagr", "avg", "min", "max", "std", "sum", "latest")
 
@@ -60,54 +59,6 @@ class ScalarResult:
     input_fact_ids: list[str] = field(default_factory=list)
     quality_flags: dict = field(default_factory=dict)
     primitive_version: str = PRIMITIVE_VERSION
-
-
-# ── combine ────────────────────────────────────────────────────────────────────
-
-def combine_series(a: list[SeriesPoint], b: list[SeriesPoint], op: str) -> SeriesResult:
-    """Align two series on period_end and apply op elementwise.
-
-    Only periods present in BOTH contribute — an unmatched period is skipped and
-    counted, rather than being treated as zero.
-    """
-    if op not in COMBINE_OPS:
-        raise ValueError(f"unsupported combine op {op!r}")
-
-    b_by_period = {p.period_end: p for p in b}
-    points: list[SeriesPoint] = []
-    unmatched = 0
-    div_zero = 0
-
-    for pa in a:
-        pb = b_by_period.get(pa.period_end)
-        if pb is None:
-            unmatched += 1
-            continue
-        if pa.value is None or pb.value is None:
-            points.append(SeriesPoint(pa.period_end, None,
-                                      pa.input_fact_ids + pb.input_fact_ids,
-                                      {"missing_input": True}))
-            continue
-        if op == "add":
-            v = pa.value + pb.value
-        elif op == "sub":
-            v = pa.value - pb.value
-        else:
-            if pb.value == 0:
-                div_zero += 1
-                points.append(SeriesPoint(pa.period_end, None,
-                                          pa.input_fact_ids + pb.input_fact_ids,
-                                          {"division_by_zero": True}))
-                continue
-            v = pa.value / pb.value
-        points.append(SeriesPoint(pa.period_end, v, pa.input_fact_ids + pb.input_fact_ids))
-
-    flags: dict = {}
-    if unmatched:
-        flags["unmatched_periods"] = unmatched
-    if div_zero:
-        flags["division_by_zero_periods"] = div_zero
-    return SeriesResult(operation=f"combine.{op}", points=points, quality_flags=flags)
 
 
 # ── change ─────────────────────────────────────────────────────────────────────

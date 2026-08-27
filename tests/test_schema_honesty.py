@@ -177,8 +177,7 @@ def test_nested_objects_forbid_unknown_arguments_too(name, tool):
 
 
 _WINDOWED = {
-    "get_fact_series": "last_n", "compute_change": "last_n", "compute_ratio": "last_n",
-    "compute_combine": "last_n", "compute_stat": "last_n", "search_filing_passages": "k",
+    "get_flow": "last_n", "get_balance_series": "last_n", "search_filing_passages": "k",
 }
 
 
@@ -187,7 +186,7 @@ def test_a_window_size_has_a_floor_as_well_as_a_ceiling(name, param):
     """Each of these had a maximum and no minimum, and the floor is where the
     damage was.
 
-    load_fact_series does `limit = min(last_n or 40, 40)` and then
+    The retired load_fact_series did `limit = min(last_n or 40, 40)` and then
     `points[-limit:]`. So last_n=0 returned all forty points while the ledger
     row recorded 0; last_n=-4 returned the series with its four OLDEST points
     dropped, which is a window nobody asked for; and last_n=-20 on a

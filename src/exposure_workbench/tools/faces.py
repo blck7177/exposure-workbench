@@ -22,9 +22,6 @@ from __future__ import annotations
 
 # Read + reflection tools available to every agent surface.
 READ_CORE = [
-    "get_issuer_snapshot",
-    "list_available_data",
-    "get_fact_series",
     # V9-A2/A3. Any window, and one instant — the two primitives report analysis
     # is composed from. On both faces: an issuer's filings are issuer-scoped
     # facts, which is what the research face is for too.
@@ -40,13 +37,8 @@ READ_CORE = [
     "calculate",
     # V9-D/P. The method map, one measure, and all of them at once — the last
     # being a batch of the second, with no privileged path of its own.
-    "list_formulas",
     "evaluate_formula",
     "get_fundamental_panel",
-    "compute_change",
-    "compute_ratio",
-    "compute_combine",
-    "compute_stat",
     "get_market_stats",
     "search_filing_passages",
     "get_filing_section",

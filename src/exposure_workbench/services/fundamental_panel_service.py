@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.analytics import fundamental_panel as fp
 from exposure_workbench.db.models import Company, FinancialFact, Position
 from exposure_workbench.services import calc_service as cs
+from exposure_workbench.services import fundamentals_service
 
 # Balance-sheet lines the panel may read. All INSTANT (V9-M3 asserts it).
 _BALANCES = (
@@ -75,8 +76,8 @@ async def _balance_dates(db: AsyncSession, company_id: str) -> dict[str, dict[da
     )).all()
     out: dict[str, dict[date, tuple[float, str]]] = {}
     for metric, pe, value, fid in rows:
-        # Latest filing wins within a period; period_ladder does the same for
-        # restatements and this mirrors it for a single-date read.
+        # Latest filing wins within a period — the restatement rule
+        # (interval_algebra.restatement_key), mirrored here for a single-date read.
         out.setdefault(metric, {})[pe] = (float(value), fid)
     return out
 
@@ -136,16 +137,18 @@ async def build_panel(db: AsyncSession, ticker: str, invoked_by: str = "agent") 
     # Flows, as TTM.
     flows: dict[str, fp.Line] = {}
     for metric in _FLOWS:
+        # V10-S4: quarters from the interval engine (consecutive windows on the
+        # issuer's grid) rather than the period ladder. Same eight most recent
+        # quarters; Q4 is a derived window like any other, and a cumulative
+        # filer's Q2 and Q3 exist where the ladder had a hole.
         try:
-            points, _flags = await cs.load_fact_series(
-                db, cs.SeriesSpec(ticker, metric, period_type="quarterly", last_n=8))
-        except Exception:
+            points = await fundamentals_service.quarterly_points(db, ticker, metric, last_n=8)
+        except LookupError:
             flows[metric] = fp.Missing(missing=(metric,),
                                        reason=f"{metric} is not reported by this issuer")
             continue
-        flows[metric] = fp.ttm([fp.Q(period_end=p.period_end, value=p.value,
-                                     fact_ids=tuple(p.input_fact_ids))
-                                for p in points if p.value is not None])
+        flows[metric] = fp.ttm([fp.Q(period_end=end, value=value, fact_ids=fact_ids)
+                                for end, value, fact_ids in points])
 
     # Whichever top line this issuer reports — named, never guessed. NVDA changed
     # tagging in 2022 and LLY only ever reports the total, so this is the normal

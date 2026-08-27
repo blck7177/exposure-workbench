@@ -72,7 +72,7 @@ def test_a_reported_interval_is_returned_as_itself():
 
 
 def test_q4_is_the_general_rule_not_a_special_case():
-    """derive_q4 in period_ladder is FY − (Q1+Q2+Q3). Here it is FY − 9M, one
+    """derive_q4 in the (now retired) period ladder was FY − (Q1+Q2+Q3). Here it is FY − 9M, one
     subtraction, and it falls out of the same search."""
     got = ia.derive(AAPL, date(2025, 6, 29), date(2025, 9, 27))
     assert isinstance(got, ia.Derived)

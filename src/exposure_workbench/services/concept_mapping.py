@@ -8,7 +8,7 @@ Design rules (see MODULE_NOTES M2):
     (AAPL 2026-03-28: 74.404 + 8.310 = 82.714 ≈ 82.700), `ProfitLoss` includes
     noncontrolling interests and `NetIncomeLoss` does not, the two cash concepts
     differ by restricted cash, and `Revenues` is a superset of contract revenue.
-    Those are NESTED quantities, and period_ladder._pick_latest resolves
+    Those are NESTED quantities, and the restatement rule (interval_algebra.restatement_key) resolves
     restatements rather than scopes — so which one reached the answer depended
     on filing order. 24 (issuer, metric) pairs were affected across 8 metrics;
     the worst disagreed by 17,596%.

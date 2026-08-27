@@ -89,8 +89,15 @@ def test_a_series_never_serves_a_shorter_window_under_a_longer_name():
 
 
 def test_restatement_rule_has_one_home():
-    from exposure_workbench.analytics import period_ladder as pl
+    """Most recently filed wins; filing_date first, accession as the tiebreak
+    that sorts chronologically within an issuer. Lived in the ladder; the
+    ladder is a frozen test fixture now and imports it from the engine."""
+    from tests import legacy_ladder as pl
     assert pl.restatement_key is ia.restatement_key
+    k = ia.restatement_key
+    assert k(date(2026, 2, 1), "a") > k(date(2025, 2, 1), "z")
+    assert k(None, "0001-25") < k(None, "0001-26")
+    assert k(None, "z") < k(date(2000, 1, 1), "a")
 
 
 # ── the tools ─────────────────────────────────────────────────────────────────

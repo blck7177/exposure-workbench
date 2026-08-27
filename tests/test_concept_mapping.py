@@ -14,7 +14,7 @@ def test_many_concepts_map_to_one_metric_only_when_they_are_one_quantity():
     with `Revenues` and `RevenueFromContractWithCustomerExcludingAssessedTax` as
     the example. V9-M1 found that example to be the counter-example: `Revenues`
     is the whole top line and contract revenue is a subset of it, measured 5.2%
-    apart on XOM, and mapping both to `revenue` let period_ladder serve
+    apart on XOM, and mapping both to `revenue` let the series serve
     whichever was filed last.
 
     The rule survives with its condition made explicit. SalesRevenueNet is the

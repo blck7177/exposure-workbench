@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 load_dotenv(".env", override=True)
 
 from exposure_workbench.analytics import interval_algebra as ia
-from exposure_workbench.analytics import period_ladder as pl
+from tests import legacy_ladder as pl
 
 pytestmark = pytest.mark.live
 

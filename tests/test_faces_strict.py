@@ -37,13 +37,13 @@ def test_resolve_raises_and_names_every_missing_tool():
     assert "no_such_tool" in message and "another_missing_one" in message
     # The tools that WERE present are not the story; the message must not bury
     # the two names in a list of eighteen.
-    assert "get_fact_series" not in message
+    assert "get_flow" not in message
 
 
 def test_resolve_on_an_empty_registry_names_the_whole_face():
     with pytest.raises(faces.FaceNotRegistered) as exc:
-        faces.resolve(ToolRegistry(), ["get_fact_series", "think"])
-    assert "get_fact_series" in str(exc.value) and "think" in str(exc.value)
+        faces.resolve(ToolRegistry(), ["get_flow", "think"])
+    assert "get_flow" in str(exc.value) and "think" in str(exc.value)
 
 
 def test_the_trimming_helper_is_gone():

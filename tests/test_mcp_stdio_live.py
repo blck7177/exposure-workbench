@@ -181,7 +181,7 @@ async def test_a_bad_call_is_refused_by_the_gate_not_the_transport(two_users):
 
     built = await server.build_stdio_server()
     async with create_connected_server_and_client_session(built) as client:
-        out = await client.call_tool("get_fact_series", {"ticker": "NVDA"})   # no metric
+        out = await client.call_tool("get_flow", {"ticker": "NVDA"})   # no metric
 
     assert out.isError
     payload = json.loads(out.content[0].text)
@@ -189,7 +189,7 @@ async def test_a_bad_call_is_refused_by_the_gate_not_the_transport(two_users):
     assert [p["field"] for p in payload["problems"]] == ["metric"]
     assert "Input validation error" not in out.content[0].text
 
-    assert await _steps(server._session.id) == [("get_fact_series", "rejected")]
+    assert await _steps(server._session.id) == [("get_flow", "rejected")]
 
 
 async def test_the_door_serves_the_whole_meta_face(two_users):

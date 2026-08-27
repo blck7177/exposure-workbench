@@ -6,7 +6,7 @@ The mapping table lets several raw concepts mean one metric. That is safe only
 while the concepts really are synonyms, and nothing was checking. They were not:
 `LongTermDebt` and `LongTermDebtNoncurrent` differ by the current maturities,
 `ProfitLoss` and `NetIncomeLoss` by the noncontrolling interests, the two cash
-concepts by restricted cash — and `period_ladder._pick_latest` resolves
+concepts by restricted cash — and the restatement rule resolves
 restatements, not scopes, so which one reached the answer depended on filing
 order. 24 (issuer, metric) pairs were affected; the worst disagreed by 17,596%.
 
@@ -37,7 +37,7 @@ URL = os.getenv(
 )
 
 # Consolidated facts only. A dimensioned fact carries the same concept and a
-# smaller value by design, and load_fact_series already filters on this.
+# smaller value by design, and _flow_facts already filters on this.
 _SQL = text("""
 SELECT c.ticker, f.normalized_metric AS metric, f.period_end,
        count(DISTINCT f.raw_concept) AS concepts,

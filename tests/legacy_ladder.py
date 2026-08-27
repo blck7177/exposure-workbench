@@ -1,20 +1,15 @@
-"""Period ladder (M3) — as-reported XBRL facts -> a clean, comparable series.
+"""FROZEN REFERENCE — the period ladder as it stood when V10 retired it.
 
-This is the ONLY place period logic lives. Every fundamentals metric consumes a
-ladder, so quarter alignment, restatement selection and Q4 derivation are
-written and tested once instead of being re-implemented per metric.
+Not product code. `analytics/period_ladder.py` was deleted in V10-S4 after the
+interval engine reproduced every one of its points on the whole corpus
+(quarterly 1439/1439, annual 484/484; the derived Q4 290/290 in V9-A6). This
+copy exists so those two parity tests keep running as a standing guard rather
+than a one-time proof: a future change to the engine that silently moves a
+quarter will disagree with this file, and this file cannot drift because
+nothing else imports it.
 
-Grounded in measured EDGAR behaviour (see MODULE_NOTES M2):
-  * fiscal_year / fiscal_quarter LABELS ARE NOT RELIABLE — the same period
-    2025-01-27..2025-04-27 is tagged FY2027 by one filing and FY2026 by another.
-    period_start / period_end are the authoritative key.
-  * Q4 quarterly facts generally DO NOT EXIST (issuers report 3 quarters + a
-    full year), so Q4 must be derived as annual - (Q1+Q2+Q3).
-  * Half-year and nine-month CUMULATIVE facts exist and must never be mistaken
-    for quarters.
-
-Pure functions: no DB, no network, no LLM. Missing data yields fewer points plus
-a quality flag — never an interpolated or carried-forward value.
+`restatement_key` is imported from the engine, so the one rule stays one rule.
+Everything else is verbatim.
 """
 
 from __future__ import annotations

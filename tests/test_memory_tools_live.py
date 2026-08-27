@@ -21,6 +21,8 @@ load_dotenv(".env", override=True)
 
 from exposure_workbench.services import brief_service, job_status_service
 from exposure_workbench.services import portfolio_service
+from exposure_workbench.services import fundamentals_service as fs
+from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools import definitions as D
 from exposure_workbench.tools.registry import extract_evidence_refs
 
@@ -148,20 +150,21 @@ async def test_every_holding_is_listed_and_priced_from_the_run_not_the_position(
         await engine.dispose()
 
 
-async def test_free_cash_flow_is_finally_a_ledgered_calculation():
+async def test_free_cash_flow_is_a_ledgered_series_calculation():
     """operating_cash_flow minus capex is the example in this project's own
-    module notes, and until now `sub` was unreachable from every agent face:
-    compute_ratio hardcoded divide and nothing else exposed combine."""
+    module notes. It used to need compute_combine with op='sub'; since V10 it
+    is calculate over two series ids, and a nonsense op is refused by name."""
     engine, mk = await _session()
     try:
         async with mk() as db:
-            out = await D._compute_combine(db, "AAPL", "operating_cash_flow", "capex", "sub")
+            ocf = await fs.get_flow(db, "AAPL", "operating_cash_flow", months=3, last_n=8)
+            capex = await fs.get_flow(db, "AAPL", "capex", months=3, last_n=8)
+            out = await tc.calculate(db, "subtract", ocf["calc_id"], capex["calc_id"])
             await db.commit()
             assert out["calc_id"].startswith("calc_")
-            assert out["operation"] == "combine.sub"
             assert out["points"], "expected at least one period of free cash flow"
 
-            bad = await D._compute_combine(db, "AAPL", "revenue", "capex", "multiply")
+            bad = await tc.calculate(db, "power", ocf["calc_id"], capex["calc_id"])
             assert bad["error"] == "unsupported_op"
     finally:
         await engine.dispose()

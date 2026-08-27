@@ -319,8 +319,8 @@ def _align(left: TypedSeries, right: TypedSeries) -> list[tuple[date, Typed, Typ
     """Pairs of points whose end dates coincide, and a refusal if none do.
 
     Unmatched points on either side are dropped from the RESULT and counted in
-    its quality flags — the same rule series_ops.combine_series has always
-    applied. Dropping is honest here where it would not be for a single refused
+    its quality flags — the rule the v1 combine_series applied, kept here now
+    that it is the only aligner. Dropping is honest here where it would not be for a single refused
     pair: an unmatched period is not a wrong number, it is a period only one
     side reported, and the result says how many there were.
     """
