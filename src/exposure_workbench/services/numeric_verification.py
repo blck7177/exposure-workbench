@@ -449,6 +449,12 @@ _CALC_RATIO_OPS = frozenset({
     # model's fault — the failure mode this frozenset exists to prevent, which
     # the V8 plan named in its baseline before it happened.
     "portfolio.reconcile",
+    # V8-D2. A book's cumulative return over a window is a return. Without this
+    # the gate types it MONEY and refuses the one figure explain_episode exists
+    # to produce — the same omission _CALC_RATIO_OPS was created for.
+    "portfolio.window_return",
+    # V8-D2. A drawdown depth is a fraction of a peak, not an amount of money.
+    "portfolio.drawdown_episodes",
 })
 
 # Operations whose result carries MORE THAN ONE computed quantity, and what each
@@ -462,6 +468,13 @@ _CALC_RATIO_OPS = frozenset({
 # against 750 observations. Enumerated, like _RUN_CHILDREN and _RUN_COUNTS,
 # because the alternative is a walker that guesses.
 _CALC_RESULT_KEYS: dict[str, dict[str, str]] = {
+    # V8-D2. Episode depths are distances below a running high, all in one unit,
+    # and there are as many as the span holds — so the declared key carries a
+    # list. Without this the depths a tool returned could be quoted by nothing.
+    "portfolio.drawdown_episodes": {
+        "deepest_depth": RATIO,
+        "episode_depths": RATIO,
+    },
     "portfolio.reconcile": {
         "sum_of_position_contributions": RATIO,
         "sum_of_factor_contributions": RATIO,
@@ -567,8 +580,13 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
         values.append(EvidenceValue(float(v), unit, row.operation, cid))
     for key, key_unit in _CALC_RESULT_KEYS.get(row.operation, {}).items():
         kv = result.get(key)
-        if isinstance(kv, (int, float)) and not isinstance(kv, bool):
-            values.append(EvidenceValue(float(kv), key_unit, f"{row.operation}.{key}", cid))
+        # A declared key may hold one number or a list of them in one unit — an
+        # episode list is n depths, all distances below a running high. Declared
+        # either way, so the list is not a licence to walk arbitrary structure.
+        for i, item in enumerate(kv if isinstance(kv, list) else [kv]):
+            if isinstance(item, (int, float)) and not isinstance(item, bool):
+                label = f"{row.operation}.{key}" + (f"[{i}]" if isinstance(kv, list) else "")
+                values.append(EvidenceValue(float(item), key_unit, label, cid))
     _numbers_in(result.get("quality_flags") or {}, "quality_flags", values, cid)
     return values, set()
 

@@ -71,6 +71,9 @@ META_ONLY_READS = [
     # V8-B. One call that reconciles a day's move, built on get_attribution's
     # own service rather than a second copy of the query.
     "reconcile_move",
+    # V8-D. When the book fell and what the window between two dates held. Both
+    # are about a portfolio, so both are meta-only.
+    "get_drawdown_episodes", "explain_episode",
 ]
 
 FACE_META_AGENT = READ_CORE + META_ONLY_READS + [

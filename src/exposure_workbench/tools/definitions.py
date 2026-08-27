@@ -26,6 +26,7 @@ from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
+from exposure_workbench.services import drawdown_service
 from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import trace_service
@@ -252,6 +253,14 @@ async def _get_run_freshness(db: AsyncSession, portfolio_id: str) -> dict:
 
 async def _reconcile_move(db: AsyncSession, run_id: str) -> dict:
     return await reconcile_service.reconcile_move(db, run_id)
+
+
+async def _get_drawdown_episodes(db: AsyncSession, portfolio_id: str, span: str = "1y") -> dict:
+    return await drawdown_service.get_drawdown_episodes(db, portfolio_id, span)
+
+
+async def _explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough: str) -> dict:
+    return await drawdown_service.explain_episode(db, portfolio_id, peak, trough)
 
 
 # ── filing retrieval ────────────────────────────────────────────────────────────
@@ -622,6 +631,40 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_reconcile_move, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_drawdown_episodes",
+        description=(
+            "When this portfolio fell and whether it came back: every peak-to-trough "
+            "episode at least 5% deep in the span, deepest first, with the trough date and "
+            "the recovery date (null while still under water). Use this for 'have there "
+            "been drawdowns' and 'what was the worst one'. A depth is a distance below a "
+            "running high, not a return."
+        ),
+        json_schema={"type": "object", "properties": {
+            "portfolio_id": {"type": "string"},
+            # An enum rather than a day count. "The last 37 days" is a window
+            # chosen after seeing the answer.
+            "span": {"type": ["string", "null"], "enum": ["3m", "6m", "1y", "3y", None],
+                     "description": "history to search (default 1y)"},
+        }, "required": ["portfolio_id"], "additionalProperties": False},
+        fn=_get_drawdown_episodes, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="explain_episode",
+        description=(
+            "What happened between a peak and a trough: the book's cumulative return over "
+            "that window, the benchmark's over the same window, and each holding's. These "
+            "are fixed-window returns — they do NOT break the drawdown's depth into parts, "
+            "because depth depends on the path and is not additive. Say the window when "
+            "you quote any of these."
+        ),
+        json_schema={"type": "object", "properties": {
+            "portfolio_id": {"type": "string"},
+            "peak": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
+            "trough": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
+        }, "required": ["portfolio_id", "peak", "trough"], "additionalProperties": False},
+        fn=_explain_episode, tool_class=READ,
     ))
     reg.register(Tool(
         name="compute_stat",
