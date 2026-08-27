@@ -68,6 +68,9 @@ META_ONLY_READS = [
     # issuer.
     "get_attribution", "get_risk_state", "list_run_alerts", "list_risk_limits",
     "get_run_freshness",
+    # V8-B. One call that reconciles a day's move, built on get_attribution's
+    # own service rather than a second copy of the query.
+    "reconcile_move",
 ]
 
 FACE_META_AGENT = READ_CORE + META_ONLY_READS + [

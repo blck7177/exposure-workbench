@@ -443,7 +443,33 @@ _CALC_RATIO_OPS = frozenset({
     # types its own product as MONEY and then refuses the leverage figure it
     # just produced, reporting it as the model's fault.
     "calc.scalar.divide",
+    # V8-B. reconcile_move divides two returns to state what share of a move the
+    # factors account for. Without this line the gate types its own product as
+    # MONEY, refuses the share it just computed, and reports the refusal as the
+    # model's fault — the failure mode this frozenset exists to prevent, which
+    # the V8 plan named in its baseline before it happened.
+    "portfolio.reconcile",
 })
+
+# Operations whose result carries MORE THAN ONE computed quantity, and what each
+# one is. Every operation in this ledger until V8-B produced a single `value` or
+# a series of them, so the resolver read exactly those two shapes and a result
+# with other numeric keys carried nothing — silently.
+#
+# A per-key map rather than a second inference rule: _CALC_RATIO_OPS types an
+# operation's `value`, and an op like this one computes a share (a ratio) beside
+# an observation count (not one). Typing them alike would let "750%" verify
+# against 750 observations. Enumerated, like _RUN_CHILDREN and _RUN_COUNTS,
+# because the alternative is a walker that guesses.
+_CALC_RESULT_KEYS: dict[str, dict[str, str]] = {
+    "portfolio.reconcile": {
+        "sum_of_position_contributions": RATIO,
+        "sum_of_factor_contributions": RATIO,
+        "alpha_plus_residual": RATIO,
+        "factor_share": RATIO,
+        "unexplained_share": RATIO,
+    },
+}
 
 # run_ resolves through its children: exposure_runs itself has no numeric column.
 # (model, column, unit_class) — the label names the row so the model can tell
@@ -539,6 +565,10 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
     v = result.get("value")
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         values.append(EvidenceValue(float(v), unit, row.operation, cid))
+    for key, key_unit in _CALC_RESULT_KEYS.get(row.operation, {}).items():
+        kv = result.get(key)
+        if isinstance(kv, (int, float)) and not isinstance(kv, bool):
+            values.append(EvidenceValue(float(kv), key_unit, f"{row.operation}.{key}", cid))
     _numbers_in(result.get("quality_flags") or {}, "quality_flags", values, cid)
     return values, set()
 

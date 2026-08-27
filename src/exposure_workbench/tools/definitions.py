@@ -26,6 +26,7 @@ from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
+from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
@@ -247,6 +248,10 @@ async def _list_risk_limits(db: AsyncSession, portfolio_id: str) -> dict:
 
 async def _get_run_freshness(db: AsyncSession, portfolio_id: str) -> dict:
     return await run_reads_service.get_run_freshness(db, portfolio_id)
+
+
+async def _reconcile_move(db: AsyncSession, run_id: str) -> dict:
+    return await reconcile_service.reconcile_move(db, run_id)
 
 
 # ── filing retrieval ────────────────────────────────────────────────────────────
@@ -601,6 +606,22 @@ def build_read_registry() -> ToolRegistry:
             "portfolio_id": {"type": "string"},
         }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_get_run_freshness, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="reconcile_move",
+        description=(
+            "Reconcile one day's portfolio move in a single call: checks that the position "
+            "contributions sum to the day's return, splits the move into what the factor "
+            "model explains and what it does not (alpha_plus_residual), and names the "
+            "largest factor and the largest position. Use this for 'why did the book move' "
+            "and 'what drove the drawdown' before reaching for anything else. If the "
+            "position identity does not hold, no share of the move is reported at all — "
+            "that is a data problem, not a smaller answer. Cite the run_id or the calc_id."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_reconcile_move, tool_class=READ,
     ))
     reg.register(Tool(
         name="compute_stat",
