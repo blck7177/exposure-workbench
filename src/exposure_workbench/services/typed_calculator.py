@@ -154,14 +154,29 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
                             f"them counts {narrow.quantity} twice. Take the total, or take "
                             f"its components — not one of each.")
 
-    # R1 — flows may be added only over days that do not overlap.
+    # R1 — two flows may be added in exactly two situations, and the acceptance
+    # battery found the hole between them. Blocking only OVERLAP let through the
+    # worse case: NVDA's EBIT came out as 2026 net income plus 2024 interest
+    # expense, because the two windows merely failed to overlap and nothing
+    # objected. Summing incomparable periods is not double-counting, it is
+    # arithmetic on two different years.
     if a.interval and b.interval and op == "add":
         (a0, a1), (b0, b1) = a.interval, b.interval
+        same_window = (a0, a1) == (b0, b1)
+        adjacent = b0 == a1 + timedelta(days=1) or a0 == b1 + timedelta(days=1)
+        if same_window or adjacent:
+            return None
         if a0 <= b1 and b0 <= a1:
             return _err("overlapping_intervals",
                         f"{a.source_id} covers {a0}..{a1} and {b.source_id} covers "
                         f"{b0}..{b1}; the shared days would be counted twice. Subtract "
                         f"to get the difference, or add windows that do not overlap.")
+        return _err("mismatched_windows",
+                    f"{a.source_id} covers {a0}..{a1} and {b.source_id} covers {b0}..{b1}. "
+                    f"Components of one period may be added when they cover the SAME "
+                    f"window, and consecutive periods may be added when they meet; these "
+                    f"do neither, so their sum belongs to no period. Fetch both over one "
+                    f"window with get_flow(start=..., end=...).")
     return None
 
 
@@ -173,6 +188,11 @@ def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
         return Typed(value=value, unit_class=a.unit_class, instant=a.instant)
     if a.interval and b.interval:
         (a0, a1), (b0, b1) = a.interval, b.interval
+        # Components of ONE period summed: EBIT is net income plus interest plus
+        # tax over the same window, and the result is about that window. Losing
+        # it here left debt_to_ebitda printing a basis with an empty half.
+        if (a0, a1) == (b0, b1):
+            return Typed(value=value, unit_class=a.unit_class, interval=(a0, a1))
         if op == "add" and b0 == a1 + timedelta(days=1):
             return Typed(value=value, unit_class=a.unit_class, interval=(a0, b1))
         if op == "add" and a0 == b1 + timedelta(days=1):

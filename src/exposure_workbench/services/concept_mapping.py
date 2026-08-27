@@ -157,6 +157,18 @@ _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
     "interest_expense": (
         "InterestExpense",
     ),
+    # Interest expense classified as non-operating. Its OWN metric, never folded
+    # into interest_expense: they are nested by definition, and merging them
+    # would produce a series that switches basis in 2024 — the NVDA revenue
+    # situation, which V9-M1 split rather than merged.
+    #
+    # It exists because usage moved. `InterestExpense` stops in 2024 for 7 of the
+    # 8 issuers held (only XOM runs to 2026) while this tag runs to 2026-06-30
+    # for AMZN, GOOGL, LLY, MSFT and NVDA. Without it EBIT is uncomputable for a
+    # recent window for almost every issuer here — measured, not assumed.
+    "interest_expense_nonoperating": (
+        "InterestExpenseNonoperating",
+    ),
     # Cash interest actually paid, which is not the accrued charge. 5/8.
     "interest_paid": (
         "InterestPaidNet",

@@ -125,6 +125,11 @@ def test_the_unsplit_multi_concept_metrics_are_named_and_few():
 @pytest.mark.parametrize("metric, concept, cos", [
     # flows
     ("interest_expense", "InterestExpense", 8),
+    # Its own name rather than merged into interest_expense: nested by
+    # definition, and merging would switch the series' basis in 2024. Mapped at
+    # all because usage moved — InterestExpense stops in 2024 for 7 of 8 issuers
+    # and this runs to 2026-06-30 for five of them.
+    ("interest_expense_nonoperating", "InterestExpenseNonoperating", 5),
     ("income_tax_expense", "IncomeTaxExpenseBenefit", 8),
     ("depreciation_amortization", "DepreciationDepletionAndAmortization", 5),
     ("depreciation", "Depreciation", 6),
@@ -168,8 +173,6 @@ def test_ebit_has_every_input_it_needs():
 @pytest.mark.parametrize("wrong_concept, why", [
     ("InterestIncomeExpenseNet",
      "a bank's net interest income is revenue, not an interest expense"),
-    ("InterestExpenseNonoperating",
-     "a component of interest expense, not a synonym for it"),
     ("AccumulatedDepreciationDepletionAndAmortizationPropertyPlantAndEquipment",
      "an accumulated balance, not the period's charge"),
     ("FiniteLivedIntangibleAssetsAmortizationExpenseNextTwelveMonths",

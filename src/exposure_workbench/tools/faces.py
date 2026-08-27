@@ -33,6 +33,11 @@ READ_CORE = [
     # V9-A5. The four operators, typed: they refuse the combinations the
     # citation gate cannot see and allow every other one.
     "calculate",
+    # V9-D/P. The method map, one measure, and all of them at once — the last
+    # being a batch of the second, with no privileged path of its own.
+    "list_formulas",
+    "evaluate_formula",
+    "get_fundamental_panel",
     "compute_change",
     "compute_ratio",
     "compute_combine",

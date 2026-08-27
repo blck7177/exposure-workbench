@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, RiskAlert
 from exposure_workbench.services import brief_service
-from exposure_workbench.services import fundamentals_service, typed_calculator
+from exposure_workbench.services import (
+    formula_service, fundamentals_service, typed_calculator,
+)
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
@@ -81,6 +83,26 @@ async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = Non
 
 async def _calculate(db: AsyncSession, op: str, a: str, b: str) -> dict:
     return await typed_calculator.calculate(db, op, a, b, invoked_by=current_session_id())
+
+
+async def _list_formulas(db: AsyncSession) -> dict:
+    from exposure_workbench.analytics import formulas as _fm
+    return {"formulas": [
+        {"name": n, "definition": f.expression, "inputs": list(f.inputs),
+         "basis": f.basis, "source": f.source_url, "note": f.note}
+        for n, f in sorted(_fm.FORMULAS.items())]}
+
+
+async def _evaluate_formula(db: AsyncSession, ticker: str, name: str,
+                            months: int | None = None, at: str | None = None) -> dict:
+    return await formula_service.evaluate_formula(
+        db, ticker, name, months=months or 12, at=at, invoked_by=current_session_id())
+
+
+async def _get_fundamental_panel(db: AsyncSession, ticker: str,
+                                 months: int | None = None, at: str | None = None) -> dict:
+    return await formula_service.build_panel(
+        db, ticker, months=months or 12, at=at, invoked_by=current_session_id())
 
 
 # ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
@@ -351,6 +373,50 @@ def build_read_registry() -> ToolRegistry:
             "b": {"type": "string", "description": "fact_… or calc_… id"},
         }, "required": ["op", "a", "b"], "additionalProperties": False},
         fn=_calculate, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="list_formulas",
+        description=(
+            "The named measures this desk knows how to build, each with its definition, "
+            "its inputs and the authority for defining it that way (EBIT from net income "
+            "per SEC C&DI 103.01, free cash flow per 102.07). No thresholds — this desk "
+            "reports values and definitions; what counts as high or low is the reader's."
+        ),
+        json_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        fn=_list_formulas, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="evaluate_formula",
+        description=(
+            "One named measure for one issuer, built from the same primitives you could "
+            "call yourself: the value, the definition that produced it, the period basis, "
+            "a citable calc_id and the source. An input the issuer does not report is "
+            "named rather than left as a hole."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER,
+            "name": {"type": "string", "description": "a name from list_formulas"},
+            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120},
+            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
+        }, "required": ["ticker", "name"], "additionalProperties": False},
+        fn=_evaluate_formula, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_fundamental_panel",
+        description=(
+            "Every named measure at once for one issuer — leverage, coverage, liquidity, "
+            "cash generation, margins, turnover — each with its definition, period basis "
+            "and calc_id. A shortcut for the whole registry, not a special path: every "
+            "line is reproducible by a single evaluate_formula call. Financial issuers are "
+            "refused, because interest expense is an operating cost for a bank. No "
+            "judgement is attached."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER,
+            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120},
+            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
+        }, "required": ["ticker"], "additionalProperties": False},
+        fn=_get_fundamental_panel, tool_class=READ,
     ))
     reg.register(Tool(
         name="list_available_data",
