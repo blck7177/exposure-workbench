@@ -84,15 +84,10 @@ def classify_duration(period_start: date | None, period_end: date) -> str:
     return OTHER
 
 
-def restatement_key(filing_date: date | None, source_accession: str | None) -> tuple:
-    """How two versions of one period are ordered: most recently filed wins.
-
-    Extracted so the interval engine resolves restatements by the SAME rule and
-    not by a second implementation of it — the whole class of defect V9-M1
-    removed was two opinions about one thing. Prefers filing_date and falls back
-    to the accession, which sorts chronologically within an issuer.
-    """
-    return (filing_date or date.min, source_accession or "")
+# V10-S1: the rule moved to interval_algebra, where the code that outlives this
+# module is. Re-exported so the ladder and every remaining importer keep the one
+# rule until the ladder is deleted in V10-S4.
+from exposure_workbench.analytics.interval_algebra import restatement_key  # noqa: E402,F401
 
 
 def _pick_latest(candidates: list[FactPoint]) -> tuple[FactPoint, bool]:

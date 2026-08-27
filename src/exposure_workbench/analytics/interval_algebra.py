@@ -32,7 +32,22 @@ import heapq
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from exposure_workbench.analytics.period_ladder import restatement_key
+
+
+def restatement_key(filing_date: date | None, source_accession: str | None) -> tuple:
+    """How two versions of one period are ordered: most recently filed wins.
+
+    Lived in period_ladder and was imported from there (V9-A6 extracted it so
+    the engine and the ladder resolved restatements by ONE rule — the class of
+    defect V9-M1 removed was two opinions about one thing). V10 deletes the
+    ladder, so the rule now lives with the code that survives; period_ladder
+    imports it from here until it goes.
+
+    Prefers filing_date and falls back to the accession, which sorts
+    chronologically within an issuer.
+    """
+    return (filing_date or date.min, source_accession or "")
+
 
 # 52/53-week filers move their year end by up to a week; two boundaries this
 # close are the same seam. Wider than a week would start swallowing real gaps —
@@ -245,3 +260,138 @@ def latest_window(facts: list[FlowFact], months: int = 12) -> Window:
                 + (f" (tried {len(attempts)} end dates)" if attempts else "")),
         nearest_end=ends[0] if ends else None,
     )
+
+
+# ── series ────────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class SeriesWindow:
+    """One slot of a series: the window that was asked for, and what came back.
+
+    `start`/`end` are always present — they are what the series is a series OF.
+    `window` is a Derived value or an Unreachable reason. An unreachable slot
+    stays in its place (V10 DP2): the alternative, dropping it and letting the
+    neighbours close ranks, is how a nine-month figure ends up labelled as a
+    quarter's neighbour and read as one.
+    """
+
+    start: date
+    end: date
+    window: Window
+
+    @property
+    def value(self) -> float | None:
+        return self.window.value if isinstance(self.window, Derived) else None
+
+
+def _series_end(usable: list[FlowFact], canon: dict[date, date], span: timedelta) -> date | None:
+    """Where a series of `span`-long windows should end: on the issuer's own grid.
+
+    Not `latest_window`'s end. That is the latest boundary from which a window
+    of this length can be derived — for twelve months on AAPL, a trailing year
+    ending at the June quarter — and stepping back from it by a year at a time
+    produces a series of Junes, none of which is a fiscal year. A series has a
+    PHASE, and the phase is the issuer's: fiscal years end where the issuer ends
+    them, quarters where it draws them.
+
+    So: take every reported fact whose own length is about `span` (the native
+    periods — FY facts for a year, Q1 facts for a quarter, whatever the issuer
+    files), and choose the latest boundary that sits a whole number of spans
+    after one of their ends. On AAPL that puts a quarterly series at the latest
+    June boundary (two quarters past the last Q1 fact, both derivable from the
+    cumulative filings) and an annual series at the latest September.
+
+    An issuer with no native fact of this length — nothing it ever reported as
+    a single period this long — has no grid to align to, and the series ends
+    wherever the latest window does.
+    """
+    native = sorted({canon[f.hi] for f in usable
+                     if abs((f.hi - f.lo).days - span.days) <= WINDOW_SNAP_DAYS})
+    ends = sorted({c for c in canon.values()}, reverse=True)
+    if not native:
+        head = latest_window(usable, months=round(span.days / _DAYS_PER_MONTH))
+        return None if isinstance(head, Unreachable) else head.end
+    for e in ends:
+        anchor = max((n for n in native if n <= e), default=None)
+        if anchor is None:
+            continue
+        steps = round((e - anchor).days / span.days)
+        if abs((e - anchor).days - steps * span.days) <= WINDOW_SNAP_DAYS:
+            return e
+    return None
+
+
+def consecutive_windows(
+    facts: list[FlowFact], *, months: int, last_n: int, end: date | None = None,
+) -> list[SeriesWindow]:
+    """`last_n` back-to-back windows of `months` each, oldest first.
+
+    This is the series primitive V10 builds on: a quarterly series is a sequence
+    of three-month windows, an annual one a sequence of twelve-month windows,
+    and every slot is derived by the same search `get_flow` uses for one.
+    Nothing here classifies a fact as "a quarter" — the ladder did, and threw
+    away every half-year and nine-month fact as a result. Here those are edges
+    like any other, so a year an issuer filed as H1 + FY yields H1 and FY − H1
+    where the ladder yielded nothing.
+
+    The anchors are the issuer's own reported boundaries (`_boundary_map`),
+    walked backwards from `end` by `months` at a time with the same snap
+    tolerance `latest_window` uses. When no boundary lies near the next anchor
+    the series ENDS there — a slot needs two real boundaries to be a slot. When
+    both boundaries exist but no path joins them, the slot is kept as
+    Unreachable (DP2) and the walk continues from its start.
+
+    `end` defaults to the latest boundary on the issuer's own grid for this
+    length (see `_series_end`) — which is NOT `latest_window`'s end. A single
+    window is "the most recent one the filings can support"; a series is "the
+    issuer's reporting periods, in order". `get_flow` keeps `latest_window` for
+    `last_n=1` and uses this for a series, and its docstring says so.
+    """
+    usable = [f for f in facts if f.value is not None and f.period_start is not None]
+    if not usable or last_n < 1:
+        return []
+
+    canon = _boundary_map(usable)
+    span = timedelta(days=round(months * _DAYS_PER_MONTH))
+
+    if end is None:
+        cur_end = _series_end(usable, canon, span)
+        if cur_end is None:
+            return []
+    else:
+        snapped = _snap(end, canon, tolerance=WINDOW_SNAP_DAYS)
+        if snapped is None:
+            return []
+        cur_end = snapped
+
+    out: list[SeriesWindow] = []
+    for _ in range(last_n):
+        src = _snap(cur_end - span, canon, tolerance=WINDOW_SNAP_DAYS)
+        if src is None:
+            # No reported boundary where this slot should start. The slot is
+            # kept, unreachable, at its nominal dates, and the walk goes on from
+            # there: NVDA reported FY2023 capex as 9M + FY only, so no boundary
+            # exists a quarter before 2022-10-30 — stopping here would have
+            # left the four filed quarters of FY2022 permanently out of reach
+            # behind a gap the walk could simply have stepped over. The next
+            # slot that lands near a real boundary snaps to it, so the phase
+            # re-locks to the issuer's grid as soon as the filings resume.
+            src = cur_end - span
+            start = src + timedelta(days=1)
+            out.append(SeriesWindow(start=start, end=cur_end, window=Unreachable(
+                reason=f"no reported period boundary near {src.isoformat()}")))
+            cur_end = src
+            continue
+        if src >= cur_end:
+            break
+        start = src + timedelta(days=1)
+        out.append(SeriesWindow(start=start, end=cur_end, window=derive(usable, start, cur_end)))
+        cur_end = src
+    out.reverse()
+    # Leading unreachable slots say only "the data starts later"; they are not
+    # information about any period the issuer reported. Interior and trailing
+    # ones are kept — an interior gap is a fact about the filings, and a
+    # trailing one says the newest window is not derivable YET.
+    while out and isinstance(out[0].window, Unreachable):
+        out.pop(0)
+    return out
