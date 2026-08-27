@@ -227,7 +227,18 @@ _NUMBER_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     for name, pattern, flags in (
         ("money_scaled", rf"{_SIGN}\$\s?{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
         ("money_plain", rf"{_SIGN}\$\s?{_LIT}", 0),
-        ("percent", rf"{_SIGN}{_LIT}\s*%", 0),
+        # "82 percent" is the same claim as "82%", and a filing that spells it out
+        # made it uncitable in BOTH spellings: written as words it typed as a
+        # COUNT and fell under the three-digit floor for bare numbers, written
+        # with the sign it looked for a "%:82" key the passage does not contain.
+        # LLY's 10-K states its revenue concentration that way — "collectively
+        # accounted for 82 percent of our total revenues in 2025" — and the gate
+        # refused the verbatim quotation, which the answer then replaced with "a
+        # small set of products accounted for a very large share". 77 of 3078
+        # chunks in this corpus spell it out. A closed edit to the pattern, in
+        # the terms the module already allows: another way of writing a unit,
+        # never a widening of the tolerance.
+        ("percent", rf"{_SIGN}{_LIT}\s*(?:%|percent\b)", re.IGNORECASE),
         ("multiple", rf"{_SIGN}{_LIT}\s?x\b", 0),
         ("scaled", rf"{_SIGN}{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
         ("bare", rf"{_SIGN}{_LIT}", 0),
@@ -357,6 +368,14 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
 _MIN_BARE_QUOTED_DIGITS = 3
 
 
+# Matched against a window wide enough to hold the whole word. Two characters
+# was enough for "%" and is not enough here: `\s*p` also accepts "5 points" and
+# "3 pages", which would let a written "5%" verify against a passage that says
+# five of something else. A false accept in the module whose job is refusing.
+_PERCENT_WORD = re.compile(r"\s*percent\b", re.IGNORECASE)
+_PERCENT_WORD_WINDOW = 9
+
+
 def quoted_keys(text: str) -> set[str]:
     """The digit sequences a passage literally contains.
 
@@ -378,7 +397,8 @@ def quoted_keys(text: str) -> set[str]:
         digits = m.group(0).replace(",", "")
         before = text[max(0, m.start() - 2):m.start()]
         after = text[m.end():m.end() + 2]
-        if after.lstrip().startswith("%"):
+        after_word = text[m.end():m.end() + _PERCENT_WORD_WINDOW]
+        if after.lstrip().startswith("%") or _PERCENT_WORD.match(after_word):
             keys.add(f"%:{digits}")
         elif "$" in before:
             keys.add(f"$:{digits}")
@@ -419,6 +439,13 @@ class EvidenceValue:
     unit_class: str
     label: str
     source_id: str
+    # V11-F. Set when the row itself says this number is not determinate on its
+    # own. The regression records collinearity (max VIF above 5), under which the
+    # SUM over the factor set is well determined and no single coefficient is —
+    # a statement the model was already given, in words, on every factor row, and
+    # ignored in two answers out of three. `not_alone` carries what to quote
+    # instead, and verify() refuses a figure that only these support.
+    not_alone: str | None = None
 
 
 # Which written class may be compared with which stored class. A bare number
@@ -646,6 +673,26 @@ async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], se
                         out.append(EvidenceValue(
                             float(v), unit, f"{model.__tablename__}{who}.{col}", rid))
 
+    # Under collinearity a single beta is not identified, and the tools have said
+    # so on every factor row since V8 — `quotable_individually: false`, plus a
+    # factor_note spelling out the substitute. Asked why the book was down, the
+    # battery's agent quoted the market factor's -0.00989278 anyway; it is 138%
+    # of the total factor contribution, because growth and small_cap offset it,
+    # and the sentence it supported ("plus a broad market leg") rests entirely on
+    # a coefficient the regression cannot pin down. A field the model may ignore
+    # is not a guard. The sum stays quotable — it is what is determined.
+    metrics = next(iter(by_model.get(ExposureMetrics) or []), None)
+    if metrics is not None and getattr(metrics, "collinear", None):
+        total = sum(float(r.contribution) for r in by_model.get(FactorAttribution) or []
+                    if r.contribution is not None)
+        instead = (f"these factors are collinear, so no single beta is determined; "
+                   f"their sum, {total:.8f}, is")
+        out = [v if not v.label.startswith(f"{FactorAttribution.__tablename__}.")
+               else EvidenceValue(v.value, v.unit_class, v.label, v.source_id, instead)
+               for v in out]
+        out.append(EvidenceValue(total, RATIO,
+                                 f"{FactorAttribution.__tablename__}.sum_of_contributions", rid))
+
     # V8-P4: the counts. COUNT, not RATIO — _COMPATIBLE lets a bare written
     # number meet a stored COUNT, so "3 alerts" verifies while "3%" does not,
     # which is exactly the distinction between counting things and measuring
@@ -736,6 +783,28 @@ async def resolve_cited_values(
     return values, quoted
 
 
+# The prose routes, and only those: a fact row or a calc row holds numbers, not
+# sentences, so a quotation attributed to one is a quotation from nowhere.
+_PASSAGE_SOURCES = {"chunk_": FilingChunk, "src_": ResearchSource}
+
+
+async def resolve_cited_passages(db: AsyncSession, citation_ids: Iterable[str]) -> list[str]:
+    """The text of every cited passage, for checking what quotation marks assert."""
+    out: list[str] = []
+    for cid in citation_ids:
+        if cid.startswith("chunk_"):
+            row = (await db.execute(
+                select(FilingChunk).where(FilingChunk.id == cid))).scalar_one_or_none()
+            if row is not None:
+                out.append(row.text or "")
+        elif cid.startswith("src_"):
+            row = (await db.execute(
+                select(ResearchSource).where(ResearchSource.id == cid))).scalar_one_or_none()
+            if row is not None:
+                out.append(f"{row.title or ''} {row.snippet or ''}")
+    return out
+
+
 def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
     """Whether a cited passage contains this number as the KIND of thing it is."""
     if n.unit_class == PERCENT:
@@ -812,6 +881,58 @@ def _derivation(n: ExtractedNumber, values: list[EvidenceValue]) -> dict | None:
     return None
 
 
+# ── quoted text (V11-Q) ───────────────────────────────────────────────────────
+# The gate had a numeric half and no textual half. A filings answer is prose with
+# no numbers in it, so the verification actually performed on one was: extract
+# zero claims, compare none, pass. Four quotations from MSFT's 10-K and 10-Q went
+# out in the battery and all four were verbatim — because the model was faithful,
+# not because anything checked. Changing one word would have looked identical.
+#
+# What is checkable without semantics is what quotation marks assert: that these
+# exact words appear in the cited passage. So that is what is checked, and only
+# that. A paraphrase outside the marks is a summary, is not a verbatim claim, and
+# is not touched here — recorded as this check's limit rather than implied away.
+
+_QUOTE_PAIRS = (('"', '"'), ("\u201c", "\u201d"), ("\u2018", "\u2019"))
+# Below this, a "quotation" is a term of art in scare quotes ("free cash flow",
+# a metric name) rather than a passage being reproduced. Measured against the
+# battery's answers: every real quotation ran well past it, every bare term fell
+# under. Four, because three admits "cash and equivalents".
+_MIN_QUOTED_WORDS = 4
+_WS = re.compile(r"\s+")
+_TYPOGRAPHIC = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'",
+                              "\u2013": "-", "\u2014": "-", "\u00a0": " "})
+
+
+def _normalise(text: str) -> str:
+    """Whitespace and typography only — never letters, never punctuation."""
+    return _WS.sub(" ", (text or "").translate(_TYPOGRAPHIC)).strip().lower()
+
+
+def quoted_spans(text: str) -> list[str]:
+    """Every passage the answer puts in quotation marks and asserts as verbatim."""
+    out: list[str] = []
+    for open_q, close_q in _QUOTE_PAIRS:
+        pattern = (re.escape(open_q) + r"([^" + re.escape(open_q + close_q) + r"]+)"
+                   + re.escape(close_q)) if open_q != close_q else (
+            re.escape(open_q) + r"([^" + re.escape(open_q) + r"]+)" + re.escape(close_q))
+        for m in re.finditer(pattern, text or ""):
+            span = m.group(1).strip()
+            if len(span.split()) >= _MIN_QUOTED_WORDS:
+                out.append(span)
+    return out
+
+
+def verify_quotes(text: str, passages: Iterable[str]) -> list[dict]:
+    """Problems, one per quoted span that no cited passage contains verbatim."""
+    haystack = " \u2026 ".join(_normalise(p) for p in passages)
+    problems: list[dict] = []
+    for span in quoted_spans(text):
+        if _normalise(span) not in haystack:
+            problems.append({"quote": span, "reason": "not_in_cited_passages"})
+    return problems
+
+
 def verify(
     numbers: Iterable[ExtractedNumber],
     values: Iterable[EvidenceValue],
@@ -835,7 +956,20 @@ def verify(
             continue
         allowed = _COMPATIBLE.get(n.unit_class, ())
         candidates = [v for v in values if v.unit_class in allowed]
-        if any(abs(v.value - n.value) <= n.atol for v in candidates):
+        matched = [v for v in candidates if abs(v.value - n.value) <= n.atol]
+        if matched:
+            # Supported by something determinate: done. Supported ONLY by values
+            # the row itself declared indeterminate: refused, and told what is
+            # determinate instead. The distinction has to be "only", because a
+            # figure that also equals a quotable value is quotable.
+            if any(v.not_alone is None for v in matched):
+                continue
+            problems.append({
+                "number": n.surface,
+                "reason": "not_quotable_individually",
+                "detail": matched[0].not_alone,
+                "matched": [v.label for v in matched],
+            })
             continue
         nearest = min(candidates, key=lambda v: abs(v.value - n.value), default=None)
         problem = {

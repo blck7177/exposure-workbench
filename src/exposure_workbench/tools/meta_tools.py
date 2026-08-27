@@ -203,7 +203,20 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
                                "session" + ("; this reply states no numbers, so an empty "
                                             "citations list is correct here"
                                             if not numeric.extract_numbers(text) else ""))}
-        # The ids are real; now the numbers standing next to them have to be.
+        # The ids are real; now what the answer asserts about them has to be.
+        # Quotation marks first: they are a claim of verbatim reproduction, and
+        # a filings answer can be pure prose with no number in it — in which case
+        # everything below this ran on an empty list and the reply passed having
+        # been checked for nothing at all.
+        bad_quotes = numeric.verify_quotes(
+            text, await numeric.resolve_cited_passages(db, citation_ids))
+        if bad_quotes:
+            return {"error": "unverified_quote", "problems": bad_quotes,
+                    "detail": "quotation marks say these words appear in a cited passage "
+                              "exactly as written. Reproduce the source wording, cite the "
+                              "passage that carries it, or drop the marks and paraphrase — "
+                              "a paraphrase is not checked here and does not claim to be "
+                              "verbatim"}
         stated = numeric.extract_numbers(text)
         if stated:
             values, quoted = await numeric.resolve_cited_values(db, citation_ids)
@@ -217,6 +230,15 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
                 # never there. Omitting the figure and answering with the rest is
                 # a legitimate, honest move, and the model has no way to know
                 # that unless the refusal says so.
+                # A number refused for being indeterminate needs different
+                # advice from one refused for being absent: re-citing cannot fix
+                # it, and each problem already names what IS determinate.
+                if all(p["reason"] == "not_quotable_individually" for p in bad):
+                    return {"error": "unverified_numbers", "problems": bad,
+                            "detail": "these figures are real, and the rows carrying them "
+                                      "record that they are not determined on their own. "
+                                      "Quote the aggregate each problem names, or say the "
+                                      "direction without the coefficient"}
                 return {"error": "unverified_numbers", "problems": bad,
                         "detail": "each number must match a value held by the evidence you "
                                   "cited. Re-cite the id that actually carries it, compute it "
