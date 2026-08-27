@@ -33,6 +33,11 @@ from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
 # unit of the metric beneath them, which for every citable fact here is USD.
 OP_FLOW = "derive.interval"
 OP_BALANCE = "read.instant"
+# V10-S2. A series of windows / a series of instants. Both carry `points` and a
+# `result_type` in params, which is how the resolver types them and how
+# typed_calculator lifts them into element-wise arithmetic.
+OP_FLOW_SERIES = "flow.series"
+OP_BALANCE_SERIES = "balance.series"
 
 
 async def _company_id(db: AsyncSession, ticker: str) -> str | None:
@@ -70,14 +75,25 @@ async def get_flow(
     months: int | None = None,
     start: str | None = None,
     end: str | None = None,
+    last_n: int | None = None,
     invoked_by: str = "agent",
 ) -> dict:
-    """A flow over a window. Either `months` (most recent derivable) or an
-    explicit `start`/`end` pair.
+    """A flow over a window — or, with `last_n` > 1, over a run of them.
+
+    One window is "the most recent `months`-long window the filings support"
+    (`latest_window`). A series is "the issuer's own reporting periods of that
+    length, in order" (`consecutive_windows`), and the two do not share an end:
+    the latest derivable twelve months on AAPL run to the June quarter, while
+    the annual series ends at September because that is where AAPL ends its
+    years. Both are right about what they are; a series of trailing-twelve-month
+    windows stepping back a year at a time is what nobody means by "the last
+    five years".
 
     There is no fallback to a shorter period. A window that cannot be derived
     comes back as a refusal naming what stopped it, because a nine-month figure
-    served as a year is the silent convention switch this design removes.
+    served as a year is the silent convention switch this design removes. In a
+    series that refusal sits in its slot rather than making the neighbours
+    close ranks.
     """
     ticker = ticker.upper()
     if metric not in SUPPORTED_METRICS:
@@ -90,7 +106,14 @@ async def get_flow(
     if not facts:
         return {"error": "not_reported", "ticker": ticker, "metric": metric,
                 "detail": f"{ticker} reports no {metric} with a period; it may report "
-                          f"a related line instead — call list_available_data"}
+                          f"a related line instead — call describe_issuer"}
+
+    if last_n is not None and last_n > 1:
+        if start or end:
+            return {"error": "invalid_arguments",
+                    "detail": "a series is anchored to the issuer's reporting grid; give "
+                              "`months` and `last_n`, not start/end"}
+        return await _flow_series(db, ticker, metric, facts, months or 12, last_n, invoked_by)
 
     if start and end:
         window = ia.derive(facts, date.fromisoformat(start), date.fromisoformat(end))
@@ -175,3 +198,97 @@ async def get_balance_sheet(
     return {"ticker": ticker, "as_of": as_of.isoformat(),
             "balances": balances, "not_reported_at_this_date": absent,
             "basis": f"balance sheet as of {as_of.isoformat()}; one instant, no substitution"}
+
+
+# ── series (V10-S2) ───────────────────────────────────────────────────────────
+
+def _slot(w: ia.SeriesWindow) -> dict:
+    base = {"start": w.start.isoformat(), "end": w.end.isoformat()}
+    if isinstance(w.window, ia.Derived):
+        return base | {"value": w.window.value,
+                       "fact_ids": list(w.window.fact_ids),
+                       "terms": [{"fact_id": f, "sign": s} for f, s in w.window.terms],
+                       "derivation": w.window.formula}
+    return base | {"value": None, "unreachable": w.window.reason}
+
+
+async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) -> dict:
+    slots = ia.consecutive_windows(facts, months=months, last_n=last_n)
+    derived = [w for w in slots if isinstance(w.window, ia.Derived)]
+    if not derived:
+        ends = sorted({f.period_end for f in facts})
+        return {"error": "series_not_derivable", "ticker": ticker, "metric": metric,
+                "months": months,
+                "detail": (f"no {months}-month window of {metric} can be derived from the "
+                           f"periods {ticker} reports; it may report this metric only over "
+                           f"longer periods — ask for a longer `months`"),
+                "data_covers": {"from": ends[0].isoformat(), "to": ends[-1].isoformat()}}
+    points = [_slot(w) for w in slots]
+    calc_id = await cs._record(
+        db, ticker, OP_FLOW_SERIES,
+        {"metric": metric, "months": months, "last_n": last_n,
+         # What every point IS, once, so the resolver and the calculator need
+         # no table keyed on the operation name.
+         "result_type": {"unit_class": "money", "kind": "flow", "quantity": metric,
+                         "months": months}},
+        {"points": points},
+        sorted({f for w in derived for f in w.window.fact_ids}),
+        {"unreachable_slots": len(slots) - len(derived)} if len(slots) != len(derived) else {},
+        invoked_by,
+    )
+    return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "months": months,
+            "points": points,
+            "basis": (f"{len(derived)} consecutive {months}-month windows on {ticker}'s own "
+                      f"reporting grid, {points[0]['start']}..{points[-1]['end']}"
+                      + (f"; {len(slots) - len(derived)} slot(s) not derivable, kept in place"
+                         if len(slots) != len(derived) else ""))}
+
+
+async def get_balance_series(
+    db: AsyncSession, ticker: str, metric: str, *, last_n: int = 12,
+    invoked_by: str = "agent",
+) -> dict:
+    """One balance-sheet line at each date the issuer reported it, newest last.
+
+    No derivation, no alignment, no filling: a balance is a reading at an
+    instant and there is nothing to add across instants (R2). Restatements are
+    resolved by the one rule. `get_balance_sheet` is every line at ONE date;
+    this is ONE line at every date — the same rows, the other axis.
+    """
+    ticker = ticker.upper()
+    if metric not in SUPPORTED_METRICS:
+        return _unknown_metric(metric)
+    company_id = await _company_id(db, ticker)
+    if company_id is None:
+        return {"error": "unknown_company", "ticker": ticker}
+    rows = (await db.execute(
+        select(FinancialFact.period_end, FinancialFact.value, FinancialFact.id,
+               FinancialFact.source_accession, Filing.filing_date)
+        .outerjoin(Filing, Filing.id == FinancialFact.filing_id)
+        .where(FinancialFact.company_id == company_id,
+               FinancialFact.normalized_metric == metric,
+               FinancialFact.dimensions_hash == "",
+               FinancialFact.period_start.is_(None),
+               FinancialFact.value.is_not(None))
+    )).all()
+    if not rows:
+        return {"error": "not_reported", "ticker": ticker, "metric": metric,
+                "detail": f"{ticker} reports no {metric} as a balance; it may be a flow — "
+                          f"call get_flow, or describe_issuer to see which it is"}
+    best: dict[date, tuple] = {}
+    for pe, value, fid, acc, fd in rows:
+        prev = best.get(pe)
+        if prev is None or ia.restatement_key(fd, acc) > ia.restatement_key(prev[3], prev[2]):
+            best[pe] = (float(value), fid, acc, fd)
+    dates = sorted(best)[-max(1, last_n):]
+    points = [{"as_of": d.isoformat(), "value": best[d][0], "fact_ids": [best[d][1]]}
+              for d in dates]
+    calc_id = await cs._record(
+        db, ticker, OP_BALANCE_SERIES,
+        {"metric": metric, "last_n": last_n,
+         "result_type": {"unit_class": "money", "kind": "instant", "quantity": metric}},
+        {"points": points}, [p["fact_ids"][0] for p in points], {}, invoked_by,
+    )
+    return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "points": points,
+            "basis": f"{metric} as reported at each of {len(points)} instants, "
+                     f"{points[0]['as_of']}..{points[-1]['as_of']}; no value is carried across dates"}

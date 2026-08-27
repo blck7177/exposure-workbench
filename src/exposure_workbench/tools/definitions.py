@@ -29,6 +29,7 @@ from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import drawdown_service
 from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
+from exposure_workbench.services import series_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
 
@@ -71,11 +72,65 @@ async def _list_available_data(db: AsyncSession, ticker: str) -> dict:
 
 # ── V9-A2/A3: a flow over any window, and one instant's balance sheet ─────────
 
+async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
+    """Identity, what the filings hold, and which named measures that supports.
+
+    V10-S2: the one locating tool. It replaces get_issuer_snapshot (identity +
+    metrics), list_available_data (metrics alone — the same list) and
+    list_formulas (the registry with no ticker), because "what can I ask about
+    this company" is one question and three tools made the model ask it three
+    times. The formula list is the same sixteen for every issuer; what differs
+    per issuer is which of them its filings can feed, and that is stated here
+    rather than discovered by a refused evaluate_formula.
+    """
+    from exposure_workbench.analytics import formulas as _fm
+    company = await _resolve_company(db, ticker)
+    if company.get("error"):
+        return company
+    metrics = await cs.list_available_metrics(db, ticker.upper())
+    have = {m["metric"] for m in metrics["metrics"]}
+
+    def leaves(name: str, seen: set[str]) -> set[str]:
+        f = _fm.FORMULAS.get(name)
+        if f is None:
+            return {name}
+        out: set[str] = set()
+        for inp in f.inputs:
+            if inp in seen:
+                continue
+            out |= leaves(inp, seen | {inp})
+        return out
+
+    formulas = []
+    for name, f in sorted(_fm.FORMULAS.items()):
+        needed = leaves(name, {name})
+        missing = sorted(needed - have)
+        formulas.append({"name": name, "definition": f.expression, "basis": f.basis,
+                         "source": f.source_url,
+                         "computable": not missing,
+                         **({"missing_inputs": missing} if missing else {})})
+    return {"company": company, "available_metrics": metrics["metrics"], "formulas": formulas}
+
+
+async def _get_balance_series(db: AsyncSession, ticker: str, metric: str, last_n: int = 12) -> dict:
+    return await fundamentals_service.get_balance_series(
+        db, ticker, metric, last_n=int(last_n), invoked_by=current_session_id())
+
+
+async def _series_stat(db: AsyncSession, series_id: str, op: str) -> dict:
+    return await series_service.series_stat(db, series_id, op, invoked_by=current_session_id())
+
+
 async def _get_flow(db: AsyncSession, ticker: str, metric: str,
                     months: int | None = None,
-                    start: str | None = None, end: str | None = None) -> dict:
+                    start: str | None = None, end: str | None = None,
+                    last_n: int | None = None) -> dict:
+    # int(), for the reason the old _LAST_N carried: draft 2020-12 counts 12.0
+    # as an integer, so the schema cannot refuse the float a model writes when
+    # it means twelve, and it would reach a slice.
     return await fundamentals_service.get_flow(
         db, ticker, metric, months=months, start=start, end=end,
+        last_n=None if last_n is None else int(last_n),
         invoked_by=current_session_id())
 
 
@@ -379,8 +434,59 @@ def build_read_registry() -> ToolRegistry:
                        "description": "window length; defaults to 12"},
             "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, first day covered"},
             "end": {"type": ["string", "null"], "description": "YYYY-MM-DD, last day covered"},
+            # A floor as well as a ceiling. The predecessor (get_fact_series)
+            # learned that 0 asked for none and got all forty, and -20 on a
+            # twelve-point series returned an empty series with a citable id.
+            "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40,
+                       "description": "more than 1 returns a SERIES: that many consecutive "
+                                      "windows of `months` each, on the issuer's own "
+                                      "reporting grid, oldest first, as one citable calc_id. "
+                                      "Use months=3 for quarters, 12 for fiscal years."},
         }, "required": ["ticker", "metric"], "additionalProperties": False},
         fn=_get_flow, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_balance_series",
+        description=(
+            "One balance-sheet line (cash, total debt, receivables, equity …) at each date "
+            "the issuer reported it, newest last, as one citable series. Nothing is derived "
+            "or carried across dates — a balance is a reading at an instant. get_balance_sheet "
+            "is every line at ONE date; this is ONE line over time."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER,
+            "metric": {"type": "string", "description": "a normalised balance metric; describe_issuer has them"},
+            "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40,
+                       "description": "how many most-recent dates (default 12)"},
+        }, "required": ["ticker", "metric"], "additionalProperties": False},
+        fn=_get_balance_series, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="series_stat",
+        description=(
+            "One operator over one series you already hold (a calc_id from get_flow with "
+            "last_n, get_balance_series, or calculate). yoy / qoq / pct / abs return a new "
+            "series of changes, each point matched to its prior BY DATE; cagr / avg / min / "
+            "max / std / sum / latest return one number. The result is citable. For growth "
+            "over the last N quarters: get_flow(months=3, last_n=N) then series_stat(yoy)."
+        ),
+        json_schema={"type": "object", "properties": {
+            "series_id": {"type": "string", "description": "calc_… id of a series"},
+            "op": {"type": "string", "enum": list(series_service.OPS)},
+        }, "required": ["series_id", "op"], "additionalProperties": False},
+        fn=_series_stat, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="describe_issuer",
+        description=(
+            "Start here for any issuer: identity (name, CIK, sector, whether it can be "
+            "investigated), every financial metric its filings hold with how many periods "
+            "each has, and which named measures (leverage, coverage, margins …) those "
+            "metrics can feed — with the missing input named for the ones they cannot."
+        ),
+        json_schema={"type": "object", "properties": {"ticker": _TICKER},
+                     "required": ["ticker"], "additionalProperties": False},
+        fn=_describe_issuer, tool_class=READ,
     ))
     reg.register(Tool(
         name="get_balance_sheet",

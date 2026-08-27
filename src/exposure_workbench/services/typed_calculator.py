@@ -92,6 +92,9 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         if row is None:
             return _err("unknown_operand", f"{ref} is not a calculation this desk holds")
         params = row.params or {}
+        points = (row.result or {}).get("points")
+        if isinstance(points, list):
+            return _resolve_series(ref, row.operation, params, points)
         value = (row.result or {}).get("value")
         # derive.interval rows predate result_type but carry everything needed.
         if row.operation == cs_op_flow() and params.get("period"):
@@ -115,6 +118,52 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             quantity=t.get("quantity"), source_id=ref,
         )
     return _err("unknown_operand", f"{ref} is not a fact_ or calc_ id")
+
+
+@dataclass(frozen=True)
+class TypedSeries:
+    """A series of typed quantities keyed by the date each one ends.
+
+    V10-S2. The scalar calculator lifts to series element-wise: two series are
+    aligned on their end dates (within the engine's snap tolerance — a 52/53-
+    week filer's quarter ends a few days from a calendar filer's), and every
+    aligned pair goes through the same `_check` a pair of scalars would. One
+    refused pair refuses the whole operation and names the slot, because a
+    series with a silently dropped point is a series that lies about its length.
+    """
+    points: tuple[tuple[date, Typed], ...]
+    unit_class: str
+    kind: str                     # flow | instant | series | scalar (derived)
+    quantity: str | None
+    source_id: str
+
+
+def _resolve_series(ref: str, operation: str, params: dict, points: list) -> TypedSeries | dict:
+    rt = params.get("result_type")
+    if not rt:
+        return _err("untyped_operand",
+                    f"{ref} is a series recorded before series carried their type. "
+                    f"Recompute it with get_flow(last_n=…) or get_balance_series.")
+    unit = rt.get("unit_class", MONEY)
+    kind = rt.get("kind", "series")
+    quantity = rt.get("quantity")
+    typed: list[tuple[date, Typed]] = []
+    for p in points:
+        end_s = p.get("end") or p.get("as_of")
+        if end_s is None or p.get("value") is None:
+            continue                       # an unreachable slot has no quantity to combine
+        end = date.fromisoformat(end_s)
+        if kind == "flow" and p.get("start"):
+            t = Typed(value=float(p["value"]), unit_class=unit,
+                      interval=(date.fromisoformat(p["start"]), end), quantity=quantity, source_id=ref)
+        elif kind == "instant":
+            t = Typed(value=float(p["value"]), unit_class=unit, instant=end, quantity=quantity, source_id=ref)
+        else:
+            t = Typed(value=float(p["value"]), unit_class=unit, quantity=quantity, source_id=ref)
+        typed.append((end, t))
+    if not typed:
+        return _err("empty_series", f"{ref} holds no derivable points")
+    return TypedSeries(points=tuple(typed), unit_class=unit, kind=kind, quantity=quantity, source_id=ref)
 
 
 def cs_op_flow() -> str:
@@ -219,6 +268,9 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     if isinstance(right, dict):
         return right
 
+    if isinstance(left, TypedSeries) or isinstance(right, TypedSeries):
+        return await _calculate_series(db, op, a, b, left, right, invoked_by)
+
     refusal = _check(op, left, right)
     if refusal:
         return refusal
@@ -254,3 +306,98 @@ def _basis_str(t: Typed) -> str:
     if t.interval:
         return f"{t.interval[0].isoformat()}..{t.interval[1].isoformat()}"
     return ""
+
+
+# ── series arithmetic (V10-S2) ────────────────────────────────────────────────
+
+# How far apart two series' end dates may be and still be the same period. The
+# interval engine's boundary tolerance, for the same reason it exists there.
+from exposure_workbench.analytics.interval_algebra import BOUNDARY_TOLERANCE_DAYS as _ALIGN_DAYS
+
+
+def _align(left: TypedSeries, right: TypedSeries) -> list[tuple[date, Typed, Typed]] | dict:
+    """Pairs of points whose end dates coincide, and a refusal if none do.
+
+    Unmatched points on either side are dropped from the RESULT and counted in
+    its quality flags — the same rule series_ops.combine_series has always
+    applied. Dropping is honest here where it would not be for a single refused
+    pair: an unmatched period is not a wrong number, it is a period only one
+    side reported, and the result says how many there were.
+    """
+    pairs = []
+    rights = list(right.points)
+    for end, lt in left.points:
+        match = min(rights, key=lambda rp: abs((rp[0] - end).days), default=None)
+        if match is None or abs((match[0] - end).days) > _ALIGN_DAYS:
+            continue
+        pairs.append((end, lt, match[1]))
+    if not pairs:
+        return _err("misaligned_series",
+                    f"{left.source_id} and {right.source_id} share no period end within "
+                    f"{_ALIGN_DAYS} days; they are on different reporting grids "
+                    f"({left.points[0][0]}..{left.points[-1][0]} vs "
+                    f"{right.points[0][0]}..{right.points[-1][0]})")
+    return pairs
+
+
+def _broadcast(scalar: Typed, series: TypedSeries) -> list[tuple[date, Typed, Typed]]:
+    return [(end, scalar, t) for end, t in series.points]
+
+
+async def _calculate_series(db, op, a, b, left, right, invoked_by) -> dict:
+    if isinstance(left, TypedSeries) and isinstance(right, TypedSeries):
+        pairs = _align(left, right)
+        if isinstance(pairs, dict):
+            return pairs
+        unmatched = len(left.points) + len(right.points) - 2 * len(pairs)
+        order = [(end, lt, rt) for end, lt, rt in pairs]
+    elif isinstance(left, TypedSeries):
+        order = [(end, lt, right) for end, lt in left.points]
+        unmatched = 0
+    else:
+        order = [(end, left, rt) for end, rt in right.points]
+        unmatched = 0
+
+    # Every pair through the scalar rules. The first refusal is the answer,
+    # with the slot that produced it.
+    for end, lt, rt in order:
+        refusal = _check(op, lt, rt)
+        if refusal:
+            return refusal | {"at": end.isoformat(),
+                              "detail": f"at {end.isoformat()}: " + refusal["detail"]}
+
+    points, div_zero = [], 0
+    sample_type = None
+    for end, lt, rt in order:
+        if op == "divide" and rt.value == 0:
+            div_zero += 1
+            points.append({"end": end.isoformat(), "value": None, "flags": {"division_by_zero": True},
+                           "fact_ids": []})
+            continue
+        value = {"add": lt.value + rt.value, "subtract": lt.value - rt.value,
+                 "multiply": lt.value * rt.value, "divide": lt.value / rt.value}[op]
+        r = _result_type(op, lt, rt, value)
+        sample_type = sample_type or r
+        pt = {"end": end.isoformat(), "value": value, "fact_ids": []}
+        if r.interval:
+            pt["start"] = r.interval[0].isoformat()
+        points.append(pt)
+
+    unit = sample_type.unit_class if sample_type else left.unit_class
+    kind = ("flow" if sample_type and sample_type.interval else
+            "instant" if sample_type and sample_type.instant else "series")
+    rt_out = {"unit_class": unit, "kind": kind, "quantity": None,
+              "derived_from": [getattr(left, "quantity", None), getattr(right, "quantity", None)]}
+    flags = {}
+    if unmatched:
+        flags["unmatched_periods"] = unmatched
+    if div_zero:
+        flags["division_by_zero_periods"] = div_zero
+    calc_id = await cs._record(
+        db, None, f"calc.series.{op}",
+        {"op": op, "operands": [a, b], "result_type": rt_out},
+        {"points": points}, [a, b], flags, invoked_by,
+    )
+    return {"calc_id": calc_id, "op": op, "operands": [a, b], "points": points,
+            "type": rt_out, "quality_flags": flags,
+            "basis": f"{op}, element-wise over {len(points)} aligned period ends"}

@@ -566,7 +566,16 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
     row = (await db.execute(select(CalcLedger).where(CalcLedger.id == cid))).scalar_one_or_none()
     if row is None:
         return [], set()
-    unit = RATIO if row.operation in _CALC_RATIO_OPS else MONEY
+    # V10-S2. A row that recorded its own type (V9's calculator, and every
+    # series producer since) is believed; the operation-name table below is for
+    # the rows that did not. The table cannot type a `stat.latest` over a
+    # margin series — the op says nothing about what it was taken over — and
+    # the recorded type can.
+    recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
+    if recorded in ("money", "ratio"):
+        unit = RATIO if recorded == "ratio" else MONEY
+    else:
+        unit = RATIO if row.operation in _CALC_RATIO_OPS else MONEY
     result = row.result or {}
     values: list[EvidenceValue] = []
     if "points" in result:

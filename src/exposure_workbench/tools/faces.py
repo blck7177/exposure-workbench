@@ -30,6 +30,11 @@ READ_CORE = [
     # facts, which is what the research face is for too.
     "get_flow",
     "get_balance_sheet",
+    # V10-S2. The series axis of the same two primitives, and the one operator
+    # over a series; describe_issuer is the single locating tool.
+    "get_balance_series",
+    "series_stat",
+    "describe_issuer",
     # V9-A5. The four operators, typed: they refuse the combinations the
     # citation gate cannot see and allow every other one.
     "calculate",
