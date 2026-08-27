@@ -81,7 +81,19 @@ async def test_a_run_resolves_through_its_children_not_its_own_columns():
             assert values, "a completed run must resolve to the numbers on its children"
             labels = {v.label.split(".")[0] for v in values}
             assert "exposure_metrics" in labels
-            assert {v.unit_class for v in values} <= {nv.MONEY, nv.RATIO}
+            # Two classes of value, and they are told apart by label. A child
+            # column is a MEASUREMENT and is money or a ratio; a COUNT is V8-P4's
+            # row count and may only come from the count.* labels. Written as an
+            # equivalence rather than a subset so that a COUNT arriving from
+            # anywhere else — a column mistyped, a JSONB leaf walked by accident —
+            # still fails here.
+            for v in values:
+                if v.unit_class == nv.COUNT:
+                    assert v.label.startswith("count."), f"{v.label} is not a row count"
+                else:
+                    assert v.unit_class in (nv.MONEY, nv.RATIO), v.label
+            assert any(v.label.startswith("count.") for v in values), (
+                "a completed run has children, so it has counts of them")
     finally:
         await engine.dispose()
 
