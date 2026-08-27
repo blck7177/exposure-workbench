@@ -34,7 +34,11 @@ function latestVal(r: CalcRow): number | null {
 }
 function latestPeriod(r: CalcRow): string {
   const pts = r.result?.points;
-  if (Array.isArray(pts) && pts.length) return pts[pts.length - 1].period_end;
+  // v2 series points end on `end` (a window) or `as_of` (an instant); v1 rows used period_end.
+  if (Array.isArray(pts) && pts.length) {
+    const p = pts[pts.length - 1];
+    return p.end ?? p.as_of ?? p.period_end ?? "";
+  }
   return "";
 }
 
@@ -242,13 +246,22 @@ function FinancialsTab({ ticker }: { ticker: string }) {
         <thead><tr className="text-left text-slate-500 text-xs border-b border-[#21262d]"><th className="py-1.5">Metric</th><th>Latest</th><th>Period</th><th>Evidence</th></tr></thead>
         <tbody>
           {calcs.map((r) => {
-            const label = `${r.operation}${r.params?.series?.metric ? ` · ${r.params.series.metric}` : r.params?.a?.metric ? ` · ${r.params.a.metric}/${r.params.b?.metric}` : ""}`;
+            // V10: the recipe names its rows; the operation-derived label is the fallback for v1 rows.
+            const label = r.label ?? `${r.operation}${r.params?.series?.metric ? ` · ${r.params.series.metric}` : r.params?.a?.metric ? ` · ${r.params.a.metric}/${r.params.b?.metric}` : ""}`;
+            if (r.unavailable) {
+              return (
+                <tr key={label} className="border-b border-[#161b22]">
+                  <td className="py-1.5 text-slate-500 font-mono text-xs">{label}</td>
+                  <td className="text-slate-600 text-xs" colSpan={3}>unavailable — {r.unavailable}</td>
+                </tr>
+              );
+            }
             return (
-              <tr key={r.calc_id} className="border-b border-[#161b22]">
+              <tr key={r.calc_id ?? label} className="border-b border-[#161b22]">
                 <td className="py-1.5 text-slate-300 font-mono text-xs">{label}</td>
                 <td className="text-slate-100">{fmt(latestVal(r))}</td>
                 <td className="text-slate-500 text-xs">{latestPeriod(r)}</td>
-                <td><CitationChip id={r.calc_id} /></td>
+                <td>{r.calc_id ? <CitationChip id={r.calc_id} /> : null}</td>
               </tr>
             );
           })}

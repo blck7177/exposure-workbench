@@ -17,7 +17,11 @@ export type Snapshot = {
   available_metrics: MetricAvail[];
 };
 
-export type CalcRow = { calc_id: string; operation: string; params: any; result: any; primitive_version: string };
+export type CalcRow = {
+  calc_id: string | null; operation: string | null; params: any; result: any; primitive_version: string | null;
+  label?: string;            // V10: the recipe's own name for the row
+  unavailable?: string;      // V10: present when the recipe could not compute it
+};
 export type FilingRow = { accession: string; form_type: string; filing_date: string; period_end: string | null; source_url: string | null; sections: { id: string; item_code: string | null; title: string | null }[] };
 export type SourceRow = { id: string; title: string | null; url: string; publisher: string | null; published_date: string | null; snippet: string | null; search_query: string | null };
 export type Brief = {

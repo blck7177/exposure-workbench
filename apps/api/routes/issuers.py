@@ -82,21 +82,45 @@ async def snapshot(ticker: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/issuers/{ticker}/financials", dependencies=[Depends(optional_user)])
 async def financials(ticker: str, db: AsyncSession = Depends(get_db)):
+    """The baseline rows the latest recipe run produced, by label.
+
+    V10-S3: read from the recipe's manifest row rather than by scanning the
+    ledger for `invoked_by = 'recipe'` and keying on `params.series.metric`.
+    The scan worked only because every v1 row carried the metric name in the
+    same place; a v2 yoy row carries the id of the series it was taken over,
+    which is a different id on every run, so "latest row per metric" had
+    nothing stable to key on. The manifest names each label's row explicitly.
+    An issuer whose readiness has not run since v2 has no manifest and gets an
+    empty list with the reason — not the v1 rows under v2's name.
+    """
+    from exposure_workbench.services.recipe import OP_MANIFEST
     c = await _company(db, ticker)
-    rows = (await db.execute(
-        select(CalcLedger).where(CalcLedger.company_id == c.ticker, CalcLedger.invoked_by == "recipe")
-        .order_by(CalcLedger.created_at.desc())
-    )).scalars().all()
-    # latest ledger row per operation (recipe re-runs append; show the newest)
-    latest: dict[str, CalcLedger] = {}
-    for r in rows:
-        key = f"{r.operation}:{r.params.get('series',{}).get('metric') or r.params.get('a',{}).get('metric') or ''}"
-        latest.setdefault(key, r)
-    return {"ticker": c.ticker, "calcs": [
-        {"calc_id": r.id, "operation": r.operation, "params": r.params,
-         "result": r.result, "primitive_version": r.primitive_version}
-        for r in latest.values()
-    ]}
+    manifest = (await db.execute(
+        select(CalcLedger).where(CalcLedger.company_id == c.ticker,
+                                 CalcLedger.operation == OP_MANIFEST)
+        .order_by(CalcLedger.created_at.desc()).limit(1)
+    )).scalar_one_or_none()
+    if manifest is None:
+        return {"ticker": c.ticker, "calcs": [],
+                "note": "no baseline computed by the current recipe yet — run readiness"}
+    labels: dict = (manifest.result or {}).get("labels") or {}
+    ids = [v for v in labels.values() if isinstance(v, str)]
+    rows = {r.id: r for r in (await db.execute(
+        select(CalcLedger).where(CalcLedger.id.in_(ids)))).scalars().all()} if ids else {}
+    calcs = []
+    for label, ref in labels.items():
+        if isinstance(ref, str) and ref in rows:
+            r = rows[ref]
+            calcs.append({"label": label, "calc_id": r.id, "operation": r.operation,
+                          "params": r.params, "result": r.result,
+                          "primitive_version": r.primitive_version})
+        else:
+            calcs.append({"label": label, "calc_id": None, "operation": None, "params": {},
+                          "result": None, "primitive_version": None,
+                          "unavailable": (ref or {}).get("reason") if isinstance(ref, dict) else "missing"})
+    return {"ticker": c.ticker, "calcs": calcs,
+            "recipe_version": (manifest.params or {}).get("recipe_version"),
+            "as_of": (manifest.params or {}).get("as_of")}
 
 
 # ── filings tab ────────────────────────────────────────────────────────────────────
