@@ -44,17 +44,11 @@ async def _company_id(db: AsyncSession, ticker: str) -> str:
 async def load_price_series(
     db: AsyncSession, ticker: str, start: date, end: date
 ) -> list[so.PricePoint]:
-    rows = (
-        await db.execute(
-            select(MarketPrice.price_date, MarketPrice.adj_close, MarketPrice.close).where(
-                MarketPrice.ticker == ticker,
-                MarketPrice.price_date >= start,
-                MarketPrice.price_date <= end,
-            ).order_by(MarketPrice.price_date)
-        )
-    ).all()
-    # adj_close preferred (splits/dividends), close as the as-traded value
-    return [so.PricePoint(d, float(adj if adj is not None else c)) for d, adj, c in rows]
+    """The store rule lives in market_data_service.price_points (V10); this is
+    the name window_return has always called."""
+    from exposure_workbench.services import market_data_service as mds
+    points, _store = await mds.price_points(db, ticker, start, end)
+    return points
 
 
 # ── Ledger ─────────────────────────────────────────────────────────────────────

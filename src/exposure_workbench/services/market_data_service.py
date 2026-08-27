@@ -250,3 +250,41 @@ def build_factor_returns_df(factor_prices_df: pd.DataFrame) -> pd.DataFrame:
     returns = panel.pct_change()
     span = panel.index.to_series().diff().dt.days
     return returns[span <= _MAX_RETURN_SPAN_DAYS].dropna()
+
+
+# ── one rule for which store holds a ticker's prices (V10 side item) ─────────
+
+async def price_points(db: AsyncSession, ticker: str, start: date, end: date):
+    """A ticker's price series, from the store that tracks it, and which one.
+
+    Prices live in two tables. `market_prices` is filled by holdings — a ticker
+    enters it when somebody's portfolio contains it, with whatever history that
+    upload backfilled. `factor_prices` is filled by the factor sync, which keeps
+    full history because the regression needs it. The same ticker can be in
+    both, and for SPY on this deployment the difference decides the answer:
+    277 sessions from 2025-06-18 in the holdings store against 825 from
+    2023-05-08 in the factor store.
+
+    So the store is chosen by what the ticker IS to this desk — rows in
+    `factor_prices` mean the factor sync tracks it — and that is decided from
+    the database rather than from factor_config.yaml, because the api container
+    has no /app/configs mount and a tool reading YAML there answers with an
+    empty set (V2-H4's bug). This function is the only place the rule lives;
+    calc_service.window_return and drawdown_service both call it. Before V10
+    the rule sat in drawdown_service and window_return read the holdings store
+    unconditionally, so get_market_stats on a benchmark returned nothing for
+    any window older than the newest upload.
+
+    Returns (points, store_name). Prefers adj_close, as every consumer here does.
+    """
+    from exposure_workbench.analytics import series_ops as so
+    is_factor = (await db.execute(
+        select(FactorPrice.ticker).where(FactorPrice.ticker == ticker).limit(1)
+    )).scalar_one_or_none() is not None
+    model = FactorPrice if is_factor else MarketPrice
+    rows = (await db.execute(
+        select(model.price_date, model.adj_close, model.close)
+        .where(model.ticker == ticker, model.price_date >= start, model.price_date <= end)
+        .order_by(model.price_date))).all()
+    return ([so.PricePoint(d, float(a if a is not None else c)) for d, a, c in rows],
+            model.__tablename__)

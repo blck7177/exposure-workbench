@@ -103,7 +103,7 @@ chunk/embedding(M5)、任何计算(M3)、10-K/10-Q 之外表单、修正案(只�
 
 ---
 
-## M3 — Analysis Primitives & Computation Ledger(2026-07-23 定稿,经重定义)
+## M3 — Analysis Primitives & Computation Ledger(2026-07-23 定稿,经重定义;**序列部分于 2026-08-27 由 M18 取代**——`period_ladder`、`get_fact_series`、四个 `compute_*` 已删,下文保留为历史)
 
 > 重定义:M3 不是"预先定死的指标清单",而是**分析原语 + 计算台账**架构。
 > 具体算哪些指标是 recipe 内容(随时可改,不在架构讨论范围);架构回答的是:
@@ -774,3 +774,58 @@ A 批五个读、B 批一个方法工具,全部 META_ONLY:它们回答的是**�
 ### 三条实证纠正(细节见 `docs/spikes/V8_COVERAGE.md` §3)
 
 `utilization` 是 `current/breach_level` 而 `limit_value` 是**被越过的那一档**,计划里的示例文案对本代码库是错的;恒等式 B 的左边必须是 `attribution_portfolio_return`(差 2.4e-6 全部是分红历史);benchmark 要按 **ticker 对本台是什么**选价格表,而这个问题从 DB 事实回答**不从 YAML 读**(api 容器没有 `/app/configs`,是 M16 那个 bug 的同形)。
+
+
+---
+
+## M18 — 序列并轨:一种取数、一种算、一条路(V10,2026-08-27 完成)
+
+**一句话**:V9 把"取一个窗口"做对了但没做"取一串";V3 有"一串"但窗口是错的枚举。把"一串"建在 V9 的窗口上,然后把 V3 删掉。工具面 36 → 31,不新增任何分析能力。
+
+### 为什么不是"删 V3"
+
+起草时我写过「V3 能做的 V9 都能做」,对着代码核是错的:`interval_algebra` 只有 `derive(start,end)` 与 `latest_window(months)`,一次一个窗口;`get_fact_series` 给 N 个期间的阶梯。真实使用(yoy over 4–8 季,113 次)正是 V9 缺的形状,而 `recipe.py`(issuer 页 Financials tab)直接依赖 V3 路径。所以 V10 是三步:建序列维度 → 全语料 parity → 迁 recipe → 整体删旧路(DP3,V2-H4 的"半切换不可见")。
+
+### 序列 = 连续窗口,而且有相位
+
+`consecutive_windows(facts, months, last_n)`:锚点是语料自己的期末日,相邻两两 `derive`。它取代的不只是 `build_ladder`,还有 `derive_q4` 这个特例——Q4 就是一个窗口(常为 FY − 9M)。
+
+全语料 parity 逼出两条设计,都在"序列从哪里结束、怎么走":
+
+- **相位是发行人的**。第一版从 `latest_window` 的 end 起步——对 AAPL 十二个月那是到 6 月季末的 TTM,往回走出来的是一串 6 月,484 个财年点"缺"了 420 个。`_series_end` 取该长度的**原生报告期**(年度看 FY 事实、季度看 Q1 事实)的期末,选最新的、与之相差整数个 span 的边界。季度落在最新的 6 月边界(比最后一个 Q1 事实晚两个可推导的季度),年度落在 9 月。**单窗口 = 最近可推导的那个;序列 = 发行人自己的报告期按序**,两者不共享 end,`get_flow` 的 docstring 写明。
+- **缺口留在原位,走法不停**。NVDA FY2023 的 capex 只报了 9M 与 FY,往前一个季度没有任何边界,第一版在这里停下,FY2022 的四个已申报季度永远够不着。现在缺边界的槽按名义日期留一个 Unreachable(DP2)继续走,下一个靠近真实边界的槽重新对齐。最老一端的连续 Unreachable 修掉——它们只说明"数据从更晚开始"。
+
+**parity 数字**:季度 1439/1439、年度 484/484(A6 容差);季度多出 252 个窗口,全部是累计申报的现金流指标上的 2 项推导(H1−Q1、9M−H1 那种形状),年度零多余。
+
+### 工具面:8 个替 13 个
+
+```
+定位  describe_issuer                       ← get_issuer_snapshot ⊃ list_available_data,+ list_formulas(每家相同的 16 条,加"这家能算哪些")
+取    get_flow(…, last_n?)                  ← + get_fact_series(quarterly/annual)
+      get_balance_sheet(不变)
+      get_balance_series                    ← get_fact_series(instant):一条线在每个日期,不推导不填
+算    calculate(序列对齐)                   ← + compute_ratio(=combine.divide,docstring 自认)+ compute_combine
+      series_stat(series_id, op)            ← compute_change ∪ compute_stat(真实使用 yoy 74 / latest 4 / qoq 2 / abs 1,无一可删)
+      evaluate_formula / get_fundamental_panel(不变)
+```
+
+`series_stat` 只收一个 id 和一个 op——`compute_change` 收 `(ticker, metric, period_type, last_n, mode)`,把"取"和"算"绑在一次呼吸里,五个工具共 21 个参数。算法层 `series_ops.compute_change/compute_stat` 原封不动(它们吃 `SeriesPoint[]`,从不认识 ladder,所以活了下来);`combine_series` 删,`typed_calculator._align` 是唯一的对齐器。
+
+`calculate` 升到序列:按 end 对齐(容差就是引擎的 `BOUNDARY_TOLERANCE_DAYS`,不是新数字),每一对过同一套 `_check`,**一对被拒整体拒并点名槽位**——静默丢一个点的序列在长度上说谎。未匹配的期数丢弃并计数(`combine_series` 一直的规则)。
+
+每个序列行记录 `result_type`,`_from_calc` **先信记录的类型再查 op 名表**:`stat.latest` 对一个 margin 序列是比率,op 名说不出这一点。
+
+### recipe v2 与 manifest
+
+同一组标签,经新原语组合;结尾**一条 manifest 行**记每个标签的 calc_id。Financials 路由读 manifest,不再按 `invoked_by='recipe'` 扫台账、按 `params.series.metric` 分组——v2 的 yoy 行 `series` 参数是它所取序列的 id,每次运行都不同,"每 metric 最新一行"没有稳定的 key。
+
+实跑 8 家:AAPL/NVDA 是仅有的两家跑过 v1 的;AAPL 两代共有的 77 个点**逐点相同**,v2 更多(ocf yoy 8 vs 5,fcf 12 vs 6——S1 量出的累计申报增益到页面上)。**三件撞出的既存事实**:NVDA `revenue` 的 v1 行是 7/24 的、早于 V9-M1 把 NVDA 2022 后收入拆到 `total_revenues`,今天 v1 同样取不到——recipe 硬编码 `revenue` 而 V9 公式表有具名替代,是 recipe 的问题不是 V10 的;LLY capex 事实止于 2022-09 与 ocf 零重叠,`misaligned_series` 是正确的拒绝(v1 会给空序列带 calc_id);六家从没有过 Financials tab。
+
+### 冻结的 ladder
+
+`period_ladder.py` 不在产品代码里了,但在 `tests/legacy_ladder.py`:一份冻结的参考实现,只有两个 parity 测试 import 它。A6 的 290/290 与 S1 的 1439/1439 是某一刻的证明;作为常驻测试它们是守卫,守卫需要一个固定的东西来产生分歧。它不会漂移,因为没有别的东西够得到它;`restatement_key` 从引擎 import,一条规则还是一条。
+
+### 本批记下的两条
+
+- **切一块代码时,数它中间夹着什么**。从 `SeriesSpec` 切到 `load_price_series` 把 `_company_id` 一起切走了——五个序列函数都在那一段,它们共用的那个 helper 也在。offline 全绿(没有测试碰数据库),live 第一条就 NameError。V3 那句"全绿只是测试碰巧盖到的"又一次。
+- **一个真实的 store 规则只能有一个家**。`_benchmark_series` 的选表规则(V8-D 写在 drawdown_service)搬进 `market_data_service.price_points`,`window_return` 与 `explain_episode` 都经它;`get_market_stats` 同时改用服务端日期(V5 修 recipe 时漏了这个工具)。

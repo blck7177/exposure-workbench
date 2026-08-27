@@ -200,10 +200,10 @@ apps/
 
 | 类 | 工具 | 说明 |
 |---|---|---|
-| 数据原语(read) | `list_available_data` / `get_fact_series` / `get_price_series` | 序列已经 period_ladder 对齐,agent 无"自己对期次"的机会;返回带 fact_id |
-| 计算代数(read,落台账) | `combine_series(add/sub/divide)` / `compute_change(yoy/qoq/pct/abs)` / `compute_stat(cagr/avg/min/max/std)` / `compute_window_return` | **封闭代数**:表达力靠组合不靠加工具;增删原语是架构评审动作 |
+| 数据原语(read) | `describe_issuer` / `get_flow(months, last_n)` / `get_balance_sheet(at)` / `get_balance_series` | **V10**:窗口与序列都来自区间引擎(任意窗口=边界图上的带符号路径;序列=发行人自己报告网格上的连续窗口),agent 无"自己对期次"的机会;每点带 fact_id 与推导式 |
+| 计算代数(read,落台账) | `calculate(op, a, b)`(标量或序列,带类型四则)/ `series_stat(series_id, yoy/qoq/pct/abs/cagr/avg/min/max/std/sum/latest)` / `evaluate_formula` / `get_fundamental_panel` / `get_market_stats` | **封闭代数**:表达力靠组合不靠加工具;增删原语是架构评审动作 |
 | 检索(read) | `search_filing_passages`(找位置,默认全 filing 覆盖+filters 收窄)/ `get_filing_section`(读全文) | 正交而非冗余:对抗"RAG 只看碎片"偏差 |
-| 组合/状态(read) | `get_issuer_snapshot` / `list_alerts` / `list_research_sources` / `get_run_status` | 组合敞口/告警是普通证据,带 id 可引用 |
+| 组合/状态(read) | `get_portfolio_snapshot` / `list_alerts` / `get_task_status` / `read_issuer_brief`(+V8 的 run 产物读) | 组合敞口/告警是普通证据,带 id 可引用 |
 | delegation | `ensure_company_ready` / `start_issuer_research` / `start_exposure_run` / `search_external_research(query, reason)` | reason 必填(判断留痕);外部搜索仅在 FACE_RESEARCH |
 | reflection | `think` | 无副作用,只写轨迹 |
 | 出口(门) | `respond`(meta)/ `submit_brief`(research) | §5 提交门 |

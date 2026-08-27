@@ -1,6 +1,6 @@
 # Implementation Plan V10 — 收敛批:一种取数、一种算、一条路
 
-> **状态(2026-08-27 起草,待 boss 拍板)**:未开工。本文是 boss「先收敛,不再加功能」指示下的第一批,范围只有一组:**V3 时代的序列原语(`get_fact_series` + 四个 `compute_*`)与 V9 的区间原语并轨**。其余重复(run 切片合并、告警三切法)登记在 §8,本批不动。
+> **状态(2026-08-27)**:**S1–S5 + 旁支全部完成**(`c892e4b`…;offline 1095→**1039**——差额是随 `period_ladder`/`combine_series` 一起退役的两文件测试;live 211 待重建后复验)。终验 `docs/spikes/V10_COVERAGE.md`,笔记 MODULE_NOTES §M18。**两处对计划的纠正**:①面 36→**31**(计划写 29:计划从 V8 前的面数起,漏算了 V8-A…D 新增的 5 个);②序列**不从 `latest_window` 的 end 起步**——它必须有发行人的相位(`_series_end`),否则年度序列是一串 6 月 TTM;`get_flow(last_n=1)` 保持旧行为,`last_n>1` 走网格。S5 的 `_SYSTEM` 措辞**待 boss 过目**。
 > **性质**:减法。工具面 36 → **31**,`period_ladder` 整个模块删除,`calc_service` 的序列装载删除。**不新增任何分析能力**——本批结束时模型能回答的问题集合与现在完全相同,只是每个问题只剩一条路。
 > **一句话**:V9 把"取一个窗口"做对了但没做"取一串窗口";V3 有"一串"但窗口是错的枚举。把"一串"建在 V9 的窗口上,然后把 V3 删掉。
 > **上游依据**:`docs/IMPLEMENTATION_PLAN_V9.md` §0 诊断与 §"本批不动"里的「quarterly ladder 整体迁移(A6 只做 Q4 parity)」;`tests/test_v9_q4_parity_live.py`(290/290);2026-08-27 工具集正交性分析(topic 日志)。

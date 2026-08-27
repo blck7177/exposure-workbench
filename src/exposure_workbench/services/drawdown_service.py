@@ -29,7 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import drawdown as dd
-from exposure_workbench.db.models import FactorPrice, Portfolio, Position
+from exposure_workbench.db.models import Portfolio, Position
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import market_data_service
 from exposure_workbench.tools.registry import current_session_id
@@ -43,45 +43,11 @@ _BENCHMARK_FALLBACK = "SPY"
 
 
 async def _benchmark_series(db: AsyncSession, ticker: str, start: date, end: date):
-    """The benchmark's prices, from the store that tracks this ticker.
-
-    Prices live in two tables. `market_prices` is filled by holdings — a ticker
-    enters it when somebody's portfolio contains it, and gets whatever history
-    that upload backfilled. `factor_prices` is filled by the factor sync, which
-    maintains full history because the regression needs it. The same ticker can
-    be in both, and for SPY on this deployment the difference is decisive:
-    277 sessions from 2025-06-18 in the holdings store against 825 from
-    2023-05-08 in the factor store. Asking the holdings store for SPY's return
-    across a drawdown in early 2025 returns nothing at all.
-
-    So the store is chosen by what the ticker IS to this desk, not by what
-    happens to be present: a ticker with rows in `factor_prices` is one of the
-    desk's factors, because that table is populated by the factor sync for
-    exactly the configured set. That question is answered from the database and
-    not from factor_config.yaml on purpose — the api container has no
-    /app/configs mount, so a tool reading YAML returns the full answer in the
-    mcp container and an empty one in the api container, which is V2-H4's bug
-    exactly.
-
-    The underlying flaw is that two tables hold one kind of fact and every
-    consumer has to know which. Measured while writing this: they agree exactly
-    on `close` across all 1,927 overlapping rows, and differ on `adj_close` for
-    38 SPY rows by at most 2e-4 — two ingests of one series rounding at the
-    fourth decimal. Unifying them is a migration and belongs in its own batch;
-    what is here is one rule, stated, rather than each caller guessing.
-    """
-    is_factor = (await db.execute(
-        select(FactorPrice.ticker).where(FactorPrice.ticker == ticker).limit(1)
-    )).scalar_one_or_none() is not None
-    if not is_factor:
-        return None, "market_prices"
-    rows = (await db.execute(
-        select(FactorPrice.price_date, FactorPrice.adj_close, FactorPrice.close)
-        .where(FactorPrice.ticker == ticker,
-               FactorPrice.price_date >= start, FactorPrice.price_date <= end)
-        .order_by(FactorPrice.price_date))).all()
-    from exposure_workbench.analytics import series_ops as so
-    return [so.PricePoint(d, float(a if a is not None else c)) for d, a, c in rows], "factor_prices"
+    """The benchmark's prices from the store that tracks it — the rule is
+    market_data_service.price_points, which was written here first (V8-D) and
+    moved there when window_return turned out to need the same rule."""
+    from exposure_workbench.services import market_data_service as mds
+    return await mds.price_points(db, ticker, start, end)
 
 
 async def _book(db: AsyncSession, portfolio_id: str):
@@ -195,19 +161,9 @@ async def explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough
     book_return = float((1.0 + returns).prod() - 1.0)
 
     benchmark = pf.benchmark or _BENCHMARK_FALLBACK
-    factor_points, store = await _benchmark_series(db, benchmark, start, end)
-    if factor_points is None:
-        bench = await cs.window_return(db, benchmark, start, end,
-                                       invoked_by=current_session_id())
-    else:
-        from exposure_workbench.analytics import series_ops as so
-        res = so.compute_window_return(factor_points, start, end)
-        bench = {"value": res.value, "quality_flags": res.quality_flags,
-                 "calc_id": await cs._record(
-                     db, benchmark, res.operation,
-                     {"ticker": benchmark, "start": peak, "end": trough, "store": store},
-                     {"value": res.value}, [f"price:{benchmark}:{peak}:{trough}"],
-                     res.quality_flags, current_session_id())}
+    # One path: window_return reads through the same store rule now.
+    _points, store = await _benchmark_series(db, benchmark, start, end)
+    bench = await cs.window_return(db, benchmark, start, end, invoked_by=current_session_id())
 
     holdings = []
     for p in positions:

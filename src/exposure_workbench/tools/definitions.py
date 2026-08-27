@@ -145,8 +145,16 @@ async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
 # ── financial data / calculations ───────────────────────────────────────────────
 
 async def _get_market_stats(db: AsyncSession, ticker: str, window: str = "1y", benchmark: str | None = "SPY") -> dict:
+    # The reporting date is a server fact. Reading the clock here made the same
+    # ticker's 1m return a different number on consecutive days with nothing in
+    # the ledger row to say the window had moved — V5 fixed that for the recipe
+    # and this tool kept the clock. `latest_session_date` is the last completed
+    # session, which is also what start_exposure_run reports on.
+    from exposure_workbench.services import market_data_service
     days = {"1m": 30, "3m": 91, "6m": 182, "1y": 365}.get(window, 365)
-    end = date.today()
+    end = await market_data_service.latest_session_date(db)
+    if end is None:
+        return {"error": "no_price_data", "detail": "no market prices are loaded yet"}
     start = end - timedelta(days=days)
     return await cs.window_return(db, ticker.upper(), start, end, benchmark=benchmark,
                                   invoked_by=current_session_id())
