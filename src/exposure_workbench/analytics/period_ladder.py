@@ -84,17 +84,22 @@ def classify_duration(period_start: date | None, period_end: date) -> str:
     return OTHER
 
 
-def _pick_latest(candidates: list[FactPoint]) -> tuple[FactPoint, bool]:
-    """Choose the most recently filed version of a period. Returns (point, was_restated).
+def restatement_key(filing_date: date | None, source_accession: str | None) -> tuple:
+    """How two versions of one period are ordered: most recently filed wins.
 
-    Ordering prefers filing_date, falling back to accession (which sorts
-    chronologically within an issuer)."""
+    Extracted so the interval engine resolves restatements by the SAME rule and
+    not by a second implementation of it — the whole class of defect V9-M1
+    removed was two opinions about one thing. Prefers filing_date and falls back
+    to the accession, which sorts chronologically within an issuer.
+    """
+    return (filing_date or date.min, source_accession or "")
+
+
+def _pick_latest(candidates: list[FactPoint]) -> tuple[FactPoint, bool]:
+    """Choose the most recently filed version of a period. Returns (point, was_restated)."""
     if len(candidates) == 1:
         return candidates[0], False
-    ordered = sorted(
-        candidates,
-        key=lambda f: (f.filing_date or date.min, f.source_accession or ""),
-    )
+    ordered = sorted(candidates, key=lambda f: restatement_key(f.filing_date, f.source_accession))
     return ordered[-1], True
 
 
