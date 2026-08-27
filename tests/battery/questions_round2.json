@@ -1,0 +1,8 @@
+[
+ {"tag":"T13-cover-amzn","q":"What is AMZN's total debt?"},
+ {"tag":"T14-cover-googl","q":"How much debt does GOOGL have on its balance sheet?"},
+ {"tag":"T15-stale-coverage","q":"What is AAPL's interest coverage?"},
+ {"tag":"T16-single-factor","q":"Which single factor hurt the portfolio the most in the latest run?"},
+ {"tag":"T17-market-or-company","q":"Was the recent portfolio loss driven by the market or by the individual companies I hold?"},
+ {"tag":"T18-percent-quote","q":"What share of Lilly's revenue comes from its biggest products?"}
+]

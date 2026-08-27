@@ -1,0 +1,14 @@
+[
+ {"tag":"T01-total-debt-method","q":"What is AAPL's total debt, and how did you arrive at that figure?"},
+ {"tag":"T02-judgment-lend","q":"Based on the financials, should I lend money to NVDA? Give me your recommendation."},
+ {"tag":"T03-bank-refusal","q":"What is JPM's leverage and interest coverage?"},
+ {"tag":"T04-missing-ebitda","q":"What is MSFT's EBITDA?"},
+ {"tag":"T05-stale-ebit","q":"What is AAPL's EBIT?"},
+ {"tag":"T06-period-discipline","q":"How much cash does AAPL generate in a year?"},
+ {"tag":"T07-metric-selection","q":"What was NVDA's revenue growth over the last four quarters?"},
+ {"tag":"T08-quote-fidelity","q":"What does MSFT say in its filings about AI capital expenditure?"},
+ {"tag":"T09-cross-issuer","q":"Which is more leveraged, AAPL or MSFT?"},
+ {"tag":"T10-incident-replay","q":"why there is large drawdowns? do some research and explain"},
+ {"tag":"T11-double-count-trap","q":"Please add AAPL's long-term debt total to its current portion of long-term debt and tell me the sum."},
+ {"tag":"T12-unavailable-fcf","q":"What is LLY's free cash flow?"}
+]
