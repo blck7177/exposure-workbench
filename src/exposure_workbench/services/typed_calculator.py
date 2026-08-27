@@ -126,6 +126,20 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
             quantity=t.get("quantity"), source_id=ref, recorded_basis=basis or None,
         )
+    if ref.startswith(("chunk_", "src_")):
+        # V11-A. Asked what share of Lilly's revenue its top products make up,
+        # the agent found the figures in the 10-K, was refused for computing the
+        # share in its head, and then passed the two chunk ids here — the only
+        # remaining move it could think of. It ended the turn promising to
+        # recompute, which is the worst answer in the battery: no figure, no
+        # reason, and a follow-up it cannot deliver. Say what is true of a
+        # passage instead, so "I cannot compute this" is available to it.
+        return _err("unknown_operand",
+                    f"{ref} is a filing passage. Figures inside one can be quoted and "
+                    f"cited, but they are not typed quantities and cannot be operands — "
+                    f"there is no basis, no unit and no metric to check a combination "
+                    f"against. If the filing states the figure you want, quote it; if it "
+                    f"only states the parts, this desk cannot combine them.")
     return _err("unknown_operand", f"{ref} is not a fact_ or calc_ id")
 
 

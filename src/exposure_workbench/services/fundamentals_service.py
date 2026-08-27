@@ -67,6 +67,40 @@ def _unknown_metric(metric: str) -> dict:
             "detail": f"{metric} is not a normalised metric; describe_issuer lists them"}
 
 
+async def _metric_absence(db: AsyncSession, error: str, kind: str, ticker: str, metric: str,
+                          why: str, invoked_by: str, **extra) -> dict:
+    """A metric refusal that names the stand-in the registry already knows about.
+
+    V11-A. `Formula.alternatives` has recorded since V9 that NVDA's revenue moved
+    to total_revenues and MSFT's interest expense to its non-operating tag — and
+    only evaluate_formula could read it. Asked for NVDA's last four quarters of
+    revenue, the agent tried the retired tag twice and then reported that the
+    filings cannot support a quarterly series. get_flow on total_revenues returns
+    four quarters. An absence has to carry what the desk knows sits beside it, or
+    it is not an absence, it is a dead end.
+    """
+    from exposure_workbench.services import absence_service as ab
+    alts = ab.superseded_by(metric)
+    covers = await ab.coverage(db, ticker, (metric,) + alts)
+    latest = await ab.issuer_latest(db, ticker)
+    instead = [f"{a} through {covers[a]['through']}" for a in alts if covers.get(a)]
+    statement = (
+        f"{why} "
+        + (f"This desk holds {'; '.join(instead)} for {ticker} — the registry records "
+           f"{' and '.join(alts)} as what {metric} was superseded by, so ask for that "
+           f"metric instead. " if instead else "")
+        + (f"{ticker}'s most recent filed period ends {latest}. " if latest else "")
+        + "This is a statement about this desk's coverage, not a statement that the "
+          "issuer does not disclose the item.")
+    return await ab.refuse(
+        db, error, kind=kind, ticker=ticker, statement=statement,
+        tried={"metric": metric, **{k: v for k, v in extra.items() if k != "detail"}},
+        stopped_at={"metric": metric, "coverage": covers.get(metric)},
+        neighbours={"superseded_by": list(alts), "coverage": covers,
+                    "issuer_latest_period_end": latest},
+        invoked_by=invoked_by, metric=metric, **extra)
+
+
 async def get_flow(
     db: AsyncSession,
     ticker: str,
@@ -104,9 +138,12 @@ async def get_flow(
 
     facts = await _flow_facts(db, company_id, metric)
     if not facts:
-        return {"error": "not_reported", "ticker": ticker, "metric": metric,
-                "detail": f"{ticker} reports no {metric} with a period; it may report "
-                          f"a related line instead — call describe_issuer"}
+        return await _metric_absence(
+            db, "not_reported", "not_reported", ticker, metric,
+            why=f"This desk holds no {metric} for {ticker} over any period.",
+            invoked_by=invoked_by,
+            detail=f"{ticker} reports no {metric} with a period; it may report "
+                   f"a related line instead — call describe_issuer")
 
     if last_n is not None and last_n > 1:
         if start or end:
@@ -121,10 +158,13 @@ async def get_flow(
         window = ia.latest_window(facts, months=months or 12)
 
     if isinstance(window, ia.Unreachable):
-        return {"error": "window_not_derivable", "ticker": ticker, "metric": metric,
-                "detail": window.reason,
-                "data_covers": {"from": window.nearest_start.isoformat() if window.nearest_start else None,
-                                "to": window.nearest_end.isoformat() if window.nearest_end else None}}
+        covers = {"from": window.nearest_start.isoformat() if window.nearest_start else None,
+                  "to": window.nearest_end.isoformat() if window.nearest_end else None}
+        return await _metric_absence(
+            db, "window_not_derivable", "window_not_derivable", ticker, metric,
+            why=(f"No such window of {ticker}'s {metric} can be derived from the periods "
+                 f"it files; the reported boundaries run {covers['from']} to {covers['to']}."),
+            invoked_by=invoked_by, detail=window.reason, data_covers=covers)
 
     terms = [{"fact_id": fid, "sign": sign} for fid, sign in window.terms]
     period = {"start": window.start.isoformat(), "end": window.end.isoformat()}
@@ -216,12 +256,16 @@ async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) ->
     derived = [w for w in slots if isinstance(w.window, ia.Derived)]
     if not derived:
         ends = sorted({f.period_end for f in facts})
-        return {"error": "series_not_derivable", "ticker": ticker, "metric": metric,
-                "months": months,
-                "detail": (f"no {months}-month window of {metric} can be derived from the "
-                           f"periods {ticker} reports; it may report this metric only over "
-                           f"longer periods — ask for a longer `months`"),
-                "data_covers": {"from": ends[0].isoformat(), "to": ends[-1].isoformat()}}
+        covers = {"from": ends[0].isoformat(), "to": ends[-1].isoformat()}
+        return await _metric_absence(
+            db, "series_not_derivable", "series_not_derivable", ticker, metric,
+            why=(f"No {months}-month window of {ticker}'s {metric} can be derived from the "
+                 f"periods it files under that tag, which run {covers['from']} to "
+                 f"{covers['to']}."),
+            invoked_by=invoked_by, months=months, data_covers=covers,
+            detail=(f"no {months}-month window of {metric} can be derived from the "
+                    f"periods {ticker} reports; it may report this metric only over "
+                    f"longer periods — ask for a longer `months`"))
     points = [_slot(w) for w in slots]
     calc_id = await cs._record(
         db, ticker, OP_FLOW_SERIES,
@@ -271,9 +315,12 @@ async def get_balance_series(
                FinancialFact.value.is_not(None))
     )).all()
     if not rows:
-        return {"error": "not_reported", "ticker": ticker, "metric": metric,
-                "detail": f"{ticker} reports no {metric} as a balance; it may be a flow — "
-                          f"call get_flow, or describe_issuer to see which it is"}
+        return await _metric_absence(
+            db, "not_reported", "not_reported", ticker, metric,
+            why=f"This desk holds no {metric} for {ticker} as a balance at any date.",
+            invoked_by=invoked_by,
+            detail=f"{ticker} reports no {metric} as a balance; it may be a flow — "
+                   f"call get_flow, or describe_issuer to see which it is")
     best: dict[date, tuple] = {}
     for pe, value, fid, acc, fd in rows:
         prev = best.get(pe)

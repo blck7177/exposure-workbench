@@ -111,10 +111,18 @@ _GATE_EXHAUSTED_TEXT = (
 _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 
-# How much of one tool result reaches the model. Entries come off the tail of
-# the largest container and are named in a `truncated` field, so a payload that
-# does not fit says so — see utils.json.dumps_capped.
-TOOL_RESULT_LIMIT = 6000
+# How much of one tool result reaches the model. Entries come off the tail of the
+# largest container and are named in a `truncated` field, so a payload that does
+# not fit says so — see utils.json.dumps_capped.
+#
+# Derived rather than picked. The binding constraint is context_soft_limit_tokens
+# (80k); a turn may make turn_tool_budget (15) calls, so 12kB each is ~45k
+# characters, ~12k tokens, well inside it. The largest legitimate payload is the
+# fundamental panel — sixteen measures, and for an issuer with several
+# unavailable ones, sixteen measures plus the sentences saying why — which runs
+# to 6.7kB. The previous 6000 was a byte-slice guard nobody had costed against
+# either number, and it silently deleted four panel lines per NVDA call.
+TOOL_RESULT_LIMIT = 12_000
 
 
 async def _load_history(db, session_id: str) -> list[dict]:
