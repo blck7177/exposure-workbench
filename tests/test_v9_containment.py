@@ -80,7 +80,35 @@ def test_what_the_cover_left_out_is_reported_not_hidden():
     got = ct.cover({"short_term_borrowings": 68.048}, family="debt")
     assert isinstance(got, ct.Cover)
     assert got.value == pytest.approx(68.048)
-    assert "long_term_debt_total" in got.uncovered or "long_term_debt_noncurrent" in got.uncovered
+    left_out = got.missing_at_this_date + got.no_facts_for_issuer
+    assert "long_term_debt_total" in left_out or "long_term_debt_noncurrent" in left_out
+
+
+def test_a_component_never_filed_is_not_reported_as_debt_left_out():
+    """The battery's sharpest false note, on its cleanest answer.
+
+    AAPL's total debt is complete at long_term_debt_total + commercial_paper, and
+    the answer said debt_current_total and short_term_borrowings "were not covered
+    by that reported set" — which reads as debt omitted. AAPL has never filed
+    either concept at any date. The two absences are different facts and are now
+    two fields.
+    """
+    aapl = {"long_term_debt_total": 82.700, "long_term_debt_noncurrent": 74.404,
+            "current_portion_long_term_debt": 8.310, "commercial_paper": 1.997}
+    got = ct.cover(aapl, family="debt", ever_reported=frozenset(aapl))
+    assert isinstance(got, ct.Cover)
+    assert got.value == pytest.approx(84.697)
+    assert got.missing_at_this_date == (), "nothing AAPL files is missing from this instant"
+    assert set(got.no_facts_for_issuer) == {"debt_current_total", "short_term_borrowings"}
+
+
+def test_a_component_filed_at_another_date_is_the_signal_that_survives():
+    """The case the single field existed for: this one really may be short."""
+    got = ct.cover({"long_term_debt_total": 82.700}, family="debt",
+                   ever_reported=frozenset({"long_term_debt_total", "commercial_paper"}))
+    assert isinstance(got, ct.Cover)
+    assert got.missing_at_this_date == ("commercial_paper",)
+    assert "commercial_paper" not in got.no_facts_for_issuer
 
 
 def test_a_zero_component_is_present():

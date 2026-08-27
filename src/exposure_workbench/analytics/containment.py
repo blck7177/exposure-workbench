@@ -65,11 +65,23 @@ FAMILIES: dict[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True)
 class Cover:
-    """The widest non-overlapping set of what was reported, and what it misses."""
+    """The widest non-overlapping set of what was reported, and what it misses.
+
+    What it misses is TWO things and they were one field until V11-U, which made
+    the cleanest answer in the battery carry a falsehood. AAPL's total debt is
+    complete at 84.697bn — and the answer said "debt_current_total and
+    short_term_borrowings were not covered by that reported set", which a reader
+    takes as debt left out. AAPL has never filed either concept, at any date.
+
+    `missing_at_this_date` is the signal: the issuer files this component, not on
+    this instant, so the total may genuinely be short. `no_facts_for_issuer` is a
+    statement about THIS DESK's coverage of that issuer, not about its debt.
+    """
     value: float
     terms: tuple[str, ...]
     formula: str
-    uncovered: tuple[str, ...] = field(default_factory=tuple)
+    missing_at_this_date: tuple[str, ...] = field(default_factory=tuple)
+    no_facts_for_issuer: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -97,17 +109,22 @@ def contains(ancestor: str, descendant: str) -> bool:
     return descendant in _descendants(ancestor)
 
 
-def cover(available: dict[str, float], family: str) -> Result:
+def cover(available: dict[str, float], family: str,
+          *, ever_reported: frozenset[str] | set[str] = frozenset()) -> Result:
     """Add up a family without counting anything twice.
 
     Widest-first: a node the issuer reported is its own arithmetic, and each term
     dropped is one fewer number that can be restated or misread. Having taken a
     node, everything beneath it is excluded — that exclusion IS axiom R3.
 
-    `uncovered` names family members that are neither taken nor beneath a taken
-    node. A cover is the widest non-overlapping set of what exists, which is not
-    the same as complete, and the difference has to be visible: JPM reports only
-    short-term borrowings, and 68bn is its short end, not its debt.
+    What is left over is named, because a cover is the widest non-overlapping set
+    of what exists and that is not the same as complete: JPM reports only
+    short-term borrowings, and 68bn is its short end, not its debt. Widest-first
+    means every member that IS present ends up taken or excluded, so the leftovers
+    are always members with no value here — split by whether the issuer files them
+    at all. `ever_reported` is what the caller knows about other dates; without it
+    every absence reads as one this desk has never seen, which is what it is from
+    inside this function.
     """
     members = FAMILIES.get(family)
     if members is None:
@@ -132,11 +149,11 @@ def cover(available: dict[str, float], family: str) -> Result:
         excluded |= _descendants(node)
 
     taken_in_order = [m for m in members if m in taken]
-    uncovered = tuple(m for m in members
-                      if m not in taken and m not in excluded)
+    left_over = [m for m in members if m not in taken and m not in excluded]
     return Cover(
         value=sum(available[m] for m in taken_in_order),
         terms=tuple(taken_in_order),
         formula=" + ".join(taken_in_order),
-        uncovered=uncovered,
+        missing_at_this_date=tuple(m for m in left_over if m in ever_reported),
+        no_facts_for_issuer=tuple(m for m in left_over if m not in ever_reported),
     )

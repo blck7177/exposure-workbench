@@ -192,8 +192,17 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
     if citation_ids:
         ok, problems = await trail.validate_citations(db, current_session_id(), citation_ids)
         if not ok:
+            # An answer that states no numbers may cite nothing, and a model that
+            # does not know that invents ids to satisfy the gate. Measured: every
+            # "this cannot be produced" answer in the battery hit this refusal —
+            # three for three — and worked up through citing tool names and
+            # `co_jpm` to inventing `run_?` before landing on the empty list that
+            # was correct all along.
             return {"error": "invalid_citations", "problems": problems,
-                    "detail": "cited ids must come from tool results you called this session"}
+                    "detail": ("cited ids must come from tool results you called this "
+                               "session" + ("; this reply states no numbers, so an empty "
+                                            "citations list is correct here"
+                                            if not numeric.extract_numbers(text) else ""))}
         # The ids are real; now the numbers standing next to them have to be.
         stated = numeric.extract_numbers(text)
         if stated:
@@ -211,9 +220,11 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
                 return {"error": "unverified_numbers", "problems": bad,
                         "detail": "each number must match a value held by the evidence you "
                                   "cited. Re-cite the id that actually carries it, compute it "
-                                  "with a tool so it has one, or leave that figure out and "
-                                  "answer with what you can support — a partial answer that "
-                                  "holds up is worth more than a complete one that does not"}
+                                  "with a tool so it has one (a problem carrying `derivable` "
+                                  "names the exact call), or leave that figure out and answer "
+                                  "with what you can support — a partial answer that holds up "
+                                  "is worth more than a complete one that does not. Do not "
+                                  "swap in a different measure because it is easier to cite"}
     else:
         # Zero citations used to skip validation entirely, so a reply made
         # entirely of numbers passed the gate untouched — the one shape the gate

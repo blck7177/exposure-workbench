@@ -752,6 +752,66 @@ def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
             and f":{n.key}" in quoted)
 
 
+# The four operations `calculate` offers, searched over the cited values when a
+# number is refused. V11-G, from the battery: asked about NVDA, the agent wrote
+# "net debt was negative 3.767bn" — correct, derivable from two figures in the
+# same sentence, and refused for having no calc id. Rather than compute it, the
+# model swapped in a different measure it could cite cheaply, and the sentence
+# that survived does not follow from the numbers it states. Refusing is right;
+# refusing without naming the one legal move that fixes it is what made the
+# cheap wrong answer the cheapest answer.
+#
+# This does NOT relax the gate. The number is still refused. It costs 4k^2
+# comparisons over the cited values, is closed at two operands, and suggests
+# nothing it has not arithmetically confirmed.
+_DERIVATIONS = (("subtract", lambda a, b: a - b), ("add", lambda a, b: a + b),
+                ("divide", lambda a, b: a / b if b else None),
+                ("multiply", lambda a, b: a * b))
+
+
+def _derived_class(op: str, left: str, right: str) -> str | None:
+    """What class `calculate` would give the result, or None if it would refuse.
+
+    A mirror of typed_calculator._result_type, and it has to be one: the hint
+    names a calculate() call, so a hint the calculator would reject is worse than
+    no hint. It is also why the search cannot run over the candidates the unit
+    rule already narrowed — division CHANGES the class, and leverage written as
+    "1.3978x" is two MONEY values the compatibility table had excluded.
+    """
+    if op in ("add", "subtract"):
+        return left if left == right else None      # the calculator refuses the mix
+    if op == "divide":
+        return RATIO if left == right else left
+    return left                                      # multiply
+
+
+def _derivation(n: ExtractedNumber, values: list[EvidenceValue]) -> dict | None:
+    """One two-operand combination of cited values that rounds to what was written."""
+    allowed = _COMPATIBLE.get(n.unit_class, ())
+    for op, fn in _DERIVATIONS:
+        for left in values:
+            for right in values:
+                if left.source_id == right.source_id and left.label == right.label:
+                    continue
+                result_class = _derived_class(op, left.unit_class, right.unit_class)
+                if result_class is None or result_class not in allowed:
+                    continue
+                try:
+                    got = fn(left.value, right.value)
+                except (TypeError, ZeroDivisionError):
+                    continue
+                if got is None:
+                    continue
+                # Percent-written claims are canonicalised to fractions, so a
+                # ratio derivation meets them without a second rule.
+                if abs(got - n.value) <= n.atol:
+                    return {"op": op, "a": left.source_id, "b": right.source_id,
+                            "detail": (f"{left.label} {op} {right.label} is {got:g} — "
+                                       f"calculate(op='{op}', a='{left.source_id}', "
+                                       f"b='{right.source_id}') gives it an id")}
+    return None
+
+
 def verify(
     numbers: Iterable[ExtractedNumber],
     values: Iterable[EvidenceValue],
@@ -761,8 +821,10 @@ def verify(
 
     A number is supported when some compatible evidence value is within half an
     ulp of what was written, or when its digits appear verbatim in a cited
-    passage. Each problem carries the nearest compatible value, because the point
-    is for the model to re-cite or re-fetch, not to guess again.
+    passage. Each problem carries the nearest compatible value, and — when the
+    written number is two cited values away — the operation that would earn it an
+    id, because the point is for the model to re-cite or compute, not to guess
+    again or to quietly write about something else.
     """
     quoted = quoted or set()
     values = list(values)
@@ -776,10 +838,14 @@ def verify(
         if any(abs(v.value - n.value) <= n.atol for v in candidates):
             continue
         nearest = min(candidates, key=lambda v: abs(v.value - n.value), default=None)
-        problems.append({
+        problem = {
             "number": n.surface,
             "reason": "not_in_cited_evidence",
             "nearest": None if nearest is None else {"value": nearest.value, "label": nearest.label,
                                                      "id": nearest.source_id},
-        })
+        }
+        derived = _derivation(n, values)
+        if derived is not None:
+            problem["derivable"] = derived
+        problems.append(problem)
     return problems

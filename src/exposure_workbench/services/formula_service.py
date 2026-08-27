@@ -107,7 +107,11 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
     if bs.get("error"):
         return bs
     available = {m: line["value"] for m, line in bs["balances"].items()}
-    cover = ct.cover(available, family="debt")
+    # Everything this issuer files, at this date or another one. Without it the
+    # cover cannot tell "AAPL has never filed short-term borrowings" from "AAPL
+    # files it and not on this instant", and reported both as debt left out.
+    ever = frozenset(bs["balances"]) | frozenset(bs.get("not_reported_at_this_date", {}))
+    cover = ct.cover(available, family="debt", ever_reported=ever)
     if isinstance(cover, ct.NoCover):
         return {"error": "not_reported", "metric": "total_debt", "detail": cover.reason}
 
@@ -120,7 +124,8 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
         running_id, running_value = step["calc_id"], step["value"]
     return {"id": running_id, "value": running_value,
             "basis": f"as of {bs['as_of']}", "formula": cover.formula,
-            "uncovered": list(cover.uncovered)}
+            "missing_at_this_date": list(cover.missing_at_this_date),
+            "no_facts_for_issuer": list(cover.no_facts_for_issuer)}
 
 
 async def _common_window(db: AsyncSession, ticker: str, f, months: int,
@@ -175,10 +180,16 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         if got.get("error"):
             return got
         f = fm.FORMULAS["total_debt"]
-        return {"formula": name, "ticker": ticker, "value": got["value"],
-                "calc_id": got["id"], "definition": got.get("formula", f.expression),
-                "basis": got["basis"], "source_url": f.source_url, "note": f.note,
-                "uncovered": got.get("uncovered", [])}
+        out = {"formula": name, "ticker": ticker, "value": got["value"],
+               "calc_id": got["id"], "definition": got.get("formula", f.expression),
+               "basis": got["basis"], "source_url": f.source_url, "note": f.note,
+               "unit_class": f.unit_class}
+        # Only when there is something to say. An empty list beside every total
+        # invites a sentence about what was left out when nothing was.
+        for key in ("missing_at_this_date", "no_facts_for_issuer"):
+            if got.get(key):
+                out[key] = got[key]
+        return out
 
     f = fm.FORMULAS[name]
     window = _window
