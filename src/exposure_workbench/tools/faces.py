@@ -25,6 +25,11 @@ READ_CORE = [
     "get_issuer_snapshot",
     "list_available_data",
     "get_fact_series",
+    # V9-A2/A3. Any window, and one instant — the two primitives report analysis
+    # is composed from. On both faces: an issuer's filings are issuer-scoped
+    # facts, which is what the research face is for too.
+    "get_flow",
+    "get_balance_sheet",
     "compute_change",
     "compute_ratio",
     "compute_combine",

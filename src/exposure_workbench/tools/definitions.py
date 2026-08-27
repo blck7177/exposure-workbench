@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, RiskAlert
 from exposure_workbench.services import brief_service
+from exposure_workbench.services import fundamentals_service
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
@@ -61,6 +62,21 @@ async def _get_issuer_snapshot(db: AsyncSession, ticker: str) -> dict:
 
 async def _list_available_data(db: AsyncSession, ticker: str) -> dict:
     return await cs.list_available_metrics(db, ticker.upper())
+
+
+# ── V9-A2/A3: a flow over any window, and one instant's balance sheet ─────────
+
+async def _get_flow(db: AsyncSession, ticker: str, metric: str,
+                    months: int | None = None,
+                    start: str | None = None, end: str | None = None) -> dict:
+    return await fundamentals_service.get_flow(
+        db, ticker, metric, months=months, start=start, end=end,
+        invoked_by=current_session_id())
+
+
+async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = None) -> dict:
+    return await fundamentals_service.get_balance_sheet(
+        db, ticker, at=at, invoked_by=current_session_id())
 
 
 # ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
@@ -275,6 +291,44 @@ def build_read_registry() -> ToolRegistry:
         description="Company identity plus the list of financial metrics available for this issuer.",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_get_issuer_snapshot, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_flow",
+        description=(
+            "A flow metric (revenue, net income, interest expense, operating cash flow, "
+            "capex …) over a window YOU choose. Give `months` for the most recent window "
+            "of that length, or an explicit start/end. Issuers file flows over whatever "
+            "periods they file — quarters, half-years, year-to-date, full years — and this "
+            "derives your window from them by adding and subtracting the ones they did "
+            "report, returning the exact interval covered and which facts went in with "
+            "which sign. It never returns a shorter period than you asked for: a window "
+            "that cannot be derived is refused."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER,
+            "metric": {"type": "string", "description": "a normalised metric name; "
+                                                        "list_available_data has them"},
+            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120,
+                       "description": "window length; defaults to 12"},
+            "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, first day covered"},
+            "end": {"type": ["string", "null"], "description": "YYYY-MM-DD, last day covered"},
+        }, "required": ["ticker", "metric"], "additionalProperties": False},
+        fn=_get_flow, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_balance_sheet",
+        description=(
+            "Every balance this issuer reported at ONE date — debt components, cash, "
+            "working capital, equity. Balances from different dates are different "
+            "company-moments and must not be combined, so lines the issuer did not report "
+            "at this date are listed separately with the date they were last reported, "
+            "never substituted in. `at` defaults to the most recent such date."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ticker": _TICKER,
+            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD; defaults to latest"},
+        }, "required": ["ticker"], "additionalProperties": False},
+        fn=_get_balance_sheet, tool_class=READ,
     ))
     reg.register(Tool(
         name="list_available_data",
