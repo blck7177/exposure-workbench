@@ -45,6 +45,26 @@ _session_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("tool_
 def current_session_id() -> str:
     return _session_ctx.get() or "agent"
 
+
+# V8-C1. The message this tool call belongs to. `invoke()` has taken message_id
+# since the trace learned to group steps by turn, and passed it straight to
+# record_step — so the value existed, was written to every row, and was
+# unreachable from inside a tool fn. The respond gate needs it: a criterion about
+# what the model did BEFORE answering is a question about this turn's steps, and
+# without the id the only available scope is the whole session, where a tool call
+# from four questions ago would satisfy it.
+_message_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("tool_message_id", default=None)
+
+
+def current_message_id() -> str | None:
+    """None when a tool runs outside a turn — the recipe path, a direct call.
+
+    Returned rather than defaulted, because a criterion scoped to "this message"
+    has no meaning when there is no message, and a fabricated id would silently
+    scope it to nothing.
+    """
+    return _message_ctx.get()
+
 READ = "read"
 DELEGATION = "delegation"
 REFLECTION = "reflection"
@@ -184,6 +204,7 @@ async def invoke(
     """
     started = time.monotonic()
     _session_ctx.set(session_id)          # so calc tools stamp ledger.invoked_by
+    _message_ctx.set(message_id)          # so the gate can ask what THIS turn did
     tool = registry.tools.get(tool_name)
     if tool is None:
         await trace_service.record_step(

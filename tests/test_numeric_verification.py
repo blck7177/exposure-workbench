@@ -232,7 +232,8 @@ def test_a_number_free_reply_yields_nothing():
 
 
 # ── group C: the gate that consumes it (A0-1) ─────────────────────────────────
-# db is None throughout: the empty-citations branch provably never touches it,
+# db is None throughout: with no message scope the trajectory check returns before
+# its first query, so the empty-citations branch still reaches no database,
 # and a test that needed a database to prove a pure refusal would be testing the
 # database.
 

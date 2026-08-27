@@ -19,7 +19,10 @@ from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 from exposure_workbench.services import evidence_trail_service as trail
 from exposure_workbench.services import numeric_verification as numeric
-from exposure_workbench.tools.registry import DELEGATION, GATE, Tool, ToolRegistry, current_session_id
+from exposure_workbench.services import trajectory_gate
+from exposure_workbench.tools.registry import (
+    DELEGATION, GATE, Tool, ToolRegistry, current_message_id, current_session_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +159,17 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
     a number must cite, and any cited id must be in the session's evidence trail
     and resolve in the DB.
 
-    The empty-citations branch never touches `db`, which is what makes the
-    refusal testable without one.
+    The empty-citations branch reaches `db` only through the trajectory check,
+    and that check returns before its first query when there is no message scope
+    — which is the case in every direct call. So a refusal about numbers or
+    citations is still provable without a database, and a test passing None gets
+    the same answer production does.
+
+    That is a weaker statement than the one this docstring used to make ("never
+    touches db"), and the criterion is what changed it: R2 is about a turn that
+    enqueued six research runs and mentioned none, and such a reply cites nothing
+    at all. A criterion that skipped the uncited branch would skip the shape it
+    exists to catch.
     """
     # A non-string citation is REFUSED, not dropped. Dropping it was the worse
     # of the two, and the schema comment below already said so: tool results are
@@ -214,6 +226,20 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
                     "numbers_found": numeric.raw_forms(stated),
                     "detail": "a reply that states numbers must cite the evidence ids "
                               "they came from; call a tool to get them first"}
+
+    # V8-C2. The last thing checked, and the only one that looks at the TURN
+    # rather than at the answer. Placed after the citation and number checks
+    # because those are cheaper and because a trajectory complaint about an
+    # answer whose ids are fake would be the less useful of two true refusals.
+    #
+    # Both refusals here are escapable by editing the reply alone — the gate is
+    # budget-free, so a turn that has spent everything can still take either
+    # exit. That is DP4, and it is the property V7-Q2 was the absence of.
+    trajectory = await trajectory_gate.check(
+        db, current_session_id(), current_message_id(), text, citation_ids)
+    if trajectory:
+        return trajectory
+
     return {"responded": True, "text": text, "citations": citation_ids}
 
 
