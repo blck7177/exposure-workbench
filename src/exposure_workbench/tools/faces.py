@@ -61,6 +61,13 @@ READ_CORE = [
 # previous brief's ids is a citation loop, not a source.
 META_ONLY_READS = [
     "get_portfolio_snapshot", "get_task_status", "get_portfolio_positions", "read_issuer_brief",
+    # V8-A. The run's own findings. Meta-only for the same reason as the four
+    # above: they answer questions about THIS DESK's portfolios, and the research
+    # face is issuer-scoped by construction. A brief-writing agent that could
+    # read the book's attribution would be writing about the holder, not the
+    # issuer.
+    "get_attribution", "get_risk_state", "list_run_alerts", "list_risk_limits",
+    "get_run_freshness",
 ]
 
 FACE_META_AGENT = READ_CORE + META_ONLY_READS + [

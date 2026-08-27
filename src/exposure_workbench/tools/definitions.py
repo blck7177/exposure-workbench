@@ -26,6 +26,7 @@ from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
+from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
 
@@ -220,6 +221,32 @@ async def _read_issuer_brief(db: AsyncSession, ticker: str) -> dict:
         return {"error": "no_brief", "ticker": ticker.upper(),
                 "hint": "start_issuer_research produces one"}
     return {"ticker": ticker.upper(), **brief}
+
+
+# ── the run's own findings (V8-A) ───────────────────────────────────────────────
+# Thin, like every fn here. The reason these are four tools rather than one is
+# that they answer four different questions and a single "get_run" would make
+# every one of them cost the whole payload — which for a ten-position book is
+# fine and stops being fine at the first real one.
+
+async def _get_attribution(db: AsyncSession, run_id: str) -> dict:
+    return await run_reads_service.get_attribution(db, run_id)
+
+
+async def _get_risk_state(db: AsyncSession, run_id: str) -> dict:
+    return await run_reads_service.get_risk_state(db, run_id)
+
+
+async def _list_run_alerts(db: AsyncSession, run_id: str) -> dict:
+    return await run_reads_service.list_run_alerts(db, run_id)
+
+
+async def _list_risk_limits(db: AsyncSession, portfolio_id: str) -> dict:
+    return await run_reads_service.list_risk_limits(db, portfolio_id)
+
+
+async def _get_run_freshness(db: AsyncSession, portfolio_id: str) -> dict:
+    return await run_reads_service.get_run_freshness(db, portfolio_id)
 
 
 # ── filing retrieval ────────────────────────────────────────────────────────────
@@ -503,6 +530,77 @@ def build_read_registry() -> ToolRegistry:
                     "each block. Cite those ids, not the brief.",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_read_issuer_brief, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_attribution",
+        description=(
+            "Why a portfolio moved on the run's date: every factor's beta, return and "
+            "contribution, and every position's weight, return and contribution — the "
+            "complete set, not a selection. Also the regression behind the betas "
+            "(observations, window, R², alpha, residual). This is the FIRST tool for any "
+            "'why did it move' question; filings describe an issuer over quarters and "
+            "cannot explain one day. Cite the run_id. When factors are collinear each "
+            "beta carries quotable_individually=false — quote their sum instead."
+        ),
+        json_schema={"type": "object", "properties": {
+            # No top_k. No limit. The absence is asserted by a test: a size
+            # argument is how an answer comes to name two positions and imply the
+            # other eight did nothing.
+            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_get_attribution, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_risk_state",
+        description=(
+            "One run's measured risk state: exposure and volatility metrics, the tail "
+            "measures with their confidence and horizon attached, every stress scenario "
+            "(including the ones that were refused and why), and how many limit checks ran "
+            "versus fired. Describes the book on that date under those shocks; it is not a "
+            "forecast. Cite the run_id."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_get_risk_state, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="list_run_alerts",
+        description=(
+            "The alerts one run raised, each whole: current value, limit, utilisation, and a "
+            "reads_as sentence composed for you. Use reads_as — the three numbers on an alert "
+            "row are easy to attribute to the wrong quantity, and utilisation is the share of "
+            "the limit consumed, never a level. Cite the alert id or the run id."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_list_run_alerts, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="list_risk_limits",
+        description=(
+            "The limit policy in force for a portfolio: each check's warning and breach level. "
+            "This is what the desk decided, not a measurement of the world — these rows are "
+            "not citable evidence. For a breached level, cite the alert that carries it."
+        ),
+        json_schema={"type": "object", "properties": {
+            "portfolio_id": {"type": "string"},
+        }, "required": ["portfolio_id"], "additionalProperties": False},
+        fn=_list_risk_limits, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_run_freshness",
+        description=(
+            "How current a portfolio's newest completed run is: the run's date, the latest "
+            "market session, how many sessions have traded since, and whether a run is in "
+            "flight. Two dates kept apart on purpose — 'the run is from Thursday' and 'the "
+            "market has traded twice since' are different facts."
+        ),
+        json_schema={"type": "object", "properties": {
+            "portfolio_id": {"type": "string"},
+        }, "required": ["portfolio_id"], "additionalProperties": False},
+        fn=_get_run_freshness, tool_class=READ,
     ))
     reg.register(Tool(
         name="compute_stat",

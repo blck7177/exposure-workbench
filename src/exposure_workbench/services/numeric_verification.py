@@ -78,6 +78,7 @@ from exposure_workbench.db.models import (
     FilingChunk,
     FinancialFact,
     IssuerExposure,
+    LimitCheck as LimitCheckRow,
     Position,
     ResearchSource,
     RiskAlert,
@@ -475,6 +476,33 @@ _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], 
     # be cited separately made a citation set that had to be assembled by hand
     # out of two kinds of id to describe one run.
     (RiskAlert, (), ("current_value", "limit_value", "utilization"), "alert_type"),
+    # V8-P3/P4. A limit check holds no measurement — it holds the fact that a
+    # check RAN and whether it fired. It is listed here with no value columns so
+    # that "a run child" means one thing in this module: every table _from_run
+    # reads is declared in one tuple, and the count map below can require that
+    # what it counts is something the resolver already reads.
+    (LimitCheckRow, (), (), "limit_type"),
+)
+
+# V8-P4. How MANY of those children there are. Every value above is a
+# measurement some row holds; a count is a fact about the run itself, and the run
+# row has no column for it, so "three limits are breached" and "twenty-four
+# checks were clear" were unsupportable sentences made entirely of supportable
+# numbers.
+#
+# (model, label, split_column | None). A split names ONE column whose distinct
+# values partition the rows — `fired`, `status` — because that column is the
+# thing its table exists to record. That is the whole vocabulary: no predicate,
+# no caller-chosen grouping, no filter by value. The restraint is the point.
+# Counting is arithmetic over rows, and an open counting facility reachable
+# through a citation id would be the portfolio-arithmetic surface this desk
+# decided not to open (DP1), arrived at by the back door.
+_RUN_COUNTS: tuple[tuple[type, str, str | None], ...] = (
+    (RiskAlert, "alerts", None),
+    (LimitCheckRow, "limit_checks", "fired"),
+    (StressResultRow, "stress_scenarios", "status"),
+    (IssuerExposure, "positions", None),
+    (FactorAttribution, "factors", None),
 )
 
 
@@ -544,8 +572,10 @@ async def _from_alert(db: AsyncSession, aid: str) -> tuple[list[EvidenceValue], 
 async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], set[str]]:
     """exposure_runs has no numeric columns — every number lives on a child."""
     out: list[EvidenceValue] = []
+    by_model: dict[type, list] = {}
     for model, abs_cols, ratio_cols, name_col in _RUN_CHILDREN:
         rows = (await db.execute(select(model).where(model.run_id == rid))).scalars().all()
+        by_model[model] = list(rows)
         for row in rows:
             who = f".{getattr(row, name_col)}" if name_col else ""
             for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO)):
@@ -554,6 +584,34 @@ async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], se
                     if v is not None:
                         out.append(EvidenceValue(
                             float(v), unit, f"{model.__tablename__}{who}.{col}", rid))
+
+    # V8-P4: the counts. COUNT, not RATIO — _COMPATIBLE lets a bare written
+    # number meet a stored COUNT, so "3 alerts" verifies while "3%" does not,
+    # which is exactly the distinction between counting things and measuring
+    # them. Zero is emitted as a value: "no scenario was left unevaluated" is a
+    # claim about this run and it is checkable.
+    for model, label, split in _RUN_COUNTS:
+        rows = by_model.get(model)
+        if rows is None:
+            continue
+        out.append(EvidenceValue(float(len(rows)), COUNT, f"count.{label}", rid))
+        if split is None:
+            continue
+        seen: dict[str, int] = {}
+        for row in rows:
+            key = getattr(row, split, None)
+            seen[str(key).lower()] = seen.get(str(key).lower(), 0) + 1
+        for key, n in seen.items():
+            out.append(EvidenceValue(float(n), COUNT, f"count.{label}.{split}={key}", rid))
+        # The complement of a partition this run happens not to exhibit is still
+        # a true count of zero, and it is the half an answer usually wants:
+        # "none of the eight fired". Only for a boolean split, where the domain
+        # is known; an enum's unseen values are not enumerable from the rows.
+        if isinstance(getattr(model.__table__.columns[split].type, "python_type", None), type) and \
+           model.__table__.columns[split].type.python_type is bool:
+            for key in ("true", "false"):
+                if key not in seen:
+                    out.append(EvidenceValue(0.0, COUNT, f"count.{label}.{split}={key}", rid))
     return out, set()
 
 
