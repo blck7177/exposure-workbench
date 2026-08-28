@@ -316,9 +316,30 @@ G2 的六项里,**四项与本批改同一个函数**(`_describe_issuer`):
 > total_debt  "adding a total to its own component double-counts — 8.31bn on AAPL"
 > ```
 >
-> 这些数字今天是安全的——因为 `note` **谁也没发给模型**(V11-T 把它从面板拿掉,定位工具本来就没发过)。K2 一上线它们就变成"看起来可引、实际引不了"的数,模型抄进答案会被门拒,而拒因是 `unverified_numbers`——**看起来像模型的错,实际是我们发了不该发的东西**。这正是 V11-T 修 `days_*` 时的同一形状(系统发布了任何证据行都支撑不了的数)。
+> **起草时我写的"今天是安全的,因为 note 没发给模型"是错的,已实测更正。** `evaluate_formula` **今天就发 `note`**([formula_service.py:276](../src/exposure_workbench/services/formula_service.py#L276) 与 358)——V11-T 只把它从**面板**拿掉,单查路径一直在发。近两天 `evaluate_formula` 被调 **42 次**,每次都把上面那段原文交给了模型。
 >
-> **处置**:`note` 上线前逐条去掉具体数字,只留后果句;测试断言 `note` 不含 `%` 与货币量级词(`bn`/`billion`/`m`/`million`)。被删掉的测量数字留在 `docs/spikes/V9_FORMULA_BASIS.md` 给人读——它们本来就是写给写代码的人的证据,不是写给答案的。**待拍板:同意去掉,还是给这两句各配一个 fact id。**
+> 实测后果(对着真实 calc_id 跑 `nv.verify`):
+>
+> ```
+> 答案含 "C&DI 103.02"                        → REFUSE ['103.02']
+> 答案含 "pretax 138.753bn vs operating 40.770bn" → REFUSE ['138.753bn','40.770bn']
+> 答案含 "double-counts 8.31bn"                → REFUSE ['8.31bn']
+> ```
+>
+> **还没引爆**:131 条历史 assistant 消息里,含 C&DI 或这些数字的 **0 条**。模型至今没有转述过 note。
+>
+> **但问题是两半,性质不同**:
+>
+> | | 例 | 是不是关于世界的主张 | 修法 |
+> |---|---|---|---|
+> | **法规条款号** | `103.02` · `102.07` · `Rule 17a-4`(抽出 `17`/`4`)· `Item 1A`(抽出 `1`) | **不是**,是引证 | 加一条封闭豁免模式 |
+> | **举例用的实测数** | `8.31bn`(= `fact_51249e3994ea`)· `138.753bn` / `40.770bn`(GOOGL 2026-06-30 真实事实) | **是** | 去掉,或配 id |
+>
+> 第一半是**独立于 V12 的既存缺陷**,而且方向反了:这套系统的设计说"公式随数字旅行,因为监管要求如此",`source_url` 指着 SEC,**而模型说不出是哪一条 C&DI**——一说就被拒。
+>
+> 第二半的"配 id"经实测**要改形状才可行**:id 埋在句子里 `extract_evidence_refs` 采不到(返回 `[]`),必须作为**同级字段** `note_evidence: ["fact_..."]` 才会进证据轨迹。
+>
+> **待拍板**:见本文件末的 §10。
 
 ---
 
@@ -328,3 +349,30 @@ G2 的六项里,**四项与本批改同一个函数**(`_describe_issuer`):
 - 判决禁令、引号外的方法句、叙事拉力——`GAPS.md` 右列,不可机械化
 - LLY capex 映射(`test_v11_tag_drift_live` 的唯一 `unmapped_candidate`,需先验证语料)
 - G6 范围绑定的 skill 层厚度(本批的 K3 是最薄的一版,按 S6 的数字决定要不要加厚)
+
+---
+
+## 10. 待拍板:`note` 里的数字(§8 风险 4 的展开)
+
+**K2 会把暴露面放大**:`describe_issuer` 近两天 **127 次** vs `evaluate_formula` **42 次**,且 K2 一次发 **16 条** note 而不是 1 条。所以这件事要在 K2 之前定。
+
+### 三个动作,可以独立取舍
+
+| | 动作 | 触及 | 效果 | 代价 |
+|---|---|---|---|---|
+| **A** | **法规引证进豁免集**:`(?:C&DI|Item|Rule|Reg(?:ulation)?|§)\s*\d+(?:[.\-a-z]\d*)*` | `_EXEMPTION_PATTERNS` + 测试 | 模型终于能说出定义的依据是哪一条。**独立于 V12 就该做** | 一条封闭模式,与 `year`/`form type` 同族。**不放松容差** |
+| **B** | **举例数字从 note 里删掉**,只留后果句 | `formulas.py` 2 条 + 新 `semantics.py` | 暴露归零 | 与证据相悖:Anthropic 要 gotcha 是"concrete corrections";列描述实验里**更啰嗦的描述反而更好**(0.3328 gold → 0.3678) |
+| **C** | **给举例数字配 id**:`note_evidence: ["fact_51249e3994ea"]` 同级字段 | `Formula` 加字段、`_describe_issuer`/`evaluate_formula` 转发 | 数字既保留又可引 | 这些 fact 是**别家发行人**的(AAPL 的 8.31 出现在问 GOOGL 的回合里);要接受"引用一个作为例子的外部事实"这件事 |
+
+### 建议
+
+**A 一定做**,而且**不必等 V12**——它修的是既存缺陷,且方向与系统的设计意图一致。
+
+**B 与 C 之间选 B**,理由三条:
+1. 起作用的是**后果句**("this is NOT the cash available to repay debt"),不是数字——DABstep 说模型守得住的是显式规则,而 `8.31bn on AAPL` 对"现在这个发行人"不构成规则;
+2. C 会让一个 AAPL 事实出现在 GOOGL 的证据集里,**语义上是噪声**,而 LinkedIn 的反向实验说无关知识会降分;
+3. 测量数字的读者是写代码的人,它们已经在 `docs/spikes/V9_FORMULA_BASIS.md` 里,**不会丢**。
+
+**机械化 B**:测试断言 `Formula.note` 与 `MetricSemantics.note` 不含货币量级词(`bn`/`billion`/`m`/`million`/`trn`)与 `%`。**A 上线后 `103.02` 这类不再受此限**,因为它已经不是被抽取的数了。
+
+**如果选 C**:那就连 A 一起做,并且 `note_evidence` 要走 `extract_evidence_refs` 的同级字段形式——埋在句子里采不到,已实测。
