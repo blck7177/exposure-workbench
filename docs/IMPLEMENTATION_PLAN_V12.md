@@ -1,6 +1,6 @@
 # Implementation Plan V12 — 知识层:让模型看见这套系统已经知道的事
 
-> **状态(2026-08-27)**:起草,未开工。**上游** `dev_note/portfolio-demo/analyst-skills/13-skill-as-knowledge.md`(四路联网研究)与 `dev_note/portfolio-demo/agent-battery/`(43 次真实会话 + `GAPS.md`)。
+> **状态(2026-08-28)**:起草完成,**§10 已拍板**(A 法规引证豁免 + B 去掉 note 里的举例数字;C 配 id 否决;`source_url` → `authority` 记入本批)。未开工。S0 独立于其余各步,可先行。**上游** `dev_note/portfolio-demo/analyst-skills/13-skill-as-knowledge.md`(四路联网研究)与 `dev_note/portfolio-demo/agent-battery/`(43 次真实会话 + `GAPS.md`)。
 > **性质**:加法,但**只加已经存在的知识的投递管道**,不加分析能力、不加规则、不加阈值。四条公理、门、工具面一律不动。
 > **一句话**:`concept_mapping.py` 的注释和 `formulas.py` 的 `note` 里写着这套系统对数据的全部理解,**而模型一个字都看不到**。把它们发到模型手上,然后让它自己决定。
 > **与 G2 的关系**:G2(投影契约,`GAPS.md`)改的是 `describe_issuer` **数据的准确性**;本批加的是**数据的语义**。**建议合批**,理由见 §7。
@@ -45,6 +45,8 @@ V11 把门能消灭的类别消灭了(1068 offline / 225 live)。电池重跑显
 | D4 | **不发流程卡、不发阈值、不发判决** | FinAgent 的 T 消融(不匹配资产 −21%)、AutoGuide vs ExpeL、DV8、判断禁令是不变量 |
 | D5 | **每条 note 要写成"事实 + 后果"**,并且**结论字段与图字段一起发** | DABstep 的复合规则失败 |
 | D6 | **先基线后写**,开关对照,**n ≥ 8** | Anthropic:*"Create evaluations BEFORE writing extensive documentation"*;V11 的方差纪律 |
+| D7 | **法规引证是引证,不是主张**:`C&DI 103.02` / `Item 1A` / `Rule 17a-4` 进数值门的封闭豁免集;**note 里的举例数字删掉,只留后果句**;不给举例数字配 id | §10 的实测:`evaluate_formula` 今天就发 note,转述即被拒;配 id 会把别家发行人的事实塞进证据集 |
+| D8 | **`source_url` 改为 `authority`**,值是可说出口的名字 + URL(`"SEC C&DI 103.01, 103.02 — https://…"`);`Formula` 加 `citation` 字段 | §10 的实测:模型把 `source_url` 拼成了 `src_https://…`,`invalid_citations`——继 `co_jpm`、定义串之后第三个"有证据语法、无证据地位"的字段 |
 
 ---
 
@@ -145,10 +147,18 @@ AAPL Sep 27 · MSFT Jun 30 · NVDA Jan 25 · 其余 Dec 31
 ```json
 {"name": "net_debt", "definition": "total debt − cash and equivalents", "basis": "instant",
  "family": "leverage", "unit_class": "money", "computable": true,
+ "authority": "SEC non-GAAP C&DIs — https://www.sec.gov/corpfin/non-gaap-financial-measures",
  "note": "NOT an agency net debt. S&P nets only surplus cash, with haircuts that need inputs this desk does not have, so a number carrying that name here would be a defined term it is not."}
+
+{"name": "ebit", "definition": "net income + interest expense + income tax expense", "basis": "window",
+ "family": "earnings", "unit_class": "money", "computable": true,
+ "authority": "SEC C&DI 103.01, 103.02 — https://www.sec.gov/corpfin/non-gaap-financial-measures",
+ "note": "Starts from net income, never operating income: C&DI 103.02 says operating income is not the comparable measure, because EBIT and EBITDA adjust for items that are not included in operating income. Read it beside operating income — for some issuers a correct EBIT is mostly non-operating."}
 ```
 
-`family` 是**新字段**(leverage / coverage / liquidity / margin / turnover / cash / earnings)。`note` 来自已有的 `Formula.note`,**但要先去掉里面的测量数字**——见 §8 风险 4:16 条里已有 2 条带 `138.753bn` / `8.31bn` 这类数,发出去就是"看起来可引、实际引不了"。
+`ebit` 的 note 是**清洗后**的版本:原文的 *"measured on GOOGL's June 2026 quarter, pretax income of 138.753bn against operating income of 40.770bn"* 去掉(D7),后果句保留。`authority` 取代 `source_url`(D8)。
+
+`family` 是**新字段**(leverage / coverage / liquidity / margin / turnover / cash / earnings)。`note` 来自已有的 `Formula.note`,**先按 D7 去掉举例数字**(16 条里 2 条:`ebit` 的 138.753/40.770、`total_debt` 的 8.31)。`citation` 是**新字段**,`authority` 由它与 `source_url` 拼成。
 
 ### K3 — 已验证示例(`describe_issuer` 与 `get_portfolio_snapshot` 各 3–5 条)
 
@@ -180,12 +190,35 @@ AAPL Sep 27 · MSFT Jun 30 · NVDA Jan 25 · 其余 Dec 31
 
 | 步 | 内容 | 触及 | 量 |
 |---|---|---|---|
+| **S0** | **既存缺陷,独立提交,可先行**:①法规引证进数值门豁免集;②`Formula.citation` + `authority` 上线、`source_url` 下线;③两条 note 去数字 | `numeric_verification.py`、`formulas.py`、`formula_service.py` + 测试 | 小 |
 | **S1** | `analytics/semantics.py`:知识表(数据) | 新文件 + 单测 | 中 |
 | **S2** | K0 期间语义:`services/period_semantics.py` + 接进 `_describe_issuer` | 新文件、`definitions.py` | 小 |
 | **S3** | K1 指标语义:`available_metrics` 逐条增补 | `calc_service.list_available_metrics` 或 `definitions.py` | 小 |
 | **S4** | K2 公式语义:`Formula.family` + `note` 上线 | `formulas.py`、`definitions.py` | 小 |
 | **S5** | K3 示例 + `_SYSTEM` 第 56/62 段迁出 | `analytics/semantics.py`、`meta_agent.py` | 小 |
 | **S6** | 评测:开关 + 电池重跑 n≥8 | `scripts/agent_battery.py`、settings | 中 |
+
+### S0 · 既存缺陷三件(不依赖 V12 的任何一步)
+
+**①法规引证豁免。** `_EXEMPTION_PATTERNS` 加一条,与 `year` / `form type` 同族——封闭、不放松容差:
+
+```python
+# A regulation reference is a citation, not a claim about the world. "C&DI 103.02"
+# was extracted as 103.02 and refused, so the model could not name the section
+# that defines EBIT — in a system whose argument is that the definition travels
+# with the number because the regulator requires it. Item 1A and Rule 17a-4 leak
+# the same way (as 1, and as 17 / 4).
+("regulation_ref",
+ r"\b(?:C&DI|Item|Rule|Reg(?:ulation)?|Section|§|ASC|IFRS|IAS)\s*\d+(?:[.\-][0-9a-z]+)*\b", re.IGNORECASE),
+```
+
+测试:`C&DI 103.02` / `Item 1A` / `Rule 17a-4` / `ASC 842` 各抽出 0 个数;**而** `103.02%` 与 `$103.02` 仍然被抽(豁免不得吞掉真实主张——沿用 `year` 模式的负例写法)。
+
+**②`authority`。** `Formula` 加 `citation: str`(如 `"SEC C&DI 103.01, 103.02"`);`evaluate_formula` 与 `build_panel` 的返回把 `source_url` 换成 `authority = f"{citation} — {source_url}"`。`source_url` 不再上线——它是继 `co_jpm`、`definition` 之后第三个被模型拼成假 id 的字段(实测 `src_https://www.sec.gov/…`)。**有 URL 的地方全部改**(`grep -rn source_url src/ apps/`),前端若读它,同步改读 `authority`。
+
+**③两条 note 去数字。** `ebit`、`total_debt` 的 note 按 §4 K2 的清洗版重写;被删的实测数字确认已在 `docs/spikes/V9_FORMULA_BASIS.md`。测试(机械化 D7):**所有** `Formula.note` 不含 `\d+(?:\.\d+)?\s*(?:bn|billion|m|million|trn|trillion|%)`。
+
+**验收**:重放 §10 的那个问句,期望一次过门、答案里出现 `C&DI 103.02` 与 `interest_expense_nonoperating`、且不多调 `get_flow`。
 
 ### S1 · `analytics/semantics.py`
 
@@ -207,6 +240,7 @@ WORKED_EXAMPLES: dict[str, tuple[Example, ...]] = {"issuer": (...), "portfolio":
 - 每个 `METRICS` 的键必须在 `concept_mapping` 的映射表里(拼错就红)
 - 每个 `do_not_combine_with` / `contains` 的目标必须是真实指标名
 - 每条 `note` ≤ 240 字符,且**必须含一个后果连接词**(`so` / `NOT` / `rather than`)——D5 的机械化形式
+- 每条 `note` **不含货币量级词与 `%`**——D7 的机械化形式,与 S0③ 同一条断言,覆盖 `MetricSemantics.note` 与 `Formula.note` 两处
 - **零阈值**:`note` 里不得出现数字比较词(`above` / `below` / `high` / `low` / `healthy` / `risky`),沿用 `test_no_formula_carries_a_threshold` 的写法
 - 每个 `WORKED_EXAMPLES` 里点名的工具必须在 `FACE_META_AGENT` 上(仿 `faces.resolve` 的 strict 语义)
 
@@ -280,6 +314,7 @@ async def describe_periods(db, ticker) -> dict:
 4. **知识不重复**:`METRICS` 的 note 与 `Formula.note` 不得互相复制(测试断言无 ≥60 字符的公共子串)。
 5. **对照有数**:S6 的四题开/关各 n≥8,数字进 `docs/spikes/V12_COVERAGE.md`,**改善与否都如实记**。
 6. **`_SYSTEM` 变短**(字符数断言)。
+7. **依据说得出口**:S0 的重放问句一次过门,答案含 `C&DI 103.02`;`grep source_url src/ apps/` 为空。
 
 ---
 
@@ -307,7 +342,7 @@ G2 的六项里,**四项与本批改同一个函数**(`_describe_issuer`):
 | **知识没被用上**(DABstep 的失败形态) | 开/关对照无差异 | 不是加更多字,是**把 note 挪到更靠近决策的地方**(如 `get_flow` 的返回也带该指标的 note),或缩短到只剩后果句 |
 | **无关知识降分**(LinkedIn) | 某一题开着反而更差 | D3 收紧:只留该题触及的条目;逐条剔除 |
 | 载荷变大挤掉别的 | `truncated` 字段出现 | 验收判据 2 会先红 |
-| `note` 被模型当成可引用事实写进答案 | 门拒 `unverified_numbers`(note 里的 9.9% 无 id) | **note 里不放可被当作答案的数字**——测试断言 note 不含 `%` 与货币量级词;测量数字放在 `docs/spikes/V9_FORMULA_BASIS.md` 里给人读 |
+| `note` 被模型当成可引用事实写进答案 | 门拒 `unverified_numbers` | **已拍板(D7,S0③)**:note 不放数字;测试断言;测量数字留在 `V9_FORMULA_BASIS.md` |
 
 > 最后一条是起草时才想到的,而且**已经在现有代码里存在**。扫 16 条 `Formula.note`,**2 条带可被抄进答案的数字**:
 >
@@ -352,27 +387,42 @@ G2 的六项里,**四项与本批改同一个函数**(`_describe_issuer`):
 
 ---
 
-## 10. 待拍板:`note` 里的数字(§8 风险 4 的展开)
+## 10. 已拍板(2026-08-28):`note` 里的数字、法规引证、`source_url`
 
-**K2 会把暴露面放大**:`describe_issuer` 近两天 **127 次** vs `evaluate_formula` **42 次**,且 K2 一次发 **16 条** note 而不是 1 条。所以这件事要在 K2 之前定。
+**决定**:**A + B,否决 C**;`source_url` 问题一并进 S0。
 
-### 三个动作,可以独立取舍
+### 实例(真跑,`scripts/agent_battery.py`)
 
-| | 动作 | 触及 | 效果 | 代价 |
-|---|---|---|---|---|
-| **A** | **法规引证进豁免集**:`(?:C&DI|Item|Rule|Reg(?:ulation)?|§)\s*\d+(?:[.\-a-z]\d*)*` | `_EXEMPTION_PATTERNS` + 测试 | 模型终于能说出定义的依据是哪一条。**独立于 V12 就该做** | 一条封闭模式,与 `year`/`form type` 同族。**不放松容差** |
-| **B** | **举例数字从 note 里删掉**,只留后果句 | `formulas.py` 2 条 + 新 `semantics.py` | 暴露归零 | 与证据相悖:Anthropic 要 gotcha 是"concrete corrections";列描述实验里**更啰嗦的描述反而更好**(0.3328 gold → 0.3678) |
-| **C** | **给举例数字配 id**:`note_evidence: ["fact_51249e3994ea"]` 同级字段 | `Formula` 加字段、`_describe_issuer`/`evaluate_formula` 转发 | 数字既保留又可引 | 这些 fact 是**别家发行人**的(AAPL 的 8.31 出现在问 GOOGL 的回合里);要接受"引用一个作为例子的外部事实"这件事 |
+问句:*"What is GOOGL's EBIT, and why is it calculated that way?"*(`sess_6acc3b20069d`)
 
-### 建议
+工具交给模型的(`evaluate_formula(GOOGL, ebit)`):
 
-**A 一定做**,而且**不必等 V12**——它修的是既存缺陷,且方向与系统的设计意图一致。
+```
+value        301,521,000,000
+calc_id      calc_58a892c205b8                                           ← 唯一可引
+definition   net income + interest expense + income tax expense
+             [interest expense nonoperating used for interest expense]
+source_url   https://www.sec.gov/corpfin/non-gaap-financial-measures      ← 长得像 src_
+note         "…C&DI 103.02 says … measured on GOOGL's June 2026 quarter,
+              pretax income of 138.753bn against operating income of 40.770bn…"   ← 三个数都引不了
+```
 
-**B 与 C 之间选 B**,理由三条:
-1. 起作用的是**后果句**("this is NOT the cash available to repay debt"),不是数字——DABstep 说模型守得住的是显式规则,而 `8.31bn on AAPL` 对"现在这个发行人"不构成规则;
-2. C 会让一个 AAPL 事实出现在 GOOGL 的证据集里,**语义上是噪声**,而 LinkedIn 的反向实验说无关知识会降分;
-3. 测量数字的读者是写代码的人,它们已经在 `docs/spikes/V9_FORMULA_BASIS.md` 里,**不会丢**。
+模型第一稿(seq 6):*"…the **SEC-based** formula … EBIT is defined from net income, not operating income … The tool used **interest_expense_nonoperating** for the interest input, because the filed interest_expense series is not available for the latest period…"* `[calc_f8b868774aef] [src_https://www.sec.gov/corpfin/non-gaap-financial-measures]` → **`invalid_citations`**。
 
-**机械化 B**:测试断言 `Formula.note` 与 `MetricSemantics.note` 不含货币量级词(`bn`/`billion`/`m`/`million`/`trn`)与 `%`。**A 上线后 `103.02` 这类不再受此限**,因为它已经不是被抽取的数了。
+通过稿(seq 8)丢了两样:依据从 "SEC-based" 退成 *"the formula returned by **the issuer panel**"*;**替代披露那整句消失**——`substituted_inputs` 是 V9 专门加的,被门逼出来的重写把它删了。
 
-**如果选 C**:那就连 A 一起做,并且 `note_evidence` 要走 `extract_evidence_refs` 的同级字段形式——埋在句子里采不到,已实测。
+第二问(`sess_d4e6d89f81d9`,*"Why … from net income instead of operating income? Show me GOOGL"*):note 里已经写好的对照,模型又跑了三次 `get_flow`(net_income / pretax_income / operating_income)去取**带 id 的版本**;依据仍然只能说 *"the desk's SEC-based measure registry … under that guidance … the cited SEC compliance interpretation"*——三处绕着说,正确答案是 `C&DI 103.02`。
+
+### 为什么是 A + B 不是 C
+
+| | 效果 | 代价 |
+|---|---|---|
+| **A** 法规引证进豁免集 | 模型能说出定义依据;`Item 1A`(`get_filing_section` 返回的东西)同时解锁 | 一条封闭模式,不放松容差 |
+| **B** note 去掉举例数字 | 暴露归零;起作用的后果句完整保留 | 与"更啰嗦更好"的列描述实验相悖——但那实验里啰嗦的是**描述**,不是**别家的实测数** |
+| ~~**C** 配 id~~ | 数字既留又可引 | 实测要改成同级字段 `note_evidence`(埋句子里 `extract_evidence_refs` 采不到);且把 AAPL 的事实塞进 GOOGL 的证据集,LinkedIn 反向实验说无关知识降分。**否决** |
+
+### 修好之后
+
+同一问句的预期答案(一次过门,少三次调用):
+
+> GOOGL's EBIT for the 12 months ended 2026-06-30 is $301.521bn, calculated as net income + interest expense + income tax expense — using interest_expense_nonoperating, because GOOGL's filed interest_expense stops in 2024. It starts from net income rather than operating income per **SEC C&DI 103.02**, which says operating income is not the comparable measure. [calc_58a892c205b8]
