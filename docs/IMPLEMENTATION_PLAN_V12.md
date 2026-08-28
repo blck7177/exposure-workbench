@@ -46,7 +46,7 @@ V11 把门能消灭的类别消灭了(1068 offline / 225 live)。电池重跑显
 | D5 | **每条 note 要写成"事实 + 后果"**,并且**结论字段与图字段一起发** | DABstep 的复合规则失败 |
 | D6 | **先基线后写**,开关对照,**n ≥ 8** | Anthropic:*"Create evaluations BEFORE writing extensive documentation"*;V11 的方差纪律 |
 | D7 | **法规引证是引证,不是主张**:`C&DI 103.02` / `Item 1A` / `Rule 17a-4` 进数值门的封闭豁免集;**note 里的举例数字删掉,只留后果句**;不给举例数字配 id | §10 的实测:`evaluate_formula` 今天就发 note,转述即被拒;配 id 会把别家发行人的事实塞进证据集 |
-| D8 | **`source_url` 改为 `authority`**,值是可说出口的名字 + URL(`"SEC C&DI 103.01, 103.02 — https://…"`);`Formula` 加 `citation` 字段 | §10 的实测:模型把 `source_url` 拼成了 `src_https://…`,`invalid_citations`——继 `co_jpm`、定义串之后第三个"有证据语法、无证据地位"的字段 |
+| D8 | **公式的 `source_url` 改为 `authority` 对象** `{"cite_as": "SEC C&DI 103.01, 103.02", "url": "https://…"}`;`Formula` 加 `citation` 字段。**只动 `Formula.source_url`**——`Filing.source_url`(EDGAR 链接,`db/models.py:567`)是另一个对象上的另一个字段,不动 | §10 的实测:模型把 `source_url` 拼成了 `src_https://…`,`invalid_citations`——继 `co_jpm`、定义串之后第三个"有证据语法、无证据地位"的字段 |
 
 ---
 
@@ -147,12 +147,12 @@ AAPL Sep 27 · MSFT Jun 30 · NVDA Jan 25 · 其余 Dec 31
 ```json
 {"name": "net_debt", "definition": "total debt − cash and equivalents", "basis": "instant",
  "family": "leverage", "unit_class": "money", "computable": true,
- "authority": "SEC non-GAAP C&DIs — https://www.sec.gov/corpfin/non-gaap-financial-measures",
+ "authority": {"cite_as": "SEC non-GAAP C&DIs", "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"},
  "note": "NOT an agency net debt. S&P nets only surplus cash, with haircuts that need inputs this desk does not have, so a number carrying that name here would be a defined term it is not."}
 
 {"name": "ebit", "definition": "net income + interest expense + income tax expense", "basis": "window",
  "family": "earnings", "unit_class": "money", "computable": true,
- "authority": "SEC C&DI 103.01, 103.02 — https://www.sec.gov/corpfin/non-gaap-financial-measures",
+ "authority": {"cite_as": "SEC C&DI 103.01, 103.02", "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"},
  "note": "Starts from net income, never operating income: C&DI 103.02 says operating income is not the comparable measure, because EBIT and EBITDA adjust for items that are not included in operating income. Read it beside operating income — for some issuers a correct EBIT is mostly non-operating."}
 ```
 
@@ -214,7 +214,15 @@ AAPL Sep 27 · MSFT Jun 30 · NVDA Jan 25 · 其余 Dec 31
 
 测试:`C&DI 103.02` / `Item 1A` / `Rule 17a-4` / `ASC 842` 各抽出 0 个数;**而** `103.02%` 与 `$103.02` 仍然被抽(豁免不得吞掉真实主张——沿用 `year` 模式的负例写法)。
 
-**②`authority`。** `Formula` 加 `citation: str`(如 `"SEC C&DI 103.01, 103.02"`);`evaluate_formula` 与 `build_panel` 的返回把 `source_url` 换成 `authority = f"{citation} — {source_url}"`。`source_url` 不再上线——它是继 `co_jpm`、`definition` 之后第三个被模型拼成假 id 的字段(实测 `src_https://www.sec.gov/…`)。**有 URL 的地方全部改**(`grep -rn source_url src/ apps/`),前端若读它,同步改读 `authority`。
+**②`authority`。** `Formula` 加 `citation: str`(如 `"SEC C&DI 103.01, 103.02"`);`evaluate_formula`、`build_panel`、`_describe_issuer` 的返回把 `source_url` 换成
+
+```json
+"authority": {"cite_as": "SEC C&DI 103.01, 103.02", "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"}
+```
+
+对象而不是拼接串,两个理由:模型手上没有一个 `src_` 形状的扁平字符串可拼;前端 `Evidence.tsx:120` 把任何叫 `url` 的键渲染成链接,所以 UI 不用改。
+
+**范围核过**:`grep source_url` 有 46 处 / 13 文件,**但其中 10 个文件是 `Filing.source_url`**(EDGAR 链接:`db/models.py:567`、providers、ingestion、retrieval、`evidence_resolver_service`、`apps/api/routes/issuers.py`、`issuer.ts`、`page.tsx`)——**另一个对象上的另一个字段,不动**。要改的只有 `formulas.py`、`formula_service.py`(2 处)、`tools/definitions.py`(1 处)。验收改为:`grep -rn "source_url" src/exposure_workbench/analytics/formulas.py src/exposure_workbench/services/formula_service.py src/exposure_workbench/tools/definitions.py` 为空。
 
 **③两条 note 去数字。** `ebit`、`total_debt` 的 note 按 §4 K2 的清洗版重写;被删的实测数字确认已在 `docs/spikes/V9_FORMULA_BASIS.md`。测试(机械化 D7):**所有** `Formula.note` 不含 `\d+(?:\.\d+)?\s*(?:bn|billion|m|million|trn|trillion|%)`。
 
@@ -314,7 +322,7 @@ async def describe_periods(db, ticker) -> dict:
 4. **知识不重复**:`METRICS` 的 note 与 `Formula.note` 不得互相复制(测试断言无 ≥60 字符的公共子串)。
 5. **对照有数**:S6 的四题开/关各 n≥8,数字进 `docs/spikes/V12_COVERAGE.md`,**改善与否都如实记**。
 6. **`_SYSTEM` 变短**(字符数断言)。
-7. **依据说得出口**:S0 的重放问句一次过门,答案含 `C&DI 103.02`;`grep source_url src/ apps/` 为空。
+7. **依据说得出口**:S0 的重放问句一次过门,答案含 `C&DI 103.02`;公式三文件里 `source_url` 为零(`Filing.source_url` 不在此列)。
 
 ---
 
