@@ -169,6 +169,22 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
          rf"(?:,\s*\d{{4}}\b)?{_UNIT_MARKER}", 0),
         # 10-K, 10-Q, 8-K, 20-F, S-1 — a form name, not a quantity.
         ("form_type", r"\b(?:10-[KQ]|8-K|20-F|6-K|S-[13]|DEF\s?14A)\b", 0),
+        # A regulation reference is a CITATION, not a claim about the world, and
+        # refusing it pointed the wrong way. This desk's whole argument is that
+        # the definition travels with the number because the regulator requires
+        # it — and "C&DI 103.02", the section that defines EBIT, extracted as
+        # 103.02 and was refused. Measured on a real turn (sess_6acc3b20069d):
+        # asked why EBIT is computed that way, the model could only reach for
+        # "the formula returned by the issuer panel". "Item 1A" leaked as 1 and
+        # "Rule 17a-4" as 17 and 4, so a filings answer could not name the item
+        # it had just read either.
+        #
+        # Anchored on the naming word, like confidence_level: a bare 103.02
+        # elsewhere is still a claim, and the trailing _UNIT_MARKER keeps
+        # "Item 3 15%" from swallowing the percentage.
+        ("regulation_ref",
+         r"\b(?:C&DI|Item|Rule|Reg(?:ulation)?|Section|§|ASC|ASU|IFRS|IAS|SFAS)\s*"
+         rf"\d+[0-9A-Za-z]*(?:[.\-][0-9A-Za-z]+)*\b{_UNIT_MARKER}", re.IGNORECASE),
         ("period_label", r"\b(?:[QH][1-4]|FY\d{2,4}|CY\d{2,4})\b", 0),
         # A product whose name ENDS IN DIGITS, with nothing between them: H200,
         # GB200, RTX4090, S&P500. Attachment is what says "name" — a space is

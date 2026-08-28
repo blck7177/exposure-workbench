@@ -38,6 +38,16 @@ class Formula:
     op: str                              # sum | difference | divide
     basis: str                           # instant | window | mixed
     source_url: str
+    # What a reader may SAY the authority is. The url alone could not be spoken:
+    # the model spliced it into `src_https://www.sec.gov/...` and the citation
+    # gate refused it (sess_6acc3b20069d), so the answer fell back to "the
+    # formula returned by the issuer panel" — a desk whose whole argument is
+    # that the definition travels with the number, unable to name the section.
+    citation: str = "SEC non-GAAP C&DIs"
+    # Which question this measure answers, for a caller comparing two issuers:
+    # "more leveraged" is a question about a ratio, and a dollar amount of debt
+    # is not one. Data, so adding a family is an edit here.
+    family: str = ""
     source_quote: str = ""
     note: str = ""
     unit_class: str = "money"            # money | ratio | count
@@ -55,21 +65,21 @@ FORMULAS: dict[str, Formula] = {
         expression="net income + interest expense + income tax expense",
         inputs=("net_income", "interest_expense", "income_tax_expense"),
         alternatives={"interest_expense": ("interest_expense_nonoperating",)},
-        op="sum", basis="window", source_url=SEC_NON_GAAP,
+        op="sum", basis="window", family="earnings", citation="SEC C&DI 103.01, 103.02", source_url=SEC_NON_GAAP,
         source_quote=('C&DI 103.01: "Earnings" means net income as presented in the '
                       'statement of operations under GAAP. Measures that are calculated '
                       'differently ... should not be characterized as "EBIT" or "EBITDA".'),
         note=("Starts from net income, never operating income: C&DI 103.02 says operating "
               "income is not the comparable measure 'because EBIT and EBITDA make "
               "adjustments for items that are not included in operating income'. Read it "
-              "beside operating income — measured on GOOGL's June 2026 quarter, pretax "
-              "income of 138.753bn against operating income of 40.770bn makes a correct "
-              "EBIT almost entirely non-operating."),
+              "beside operating income: where an issuer carries large non-operating income "
+              "the two are far apart, and a correct EBIT is then mostly non-operating. The "
+              "measurements behind that are in V9_FORMULA_BASIS."),
     ),
     "ebitda": Formula(
         expression="EBIT + depreciation and amortisation",
         inputs=("ebit", "depreciation_amortization"),
-        op="sum", basis="window", source_url=SEC_NON_GAAP,
+        op="sum", basis="window", family="earnings", citation="SEC C&DI 103.01, 103.02", source_url=SEC_NON_GAAP,
         source_quote='C&DI 103.01 describes EBITDA as "earnings before interest, taxes, '
                      'depreciation and amortization".',
         note=("Available for 5 of the 8 issuers held: GOOGL, JPM and MSFT do not report "
@@ -82,7 +92,7 @@ FORMULAS: dict[str, Formula] = {
     "free_cash_flow": Formula(
         expression="operating cash flow − capital expenditures",
         inputs=("operating_cash_flow", "capex"), signs=(1, -1),
-        op="difference", basis="window", source_url=SEC_NON_GAAP,
+        op="difference", basis="window", family="cash", citation="SEC C&DI 102.07", source_url=SEC_NON_GAAP,
         source_quote=('C&DI 102.07: "free cash flow" ... is typically calculated as cash '
                       'flows from operating activities ... less capital expenditures ... '
                       'this measure does not have a uniform definition and its title does '
@@ -93,15 +103,15 @@ FORMULAS: dict[str, Formula] = {
     # ── what the book owes ────────────────────────────────────────────────────
     "total_debt": Formula(
         expression="the widest non-overlapping set of reported debt components",
-        inputs=(), op="cover", basis="instant", source_url=SEC_NON_GAAP,
+        inputs=(), op="cover", basis="instant", family="leverage", source_url=SEC_NON_GAAP,
         note=("Composed by containment cover rather than a fixed list: which components an "
-              "issuer reports varies, and adding a total to its own component double-counts "
-              "— 8.31bn on AAPL. What the cover does not reach is reported beside it."),
+              "issuer reports varies, and adding a total to its own component double-counts. "
+              "What the cover does not reach is reported beside it."),
     ),
     "net_debt": Formula(
         expression="total debt − cash and equivalents",
         inputs=("total_debt", "cash_and_equivalents"), signs=(1, -1),
-        op="difference", basis="instant", source_url=SEC_NON_GAAP,
+        op="difference", basis="instant", family="leverage", source_url=SEC_NON_GAAP,
         note=("NOT an agency net debt. S&P nets only surplus cash, with haircuts that need "
               "inputs this desk does not have, so a number carrying that name here would be "
               "a defined term it is not."),
@@ -113,38 +123,38 @@ FORMULAS: dict[str, Formula] = {
         inputs=("ebit", "interest_expense"),
         alternatives={"interest_expense": ("interest_expense_nonoperating",)},
         op="divide", basis="window",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="coverage", source_url=SEC_NON_GAAP,
         note="Both sides over one window; the window is stated with the number.",
     ),
     "debt_to_ebitda": Formula(
         expression="total debt ÷ EBITDA",
         inputs=("total_debt", "ebitda"), op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow: the instant and the window are both stated.",
     ),
     "debt_to_operating_cash_flow": Formula(
         expression="total debt ÷ operating cash flow",
         inputs=("total_debt", "operating_cash_flow"), op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow; both bases stated.",
     ),
     "fcf_to_debt": Formula(
         expression="free cash flow ÷ total debt",
         inputs=("free_cash_flow", "total_debt"), op="divide", basis="mixed",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="coverage", source_url=SEC_NON_GAAP,
         note="A flow over a balance; both bases stated.",
     ),
     "current_ratio": Formula(
         expression="current assets ÷ current liabilities",
         inputs=("current_assets", "current_liabilities"), op="divide", basis="instant",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="liquidity", source_url=SEC_NON_GAAP,
         note="Both sides at one instant.",
     ),
     "gross_margin": Formula(
         expression="gross profit ÷ revenue",
         inputs=("gross_profit", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="window",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="margin", source_url=SEC_NON_GAAP,
         note=("Whichever top line the issuer reports is named in the result: LLY and JPM "
               "report only total revenues, and NVDA changed tagging in 2022."),
     ),
@@ -152,39 +162,51 @@ FORMULAS: dict[str, Formula] = {
         expression="operating income ÷ revenue",
         inputs=("operating_income", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="window",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="margin", source_url=SEC_NON_GAAP,
         note="The revenue line used is named in the result.",
     ),
     "net_margin": Formula(
         expression="net income ÷ revenue",
         inputs=("net_income", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="window",
-        unit_class="ratio", source_url=SEC_NON_GAAP,
+        unit_class="ratio", family="margin", source_url=SEC_NON_GAAP,
         note="The revenue line used is named in the result.",
     ),
     "days_sales_outstanding": Formula(
         expression="accounts receivable ÷ revenue × 365",
         inputs=("accounts_receivable", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="mixed",
-        unit_class="count", source_url=SEC_NON_GAAP,
+        unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note=("Ending balance, not an average: an average needs two dates and doubles the "
               "surface a missing quarter can remove. Stated in the result."),
     ),
     "days_inventory": Formula(
         expression="inventory ÷ cost of revenue × 365",
         inputs=("inventory", "cost_of_revenue"), op="divide", basis="mixed",
-        unit_class="count", source_url=SEC_NON_GAAP,
+        unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
     "days_payable": Formula(
         expression="accounts payable ÷ cost of revenue × 365",
         inputs=("accounts_payable", "cost_of_revenue"), op="divide", basis="mixed",
-        unit_class="count", source_url=SEC_NON_GAAP,
+        unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
 }
 
 DAYS_FORMULAS = ("days_sales_outstanding", "days_inventory", "days_payable")
+
+
+def authority(f: "Formula") -> dict:
+    """What a reader may say the authority is, and where to read it.
+
+    An object rather than a joined string, and that is the point: handed a bare
+    url the model built `src_https://www.sec.gov/...` out of it and the gate
+    refused the answer (sess_6acc3b20069d). There is no flat, id-shaped value
+    here to splice. `Evidence.tsx` already renders any key named `url` as a
+    link, so the UI needs nothing.
+    """
+    return {"cite_as": f.citation, "url": f.source_url}
 
 
 def evaluation_order() -> tuple[str, ...]:

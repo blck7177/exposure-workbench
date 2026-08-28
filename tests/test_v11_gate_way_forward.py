@@ -77,3 +77,30 @@ def test_incompatible_units_are_not_searched_across():
     problems = verify(extract_numbers("the factors explain 62.0%"), [TOTAL_DEBT, CASH, share])
     assert len(problems) == 1
     assert "derivable" not in problems[0]
+
+
+# ── V12-S0: a regulation reference is a citation, not a claim ────────────────
+
+def test_a_regulation_reference_is_not_a_number():
+    """C&DI 103.02 is the section that defines EBIT, and the gate refused it.
+
+    Measured on a real turn (sess_6acc3b20069d): asked why EBIT is computed from
+    net income, the model reached for "the formula returned by the issuer panel"
+    — a desk whose whole argument is that the definition travels with the number
+    because the regulator requires it, unable to name the regulator's section.
+    Item 1A leaked as 1 and Rule 17a-4 as 17 and 4, so a filings answer could
+    not name the item it had just read either.
+    """
+    for text in ("EBIT starts from net income per SEC C&DI 103.02",
+                 "per Item 1A of the 10-K", "SEC Rule 17a-4 requires",
+                 "free cash flow, C&DI 102.07", "under ASC 842", "IFRS 16 leases",
+                 "Section 13(a) of the Exchange Act"):
+        assert extract_numbers(text) == [], text
+
+
+def test_the_exemption_does_not_swallow_a_claim():
+    """Anchored on the naming word, like confidence_level. A bare figure with
+    the same digits is still a claim about the world."""
+    assert [n.surface for n in extract_numbers("margin was 103.02%")] == ["103.02%"]
+    assert [n.surface for n in extract_numbers("the fee was $103.02")] == ["$103.02"]
+    assert [n.surface for n in extract_numbers("Item 3 shows 15% growth")] == ["15%"]

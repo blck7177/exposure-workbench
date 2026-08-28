@@ -90,3 +90,41 @@ def test_a_formula_states_whether_it_wants_a_balance_or_a_window():
     side is which before it can fetch anything."""
     for name, f in fm.FORMULAS.items():
         assert f.basis in ("instant", "window", "mixed"), f"{name}: {f.basis}"
+
+
+# ── V12-S0: what the registry may hand a model ───────────────────────────────
+
+def test_no_note_carries_a_figure():
+    """A note is a rule, not a measurement.
+
+    Measured (V12 §10): `evaluate_formula` ships `note` on every call — 42 times
+    in two days — and two notes carried other issuers' figures (138.753bn /
+    40.770bn on GOOGL, 8.31bn on AAPL). Relaying one is refused, because nothing
+    the caller cited holds it, and the refusal reads as the model's fault. The
+    consequence sentence is what does the work; the measurements live in
+    docs/spikes/V9_FORMULA_BASIS.md, for the people who read code.
+    """
+    import re
+    figure = re.compile(r"\d[\d.,]*\s*(?:%|bn\b|billion|million|trillion|trn\b)", re.IGNORECASE)
+    offenders = {name: figure.findall(f.note) for name, f in fm.FORMULAS.items()
+                 if f.note and figure.findall(f.note)}
+    assert not offenders, offenders
+
+
+def test_every_formula_says_what_it_may_be_cited_as():
+    """The url alone could not be spoken: handed it, the model built
+    `src_https://www.sec.gov/...` and the gate refused the answer."""
+    for name, f in fm.FORMULAS.items():
+        auth = fm.authority(f)
+        assert auth["url"].startswith("https://"), name
+        assert auth["cite_as"], name
+        assert "http" not in auth["cite_as"], f"{name}: cite_as is a name, not a link"
+        assert set(auth) == {"cite_as", "url"}, f"{name}: no flat id-shaped value"
+
+
+def test_every_formula_belongs_to_a_family():
+    """"More leveraged" is a question about a ratio; a dollar amount of debt is
+    not one. The family is what lets a comparison pick a commensurable measure."""
+    known = {"earnings", "cash", "leverage", "coverage", "liquidity", "margin", "turnover"}
+    for name, f in fm.FORMULAS.items():
+        assert f.family in known, f"{name}: {f.family!r}"

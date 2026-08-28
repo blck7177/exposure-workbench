@@ -216,7 +216,7 @@ async def _unavailable(db: AsyncSession, ticker: str, name: str, f, missing: str
     shared = None if cache is None else cache.get(("_absence", missing))
     if shared is not None:
         return {**shared, "formula": name, "definition": f.expression,
-                "source_url": f.source_url}
+                "authority": fm.authority(f)}
 
     leaves = await _leaf_inputs(f)
     covers = await ab.coverage(db, ticker, leaves)
@@ -245,7 +245,7 @@ async def _unavailable(db: AsyncSession, ticker: str, name: str, f, missing: str
                     "issuer_latest_period_end": latest},
         invoked_by=invoked_by,
         formula=name, missing=missing, detail=detail,
-        definition=f.expression, source_url=f.source_url,
+        definition=f.expression, authority=fm.authority(f),
     )
     if cache is not None:
         cache[("_absence", missing)] = out
@@ -273,7 +273,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         f = fm.FORMULAS["total_debt"]
         out = {"formula": name, "ticker": ticker, "value": got["value"],
                "calc_id": got["id"], "definition": got.get("formula", f.expression),
-               "basis": got["basis"], "source_url": f.source_url, "note": f.note,
+               "basis": got["basis"], "authority": fm.authority(f), "note": f.note,
                "unit_class": f.unit_class}
         # Only when there is something to say. An empty list beside every total
         # invites a sentence about what was left out when nothing was.
@@ -316,7 +316,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
                         "detail": step["detail"], "definition": f.expression,
-                    "source_url": f.source_url}
+                    "authority": fm.authority(f)}
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     elif f.op == "difference":
         acc = operands[0]
@@ -326,7 +326,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
                         "detail": step["detail"], "definition": f.expression,
-                    "source_url": f.source_url}
+                    "authority": fm.authority(f)}
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     else:  # divide
         step = await tc.calculate(db, "divide", operands[0]["id"], operands[1]["id"],
@@ -334,7 +334,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         if step.get("error"):
             return {"error": "not_combinable", "formula": name,
                     "detail": step["detail"], "definition": f.expression,
-                    "source_url": f.source_url}
+                    "authority": fm.authority(f)}
         acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
         if name in fm.DAYS_FORMULAS:
             # The x365 gets its own ledger row. Doing it here in Python was the
@@ -346,7 +346,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             if scaled.get("error"):
                 return {"error": "not_combinable", "formula": name,
                         "detail": scaled["detail"], "definition": f.expression,
-                    "source_url": f.source_url}
+                    "authority": fm.authority(f)}
             acc = {"id": scaled["calc_id"], "value": scaled["value"],
                    "basis": acc["basis"]}
 
@@ -355,13 +355,13 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         definition += f" [{actual.replace('_', ' ')} used for {wanted.replace('_', ' ')}]"
     out = {"formula": name, "ticker": ticker, "value": acc["value"],
            "calc_id": acc["id"], "definition": definition, "basis": acc["basis"],
-           "source_url": f.source_url, "note": f.note, "unit_class": f.unit_class}
+           "authority": fm.authority(f), "note": f.note, "unit_class": f.unit_class}
     if used_instead:
         out["substituted_inputs"] = used_instead
     return out
 
 
-_REGISTRY_PROSE = ("note", "source_url")
+_REGISTRY_PROSE = ("note", "authority")
 
 
 async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
@@ -388,7 +388,7 @@ async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
             if aid in seen_absences:
                 line = {k: v for k, v in line.items() if k != "statement"}
             seen_absences.add(aid)
-        # `note` and `source_url` are registry prose: the same bytes for every
+        # `note` and `authority` are registry prose: the same bytes for every
         # issuer on every call, and 2.0kB of the 8.2kB NVDA panel. Shipping them
         # sixteen times pushed the payload past the context cap and silently cost
         # the model four whole lines, net_debt among them. What varies per issuer

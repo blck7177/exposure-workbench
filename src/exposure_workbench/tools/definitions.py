@@ -87,7 +87,9 @@ async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
         needed = leaves(name, {name})
         missing = sorted(needed - have)
         formulas.append({"name": name, "definition": f.expression, "basis": f.basis,
-                         "source": f.source_url,
+                         "family": f.family, "unit_class": f.unit_class,
+                         "authority": _fm.authority(f),
+                         **({"note": f.note} if f.note else {}),
                          "computable": not missing,
                          **({"missing_inputs": missing} if missing else {})})
     return {"company": company, "available_metrics": metrics["metrics"], "formulas": formulas}

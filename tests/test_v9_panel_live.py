@@ -137,7 +137,7 @@ async def test_a_bank_is_refused_before_any_number_is_produced():
 async def test_every_line_carries_its_definition_and_its_source():
     """The panel carries what varies per issuer; the source travels with the formula.
 
-    V11-T moved `note` and `source_url` off the panel lines: identical bytes for
+    V11-T moved `note` and `source_url` (now `authority`) off the panel lines: identical bytes for
     every issuer on every call, 2.0kB of an 8.2kB payload, and the overflow cost
     the model four whole lines silently. The guarantee is unchanged, so this
     checks it where it now lives — a source url for every line the panel names,
@@ -156,8 +156,12 @@ async def test_every_line_carries_its_definition_and_its_source():
     assert "evaluate_formula" in panel["per_formula_sources"]
     for name, line in panel["lines"].items():
         assert line.get("definition"), f"{name} has no definition"
-        assert "note" not in line and "source_url" not in line, f"{name} still ships registry prose"
-        assert sources[name]["source_url"].startswith("http"), f"{name} has no source"
+        assert "note" not in line and "authority" not in line, f"{name} still ships registry prose"
+        # V12-S0: an authority a reader may SAY, plus where to read it. The bare
+        # url was spliced into a src_ id and refused by the gate.
+        auth = sources[name]["authority"]
+        assert auth["url"].startswith("http"), f"{name} has no source"
+        assert auth["cite_as"] and "http" not in auth["cite_as"], f"{name} has nothing to cite as"
         if not line.get("error"):
             assert line["basis"], f"{name} states no period basis"
             assert line["calc_id"].startswith(("calc_", "fact_"))
