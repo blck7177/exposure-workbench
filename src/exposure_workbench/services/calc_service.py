@@ -105,23 +105,52 @@ async def window_return(
 
 
 async def list_available_metrics(db: AsyncSession, ticker: str) -> dict:
-    """The agent's map: which metrics exist for this issuer, and how deep."""
+    """The agent's map: which metrics exist for this issuer, how deep, what kind.
+
+    V12-K1 adds `kind` and, for flows, `windows_filed`. The interval engine's
+    whole subject — a flow covers an interval, a balance is read at an instant —
+    reached the model as the word "mixed" and nothing more. Measured externally:
+    once agents have a catalogue of financial tools, 63% of what still goes
+    wrong is the period (FinRetrieval), attributed to undocumented conventions.
+
+    `windows_filed` needs period_start, which this query did not select.
+    """
+    from exposure_workbench.services.period_semantics import filed_window_lengths
+
     company_id = await _company_id(db, ticker)
     rows = (
         await db.execute(
-            select(FinancialFact.normalized_metric, FinancialFact.period_end)
+            select(FinancialFact.normalized_metric, FinancialFact.period_end,
+                   FinancialFact.period_start)
             .where(FinancialFact.company_id == company_id,
                    FinancialFact.normalized_metric.is_not(None))
         )
     ).all()
-    out: dict[str, set] = {}
-    for metric, pe in rows:
-        out.setdefault(metric, set()).add(pe)
+    ends: dict[str, set] = {}
+    spans: dict[str, set] = {}
+    for metric, period_end, period_start in rows:
+        ends.setdefault(metric, set()).add(period_end)
+        if period_start is not None and period_end is not None:
+            spans.setdefault(metric, set()).add((period_start, period_end))
+
+    def described(metric: str, periods: set) -> dict:
+        got = {"metric": metric, "periods": len(periods),
+               "latest_period_end": max(periods).isoformat()}
+        # Said once, on the lines it is true of. A balance is the other case and
+        # naming it on twenty rows spends bytes to repeat the absence of a word.
+        if metric in spans:
+            got["kind"] = "flow"
+            windows = filed_window_lengths(sorted(spans[metric]))
+            # Only when there is more than one. A lone "3-month" repeats what
+            # `kind: flow` already said; two or more lengths off one year-start
+            # is the fact that matters — this line is filed cumulatively, so a
+            # single quarter after the first is a subtraction.
+            if len(windows) > 1:
+                got["windows_filed"] = list(windows)
+        return got
+
     return {
         "ticker": ticker,
-        "metrics": sorted(
-            ({"metric": m, "periods": len(p),
-              "latest_period_end": max(p).isoformat()} for m, p in out.items()),
-            key=lambda d: d["metric"],
-        ),
+        "metrics": sorted((described(m, p) for m, p in ends.items()),
+                          key=lambda d: d["metric"]),
     }

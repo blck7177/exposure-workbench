@@ -64,12 +64,56 @@ async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
     per issuer is which of them its filings can feed, and that is stated here
     rather than discovered by a refused evaluate_formula.
     """
+    from exposure_workbench.analytics import containment as _ct
     from exposure_workbench.analytics import formulas as _fm
+    from exposure_workbench.analytics import semantics as _sem
+    from exposure_workbench.services import absence_service as _ab
+    from exposure_workbench.services import period_semantics as _ps
+
     company = await _resolve_company(db, ticker)
     if company.get("error"):
         return company
     metrics = await cs.list_available_metrics(db, ticker.upper())
     have = {m["metric"] for m in metrics["metrics"]}
+
+    # V12-K1. What each metric MEANS, at the moment of choosing one. Every field
+    # below already existed — in the containment edges, in the registry's named
+    # alternatives, in concept_mapping's comments — and none of it reached the
+    # model, which saw a name, a count and a date and chose between strings.
+    for row in metrics["metrics"]:
+        name = row["metric"]
+        # The RULE, not the graph. Shipping `contains` and `contained_by` beside
+        # this said the same thing three ways: which one is the wider line is
+        # what `for_a_total_call` answers, and the only thing a caller has to
+        # act on is that these two may not be summed. A rule the model has to
+        # compose out of two facts is the class DABstep measured agents missing,
+        # so the conclusion travels and the graph stays in containment.py.
+        nested = sorted({c for c in have if _ct.contains(name, c)} |
+                        {p for p in have if _ct.contains(p, name)})
+        if nested:
+            row["do_not_add_to"] = nested
+        superseded = [a for a in _ab.superseded_by(name) if a in have]
+        if superseded:
+            row["superseded_by"] = superseded
+        sem = _sem.for_metric(name)
+        if sem is None:
+            continue
+        confusable = [o for o in sem.do_not_combine_with if o in have]
+        if confusable:
+            row["do_not_combine_with"] = confusable
+        if sem.for_a_total_call:
+            row["for_a_total_call"] = sem.for_a_total_call
+        # Every note in the table warns about a RELATIONSHIP — this line is
+        # inside that one, this tag was superseded by that one, this is a
+        # component and not the total. Shipped where the other side of the
+        # relationship is absent, it is a caveat about a choice this issuer does
+        # not offer, and LinkedIn measured irrelevant domain knowledge lowering
+        # answer quality rather than raising it. So the note travels with the
+        # relationship that makes it true.
+        if sem.note and any(k in row for k in
+                            ("contains", "contained_by", "superseded_by",
+                             "do_not_combine_with", "for_a_total_call")):
+            row["note"] = sem.note
 
     def leaves(name: str, seen: set[str]) -> set[str]:
         f = _fm.FORMULAS.get(name)
@@ -86,13 +130,23 @@ async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
     for name, f in sorted(_fm.FORMULAS.items()):
         needed = leaves(name, {name})
         missing = sorted(needed - have)
+        # No `authority` and no `note` here. Both are registry prose — the same
+        # bytes for every issuer, and `authority` is the SAME OBJECT sixteen
+        # times over in one catalogue. They travel where they are load-bearing:
+        # beside the number, in evaluate_formula, which has always shipped them.
+        # This is the V11-T lesson applied to the other listing tool; measured,
+        # the two cost 3.8kB of an 18.7kB payload against a 12kB cap.
         formulas.append({"name": name, "definition": f.expression, "basis": f.basis,
                          "family": f.family, "unit_class": f.unit_class,
-                         "authority": _fm.authority(f),
-                         **({"note": f.note} if f.note else {}),
                          "computable": not missing,
                          **({"missing_inputs": missing} if missing else {})})
-    return {"company": company, "available_metrics": metrics["metrics"], "formulas": formulas}
+
+    out = {"company": company, "available_metrics": metrics["metrics"],
+           "formulas": formulas}
+    periods = await _ps.describe_periods(db, ticker.upper())
+    if periods:
+        out["period_semantics"] = periods
+    return out
 
 
 async def _get_balance_series(db: AsyncSession, ticker: str, metric: str, last_n: int = 12) -> dict:
