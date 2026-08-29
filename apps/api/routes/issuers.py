@@ -41,6 +41,36 @@ async def get_evidence(ref_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, f"no evidence for {ref_id}")
 
 
+# A ceiling on one request, not a page size: the caller is a rendered answer
+# resolving its own citations, and the largest of those in the live database
+# carries 17. A hundred is generous for that and bounded for anyone else.
+MAX_LABEL_IDS = 100
+
+
+@router.get("/evidence/labels", dependencies=[Depends(optional_user)])
+async def evidence_labels(ids: str = "", db: AsyncSession = Depends(get_db)):
+    """Short captions for many evidence ids at once (V13-S3).
+
+    An answer citing seventeen things would otherwise open seventeen requests
+    just to put words on its chips. Resolution is per-id and the envelope is
+    unchanged; this returns the label alone.
+
+    An id that does not resolve is simply absent from the result rather than
+    an error: a chip whose evidence has gone is a chip that shows its id, which
+    is what every chip did before this existed, and failing the whole batch for
+    one of them would take the other sixteen down with it.
+    """
+    wanted = [i.strip() for i in ids.split(",") if i.strip()][:MAX_LABEL_IDS]
+    out: dict[str, dict] = {}
+    for ref in wanted:
+        try:
+            resolved = await ev.resolve(db, ref)
+        except ev.EvidenceNotFound:
+            continue
+        out[ref] = {"type": resolved["type"], "label": resolved.get("label", "")}
+    return {"labels": out}
+
+
 # ── companies list (for the portfolio -> investigate entry) ───────────────────────
 
 @router.get("/companies", dependencies=[Depends(optional_user)])
