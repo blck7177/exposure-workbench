@@ -193,6 +193,24 @@ export interface Task {
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
 
+/**
+ * How old what you are looking at actually is (V13-S1).
+ *
+ * Two dates kept apart on purpose: the run's reporting date and the newest
+ * session the market has traded. "Aug 20" alone does not say whether that is
+ * the freshest data there is or a week of silence, and the top bar was showing
+ * exactly that much.
+ */
+export interface Freshness {
+  portfolio_id: string;
+  latest_completed_run: string | null;
+  run_as_of: string | null;
+  latest_market_session: string | null;
+  sessions_behind: number | null;
+  runs_in_flight: number;
+  detail: string | null;
+}
+
 // ─── Daily quota (V2-E4) ──────────────────────────────────────────────────────
 
 export interface UsagePool {

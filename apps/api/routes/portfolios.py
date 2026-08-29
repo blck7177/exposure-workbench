@@ -14,7 +14,7 @@ from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.services import (
-    exposure_run_service, portfolio_csv, portfolio_service, usage_service,
+    exposure_run_service, portfolio_csv, portfolio_service, run_reads_service, usage_service,
 )
 
 router = APIRouter()
@@ -263,6 +263,40 @@ class DashboardOut(BaseModel):
     factor_attributions: list[dict[str, Any]]
     risk_alerts: list[dict[str, Any]]
     report_summary: dict[str, Any] | None
+
+
+class FreshnessOut(BaseModel):
+    """How old what the reader is looking at actually is (V13-S1).
+
+    The same two dates get_run_freshness keeps apart for the agent, on the page
+    for the same reason: "the last run was Thursday" and "the market has traded
+    seven times since" are different facts, and the top bar was showing neither.
+    A visitor met an August 20 date with nothing saying whether that was the
+    newest data there is or a week of silence.
+    """
+
+    portfolio_id: str
+    latest_completed_run: str | None
+    run_as_of: str | None
+    latest_market_session: str | None
+    sessions_behind: int | None
+    runs_in_flight: int
+    detail: str | None
+
+
+@router.get("/portfolios/{portfolio_id}/freshness", response_model=FreshnessOut,
+            dependencies=[Depends(optional_user)])
+async def get_portfolio_freshness(
+    portfolio_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    # A thin wrapper over the read the agent already has, deliberately: one
+    # definition of "behind", so the sentence in the top bar and the sentence in
+    # an answer cannot disagree about the same book on the same day.
+    portfolio = await portfolio_service.get_portfolio(db, portfolio_id)
+    if not portfolio:
+        raise HTTPException(404, {"error": "unknown_portfolio", "portfolio_id": portfolio_id})
+    return await run_reads_service.get_run_freshness(db, portfolio_id)
 
 
 @router.get("/portfolios/{portfolio_id}/dashboard", response_model=DashboardOut,

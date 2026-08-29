@@ -1,4 +1,4 @@
-import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Task, Usage } from "./types";
+import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Freshness, Task, Usage } from "./types";
 import { apiFetch as fetchJson } from "./http";
 
 // setAuthTokenGetter now lives in ./http (the shared transport); re-export so
@@ -17,6 +17,10 @@ export async function getPortfolio(id: string): Promise<Portfolio> {
 
 export async function getPositions(portfolioId: string): Promise<Position[]> {
   return fetchJson<Position[]>(`/api/portfolios/${portfolioId}/positions`);
+}
+
+export async function getFreshness(portfolioId: string): Promise<Freshness> {
+  return fetchJson<Freshness>(`/api/portfolios/${portfolioId}/freshness`);
 }
 
 // ─── Portfolio create / upload / clone (V2-B, authenticated) ────────────────────
@@ -68,7 +72,12 @@ export async function getRun(runId: string): Promise<ExposureRun> {
   return fetchJson<ExposureRun>(`/api/exposure-runs/${runId}`);
 }
 
-/** Omit asOfDate to report on the last completed session (the usual case). */
+/**
+ * Omit asOfDate to report on the last completed session (the usual case).
+ *
+ * There is no `triggered_by` to pass: what a run is called is a fact about which
+ * door it came through, and the door knows (V13-S1).
+ */
 export async function createRun(
   portfolioId: string,
   asOfDate?: string

@@ -143,6 +143,17 @@ class RunSummaryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# What a run started through this route is called, and the client does not get a
+# say (V13-S1). `triggered_by` was a free string on the request body, so every
+# acceptance script that ever posted one wrote its own label into an audit column
+# on a book strangers read: five of the twenty runs on the public demo said
+# `v8-p-live-acceptance`, `v5_validation`, `v5_deploy_check`, `v2h4_verification`.
+# The label is a fact about which door the run came through, and the door knows.
+# The other two values are minted where they are true: `agent:<session>` in
+# meta_tools, `seed` by the seed script, both through the service.
+_TRIGGERED_BY_API = "manual"
+
+
 # ─── Request model ────────────────────────────────────────────────────────────
 
 class CreateRunRequest(BaseModel):
@@ -152,7 +163,6 @@ class CreateRunRequest(BaseModel):
     # cannot support, which fails the run loudly rather than reporting a figure
     # for a date nothing was priced on.
     as_of_date: date | None = None
-    triggered_by: str = "manual"
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -185,7 +195,7 @@ async def create_exposure_run(
             payload={
                 "portfolio_id": body.portfolio_id,
                 "as_of_date": as_of.isoformat(),
-                "triggered_by": body.triggered_by,
+                "triggered_by": _TRIGGERED_BY_API,
             },
             owner_user_id=user.user_id,
         )
@@ -196,7 +206,7 @@ async def create_exposure_run(
         portfolio_id=body.portfolio_id,
         as_of_date=as_of,
         task_id=task.id,
-        triggered_by=body.triggered_by,
+        triggered_by=_TRIGGERED_BY_API,
     )
     # Link task payload back to run_id
     from sqlalchemy.orm.attributes import flag_modified
