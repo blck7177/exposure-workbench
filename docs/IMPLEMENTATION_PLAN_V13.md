@@ -1,6 +1,8 @@
 # Implementation Plan V13 — 上线前 UI 收口:读者层 / 审计层 / 可视化
 
-> **状态(2026-08-29)**:执行中。**S0 ✅** 共享面 + Next 16 笔记 · **S1 ✅** 数据卫生(脚本只跑 dry-run,删/改标签待拍板)· **S2 ✅** 错误面(1116 offline / tsc 绿)· S3–S8 待做。**§9 九项待拍板**——执行按 §1 的"建议"默认值走,凡涉及**删数据、改线上、改 LLM 措辞**的三类一律停在拍板前(S1 的删除脚本只跑 `--dry-run`;S7 的 `_SYSTEM` 与日报 prompt 不改;S8 不部署)。
+> **状态(2026-08-29)**:执行中。**S0 ✅** 共享面 + Next 16 笔记 · **S1 ✅** 数据卫生(脚本只跑 dry-run,删/改标签待拍板)· **S2 ✅** 错误面 · **S3a ✅** 证据标签 + 显示名表(**1138 offline** / tsc 绿,基线 1082)· S3b(`meta.verified`)· S4–S8 待做。
+> **⚠️ 提交卫生事故**:`58e8e98`(S1)用了 `git add -A`,把**另一个 session 的 6 个文件**卷了进去(`meta_agent.py`、`formula_service.py`、`typed_calculator.py`、`tools/definitions.py`、`test_balance_delta.py`、`test_absence_derived_input.py`——三处不相关的修复)。对方已提醒并要求先不改写、不推送,由 boss 决定怎么拆。我此后全部按路径暂存;`17aa6b8`(S0)与其后各提交经核实只含本批文件。讽刺的是本计划 §7 风险表第一行写的就是"本机有并行 session 在同一工作树"。
+> **已对活库做的唯一改动**:`v13_run_errors.sql`(加列、幂等、跑两遍验证)。运行中的四个容器构建自不含这些列的镜像,站点全程 200。**§9 九项待拍板**——执行按 §1 的"建议"默认值走,凡涉及**删数据、改线上、改 LLM 措辞**的三类一律停在拍板前(S1 的删除脚本只跑 `--dry-run`;S7 的 `_SYSTEM` 与日报 prompt 不改;S8 不部署)。
 > **执行期偏离(如实记)**:①S0 的"组件目录拆分"并入 S6。②**S2 的 `error_detail` 不上 API**——计划 §S0 写的"字段本身不做权限分支,RLS 决定可见性"是错的:demo 是**公开**组合,它的 run 任何匿名访客都读得到,把供应商原文与内网主机名放在 payload 上等于把本批要堵的洞挪到 JSON 里。改为**根本不服务该字段**(库里写给运维,psql 读),连权限分支都不需要;`WorkflowEventOut` 另加一个 scrubber 把 `payload_summary` 里的 detail 也剥掉。③S1 的删除脚本长出 `--relabel`:dry-run 发现最完整的那个 demo run 恰恰带开发标签,按标签删会把橱窗退回 7 月。④新增一个计划里没有的 code `brief_not_submitted`——research agent 用完预算未提交 brief 不是缺陷,和"run 停了"共用一句话是把两件事说成一件。理由:拆分的原因是 V7 的并行 lane 撞车,而本次是单人顺序执行;先做一次纯搬运提交、再在 S6 原地重写,是两遍改同一批文件。S0 只做真正的共享面(schemas / types / errors 词表)与 Next 16 笔记。**上游**:`dev_note/portfolio-demo/ui-review/`(README §1–§5:25 条暴露项 + 27 产品 / 50 模式研究 + 可视化盘点;报告 artifact `11c69b1e…`;目标 UI mockup v2 artifact `e8ee7ba5…`,`target-ui-mockup.html` + `viz-build/` 取数脚本可对活库重跑)。
 > **性质**:**呈现层 + 数据卫生 + 只读端点**。四公理、门、工具语义、预算一律不动;LLM 路径只改**措辞**(全部过目后才提交,§7)。与 8/27「先收敛不加功能」的关系:P0/P1 全部是把**已经算出来、已经存在库里**的东西给读者看;本批唯一的"新东西"是 9 个只读端点和 3 列持久化,没有新的分析能力。
 > **一句话**:这个产品按实质站在信任阶梯顶端(每个数字有 fact/calc、期间、申报号、上游图、公式出处),按呈现站在底端(`calc 2b5395` chip、JSON dump、模型版本与原始错误串在读者眼前)。本批把两者对齐,并把差异化(数值门、账本、覆盖度诚实)做成看得见的。
@@ -143,7 +145,7 @@
 
 **判据**:活库那三条真实失败(429 原文、`exposure-mcp:8000`、`max_tokens`)回放后 UI 各是一句人话;`--dump-dom` 的 `/issuer/FOOBAR` 不含 `API 404`。
 
-### S3 · 证据标签、编号引用、证据卡(1.5 天,BE 0.5 / FE 1)
+### S3 · 证据标签、编号引用、证据卡(1.5 天,BE 0.5 / FE 1) — BE ✅ / FE 归入 S6
 
 **BE**
 - `evidence_resolver_service.py:36-181` 每类多回 `label`(同一函数内,不新增查询):fact「Gross profit · Q2 FY2026 · 10-Q」(指标显示名 + 窗口标签 + form);calc:recipe label / 公式名 + 窗口(`params` 里有);chunk「10-Q · Part I, Item 2 · MD&A」;src「publisher · title」;alert:`message`;run「Exposure run · Aug 20, 2026」;pos「AAPL · 5,000 sh」。窗口标签复用 `period_semantics`(财年 / 财季从 `period_end` 推,同 V12 K0)。
