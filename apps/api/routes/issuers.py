@@ -38,17 +38,14 @@ async def _company(db: AsyncSession, ticker: str) -> Company:
         raise HTTPException(404, {"error": "unknown_ticker", "ticker": ticker.upper()})
 
 
-# ── evidence resolver (the drill-through endpoint) ────────────────────────────────
-
-@router.get("/evidence/{ref_id}", dependencies=[Depends(optional_user)])
-async def get_evidence(ref_id: str, db: AsyncSession = Depends(get_db)):
-    # optional_user sets the tenant so run_/alert_ evidence for the caller's own
-    # runs resolves (public demo evidence resolves anonymously via is_public).
-    try:
-        return await ev.resolve(db, ref_id)
-    except ev.EvidenceNotFound:
-        raise HTTPException(404, f"no evidence for {ref_id}")
-
+# ── evidence: the batch of labels, then the drill-through ────────────────────────
+#
+# /evidence/labels is declared FIRST and has to be. A path parameter matches any
+# single segment, so with the resolver above it every request for the batch was
+# answered by resolve(ref_id="labels") — a 404 reading "no evidence for labels",
+# which is a sentence about the wrong question. tests/test_route_reachability.py
+# derives the rule from the app's route table so the next literal path added
+# under a parameterised one is caught at the same place.
 
 # A ceiling on one request, not a page size: the caller is a rendered answer
 # resolving its own citations, and the largest of those in the live database
@@ -78,6 +75,16 @@ async def evidence_labels(ids: str = "", db: AsyncSession = Depends(get_db)):
             continue
         out[ref] = {"type": resolved["type"], "label": resolved.get("label", "")}
     return {"labels": out}
+
+
+@router.get("/evidence/{ref_id}", dependencies=[Depends(optional_user)])
+async def get_evidence(ref_id: str, db: AsyncSession = Depends(get_db)):
+    # optional_user sets the tenant so run_/alert_ evidence for the caller's own
+    # runs resolves (public demo evidence resolves anonymously via is_public).
+    try:
+        return await ev.resolve(db, ref_id)
+    except ev.EvidenceNotFound:
+        raise HTTPException(404, f"no evidence for {ref_id}")
 
 
 # ── companies list (for the portfolio -> investigate entry) ───────────────────────
