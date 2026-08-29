@@ -158,6 +158,12 @@ async def handle_message(
 
     messages = [{"role": "system", "content": _SYSTEM}, *history]
     reply_text, reply_citations = None, []
+    # What the gate matched, on the turn it accepted (V13-S3). Kept beside the
+    # reply rather than recomputed later: re-running the checker over a stored
+    # answer would be a SECOND judgement of the same text, free to disagree with
+    # the one that let it through, and the honest record is what the gate
+    # actually found at the moment it decided.
+    reply_verified: dict | None = None
     # What the gate refused, in order. Empty is a fact, not a gap: it means the
     # turn never reached the gate, which is a different failure from one the gate
     # turned away, and the two must not read the same afterwards.
@@ -230,6 +236,7 @@ async def handle_message(
                 if name == "respond":
                     if result.get("responded"):
                         reply_text, reply_citations = result["text"], result.get("citations", [])
+                        reply_verified = result.get("verified")
                     elif result.get("error"):
                         # Every refusal, in order. Diagnosing V7-Q2 meant
                         # rebuilding the turn out of agent_steps by hand, because
@@ -246,6 +253,8 @@ async def handle_message(
     # done, and hiding the failure from the transcript would leave the user's
     # question sitting there with no reply and no explanation.
     meta: dict = {"prompt_tokens": prompt_peak}
+    if reply_verified is not None:
+        meta["verified"] = reply_verified
     if reply_text is None:
         reply_text, reply_citations = _GATE_EXHAUSTED_TEXT, []
         meta |= _GATE_EXHAUSTED_META | {"gate_refusals": gate_refusals}

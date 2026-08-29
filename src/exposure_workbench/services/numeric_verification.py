@@ -962,13 +962,54 @@ def verify(
     written number is two cited values away — the operation that would earn it an
     id, because the point is for the model to re-cite or compute, not to guess
     again or to quietly write about something else.
+
+    The gate's own entry point, unchanged in signature and in judgement. It
+    delegates so that the ONE place a number is decided against evidence stays
+    one place; see verify_with_matches for why the other half is wanted.
+    """
+    return verify_with_matches(numbers, values, quoted)[0]
+
+
+def verify_with_matches(
+    numbers: Iterable[ExtractedNumber],
+    values: Iterable[EvidenceValue],
+    quoted: set[str] | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """The same pass, returning what it REFUSED and what it ACCEPTED (V13-S3).
+
+    The gate has always known, for every figure in an answer, which cited row
+    supports it — and thrown that away, keeping only the failures. Keeping it is
+    what lets a reader hover a number and be shown what stands behind it, which
+    is the whole difference between a product whose numbers are checked and one
+    that says its numbers are checked.
+
+    The judgement is not duplicated and not re-derived: this IS the pass, and
+    verify() is now a call to it. A second implementation that agreed today is
+    the shape of defect this codebase has been bitten by more than once — a
+    mirrored table, a re-built join key — and here it would be worse than most,
+    because the two copies would disagree about whether an answer may be shown.
+
+    A match carries the span so the UI can find the figure it belongs to without
+    searching the text for a substring, which would attach the basis for "1.39"
+    to the "1.39" inside "21.39" the first time both appeared.
     """
     quoted = quoted or set()
     values = list(values)
     problems: list[dict] = []
+    matches: list[dict] = []
+
+    def _match(n: ExtractedNumber, kind: str, v: EvidenceValue | None = None) -> None:
+        matches.append({
+            "span": list(n.span), "surface": n.surface, "how": kind,
+            **({} if v is None else {"label": v.label, "source_id": v.source_id,
+                                     "value": v.value, "unit_class": v.unit_class}),
+        })
 
     for n in numbers:
         if _is_quoted(n, quoted):
+            # Verbatim inside a passage the answer cited. The passage is the
+            # support, so the match names no single value — there is none.
+            _match(n, "quoted")
             continue
         allowed = _COMPATIBLE.get(n.unit_class, ())
         candidates = [v for v in values if v.unit_class in allowed]
@@ -979,6 +1020,10 @@ def verify(
             # determinate instead. The distinction has to be "only", because a
             # figure that also equals a quotable value is quotable.
             if any(v.not_alone is None for v in matched):
+                # Prefer a determinate row as the one shown: a figure supported
+                # by both is quotable, and naming the indeterminate one would
+                # explain it with the row the gate would have refused.
+                _match(n, "value", next(v for v in matched if v.not_alone is None))
                 continue
             problems.append({
                 "number": n.surface,
@@ -998,4 +1043,4 @@ def verify(
         if derived is not None:
             problem["derivable"] = derived
         problems.append(problem)
-    return problems
+    return problems, matches

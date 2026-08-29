@@ -39,9 +39,34 @@ export type Evidence = { type: string; id: string; body: Record<string, any>; pr
 // this payload is readable by anyone who can see the run (V13-S2).
 export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; error_code: string | null; started_at: string | null; completed_at: string | null; workflow_events: TimelineEvent[] };
 export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string; prompt_tokens: number | null; completion_tokens: number | null };
+/**
+ * What the gate found for one figure, kept from the pass that accepted it (V13-S3).
+ *
+ * `span` indexes into the answer's own text, so a figure is located rather than
+ * searched for — a substring search would attach the basis for "1.39" to the
+ * "1.39" inside "21.39" the first time an answer held both.
+ *
+ * `how` is "value" when a cited row holds the number, "quoted" when it appears
+ * verbatim in a cited passage; the latter names no single value because there
+ * is none, and the passage is the support.
+ */
+export type VerifiedMatch = {
+  span: [number, number];
+  surface: string;
+  how: "value" | "quoted";
+  label?: string;
+  source_id?: string;
+  value?: number;
+  unit_class?: string;
+};
+
+export type Verified = { figures: number; sources: number; matches: VerifiedMatch[] };
+
 // meta carries out-of-band facts about the turn. {"gate":"exhausted"} means the
 // loop ended without the citation gate accepting an answer — a refusal, not a reply.
-export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: Record<string, unknown> };
+// {"verified": …} is the record of the check that let this answer through — not a
+// second opinion computed later, which would be free to disagree with the first.
+export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: { gate?: string; verified?: Verified } & Record<string, unknown> };
 export type SessionDetail = { id: string; kind: string; tools_used: number; messages: AgentMessage[]; steps: AgentStep[] };
 // V13-S0. The list a person navigates their own conversations by. `title` is
 // the first thing they asked — already written, already theirs — rather than a

@@ -189,6 +189,11 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
         }
 
     citation_ids = list(citations or [])
+    # Bound on every path out of the checks below, because the successful return
+    # reads it unconditionally: an answer with no numbers in it verified nothing,
+    # and saying "0 figures checked" is the true statement about it.
+    verified: list[dict] = []
+
     if citation_ids:
         ok, problems = await trail.validate_citations(db, current_session_id(), citation_ids)
         if not ok:
@@ -220,7 +225,7 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
         stated = numeric.extract_numbers(text)
         if stated:
             values, quoted = await numeric.resolve_cited_values(db, citation_ids)
-            bad = numeric.verify(stated, values, quoted)
+            bad, verified = numeric.verify_with_matches(stated, values, quoted)
             if bad:
                 # Three options, and the third one matters. Observed live: asked
                 # to summarise a pre-V3 brief, the agent hit this three times
@@ -273,7 +278,18 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
     if trajectory:
         return trajectory
 
-    return {"responded": True, "text": text, "citations": citation_ids}
+    # What the gate found, kept rather than discarded (V13-S3). Every figure that
+    # got here matched something a cited row holds — the gate has always known
+    # which, and has always thrown it away the moment it decided not to refuse.
+    #
+    # Keeping it is the difference between a product whose numbers are checked
+    # and one that says its numbers are checked: the reader can be shown the
+    # count, and can hover a figure to see what stands behind it. It is a record
+    # of a check that already happened, not a new claim — nothing here can make
+    # an answer pass that would not have passed anyway.
+    return {"responded": True, "text": text, "citations": citation_ids,
+            "verified": {"figures": len(verified), "sources": len(citation_ids),
+                         "matches": verified}}
 
 
 # ── registration ────────────────────────────────────────────────────────────────
