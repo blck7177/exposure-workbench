@@ -35,15 +35,15 @@ export interface Position {
 }
 
 /**
- * Why a run stopped, in the two registers a failure has (V13-S2).
+ * Why a step stopped — the KIND of failure, and only that (V13-S2).
  *
- * `code` is what `explainApiError`-style wording keys on; `detail` is the
- * operator's half — the provider's own words, the internal hostname — and it
- * belongs in the audit layer, never in the sentence a reader is shown.
+ * The exception's own words (a provider's 429 JSON, an internal hostname) are
+ * kept in the database for the operator and are not served: the demo book is
+ * public, so anything on this payload is readable by any visitor. The sentence
+ * the reader sees is looked up from the code in lib/errors.ts.
  */
 export interface RunError {
   code: string;
-  detail: string | null;
 }
 
 export interface WorkflowEvent {

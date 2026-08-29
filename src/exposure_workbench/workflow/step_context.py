@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.errors import classify, detail_of, speaks_for_itself
 from exposure_workbench.services import workflow_event_service
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,25 @@ class step:
                 )
             status, msg = "completed", self.message
         else:
-            status, msg = "failed", f"{self.message} — ERROR: {exc_val}"
+            # The step's own account, in two registers (V13-S2). `message` is
+            # what a person waiting on this run reads, so it stops where the
+            # exception's words begin: "Research agent analysing AAPL — stopped",
+            # never "— ERROR: Error code: 429 - {'error': {'message': 'You
+            # exceeded your current quota…", which is a billing relationship the
+            # reader is not party to, and never the internal hostname the tool
+            # face names in its own sentence. Both of those really were on the
+            # issuer page.
+            #
+            # The exception's words are not lost — they move into the payload,
+            # under a code, where the audit layer reads them. Except when the
+            # message was written for the reader in the first place: a refused
+            # input names the stale holdings and the way out, and then this
+            # carries it, because substituting a generic sentence for that one
+            # would be losing information rather than protecting anyone.
+            code = classify(exc_val)
+            msg = (f"{self.message} — {exc_val}" if speaks_for_itself(code)
+                   else f"{self.message} — stopped")
+            status = "failed"
             # Same defect, but NOT raised here: the body already has an
             # exception in flight, and raising during its handling would replace
             # the real cause with a complaint about the evidence field — the
@@ -91,6 +110,10 @@ class step:
                     self.step_name, payload,
                 )
                 payload = {"payload_error": repr(payload)}
+            # Beside whatever the body recorded, never instead of it: "it
+            # ingested 4 filings and then blew up" and "it blew up before
+            # ingesting any" stay distinguishable, and now carry why.
+            payload = {**payload, "error": {"code": code, "detail": detail_of(exc_val)}}
         # The payload goes out on the failure path too, for the same reason the
         # message does: "it ingested 4 filings and then blew up" and "it blew up
         # before ingesting any" are different diagnoses, and this event is the

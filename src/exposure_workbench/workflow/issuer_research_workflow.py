@@ -18,6 +18,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.errors import BriefNotSubmitted
 from exposure_workbench.agents.research_session import run_research_session
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company, EvidencePack, FilingChunk, FinancialFact
@@ -84,7 +85,10 @@ async def run_issuer_research(
                         f"Research agent analysing {ticker}"):
             result = await run_research_session(db_factory, session_id, ticker, deny=deny)
             if not result["submitted"]:
-                raise RuntimeError(
+                # A named class, not a bare RuntimeError: this is the agent
+                # running out of room, not a defect, and the two get different
+                # sentences (V13-S2).
+                raise BriefNotSubmitted(
                     f"research agent did not submit a brief within budget "
                     f"(turns={result['turns_used']})"
                 )

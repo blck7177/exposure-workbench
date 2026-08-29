@@ -9,7 +9,7 @@ import {
   startResearch, getResearchRun,
   type Snapshot, type CalcRow, type FilingRow, type SourceRow, type Brief, type ResearchRun,
 } from "../../../lib/issuer";
-import { explainApiError } from "../../../lib/errors";
+import { explainApiError, explainRunError } from "../../../lib/errors";
 import { CitationChip, EvidenceDrawer } from "../../components/Evidence";
 import { RunTimeline } from "../../components/RunTimeline";
 import { ChatPanel } from "../../components/ChatPanel";
@@ -71,7 +71,13 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   const runId = run?.id ?? null;
   const runStatus = run?.status ?? null;
 
-  useEffect(() => { getSnapshot(tk).then(setSnap).catch((e) => setError(e.message)); }, [tk]);
+  // explainApiError, not e.message: this branch is how `API 404:
+  // {"detail":{"error":"unknown_ticker","ticker":"FOOBAR"}}` came to be rendered
+  // in a red bar to anyone who mistyped a symbol — while lib/errors.ts already
+  // held a sentence for that exact code, written for exactly this reader (V13-S2).
+  useEffect(() => {
+    getSnapshot(tk).then(setSnap).catch((e) => setError(explainApiError(e).notice));
+  }, [tk]);
 
   const runResearch = async () => {
     setError(null);
@@ -148,8 +154,10 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
             <RunTimeline events={run.workflow_events}
               emptyText="Queued — a worker picks this up within a few seconds." />
           </div>
-          {run.status === "failed" && run.error_message && (
-            <div className="mt-2 text-xs text-red-300">{run.error_message}</div>
+          {run.status === "failed" && (
+            <div className="mt-2 text-xs text-red-300">
+              {explainRunError(run.error_code, run.error_message)}
+            </div>
           )}
           {staleSince >= 2 && (
             <div className="mt-2 text-[10px] text-amber-400/80">

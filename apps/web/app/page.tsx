@@ -993,7 +993,9 @@ export default function Home() {
   useEffect(() => {
     listPortfolios()
       .then(setPortfolios)
-      .catch((e) => setError(e.message));
+      // Same reason as the issuer page: a transport string in the top bar is a
+      // sentence nobody can act on, and lib/errors.ts already has one (V13-S2).
+      .catch((e) => setError(explainApiError(e).notice));
   }, []);
 
 

@@ -111,3 +111,70 @@ export function explainApiError(e: unknown): ExplainedError {
   // person reading cannot act on a transport string. It is still logged.
   return { notice: "Something went wrong on our side. Try again in a moment." };
 }
+
+/**
+ * What to say when a RUN stopped (V13-S2).
+ *
+ * A run's failure does not come back as an HTTP status — it is a row that says
+ * `failed`, and until this existed the page rendered whatever string the
+ * exception happened to carry. Three that really shipped: a provider's 429 JSON
+ * quoting a billing relationship the reader is not party to, an internal
+ * hostname, and "pre-fix crash (max_tokens param)".
+ *
+ * The rule, and it is deliberately fail-closed:
+ *
+ *   code set + message present -> the message. The API stores one ONLY when the
+ *       failure's own words were written for a reader (RunRefused, the reaper's
+ *       lease sentence), and those are better than anything here: they name the
+ *       stale holdings, the date and the way out.
+ *   code set, no message       -> the sentence below.
+ *   NO code                    -> the generic sentence, and the message is
+ *       IGNORED. Rows written before this batch carry raw provider text with no
+ *       code beside it, and they were not backfilled — guessing a code from the
+ *       prose is the text-matching this batch replaced. Ignoring them is how a
+ *       historical row cannot leak what a new one cannot.
+ *
+ * Every code here must be one the API can actually produce, and every code the
+ * API can produce must be here; tests/test_workflow_error_codes.py checks both
+ * directions, because a branch that can never fire and a failure with no wording
+ * are the same defect seen from two sides.
+ */
+const RUN_ERROR_WORDING: Record<string, string> = {
+  inputs_unusable:
+    "This run could not use the data it was given, and stopped before writing anything.",
+  provider_quota:
+    "The model service refused this run — its rate or spend limit was reached. Nothing was written; it is worth trying again later.",
+  provider_unavailable:
+    "The model service could not be reached, so the run stopped before writing anything. Try again.",
+  provider_refused:
+    "The model service rejected the request. That is a fault on our side, not yours — nothing was written, and it has been logged.",
+  tool_face_unavailable:
+    "The analysis service this run needs was unavailable, so it stopped before writing anything. Try again shortly.",
+  ingest_failed:
+    "Fetching the source data failed, so the run stopped before writing anything. Try again.",
+  brief_not_submitted:
+    "The analyst worked through its whole allowance without reaching a brief it could stand behind, so none was written. A narrower question usually gets there.",
+  lease_expired:
+    "The run stopped reporting and was settled. Nothing was written; start it again.",
+  run_failed:
+    "This run stopped before finishing. Nothing was written, and the failure has been logged.",
+};
+
+const GENERIC_RUN_ERROR =
+  "This run stopped before finishing. Nothing was written.";
+
+/**
+ * The sentence for a stopped run. Never the raw string, never a stack, and
+ * never a provider's own words unless the API vouched for them by storing them.
+ */
+export function explainRunError(
+  code: string | null | undefined,
+  message: string | null | undefined,
+): string {
+  if (!code) return GENERIC_RUN_ERROR;
+  if (message && message.trim()) return message.trim();
+  return RUN_ERROR_WORDING[code] ?? GENERIC_RUN_ERROR;
+}
+
+/** The codes this file has wording for — read by the cross-language guard. */
+export const RUN_ERROR_CODES = Object.keys(RUN_ERROR_WORDING);

@@ -14,25 +14,25 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, model_validator
 
 
 class RunErrorOut(BaseModel):
-    """Why a run stopped, in the two registers a failure has (V13-S2).
+    """Why a step stopped — the KIND of failure, and only that (V13-S2).
 
-    `code` is what the UI turns into a sentence — one of the codes in
+    `code` is what the UI turns into a sentence: one of the codes in
     exposure_workbench.errors.workflow_codes, which is also the set
     apps/web/lib/errors.ts has wording for (guarded both ways).
 
-    `detail` is the operator's half: the provider's own words, the internal
-    hostname, the traceback's last line. It is on the wire because the person
-    running this desk needs it and the audit layer is where they read it — never
-    in the reader's sentence, which is how "Error code: 429 - {'error': ..." and
-    "http://exposure-mcp:8000/mcp/research" reached a stranger's screen.
+    There is deliberately no `detail` here. The exception's own words — the
+    provider's 429 JSON, "http://exposure-mcp:8000/mcp/research could not be
+    reached" — are recorded in the database for the operator and are NOT served,
+    because the demo book is public: anything on this payload is readable by any
+    anonymous visitor with devtools open, which is the hole this batch exists to
+    close. See the scrubber below, which is the other half of the same rule.
     """
 
     code: str
-    detail: str | None = None
 
 
 class WorkflowEventOut(BaseModel):
@@ -61,6 +61,28 @@ class WorkflowEventOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @model_validator(mode="after")
+    def _scrub_operator_detail(self):
+        """Take the exception's own words back out of payload_summary.
+
+        `step` writes {"error": {"code": …, "detail": …}} into the payload so the
+        operator has the failure's own words in the database. payload_summary is
+        served whole (V7-U4 put it on the wire so a check that never ran could
+        stop looking like one that passed), so without this the detail rides out
+        with it — and on the public demo book that means an anonymous visitor,
+        which is exactly the leak this batch closes. Stripped here rather than
+        never stored: the operator needs it, the reader must not have it, and one
+        scrubber at the boundary is easier to keep true than a rule about what
+        every step may put in its payload.
+        """
+        err = (self.payload_summary or {}).get("error")
+        if isinstance(err, dict) and "detail" in err:
+            self.payload_summary = {
+                **self.payload_summary,
+                "error": {k: v for k, v in err.items() if k != "detail"},
+            }
+        return self
+
     @computed_field
     @property
     def error(self) -> RunErrorOut | None:
@@ -74,6 +96,5 @@ class WorkflowEventOut(BaseModel):
         """
         e = (self.payload_summary or {}).get("error")
         if isinstance(e, dict) and isinstance(e.get("code"), str):
-            d = e.get("detail")
-            return RunErrorOut(code=e["code"], detail=d if isinstance(d, str) else None)
+            return RunErrorOut(code=e["code"])
         return None

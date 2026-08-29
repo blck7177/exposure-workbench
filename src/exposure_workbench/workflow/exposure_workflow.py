@@ -30,6 +30,7 @@ from exposure_workbench.db.models import (
     # is how one of them silently becomes the other.
     StressResult as StressResultRow,
 )
+from exposure_workbench.errors import RunRefused, classify, detail_of, speaks_for_itself
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.providers.yfinance_market_data_provider import YFinanceMarketDataProvider
 from exposure_workbench.services import (
@@ -396,6 +397,7 @@ class ExposureWorkflow:
                 status="failed",
                 steps_completed=steps_completed,
                 error=str(e),
+                error_code=classify(e),
             )
 
     # ── Load inputs ────────────────────────────────────────────────────────────
@@ -628,9 +630,9 @@ class ExposureWorkflow:
         would be a threshold source of its own.
         """
         if positions_df.empty:
-            raise ValueError("No positions found for the given portfolio and date")
+            raise RunRefused("No positions found for the given portfolio and date")
         if prices_df.empty:
-            raise ValueError("No market prices found — ensure seed data is loaded")
+            raise RunRefused("No market prices found — ensure seed data is loaded")
 
         held = set(positions_df["ticker"].astype(str))
         as_of_ts = pd.Timestamp(as_of_date)
@@ -706,7 +708,11 @@ class ExposureWorkflow:
             )
 
         if problems:
-            raise ValueError(
+            # RunRefused, not ValueError, and the difference is what the reader
+            # sees. This sentence names the date, the holdings and the way out —
+            # it was written for them. The class is how the UI knows to show it
+            # rather than substitute a code's generic wording (V13-S2).
+            raise RunRefused(
                 "Cannot value this portfolio as of "
                 f"{as_of_date} — " + "; ".join(problems)
                 + ". Re-run once the data is available, or remove the holdings."
@@ -1071,7 +1077,15 @@ class _StepContext:
             msg = self.message
         else:
             status = "failed"
-            msg = f"{self.message} — ERROR: {exc_val}"
+            # Two registers, exactly as step_context.step does it and for the
+            # same reason (V13-S2): the reader gets the step's own sentence, the
+            # exception's words go into the payload under a code, and a refusal
+            # that was written for the reader — a run that cannot value the book
+            # because prices are stale — keeps its own words, because that
+            # sentence names the holdings and the way out.
+            code = classify(exc_val)
+            msg = (f"{self.message} — {exc_val}" if speaks_for_itself(code)
+                   else f"{self.message} — stopped")
             # A step that failed part-way through its own DML leaves the
             # transaction marked rollback-only, and the event write below would
             # then raise PendingRollbackError. That is not merely noisy: it
@@ -1096,6 +1110,7 @@ class _StepContext:
                     self.step_name, payload,
                 )
                 payload = {"payload_error": repr(payload)}
+            payload = {**payload, "error": {"code": code, "detail": detail_of(exc_val)}}
 
         # The payload goes out on the failure path too, for the same reason the
         # message does: this event is the run's only record of a step that died

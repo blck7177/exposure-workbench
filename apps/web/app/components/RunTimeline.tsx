@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Loader2, AlertTriangle, Clock } from "lucide-react";
 import { formatDuration, statusColor } from "@/lib/formatting";
+import { explainRunError } from "@/lib/errors";
 import type { RunError } from "@/lib/types";
 
 /**
@@ -63,6 +64,17 @@ export function RunTimeline({
           <StepIcon status={ev.status} />
           <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-300 leading-tight">{ev.message || ev.step_name}</p>
+            {/* A failed step now says WHAT KIND of failure, from the code the
+                step recorded. The step's own message stops at "— stopped"; the
+                provider's words and the internal hostname it used to carry are
+                in the database for the operator and not on this payload at all
+                (V13-S2). A step that failed before this batch has no code, and
+                gets the generic sentence rather than a guess. */}
+            {ev.status === "failed" && (
+              <p className="text-[11px] text-red-300/90 leading-snug mt-0.5">
+                {explainRunError(ev.error?.code, null)}
+              </p>
+            )}
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`text-[10px] ${statusColor(ev.status)}`}>{ev.status}</span>
               {ev.duration_ms && (

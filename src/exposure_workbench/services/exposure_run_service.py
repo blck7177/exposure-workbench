@@ -66,7 +66,16 @@ async def update_run_status(
     run_id: str,
     status: str,
     error_message: str | None = None,
+    error_code: str | None = None,
+    error_detail: str | None = None,
 ) -> None:
+    """Move a run along, and — when it stopped — record why in three parts.
+
+    Same shape as research_run_service.update_status, deliberately: one idea of
+    what "a run that stopped" says (V13-S2). error_message carries a sentence
+    only when it was written for the reader — which for this workflow is the
+    common case, since RunRefused names the stale holdings and the way out.
+    """
     result = await db.execute(select(ExposureRun).where(ExposureRun.id == run_id))
     run = result.scalar_one_or_none()
     if run is None:
@@ -79,6 +88,10 @@ async def update_run_status(
         run.completed_at = datetime.now(timezone.utc)
     if error_message:
         run.error_message = error_message
+    if error_code:
+        run.error_code = error_code
+    if error_detail:
+        run.error_detail = error_detail
     await db.flush()
 
 

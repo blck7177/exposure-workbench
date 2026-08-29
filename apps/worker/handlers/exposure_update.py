@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.errors import speaks_for_itself
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.services import exposure_run_service, market_data_service
 from exposure_workbench.workflow.contracts import WorkflowInput
@@ -80,7 +81,16 @@ async def handle(db: AsyncSession, task: Any) -> None:
             status_db,
             run_id,
             final_status,
-            error_message=result.error,
+            # result.error is the workflow's own prose and result.error_code the
+            # class it belongs to. The prose is stored as the reader's sentence
+            # only when it was written for them — RunRefused, which for this
+            # workflow is the common case ("Cannot value this portfolio as of …
+            # newest price older than 10 days for: AAPL (30d old)"). Otherwise it
+            # is an operator's detail and stays out of the reader's way (V13-S2).
+            error_message=(result.error
+                           if speaks_for_itself(result.error_code or "") else None),
+            error_code=result.error_code,
+            error_detail=result.error,
         )
 
     if final_status == "failed":

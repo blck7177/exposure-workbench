@@ -75,6 +75,20 @@ class ResearchRunOut(BaseModel):
     triggered_by: str | None
     agent_session_id: str | None
     error_message: str | None
+    # V13-S2. The code is on the wire; `error_detail` deliberately is NOT.
+    #
+    # The plan for this batch said the field could ride along because RLS
+    # decides row visibility — which is true and beside the point: the demo book
+    # is PUBLIC, so every anonymous visitor can read its runs, and a detail
+    # column carrying "http://exposure-mcp:8000/mcp/research could not be
+    # reached" would put the internal hostname back on the wire the moment
+    # anyone opened devtools. That is the exact hole this batch closes, so the
+    # honest fix is not a permission branch on the field but not serving it:
+    # error_detail is written for the operator and read with psql, which is what
+    # the audit layer of a one-person desk is today. A signed-in reader's own
+    # runs can get it back through an owner-only endpoint when something needs
+    # it; that is its own batch, not a field quietly widened here.
+    error_code: str | None = None
     started_at: datetime | None
     completed_at: datetime | None
     # V7-U1. The outer timeline of the run, so the page can say which of the

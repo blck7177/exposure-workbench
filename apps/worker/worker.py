@@ -192,7 +192,12 @@ async def _fail_run_for(task_row: dict) -> None:
                     task_row["id"], run_id, run.status,
                 )
                 return
-            await mark_failed(db, run_id, "failed", error_message=task_service.LEASE_EXPIRED_ERROR)
+            # The sentence was already written for the reader (task_service);
+            # the code beside it is what lets the UI recognise this failure
+            # rather than pattern-match its prose (V13-S2).
+            await mark_failed(db, run_id, "failed",
+                              error_message=task_service.LEASE_EXPIRED_ERROR,
+                              error_code="lease_expired")
             logger.warning("Reaped task %s: marked run %s failed", task_row["id"], run_id)
     except Exception as exc:
         logger.error("Reaped task %s: could not fail run %s: %s", task_row["id"], run_id, exc)

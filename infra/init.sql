@@ -172,6 +172,10 @@ CREATE TABLE IF NOT EXISTS exposure_runs (
     task_id         VARCHAR(64),
     triggered_by    VARCHAR(32) DEFAULT 'manual',  -- manual|scheduled|api
     error_message   TEXT,
+    -- V13-S2: which kind of failure, and the exception's own words. The code
+    -- drives the reader's sentence; the detail is audit-layer only.
+    error_code      VARCHAR(32),
+    error_detail    TEXT,
     started_at      TIMESTAMPTZ,
     completed_at    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -589,6 +593,10 @@ CREATE TABLE IF NOT EXISTS research_runs (
     agent_session_id  VARCHAR(64),          -- link to the analysis subagent session
     triggered_by      VARCHAR(64) DEFAULT 'manual',   -- 'manual' | 'agent:<session_id>'
     error_message     TEXT,
+    -- V13-S2: which kind of failure, and the exception's own words. The code
+    -- drives the reader's sentence; the detail is audit-layer only.
+    error_code      VARCHAR(32),
+    error_detail    TEXT,
     started_at        TIMESTAMPTZ,
     completed_at      TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()

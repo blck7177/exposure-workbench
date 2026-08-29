@@ -193,7 +193,14 @@ class ExposureRun(Base):
     as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
     task_id: Mapped[str | None] = mapped_column(String(64))
     triggered_by: Mapped[str | None] = mapped_column(String(32), default="manual")
+    # V13-S2, same three-part shape as ResearchRun: the sentence, the kind, and
+    # the exception's own words. An exposure run's error_message is often
+    # already the reader's sentence — "Cannot value this portfolio as of … —
+    # newest price older than 10 days for: AAPL (30d old)" is written for them —
+    # and RunRefused is how that case is told apart from a provider's JSON.
     error_message: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(32))
+    error_detail: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -695,7 +702,15 @@ class ResearchRun(Base):
     task_id: Mapped[str | None] = mapped_column(String(64))
     agent_session_id: Mapped[str | None] = mapped_column(String(64))
     triggered_by: Mapped[str | None] = mapped_column(String(64), default="manual")
+    # V13-S2. Three columns for one failure, because a failure has three parts.
+    # error_message is the sentence a person is shown; error_code is which kind
+    # of failure it was, from the closed set in exposure_workbench.errors, and is
+    # what the UI keys its wording on; error_detail is the exception's own words
+    # — a provider's JSON, an internal hostname — kept for the operator and read
+    # only in the audit layer. NULL code on every row written before V13.
     error_message: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(32))
+    error_detail: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

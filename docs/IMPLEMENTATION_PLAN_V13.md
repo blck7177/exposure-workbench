@@ -1,7 +1,7 @@
 # Implementation Plan V13 — 上线前 UI 收口:读者层 / 审计层 / 可视化
 
-> **状态(2026-08-29)**:执行中。**S0 ✅**(共享面 + Next 16 笔记,1082 offline / tsc 绿)· S1–S8 待做。**§9 九项待拍板**——执行按 §1 的"建议"默认值走,凡涉及**删数据、改线上、改 LLM 措辞**的三类一律停在拍板前(S1 的删除脚本只跑 `--dry-run`;S7 的 `_SYSTEM` 与日报 prompt 不改;S8 不部署)。
-> **执行期偏离(如实记)**:S0 的"组件目录拆分"并入 S6。理由:拆分的原因是 V7 的并行 lane 撞车,而本次是单人顺序执行;先做一次纯搬运提交、再在 S6 原地重写,是两遍改同一批文件。S0 只做真正的共享面(schemas / types / errors 词表)与 Next 16 笔记。**上游**:`dev_note/portfolio-demo/ui-review/`(README §1–§5:25 条暴露项 + 27 产品 / 50 模式研究 + 可视化盘点;报告 artifact `11c69b1e…`;目标 UI mockup v2 artifact `e8ee7ba5…`,`target-ui-mockup.html` + `viz-build/` 取数脚本可对活库重跑)。
+> **状态(2026-08-29)**:执行中。**S0 ✅** 共享面 + Next 16 笔记 · **S1 ✅** 数据卫生(脚本只跑 dry-run,删/改标签待拍板)· **S2 ✅** 错误面(1116 offline / tsc 绿)· S3–S8 待做。**§9 九项待拍板**——执行按 §1 的"建议"默认值走,凡涉及**删数据、改线上、改 LLM 措辞**的三类一律停在拍板前(S1 的删除脚本只跑 `--dry-run`;S7 的 `_SYSTEM` 与日报 prompt 不改;S8 不部署)。
+> **执行期偏离(如实记)**:①S0 的"组件目录拆分"并入 S6。②**S2 的 `error_detail` 不上 API**——计划 §S0 写的"字段本身不做权限分支,RLS 决定可见性"是错的:demo 是**公开**组合,它的 run 任何匿名访客都读得到,把供应商原文与内网主机名放在 payload 上等于把本批要堵的洞挪到 JSON 里。改为**根本不服务该字段**(库里写给运维,psql 读),连权限分支都不需要;`WorkflowEventOut` 另加一个 scrubber 把 `payload_summary` 里的 detail 也剥掉。③S1 的删除脚本长出 `--relabel`:dry-run 发现最完整的那个 demo run 恰恰带开发标签,按标签删会把橱窗退回 7 月。④新增一个计划里没有的 code `brief_not_submitted`——research agent 用完预算未提交 brief 不是缺陷,和"run 停了"共用一句话是把两件事说成一件。理由:拆分的原因是 V7 的并行 lane 撞车,而本次是单人顺序执行;先做一次纯搬运提交、再在 S6 原地重写,是两遍改同一批文件。S0 只做真正的共享面(schemas / types / errors 词表)与 Next 16 笔记。**上游**:`dev_note/portfolio-demo/ui-review/`(README §1–§5:25 条暴露项 + 27 产品 / 50 模式研究 + 可视化盘点;报告 artifact `11c69b1e…`;目标 UI mockup v2 artifact `e8ee7ba5…`,`target-ui-mockup.html` + `viz-build/` 取数脚本可对活库重跑)。
 > **性质**:**呈现层 + 数据卫生 + 只读端点**。四公理、门、工具语义、预算一律不动;LLM 路径只改**措辞**(全部过目后才提交,§7)。与 8/27「先收敛不加功能」的关系:P0/P1 全部是把**已经算出来、已经存在库里**的东西给读者看;本批唯一的"新东西"是 9 个只读端点和 3 列持久化,没有新的分析能力。
 > **一句话**:这个产品按实质站在信任阶梯顶端(每个数字有 fact/calc、期间、申报号、上游图、公式出处),按呈现站在底端(`calc 2b5395` chip、JSON dump、模型版本与原始错误串在读者眼前)。本批把两者对齐,并把差异化(数值门、账本、覆盖度诚实)做成看得见的。
 > **判据先写在前面**:线上任一页面的读者层 DOM **零个** `(fact|calc|chunk|src|run|alert|pos|rrun|task|sess)_[0-9a-f]{12}`;任一失败面**零个**传输串 / 供应商原文 / 内网主机名;每张图的每个点能点回一个 id。三条都用 headless Chromium 的 `--dump-dom` 机械验收(S8)。
@@ -100,7 +100,7 @@
 
 单人约 10–11 人日;两条 lane(BE / FE)并行约 7 个工作日。每步:offline 全绿 + live 增量 → commit;S8 之前不 build 镜像。
 
-### S0 · 共享面(0.5 天,单人,先做)
+### S0 · 共享面(0.5 天,单人,先做) ✅
 
 **改动**
 - `apps/api/schemas.py`:`WorkflowEventOut` 加 `error: {code, detail} | None`(来自 `payload_summary.error`);新 `EvidenceLabelOut`(`label`, `kind`, `short`)。
@@ -112,7 +112,7 @@
 
 **判据**:`tsc` + `next build` 绿;offline 全绿;没有任何可见行为变化(截图 diff 零)。
 
-### S1 · 数据卫生与运维(0.5 天,可与任何步并行)
+### S1 · 数据卫生与运维(0.5 天,可与任何步并行) ✅(删除/改标签、价格摄入待拍板)
 
 - `scripts/prune_runs.py`(owner 角色,同 `delete_user.py` 形状):删除 `port_001` 上 `triggered_by ∉ {manual, scheduled, seed}` 的 run 及其子表;先 `--dry-run` 列出。**待拍板**(§9-③):删 vs 隐藏。
 - `exposure_runs.triggered_by` 收紧:`CreateRunRequest.triggered_by` 改 `Literal["manual"]`(`exposure_runs.py:150`),验收脚本以后写 `seed` / `scheduled` 只能经 service。
@@ -121,7 +121,7 @@
 
 **判据**:匿名 `GET /api/exposure-runs?portfolio_id=port_001` 无 failed、无测试触发;`freshness` 回 `sessions_behind`。
 
-### S2 · 错误面(1 天,BE lane 起手)
+### S2 · 错误面(1 天,BE lane 起手) ✅
 
 **错误码表**(确定性层,`exposure_workbench/errors/workflow_codes.py`,数据):
 

@@ -245,7 +245,7 @@ git pull
 #   CLERK_AUTHORIZED_PARTIES=https://exposure.<domain>
 docker compose build
 
-# Schema BEFORE the new code sees the database. All five files are idempotent
+# Schema BEFORE the new code sees the database. All of them are idempotent
 # and safe to re-run in full, but the order is not optional: every V3 column is
 # read by V3 code, so an API that starts first answers 500 on the agent routes
 # until the ALTERs land. Bring postgres up alone, migrate, then start the rest.
@@ -272,6 +272,13 @@ docker compose build
 # that never recorded the window it was fitted over does not acquire one by
 # being asked later. The next run fills them; until then the read tools report
 # the absence rather than a guess.
+#
+# v13_run_errors.sql adds error_code/error_detail to both run tables and does not
+# backfill, for the fourth time and the same reason: a run that never recorded
+# what KIND of failure it had does not acquire one by being asked later, and
+# guessing a code from the old error_message text is exactly the string-matching
+# V13 replaced. NULL reads as "this run did not record it", and the UI answers
+# with its generic sentence rather than a claim about a cause it does not have.
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
@@ -285,6 +292,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v6_report_gate.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v8_skill_reads.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v13_run_errors.sql
 
 docker compose up -d
 

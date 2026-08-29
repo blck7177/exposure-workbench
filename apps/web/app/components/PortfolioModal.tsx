@@ -6,6 +6,7 @@ import { createPortfolio, cloneDemoPortfolio, searchSecurities, type SecurityHit
 import type { Portfolio } from "@/lib/types";
 import { AuthGate } from "./Auth";
 import { apiErrorDetail } from "@/lib/http";
+import { explainApiError } from "@/lib/errors";
 
 type Problem = { row?: number; ticker?: string; reason: string };
 type Picked = { ticker: string; name: string | null; qty: string };
@@ -80,8 +81,12 @@ export function PortfolioModal({
       reset();
     } catch (e) {
       const probs = extractProblems(e);
+      // Row-level problems are already written for the reader — "row 4, ZZZZ:
+      // not a symbol this desk knows" — and stay as they are. Everything else
+      // was falling through to the transport string; it now goes through the
+      // same mapping every other surface uses (V13-S2).
       if (probs) setProblems(probs);
-      else setError(e instanceof Error ? e.message : String(e));
+      else setError(explainApiError(e).notice);
     } finally {
       setBusy(false);
     }

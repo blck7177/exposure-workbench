@@ -30,6 +30,7 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.analytics.limits import LIMIT_SPECS, MissingLimit
+from exposure_workbench.errors import RunRefused
 from exposure_workbench.services import workflow_event_service
 from exposure_workbench.workflow.exposure_workflow import _StepContext
 from exposure_workbench.workflow.step_context import mark_skipped, step
@@ -197,7 +198,11 @@ async def test_a_failed_step_still_carries_what_it_recorded(make_ctx, logged):
 
     end = logged[-1]
     assert end["status"] == "failed"
-    assert end["payload_summary"] == {"checks_evaluated": [_CHECK_A]}
+    # The step's own record is untouched; V13-S2 adds the failure BESIDE it,
+    # never instead of it — losing "it ran two checks first" to make room for
+    # "and then it blew up" would be the two diagnoses collapsing into one.
+    assert end["payload_summary"]["checks_evaluated"] == [_CHECK_A]
+    assert end["payload_summary"]["error"]["code"] == "run_failed"
 
 
 @both_wrappers
@@ -250,8 +255,18 @@ async def test_a_non_dict_payload_is_recorded_not_raised_when_the_body_also_fail
 
     end = logged[-1]
     assert end["status"] == "failed"
-    assert str(err) in end["message"], "the body's own cause still reaches the timeline"
-    assert end["payload_summary"] == {"payload_error": "None"}
+    assert end["payload_summary"]["payload_error"] == "None"
+
+    # The body's own cause still survives — it moved (V13-S2). It used to be
+    # concatenated into `message`, which is what a person waiting on the run
+    # reads, and that is how a provider's 429 JSON and an internal hostname came
+    # to be rendered on the issuer page. It now sits in the payload under a code,
+    # where the audit layer reads it. Both halves are asserted, because either
+    # one alone would pass while the defect was back: the cause has to be
+    # somewhere, and it has to not be in the reader's sentence.
+    assert str(err) in end["payload_summary"]["error"]["detail"]
+    assert str(err) not in end["message"]
+    assert end["message"].endswith("— stopped")
     assert end["payload_summary"] != {}, "not the event a step with no evidence writes"
 
 
@@ -270,7 +285,8 @@ async def test_the_exposure_wrappers_rollback_does_not_take_the_payload_with_it(
     await ctx.__aexit__(type(err), err, None)
 
     assert "rollback" in db.calls
-    assert logged[-1]["payload_summary"] == {"checks_evaluated": [_CHECK_A]}
+    assert logged[-1]["payload_summary"]["checks_evaluated"] == [_CHECK_A]
+    assert logged[-1]["payload_summary"]["error"]["code"] == "run_failed"
 
 
 @both_wrappers
@@ -304,3 +320,74 @@ async def test_mark_skipped_refuses_a_payload_instead_of_dropping_it(logged):
     await mark_skipped(db, "run_1", "refresh_market_data", "skipped by request")
     assert logged[-1]["status"] == "skipped"
     assert "payload_summary" not in logged[-1]
+
+
+# ── V13-S2: what a failure says, and to whom ─────────────────────────────────
+
+
+@both_wrappers
+async def test_a_failure_the_reader_cannot_act_on_keeps_its_words_out_of_the_message(
+    make_ctx, logged
+):
+    """The defect this batch exists to close, pinned on both wrappers.
+
+    Live examples, all three rendered on the issuer page: a provider's 429 body
+    quoting a billing relationship the reader is not party to, "the research tool
+    face at http://exposure-mcp:8000/mcp/research could not be reached", and
+    "pre-fix crash (max_tokens param)". They reached the page because __aexit__
+    wrote f"{message} — ERROR: {exc_val}" and the page rendered `message`.
+    """
+    ctx = make_ctx(_FakeDB(), "run_1", "agent_session", "Research agent analysing AAPL")
+    await ctx.__aenter__()
+    err = RuntimeError("Error code: 429 - {'error': {'message': 'You exceeded "
+                       "your current quota'}} at http://exposure-mcp:8000/mcp/research")
+    await ctx.__aexit__(type(err), err, None)
+
+    end = logged[-1]
+    assert end["message"] == "Research agent analysing AAPL — stopped"
+    assert "429" not in end["message"] and "exposure-mcp" not in end["message"]
+    # Kept, not discarded: the operator needs it, and it is the audit layer's.
+    assert "429" in end["payload_summary"]["error"]["detail"]
+    assert end["payload_summary"]["error"]["code"] == "run_failed"
+
+
+@both_wrappers
+async def test_a_refusal_written_for_the_reader_keeps_its_own_sentence(make_ctx, logged):
+    """The other half, and the one that is easy to get wrong.
+
+    "Cannot value this portfolio as of 2026-08-26 — newest price older than 10
+    days for: AAPL (30d old) … Re-run once the data is available, or remove the
+    holdings" names the date, the holdings and the way out. Substituting a
+    generic sentence for it would be this batch destroying information in the
+    name of tidying it up, so RunRefused marks the class and the message stands.
+    """
+    ctx = make_ctx(_FakeDB(), "run_1", "validate_inputs", "Validating prices")
+    await ctx.__aenter__()
+    err = RunRefused("Cannot value this portfolio as of 2026-08-26 — newest price "
+                     "older than 10 days for: AAPL (30d old). Re-run once the data "
+                     "is available, or remove the holdings.")
+    await ctx.__aexit__(type(err), err, None)
+
+    end = logged[-1]
+    assert "newest price older than 10 days" in end["message"]
+    assert end["payload_summary"]["error"]["code"] == "inputs_unusable"
+
+
+@both_wrappers
+async def test_the_failure_never_displaces_the_step_s_own_record(make_ctx, logged):
+    """`error` is one more key, and it may not collide with a step's own.
+
+    A step that happened to record `error` itself would have it overwritten —
+    which is why no step does, and why this says so out loud.
+    """
+    ctx = make_ctx(_FakeDB(), "run_1", "check_limits", "Checking risk limits")
+    await ctx.__aenter__()
+    ctx.payload["checks_evaluated"] = [_CHECK_A, _CHECK_B]
+    ctx.payload["inert_overrides"] = []
+    err = MissingLimit(_CHECK_A, None)
+    await ctx.__aexit__(type(err), err, None)
+
+    payload = logged[-1]["payload_summary"]
+    assert payload["checks_evaluated"] == [_CHECK_A, _CHECK_B]
+    assert payload["inert_overrides"] == []
+    assert set(payload) == {"checks_evaluated", "inert_overrides", "error"}
