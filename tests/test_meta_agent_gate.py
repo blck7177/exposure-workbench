@@ -37,7 +37,8 @@ def _factory(store: list):
     return lambda: _FakeSession(store)
 
 
-def _stub_tools(monkeypatch, result: dict, tools: list | None = None):
+def _stub_tools(monkeypatch, result: dict, tools: list | None = None,
+                by_name: dict | None = None):
     """Stand in for the turn's tool session.
 
     These tests are about what the loop does with a tool RESULT — publishing an
@@ -62,7 +63,7 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None):
 
         async def call(self, name, args):
             self.calls.append((name, args))
-            return result
+            return (by_name or {}).get(name, result)
 
     session = _Session()
 
@@ -255,3 +256,82 @@ async def test_a_turn_that_never_reached_the_gate_records_no_refusals(monkeypatc
     out = await handle_message(_factory([]), "sess_norefuse", "how did NVDA do?", max_turns=2)
 
     assert out["meta"]["gate_refusals"] == []
+
+
+# ── a spent budget narrows the face (2026-08-29) ────────────────────────────────
+
+def _face(*names):
+    return [{"type": "function",
+             "function": {"name": n, "description": "", "parameters": {}}} for n in names]
+
+
+@pytest.mark.asyncio
+async def test_a_spent_budget_narrows_the_face_to_its_exits(monkeypatch):
+    """The wrapper refuses a call over budget with a structured return, and the
+    loop used to hand that to the model and go round again: sess_1c71b5fb7f79
+    made 65 refused calls after its fifteenth, each a ~12k-token round trip on
+    a state where no evidence could arrive. The budget bounds EVIDENCE, so once
+    it is spent the only tools that can still do anything are the pause and the
+    exit — and the loop now offers exactly those, which is the skip-flag rule
+    (remove the capability, do not refuse it inside) applied to the rest of a
+    turn. The model can still answer with what it gathered."""
+    offered: list[list[str]] = []
+
+    async def _chat(messages, tools, **_kw):
+        offered.append([t["function"]["name"] for t in tools])
+        if len(offered) == 1:
+            return ("", [{"id": "c1", "function": {
+                "name": "get_flow", "arguments": '{"ticker":"NVDA","metric":"revenue"}'}}])
+        return ("", [{"id": "c2", "function": {
+            "name": "respond", "arguments": '{"text":"Here is what I have.","citations":[]}'}}])
+
+    _stub_llm(monkeypatch, _chat)
+    _stub_tools(
+        monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
+        by_name={"get_flow": {"error": "budget_exceeded", "kind": "turn_tool",
+                              "used": 15, "limit": 15},
+                 "respond": {"responded": True, "text": "Here is what I have.",
+                             "citations": []}})
+    out = await handle_message(_factory([]), "sess_5", "everything about NVDA", max_turns=4)
+
+    assert offered[0] == ["get_flow", "think", "respond"]
+    assert offered[1] == ["think", "respond"]
+    assert out["text"] == "Here is what I have."
+    assert "gate" not in out["meta"]
+
+
+@pytest.mark.asyncio
+async def test_only_an_evidence_pool_running_dry_narrows_the_face(monkeypatch):
+    """The narrowing keys on WHICH pool is empty. A refusal of any other kind —
+    here the external-search pool, which this face does not even carry — leaves
+    the face as it was: nothing about evidence has been settled by it."""
+    offered: list[list[str]] = []
+
+    async def _chat(messages, tools, **_kw):
+        offered.append([t["function"]["name"] for t in tools])
+        if len(offered) == 1:
+            return ("", [{"id": "c1", "function": {"name": "get_flow", "arguments": "{}"}}])
+        return ("", [{"id": "c2", "function": {
+            "name": "respond", "arguments": '{"text":"Hi.","citations":[]}'}}])
+
+    _stub_llm(monkeypatch, _chat)
+    _stub_tools(
+        monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
+        by_name={"get_flow": {"error": "budget_exceeded", "kind": "external_search",
+                              "used": 5, "limit": 5},
+                 "respond": {"responded": True, "text": "Hi.", "citations": []}})
+    await handle_message(_factory([]), "sess_6", "hi", max_turns=4)
+
+    assert offered[1] == ["get_flow", "think", "respond"]
+
+
+def test_the_budget_free_names_mirror_the_registry_budget_free_classes():
+    """Two spellings of one decision. The registry says which CLASSES cost no
+    budget; the loop, which cannot see classes from its side of the mount,
+    says which NAMES it keeps. If either side changes, this is where it shows."""
+    from exposure_workbench.tools.registry import BUDGET_FREE_CLASSES
+
+    reg = build_meta_registry()
+    by_class = {n for n in faces.FACE_META_AGENT
+                if reg.tools[n].tool_class in BUDGET_FREE_CLASSES}
+    assert by_class == set(meta_agent._BUDGET_FREE_TOOLS)
