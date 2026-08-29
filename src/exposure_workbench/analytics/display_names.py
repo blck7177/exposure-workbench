@@ -141,6 +141,32 @@ RECIPE_ROW: dict[str, str] = {
     "return_1y_vs_SPY": "Return vs SPY, 1 year",
 }
 
+# ── named measures (analytics.formulas.FORMULAS) ─────────────────────────────
+#
+# These come out almost readable — `net_debt` is "net debt" — which is exactly
+# why they need a table: "almost" is the acronyms, and `debt_to_ebitda` reads as
+# "debt to ebitda" under any formatter that does not know EBITDA is a word made
+# of letters. A ratio is written with a slash because that is how a credit
+# analyst says it out loud.
+FORMULA: dict[str, str] = {
+    "ebit": "EBIT",
+    "ebitda": "EBITDA",
+    "free_cash_flow": "free cash flow",
+    "total_debt": "total debt",
+    "net_debt": "net debt",
+    "ebit_interest_coverage": "EBIT / interest coverage",
+    "debt_to_ebitda": "debt / EBITDA",
+    "debt_to_operating_cash_flow": "debt / cash from operations",
+    "fcf_to_debt": "free cash flow / debt",
+    "current_ratio": "current ratio",
+    "gross_margin": "gross margin",
+    "operating_margin": "operating margin",
+    "net_margin": "net margin",
+    "days_sales_outstanding": "days sales outstanding",
+    "days_inventory": "days inventory",
+    "days_payable": "days payable",
+}
+
 # ── sectors (as they arrive from the price provider) ─────────────────────────
 SECTOR: dict[str, str] = {
     "Technology": "Technology",
@@ -164,6 +190,7 @@ _TABLES = {
     "scenario": SCENARIO,
     "limit": LIMIT,
     "recipe_row": RECIPE_ROW,
+    "formula": FORMULA,
     "sector": SECTOR,
 }
 

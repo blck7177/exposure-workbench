@@ -297,6 +297,7 @@ async def _respond(db: AsyncSession, text: str, citations: list[str] | None = No
 def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     reg.register(Tool(
         name="ensure_company_ready",
+        display="Preparing {ticker}'s filings and prices",
         description="Enqueue a data-readiness pass for an issuer (ingest/index/price). Returns immediately.",
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
@@ -306,6 +307,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="start_issuer_research",
+        display="Starting a research run on {ticker}",
         description="Enqueue a full issuer research run (produces an Issuer Risk Brief). Returns a run id immediately.",
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
@@ -315,6 +317,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="start_exposure_run",
+        display="Starting an exposure run",
         description="Enqueue a portfolio exposure run. Returns a run id immediately.",
         json_schema={"type": "object", "properties": {
             "portfolio_id": {"type": "string"},
@@ -330,6 +333,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="respond",
+        display="Checking every figure against the evidence, then answering",
         description="Reply to the user. Any reply that states a number must cite the evidence "
                     "ids that number came from; a reply with no numbers (a greeting, a "
                     "clarifying question) may cite nothing. Whatever you cite must be real.",

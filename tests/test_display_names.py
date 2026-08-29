@@ -49,6 +49,15 @@ def test_every_scenario_in_the_config_has_a_caption():
     assert missing == [], f"stress scenarios with no caption: {missing}"
 
 
+def test_every_named_measure_has_a_caption():
+    """`debt_to_ebitda` is the reason this table exists rather than a formatter:
+    no amount of underscore-replacing turns EBITDA back into a word."""
+    from exposure_workbench.analytics.formulas import FORMULAS
+
+    missing = sorted(set(FORMULAS) - set(dn.FORMULA))
+    assert missing == [], f"named measures with no caption: {missing}"
+
+
 def test_every_mandate_check_has_a_caption():
     missing = sorted(set(LIMIT_SPECS) - set(dn.LIMIT))
     assert missing == [], f"limit types with no caption: {missing}"

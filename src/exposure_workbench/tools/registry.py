@@ -92,6 +92,22 @@ class Tool:
     fn: Callable[..., Awaitable[dict]]                  # async (db, **args) -> dict
     tool_class: str                                     # READ | DELEGATION | REFLECTION | GATE
     budget_key: str | None = None                       # e.g. 'external_search'; None = plain tool
+    # V13-S4. What this call looks like to a person watching the turn, as a
+    # format template over the call's own arguments:
+    #
+    #     "Evaluating {name} for {ticker}"  ->  Evaluating total debt for AAPL
+    #
+    # `description` is for the model and says what the tool is FOR; this says
+    # what one call of it is DOING, in the past-facing present tense a progress
+    # line is read in. They are different sentences to different readers, which
+    # is why this is a field and not a slice of the other one: the activity
+    # panel was rendering `get_portfolio_snapshot` and `evaluate_formula`, which
+    # are correct and are not English.
+    #
+    # Required in practice — tests/test_tool_display.py fails the build for a
+    # registered tool without one — and defaulted here only so the dataclass
+    # stays constructible in the argument order every registration already uses.
+    display: str = ""
 
 
 @dataclass

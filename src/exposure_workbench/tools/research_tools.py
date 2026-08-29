@@ -170,6 +170,7 @@ def _block_schema(cited: bool) -> dict:
 def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
     reg.register(Tool(
         name="search_external_research",
+        display="Searching the web for \u201c{query}\u201d",
         description="Search current external developments for an issuer (news, industry, regulatory). "
                     "reason states why the existing evidence is insufficient.",
         json_schema={"type": "object", "properties": {
@@ -181,6 +182,7 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="submit_brief",
+        display="Submitting the brief for checking",
         description="Submit the Issuer Risk Brief. Five blocks require citations; open_questions does not. "
                     "Every cited id must come from a tool result you actually called this session.",
         json_schema={"type": "object", "properties": {

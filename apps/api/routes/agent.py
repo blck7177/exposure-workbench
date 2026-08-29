@@ -21,6 +21,7 @@ from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.services import agent_session_service, context_budget, usage_service
+from exposure_workbench.tools import display as tool_display
 
 router = APIRouter()
 
@@ -220,6 +221,12 @@ class StepOut(BaseModel):
     result_summary: str | None
     evidence_refs: list
     created_at: datetime
+    # V13-S4. What this step DID, in the words a person watching would use —
+    # "Evaluating total debt for AAPL", not `evaluate_formula`. Null on the rows
+    # that are not actions: an llm_call is what the turn cost and a refusal is a
+    # call that did not happen, and both belong to the audit layer. See
+    # tools/display.for_step, which decides that once rather than at each reader.
+    display: str | None = None
     # V4-S2. Null on every step type but llm_call, where they are what the turn
     # cost. Carried here rather than only in the views because the trace panel
     # is where a person is already asking what this turn did, and a spend the
@@ -302,9 +309,22 @@ async def get_agent_session(
     steps = (await db.execute(
         select(AgentStep).where(AgentStep.session_id == session_id).order_by(AgentStep.seq)
     )).scalars().all()
+    # Rendered here, from the step's own recorded arguments, rather than stored
+    # on the row: the phrases live beside the tools and change with them, and a
+    # copy frozen into 3,008 existing rows would be a second version of a
+    # sentence nobody could then correct.
     return SessionDetailOut(
         id=s.id, kind=s.kind, tools_used=s.tools_used,
         messages=[{"id": m.id, "role": m.role, "content": m.content,
                    "citations": m.citations, "meta": m.meta or {}} for m in msgs],
-        steps=steps,
+        steps=[
+            StepOut(
+                seq=st.seq, step_type=st.step_type, tool_name=st.tool_name,
+                status=st.status, result_summary=st.result_summary,
+                evidence_refs=st.evidence_refs, created_at=st.created_at,
+                prompt_tokens=st.prompt_tokens, completion_tokens=st.completion_tokens,
+                display=tool_display.for_step(st.step_type, st.tool_name, st.status, st.args),
+            )
+            for st in steps
+        ],
     )

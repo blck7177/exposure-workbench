@@ -374,6 +374,7 @@ def build_read_registry() -> ToolRegistry:
 
     reg.register(Tool(
         name="get_flow",
+        display="Reading {ticker}'s {metric} over the periods it reports",
         description=(
             "A flow metric (revenue, net income, interest expense, operating cash flow, "
             "capex …) over a window YOU choose. Give `months` for the most recent window "
@@ -405,6 +406,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_balance_series",
+        display="Reading {ticker}'s {metric} at each reported date",
         description=(
             "One balance-sheet line (cash, total debt, receivables, equity …) at each date "
             "the issuer reported it, newest last, as one citable series. Nothing is derived "
@@ -421,6 +423,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="series_stat",
+        display="Taking the {op} over that series",
         description=(
             "One operator over one series you already hold (a calc_id from get_flow with "
             "last_n, get_balance_series, or calculate). yoy / qoq / pct / abs return a new "
@@ -436,6 +439,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="describe_issuer",
+        display="Looking up what {ticker} reports and what can be computed from it",
         description=(
             "Start here for any issuer: identity (name, CIK, sector, whether it can be "
             "investigated), every financial metric its filings hold with how many periods "
@@ -448,6 +452,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_balance_sheet",
+        display="Reading {ticker}'s balance sheet",
         description=(
             "Every balance this issuer reported at ONE date — debt components, cash, "
             "working capital, equity. Balances from different dates are different "
@@ -463,6 +468,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="calculate",
+        display="Computing {op} of two figures",
         description=(
             "Add, subtract, multiply or divide two quantities you already have, by their "
             "ids (fact_… or calc_…). Compose anything: EBIT, leverage, coverage, margins, "
@@ -483,6 +489,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="evaluate_formula",
+        display="Evaluating {name} for {ticker}",
         description=(
             "One named measure for one issuer, built from the same primitives you could "
             "call yourself: the value, the definition that produced it, the period basis, "
@@ -499,6 +506,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_fundamental_panel",
+        display="Building the measures panel for {ticker}",
         description=(
             "Every named measure at once for one issuer — leverage, coverage, liquidity, "
             "cash generation, margins, turnover — each with its definition, period basis "
@@ -516,6 +524,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_portfolio_snapshot",
+        display="Reading this desk's books and their latest run",
         description="The portfolio(s) this desk manages: latest exposure metrics, largest sector "
                     "and issuer weights, and active risk alerts. Takes no arguments — this is how "
                     "you discover holdings for a portfolio-level question. Each portfolio's numbers "
@@ -525,6 +534,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_task_status",
+        display="Checking whether the delegated work has finished",
         description="Whether delegated work has finished. Accepts the task_/run_/rrun_ id "
                     "that ensure_company_ready, start_exposure_run or start_issuer_research returned.",
         json_schema={"type": "object", "properties": {
@@ -534,6 +544,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_portfolio_positions",
+        display="Reading the holdings",
         description="Every holding in a portfolio: pos_id, ticker, quantity, sector, market value "
                     "and weight. Cite the pos_id for a share count. Capped at 50 rows — when "
                     "truncated is set, total_holdings is the real number and say so. "
@@ -545,6 +556,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="read_issuer_brief",
+        display="Opening the latest brief on {ticker}",
         description="The latest Issuer Risk Brief for a company, with the evidence ids behind "
                     "each block. Cite those ids, not the brief.",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
@@ -552,6 +564,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_attribution",
+        display="Reading what the regression attributed the day to",
         description=(
             "Why a portfolio moved on the run's date: every factor's beta, return and "
             "contribution, and every position's weight, return and contribution — the "
@@ -571,6 +584,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_risk_state",
+        display="Reading the run's risk measures",
         description=(
             "One run's measured risk state: exposure and volatility metrics, the tail "
             "measures with their confidence and horizon attached, every stress scenario "
@@ -585,6 +599,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="list_run_alerts",
+        display="Reading which mandate limits the run raised",
         description=(
             "The alerts one run raised, each whole: current value, limit, utilisation, and a "
             "reads_as sentence composed for you. Use reads_as — the three numbers on an alert "
@@ -598,6 +613,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="list_risk_limits",
+        display="Reading this book's mandate limits",
         description=(
             "The limit policy in force for a portfolio: each check's warning and breach level. "
             "This is what the desk decided, not a measurement of the world — these rows are "
@@ -610,6 +626,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_run_freshness",
+        display="Checking how current the latest run is",
         description=(
             "How current a portfolio's newest completed run is: the run's date, the latest "
             "market session, how many sessions have traded since, and whether a run is in "
@@ -623,6 +640,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="reconcile_move",
+        display="Splitting the day's move into market and stock-specific parts",
         description=(
             "Reconcile one day's portfolio move in a single call: checks that the position "
             "contributions sum to the day's return, splits the move into what the factor "
@@ -639,6 +657,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_drawdown_episodes",
+        display="Measuring the drawdowns over the window",
         description=(
             "When this portfolio fell and whether it came back: every peak-to-trough "
             "episode at least 5% deep in the span, deepest first, with the trough date and "
@@ -657,6 +676,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="explain_episode",
+        display="Explaining what happened between {peak} and {trough}",
         description=(
             "What happened between a peak and a trough: the book's cumulative return over "
             "that window, the benchmark's over the same window, and each holding's. These "
@@ -673,6 +693,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_market_stats",
+        display="Reading {ticker}'s price return",
         description="Price return over a window (1m/3m/6m/1y), optionally relative to a benchmark (default SPY).",
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
@@ -686,6 +707,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="search_filing_passages",
+        display="Searching {ticker}'s filings for \u201c{query}\u201d",
         description="Semantic search across an issuer's indexed 10-K/10-Q; returns passages with citation anchors.",
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER, "query": {"type": "string"},
@@ -698,6 +720,7 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="get_filing_section",
+        display="Reading {item_code} of {ticker}'s filing in full",
         description="Read a whole SEC Item verbatim from the most recent filing (e.g. Item 1A Risk Factors).",
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER, "item_code": {"type": "string", "minLength": 1},
@@ -707,12 +730,14 @@ def build_read_registry() -> ToolRegistry:
     ))
     reg.register(Tool(
         name="list_alerts",
+        display="Checking for alerts naming {ticker}",
         description="Portfolio risk alerts naming this issuer (concentration, etc.).",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_list_alerts, tool_class=READ,
     ))
     reg.register(Tool(
         name="think",
+        display="Making a note before going on",
         description="Pause to write an analytical note before anchoring a conclusion. No side effect, no budget.",
         json_schema={"type": "object", "properties": {
             "thought": {"type": "string"},
