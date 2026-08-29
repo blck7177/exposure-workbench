@@ -138,7 +138,16 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
     ever = frozenset(bs["balances"]) | frozenset(bs.get("not_reported_at_this_date", {}))
     cover = ct.cover(available, family="debt", ever_reported=ever)
     if isinstance(cover, ct.NoCover):
-        return {"error": "not_reported", "metric": "total_debt", "detail": cover.reason}
+        # Say WHICH date, and where the components were last seen. "no debt
+        # component reported at this date" travelled up into debt_to_ebitda's
+        # refusal with the date dropped on the way, and read there as if the
+        # issuer had no debt at all.
+        absent = bs.get("not_reported_at_this_date") or {}
+        seen = [absent[m]["last_reported"] for m in ct.FAMILIES["debt"] if m in absent]
+        detail = f"{cover.reason} ({bs['as_of']})"
+        if seen:
+            detail += f"; debt components were last reported at {max(seen)}"
+        return {"error": "not_reported", "metric": "total_debt", "detail": detail}
 
     ids = [bs["balances"][m]["fact_id"] for m in cover.terms]
     running_id, running_value = ids[0], bs["balances"][cover.terms[0]]["value"]
@@ -224,7 +233,18 @@ async def _unavailable(db: AsyncSession, ticker: str, name: str, f, missing: str
     latest = await ab.issuer_latest(db, ticker)
 
     held = [f"{m} through {c['through']}" for m, c in covers.items() if c]
-    if covers.get(missing) is None:
+    if missing in fm.FORMULAS:
+        # A COMPOSED input — total_debt is assembled by containment cover and is
+        # never a filed line — so coverage() has nothing to say about it, and its
+        # absence is whatever its own producer said, scoped as the producer
+        # scoped it. This case used to fall through to the branch below, and
+        # "this desk holds no total_debt for AAPL at any date" went out over an
+        # issuer whose total debt is 84.7B at the last date it filed: the
+        # coverage table had no row for a name that is not a metric, and the
+        # sentence read a missing row as a missing fact. The model transcribed
+        # it faithfully, which is what V11 asked of it.
+        why = f"{missing} could not be assembled: {detail}"
+    elif covers.get(missing) is None:
         why = (f"this desk holds no {missing} for {ticker} at any date"
                + (f", and no {' or '.join(alts)} either" if alts else ""))
     else:

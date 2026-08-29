@@ -127,6 +127,14 @@ _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 TOOL_RESULT_LIMIT = 12_000
 
 
+# What a turn keeps once its evidence budget is spent: the pause and the exit.
+# The registry decides this by CLASS (BUDGET_FREE_CLASSES) and this side of the
+# mount cannot read classes — the loop holds a face name and a token, not the
+# registry — so the same decision is spelled here by name, and
+# test_meta_agent_gate pins the two spellings together.
+_BUDGET_FREE_TOOLS = ("think", "respond")
+
+
 async def _load_history(db, session_id: str) -> list[dict]:
     from sqlalchemy import select
     rows = (await db.execute(
@@ -205,6 +213,20 @@ async def handle_message(
                 result = await tools_session.call(name, args)
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
                                  "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
+                if result.get("error") == "budget_exceeded" and \
+                        result.get("kind") in ("turn_tool", "tool"):
+                    # The budget bounds EVIDENCE (registry.invoke), and it is
+                    # spent: no further call on this face can return anything
+                    # the gate will accept. A refusal is a structured return,
+                    # so the loop used to hand it to the model and go round
+                    # again — sess_1c71b5fb7f79 made 65 refused calls after its
+                    # fifteenth, each a ~12k-token round trip on a state where
+                    # nothing could arrive. Narrow what is OFFERED instead of
+                    # refusing what is called: the skip-flag rule (faces.py)
+                    # applied to the rest of a turn. The exit and the pause
+                    # stay, so what running out means is what the wrapper
+                    # promised — answer with the evidence gathered so far.
+                    tools = [t for t in tools if t["function"]["name"] in _BUDGET_FREE_TOOLS]
                 if name == "respond":
                     if result.get("responded"):
                         reply_text, reply_citations = result["text"], result.get("citations", [])

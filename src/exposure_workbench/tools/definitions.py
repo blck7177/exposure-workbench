@@ -468,9 +468,11 @@ def build_read_registry() -> ToolRegistry:
             "ids (fact_… or calc_…). Compose anything: EBIT, leverage, coverage, margins, "
             "turnover — none of these needs to be a built-in. The result gets its own "
             "calc_id and is citable. Combinations that would silently double-count are "
-            "refused with the reason: two balances from different dates, two flows over "
-            "overlapping periods added together, or a total added to something it already "
-            "contains. A balance divided by a flow is fine — that is what leverage is."
+            "refused with the reason: two balances from different dates added together, "
+            "two flows over overlapping periods added together, or a total added to "
+            "something it already contains. A balance divided by a flow is fine — that is "
+            "what leverage is — and a balance subtracted from a later reading of it is the "
+            "change over the days between."
         ),
         json_schema={"type": "object", "properties": {
             "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]},

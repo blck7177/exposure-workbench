@@ -19,9 +19,16 @@ refused:
 
 Everything else goes through. A balance over a flow is leverage and is fine, as
 long as the result says it is a stock over a window. Subtracting overlapping
-intervals is fine — H1 − Q1 = Q2 is how a window is derived at all. The point is
-not to narrow what may be analysed; it is that the one region where a wrong
-answer is indistinguishable from a right one stops being reachable.
+intervals is fine — H1 − Q1 = Q2 is how a window is derived at all. Subtracting
+a balance from a later reading of it is fine too: that is the change over the
+days between — a working-capital swing is exactly this — and the result is
+typed as a flow over that window, so it meets a filed flow under R1 when and
+only when they describe the same days. R2 is a rule about ADDING across time,
+as the list above says; refusing the subtraction as well sent the one question
+that needs it ("how much has it moved?") to get_balance_sheet, which reads one
+instant and cannot produce a change. The point is not to narrow what may be
+analysed; it is that the one region where a wrong answer is indistinguishable
+from a right one stops being reachable.
 
 An operand whose type cannot be established is refused rather than assumed
 compatible: a guard whose blind spot is silent is worse than no guard, because
@@ -210,11 +217,19 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
                     f"{b.source_id} is {'a balance' if b.instant else 'a flow'}; "
                     f"a stock and a flow may be divided, not added")
 
-    if a.instant and b.instant and a.instant != b.instant:
+    # R2 is about ADDITION across time. The difference between two readings of a
+    # balance is the change over the days between them, and it is the only way
+    # "how much has it moved" can be answered from balances at all; the series
+    # axis has always allowed it element-wise. This guard used to fire on
+    # subtract as well, and its way out pointed at get_balance_sheet — which
+    # reads one instant and cannot produce a change.
+    if op == "add" and a.instant and b.instant and a.instant != b.instant:
         return _err("different_instants",
                     f"{a.source_id} is as of {a.instant.isoformat()} and {b.source_id} is "
                     f"as of {b.instant.isoformat()}. Balances from two dates describe two "
-                    f"company-moments; ask for both at one date with get_balance_sheet.")
+                    f"company-moments and cannot be summed; ask for both at one date with "
+                    f"get_balance_sheet, or subtract them for the change between the two "
+                    f"readings.")
 
     # R3 — containment, in both directions.
     if a.quantity and b.quantity:
@@ -256,6 +271,16 @@ def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
     if op in ("multiply", "divide"):
         unit = RATIO if (op == "divide" and a.unit_class == b.unit_class) else a.unit_class
         return Typed(value=value, unit_class=unit, quantity=None)
+    if op == "subtract" and a.instant and b.instant and a.instant != b.instant:
+        # The change in a balance between two readings. It accrues over the days
+        # AFTER the earlier reading through the later one — the convention the
+        # filed flows already use, a fiscal year starting the day after the prior
+        # year-end — so the delta and a flow over the same period carry the same
+        # interval and R1 sees them as one window. No quantity: a change is not
+        # a line on the balance sheet, so containment has nothing to say about it.
+        earlier, later = sorted((a.instant, b.instant))
+        return Typed(value=value, unit_class=a.unit_class,
+                     interval=(earlier + timedelta(days=1), later))
     if a.instant:
         return Typed(value=value, unit_class=a.unit_class, instant=a.instant)
     if a.interval and b.interval:
