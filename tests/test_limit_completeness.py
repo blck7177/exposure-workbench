@@ -98,7 +98,7 @@ def test_the_evaluated_list_separates_a_check_that_ran_from_one_that_did_not():
     the only thing that can tell the two runs apart.
     """
     book = full_book()
-    _, evaluated = check_limits(risk(), None, None, pnl(-0.001), book)
+    _, evaluated, _checks = check_limits(risk(), None, None, pnl(-0.001), book)
     assert "daily_loss" in evaluated
     for never_ran in ("var_95", "expected_shortfall_95", "rolling_volatility_30d"):
         assert never_ran not in evaluated
@@ -119,7 +119,7 @@ def test_a_per_entity_row_overrides_the_portfolio_wide_one():
     book = LimitBook(complete_rows() + [
         row("issuer_concentration", entity_id="LLY", warning=0.12, breach=0.18),
     ])
-    alerts, _ = check_limits(
+    alerts, _, _checks = check_limits(
         None, None, exposure(gross=0, issuers={"LLY": 0.13809, "AAPL": 0.13809}), None, book)
     # Same weight, two names, one alert: LLY's tighter row is the difference.
     assert [(a.entity_id, a.severity, a.limit_value) for a in alerts] == \

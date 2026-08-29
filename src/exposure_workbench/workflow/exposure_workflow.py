@@ -300,7 +300,7 @@ class ExposureWorkflow:
             await ctx.__aenter__()
             try:
                 alerts: list[AlertResult]
-                alerts, evaluated = check_limits(
+                alerts, evaluated, limit_checks = check_limits(
                     risk_metrics_result=risk,
                     stress_result=stress,
                     exposure_result=exposure,
@@ -882,12 +882,23 @@ class ExposureWorkflow:
         # checks, while an alert's entity_id comes from LIMIT_SPECS and reads
         # "portfolio" for a book-wide one. Rebuilding it recorded 27 checks as
         # clear on a book that was alerting on three of them.
+        # The numbers each check ran on, keyed the same way `evaluated` is. Built
+        # from the records check_limits returned rather than re-derived here:
+        # rebuilding the key is precisely what recorded 27 checks as clear on a
+        # book that was alerting on three (the comment above), and re-deriving
+        # the VALUES would be the same mistake with worse consequences.
+        seen = {c.check_key: c for c in limit_checks}
         for limit_type in evaluated:
+            record = seen.get(limit_type)
             db.add(LimitCheck(
                 run_id=run_id,
                 limit_type=limit_type,
                 fired=limit_type in alert_ids,
                 alert_id=alert_ids.get(limit_type),
+                current_value=None if record is None else record.current_value,
+                warning_level=None if record is None else record.warning_level,
+                breach_level=None if record is None else record.breach_level,
+                status=None if record is None else record.status,
             ))
 
         await db.flush()

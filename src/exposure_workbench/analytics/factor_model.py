@@ -237,3 +237,23 @@ def _univariate_r2(x: np.ndarray, y: np.ndarray) -> float:
     if ss_tot <= 0:
         return 0.0
     return max(0.0, 1.0 - ss_res / ss_tot)
+
+
+def factor_correlation(factor_returns: "pd.DataFrame") -> list[list[float]]:
+    """Pairwise correlation of the factor return series, in column order (V13-S5).
+
+    The regression already computes what this explains: `max_vif` above 5 sets
+    `collinear`, and the citation gate then refuses any single coefficient
+    (V11-F). A reader told "no single beta is quotable" has been given a verdict;
+    this is the evidence for it, and market against growth at 0.95 is a thing
+    they can check rather than accept.
+
+    Pandas' own `corr`, over the same frame the regression was handed, so there
+    is no second convention about how a return series is built. Column ORDER is
+    the caller's — the matrix is positional and a caller that reordered its
+    tickers between building the frame and labelling the axes would mislabel
+    every cell.
+    """
+    corr = factor_returns.corr()
+    return [[None if pd.isna(v) else round(float(v), 4) for v in row]
+            for row in corr.to_numpy()]

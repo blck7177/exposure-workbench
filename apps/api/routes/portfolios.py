@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import math
+from datetime import date, datetime, timedelta
 from typing import Any
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, computed_field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,8 +15,11 @@ from apps.api.auth_deps import optional_user, require_user
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.session import get_db, get_session_factory
+from exposure_workbench.analytics import drawdown as dd
+from exposure_workbench.analytics.risk_metrics import _TRADING_DAYS_PER_YEAR
 from exposure_workbench.services import (
-    exposure_run_service, portfolio_csv, portfolio_service, run_reads_service, usage_service,
+    exposure_run_service, market_data_service, portfolio_csv, portfolio_service,
+    run_reads_service, usage_service,
 )
 
 router = APIRouter()
@@ -297,6 +302,118 @@ async def get_portfolio_freshness(
     if not portfolio:
         raise HTTPException(404, {"error": "unknown_portfolio", "portfolio_id": portfolio_id})
     return await run_reads_service.get_run_freshness(db, portfolio_id)
+
+
+# How far back a history chart may look, by name. Not a free integer: a caller
+# asking for 30 years would scan a price table for a book that has three years of
+# it, and the answer to "how much history" is a product decision, not a query
+# parameter.
+_SPANS = {"1y": 365, "3y": 365 * 3, "5y": 365 * 5}
+
+
+@router.get("/portfolios/{portfolio_id}/history", dependencies=[Depends(optional_user)])
+async def get_portfolio_history(
+    portfolio_id: str,
+    span: str = "3y",
+    benchmark: str = "SPY",
+    db: AsyncSession = Depends(get_db),
+):
+    """The book's value, its drawdown, and the episodes worth naming (V13-S5).
+
+    WHAT THIS IS, said plainly because the chart cannot say it: today's holdings
+    valued at historical prices. `positions` keeps one snapshot per book and
+    there is no holding history to replay, so this is not what the book was
+    worth — it is what this book would have been worth. The same assumption
+    build_portfolio_returns has always made, and get_drawdown_episodes states in
+    its own return value; it is repeated here because a line chart is the most
+    persuasive way there is to imply otherwise.
+
+    Built on market_data_service.build_portfolio_values, which is the panel the
+    return series is a percentage change OF — so the last point of the rolling
+    volatility here equals the tile above it, rather than nearly equalling it.
+    """
+    portfolio = await portfolio_service.get_portfolio(db, portfolio_id)
+    if not portfolio:
+        raise HTTPException(404, {"error": "unknown_portfolio", "portfolio_id": portfolio_id})
+    if span not in _SPANS:
+        raise HTTPException(422, {"error": "unknown_span", "span": span,
+                                  "known": sorted(_SPANS)})
+
+    positions = await portfolio_service.get_positions(db, portfolio_id)
+    holdings = [{"ticker": p.ticker, "quantity": float(p.quantity)}
+                for p in positions if p.quantity is not None]
+    end = await market_data_service.latest_session_date(db)
+    if not holdings or end is None:
+        return {"portfolio_id": portfolio_id, "span": span, "points": [],
+                "episodes": [], "detail": "no priced holdings for this book"}
+    start = end - timedelta(days=_SPANS[span])
+
+    positions_df = pd.DataFrame(holdings)
+    prices_df = await market_data_service.get_prices_df(
+        db, positions_df["ticker"].tolist(), start, end)
+    values = market_data_service.build_portfolio_values(positions_df, prices_df)
+    if len(values) < 2:
+        return {"portfolio_id": portfolio_id, "span": span, "points": [],
+                "episodes": [], "detail": "not enough price history for this book"}
+
+    returns = values.pct_change()
+    peak = values.cummax()
+    drawdown = values / peak - 1.0
+    # The same 30-session window and the same annualisation the run reports, so
+    # the end of this line IS the number in the tile. calc_risk_metrics is the
+    # authority on both; ddof=1 and 252 are read from it rather than retyped.
+    vol30 = returns.rolling(30).std(ddof=1) * math.sqrt(_TRADING_DAYS_PER_YEAR)
+
+    # price_points answers (points, store) and chooses the store by what the
+    # ticker IS to this desk — SPY has 277 sessions in the holdings table and 825
+    # in the factor table, and the difference decides whether a three-year chart
+    # has a benchmark line at all (V10). Calling it rather than querying is how
+    # this endpoint inherits that rule instead of re-deciding it.
+    bench_points, _store = await market_data_service.price_points(db, benchmark, start, end)
+    bench_by_date = {p.price_date.isoformat(): float(p.close) for p in bench_points}
+    base_bench = next((bench_by_date[str(d.date())] for d in values.index
+                       if str(d.date()) in bench_by_date), None)
+    base_value = float(values.iloc[0])
+
+    points = []
+    for i, (ts, value) in enumerate(values.items()):
+        day = str(ts.date())
+        b = bench_by_date.get(day)
+        points.append({
+            "date": day,
+            "value": round(float(value), 2),
+            "drawdown": round(float(drawdown.iloc[i]), 6),
+            "vol_30d": (None if pd.isna(vol30.iloc[i]) else round(float(vol30.iloc[i]), 6)),
+            "return": (None if i == 0 or pd.isna(returns.iloc[i])
+                       else round(float(returns.iloc[i]), 8)),
+            # Indexed onto the book's own starting value so one axis carries
+            # both. Two y-scales on one plot invent a correlation that is not in
+            # the data; indexing to a common base is the honest way to put two
+            # series of different size on one chart.
+            "benchmark": (None if b is None or base_bench is None
+                          else round(base_value * b / base_bench, 2)),
+        })
+
+    episodes = dd.find_episodes(returns.dropna())
+    return {
+        "portfolio_id": portfolio_id,
+        "span": span,
+        "benchmark": benchmark,
+        "window": {"from": points[0]["date"], "to": points[-1]["date"],
+                   "sessions": len(points)},
+        "points": points,
+        "episodes": [
+            {"peak": e.peak_date.isoformat(), "trough": e.trough_date.isoformat(),
+             "recovery": e.recovery_date.isoformat() if e.recovery_date else None,
+             "depth": round(e.depth, 6), "trough_days": e.trough_days,
+             "recovery_days": e.recovery_days, "recovered": e.recovery_date is not None}
+            for e in episodes
+        ],
+        "valuation_assumption": (
+            "quantities are held fixed at today's holdings for the whole span — "
+            "the book has one position snapshot and no holding history to replay"
+        ),
+    }
 
 
 @router.get("/portfolios/{portfolio_id}/dashboard", response_model=DashboardOut,

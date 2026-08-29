@@ -279,6 +279,11 @@ docker compose build
 # guessing a code from the old error_message text is exactly the string-matching
 # V13 replaced. NULL reads as "this run did not record it", and the UI answers
 # with its generic sentence rather than a claim about a cause it does not have.
+#
+# v13_limit_checks_values.sql records what each mandate check measured, and does
+# not backfill for the fifth time. Recomputing from today's risk_limits rows
+# would be worse than a guess — the thresholds may have been edited since — and
+# would put a number that was never checked under a badge saying it was.
 docker compose up -d postgres
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v2_multiuser.sql
@@ -294,6 +299,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v8_skill_reads.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v13_run_errors.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v13_limit_checks_values.sql
 
 docker compose up -d
 

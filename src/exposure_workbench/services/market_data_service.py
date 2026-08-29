@@ -230,6 +230,40 @@ def build_portfolio_returns(
     return returns[span <= _MAX_RETURN_SPAN_DAYS].dropna()
 
 
+def build_portfolio_values(
+    positions_df: pd.DataFrame,
+    prices_df: pd.DataFrame,
+) -> pd.Series:
+    """The book's value each day, on the SAME panel the return series uses (V13-S5).
+
+    Extracted from build_portfolio_returns rather than written beside it: the
+    chart of the book's value and the VaR tile above it are about to be read
+    together, and two valuation conventions in one screen is how a page comes to
+    disagree with itself. This is the identical panel — adjusted closes, fixed
+    quantities, no forward fill — and the returns are literally this series'
+    percentage change.
+
+    The fixed-quantity assumption is the one build_portfolio_returns documents at
+    length: `positions` holds one snapshot per portfolio, so there is no holding
+    history to replay. A chart of it is therefore "today's book at historical
+    prices", which is a real and useful thing and is not the book's actual past.
+    The endpoint that serves it says so in those words.
+    """
+    if prices_df.empty or positions_df.empty:
+        return pd.Series(dtype=float)
+    held = [str(t) for t in positions_df["ticker"].tolist()]
+    if not held:
+        return pd.Series(dtype=float)
+    panel = total_return_panel(prices_df, held)
+    if panel.empty:
+        return pd.Series(dtype=float)
+    quantities = positions_df.set_index("ticker")["quantity"].reindex(held).astype(float)
+    if quantities.isna().any():
+        missing = ", ".join(sorted(quantities[quantities.isna()].index.astype(str)))
+        raise ValueError(f"Holdings with no quantity: {missing}")
+    return panel.mul(quantities.values, axis=1).sum(axis=1)
+
+
 def build_factor_returns_df(factor_prices_df: pd.DataFrame) -> pd.DataFrame:
     """
     Pivot factor prices into a date-indexed DataFrame of daily total returns.

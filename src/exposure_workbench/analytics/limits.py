@@ -250,17 +250,42 @@ def _check_one(
 
 
 
+@dataclass(frozen=True)
+class CheckRecord:
+    """One check that ran, with the numbers it ran on (V13-S5).
+
+    `evaluated` says a check happened; this says what it saw. The values were
+    always computed — _check_one takes all three — and were discarded unless
+    they crossed a tier, so the page could show two warnings out of twenty-seven
+    and had nothing to say about the twenty-five that held. A reader cannot tell
+    "inside the limit" from "nowhere near it" without them, and those are
+    different books.
+
+    `status` is decided here, beside the comparison that decides the alert, so
+    the meter on the page and the alert beneath it cannot disagree about the
+    same row.
+    """
+
+    check_key: str          # the key `evaluated` carries, so the two join
+    limit_type: str
+    entity_id: str
+    current_value: float
+    warning_level: float
+    breach_level: float
+    status: str             # ok | warning | breach
+
+
 def check_limits(
     risk_metrics_result: Any,           # RiskResult
     stress_result: Any,                 # StressResult
     exposure_result: Any,               # ExposureResult
     pnl_result: Any,                    # PnlResult
     limits: LimitBook,
-) -> tuple[list[AlertResult], list[str]]:
+) -> tuple[list[AlertResult], list[str], list[CheckRecord]]:
     """Compare this run's metrics against the portfolio's own thresholds.
 
-    Returns the alerts and the list of (check, entity) pairs that were actually
-    EVALUATED. The second half exists because row presence is not check
+    Returns the alerts, the list of (check, entity) pairs that were actually
+    EVALUATED, and a record per check of what it saw. The second half exists because row presence is not check
     execution: every check below sits behind a guard on its input, and a book
     with too little price history gets var_95, es_95 and vol_30d as None, so
     three of the eight silently do not run while the timeline says the step
@@ -271,12 +296,25 @@ def check_limits(
     Every threshold comes from `limits` and there is nowhere else to get one.
     """
     alerts: list[AlertResult] = []
+    checks: list[CheckRecord] = []
 
     def emit(alert_type: str, entity_id: str, value: float,
              levels: tuple[float, float]) -> None:
-        a = _check_one(alert_type, entity_id, value, *levels)
+        warning, breach = levels
+        a = _check_one(alert_type, entity_id, value, warning, breach)
         if a:
             alerts.append(a)
+        # Recorded for every check that ran, alert or not — one place, the same
+        # place the comparison happens, so a meter and the alert under it cannot
+        # come from two different readings of the same row.
+        checks.append(CheckRecord(
+            check_key=check_key_for(alert_type, entity_id),
+            limit_type=alert_type, entity_id=entity_id,
+            current_value=float(value), warning_level=float(warning),
+            breach_level=float(breach),
+            status=("breach" if a and a.severity == "breach"
+                    else "warning" if a else "ok"),
+        ))
 
     # ── Portfolio-level limits ─────────────────────────────────────────────────
     # Each guard is on whether the INPUT exists, not on whether it is
@@ -331,4 +369,4 @@ def check_limits(
     alerts.sort(key=lambda a: (severity_order.get(a.severity, 2), a.alert_type))
 
     evaluated = sorted(evaluated_key(lt, eid) for lt, eid in limits.looked_up)
-    return alerts, evaluated
+    return alerts, evaluated, checks

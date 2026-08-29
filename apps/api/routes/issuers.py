@@ -6,20 +6,29 @@ through /api/evidence/{id}.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user
 from exposure_workbench.db.models import (
-    CalcLedger, Company, Filing, FilingSection, IssuerBrief, IssuerExposure,
+    CalcLedger, Company, Filing, FilingChunk, FilingSection, IssuerBrief, IssuerExposure,
     ResearchRun, ResearchSource,
 )
 from exposure_workbench.db.session import get_db
-from exposure_workbench.services import calc_service, company_service
+from exposure_workbench.analytics import display_names as dn, interval_algebra as ia
+from exposure_workbench.services import (
+    calc_service, company_service, fundamentals_service, market_data_service, period_semantics,
+)
 from exposure_workbench.services import evidence_resolver_service as ev
 
 router = APIRouter()
+
+# Named windows, for the same reason the portfolio history has them: how far back
+# a chart looks is a product decision, not a query parameter.
+_SPANS = {"1y": 365, "3y": 365 * 3, "5y": 365 * 5}
 
 
 async def _company(db: AsyncSession, ticker: str) -> Company:
@@ -151,6 +160,188 @@ async def financials(ticker: str, db: AsyncSession = Depends(get_db)):
     return {"ticker": c.ticker, "calcs": calcs,
             "recipe_version": (manifest.params or {}).get("recipe_version"),
             "as_of": (manifest.params or {}).get("as_of")}
+
+
+# ── chart reads (V13-S5) ──────────────────────────────────────────────────────
+
+
+@router.get("/issuers/{ticker}/price-index", dependencies=[Depends(optional_user)])
+async def price_index(ticker: str, benchmark: str = "SPY", span: str = "1y",
+                      db: AsyncSession = Depends(get_db)):
+    """Two price series on one axis, and when each filing arrived.
+
+    Indexed to 100 at the start rather than plotted on two scales: a dual-axis
+    chart invents a correlation by choosing where the scales line up, and the
+    only honest way to put a $250 stock and a $600 index on one plot is to make
+    both of them a multiple of where they began.
+
+    The filing markers are the point of showing this at all on an issuer page —
+    the reader can see what the price did around the date this desk's evidence
+    arrives from, which is the thing a price chart on a research product should
+    say and usually does not.
+    """
+    c = await _company(db, ticker)
+    if span not in _SPANS:
+        raise HTTPException(422, {"error": "unknown_span", "span": span, "known": sorted(_SPANS)})
+    end = await market_data_service.latest_session_date(db)
+    if end is None:
+        return {"ticker": c.ticker, "points": [], "detail": "no prices are loaded"}
+    start = end - timedelta(days=_SPANS[span])
+
+    series, _store = await market_data_service.price_points(db, c.ticker, start, end)
+    bench, _bstore = await market_data_service.price_points(db, benchmark, start, end)
+    if len(series) < 2:
+        return {"ticker": c.ticker, "points": [],
+                "detail": f"no price history for {c.ticker} over this window"}
+
+    bench_by_date = {p.price_date.isoformat(): float(p.close) for p in bench}
+    base = float(series[0].close)
+    base_bench = next((bench_by_date[p.price_date.isoformat()] for p in series
+                       if p.price_date.isoformat() in bench_by_date), None)
+    points = []
+    for p in series:
+        day = p.price_date.isoformat()
+        b = bench_by_date.get(day)
+        points.append({
+            "date": day,
+            "value": round(float(p.close) / base * 100, 3),
+            "benchmark": None if b is None or base_bench is None else round(b / base_bench * 100, 3),
+        })
+
+    filings = (await db.execute(
+        select(Filing).where(Filing.company_id == c.id, Filing.filing_date >= start)
+        .order_by(Filing.filing_date))).scalars().all()
+    return {
+        "ticker": c.ticker, "benchmark": benchmark, "span": span,
+        "basis": "adjusted close, indexed to 100 at the first session shown",
+        "points": points,
+        "filings": [{"date": f.filing_date.isoformat(), "form": f.form_type,
+                     "accession": f.accession_number, "url": f.source_url} for f in filings],
+    }
+
+
+@router.get("/issuers/{ticker}/windows", dependencies=[Depends(optional_user)])
+async def reported_windows(ticker: str, metric: str = "revenue", last_n: int = 12,
+                           db: AsyncSession = Depends(get_db)):
+    """Which windows of a flow this desk can derive — and which it cannot.
+
+    This is the interval engine's own subject matter made visible, and it uses
+    the engine to say it. `consecutive_windows` walks the issuer's OWN reported
+    boundaries and keeps a slot it cannot derive in place, marked unreachable
+    (V10, DP2) — so the holes here are the engine's finding, not this endpoint
+    guessing where a quarter ought to have been.
+
+    That distinction is the whole value of the panel. My first version stepped
+    forward 91 days at a time with a tolerance and called anything unmatched a
+    gap, which invents structure: it does not know that Apple's year ends in
+    late September, that a year filed as H1 + FY yields H1 and FY − H1, or that
+    NVDA reported FY2023 capex as 9M + FY and has no quarterly boundary there at
+    all. The engine knows all three because it was built for exactly this.
+
+    Restatements are resolved by `derive`, which is why the same window appears
+    once here and three times in the raw facts.
+    """
+    c = await _company(db, ticker)
+    facts = await fundamentals_service._flow_facts(db, c.id, metric)
+    label = dn.metric(metric)
+    if not facts:
+        return {"ticker": c.ticker, "metric": metric, "label": label, "rows": [],
+                "detail": f"this desk holds no {label.lower()} for {c.ticker}"}
+
+    rows = []
+    for months, name in ((12, "12 months"), (6, "6 months"), (3, "3 months")):
+        slots = [fundamentals_service._slot(w)
+                 for w in ia.consecutive_windows(facts, months=months, last_n=last_n)]
+        if slots:
+            rows.append({"months": months, "label": name, "slots": slots})
+
+    return {
+        "ticker": c.ticker, "metric": metric, "label": label,
+        "fiscal": await period_semantics.describe_periods(db, c.ticker),
+        "rows": rows,
+        "note": "any window is a signed path over the ones reported; a slot with "
+                "no value is one no held filing can reach, not a figure this desk "
+                "chose to omit",
+    }
+
+
+@router.get("/issuers/{ticker}/coverage", dependencies=[Depends(optional_user)])
+async def coverage(ticker: str, db: AsyncSession = Depends(get_db)):
+    """What this desk holds on an issuer, as a grid rather than as 33 chips.
+
+    The Snapshot tab listed every metric as `operating_lease_liability_noncurrent 6`
+    — an identifier and a count, which answers neither "can you answer my
+    question" nor "how far back". A row per measure and a column per period
+    answers both at a glance, and an empty row says the thing a chip cannot:
+    interest expense is not missing by accident, it stopped being reported as a
+    separate line and there is a named substitute.
+    """
+    c = await _company(db, ticker)
+    metrics = await calc_service.list_available_metrics(db, c.ticker)
+    rows = []
+    for m in metrics["metrics"]:
+        rows.append({
+            "metric": m["metric"],
+            "label": dn.metric(m["metric"]),
+            "periods": m.get("periods"),
+            "latest": m.get("latest_period_end"),
+            "kind": m.get("kind"),
+            "windows_filed": m.get("windows_filed"),
+            "superseded_by": m.get("superseded_by"),
+        })
+    rows.sort(key=lambda r: r["label"])
+    return {"ticker": c.ticker, "measures": rows}
+
+
+@router.get("/issuers/{ticker}/citation-map", dependencies=[Depends(optional_user)])
+async def citation_map(ticker: str, db: AsyncSession = Depends(get_db)):
+    """Which parts of the filings the latest brief actually drew on.
+
+    Indexed passages per section against the ones a brief cited. On Apple all six
+    cited passages come from the 10-Q's MD&A while the 10-K's 77 risk-factor and
+    statement passages were searchable and not needed — which is a fact about how
+    this desk works that no other view shows, and is the kind of thing a reader
+    checking a brief wants before they trust it.
+    """
+    c = await _company(db, ticker)
+    rows = (await db.execute(
+        select(Filing.form_type, Filing.filing_date, FilingSection.id,
+               FilingSection.item_code, FilingSection.title,
+               func.count(FilingChunk.id))
+        .select_from(FilingSection)
+        .join(Filing, Filing.id == FilingSection.filing_id)
+        .outerjoin(FilingChunk, FilingChunk.section_id == FilingSection.id)
+        .where(Filing.company_id == c.id)
+        .group_by(Filing.form_type, Filing.filing_date, FilingSection.id,
+                  FilingSection.item_code, FilingSection.title, FilingSection.section_order)
+        .order_by(func.count(FilingChunk.id).desc())
+    )).all()
+
+    brief = (await db.execute(
+        select(IssuerBrief).where(IssuerBrief.company_id == c.id)
+        .order_by(IssuerBrief.created_at.desc()))).scalars().first()
+    cited_chunks = [x for x in (brief.citations or []) if isinstance(x, str)
+                    and x.startswith("chunk_")] if brief else []
+    section_of = {}
+    if cited_chunks:
+        section_of = dict((await db.execute(
+            select(FilingChunk.id, FilingChunk.section_id)
+            .where(FilingChunk.id.in_(cited_chunks)))).all())
+    from collections import Counter
+    cited_per_section = Counter(section_of.values())
+
+    return {
+        "ticker": c.ticker,
+        "brief_id": None if brief is None else brief.id,
+        "sections": [
+            {"form": form, "filed": filed.isoformat(), "item": item, "title": title,
+             "passages": int(n), "cited": int(cited_per_section.get(sid, 0))}
+            for form, filed, sid, item, title, n in rows
+        ],
+        "citation_mix": {kind: sum(1 for x in (brief.citations or [])
+                                   if isinstance(x, str) and x.startswith(kind + "_"))
+                         for kind in ("fact", "calc", "chunk", "src")} if brief else {},
+    }
 
 
 # ── filings tab ────────────────────────────────────────────────────────────────────

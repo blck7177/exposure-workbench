@@ -354,6 +354,16 @@ class LimitCheck(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(String(64), ForeignKey("exposure_runs.id", ondelete="CASCADE"))
     limit_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    # V13-S5. What the check SAW, not only that it ran. _check_one has always
+    # taken all three numbers and discarded them unless one was crossed, so the
+    # page could report two warnings out of twenty-seven and say nothing about
+    # the twenty-five that held — and "inside the limit" and "nowhere near it"
+    # are different books. NULL on every row written before V13, which reads as
+    # "this run did not record it" (the v6/v8 convention).
+    current_value: Mapped[float | None] = mapped_column(Numeric(20, 8))
+    warning_level: Mapped[float | None] = mapped_column(Numeric(20, 8))
+    breach_level: Mapped[float | None] = mapped_column(Numeric(20, 8))
+    status: Mapped[str | None] = mapped_column(String(16))
     # Not nullable: a check either fired or it did not, and a third state would
     # be the ambiguity this table exists to remove.
     fired: Mapped[bool] = mapped_column(Boolean, nullable=False)

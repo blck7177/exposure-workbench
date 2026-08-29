@@ -80,6 +80,37 @@ async def _record(
     return calc_id
 
 
+async def find_recorded(
+    db: AsyncSession, operation: str, params: dict,
+) -> CalcLedger | None:
+    """The most recent ledger row for exactly this call, if there is one (V13-S5).
+
+    WHY THIS EXISTS. The ledger's contract is one row per calculation, and it is
+    what makes a number citable. A read endpoint that recomputes on every page
+    load keeps that contract in letter and destroys it in spirit: the chart panel
+    for one book would mint a row every time somebody refreshed, and "25,119
+    calculations this desk has performed" would become "how many times a browser
+    asked".
+
+    So a read that would derive something asks here first. A hit is not a cache —
+    it is the same calculation, already performed and already citable, and
+    handing back its id is what lets the chart's points click through to a row
+    that a previous answer may also have cited.
+
+    Exact params, not a subset: the params ARE the call. Two reconciliations of
+    different runs, two drawdown scans over different spans, must never resolve
+    to each other, and JSONB equality is the only comparison that cannot be made
+    loose by accident.
+    """
+    row = (await db.execute(
+        select(CalcLedger)
+        .where(CalcLedger.operation == operation, CalcLedger.params == params)
+        .order_by(CalcLedger.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    return row
+
+
 async def window_return(
     db: AsyncSession,
     ticker: str,

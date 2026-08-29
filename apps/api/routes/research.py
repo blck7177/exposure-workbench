@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.api.auth_deps import optional_user, require_user
 from apps.api.schemas import WorkflowEventOut
 from exposure_workbench.auth.clerk import UserClaims
-from exposure_workbench.db.models import IssuerBrief, WorkflowEvent
+from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun, WorkflowEvent
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 
@@ -145,6 +145,46 @@ async def create_research_run(
     flag_modified(task, "payload")
     await db.commit()
     return await research_run_service.get_run(db, run.id)
+
+
+class ResearchRunSummaryOut(BaseModel):
+    id: str
+    company_id: str
+    ticker: str | None = None
+    status: str
+    started_at: datetime | None
+    completed_at: datetime | None
+    error_code: str | None = None
+
+
+@router.get("/research-runs", response_model=list[ResearchRunSummaryOut])
+async def list_research_runs(
+    limit: int = 20,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The caller's own research runs, newest first (V13-S5).
+
+    There was no way to list these. A run was reachable only by holding its id,
+    so a person who started one and navigated away had lost it — and the agent
+    was told to hand the id over in the reply, which is how `rrun_5b247ec1db21`
+    came to be a thing a user was expected to keep.
+
+    RLS scopes research_runs by owner, so this is the caller's work and no
+    filter here is doing the securing. The ticker is joined in because a list of
+    ids is not a list.
+    """
+    rows = (await db.execute(
+        select(ResearchRun, Company.ticker)
+        .outerjoin(Company, Company.id == ResearchRun.company_id)
+        .order_by(ResearchRun.created_at.desc()).limit(min(limit, 100))
+    )).all()
+    return [
+        ResearchRunSummaryOut(
+            id=r.id, company_id=r.company_id, ticker=ticker, status=r.status,
+            started_at=r.started_at, completed_at=r.completed_at, error_code=r.error_code)
+        for r, ticker in rows
+    ]
 
 
 @router.get("/research-runs/{run_id}", response_model=ResearchRunOut,

@@ -284,6 +284,11 @@ CREATE TABLE IF NOT EXISTS limit_checks (
     limit_type  VARCHAR(64) NOT NULL,
     fired       BOOLEAN NOT NULL,
     alert_id    VARCHAR(64),
+    -- V13-S5: what the check saw, beside whether it fired.
+    current_value   NUMERIC(20, 8),
+    warning_level   NUMERIC(20, 8),
+    breach_level    NUMERIC(20, 8),
+    status          VARCHAR(16),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (run_id, limit_type)
 );

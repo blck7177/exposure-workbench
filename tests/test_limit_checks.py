@@ -308,7 +308,7 @@ def test_a_fired_alert_names_a_check_that_actually_ran():
     that decides which getter is legal, and this is the assertion that it lines
     up with what `looked_up` recorded.
     """
-    alerts, evaluated = check_limits(
+    alerts, evaluated, _checks = check_limits(
         risk(), stress(("market_downside", 0.09)),
         exposure(issuers={"LLY": 0.30}, sectors={"Healthcare": 0.30}),
         pnl(-0.05),
@@ -323,3 +323,49 @@ def test_a_fired_alert_names_a_check_that_actually_ran():
     assert any(":" in k for k in keys) and any(":" not in k for k in keys), (
         "fixture did not exercise both a per-entity and a book-wide alert"
     )
+
+
+# ── V13-S5: what each check saw, keyed the way `evaluated` is ────────────────
+
+
+def test_every_evaluated_check_has_a_record_under_the_same_key():
+    """The join key, pinned in both directions.
+
+    V8-P3's bug was a key REBUILT on the writing side that the reading side
+    could not reproduce: 27 checks recorded as clear on a book that was alerting
+    on three. The records now come from check_limits itself, and this is what
+    keeps them from drifting apart again — a record set that is not exactly the
+    evaluated set is the same defect wearing a new column.
+    """
+    alerts, evaluated, checks = check_limits(
+        risk(vol_30d=0.12), stress(("tech_selloff", 0.02)),
+        exposure(gross=1.0, issuers={"AAPL": 0.30}, sectors={"Tech": 0.45}),
+        pnl(-0.001), book(THRESHOLDS))
+    assert sorted(c.check_key for c in checks) == sorted(evaluated)
+
+
+def test_a_check_that_did_not_fire_still_records_what_it_measured():
+    """The whole point: "two warnings out of twenty-seven" says nothing about a
+    book sitting at 93% of a tier versus one at 28%."""
+    _alerts, _evaluated, checks = check_limits(
+        risk(vol_30d=0.05), None, exposure(gross=1.0, issuers={"AAPL": 0.01}),
+        pnl(0.001), book(THRESHOLDS))
+    quiet = [c for c in checks if c.status == "ok"]
+    assert quiet, "no check came back clear, so this test proves nothing"
+    for c in quiet:
+        assert c.current_value is not None
+        assert c.warning_level > 0 and c.breach_level >= c.warning_level
+
+
+def test_the_status_agrees_with_the_alert_beside_it():
+    """Decided in one place, beside the comparison that decides the alert, so a
+    meter on the page and the alert under it cannot disagree about one row."""
+    alerts, _evaluated, checks = check_limits(
+        risk(vol_30d=0.30), None, exposure(gross=1.0, issuers={"AAPL": 0.30}),
+        pnl(-0.001), book(THRESHOLDS))
+    by_key = {c.check_key: c for c in checks}
+    for a in alerts:
+        assert by_key[a.check_key].status == a.severity
+    fired = {a.check_key for a in alerts}
+    for key, c in by_key.items():
+        assert (c.status == "ok") == (key not in fired)
