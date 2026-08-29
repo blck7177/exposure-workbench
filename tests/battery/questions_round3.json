@@ -1,0 +1,22 @@
+[
+{"tag":"Q01-lease-adjusted-debt","q":"Rating agencies treat operating leases as debt. Do that for Exxon — lease-adjusted debt, and where it puts debt to operating cash flow versus the unadjusted number."},
+{"tag":"Q02-cash-conversion-cycle","q":"Apple's cash conversion cycle for the latest twelve months please — receivable days, inventory days, payable days, and the net. Still deeply negative?"},
+{"tag":"Q03-growth-decomp-tax","q":"Alphabet's bottom line grew faster than the top line last year. How much of that is operating and how much is just a lower tax rate?"},
+{"tag":"Q04-maturity-stack","q":"Nvidia — what's actually coming due inside a year, and what liquid assets do they have sitting against it?"},
+{"tag":"Q05-net-debt-inputs","q":"When you quote Alphabet's net debt, what's actually being netted? Most of their liquidity is in marketable securities, not cash. Give me gross debt and net-of-cash-only, and tell me what you can't include."},
+{"tag":"Q06-etf-no-fundamentals","q":"For the growth & income book — how do TLT and HYG stack up on fundamentals against the equity names? Leverage, earnings, whatever you've got."},
+{"tag":"Q07-cash-vs-accrual-interest","q":"microsoft — what did they actually pay out in interest last year vs what they booked as interest expense? want coverage on a cash basis not accrual"},
+{"tag":"Q08-period-not-filed","q":"How did Apple's June quarter come in versus March? Mainly want the margin direction."},
+{"tag":"Q09-risk-contribution-absent","q":"rank the ten positions by how much each one contributes to portfolio risk. not weight — risk contribution."},
+{"tag":"Q10-var-reparameterize","q":"board pack needs a 10-day VaR at 99% for the book. what is it?"},
+{"tag":"Q11-screen-partial-coverage","q":"Rank Google, Amazon, Lilly and Exxon on operating margin for full-year 2025. Who's genuinely the most profitable of the four?"},
+{"tag":"Q12-noncoterminous-quarters","q":"Microsoft and Alphabet both just reported. Who put up the better quarter on revenue growth?"},
+{"tag":"Q13-useful-life-comparability","q":"Alphabet stretched the useful lives on their servers a while back and it flattered depreciation. What exactly did they say the effect was? I want their words. And is D&A even comparable across those years?"},
+{"tag":"Q14-narrative-vs-cashflow","q":"Amazon's MD&A has been all cost discipline and efficiency for a while now. Did that actually show up in the cash flow or is it talk? Give me the exact language they used."},
+{"tag":"Q15-stress-scenario-read","q":"if the market gaps down 10% what does this book lose in dollars, and is that the worst case we've got?"},
+{"tag":"Q16-warning-not-breach","q":"quick compliance check before the IC — are we offside on any single name right now? LLY looks heavy to me."},
+{"tag":"Q17-drawdown-not-additive","q":"the drawdown into late March — how much of that hole was LLY?"},
+{"tag":"Q18-run-staleness","q":"is the risk screen I'm looking at actually current? feels like nothing's been refreshed all week"},
+{"tag":"Q19-factor-proxy-is-a-holding","q":"our credit beta — is that a real exposure or just an artifact of the fact that we own HYG? same question for rates and TLT."},
+{"tag":"Q20-window-scope-reconciliation","q":"risk report says max drawdown 17.7%. I've just pulled the last twelve months and there's nothing anywhere close to that. which one's wrong?"}
+]
