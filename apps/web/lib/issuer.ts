@@ -30,7 +30,10 @@ export type Brief = {
   market_context: string | null; portfolio_implications: string | null; open_questions: string | null;
   citations: string[]; confidence_flags: Record<string, unknown>; created_at: string | null;
 };
-export type Evidence = { type: string; id: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
+// `label` is what this piece of evidence IS, in words — "Gross profit · Dec 28,
+// 2025 – Mar 28, 2026" rather than `calc 2b5395` (V13-S3). Built server-side
+// from fields that are on the row, so one definition serves every surface.
+export type Evidence = { type: string; id: string; label?: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
 // workflow_events is the run's outer timeline (V7-U1). It arrives empty from the
 // POST — the run has only just been enqueued — and fills in on the polls.
 // error_message is present ONLY when the failure's own words were written for a
@@ -38,7 +41,11 @@ export type Evidence = { type: string; id: string; body: Record<string, any>; pr
 // is no `error_detail` — the exception's own words stay server-side, because
 // this payload is readable by anyone who can see the run (V13-S2).
 export type ResearchRun = { id: string; company_id: string; status: string; agent_session_id: string | null; error_message: string | null; error_code: string | null; started_at: string | null; completed_at: string | null; workflow_events: TimelineEvent[] };
-export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; evidence_refs: { type: string; id: string }[]; created_at: string; prompt_tokens: number | null; completion_tokens: number | null };
+// `display` is what this step DID, in the words a person watching would use —
+// "Evaluating total debt for AAPL", not `evaluate_formula` (V13-S4). Null on the
+// rows that are not actions: an llm_call is what the turn cost and a refusal is a
+// call that did not happen, and both belong to the audit layer.
+export type AgentStep = { seq: number; step_type: string; tool_name: string | null; status: string; result_summary: string | null; display: string | null; evidence_refs: { type: string; id: string }[]; created_at: string; prompt_tokens: number | null; completion_tokens: number | null };
 /**
  * What the gate found for one figure, kept from the pass that accepted it (V13-S3).
  *
