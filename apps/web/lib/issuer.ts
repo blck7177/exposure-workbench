@@ -39,6 +39,10 @@ export type AgentStep = { seq: number; step_type: string; tool_name: string | nu
 // loop ended without the citation gate accepting an answer — a refusal, not a reply.
 export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: Record<string, unknown> };
 export type SessionDetail = { id: string; kind: string; tools_used: number; messages: AgentMessage[]; steps: AgentStep[] };
+// V13-S0. The list a person navigates their own conversations by. `title` is
+// the first thing they asked — already written, already theirs — rather than a
+// generated summary, which would be one more claim nothing checks.
+export type SessionSummary = { id: string; kind: string; started_at: string; ended_at: string | null; title: string | null };
 
 // ─── reads ──────────────────────────────────────────────────────────────────
 export const listCompanies = () => j<CompanyRow[]>("/api/companies");
@@ -67,3 +71,4 @@ export const getResearchRun = (id: string) => j<ResearchRun>(`/api/research-runs
 export const createSession = () => j<{ id: string }>("/api/agent/sessions", { method: "POST", body: "{}" });
 export const postMessage = (sid: string, text: string) => j<{ session_id: string; message_id: string; text: string; citations: string[]; meta?: Record<string, unknown> }>(`/api/agent/sessions/${sid}/messages`, { method: "POST", body: JSON.stringify({ text }) });
 export const getSessionDetail = (sid: string) => j<SessionDetail>(`/api/agent/sessions/${sid}`);
+export const listSessions = () => j<SessionSummary[]>("/api/agent/sessions");

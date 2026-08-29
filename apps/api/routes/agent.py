@@ -243,6 +243,11 @@ class SessionSummaryOut(BaseModel):
     kind: str
     started_at: datetime
     ended_at: datetime | None
+    # V13-S0. What the conversation was about, so a list of them is navigable.
+    # The first thing the person asked, not a generated summary: it is already
+    # written, it is theirs, and a model-written title would be one more claim
+    # nothing checks. None for a session nobody has spoken in yet.
+    title: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -258,11 +263,28 @@ async def list_agent_sessions(
     # real user. Excluding it would make the one surface built for watching a
     # tool call land the one surface the monitor cannot show. 'research' stays
     # out: a run's session is reached through the run, not this list.
+    # The opening question, per session, in the same query. A correlated
+    # subquery rather than a second round trip per row: this list is drawn on
+    # every page load, and N+1 over 50 sessions is the kind of thing that only
+    # shows up once somebody has 50.
+    opening = (
+        select(AgentMessage.content)
+        .where(AgentMessage.session_id == AgentSession.id, AgentMessage.role == "user")
+        .order_by(AgentMessage.created_at)
+        .limit(1)
+        .scalar_subquery()
+    )
     rows = (await db.execute(
-        select(AgentSession).where(AgentSession.kind.in_(("meta", "mcp")))
+        select(AgentSession, opening.label("title"))
+        .where(AgentSession.kind.in_(("meta", "mcp")))
         .order_by(AgentSession.started_at.desc()).limit(50)
-    )).scalars().all()
-    return rows
+    )).all()
+    return [
+        SessionSummaryOut(id=s.id, kind=s.kind, started_at=s.started_at,
+                          ended_at=s.ended_at,
+                          title=(title or "").strip()[:80] or None)
+        for s, title in rows
+    ]
 
 
 @router.get("/agent/sessions/{session_id}", response_model=SessionDetailOut)

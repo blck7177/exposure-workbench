@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Loader2, AlertTriangle, Clock } from "lucide-react";
 import { formatDuration, statusColor } from "@/lib/formatting";
+import type { RunError } from "@/lib/types";
 
 /**
  * The outer timeline of a run, wherever a run is being watched (V7).
@@ -20,6 +21,7 @@ export type TimelineEvent = {
   message: string | null;
   duration_ms: number | null;
   payload_summary?: Record<string, unknown>;
+  error?: RunError | null;
 };
 
 export function StepIcon({ status }: { status: string }) {

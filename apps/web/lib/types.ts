@@ -34,6 +34,18 @@ export interface Position {
   as_of_date: string;
 }
 
+/**
+ * Why a run stopped, in the two registers a failure has (V13-S2).
+ *
+ * `code` is what `explainApiError`-style wording keys on; `detail` is the
+ * operator's half — the provider's own words, the internal hostname — and it
+ * belongs in the audit layer, never in the sentence a reader is shown.
+ */
+export interface RunError {
+  code: string;
+  detail: string | null;
+}
+
 export interface WorkflowEvent {
   id: number;
   step_name: string;
@@ -46,6 +58,11 @@ export interface WorkflowEvent {
   // union here would have to be edited by anyone adding one, which is how the
   // column would quietly go back to being unread.
   payload_summary: Record<string, unknown>;
+  // V13-S2. Derived server-side from payload_summary, so there is one copy of
+  // the fact. Null on a step that succeeded and on every event written before
+  // V13 — which the UI renders as its generic sentence rather than as a claim
+  // about a cause it does not have.
+  error: RunError | null;
   created_at: string;
 }
 
