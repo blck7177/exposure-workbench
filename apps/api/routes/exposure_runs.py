@@ -367,14 +367,22 @@ async def run_reconcile(run_id: str, db: AsyncSession = Depends(get_db)):
     refresh would turn "this desk performed 25,119 calculations" into "a browser
     was open".
     """
+    # The recording is the thing to avoid, so the read must not go through the
+    # recording entry point at all. The first version called reconcile_move and
+    # then decided whether to commit — which could never work: get_db commits at
+    # the end of every request, so the row was already written by the time this
+    # function had an opinion about it.
     existing = await calc_service.find_recorded(
-        db, "portfolio.reconcile", {"run_id": run_id})
-    result = await reconcile_service.reconcile_move(db, run_id)
-    if existing is not None and "error" not in result:
-        result["calc_id"] = existing.id
-    else:
-        await db.commit()
-    return result
+        db, reconcile_service.OP_RECONCILE, reconcile_service.identifying_params(run_id))
+    if existing is not None:
+        # Recomputed, so the figures on the page cannot drift from the identity
+        # they assert; cited with the id of the calculation that was actually
+        # performed, which is what a previous answer would have cited too.
+        result = await reconcile_service.reconcile(db, run_id)
+        if "error" not in result:
+            result["calc_id"] = existing.id
+        return result
+    return await reconcile_service.reconcile_move(db, run_id)
 
 
 @router.get("/exposure-runs/{run_id}/factor-correlation", dependencies=[Depends(optional_user)])

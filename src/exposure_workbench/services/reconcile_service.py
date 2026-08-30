@@ -90,7 +90,34 @@ def _sum(rows: list[dict], key: str) -> tuple[float, int]:
 
 
 async def reconcile_move(db: AsyncSession, run_id: str) -> dict[str, Any]:
-    """Both identities, the largest single contributors, and one ledger row."""
+    """Both identities, the largest single contributors, and one ledger row.
+
+    This is the calculating entry point and the one the agent's tool calls: it
+    performs the reconciliation and records it, so the number it returns is
+    citable. `reconcile()` below is the same computation without the row, for a
+    caller that is READING a reconciliation this desk already performed.
+    """
+    out = await reconcile(db, run_id)
+    if "error" in out:
+        return out
+    out["calc_id"] = await _record_reconcile(db, run_id, out)
+    return out
+
+
+async def reconcile(db: AsyncSession, run_id: str) -> dict[str, Any]:
+    """The identities, computed and not recorded.
+
+    Split out because a page that displays a reconciliation is not performing
+    one. The ledger's contract is one row per calculation, and it is what makes
+    a number citable; a read endpoint that minted a row per refresh would keep
+    that contract in letter and destroy it in spirit — `25,119 calculations this
+    desk has performed` would become `how many times a browser asked`.
+
+    The route asks calc_service.find_recorded for the row this run already has
+    and calls THIS, so the figures on the page are recomputed (and therefore
+    cannot drift from the identity they assert) while the citation points at the
+    calculation that was actually performed.
+    """
     attribution = await rr.get_attribution(db, run_id)
     if attribution.get("error"):
         return attribution
@@ -192,28 +219,50 @@ async def reconcile_move(db: AsyncSession, run_id: str) -> dict[str, Any]:
                else "the factor identity does not close" if not holds_b
                else "the day's return is zero, so a share of it is undefined"))
 
-    # What this operation COMPUTED, at the top level where the resolver reads it.
-    # The keys are declared in numeric_verification._CALC_RESULT_KEYS with a unit
-    # each; a quantity recorded here and not declared there is a number the tool
-    # produced and the gate will refuse.
-    #
-    # daily_return, alpha, residual and the observation count are deliberately
-    # NOT repeated: they are columns of the run's own children and already
-    # resolve through the run_ id. Recording them twice would create a second,
-    # weaker path to the same evidence.
+    return out
+
+
+# The part of `params` that says WHICH reconciliation this is. Everything else
+# recorded beside it — how many terms each identity turned out to have — is a
+# fact about the call's RESULT, and a caller looking the row up cannot know it
+# before making the call. That asymmetry is why find_recorded matches on
+# containment, and tests/test_reconcile_reuse.py holds the two key sets against
+# each other so the lookup cannot drift out of the record again.
+def identifying_params(run_id: str) -> dict[str, Any]:
+    return {"run_id": run_id}
+
+
+async def _record_reconcile(db: AsyncSession, run_id: str, out: dict[str, Any]) -> str:
+    """Mint the row for a reconciliation that was just performed.
+
+    Everything recorded is read back out of what `reconcile` returned, so the
+    row and the answer cannot describe different arithmetic.
+
+    What this operation COMPUTED goes at the top level where the resolver reads
+    it. The keys are declared in numeric_verification._CALC_RESULT_KEYS with a
+    unit each; a quantity recorded here and not declared there is a number the
+    tool produced and the gate will refuse.
+
+    daily_return, alpha, residual and the observation count are deliberately NOT
+    repeated: they are columns of the run's own children and already resolve
+    through the run_ id. Recording them twice would create a second, weaker path
+    to the same evidence.
+    """
+    pos, fac = out["identity_positions"], out["identity_factors"]
     recorded = {
-        "sum_of_position_contributions": sum_positions,
-        "sum_of_factor_contributions": sum_factors,
-        "alpha_plus_residual": unexplained,
+        "sum_of_position_contributions": pos["sum_of_contributions"],
+        "sum_of_factor_contributions": fac["sum_of_factor_contributions"],
+        "alpha_plus_residual": fac["alpha_plus_residual"],
     }
-    if holds_a and holds_b and attr_return != 0.0:
+    if "factor_share" in out:
         recorded["factor_share"] = out["factor_share"]
         recorded["unexplained_share"] = out["unexplained_share"]
-    out["calc_id"] = await cs._record(
+    return await cs._record(
         db, None, OP_RECONCILE,
-        {"run_id": run_id, "terms_positions": n_pos, "terms_factors": n_fac},
+        {**identifying_params(run_id),
+         "terms_positions": pos["terms"], "terms_factors": fac["terms"]},
         recorded,
-        [run_id], {"identity_positions_holds": holds_a, "identity_factors_holds": holds_b},
+        [run_id], {"identity_positions_holds": pos["holds"],
+                   "identity_factors_holds": fac["holds"]},
         current_session_id(),
     )
-    return out

@@ -64,7 +64,9 @@ def test_shares_are_absent_not_null_when_the_identity_fails():
     read at all. The dataclass is what makes the two mutually exclusive by
     construction rather than by a caller remembering to check a flag."""
     assert set(rs._Shares.__dataclass_fields__) == {"factor_share", "unexplained_share"}
-    src = inspect.getsource(rs.reconcile_move)
+    # V13-S5 fix: the arithmetic lives in reconcile(); reconcile_move is the
+    # entry point that also records it.
+    src = inspect.getsource(rs.reconcile)
     assert "out |= asdict(shares)" in src, "shares must be merged in only on the holding branch"
     assert "shares_note" in src
 
@@ -76,7 +78,9 @@ def test_identity_b_closes_against_the_total_return_revaluation():
     against nothing else. Measured on the demo book the two differ by 2.4e-6 —
     forty times the tolerance — and written the plan's way the 'unexplained'
     figure silently absorbs a valuation convention."""
-    src = inspect.getsource(rs.reconcile_move)
+    # V13-S5 fix: the arithmetic lives in reconcile(); reconcile_move is the
+    # entry point that also records it.
+    src = inspect.getsource(rs.reconcile)
     assert "unexplained = attr_return - sum_factors" in src
     assert "unexplained = daily_return" not in src
 

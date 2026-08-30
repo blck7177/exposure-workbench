@@ -93,18 +93,70 @@ def test_a_deriving_read_asks_for_the_existing_calculation_first():
     )
 
 
-def test_find_recorded_matches_the_whole_call_and_not_a_prefix_of_it():
-    """The params ARE the call.
+def test_the_lookup_key_is_a_subset_of_what_the_operation_records():
+    """The bug this replaces, and the shape of it.
 
-    Two reconciliations of different runs, or two drawdown scans over different
-    spans, must never resolve to each other — and a lookup keyed on the
-    operation alone would hand a chart of one book's move the id of another's.
+    `find_recorded` compared params for JSONB EQUALITY, on the argument that the
+    params ARE the call. reconcile records `terms_positions` and `terms_factors`
+    beside its run_id — facts about what the call turned out to involve, which no
+    caller can know before making it — so equality never matched, every read fell
+    through to the recording path, and /reconcile minted a ledger row per
+    request. Live, for a week. The test that was here asserted the equality, so
+    it passed the whole time; the test above asserted the lookup was CALLED, and
+    it was.
+
+    A source-read cannot see behaviour. What it can see is the relationship the
+    two ends have to hold: the keys the lookup is made with must be a subset of
+    the keys the record is written with, or containment can never match. That is
+    checked here from both sources, and the live half is
+    tests/test_reconcile_reuse_live.py, which calls the endpoint twice and counts
+    the ledger.
     """
-    from exposure_workbench.services import calc_service
+    import re
+    from exposure_workbench.services import calc_service, reconcile_service
+
+    lookup = set(reconcile_service.identifying_params("run_x"))
+    assert lookup, "the operation must export the params that identify one of its calls"
+
+    recorder = inspect.getsource(reconcile_service._record_reconcile)
+    params_block = recorder[recorder.index("{**identifying_params"):]
+    params_block = params_block[:params_block.index("}") + 1]
+    recorded = set(re.findall(r'"(\w+)":', params_block)) | lookup
+    assert lookup <= recorded, (
+        f"the lookup is keyed on {sorted(lookup - recorded)}, which the record does "
+        "not carry — containment can never match and every read will mint a row"
+    )
+    assert recorded - lookup, (
+        "this guard is vacuous unless the record carries more than the lookup; if "
+        "the two sets became equal, equality would do and containment's obligation "
+        "on the caller should be reconsidered"
+    )
 
     body = inspect.getsource(calc_service.find_recorded)
-    assert "CalcLedger.params == params" in body
     assert "CalcLedger.operation == operation" in body
+    assert "CalcLedger.params.contains(params)" in body, (
+        "equality here is what shipped the bug; containment plus a caller that "
+        "passes every distinguishing argument is the contract"
+    )
+
+
+def test_a_read_does_not_go_through_the_recording_entry_point():
+    """get_db commits at the end of every request.
+
+    The first fix called reconcile_move and then decided whether to commit, which
+    could not work for that reason: the row was written before the route had an
+    opinion. The read must call the computation that does not record at all.
+    """
+    src = (ROOT / "apps" / "api" / "routes" / "exposure_runs.py").read_text()
+    body = src[src.index("async def run_reconcile"):src.index("async def run_factor_correlation")]
+    hit = body[body.index("if existing is not None"):]
+    assert "reconcile_service.reconcile(db, run_id)" in hit, (
+        "when the calculation already exists the read must use the non-recording "
+        "entry point"
+    )
+    assert "await db.commit()" not in body, (
+        "the route must not reason about committing; get_db commits every request"
+    )
 
 
 # ── the honest absences ──────────────────────────────────────────────────────

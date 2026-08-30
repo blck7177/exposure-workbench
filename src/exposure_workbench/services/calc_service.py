@@ -97,14 +97,28 @@ async def find_recorded(
     handing back its id is what lets the chart's points click through to a row
     that a previous answer may also have cited.
 
-    Exact params, not a subset: the params ARE the call. Two reconciliations of
-    different runs, two drawdown scans over different spans, must never resolve
-    to each other, and JSONB equality is the only comparison that cannot be made
-    loose by accident.
+    WHAT `params` MUST BE, and why this is containment and not equality.
+
+    The first version compared for JSONB EQUALITY, on the argument that "the
+    params ARE the call". They are not, quite: an operation is free to record
+    beside its arguments what the call turned out to involve — reconcile stores
+    `terms_positions` and `terms_factors` — and a caller looking a row up cannot
+    know those before making the call. So equality never matched, every read fell
+    through to the recording path, and the one endpoint using this minted a row
+    per request. It shipped that way; the ledger's own row count found it.
+
+    Containment keeps the guarantee the equality argument was protecting, and the
+    obligation moves to the caller: pass EVERY argument that distinguishes this
+    call from another of the same operation. Two reconciliations of different
+    runs differ in `run_id`; two drawdown scans differ in their span; pass those
+    and they can never resolve to each other. Pass a proper subset of what
+    identifies a call and this will hand back the wrong row, which is why each
+    operation exports the identifying set (reconcile_service.identifying_params)
+    rather than each caller composing one by hand.
     """
     row = (await db.execute(
         select(CalcLedger)
-        .where(CalcLedger.operation == operation, CalcLedger.params == params)
+        .where(CalcLedger.operation == operation, CalcLedger.params.contains(params))
         .order_by(CalcLedger.created_at.desc())
         .limit(1)
     )).scalar_one_or_none()
