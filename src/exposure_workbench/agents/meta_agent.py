@@ -223,15 +223,23 @@ async def handle_message(
                         result.get("kind") in ("turn_tool", "tool"):
                     # The budget bounds EVIDENCE (registry.invoke), and it is
                     # spent: no further call on this face can return anything
-                    # the gate will accept. A refusal is a structured return,
-                    # so the loop used to hand it to the model and go round
-                    # again — sess_1c71b5fb7f79 made 65 refused calls after its
-                    # fifteenth, each a ~12k-token round trip on a state where
-                    # nothing could arrive. Narrow what is OFFERED instead of
-                    # refusing what is called: the skip-flag rule (faces.py)
-                    # applied to the rest of a turn. The exit and the pause
-                    # stay, so what running out means is what the wrapper
-                    # promised — answer with the evidence gathered so far.
+                    # the gate will accept. Narrow what is OFFERED on the next
+                    # turn instead of refusing what is called: the skip-flag
+                    # rule (faces.py) applied to the rest of a turn. The exit
+                    # and the pause stay, so what running out means is what
+                    # the wrapper promised — answer with the evidence gathered.
+                    #
+                    # What this does and does not cover, measured 2026-08-30.
+                    # sess_1c71b5fb7f79's 65 refused calls were ONE assistant
+                    # message of 69 parallel calls in its third turn, not
+                    # sixty-five turns; a batch is dispatched whole, so this
+                    # line would not have changed that session, and its cost
+                    # (65 MCP round trips, ~5.7k tokens of refusal payloads
+                    # carried into the next two prompts) is still paid. Across
+                    # every session that ever hit the budget, none issued a
+                    # read call in a LATER turn: the case guarded here has not
+                    # been observed. It stays because the loop had no bound on
+                    # it other than max_turns.
                     tools = [t for t in tools if t["function"]["name"] in _BUDGET_FREE_TOOLS]
                 if name == "respond":
                     if result.get("responded"):
