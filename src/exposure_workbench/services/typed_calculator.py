@@ -37,14 +37,14 @@ it is trusted.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import containment as ct
-from exposure_workbench.db.models import CalcLedger, FinancialFact
+from exposure_workbench.db.models import CalcLedger, Company, FinancialFact
 from exposure_workbench.services import calc_service as cs
 
 OPS = ("add", "subtract", "multiply", "divide")
@@ -69,6 +69,11 @@ class Typed:
     # "unspecified" and a second operation on it lost the periods for good.
     # Kept verbatim rather than recomputed: the row is the record.
     recorded_basis: dict | None = None
+    # Whose numbers these are, as tickers. A fact has one issuer; a calculation
+    # carries the union of its operands'. Empty means UNKNOWN — a row recorded
+    # before quantities carried an issuer — and unknown is treated as shared, so
+    # the double-count rules stay ON for legacy rows rather than off.
+    issuers: tuple[str, ...] = ()
 
     def basis(self) -> dict:
         if self.instant:
@@ -79,7 +84,8 @@ class Typed:
 
     def as_dict(self) -> dict:
         return {"unit_class": self.unit_class, "basis": self.basis(),
-                "quantity": self.quantity, "source_id": self.source_id}
+                "quantity": self.quantity, "source_id": self.source_id,
+                "issuers": list(self.issuers)}
 
 
 def _err(code: str, detail: str) -> dict:
@@ -94,12 +100,16 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         )).scalar_one_or_none()
         if row is None or row.value is None:
             return _err("unknown_operand", f"{ref} is not a fact this desk holds")
+        ticker = (await db.execute(
+            select(Company.ticker).where(Company.id == row.company_id)
+        )).scalar_one_or_none()
         return Typed(
             value=float(row.value),
             unit_class=MONEY if (row.unit or "").upper() == "USD" else RATIO,
             instant=row.period_end if row.period_start is None else None,
             interval=None if row.period_start is None else (row.period_start, row.period_end),
             quantity=row.normalized_metric, source_id=ref,
+            issuers=(ticker,) if ticker else (),
         )
     if ref.startswith("calc_"):
         row = (await db.execute(
@@ -108,16 +118,17 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         if row is None:
             return _err("unknown_operand", f"{ref} is not a calculation this desk holds")
         params = row.params or {}
+        owned = _row_issuers(params.get("result_type"), row.company_id)
         points = (row.result or {}).get("points")
         if isinstance(points, list):
-            return _resolve_series(ref, row.operation, params, points)
+            return _resolve_series(ref, row.operation, params, points, owned)
         value = (row.result or {}).get("value")
         # derive.interval rows predate result_type but carry everything needed.
         if row.operation == cs_op_flow() and params.get("period"):
             p = params["period"]
             return Typed(value=float(value), unit_class=MONEY,
                          interval=(date.fromisoformat(p["start"]), date.fromisoformat(p["end"])),
-                         quantity=params.get("metric"), source_id=ref)
+                         quantity=params.get("metric"), source_id=ref, issuers=owned)
         t = params.get("result_type")
         if not t or value is None:
             return _err(
@@ -132,6 +143,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             interval=(date.fromisoformat(basis["interval"][0]),
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
             quantity=t.get("quantity"), source_id=ref, recorded_basis=basis or None,
+            issuers=owned,
         )
     if ref.startswith(("chunk_", "src_")):
         # V11-A. Asked what share of Lilly's revenue its top products make up,
@@ -150,6 +162,20 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
     return _err("unknown_operand", f"{ref} is not a fact_ or calc_ id")
 
 
+def _row_issuers(result_type: dict | None, company_id: str | None) -> tuple[str, ...]:
+    """The issuers a ledger row belongs to.
+
+    Scalar rows written since quantities carried an issuer say so in their
+    result_type; the flow and series rows fundamentals_service writes have
+    always put the ticker in the row's company column. A row with neither is
+    unknown, which the rules treat as shared.
+    """
+    named = (result_type or {}).get("issuers")
+    if named:
+        return tuple(named)
+    return (company_id,) if company_id else ()
+
+
 @dataclass(frozen=True)
 class TypedSeries:
     """A series of typed quantities keyed by the date each one ends.
@@ -166,9 +192,11 @@ class TypedSeries:
     kind: str                     # flow | instant | series | scalar (derived)
     quantity: str | None
     source_id: str
+    issuers: tuple[str, ...] = ()
 
 
-def _resolve_series(ref: str, operation: str, params: dict, points: list) -> TypedSeries | dict:
+def _resolve_series(ref: str, operation: str, params: dict, points: list,
+                    issuers: tuple[str, ...] = ()) -> TypedSeries | dict:
     rt = params.get("result_type")
     if not rt:
         return _err("untyped_operand",
@@ -185,15 +213,19 @@ def _resolve_series(ref: str, operation: str, params: dict, points: list) -> Typ
         end = date.fromisoformat(end_s)
         if kind == "flow" and p.get("start"):
             t = Typed(value=float(p["value"]), unit_class=unit,
-                      interval=(date.fromisoformat(p["start"]), end), quantity=quantity, source_id=ref)
+                      interval=(date.fromisoformat(p["start"]), end), quantity=quantity,
+                      source_id=ref, issuers=issuers)
         elif kind == "instant":
-            t = Typed(value=float(p["value"]), unit_class=unit, instant=end, quantity=quantity, source_id=ref)
+            t = Typed(value=float(p["value"]), unit_class=unit, instant=end, quantity=quantity,
+                      source_id=ref, issuers=issuers)
         else:
-            t = Typed(value=float(p["value"]), unit_class=unit, quantity=quantity, source_id=ref)
+            t = Typed(value=float(p["value"]), unit_class=unit, quantity=quantity,
+                      source_id=ref, issuers=issuers)
         typed.append((end, t))
     if not typed:
         return _err("empty_series", f"{ref} holds no derivable points")
-    return TypedSeries(points=tuple(typed), unit_class=unit, kind=kind, quantity=quantity, source_id=ref)
+    return TypedSeries(points=tuple(typed), unit_class=unit, kind=kind, quantity=quantity,
+                       source_id=ref, issuers=issuers)
 
 
 def cs_op_flow() -> str:
@@ -203,6 +235,12 @@ def cs_op_flow() -> str:
 
 # ── the four refusals ─────────────────────────────────────────────────────────
 
+def _shared_issuer(a: Typed, b: Typed) -> bool:
+    """Whether the two quantities may describe the same company — the condition
+    under which adding them can count something twice. Unknown counts as shared."""
+    return not a.issuers or not b.issuers or bool(set(a.issuers) & set(b.issuers))
+
+
 def _check(op: str, a: Typed, b: Typed) -> dict | None:
     if op in ("multiply", "divide"):
         return None                      # a ratio may cross bases; it says which
@@ -211,11 +249,43 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
         return _err("incompatible_units",
                     f"{a.source_id} is {a.unit_class} and {b.source_id} is {b.unit_class}")
 
-    if (a.instant is not None) != (b.instant is not None):
+    ka, kb = _kind(a), _kind(b)
+    if "mixed" not in (ka, kb) and ka != kb:
+        word = {"instant": "a balance", "flow": "a flow"}
         return _err("incompatible_bases",
-                    f"{a.source_id} is {'a balance' if a.instant else 'a flow'} and "
-                    f"{b.source_id} is {'a balance' if b.instant else 'a flow'}; "
+                    f"{a.source_id} is {word[ka]} and {b.source_id} is {word[kb]}; "
                     f"a stock and a flow may be divided, not added")
+
+    if not _shared_issuer(a, b):
+        # Different companies: nothing below can double-count, because the two
+        # numbers were never parts of one whole. AAPL's cash at 2026-03-28 plus
+        # MSFT's at 2026-03-31 is a sum of two moments, not one moment counted
+        # twice, and the result says both dates rather than pretending to one.
+        # Until 2026-08-30 this function was issuer-blind: it refused that sum
+        # in the same words it refuses AAPL@March + AAPL@December, and told
+        # the caller to fetch both at one date — which two issuers on
+        # different fiscal calendars never have. Every book-level question
+        # ("how much cash do the tech names hold between them?") was
+        # unreachable by construction.
+        return None
+
+    for t in (a, b):
+        if (t.unit_class != RATIO and t.instant is None and t.interval is None
+                and (t.recorded_basis or {}).get("leaves")):
+            # A money quantity resting on several periods is a sum across
+            # issuers (the only way one arises), and this operand shares an
+            # issuer with it. Whether that issuer's slice is being counted a
+            # second time cannot be told from here, so it is refused rather
+            # than assumed — the one asymmetry in this function that errs
+            # toward a refusal, because the alternative is the AAPL case
+            # through a side door.
+            lv = _leaves(t)
+            return _err("mixed_basis_operand",
+                        f"{t.source_id} is a sum across several periods "
+                        f"({', '.join(lv['instants'] + ['..'.join(x) for x in lv['intervals']])}) "
+                        f"and shares an issuer with {b.source_id if t is a else a.source_id}; "
+                        f"combine it only with other issuers' quantities, or rebuild "
+                        f"the sum from single-period parts.")
 
     # R2 is about ADDITION across time. The difference between two readings of a
     # balance is the change over the days between them, and it is the only way
@@ -267,10 +337,87 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
     return None
 
 
+_JOIN = {"multiply": " × ", "divide": " / ", "add": " + ", "subtract": " − "}
+
+
+def _leaves(t: Typed) -> dict:
+    """The instants and intervals a quantity ultimately rests on.
+
+    A fact has one; a derived quantity has whatever its operands had, carried
+    in its recorded basis. This is what lets a depth-two product say which
+    periods it is made of — the ROE that is a margin times a turnover times a
+    multiplier used to reach the ledger with basis `' multiply '`, its periods
+    gone, and an answer stating them was stating what its evidence did not
+    hold (round-4 battery, 2026-08-29).
+    """
+    if t.instant:
+        return {"instants": [t.instant.isoformat()], "intervals": []}
+    if t.interval:
+        return {"instants": [],
+                "intervals": [[t.interval[0].isoformat(), t.interval[1].isoformat()]]}
+    rec = (t.recorded_basis or {}).get("leaves") or {}
+    return {"instants": list(rec.get("instants", [])),
+            "intervals": [list(x) for x in rec.get("intervals", [])]}
+
+
+def _kind(t: Typed) -> str:
+    """instant | flow | mixed — what a quantity IS for the stock/flow rule.
+
+    A fact says so directly. A derived quantity says so through its leaves: a
+    sum of three issuers' cash rests on instants only and is still a balance;
+    a ratio of a flow to a balance rests on both and is neither.
+    """
+    if t.instant:
+        return "instant"
+    if t.interval:
+        return "flow"
+    lv = _leaves(t)
+    if lv["instants"] and not lv["intervals"]:
+        return "instant"
+    if lv["intervals"] and not lv["instants"]:
+        return "flow"
+    return "mixed"
+
+
+def _mixed_basis(op: str, a: Typed, b: Typed) -> dict:
+    """A basis for a quantity that rests on more than one period: the operands'
+    bases as one expression, and every leaf period beneath them."""
+    la, lb = _leaves(a), _leaves(b)
+    out = {
+        "mixed": f"{_basis_str(a)}{_JOIN[op]}{_basis_str(b)}",
+        "leaves": {
+            "instants": sorted(set(la["instants"]) | set(lb["instants"])),
+            "intervals": [list(x) for x in sorted({tuple(x) for x in la["intervals"] + lb["intervals"]})],
+        },
+    }
+    if not _shared_issuer(a, b):
+        out["cross_issuer"] = True
+    return out
+
+
 def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
+    issuers = tuple(sorted(set(a.issuers) | set(b.issuers)))
     if op in ("multiply", "divide"):
         unit = RATIO if (op == "divide" and a.unit_class == b.unit_class) else a.unit_class
-        return Typed(value=value, unit_class=unit, quantity=None)
+        return Typed(value=value, unit_class=unit, quantity=None,
+                     recorded_basis=_mixed_basis(op, a, b), issuers=issuers)
+    if (not _shared_issuer(a, b)
+            and not (a.instant and a.instant == b.instant)
+            and not (a.interval and a.interval == b.interval)):
+        # Two companies' quantities over different moments or windows, summed or
+        # differenced. There is no single period to stamp on it, so it carries
+        # both as leaves; it stays money (or a count), not a ratio.
+        return Typed(value=value, unit_class=a.unit_class,
+                     recorded_basis=_mixed_basis(op, a, b), issuers=issuers)
+    t = _result_type_within(op, a, b, value)
+    if t.instant is None and t.interval is None and t.recorded_basis is None:
+        # A difference of two ratios, say: no single period, but not nothing.
+        t = replace(t, recorded_basis=_mixed_basis(op, a, b))
+    return replace(t, issuers=issuers)
+
+
+def _result_type_within(op: str, a: Typed, b: Typed, value: float) -> Typed:
+    """The basis of a sum or difference of one issuer's quantities."""
     if op == "subtract" and a.instant and b.instant and a.instant != b.instant:
         # The change in a balance between two readings. It accrues over the days
         # AFTER the earlier reading through the later one — the convention the
@@ -331,11 +478,9 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
 
     result = _result_type(op, left, right, value)
     basis = result.basis()
-    if op in ("multiply", "divide"):
-        basis = {"mixed": " / ".join(
-            v for v in (_basis_str(left), _basis_str(right)) if v)}
 
-    rt = {"unit_class": result.unit_class, "basis": basis, "quantity": result.quantity}
+    rt = {"unit_class": result.unit_class, "basis": basis, "quantity": result.quantity,
+          "issuers": list(result.issuers)}
     calc_id = await cs._record(
         db, None, f"calc.scalar.{op}",
         {"op": op, "operands": [a, b],
@@ -343,9 +488,14 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
          "result_type": rt},
         {"value": value}, [a, b], {}, invoked_by,
     )
-    return {"calc_id": calc_id, "op": op, "value": value, "type": rt,
-            "operands": [a, b],
-            "basis": f"{_basis_str(left)} {op} {_basis_str(right)}"}
+    out = {"calc_id": calc_id, "op": op, "value": value, "type": rt,
+           "operands": [a, b],
+           "basis": f"{_basis_str(left)} {op} {_basis_str(right)}"}
+    if "leaves" in basis:
+        # Every period this number is made of, structured, so an answer can
+        # state them and the gate can see it stating what the row holds.
+        out["periods"] = basis["leaves"]
+    return out
 
 
 async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
@@ -368,7 +518,8 @@ async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
     if isinstance(left, dict):
         return left
     value = left.value * factor
-    rt = {"unit_class": unit_class, "basis": left.basis(), "quantity": quantity}
+    rt = {"unit_class": unit_class, "basis": left.basis(), "quantity": quantity,
+          "issuers": list(left.issuers)}
     calc_id = await cs._record(
         db, None, "calc.scalar.scale",
         {"op": "scale", "operands": [ref], "factor": factor,
@@ -385,6 +536,9 @@ def _basis_str(t: Typed) -> str:
         return t.instant.isoformat()
     if t.interval:
         return f"{t.interval[0].isoformat()}..{t.interval[1].isoformat()}"
+    mixed = (t.recorded_basis or {}).get("mixed")
+    if mixed and mixed != "unspecified":
+        return f"({mixed})"          # a derived operand: its own expression, nested
     return ""
 
 
@@ -467,7 +621,8 @@ async def _calculate_series(db, op, a, b, left, right, invoked_by) -> dict:
     kind = ("flow" if sample_type and sample_type.interval else
             "instant" if sample_type and sample_type.instant else "series")
     rt_out = {"unit_class": unit, "kind": kind, "quantity": None,
-              "derived_from": [getattr(left, "quantity", None), getattr(right, "quantity", None)]}
+              "derived_from": [getattr(left, "quantity", None), getattr(right, "quantity", None)],
+              "issuers": sorted(set(getattr(left, "issuers", ())) | set(getattr(right, "issuers", ())))}
     flags = {}
     if unmatched:
         flags["unmatched_periods"] = unmatched
