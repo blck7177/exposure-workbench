@@ -1,0 +1,151 @@
+[
+ {
+  "tag": "P1-roe-dupont",
+  "q": "break down Alphabet's return on equity for me - margin, asset turnover, and the equity multiplier. want to see which leg is actually carrying it",
+  "minimal_tools": [
+   "describe_issuer",
+   "get_flow",
+   "get_balance_sheet",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "P2-book-leverage",
+  "q": "what's the weighted average leverage across the whole book? debt to ebitda, weighted by position size",
+  "minimal_tools": [
+   "get_portfolio_snapshot",
+   "get_portfolio_positions",
+   "evaluate_formula",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "P3-revenue-correlation",
+  "q": "how correlated are Nvidia's and Apple's revenue growth quarter to quarter? give me the correlation coefficient",
+  "minimal_tools": [
+   "describe_issuer",
+   "get_flow",
+   "series_stat",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "P4-self-knowledge",
+  "q": "before I start throwing questions at you - what can you actually do, and what are you going to have to tell me you can't?",
+  "minimal_tools": [
+   "describe_issuer",
+   "get_portfolio_snapshot"
+  ]
+ },
+ {
+  "tag": "A-asset-turnover-alone",
+  "q": "what's Alphabet's asset turnover for the latest year?",
+  "minimal_tools": [
+   "describe_issuer",
+   "get_flow",
+   "get_balance_sheet",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "B-weighted-lev-three",
+  "q": "just for AAPL, MSFT and NVDA - weight their debt to ebitda by their position sizes in the book and give me the blended number",
+  "minimal_tools": [
+   "get_portfolio_positions",
+   "evaluate_formula",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "C-cross-issuer-cash",
+  "q": "how much cash are Apple, Microsoft and Nvidia sitting on between them? just the combined number",
+  "minimal_tools": [
+   "get_balance_sheet",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "T1-dangling-referent",
+  "q": "did that thing I kicked off earlier finish yet?",
+  "minimal_tools": [
+   "get_task_status",
+   "get_portfolio_snapshot"
+  ]
+ },
+ {
+  "tag": "T2-schedule-no-tool",
+  "q": "set up a daily check on the book and ping me if leverage goes above 3x",
+  "minimal_tools": [
+   "get_portfolio_snapshot",
+   "list_risk_limits",
+   "start_exposure_run"
+  ]
+ },
+ {
+  "tag": "T3-readiness-idempotent",
+  "q": "make sure nvidia's data is up to date before I dig in",
+  "minimal_tools": [
+   "describe_issuer",
+   "ensure_company_ready",
+   "get_task_status"
+  ]
+ },
+ {
+  "tag": "wc-swing",
+  "q": "apple's working capital — how much has it swung over the last year?",
+  "minimal_tools": [
+   "get_balance_series",
+   "calculate",
+   "series_stat",
+   "respond"
+  ]
+ },
+ {
+  "tag": "roic-nopat",
+  "q": "what's msft actually earning on the capital it's got in the business — after tax",
+  "minimal_tools": [
+   "evaluate_formula",
+   "get_balance_sheet",
+   "get_flow",
+   "calculate",
+   "respond"
+  ]
+ },
+ {
+  "tag": "altman-z",
+  "q": "can you run a z-score on xom",
+  "minimal_tools": [
+   "describe_issuer",
+   "respond"
+  ]
+ },
+ {
+  "tag": "leverage-screen-coverage-denominator",
+  "q": "anything in the book levered more than 3x? been meaning to check",
+  "minimal_tools": [
+   "get_portfolio_positions",
+   "evaluate_formula",
+   "respond"
+  ]
+ },
+ {
+  "tag": "X1-crossmodal-tariff-debt",
+  "q": "which of our holdings actually call out tariffs as a risk in their filings? and of those, who is carrying the most debt?",
+  "minimal_tools": [
+   "get_portfolio_positions",
+   "search_filing_passages",
+   "evaluate_formula",
+   "calculate"
+  ]
+ },
+ {
+  "tag": "risk-history-no-run-enumeration",
+  "q": "has our var been creeping up? pull me the last month of it, not just where it sits today",
+  "minimal_tools": [
+   "get_portfolio_snapshot",
+   "get_run_freshness",
+   "get_risk_state",
+   "respond"
+  ]
+ }
+]
