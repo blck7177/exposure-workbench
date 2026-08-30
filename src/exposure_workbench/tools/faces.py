@@ -68,6 +68,13 @@ META_ONLY_READS = [
     # V8-B. One call that reconciles a day's move, built on get_attribution's
     # own service rather than a second copy of the query.
     "reconcile_move",
+    # V14-A. The ordering, the netting and the distances, done once server-side.
+    # Meta-only for the same reason as the rest of this block: it answers a
+    # question about THIS DESK's book. It sits beside reconcile_move rather than
+    # inside get_portfolio_snapshot deliberately — the snapshot frames a
+    # question and is called first every time, and putting a run's whole
+    # analysis into it would make every conversation pay for one.
+    "get_portfolio_analysis",
     # V8-D. When the book fell and what the window between two dates held. Both
     # are about a portfolio, so both are meta-only.
     "get_drawdown_episodes", "explain_episode",

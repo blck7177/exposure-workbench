@@ -498,6 +498,11 @@ _CALC_RATIO_OPS = frozenset({
     "portfolio.window_return",
     # V8-D2. A drawdown depth is a fraction of a peak, not an amount of money.
     "portfolio.drawdown_episodes",
+    # V14-A. Betas and distances between two fractions are both ratios. This op
+    # records every quantity under a declared key with its own unit, so nothing
+    # reads the default today — the line is here so that the day someone adds a
+    # bare `value` to it, the default is the true one rather than MONEY.
+    "portfolio.integration",
 })
 
 # Operations whose result carries MORE THAN ONE computed quantity, and what each
@@ -524,6 +529,19 @@ _CALC_RESULT_KEYS: dict[str, dict[str, str]] = {
         "alpha_plus_residual": RATIO,
         "factor_share": RATIO,
         "unexplained_share": RATIO,
+    },
+    # V14-A. The quantities that read DERIVED, and only those: a net beta is a
+    # sum it performed and a distance to a threshold is a subtraction it
+    # performed. The stress losses, the betas and the limit levels it ORDERS are
+    # columns of the run's own children and resolve through the run id already —
+    # declaring them here would build a second, weaker path to the same evidence.
+    # Each is a labelled family (see the third shape in _from_calc): four risks,
+    # and as many distances as there were checks that recorded their value.
+    "portfolio.integration": {
+        "net_beta": RATIO,
+        "gross_beta": RATIO,
+        "room_to_warning": RATIO,
+        "room_to_breach": RATIO,
     },
 }
 
@@ -639,7 +657,21 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
         # A declared key may hold one number or a list of them in one unit — an
         # episode list is n depths, all distances below a running high. Declared
         # either way, so the list is not a licence to walk arbitrary structure.
+        #
+        # V14-A adds the third shape, and only the third: a list of {label,
+        # value} pairs, one unit for the family. It exists for the same reason
+        # _RUN_CHILDREN carries a label column — a positional label makes four
+        # net betas and four distances read alike, and "which of these did the
+        # answer nearly match" is the question a refusal has to be able to
+        # answer. Still declared, still closed: an entry that is not a number
+        # under `value` contributes nothing.
         for i, item in enumerate(kv if isinstance(kv, list) else [kv]):
+            if isinstance(item, dict):
+                v, name = item.get("value"), item.get("label")
+                if isinstance(v, (int, float)) and not isinstance(v, bool) and isinstance(name, str):
+                    values.append(EvidenceValue(
+                        float(v), key_unit, f"{row.operation}.{key}.{name}", cid))
+                continue
             if isinstance(item, (int, float)) and not isinstance(item, bool):
                 label = f"{row.operation}.{key}" + (f"[{i}]" if isinstance(kv, list) else "")
                 values.append(EvidenceValue(float(item), key_unit, label, cid))

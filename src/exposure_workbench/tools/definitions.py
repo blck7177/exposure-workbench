@@ -27,6 +27,7 @@ from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import drawdown_service
+from exposure_workbench.services import integration_service
 from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import series_service
@@ -272,6 +273,10 @@ async def _get_run_freshness(db: AsyncSession, portfolio_id: str) -> dict:
 
 async def _reconcile_move(db: AsyncSession, run_id: str) -> dict:
     return await reconcile_service.reconcile_move(db, run_id)
+
+
+async def _get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
+    return await integration_service.get_portfolio_analysis(db, run_id)
 
 
 async def _get_drawdown_episodes(db: AsyncSession, portfolio_id: str, span: str = "1y") -> dict:
@@ -654,6 +659,26 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_reconcile_move, tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="get_portfolio_analysis",
+        display="Ordering the exposures and measuring the room left",
+        description=(
+            "One run's exposures, already ordered and netted: every stress scenario ranked "
+            "by the size of the loss, the book's NET exposure to rates, credit and equity "
+            "with the legs that make it up, the distance from each limit check to its own "
+            "warning and breach levels, and every holding with its weight and its "
+            "contribution to the day. Use this for 'what is this book exposed to', 'which "
+            "risk is biggest', 'how much room is left' and 'what should I watch' — it "
+            "answers in one call what otherwise takes five, and the ordering and the "
+            "netting are done here rather than by you. A risk no factor measures is "
+            "reported as unmeasured, not as zero. Cite the run_id, or the calc_id for the "
+            "netted betas and the distances."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_get_portfolio_analysis, tool_class=READ,
     ))
     reg.register(Tool(
         name="get_drawdown_episodes",
