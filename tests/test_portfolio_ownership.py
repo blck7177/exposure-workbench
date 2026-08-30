@@ -72,10 +72,27 @@ def test_the_owner_id_never_reaches_the_wire():
 def test_the_web_decides_ownership_from_is_own_and_never_from_is_public():
     """Both halves of the old bug were individually consistent: the API answered
     'is this public' correctly and the page asked the wrong question. Nothing
-    goes red for that, so this does."""
-    body = PAGE_TSX.read_text()
-    assert "is_own" in body, "the page must ask about ownership directly"
-    assert "is_public" not in body, (
-        "page.tsx is deciding something from is_public again; publicness does not "
-        "mean 'not mine' — see this module's docstring"
+    goes red for that, so this does.
+
+    The ban was on the whole word, which is the right shape while the only thing
+    anyone wants publicness for is ownership. V13-S6c wants it for one other
+    thing — saying `Shared demo book` on a book that is public AND not yours,
+    which is a true sentence that `is_own` alone cannot produce and that
+    `!is_own` alone would print over somebody's shared book. So the rule is
+    narrowed rather than dropped: publicness may appear, and never on its own.
+    An expression that reads `is_public` without `is_own` in the same breath is
+    the original bug, and still fails here.
+    """
+    web = ROOT / "apps" / "web" / "app"
+    offenders = []
+    for path in sorted(web.rglob("*.tsx")):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if "is_public" in line and "is_own" not in line:
+                offenders.append(f"{path.relative_to(web)}:{n}: {line.strip()}")
+    assert not offenders, (
+        "publicness is deciding something on its own; it does not mean 'not mine' "
+        "— see this module's docstring:\n  " + "\n  ".join(offenders)
+    )
+    assert any("is_own" in p.read_text() for p in web.rglob("*.tsx")), (
+        "the web must ask about ownership directly"
     )

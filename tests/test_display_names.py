@@ -123,3 +123,31 @@ def test_an_unknown_key_comes_back_as_itself_and_is_therefore_visible():
     assert dn.label("metric", "a_metric_nobody_has_added") == "a_metric_nobody_has_added"
     assert dn.label("metric", None) == ""
     assert dn.label("no_such_table", "x") == "x"
+
+
+# ── the recipe's rows reach the page in words ────────────────────────────────
+
+def test_the_financials_route_serves_a_display_name_for_every_row():
+    """The manifest is keyed on `net_margin`; the Financials tab listed that.
+
+    `label` on this route is the manifest KEY, and the field name made it look
+    like a caption — so sixteen rows went to the reader spelled the way the
+    recipe spells them, `cash_to_long_term_debt_noncurrent` among them, on the
+    one tab whose subject is what this desk can tell you about a company.
+
+    The key stays (a caller matching rows across runs needs it) and `display`
+    carries the words. RECIPE_ROW's completeness is guarded above, so this only
+    has to pin that the route reaches for it at all — the two together are what
+    make the tab's spelling a property rather than a habit.
+    """
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "apps" / "api" / "routes" / "issuers.py").read_text()
+    financials = src[src.index("async def financials("):]
+    financials = financials[:financials.index("\n@router")]
+    assert 'dn.label("recipe_row", label)' in financials, (
+        "the financials route must name its rows from display_names.RECIPE_ROW"
+    )
+    assert financials.count('"display": display') == 2, (
+        "both branches — the row that exists and the one that is unavailable — "
+        "carry the name; an unavailable row is the one a reader most needs named"
+    )

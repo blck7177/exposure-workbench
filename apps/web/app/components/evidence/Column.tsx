@@ -88,7 +88,10 @@ function EvidenceColumnBody({ drill }: { drill: (id: string) => void }) {
   if (!isOpen) return null;
   const top = stack[stack.length - 1];
   return (
-    <aside className="border-l border-[#21262d] bg-[#11161d] flex flex-col min-h-0 overflow-hidden"
+    // w-[360px]: the column is a fixed lane in the workspace, not a thing the
+    // page has to size. shrink-0 so a wide table in the main pane cannot squeeze
+    // the evidence a reader opened to check it against.
+    <aside className="w-[360px] shrink-0 border-l border-[#21262d] bg-[#11161d] flex flex-col min-h-0 overflow-hidden"
       aria-label="Evidence">
       <header className="h-10 flex items-center gap-2 px-3 border-b border-[#21262d] shrink-0">
         {stack.length > 1 && (

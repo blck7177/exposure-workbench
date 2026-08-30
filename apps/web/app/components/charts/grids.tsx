@@ -2,7 +2,7 @@
 
 import React from "react";
 
-import { C, Tooltip, useTooltip, useWidth } from "./frame";
+import { C, Tooltip, useTooltip, useWidth, fmtDate } from "./frame";
 
 /**
  * The grid family (V13-S6): a heatmap, a window ladder, a coverage matrix and a
@@ -245,7 +245,7 @@ export function CoverageTable({ rows }: {
               <td className="py-1.5 px-2 border-b border-[#161b22] text-right font-mono tabular-nums text-slate-400">
                 {r.periods ?? "—"}
               </td>
-              <td className="py-1.5 px-2 border-b border-[#161b22] font-mono text-slate-400">{r.latest ?? "—"}</td>
+              <td className="py-1.5 px-2 border-b border-[#161b22] text-slate-400 whitespace-nowrap">{fmtDate(r.latest)}</td>
               <td className="py-1.5 pl-2 border-b border-[#161b22] text-slate-500">
                 {r.windows_filed?.length ? r.windows_filed.join(", ") : "—"}
               </td>

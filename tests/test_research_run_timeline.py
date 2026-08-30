@@ -148,10 +148,30 @@ def test_the_issuer_page_takes_the_portfolio_from_the_url():
     assert "startResearch(tk, portfolioId)" in src
 
 
-def test_the_issuer_page_renders_the_shared_timeline_and_the_failure_sentence():
+def test_both_run_views_share_one_step_collapse_and_say_why_a_run_stopped():
     """Two copies of the step collapse drift the moment one page meets a step
     type the other has not; and error_message is a written sentence (V4-S1) that
-    reached the API and stopped at the screen, where the run said only 'failed'."""
-    src = ISSUER_PAGE.read_text()
-    assert "RunTimeline" in src and "components/RunTimeline" in src
-    assert "run.error_message" in src
+    reached the API and stopped at the screen, where the run said only 'failed'.
+
+    The component that used to hold the collapse was retired in V13-S6c — the
+    exposure run is a folded record at the foot of the book and the research run
+    is a live panel on an issuer, and they no longer look alike. What they must
+    still share is the collapse itself, so this names the module rather than the
+    component: the guard is about there being ONE of it, not about where it is
+    drawn.
+    """
+    shared = WEB / "app" / "components" / "steps.ts"
+    assert shared.exists(), "the shared step collapse is gone; two pages will drift"
+
+    readers = [p for p in _web_sources() if "collapseSteps" in p.read_text()
+               and p.name != "steps.ts"]
+    assert len(readers) >= 2, (
+        f"only {[p.name for p in readers]} uses the shared collapse — the other run "
+        "view has grown its own copy"
+    )
+
+    issuer = ISSUER_PAGE.read_text()
+    assert "collapseSteps" in issuer, "the issuer page must collapse steps the shared way"
+    # The failure sentence: explainRunError is what turns a code into it, and it
+    # is given error_message so a message the API vouched for wins over wording.
+    assert "explainRunError(run.error_code, run.error_message)" in issuer

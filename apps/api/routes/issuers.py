@@ -153,15 +153,24 @@ async def financials(ticker: str, db: AsyncSession = Depends(get_db)):
     ids = [v for v in labels.values() if isinstance(v, str)]
     rows = {r.id: r for r in (await db.execute(
         select(CalcLedger).where(CalcLedger.id.in_(ids)))).scalars().all()} if ids else {}
+    # `label` is the manifest's KEY — `net_margin`, `cash_to_long_term_debt_noncurrent`
+    # — and it went to the page under a field called label, so the Financials tab
+    # listed sixteen rows spelled the way the recipe spells them. `display` is the
+    # same name in words, from the one table that holds them (V13-S3a); the key
+    # stays because it is what the manifest is keyed on and what a caller matching
+    # rows across runs needs.
     calcs = []
     for label, ref in labels.items():
+        display = dn.label("recipe_row", label)
         if isinstance(ref, str) and ref in rows:
             r = rows[ref]
-            calcs.append({"label": label, "calc_id": r.id, "operation": r.operation,
+            calcs.append({"label": label, "display": display,
+                          "calc_id": r.id, "operation": r.operation,
                           "params": r.params, "result": r.result,
                           "primitive_version": r.primitive_version})
         else:
-            calcs.append({"label": label, "calc_id": None, "operation": None, "params": {},
+            calcs.append({"label": label, "display": display,
+                          "calc_id": None, "operation": None, "params": {},
                           "result": None, "primitive_version": None,
                           "unavailable": (ref or {}).get("reason") if isinstance(ref, dict) else "missing"})
     return {"ticker": c.ticker, "calcs": calcs,

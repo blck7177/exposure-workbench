@@ -18,13 +18,38 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── formatting ───────────────────────────────────────────────────────────────
 
+/**
+ * Money, with the sign OUTSIDE the symbol.
+ *
+ * `$-141,973` is what interpolating a negative number after a `$` produces, and
+ * it is what the Day P&L tile read on the first screenshot of this page. It is
+ * not how anyone writes a loss, and on a tile whose whole job is to say a
+ * number is negative, a sign in the wrong place is the one character that has
+ * to be right. The magnitude is formatted, then the sign is put in front of it.
+ */
 export const fmtMoney = (v: number | null | undefined): string => {
   if (v == null) return "—";
   const a = Math.abs(v);
-  if (a >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (a >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
-  if (a >= 1e4) return `$${Math.round(v).toLocaleString()}`;
-  return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const sign = v < 0 ? "\u2212" : "";
+  if (a >= 1e9) return `${sign}$${(a / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
+  if (a >= 1e4) return `${sign}$${Math.round(a).toLocaleString()}`;
+  return `${sign}$${a.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+};
+
+/**
+ * A stored key, read as words.
+ *
+ * `Communication_Services` and `small_cap` are how a sector and a factor are
+ * spelled in the database, and both reached the page in that spelling. Where
+ * the server has a real label for something this is not used — the limit book
+ * and the correlation window both carry theirs, and a name from the source of
+ * truth beats a transformation of a key every time.
+ */
+export const titleFromKey = (k: string | null | undefined): string => {
+  if (!k) return "—";
+  const words = k.replace(/[_:]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
 export const fmtPct = (v: number | null | undefined, d = 2): string =>
@@ -196,13 +221,19 @@ export function DataTable({ spec }: { spec: TableSpec }) {
   );
 }
 
-export function Legend({ items }: { items: { label: string; colour?: string; shape?: "line" | "swatch" | "tick" | "dashed" }[] }) {
+export function Legend({ items }: { items: { label: string; colour?: string; shape?: "line" | "swatch" | "outline" | "tick" | "dashed" }[] }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 text-[11px] text-slate-400">
       {items.map((it) => (
         <span key={it.label} className="inline-flex items-center gap-1.5">
           {it.shape === "tick" ? (
             <i className="inline-block w-0 h-2.5 border-l-2" style={{ borderColor: it.colour }} />
+          ) : it.shape === "outline" ? (
+            // The ladder draws a derived window as the same hue, hollow — same
+            // measure, produced differently. A legend that showed it as a second
+            // colour would say it was a different kind of number.
+            <i className="inline-block w-2.5 h-2.5 rounded-sm border-[1.5px]"
+              style={{ borderColor: it.colour }} />
           ) : it.shape === "dashed" ? (
             <i className="inline-block w-2.5 h-2.5 rounded-sm border border-dashed border-slate-400" />
           ) : it.shape === "swatch" ? (

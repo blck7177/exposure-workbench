@@ -64,6 +64,14 @@ export function Waterfall({ steps, format, height = 200, ariaLabel }: {
   const Y = lin(lo, hi, top + plotH, top);
   const slot = (w - padLeft - padRight) / Math.max(1, bars.length);
   const bw = Math.min(BAR, slot * 0.62);
+  // A centred label wider than its slot runs into both neighbours, and with ten
+  // bars in a half-width panel `Stock-specific` overprinted `IWM` and `Day`.
+  // Roughly 5.4px per character at this size; the full name stays in the
+  // tooltip, which is where it was always going to be read anyway.
+  const fit = (t: string) => {
+    const max = Math.max(3, Math.floor(slot / 5.4));
+    return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+  };
 
   // Label the ends and the extremes; a number on every bar goes unread.
   const biggest = Math.max(...bars.filter((b) => !b.total).map((b) => Math.abs(b.value)), 0);
@@ -92,7 +100,10 @@ export function Waterfall({ steps, format, height = 200, ariaLabel }: {
                   textAnchor="middle" fontSize={10.5} fill="#e6edf3">{format(b.value)}</text>
               )}
               <text x={x + bw / 2} y={height - 6} textAnchor="middle" fontSize={10}
-                fill={b.total ? "#9aa7b7" : C.ink3}>{b.short ?? b.label}</text>
+                fill={b.total ? "#9aa7b7" : C.ink3}>
+                <title>{b.label}</title>
+                {fit(b.short ?? b.label)}
+              </text>
               {i < bars.length - 1 && !bars[i + 1].total && (
                 <line x1={x + bw} x2={padLeft + slot * (i + 1) + (slot - bw) / 2}
                   y1={Y(b.y1)} y2={Y(b.y1)} stroke={C.grid} />

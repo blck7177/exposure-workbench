@@ -3,7 +3,7 @@
 // ensure-ready) carry the Clerk bearer token, same as lib/api.
 
 import { apiFetch as j } from "./http";
-import type { TimelineEvent } from "@/app/components/RunTimeline";
+import type { RunError } from "./types";
 
 // ─── types ──────────────────────────────────────────────────────────────────
 export type CompanyRow = { ticker: string; name: string; sector: string | null; is_investigable: boolean };
@@ -19,11 +19,30 @@ export type Snapshot = {
 
 export type CalcRow = {
   calc_id: string | null; operation: string | null; params: any; result: any; primitive_version: string | null;
-  label?: string;            // V10: the recipe's own name for the row
+  label?: string;            // V10: the manifest KEY for the row — `net_margin`
+  display?: string;          // V13: that key in words — `Net margin`
   unavailable?: string;      // V10: present when the recipe could not compute it
 };
 export type FilingRow = { accession: string; form_type: string; filing_date: string; period_end: string | null; source_url: string | null; sections: { id: string; item_code: string | null; title: string | null }[] };
 export type SourceRow = { id: string; title: string | null; url: string; publisher: string | null; published_date: string | null; snippet: string | null; search_query: string | null };
+/**
+ * One step of a research run's outer timeline (V7-U1).
+ *
+ * It lived in the component that drew it until V13-S6c retired that component;
+ * it is a wire shape, so it belongs beside the call that returns it. `error`
+ * carries the KIND of failure and never the exception's own words — see
+ * RunError in lib/types.ts.
+ */
+export type TimelineEvent = {
+  id: number;
+  step_name: string;
+  status: string;
+  message: string | null;
+  duration_ms: number | null;
+  payload_summary?: Record<string, unknown>;
+  error?: RunError | null;
+};
+
 export type Brief = {
   id: string; research_run_id: string;
   financial_summary: string | null; key_changes: string | null; management_explanation: string | null;

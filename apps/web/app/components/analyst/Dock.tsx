@@ -279,7 +279,11 @@ export function AnalystDock() {
   const pool = usage?.pools.find((p) => p.kind === "chat_turn");
 
   return (
-    <aside className="border-l border-[#21262d] bg-[#11161d] flex flex-col min-h-0" aria-label="Analyst">
+    // order-last: EvidenceProvider renders the evidence column after its own
+    // children, and the dock is one of those children — so without this the
+    // evidence a reader opened would appear on the far side of the dock,
+    // away from the answer that cited it.
+    <aside className="w-[380px] shrink-0 order-last border-l border-[#21262d] bg-[#11161d] flex flex-col min-h-0" aria-label="Analyst">
       <header className="h-10 flex items-center gap-2 px-3 border-b border-[#21262d] shrink-0">
         <MessageSquare className="w-3.5 h-3.5 text-blue-400 shrink-0" />
         <span className="text-sm text-slate-300 truncate">Analyst</span>

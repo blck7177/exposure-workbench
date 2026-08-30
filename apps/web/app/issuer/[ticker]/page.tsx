@@ -1,46 +1,53 @@
 "use client";
 
-import { useEffect, useState, useCallback, use, Suspense } from "react";
+import { Suspense, use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Play, Loader2, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Loader2, Play } from "lucide-react";
+
+import { AuditOnly } from "../../components/audit";
+import { AuthGate } from "../../components/Auth";
+import { useDockContext } from "../../components/analyst/Dock";
+import { AnswerText, idsIn } from "../../components/analyst/AnswerText";
+import { CitationList } from "../../components/evidence/Cite";
+import { useEvidence } from "../../components/evidence/Column";
+import { fmtDate, fmtMoney, fmtPct } from "../../components/charts/frame";
 import {
-  getSnapshot, getFinancials, getFilings, getSection, getResearchSources, getLatestBrief,
-  startResearch, getResearchRun,
-  type Snapshot, type CalcRow, type FilingRow, type SourceRow, type Brief, type ResearchRun,
-} from "../../../lib/issuer";
-import { explainApiError, explainRunError } from "../../../lib/errors";
-import { CitationChip, EvidenceDrawer } from "../../components/Evidence";
-import { RunTimeline } from "../../components/RunTimeline";
-import { ChatPanel } from "../../components/ChatPanel";
+  BriefProvenance, Coverage, PriceVsBenchmark, Windows,
+} from "../../components/issuer/panels";
+import { getPositions } from "@/lib/api";
+import {
+  getCitationMap, getCoverage, getEvidenceLabels, getPriceIndex, getWindows,
+  type CitationMap as CitationMapData, type CoverageRow, type EvidenceLabel,
+  type PriceIndex, type ReportedWindows,
+} from "@/lib/charts";
+import { explainApiError, explainRunError } from "@/lib/errors";
+import {
+  getFilings, getFinancials, getLatestBrief, getResearchRun, getResearchSources,
+  getSection, getSnapshot, startResearch,
+  type Brief, type CalcRow, type FilingRow, type ResearchRun, type Snapshot, type SourceRow,
+} from "@/lib/issuer";
+import { collapseSteps, stepPhrase } from "../../components/steps";
+import type { Position } from "@/lib/types";
 
-const TABS = ["Snapshot", "Financials", "Filings", "Research", "Brief"] as const;
+/**
+ * An issuer (V13-S6c).
+ *
+ * The tabs are the same five questions as before; what changed is that four of
+ * them now answer with the engine's own structure instead of a list of
+ * identifiers. Snapshot listed 33 metric chips with a period count each, which
+ * answers neither "can you answer my question about this company" nor "how far
+ * back does this go". Financials listed rows with `calc 2b5395` beside them.
+ *
+ * The most consequential panel is the window ladder, and it corrected me: I had
+ * assumed two filings meant a quarterly series full of holes. They do not.
+ * Apple's December quarter is the fiscal year minus its nine months — a figure
+ * no filing states and this engine derives exactly — so the honest distinction
+ * is reported versus derived, not held versus missing.
+ */
+
+const TABS = ["Overview", "Financials", "Filings", "Brief"] as const;
 type Tab = (typeof TABS)[number];
-
-function fmt(v: unknown): string {
-  if (typeof v !== "number") return v == null ? "—" : String(v);
-  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (Math.abs(v) < 1 && v !== 0) return `${(v * 100).toFixed(2)}%`;
-  return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-// latest point of a calc series result, or the scalar value
-function latestVal(r: CalcRow): number | null {
-  if (r.result?.value !== undefined) return r.result.value;
-  const pts = r.result?.points;
-  if (Array.isArray(pts) && pts.length) return pts[pts.length - 1].value;
-  return null;
-}
-function latestPeriod(r: CalcRow): string {
-  const pts = r.result?.points;
-  // v2 series points end on `end` (a window) or `as_of` (an instant); v1 rows used period_end.
-  if (Array.isArray(pts) && pts.length) {
-    const p = pts[pts.length - 1];
-    return p.end ?? p.as_of ?? p.period_end ?? "";
-  }
-  return "";
-}
 
 // useSearchParams below bails the client tree out of prerendering up to the
 // closest Suspense boundary, and a production build with no such boundary fails
@@ -48,7 +55,7 @@ function latestPeriod(r: CalcRow): string {
 // page's own background so the bail-out cannot flash white.
 export default function IssuerPage({ params }: { params: Promise<{ ticker: string }> }) {
   return (
-    <Suspense fallback={<div className="h-screen bg-[#0d1117]" />}>
+    <Suspense fallback={<div className="flex-1 bg-[#0d1117]" />}>
       <IssuerView params={params} />
     </Suspense>
   );
@@ -57,26 +64,40 @@ export default function IssuerPage({ params }: { params: Promise<{ ticker: strin
 function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = use(params);
   const tk = ticker.toUpperCase();
-  // Which book the reader came from. Absent is a real answer — a hand-typed URL,
-  // an anonymous visitor, someone with no portfolio yet — and stays absent: the
-  // literal demo id this used to send made every run a signed-in user started
-  // read as the demo's, and the brief reasoned about the wrong holdings.
+  // Which book the reader came from. Absent is a real answer — a hand-typed
+  // URL, an anonymous visitor, someone with no portfolio yet — and stays
+  // absent: the literal demo id this used to send made every run a signed-in
+  // user started read as the demo's, and the brief reasoned about the wrong
+  // holdings.
   const portfolioId = useSearchParams().get("portfolio") ?? undefined;
-  const [tab, setTab] = useState<Tab>("Snapshot");
+
+  const [tab, setTab] = useState<Tab>("Overview");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [index, setIndex] = useState<PriceIndex | null>(null);
+  const [coverage, setCoverage] = useState<CoverageRow[] | null>(null);
   // The whole run, not just its status: the timeline and the failure sentence
   // both arrive on it, and one poll already carries all three.
   const [run, setRun] = useState<ResearchRun | null>(null);
   const runId = run?.id ?? null;
   const runStatus = run?.status ?? null;
 
+  const { setContext } = useDockContext();
+  useEffect(() => {
+    setContext({ kind: "issuer", ticker: tk, name: snap?.company.name ?? null });
+  }, [tk, snap?.company.name, setContext]);
+
   // explainApiError, not e.message: this branch is how `API 404:
   // {"detail":{"error":"unknown_ticker","ticker":"FOOBAR"}}` came to be rendered
   // in a red bar to anyone who mistyped a symbol — while lib/errors.ts already
-  // held a sentence for that exact code, written for exactly this reader (V13-S2).
+  // held a sentence for that exact code, written for exactly this reader.
   useEffect(() => {
-    getSnapshot(tk).then(setSnap).catch((e) => setError(explainApiError(e).notice));
+    let ignore = false;
+    getSnapshot(tk).then((s) => { if (!ignore) setSnap(s); })
+      .catch((e) => { if (!ignore) setError(explainApiError(e).notice); });
+    getPriceIndex(tk).then((i) => { if (!ignore) setIndex(i); }).catch(() => setIndex(null));
+    getCoverage(tk).then((c) => { if (!ignore) setCoverage(c.measures); }).catch(() => setCoverage([]));
+    return () => { ignore = true; };
   }, [tk]);
 
   const runResearch = async () => {
@@ -89,16 +110,11 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   };
 
   // A poll that throws used to be an unhandled rejection, and the timeline
-  // simply stopped moving on whatever step it had reached. That was survivable
-  // when the page showed a spinner; now that the steps ARE the narrative, a
-  // frozen one is worse than no narrative, because it reads as a run that hung
-  // rather than a page that lost contact.
-  //
-  // It keeps polling rather than giving up on the first failure: a worker
-  // restart or a brief 503 is a normal few seconds, and abandoning a live run
-  // over one would be the more common wrong answer. What it will not do is stay
-  // quiet — after two consecutive failures the panel says the state may be out
-  // of date, which is the honest description of what is on screen.
+  // simply stopped moving on whatever step it had reached. It keeps polling
+  // rather than giving up on the first failure — a worker restart is a normal
+  // few seconds — but it will not stay quiet: after two consecutive failures
+  // the panel says the state may be out of date, which is the honest
+  // description of what is on screen.
   const [staleSince, setStaleSince] = useState(0);
   useEffect(() => {
     if (!runId || runStatus === "completed" || runStatus === "failed") return;
@@ -115,186 +131,319 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
     return () => clearInterval(iv);
   }, [runId, runStatus]);
 
+  const e = snap?.portfolio_exposure;
+  const working = !!runStatus && runStatus !== "completed" && runStatus !== "failed";
+
   return (
-    <div className="h-screen flex flex-col bg-[#0d1117] text-[#e6edf3]">
-      <header className="h-12 border-b border-[#21262d] flex items-center px-4 gap-3 shrink-0">
-        <Link href="/" className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-sm">
-          <ArrowLeft className="w-4 h-4" /> Portfolio
-        </Link>
-        <div className="h-4 w-px bg-[#21262d]" />
-        <span className="font-semibold">{tk}</span>
-        <span className="text-sm text-slate-500">{snap?.company.name}</span>
-        {snap?.company.sector && <span className="text-xs text-slate-600 px-2 py-0.5 rounded border border-[#21262d]">{snap.company.industry || snap.company.sector}</span>}
-        <div className="ml-auto flex items-center gap-2">
-          {runStatus && runStatus !== "completed" && runStatus !== "failed" && (
-            <span className="text-xs text-amber-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> research {runStatus}…</span>
-          )}
-          {runStatus === "completed" && <span className="text-xs text-emerald-400">research complete</span>}
-          {runStatus === "failed" && <span className="text-xs text-red-400">research failed</span>}
-          <button onClick={runResearch} disabled={!!runStatus && runStatus !== "completed" && runStatus !== "failed"}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm">
-            <Play className="w-3.5 h-3.5" /> Run research
-          </button>
-        </div>
-      </header>
+    <>
+      {portfolioId && <BookRail portfolioId={portfolioId} current={tk} />}
 
-      {error && <div className="px-4 py-2 text-xs text-red-400 bg-red-950/30 border-b border-red-900/40">{error}</div>}
-
-      {/* The panel appears as soon as a run exists and STAYS once it settles.
-          Both halves are about someone who looked away: before the first event
-          lands there is nothing to show but the fact that the run was accepted,
-          so it says that rather than rendering an empty box, which reads as a
-          click that missed; and it does not auto-hide, because a timer would
-          race the reader's attention and on a failed run this is the only place
-          the reason is written. Starting the next run replaces it. */}
-      {run && (
-        <div className="px-4 py-3 border-b border-[#21262d] shrink-0">
-          <div className="text-[10px] uppercase text-slate-500 mb-2">Research run</div>
-          <div className="max-h-48 overflow-y-auto">
-            <RunTimeline events={run.workflow_events}
-              emptyText="Queued — a worker picks this up within a few seconds." />
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="max-w-[1180px] mx-auto px-5 py-4 flex flex-col gap-3">
+          {/* who this is */}
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="min-w-0">
+              <Link href="/"
+                className="inline-flex items-center gap-1 text-[11.5px] text-slate-500 hover:text-slate-300">
+                <ArrowLeft className="w-3 h-3" /> Back to the book
+              </Link>
+              <h1 className="text-lg font-semibold text-slate-100 mt-1">
+                {snap?.company.name ?? tk}
+                <span className="ml-2 font-mono text-sm text-slate-500">{tk}</span>
+              </h1>
+              <p className="text-[11.5px] text-slate-500 mt-0.5">
+                {[snap?.company.industry || snap?.company.sector, snap?.company.exchange]
+                  .filter(Boolean).join(" · ")}
+                {e && <> · in this book <span className="text-slate-400">{fmtMoney(e.market_value)}</span>
+                  {e.weight != null && <> · {fmtPct(e.weight, 2)}</>}</>}
+              </p>
+              <AuditOnly>
+                <span className="block mt-1 font-mono text-[10px] text-slate-600">
+                  CIK {snap?.company.cik ?? "—"}{portfolioId ? ` · ${portfolioId}` : ""}
+                </span>
+              </AuditOnly>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {snap?.latest_filing?.source_url && (
+                <a href={snap.latest_filing.source_url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded-md border border-[#30363d] px-2.5 py-1.5 text-[11.5px] text-slate-300 hover:border-slate-500">
+                  Open the {snap.latest_filing.form_type} <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              <AuthGate fallback={<span className="text-[11px] text-slate-600">Sign in to research</span>}>
+                <button onClick={runResearch} disabled={working}
+                  className="flex items-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-3 py-1.5 text-xs font-medium text-white">
+                  {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  {working ? "Researching…" : "Refresh the brief"}
+                </button>
+              </AuthGate>
+            </div>
           </div>
-          {run.status === "failed" && (
-            <div className="mt-2 text-xs text-red-300">
-              {explainRunError(run.error_code, run.error_message)}
-            </div>
-          )}
-          {staleSince >= 2 && (
-            <div className="mt-2 text-[10px] text-amber-400/80">
-              Lost contact with the run — the steps above may be out of date. Reload to check.
-            </div>
-          )}
-        </div>
-      )}
 
-      <div className="border-b border-[#21262d] flex px-4 gap-1 shrink-0">
-        {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-2 text-sm border-b-2 -mb-px ${tab === t ? "border-blue-500 text-slate-100" : "border-transparent text-slate-500 hover:text-slate-300"}`}>{t}</button>
+          {error && (
+            <p className="rounded-md border border-amber-900/60 bg-amber-950/25 px-3 py-2 text-[12px] text-amber-300">
+              {error}
+            </p>
+          )}
+
+          {/* The panel appears as soon as a run exists and STAYS once it settles.
+              It does not auto-hide: a timer would race the reader's attention, and
+              on a failed run this is the only place the reason is written. */}
+          {run && <ResearchProgress run={run} stale={staleSince >= 2} />}
+
+          <div className="flex gap-1 border-b border-[#21262d]">
+            {TABS.map((t) => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-3 py-1.5 text-[12.5px] border-b-2 -mb-px transition-colors ${
+                  tab === t ? "border-blue-500 text-slate-100" : "border-transparent text-slate-500 hover:text-slate-300"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {tab === "Overview" && (
+            <div className="flex flex-col gap-3">
+              {index && <PriceVsBenchmark index={index} />}
+              {coverage && coverage.length > 0 && <Coverage rows={coverage} />}
+              {coverage?.length === 0 && (
+                <p className="text-xs text-slate-500 py-8 text-center">
+                  Nothing is ingested for {tk} yet — refresh the brief to read its filings.
+                </p>
+              )}
+            </div>
+          )}
+          {tab === "Financials" && <FinancialsTab ticker={tk} coverage={coverage ?? []} />}
+          {tab === "Filings" && <FilingsTab ticker={tk} />}
+          {tab === "Brief" && <BriefTab ticker={tk} runStatus={runStatus} />}
+          <div className="h-6" />
+        </div>
+      </main>
+    </>
+  );
+}
+
+// ── the book you came from, as a way back into it ────────────────────────────
+
+function BookRail({ portfolioId, current }: { portfolioId: string; current: string }) {
+  const [positions, setPositions] = useState<Position[]>([]);
+  useEffect(() => {
+    let ignore = false;
+    getPositions(portfolioId).then((p) => { if (!ignore) setPositions(p); }).catch(() => {});
+    return () => { ignore = true; };
+  }, [portfolioId]);
+  if (positions.length === 0) return null;
+  return (
+    <nav className="w-[228px] shrink-0 border-r border-[#21262d] bg-[#0d1117] overflow-y-auto"
+      aria-label="Holdings of the book you came from">
+      <div className="px-3 pt-3 pb-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-600">
+        Holdings
+      </div>
+      {[...positions]
+        .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
+        .map((p) => (
+          <Link key={p.id} href={`/issuer/${p.ticker}?portfolio=${portfolioId}`}
+            className={`px-3 py-1 flex items-baseline gap-2 border-l-2 ${
+              p.ticker === current
+                ? "border-blue-500 bg-[#161b22]"
+                : "border-transparent hover:bg-[#11161d]"}`}>
+            <span className="font-mono text-[11.5px] text-slate-300 w-12 shrink-0">{p.ticker}</span>
+            <span className="text-[10.5px] text-slate-600 tabular-nums ml-auto">
+              {fmtMoney(p.market_value)}
+            </span>
+          </Link>
         ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5">
-        {tab === "Snapshot" && <SnapshotTab snap={snap} />}
-        {tab === "Financials" && <FinancialsTab ticker={tk} />}
-        {tab === "Filings" && <FilingsTab ticker={tk} />}
-        {tab === "Research" && <ResearchTab ticker={tk} />}
-        {tab === "Brief" && <BriefTab ticker={tk} runStatus={runStatus} />}
-      </div>
-
-      <EvidenceDrawer />
-      <ChatPanel />
-    </div>
+    </nav>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border border-[#21262d] rounded-lg p-4 bg-[#0d1117]">
-      <div className="text-[10px] uppercase text-slate-500 mb-2">{title}</div>
-      {children}
-    </div>
-  );
-}
+// ── a research run, while it is happening ────────────────────────────────────
 
-function SnapshotTab({ snap }: { snap: Snapshot | null }) {
-  if (!snap) return <div className="text-slate-500 text-sm">loading…</div>;
-  const e = snap.portfolio_exposure;
+function ResearchProgress({ run, stale }: { run: ResearchRun; stale: boolean }) {
+  const steps = collapseSteps(run.workflow_events ?? []);
+  const done = steps.filter((e) => e.status !== "running");
+  const failed = run.status === "failed";
   return (
-    <div className="grid grid-cols-2 gap-4 max-w-4xl">
-      <Card title="Company">
-        <div className="space-y-1 text-sm">
-          <Row k="Name" v={snap.company.name} />
-          <Row k="CIK" v={snap.company.cik} />
-          <Row k="Exchange" v={snap.company.exchange} />
-          <Row k="Industry" v={snap.company.industry} />
-        </div>
-      </Card>
-      <Card title="Latest filing">
-        {snap.latest_filing ? (
-          <div className="space-y-1 text-sm">
-            <Row k="Form" v={snap.latest_filing.form_type} />
-            <Row k="Filed" v={snap.latest_filing.filing_date} />
-            <div className="pt-1"><a href={snap.latest_filing.source_url || "#"} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline text-xs flex items-center gap-1">{snap.latest_filing.accession} <ExternalLink className="w-3 h-3" /></a></div>
-          </div>
-        ) : <div className="text-slate-600 text-sm">not ingested — run research</div>}
-      </Card>
-      <Card title="Portfolio exposure">
-        {e ? (
-          <div className="space-y-1 text-sm">
-            <Row k="Market value" v={fmt(e.market_value)} />
-            <Row k="Weight" v={fmt(e.weight)} />
-          </div>
-        ) : <div className="text-slate-600 text-sm">no exposure recorded</div>}
-      </Card>
-      <Card title="Available financial data">
-        <div className="flex flex-wrap gap-1">
-          {snap.available_metrics.map((m) => (
-            <span key={m.metric} className="text-[10px] px-1.5 py-0.5 rounded border border-[#21262d] text-slate-400">{m.metric} <span className="opacity-50">{m.periods}</span></span>
+    <section className={`rounded-lg border px-4 py-3 ${
+      failed ? "border-red-900/60 bg-red-950/20" : "border-[#21262d] bg-[#11161d]"}`}>
+      <div className="flex items-center gap-2">
+        {!failed && run.status !== "completed" && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />}
+        <span className="text-[12.5px] text-slate-300">
+          {failed ? "Research stopped"
+            : run.status === "completed" ? "Research finished"
+            : "Reading filings and current sources"}
+        </span>
+        <span className="text-[11px] text-slate-500">
+          {done.length > 0 ? `step ${done.length}` : "queued — a worker picks this up within a few seconds"}
+        </span>
+      </div>
+      {failed && (
+        <p className="mt-1.5 text-[12px] text-red-300">
+          {explainRunError(run.error_code, run.error_message)}
+        </p>
+      )}
+      {steps.length > 0 && (
+        <ol className="mt-1.5 flex flex-col gap-0.5 text-[11.5px] text-slate-500 max-h-44 overflow-y-auto">
+          {steps.map((e) => (
+            <li key={e.id} className="flex items-baseline gap-2">
+              <span aria-hidden className={
+                e.status === "failed" ? "text-amber-500"
+                : e.status === "running" ? "text-blue-400"
+                : "text-emerald-600"}>
+                {e.status === "failed" ? "✕" : e.status === "running" ? "•" : "✓"}
+              </span>
+              <span className={`flex-1 ${e.status === "failed" ? "text-amber-400" : ""}`}>
+                {stepPhrase(e)}
+              </span>
+            </li>
           ))}
-        </div>
-      </Card>
-    </div>
+        </ol>
+      )}
+      {stale && (
+        <p className="mt-1.5 text-[10.5px] text-amber-400/80">
+          Lost contact with the run — what is above may be out of date. Reload to check.
+        </p>
+      )}
+      <AuditOnly>
+        <span className="block mt-2 font-mono text-[10px] text-slate-600 break-all">
+          {run.id}{run.error_code ? ` · ${run.error_code}` : ""}
+          {run.agent_session_id ? ` · ${run.agent_session_id}` : ""}
+        </span>
+      </AuditOnly>
+    </section>
   );
 }
 
-function Row({ k, v }: { k: string; v: unknown }) {
-  return <div className="flex gap-2"><span className="text-slate-500 w-28 shrink-0">{k}</span><span className="text-slate-200">{v == null ? "—" : String(v)}</span></div>;
-}
+// ── financials ───────────────────────────────────────────────────────────────
 
-function FinancialsTab({ ticker }: { ticker: string }) {
+function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: CoverageRow[] }) {
+  const flows = coverage.filter((c) => c.kind === "flow");
+  const [metric, setMetric] = useState("revenue");
+  const [windows, setWindows] = useState<ReportedWindows | null>(null);
   const [calcs, setCalcs] = useState<CalcRow[] | null>(null);
-  useEffect(() => { getFinancials(ticker).then((d) => setCalcs(d.calcs)).catch(() => setCalcs([])); }, [ticker]);
-  if (!calcs) return <div className="text-slate-500 text-sm">loading…</div>;
-  if (calcs.length === 0) return <div className="text-slate-600 text-sm">No baseline metrics yet — run research to compute them.</div>;
+  const { open } = useEvidence();
+
+  useEffect(() => {
+    let ignore = false;
+    getWindows(ticker, metric).then((w) => { if (!ignore) setWindows(w); }).catch(() => setWindows(null));
+    return () => { ignore = true; };
+  }, [ticker, metric]);
+  useEffect(() => {
+    getFinancials(ticker).then((d) => setCalcs(d.calcs)).catch(() => setCalcs([]));
+  }, [ticker]);
+
+  const options = flows.length > 0
+    ? flows.map((f) => ({ metric: f.metric, label: f.label }))
+    : [{ metric: "revenue", label: "Revenue" }];
+
   return (
-    <div className="max-w-3xl">
-      <div className="text-xs text-slate-500 mb-3">Every value is a ledgered calculation — click its chip to trace the inputs.</div>
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-slate-500 text-xs border-b border-[#21262d]"><th className="py-1.5">Metric</th><th>Latest</th><th>Period</th><th>Evidence</th></tr></thead>
-        <tbody>
-          {calcs.map((r) => {
-            // V10: the recipe names its rows; the operation-derived label is the fallback for v1 rows.
-            const label = r.label ?? `${r.operation}${r.params?.series?.metric ? ` · ${r.params.series.metric}` : r.params?.a?.metric ? ` · ${r.params.a.metric}/${r.params.b?.metric}` : ""}`;
-            if (r.unavailable) {
-              return (
-                <tr key={label} className="border-b border-[#161b22]">
-                  <td className="py-1.5 text-slate-500 font-mono text-xs">{label}</td>
-                  <td className="text-slate-600 text-xs" colSpan={3}>unavailable — {r.unavailable}</td>
+    <div className="flex flex-col gap-3">
+      {windows && (
+        <Windows data={windows} metrics={options} metric={metric} onMetric={setMetric} />
+      )}
+      {calcs && calcs.length > 0 && (
+        <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
+          <header className="flex items-center gap-2 px-4 py-2.5 border-b border-[#21262d]">
+            <h3 className="text-sm font-medium text-slate-200">Baseline measures</h3>
+            <span className="text-[11px] text-slate-500">{calcs.length} · every one a ledgered calculation</span>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <th className="text-left font-medium py-1.5 px-4">Measure</th>
+                  <th className="text-right font-medium py-1.5 px-2">Latest</th>
+                  <th className="text-left font-medium py-1.5 px-2">Period</th>
+                  <th className="text-left font-medium py-1.5 px-4">Basis</th>
                 </tr>
-              );
-            }
-            return (
-              <tr key={r.calc_id ?? label} className="border-b border-[#161b22]">
-                <td className="py-1.5 text-slate-300 font-mono text-xs">{label}</td>
-                <td className="text-slate-100">{fmt(latestVal(r))}</td>
-                <td className="text-slate-500 text-xs">{latestPeriod(r)}</td>
-                <td>{r.calc_id ? <CitationChip id={r.calc_id} /> : null}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              </thead>
+              <tbody className="divide-y divide-[#21262d]">
+                {calcs.map((r, i) => {
+                  const label = r.display ?? r.label ?? r.operation;
+                  if (r.unavailable) {
+                    return (
+                      <tr key={`u${i}`}>
+                        <td className="py-1.5 px-4 text-slate-500">{label}</td>
+                        <td className="py-1.5 px-2 text-slate-600 text-[11px]" colSpan={3}>{r.unavailable}</td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={r.calc_id ?? `c${i}`} className="hover:bg-[#161b22]">
+                      <td className="py-1.5 px-4 text-slate-300">{label}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums text-slate-100">{money(latestVal(r))}</td>
+                      <td className="py-1.5 px-2 text-slate-500">{fmtDate(latestPeriod(r)) || "—"}</td>
+                      <td className="py-1.5 px-4">
+                        {r.calc_id && (
+                          <button onClick={() => open(r.calc_id as string)}
+                            className="text-[11px] text-teal-400 hover:text-teal-300 hover:underline">
+                            how this was worked out
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {coverage.length > 0 && <Coverage rows={coverage} />}
     </div>
   );
 }
+
+function money(v: number | null): string {
+  if (v == null) return "—";
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (Math.abs(v) < 1 && v !== 0) return `${(v * 100).toFixed(2)}%`;
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** The latest point of a calc series, or the scalar value. */
+function latestVal(r: CalcRow): number | null {
+  if (r.result?.value !== undefined) return r.result.value;
+  const pts = r.result?.points;
+  if (Array.isArray(pts) && pts.length) return pts[pts.length - 1].value;
+  return null;
+}
+function latestPeriod(r: CalcRow): string {
+  const pts = r.result?.points;
+  // v2 series points end on `end` (a window) or `as_of` (an instant); v1 rows used period_end.
+  if (Array.isArray(pts) && pts.length) {
+    const p = pts[pts.length - 1];
+    return p.end ?? p.as_of ?? p.period_end ?? "";
+  }
+  return "";
+}
+
+// ── filings ──────────────────────────────────────────────────────────────────
 
 function FilingsTab({ ticker }: { ticker: string }) {
   const [filings, setFilings] = useState<FilingRow[] | null>(null);
   const [sec, setSec] = useState<{ title: string; item_code: string; text: string } | null>(null);
   useEffect(() => { getFilings(ticker).then((d) => setFilings(d.filings)).catch(() => setFilings([])); }, [ticker]);
-  if (!filings) return <div className="text-slate-500 text-sm">loading…</div>;
-  if (filings.length === 0) return <div className="text-slate-600 text-sm">No filings ingested — run research.</div>;
+  if (!filings) return <p className="text-xs text-slate-500 py-6">Loading…</p>;
+  if (filings.length === 0) {
+    return <p className="text-xs text-slate-500 py-8 text-center">
+      No filings are ingested for {ticker} — refresh the brief to read them.
+    </p>;
+  }
   return (
-    <div className="flex gap-4 h-full">
-      <div className="w-72 shrink-0 space-y-3">
+    <div className="flex gap-3 min-h-[420px]">
+      <div className="w-64 shrink-0 flex flex-col gap-2">
         {filings.map((f) => (
-          <div key={f.accession} className="border border-[#21262d] rounded-lg p-3">
-            <div className="flex items-center gap-2 text-sm"><FileText className="w-3.5 h-3.5 text-slate-500" /><span className="font-medium">{f.form_type}</span><span className="text-xs text-slate-500">{f.filing_date}</span></div>
-            <div className="mt-2 space-y-0.5">
+          <div key={f.accession} className="rounded-lg border border-[#21262d] bg-[#11161d] p-3">
+            <div className="flex items-center gap-2 text-[12.5px]">
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span className="font-medium text-slate-200">{f.form_type}</span>
+              <span className="text-[11px] text-slate-500">{fmtDate(f.filing_date)}</span>
+            </div>
+            <div className="mt-1.5 flex flex-col">
               {f.sections.map((s) => (
                 <button key={s.id} onClick={() => getSection(s.id).then(setSec)}
-                  className="block w-full text-left text-xs text-slate-400 hover:text-sky-300 truncate py-0.5">
+                  className="text-left text-[11px] text-slate-400 hover:text-teal-300 truncate py-0.5">
                   {s.item_code} <span className="text-slate-600">{s.title}</span>
                 </button>
               ))}
@@ -302,65 +451,122 @@ function FilingsTab({ ticker }: { ticker: string }) {
           </div>
         ))}
       </div>
-      <div className="flex-1 border border-[#21262d] rounded-lg p-4 overflow-y-auto">
+      <div className="flex-1 min-w-0 rounded-lg border border-[#21262d] bg-[#11161d] p-4 overflow-y-auto max-h-[70vh]">
         {sec ? (
-          <><div className="text-sm text-slate-300 mb-2 font-medium">{sec.item_code} · {sec.title}</div>
-            <div className="text-xs text-slate-400 whitespace-pre-wrap leading-relaxed">{sec.text.slice(0, 20000)}</div></>
-        ) : <div className="text-slate-600 text-sm">Select a filing section to read it.</div>}
+          <>
+            <h3 className="text-[12.5px] font-medium text-slate-200 mb-2">{sec.item_code} · {sec.title}</h3>
+            <p className="text-[11.5px] text-slate-400 whitespace-pre-wrap leading-relaxed">
+              {sec.text.slice(0, 20000)}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-slate-500">Choose a section to read it.</p>
+        )}
       </div>
     </div>
   );
 }
 
-function ResearchTab({ ticker }: { ticker: string }) {
-  const [sources, setSources] = useState<SourceRow[] | null>(null);
-  useEffect(() => { getResearchSources(ticker).then((d) => setSources(d.sources)).catch(() => setSources([])); }, [ticker]);
-  if (!sources) return <div className="text-slate-500 text-sm">loading…</div>;
-  if (sources.length === 0) return <div className="text-slate-600 text-sm">No external research yet — run research to gather current context.</div>;
-  return (
-    <div className="max-w-3xl space-y-3">
-      {sources.map((s) => (
-        <div key={s.id} className="border border-[#21262d] rounded-lg p-3">
-          <a href={s.url} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline text-sm flex items-center gap-1">{s.title || s.url} <ExternalLink className="w-3 h-3 shrink-0" /></a>
-          <div className="text-[10px] text-slate-500 mt-0.5">{s.publisher} {s.published_date && `· ${s.published_date}`} {s.search_query && `· query: ${s.search_query}`}</div>
-          {s.snippet && <div className="text-xs text-slate-400 mt-1.5 line-clamp-3">{s.snippet}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
+// ── the brief ────────────────────────────────────────────────────────────────
 
 function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | null }) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const load = useCallback(() => { getLatestBrief(ticker).then((d) => { setBrief(d.brief); setLoaded(true); }); }, [ticker]);
+  const [map, setMap] = useState<CitationMapData | null>(null);
+  const [sources, setSources] = useState<SourceRow[]>([]);
+  const [labels, setLabels] = useState<Record<string, EvidenceLabel>>({});
+  const { open } = useEvidence();
+
+  const load = useCallback(() => {
+    getLatestBrief(ticker).then((d) => { setBrief(d.brief); setLoaded(true); }).catch(() => setLoaded(true));
+    getCitationMap(ticker).then(setMap).catch(() => setMap(null));
+    getResearchSources(ticker).then((d) => setSources(d.sources)).catch(() => setSources([]));
+  }, [ticker]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (runStatus === "completed") load(); }, [runStatus, load]);
 
-  if (!loaded) return <div className="text-slate-500 text-sm">loading…</div>;
-  if (!brief) return <div className="text-slate-600 text-sm">No brief yet — click &ldquo;Run research&rdquo; to generate an Issuer Risk Brief.</div>;
+  // One request for every caption on the page, rather than one per chip.
+  useEffect(() => {
+    if (!brief) return;
+    const ids = idsIn(
+      [brief.financial_summary, brief.key_changes, brief.management_explanation,
+       brief.market_context, brief.portfolio_implications, brief.open_questions]
+        .filter(Boolean).join("\n"),
+      brief.citations);
+    if (ids.length === 0) return;
+    let ignore = false;
+    getEvidenceLabels(ids).then((r) => { if (!ignore) setLabels(r.labels); }).catch(() => {});
+    return () => { ignore = true; };
+  }, [brief]);
 
-  const blocks: [string, string | null][] = [
+  if (!loaded) return <p className="text-xs text-slate-500 py-6">Loading…</p>;
+
+  const blocks: [string, string | null][] = brief ? [
     ["Financial summary", brief.financial_summary],
     ["Key changes", brief.key_changes],
-    ["Management explanation", brief.management_explanation],
-    ["Market & industry context", brief.market_context],
-    ["Portfolio implications", brief.portfolio_implications],
+    ["What management said", brief.management_explanation],
+    ["Market and industry context", brief.market_context],
+    ["What it means for this book", brief.portfolio_implications],
     ["Open questions", brief.open_questions],
-  ];
+  ] : [];
+
   return (
-    <div className="max-w-3xl space-y-4">
-      <div className="text-xs text-slate-500">Issuer Risk Brief · {brief.citations.length} citations · every claim traceable</div>
-      {blocks.map(([title, text]) => text && (
-        <div key={title}>
-          <div className="text-[10px] uppercase text-slate-500 mb-1">{title}</div>
-          <div className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{text}</div>
-        </div>
-      ))}
-      <div className="pt-2 border-t border-[#21262d]">
-        <div className="text-[10px] uppercase text-slate-500 mb-1.5">Evidence ({brief.citations.length})</div>
-        <div className="flex flex-wrap">{brief.citations.map((c) => <CitationChip key={c} id={c} />)}</div>
-      </div>
+    <div className="flex flex-col gap-3">
+      {map && map.sections.length > 0 && <BriefProvenance map={map} />}
+
+      {!brief ? (
+        <p className="text-xs text-slate-500 py-8 text-center">
+          No brief for {ticker} yet — refresh the brief to have one written.
+        </p>
+      ) : (
+        <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
+          <header className="flex items-center gap-3 px-4 py-2.5 border-b border-[#21262d]">
+            <h3 className="text-sm font-medium text-slate-200">Issuer brief</h3>
+            <span className="text-[11px] text-slate-500">
+              {brief.citations.length} citations · {fmtDate(brief.created_at)}
+            </span>
+            <AuditOnly>
+              <span className="ml-auto font-mono text-[10px] text-slate-600">
+                {brief.id} · {brief.research_run_id}
+              </span>
+            </AuditOnly>
+          </header>
+          <div className="px-4 py-3 flex flex-col gap-4 text-[12.5px] text-slate-300">
+            {blocks.filter(([, body]) => body).map(([title, body]) => (
+              <div key={title}>
+                <h4 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">{title}</h4>
+                <AnswerText text={body as string} citations={brief.citations}
+                  labels={labels} onOpen={open} />
+              </div>
+            ))}
+            <CitationList citations={brief.citations} labels={labels} onOpen={open} />
+          </div>
+        </section>
+      )}
+
+      {sources.length > 0 && (
+        <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
+          <header className="flex items-center gap-2 px-4 py-2.5 border-b border-[#21262d]">
+            <h3 className="text-sm font-medium text-slate-200">External sources</h3>
+            <span className="text-[11px] text-slate-500">{sources.length}</span>
+          </header>
+          <ul className="divide-y divide-[#21262d]">
+            {sources.map((s) => (
+              <li key={s.id} className="px-4 py-2.5">
+                <a href={s.url} target="_blank" rel="noreferrer"
+                  className="text-[12.5px] text-teal-400 hover:text-teal-300 hover:underline inline-flex items-baseline gap-1">
+                  {s.title || s.url} <ExternalLink className="w-3 h-3 shrink-0 self-center" />
+                </a>
+                <p className="text-[10.5px] text-slate-500 mt-0.5">
+                  {[s.publisher, s.published_date ? fmtDate(s.published_date) : null]
+                    .filter(Boolean).join(" · ")}
+                </p>
+                {s.snippet && <p className="text-[11.5px] text-slate-400 mt-1 line-clamp-2">{s.snippet}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
