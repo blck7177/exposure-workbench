@@ -159,7 +159,8 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
     return {"id": running_id, "value": running_value,
             "basis": f"as of {bs['as_of']}", "formula": cover.formula,
             "missing_at_this_date": list(cover.missing_at_this_date),
-            "no_facts_for_issuer": list(cover.no_facts_for_issuer)}
+            "no_facts_for_issuer": list(cover.no_facts_for_issuer),
+            "overlapping_not_added": list(cover.overlapping_not_added)}
 
 
 async def _common_window(db: AsyncSession, ticker: str, f, months: int,
@@ -297,7 +298,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                "unit_class": f.unit_class}
         # Only when there is something to say. An empty list beside every total
         # invites a sentence about what was left out when nothing was.
-        for key in ("missing_at_this_date", "no_facts_for_issuer"):
+        for key in ("missing_at_this_date", "no_facts_for_issuer", "overlapping_not_added"):
             if got.get(key):
                 out[key] = got[key]
         return out

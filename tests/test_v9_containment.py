@@ -150,3 +150,47 @@ def test_the_family_members_with_no_validated_edge_are_named():
     isolated = {m for members in ct.FAMILIES.values() for m in members} - on_an_edge
     assert isolated == {"short_term_borrowings"}, (
         f"a family member gained or lost its edges without a decision: {sorted(isolated)}")
+
+
+# ── two parents, one child (round-3 battery, 2026-08-28) ───────────────────────
+
+def test_a_candidate_reaching_into_covered_ground_is_set_aside_not_summed():
+    """NVDA 2026-04-26, as filed: long_term_debt_total 8.470 = noncurrent 7.470
+    + current portion 1.000, and debt_current_total 1.000 is that same current
+    portion. The cover took both parents and reported 9.470 — with a calc_id,
+    through the gate, on nineteen dates."""
+    got = ct.cover({"long_term_debt_total": 8.470,
+                    "long_term_debt_noncurrent": 7.470,
+                    "current_portion_long_term_debt": 1.000,
+                    "debt_current_total": 1.000}, "debt")
+    assert got.value == pytest.approx(8.470)
+    assert got.terms == ("long_term_debt_total",)
+    assert got.overlapping_not_added == ("debt_current_total",)
+    assert "debt_current_total" not in got.missing_at_this_date
+    assert "debt_current_total" not in got.no_facts_for_issuer
+
+
+def test_what_the_overlapping_line_holds_beyond_the_cover_is_reached_through_its_own_parts():
+    """If commercial paper is reported separately it is a term of its own; if
+    it is not, it is named as missing rather than smuggled in whole."""
+    with_cp = ct.cover({"long_term_debt_total": 8.470, "current_portion_long_term_debt": 1.000,
+                        "debt_current_total": 1.500, "commercial_paper": 0.500}, "debt")
+    assert with_cp.terms == ("long_term_debt_total", "commercial_paper")
+    assert with_cp.value == pytest.approx(8.970)
+    assert with_cp.overlapping_not_added == ("debt_current_total",)
+
+    without = ct.cover({"long_term_debt_total": 8.470, "current_portion_long_term_debt": 1.000,
+                        "debt_current_total": 1.500}, "debt",
+                       ever_reported={"commercial_paper"})
+    assert without.terms == ("long_term_debt_total",)
+    assert without.missing_at_this_date == ("commercial_paper",)
+    assert without.overlapping_not_added == ("debt_current_total",)
+
+
+def test_the_cover_is_still_an_antichain_after_the_fix():
+    got = ct.cover({"long_term_debt_total": 8.470, "long_term_debt_noncurrent": 7.470,
+                    "current_portion_long_term_debt": 1.000, "debt_current_total": 1.000,
+                    "commercial_paper": 0.0}, "debt")
+    for x in got.terms:
+        for y in got.terms:
+            assert x == y or not ct.contains(x, y)

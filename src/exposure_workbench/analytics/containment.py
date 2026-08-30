@@ -82,6 +82,12 @@ class Cover:
     formula: str
     missing_at_this_date: tuple[str, ...] = field(default_factory=tuple)
     no_facts_for_issuer: tuple[str, ...] = field(default_factory=tuple)
+    # Reported at this date, and NOT added, because part of it was already
+    # summed through a wider node. NVDA files debt_current_total (1.0bn) and
+    # that 1.0bn is the current portion long_term_debt_total already holds.
+    # It is neither missing nor unfiled, so it is neither of the two above; a
+    # reader who sees it here knows why the total is narrower than the lines.
+    overlapping_not_added: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -115,7 +121,17 @@ def cover(available: dict[str, float], family: str,
 
     Widest-first: a node the issuer reported is its own arithmetic, and each term
     dropped is one fewer number that can be restated or misread. Having taken a
-    node, everything beneath it is excluded — that exclusion IS axiom R3.
+    node, everything beneath it is covered — that exclusion IS axiom R3 — and a
+    later candidate that REACHES INTO covered ground is set aside too, because
+    taking it would sum the shared part twice.
+
+    The second half is the round-3 battery's finding (2026-08-28). The exclusion
+    used to run one way only: it kept the descendants of taken nodes out, and
+    never asked whether a candidate's own descendants were already in. Two
+    parents sharing one child — long_term_debt_total and debt_current_total
+    both hold current_portion_long_term_debt — were both taken, and NVDA's
+    total debt came out 9.47bn against a filed 8.47bn, on 19 dates, with a
+    calc_id, through the gate. Every number was real; the antichain was not.
 
     What is left over is named, because a cover is the widest non-overlapping set
     of what exists and that is not the same as complete: JPM reports only
@@ -141,19 +157,30 @@ def cover(available: dict[str, float], family: str,
     ranked = sorted(present, key=lambda m: (-len(_descendants(m) & set(members)),
                                             members.index(m)))
     taken: list[str] = []
-    excluded: set[str] = set()
+    covered: set[str] = set()          # taken nodes and everything beneath them
+    overlapping: list[str] = []
     for node in ranked:
-        if node in excluded:
+        if node in covered:
+            continue
+        below = _descendants(node)
+        if below & covered:
+            # Part of this line is already in the sum. The part that is NOT is
+            # reachable only through this line's own descendants, which the
+            # ranking visits next — taken if reported here, named as missing
+            # if not. What must not happen is taking the line whole.
+            overlapping.append(node)
             continue
         taken.append(node)
-        excluded |= _descendants(node)
+        covered |= {node} | below
 
     taken_in_order = [m for m in members if m in taken]
-    left_over = [m for m in members if m not in taken and m not in excluded]
+    left_over = [m for m in members
+                 if m not in taken and m not in covered and m not in overlapping]
     return Cover(
         value=sum(available[m] for m in taken_in_order),
         terms=tuple(taken_in_order),
         formula=" + ".join(taken_in_order),
         missing_at_this_date=tuple(m for m in left_over if m in ever_reported),
         no_facts_for_issuer=tuple(m for m in left_over if m not in ever_reported),
+        overlapping_not_added=tuple(m for m in members if m in overlapping),
     )
