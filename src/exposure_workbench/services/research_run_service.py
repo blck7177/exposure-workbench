@@ -45,6 +45,18 @@ async def create_run(
     return run
 
 
+class RunNotVisible(LookupError):
+    """update_status was asked to move a run this session cannot see.
+
+    Under RLS an invisible row and a nonexistent one are the same SELECT
+    result, and returning quietly on it is how rrun_5b247ec1db21 sat at
+    `pending` from 2026-08-03: the workflow died on an RLS denial, the
+    handler's except-branch came here to say so, this function found no run
+    under that tenant, and said nothing. The task was marked failed; the run
+    never was, and nothing anywhere recorded that the record had been lost.
+    """
+
+
 async def get_run(db: AsyncSession, run_id: str) -> ResearchRun | None:
     return (await db.execute(select(ResearchRun).where(ResearchRun.id == run_id))).scalar_one_or_none()
 
@@ -67,7 +79,9 @@ async def update_status(
     """
     run = await get_run(db, run_id)
     if run is None:
-        return
+        raise RunNotVisible(
+            f"research run {run_id!r} is not visible to this session, so its status "
+            f"could not be set to {status!r}")
     run.status = status
     if status == "running" and run.started_at is None:
         run.started_at = datetime.now(timezone.utc)
