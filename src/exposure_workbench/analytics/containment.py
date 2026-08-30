@@ -13,8 +13,8 @@ next issuer. An antichain over the containment graph derives all eight and
 covers the shapes nobody has met.
 
 The edges are the taxonomy's, not ours, and every one was validated against the
-corpus before it was written down — child never exceeds parent, over 787
-co-occurrences with zero violations (2026-08-25). test_v9_containment_live
+corpus before it was written down — child never exceeds parent, over 802
+co-occurrences with zero violations (2026-08-25; counts refreshed 2026-08-30). test_v9_containment_live
 re-runs that check, so an edge that stops holding goes red rather than quiet.
 
 Two relationships that ARE true of the taxonomy are deliberately absent:
@@ -31,17 +31,17 @@ from dataclasses import dataclass, field
 # (parent, child, times observed together in the corpus with child <= parent).
 # The count is the evidence, kept beside the claim.
 EDGES: tuple[tuple[str, str, int], ...] = (
-    ("long_term_debt_total", "long_term_debt_noncurrent", 90),
-    ("long_term_debt_total", "current_portion_long_term_debt", 85),
-    ("debt_current_total", "current_portion_long_term_debt", 24),
-    ("debt_current_total", "commercial_paper", 21),
+    ("long_term_debt_total", "long_term_debt_noncurrent", 92),
+    ("long_term_debt_total", "current_portion_long_term_debt", 86),
+    ("debt_current_total", "current_portion_long_term_debt", 25),
+    ("debt_current_total", "commercial_paper", 22),
     ("stockholders_equity_including_noncontrolling", "stockholders_equity", 40),
     ("stockholders_equity_including_noncontrolling", "noncontrolling_interest", 40),
-    ("operating_lease_liability_total", "operating_lease_liability_current", 66),
-    ("operating_lease_liability_total", "operating_lease_liability_noncurrent", 87),
-    ("total_liabilities", "current_liabilities", 109),
-    ("total_liabilities", "long_term_debt_noncurrent", 74),
-    ("total_assets", "current_assets", 151),
+    ("operating_lease_liability_total", "operating_lease_liability_current", 68),
+    ("operating_lease_liability_total", "operating_lease_liability_noncurrent", 89),
+    ("total_liabilities", "current_liabilities", 111),
+    ("total_liabilities", "long_term_debt_noncurrent", 76),
+    ("total_assets", "current_assets", 153),
 )
 
 # What a caller may ask to be covered. A family is a question ("what does this
