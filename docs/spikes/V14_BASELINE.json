@@ -1,0 +1,258 @@
+{
+ "scored": [
+  {
+   "tag": "V1-macro-breakdown",
+   "question_tag": "V1-macro-breakdown",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 5,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_risk_state"
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cBroad US equity market risk is the dominant macro driver\u2026 the market factor was the largest factor contribution.\u201d"
+    },
+    "netting": {
+     "met": true,
+     "why": "The answer states the offset explicitly: \u201cFixed Income is 13.4%, split between HYG 7.3% and TLT 6.1%,\u201d so it nets them rather than adding opposite legs."
+    },
+    "so_what": {
+     "met": true,
+     "why": "The close gives an actionable implication: \u201cMarket downside stress warning\u201d and concentration warnings signal a manager should de-risk or rebalance."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses rounded percentages like \u201c33.9%,\u201d \u201c15.5%,\u201d and \u201c13.4%\u201d rather than ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "V2-fundamental-lens",
+   "question_tag": "V2-fundamental-lens",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "no_linear_locating": {
+     "met": false,
+     "why": "11 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites named firms and a periodless portfolio snapshot with run/alert references like \u201c[run_95ebe31c5e51]\u201d and \u201c[alert_8628e12b8d0b].\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can turn this into...\u201d instead of a portfolio-manager action or implication for the book."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses rounded weights like \u201c15.5%,\u201d \u201c14.6%,\u201d and \u201c7.4%\u201d instead of ledger-raw precision, fitting reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "V3-rate-exposure",
+   "question_tag": "V3-rate-exposure",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_attribution"
+    },
+    "netting": {
+     "met": true,
+     "why": "\u201cThe book cuts against higher rates\u201d and \u201cnet short duration / rates-sensitive to the downside\u201d state the net direction."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It says \u201cThe book cuts against higher rates\u201d but gives no ordered drivers or largest driver ranking."
+    },
+    "precision": {
+     "met": false,
+     "why": "\"1.516626% portfolio loss\" and \"USD 164,482.03\" reproduce ledger-raw precision instead of the two or three significant figures the sentence needs."
+    }
+   }
+  },
+  {
+   "tag": "V4-what-to-watch",
+   "question_tag": "V4-what-to-watch",
+   "answered": true,
+   "gate_refusals": 6,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "trigger": {
+     "met": true,
+     "why": "\u201c12.0% warning level,\u201d \u201c15.0% warning level,\u201d and \u201c6.0% warning level\u201d are quantified thresholds that would change the assessment."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can turn this into\u2026\u201d rather than an actionable implication for the portfolio manager."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer lists items in bullet order and says \"Largest position drag was LLY... then AAPL... then JPM,\" but does not rank the drivers by magnitude as requested."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c13.7690%\u201d, \u201c15.5278%\u201d, \u201c7.4449%\u201d, \u201c1.3860%\u201d, and \u201c1.9931%\u201d are ledger-raw precision, more exact than a reader needs in prose."
+    }
+   }
+  },
+  {
+   "tag": "V5-drawdown-forensics",
+   "question_tag": "V5-drawdown-forensics",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": true,
+     "why": "all required reads present"
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer lists losses and exposures, but not ordered by magnitude; it says \u201cthe biggest holding-level losses\u201d without ranking drivers against each other."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with \u201ca broad market selloff plus ... large declines ... amplified by the book\u2019s own position sizing,\u201d which is an actionable implication."
+    },
+    "precision": {
+     "met": false,
+     "why": "\"33.88%\" and \"55.56%\" are ledger-raw precision in prose; the criterion says to use two or three significant figures instead."
+    }
+   }
+  },
+  {
+   "tag": "V6-concentration-mandate",
+   "question_tag": "V6-concentration-mandate",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": true,
+     "why": "all required reads present"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can next compute...\u201d instead of closing with an actionable implication for the portfolio manager."
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201cLLY issuer concentration is in warning at 13.8% versus a 12.0% warning limit\u201d gives a quantified threshold that changes the assessment."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c13.8% versus a 12.0% warning limit\u201d and \u201c15.5% versus a 15.0% warning limit\u201d use reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "V7-single-name-integration",
+   "question_tag": "V7-single-name-integration",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cas of 2026-03-31,\u201d \u201ctotal debt 43.37bn,\u201d and \u201cEBIT interest coverage was 29.75x\u201d are filed, period-specific figures rather than generic prose."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating health metrics and market behavior; no portfolio-size implication or actionable \u201chow I should size it here.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses ledger-raw precision like \u201c29.75x,\u201d \u201c34.99%,\u201d \u201c43.37bn,\u201d and \u201c38.09bn\u201d where the criterion asks for reader-appropriate rounding."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer lists metrics flatly and never orders drivers by magnitude or names the largest driver as largest."
+    }
+   }
+  },
+  {
+   "tag": "V8-cross-issuer",
+   "question_tag": "V8-cross-issuer",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 12,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "ranking": {
+     "met": true,
+     "why": "The answer explicitly names the largest: \u201cAAPL is carrying the most balance-sheet risk among the megacaps I could measure here.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific ratios and periods like \u201c0.6040 for AAPL for 2025-03-30..2026-03-28,\u201d grounding the claim in system evidence."
+    },
+    "precision": {
+     "met": false,
+     "why": "\"0.6040\", \"0.2483\", and \"0.2366\" use four decimal places, beyond reader-useful precision."
+    },
+    "netting": {
+     "met": true,
+     "why": "It states the direction of the comparison: \u201cAAPL is carrying the most balance-sheet risk\u201d and \u201cI can\u2019t rank JPM against them.\u201d"
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "read_required_inputs": [
+   2,
+   4
+  ],
+  "ranking": [
+   2,
+   6
+  ],
+  "netting": [
+   3,
+   3
+  ],
+  "so_what": [
+   2,
+   6
+  ],
+  "precision": [
+   3,
+   8
+  ],
+  "no_linear_locating": [
+   0,
+   1
+  ],
+  "grounded_claims": [
+   3,
+   3
+  ],
+  "trigger": [
+   2,
+   2
+  ]
+ }
+}

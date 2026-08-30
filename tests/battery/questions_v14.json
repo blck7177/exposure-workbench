@@ -1,0 +1,50 @@
+[
+ {
+  "tag": "V1-macro-breakdown",
+  "q": "break down the portfolio and analyze what macro risks this portfolio is mainly exposed to",
+  "failure_mode": "flat listing: exposures enumerated in arbitrary order, offsetting legs never netted, no actionable close (observed sess_16b176ea4c9b turn 1)",
+  "criteria": ["ranking", "netting", "so_what", "precision", "read_required_inputs"]
+ },
+ {
+  "tag": "V2-fundamental-lens",
+  "q": "from a fundamental analysis point of view, assess what each firm's business is and what kind of macro risk each one carries",
+  "failure_mode": "zero-evidence narrative: business claims are model prior, not filings; budget spent linearly on locating (observed sess_16b176ea4c9b turn 2)",
+  "criteria": ["grounded_claims", "no_linear_locating", "so_what", "precision"]
+ },
+ {
+  "tag": "V3-rate-exposure",
+  "q": "what is this book's net exposure to rates? be specific about which way it cuts",
+  "failure_mode": "gross legs listed as if all one direction: TLT duration, JPM net interest margin and HYG spread point different ways and the net is never stated",
+  "criteria": ["netting", "ranking", "precision", "read_required_inputs"]
+ },
+ {
+  "tag": "V4-what-to-watch",
+  "q": "what should I be watching over the next month for this portfolio? give me levels, not vibes",
+  "failure_mode": "unquantified monitoring: watch-items named without a threshold that would change the assessment",
+  "criteria": ["trigger", "so_what", "ranking", "precision"]
+ },
+ {
+  "tag": "V5-drawdown-forensics",
+  "q": "why did this book have such large drawdowns? walk me through what actually happened",
+  "failure_mode": "wrong measurement unit: the deepest real episode is never measured, a single day's move is explained instead (V11 T10, still open as G6)",
+  "criteria": ["read_required_inputs", "ranking", "so_what", "precision"]
+ },
+ {
+  "tag": "V6-concentration-mandate",
+  "q": "am I offside on concentration anywhere, and how much room is left before I am?",
+  "failure_mode": "distance not computed: limits reported as breached or clear without the headroom that makes it actionable",
+  "criteria": ["so_what", "trigger", "precision", "read_required_inputs"]
+ },
+ {
+  "tag": "V7-single-name-integration",
+  "q": "how healthy is LLY as a business right now, and does that change how I should size it here?",
+  "failure_mode": "bottom-up and top-down never meet: issuer fundamentals discussed without the position's factor loadings or weight, or vice versa",
+  "criteria": ["grounded_claims", "so_what", "precision", "ranking"]
+ },
+ {
+  "tag": "V8-cross-issuer",
+  "q": "compare the leverage of the banks and the megacaps in this book - who is carrying the most balance sheet risk?",
+  "failure_mode": "comparison without a common basis: figures from different fiscal periods or different debt definitions are ranked against each other",
+  "criteria": ["ranking", "grounded_claims", "precision", "netting"]
+ }
+]
