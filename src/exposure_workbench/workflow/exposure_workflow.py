@@ -21,7 +21,7 @@ from exposure_workbench.analytics.pnl import calc_pnl, PnlResult
 from exposure_workbench.analytics.factor_model import calc_factor_attribution, FactorAttributionResult
 from exposure_workbench.analytics.risk_metrics import calc_risk_metrics, RiskResult
 from exposure_workbench.analytics.stress import calc_stress, StressResult
-from exposure_workbench.analytics.limits import AlertResult, LimitBook, check_limits
+from exposure_workbench.analytics.limits import AlertResult, CheckRecord, LimitBook, check_limits
 from exposure_workbench.db.models import (
     ExposureMetrics, SectorExposure, IssuerExposure,
     FactorAttribution, RiskAlert, DailyReport, LimitCheck,
@@ -351,7 +351,7 @@ class ExposureWorkflow:
                 await self._persist_outputs(
                     db, run_id, portfolio_id, as_of_date,
                     exposure, pnl, factor_result, risk, stress, alerts, evaluated,
-                    prev_sector_weights,
+                    limit_checks, prev_sector_weights,
                 )
                 await db.commit()
                 await ctx.__aexit__(None, None, None)
@@ -733,6 +733,7 @@ class ExposureWorkflow:
         stress: StressResult,
         alerts: list[AlertResult],
         evaluated: list[str],
+        limit_checks: list[CheckRecord],
         prev_sector_weights: dict[str, float],
     ) -> None:
         # ExposureMetrics (one row per run)
