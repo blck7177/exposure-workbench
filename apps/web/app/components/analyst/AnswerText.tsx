@@ -26,7 +26,7 @@ import { useAudit } from "../audit";
  * into it. Nothing is removed before anything is located.
  */
 
-type Annotation =
+export type Annotation =
   | { start: number; end: number; kind: "figure"; match: VerifiedMatch }
   | { start: number; end: number; kind: "cites"; ids: string[] };
 
@@ -34,22 +34,14 @@ const ID_BODY = "(?:fact|calc|chunk|src|alert|run|pos)_[0-9a-f]{6,}";
 const BRACKETED = new RegExp(`\\s*\\[\\s*(${ID_BODY}(?:\\s*,\\s*${ID_BODY})*)\\s*\\]`, "g");
 const BARE = new RegExp(`(,\\s*)?(${ID_BODY})`, "g");
 
-export function AnswerText({ text, citations, matches, labels, onOpen }: {
-  text: string;
-  citations: string[];
-  matches?: VerifiedMatch[];
-  labels?: Record<string, { type: string; label: string }>;
-  onOpen: (id: string) => void;
-}) {
-  const { audit } = useAudit();
-  const order = [...citations];
-  const numberOf = (id: string) => {
-    const i = order.indexOf(id);
-    return i >= 0 ? i + 1 : order.push(id);
-  };
-
+/**
+ * The one walk, as a pure function (V13-S7 §9-⑧): both kinds of annotation
+ * located against the ORIGINAL text, sorted, non-overlapping. Exported so the
+ * invariants live under a unit test — the two-pass version of this shifted the
+ * gate's spans and LOST highlighting silently, which no browser check reports.
+ */
+export function planAnnotations(text: string, matches?: VerifiedMatch[]): Annotation[] {
   const spans: Annotation[] = [];
-
   for (const m of text.matchAll(BRACKETED)) {
     const start = m.index ?? 0;
     spans.push({
@@ -71,8 +63,25 @@ export function AnswerText({ text, citations, matches, labels, onOpen }: {
     if (spans.some((s) => start < s.end && end > s.start)) continue;
     spans.push({ start, end, kind: "figure", match });
   }
-
   spans.sort((a, b) => a.start - b.start);
+  return spans;
+}
+
+export function AnswerText({ text, citations, matches, labels, onOpen }: {
+  text: string;
+  citations: string[];
+  matches?: VerifiedMatch[];
+  labels?: Record<string, { type: string; label: string }>;
+  onOpen: (id: string) => void;
+}) {
+  const { audit } = useAudit();
+  const order = [...citations];
+  const numberOf = (id: string) => {
+    const i = order.indexOf(id);
+    return i >= 0 ? i + 1 : order.push(id);
+  };
+
+  const spans = planAnnotations(text, matches);
 
   const out: React.ReactNode[] = [];
   let cursor = 0;
