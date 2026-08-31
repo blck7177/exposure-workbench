@@ -67,11 +67,16 @@ def _build_user_message(inp: ReportInput) -> str:
                 "\n### Factor Attribution (direction and rank only — the factors are "
                 f"collinear{vif}, so no single factor's figure is individually "
                 "determined and none is supplied; describe influence in words)")
+            # Rank words, not rank NUMERALS: "#2" in the context came straight
+            # back as a bare "2" in the draft, which the gate then had to judge
+            # as a figure. The same rule as the contributions themselves — a
+            # digit the model never saw is a digit it cannot echo.
+            _RANK = ("largest", "second", "third", "fourth", "fifth")
             ranked = sorted(inp.factor_attributions[:5],
                             key=lambda fa: abs(fa.get("contribution") or 0.0), reverse=True)
-            for i, fa in enumerate(ranked, 1):
+            for i, fa in enumerate(ranked):
                 sign = "negative" if (fa.get("contribution") or 0.0) < 0 else "positive"
-                lines.append(f"- #{i} {fa['factor_name']}: {sign} contribution")
+                lines.append(f"- {fa['factor_name']}: {sign} contribution ({_RANK[i]} by size)")
         else:
             lines.append("\n### Factor Attribution (top 5)")
             for fa in inp.factor_attributions[:5]:

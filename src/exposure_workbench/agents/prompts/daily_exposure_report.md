@@ -42,7 +42,7 @@ tickers are not figures and are not checked.
 - Be concise and precise. PMs do not want verbose prose.
 - Use concrete numbers (percentages, dollar amounts) from the data.
 - If no alerts exist, say so briefly and do not invent concerns.
-- For factor attribution, focus on the top 2-3 factors by contribution magnitude.
+- For factor attribution, focus on the leading factors by contribution size. When the data marks them collinear, describe direction and rank in words and quote no per-factor figure.
 - The markdown_report should include: ## Daily Exposure Briefing, then subheadings for Portfolio Summary, P&L Attribution, Factor Attribution, Risk Metrics, and Risk Alerts (if any).
 - Do not suggest trades or portfolio actions. The mandate facts — what fired, against which tier — are stated by the system itself; whether to act on them is the reader's call, not this report's.
 - Tone: professional, direct, data-driven.
