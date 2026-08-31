@@ -29,7 +29,12 @@ from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.auth import internal_token
 from exposure_workbench.db.session import get_session_factory
-from exposure_workbench.services import exposure_run_service, research_run_service, task_service
+from exposure_workbench.services import (
+    exposure_run_service,
+    research_run_service,
+    schedule_service,
+    task_service,
+)
 from exposure_workbench.services.task_service import claim_next_task, complete_task, fail_task
 
 # The worker is a system process; each task runs under the tenant of the user who
@@ -69,6 +74,9 @@ def _get_handler(task_type: str):
             HANDLERS[task_type] = handle
         elif task_type == "issuer_research":
             from apps.worker.handlers.issuer_research import handle
+            HANDLERS[task_type] = handle
+        elif task_type == "scheduled_update":
+            from apps.worker.handlers.scheduled_update import handle
             HANDLERS[task_type] = handle
         else:
             return None
@@ -141,11 +149,13 @@ async def process_one() -> bool:
     return True
 
 
-# How to reach a failed task's run, per task type: (lookup, mark-failed). Only
-# the two non-replayable types have a run row at all — company_readiness logs
-# under the task's own id and market_data_sync has no run concept — so their
-# absence here is the design, not an oversight. The two services spell the
-# updater differently (update_run_status vs update_status), hence the pair.
+# How to reach a failed task's run, per task type: (lookup, mark-failed). A type
+# absent here is the design, not an oversight: company_readiness logs under the
+# task's own id, market_data_sync has no run concept, and scheduled_update mints
+# its run LAST — so at the moment its lease could expire there is either no run
+# yet or a run that already belongs to the exposure_update task it created,
+# which carries its own lease. The two services spell the updater differently
+# (update_run_status vs update_status), hence the pair.
 _RUN_FAILERS = {
     "exposure_update": (exposure_run_service.get_run, exposure_run_service.update_run_status),
     "issuer_research": (research_run_service.get_run, research_run_service.update_status),
@@ -230,6 +240,7 @@ async def run_worker() -> None:
     poll_interval = settings.worker_poll_interval
     logger.info(f"Worker started — polling every {poll_interval}s")
 
+    last_schedule_tick = 0.0  # monotonic; 0 => tick on the first pass
     while _running:
         try:
             processed = await process_one()
@@ -244,6 +255,22 @@ async def run_worker() -> None:
                 await reap_stale_leases()
             except Exception as exc:
                 logger.error(f"Lease reaper failed: {exc}", exc_info=True)
+
+            # The scheduler tick, throttled to once per poll interval on the
+            # monotonic clock rather than gated on an idle poll: a busy queue
+            # would otherwise postpone 06:30 for as long as it stayed busy, and
+            # ticking per processed task would hammer the schedules table
+            # exactly when the queue is deepest. Its own try block for the same
+            # reason the reaper has one — a persistently failing scheduler
+            # degrades to log noise instead of starving task processing.
+            if asyncio.get_running_loop().time() - last_schedule_tick >= poll_interval:
+                last_schedule_tick = asyncio.get_running_loop().time()
+                try:
+                    fired = await schedule_service.tick()
+                    if fired:
+                        logger.info(f"Scheduler tick enqueued {fired} task(s)")
+                except Exception as exc:
+                    logger.error(f"Scheduler tick failed: {exc}", exc_info=True)
 
             if not processed:
                 # No tasks available — wait before next poll

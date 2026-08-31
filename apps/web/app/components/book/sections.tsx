@@ -44,6 +44,10 @@ export function FreshnessLine({ freshness }: { freshness: Freshness | null }) {
       {freshness.runs_in_flight > 0 && (
         <span className="text-blue-400">· {freshness.runs_in_flight} update in flight</span>
       )}
+      {freshness.next_update && (
+        <span>· next update {new Date(freshness.next_update).toLocaleString(undefined,
+          { weekday: "short", hour: "numeric", minute: "2-digit" })}</span>
+      )}
     </p>
   );
 }
@@ -462,6 +466,34 @@ export function Briefing({ report, checked }: {
           </div>
         </details>
       </div>
+    </section>
+  );
+}
+
+/**
+ * Where the briefing would be, when the gate refused it (V13).
+ *
+ * The report gate's design is that a report failing verification is NOT
+ * written — best-effort means the RUN survives, not that the refusal is quiet.
+ * It was quiet in exactly one place: this page, which simply rendered nothing
+ * where the briefing goes. The refusal is a fact about the model's draft, not
+ * about the run — every number above stands on the run's own rows — and this
+ * card says precisely that, instead of leaving a hole a reader can read as
+ * "no news today".
+ */
+export function BriefingRefused({ run }: { run: ExposureRun }) {
+  const failed = collapseSteps(run.workflow_events ?? [])
+    .find((e) => e.step_name === "generate_report" && e.status === "failed");
+  if (!failed || run.status !== "completed") return null;
+  return (
+    <section className="rounded-lg border border-[#21262d] bg-[#11161d] px-4 py-3">
+      <h3 className="text-sm font-medium text-slate-200">Daily briefing</h3>
+      <p className="mt-1 text-[12px] text-slate-400 leading-relaxed">
+        None was written for this run. The draft the model produced did not survive
+        verification against the run&apos;s own rows, and a report that fails its check is
+        discarded rather than shown. The figures on this page are unaffected — they
+        come from the run directly, not from the report. The next update tries afresh.
+      </p>
     </section>
   );
 }

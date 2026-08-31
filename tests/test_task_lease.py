@@ -25,7 +25,16 @@ DISPATCHABLE = {
     "market_data_sync",
     "company_readiness",
     "issuer_research",
+    "scheduled_update",
 }
+
+# Failed on expiry like the non-replayable types, but with NO run row of its own
+# to settle: the run scheduled_update exists to mint belongs to the
+# exposure_update task it creates, which carries its own lease. Stated as a set,
+# not folded into _RUN_FAILERS, so the next type cannot hide behind it — being
+# runless is a claim about the persistence code, and this one is measured: the
+# handler writes nothing under its own task id.
+FAILED_RUNLESS_ON_EXPIRY = {"scheduled_update"}
 
 
 @pytest.mark.parametrize("task_type", sorted(DISPATCHABLE))
@@ -35,7 +44,6 @@ def test_dispatch_resolves_every_type_we_classify(task_type: str):
 
 
 def test_unknown_task_type_resolves_to_no_handler():
-    assert worker._get_handler("scheduled_update") is None  # named in DDL, never implemented
     assert worker._get_handler("not_a_real_type") is None
 
 
@@ -45,7 +53,8 @@ def test_every_dispatchable_type_has_a_lease_expiry_policy():
     A type in neither set would be failed by the reaper with its run left in
     'running' forever, which is the stuck-run class E1 exists to remove.
     """
-    classified = set(task_service.REQUEUEABLE_TYPES) | set(worker._RUN_FAILERS)
+    classified = (set(task_service.REQUEUEABLE_TYPES) | set(worker._RUN_FAILERS)
+                  | FAILED_RUNLESS_ON_EXPIRY)
     assert DISPATCHABLE - classified == set(), (
         f"unclassified task types: {DISPATCHABLE - classified}"
     )
@@ -60,6 +69,9 @@ def test_requeueable_types_never_also_fail_a_run():
 def test_classification_sets_contain_no_unknown_types():
     assert set(task_service.REQUEUEABLE_TYPES) <= DISPATCHABLE
     assert set(worker._RUN_FAILERS) <= DISPATCHABLE
+    assert FAILED_RUNLESS_ON_EXPIRY <= DISPATCHABLE
+    assert FAILED_RUNLESS_ON_EXPIRY.isdisjoint(task_service.REQUEUEABLE_TYPES)
+    assert FAILED_RUNLESS_ON_EXPIRY.isdisjoint(worker._RUN_FAILERS)
 
 
 def test_non_idempotent_types_are_not_replayable():
@@ -68,6 +80,9 @@ def test_non_idempotent_types_are_not_replayable():
     have to delete this test and explain itself."""
     assert "exposure_update" not in task_service.REQUEUEABLE_TYPES
     assert "issuer_research" not in task_service.REQUEUEABLE_TYPES
+    # Replaying scheduled_update re-runs its mint: a second run row and a second
+    # quota charge for the same 06:30.
+    assert "scheduled_update" not in task_service.REQUEUEABLE_TYPES
 
 
 def test_reap_decides_expiry_on_the_server_clock():

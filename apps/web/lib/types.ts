@@ -209,6 +209,8 @@ export interface Freshness {
   sessions_behind: number | null;
   runs_in_flight: number;
   detail: string | null;
+  /** When the next scheduled update fires, if one is armed (V13 §9-④). */
+  next_update: string | null;
 }
 
 export interface Me {

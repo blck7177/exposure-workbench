@@ -30,6 +30,7 @@ dependencies = [
     # `playwright install chromium` once; never imported by the product.
     "playwright>=1.44",
     "apscheduler>=3.10",
+    "croniter>=2",            # schedule_service.next_fire — cron + zoneinfo -> next UTC instant
     "pyyaml>=6.0",
     "tabulate>=0.9",
     # ─── Issuer Intelligence (P0+) ────────────────────────────────────────────

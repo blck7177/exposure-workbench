@@ -19,7 +19,8 @@ from exposure_workbench.analytics import drawdown as dd
 from exposure_workbench.analytics.risk_metrics import _TRADING_DAYS_PER_YEAR
 from exposure_workbench.services import (
     calc_service, drawdown_service, exposure_run_service, market_data_service,
-    portfolio_csv, portfolio_service, run_reads_service, usage_service,
+    portfolio_csv, portfolio_service, run_reads_service, schedule_service,
+    usage_service,
 )
 
 router = APIRouter()
@@ -287,6 +288,9 @@ class FreshnessOut(BaseModel):
     sessions_behind: int | None
     runs_in_flight: int
     detail: str | None
+    # V13 §9-④: when the next scheduled update fires, if one is armed. None on
+    # a book with no active schedule — absent, not a promise.
+    next_update: str | None = None
 
 
 @router.get("/portfolios/{portfolio_id}/freshness", response_model=FreshnessOut,
@@ -301,7 +305,9 @@ async def get_portfolio_freshness(
     portfolio = await portfolio_service.get_portfolio(db, portfolio_id)
     if not portfolio:
         raise HTTPException(404, {"error": "unknown_portfolio", "portfolio_id": portfolio_id})
-    return await run_reads_service.get_run_freshness(db, portfolio_id)
+    fresh = await run_reads_service.get_run_freshness(db, portfolio_id)
+    nxt = await schedule_service.next_update_for(db, portfolio_id)
+    return {**fresh, "next_update": nxt.isoformat() if nxt else None}
 
 
 # How far back a history chart may look, by name. Not a free integer: a caller

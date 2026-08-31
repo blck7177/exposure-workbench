@@ -21,7 +21,12 @@ def test_every_task_type_maps_to_a_pool():
     """create_task is one of only two charge points; a type missing from the map
     must raise KeyError there rather than enqueue work for free."""
     from tests.test_task_lease import DISPATCHABLE
-    assert set(task_service.TASK_TYPE_QUOTA_KIND) == DISPATCHABLE
+    # scheduled_update is dispatched by the worker but never enqueued through
+    # create_task: the scheduler's own clock mints it, and the user pays once —
+    # at the exposure_update mint inside the handler. A pool entry here would
+    # bill the same nightly run twice; test_schedule_service pins the direct
+    # enqueue from the other side.
+    assert set(task_service.TASK_TYPE_QUOTA_KIND) == DISPATCHABLE - {"scheduled_update"}
 
 
 def test_every_mapped_kind_is_a_registered_pool():

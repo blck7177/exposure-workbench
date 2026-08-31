@@ -12,8 +12,8 @@ import {
   FactorBetas, FactorCorrelations, MandateBook, Stress, ValueAndDrawdown, WhereTheDayWent,
 } from "./components/book/panels";
 import {
-  AuditStrip, Briefing, FreshnessLine, Holdings, RunRail, Tiles, Warnings, WhatThisRunFound,
-  readStepFacts,
+  AuditStrip, Briefing, BriefingRefused, FreshnessLine, Holdings, RunRail, Tiles, Warnings,
+  WhatThisRunFound, readStepFacts,
 } from "./components/book/sections";
 import { createRun, getFreshness, getPositions, getRun, listPortfolios, listRuns } from "@/lib/api";
 import {
@@ -332,6 +332,7 @@ export default function BookPage() {
           {run?.daily_report && (
             <Briefing report={run.daily_report} checked={facts.numbersChecked} />
           )}
+          {run && !run.daily_report && <BriefingRefused run={run} />}
 
           {run && <RunRail run={run} />}
 
