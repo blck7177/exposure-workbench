@@ -13,13 +13,14 @@ import { CitationList } from "../../components/evidence/Cite";
 import { useEvidence } from "../../components/evidence/Column";
 import { fmtDate, fmtMoney, fmtPct } from "../../components/charts/frame";
 import {
-  BriefProvenance, Coverage, PriceVsBenchmark, Windows,
+  BriefProvenance, Coverage, HowAssembled, Margins, PriceVsBenchmark, Windows,
 } from "../../components/issuer/panels";
 import { getPositions } from "@/lib/api";
 import {
-  getCitationMap, getCoverage, getEvidenceLabels, getPriceIndex, getWindows,
-  type CitationMap as CitationMapData, type CoverageRow, type EvidenceLabel,
-  type PriceIndex, type ReportedWindows,
+  getCitationMap, getContainment, getCoverage, getEvidenceLabels, getPanelSeries,
+  getPriceIndex, getWindows,
+  type CitationMap as CitationMapData, type Containment, type CoverageRow,
+  type EvidenceLabel, type PanelSeriesResponse, type PriceIndex, type ReportedWindows,
 } from "@/lib/charts";
 import { explainApiError, explainRunError } from "@/lib/errors";
 import {
@@ -75,6 +76,7 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState<PriceIndex | null>(null);
+  const [panel, setPanel] = useState<PanelSeriesResponse | null>(null);
   const [coverage, setCoverage] = useState<CoverageRow[] | null>(null);
   // The whole run, not just its status: the timeline and the failure sentence
   // both arrive on it, and one poll already carries all three.
@@ -96,6 +98,7 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
     getSnapshot(tk).then((s) => { if (!ignore) setSnap(s); })
       .catch((e) => { if (!ignore) setError(explainApiError(e).notice); });
     getPriceIndex(tk).then((i) => { if (!ignore) setIndex(i); }).catch(() => setIndex(null));
+    getPanelSeries(tk).then((ps) => { if (!ignore) setPanel(ps); }).catch(() => setPanel(null));
     getCoverage(tk).then((c) => { if (!ignore) setCoverage(c.measures); }).catch(() => setCoverage([]));
     return () => { ignore = true; };
   }, [tk]);
@@ -204,6 +207,7 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
           {tab === "Overview" && (
             <div className="flex flex-col gap-3">
               {index && <PriceVsBenchmark index={index} />}
+              {panel && <OverviewMargins panel={panel} />}
               {coverage && coverage.length > 0 && <Coverage rows={coverage} />}
               {coverage?.length === 0 && (
                 <p className="text-xs text-slate-500 py-8 text-center">
@@ -220,6 +224,11 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
       </main>
     </>
   );
+}
+
+function OverviewMargins({ panel }: { panel: PanelSeriesResponse }) {
+  const { open } = useEvidence();
+  return <Margins data={panel} onOpen={open} />;
 }
 
 // ── the book you came from, as a way back into it ────────────────────────────
@@ -320,6 +329,7 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
   const [metric, setMetric] = useState("revenue");
   const [windows, setWindows] = useState<ReportedWindows | null>(null);
   const [calcs, setCalcs] = useState<CalcRow[] | null>(null);
+  const [assembly, setAssembly] = useState<Containment | null>(null);
   const { open } = useEvidence();
 
   useEffect(() => {
@@ -329,6 +339,7 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
   }, [ticker, metric]);
   useEffect(() => {
     getFinancials(ticker).then((d) => setCalcs(d.calcs)).catch(() => setCalcs([]));
+    getContainment(ticker).then(setAssembly).catch(() => setAssembly(null));
   }, [ticker]);
 
   const options = flows.length > 0
@@ -388,6 +399,7 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
           </div>
         </section>
       )}
+      {assembly && <HowAssembled data={assembly} onOpen={open} />}
       {coverage.length > 0 && <Coverage rows={coverage} />}
     </div>
   );

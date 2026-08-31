@@ -176,3 +176,42 @@ export type ResearchRunSummary = {
 };
 
 export const listResearchRuns = () => j<ResearchRunSummary[]>("/api/research-runs");
+
+// ── how a composed figure was assembled ──────────────────────────────────────
+
+export type ContainmentTerm = { metric: string; label: string; value: number | null; fact_id: string | null };
+export type Containment = {
+  ticker: string; formula: string; family: string;
+  as_of: string | null;
+  /** e.g. "long_term_debt_total + commercial_paper" — the cover, in words. */
+  definition: string | null;
+  taken: ContainmentTerm[];
+  overlapping_not_added: (ContainmentTerm & {
+    because: { part: string; part_label: string; already_in: string; already_in_label: string }[];
+  })[];
+  missing_at_this_date: { metric: string; label: string; last_reported: string | null }[];
+  no_facts_for_issuer: { metric: string; label: string }[];
+  outside_family: { metric: string; label: string }[];
+  edges: { parent: string; child: string; observed: number }[];
+  note?: string; detail?: string;
+};
+
+export const getContainment = (t: string, formula = "total_debt") =>
+  j<Containment>(`/api/issuers/${t}/containment?formula=${encodeURIComponent(formula)}`);
+
+// ── the recipe's series, for the margins panel ───────────────────────────────
+
+export type PanelPoint = { end: string; value: number; fact_ids: string[] };
+export type PanelSeries = {
+  metric: string; label: string; calc_id: string; operation: string; points: PanelPoint[];
+};
+export type PanelSeriesResponse = {
+  ticker: string; as_of: string | null; recipe_version: string | null;
+  series: PanelSeries[];
+  unavailable?: { metric: string; detail: string }[];
+  chartable?: string[];
+};
+
+export const getPanelSeries = (t: string, metrics?: string[]) =>
+  j<PanelSeriesResponse>(`/api/issuers/${t}/panel-series${
+    metrics?.length ? `?metrics=${encodeURIComponent(metrics.join(","))}` : ""}`);

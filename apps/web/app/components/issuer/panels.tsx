@@ -5,7 +5,10 @@ import {
 } from "../charts/frame";
 import { LineChart } from "../charts/line";
 import { CitationMap, CoverageTable, WindowLadder } from "../charts/grids";
-import type { CitationMap as CitationMapData, CoverageRow, PriceIndex, ReportedWindows } from "@/lib/charts";
+import type {
+  CitationMap as CitationMapData, Containment, CoverageRow, PanelSeries,
+  PanelSeriesResponse, PriceIndex, ReportedWindows,
+} from "@/lib/charts";
 
 /**
  * The issuer's panels (V13-S6c).
@@ -175,6 +178,174 @@ export function BriefProvenance({ map }: { map: CitationMapData }) {
             .map(([k, v]) => `${v} ${kind[k] ?? k}`)
             .join(" · ")}
         </p>
+      )}
+    </ChartCard>
+  );
+}
+
+// ── margins over the reported windows ────────────────────────────────────────
+
+/**
+ * The three margins as the recipe computed them — one calc row per series, so
+ * the line and an answer citing net margin point at the same calculation.
+ *
+ * A LINE, not the dot plot first sketched for this: the recipe's series are one
+ * window length marching through time, which is change-over-time, and the form
+ * follows the data that exists rather than the panel that was imagined.
+ */
+export function Margins({ data, onOpen }: {
+  data: PanelSeriesResponse;
+  onOpen?: (id: string) => void;
+}) {
+  const margins = data.series.filter((s) => s.metric.endsWith("_margin"));
+  if (margins.length === 0) return null;
+  const x = margins[0].points.map((p) => p.end);
+  const at = (s: PanelSeries) => {
+    const by = new Map(s.points.map((p) => [p.end, p.value]));
+    return x.map((d) => by.get(d) ?? null);
+  };
+  const colours = [C.s1, C.s2, C.s3];
+
+  return (
+    <ChartCard
+      title="Margins"
+      aside={data.as_of ? `computed ${fmtDate(data.as_of)}` : undefined}
+      table={{
+        columns: ["Quarter end", ...margins.map((s) => s.label)],
+        rows: x.map((d, i) => [fmtDate(d), ...margins.map((s) => {
+          const v = at(s)[i];
+          return v == null ? "—" : `${(v * 100).toFixed(2)}%`;
+        })]),
+      }}
+      note={<>Each line is one ledgered calculation over the issuer&apos;s filed quarters
+        {onOpen && margins.map((s, i) => (
+          <span key={s.metric}>{i === 0 ? " — " : " · "}
+            <button onClick={() => onOpen(s.calc_id)}
+              className="text-teal-400 hover:text-teal-300 hover:underline">{s.label.toLowerCase()}</button>
+          </span>
+        ))}.
+      </>}>
+      <LineChart
+        x={x}
+        height={200}
+        series={margins.map((s, i) => ({
+          key: s.metric, label: s.label, points: at(s), colour: colours[i % colours.length],
+          endLabel: `${((s.points[s.points.length - 1]?.value ?? 0) * 100).toFixed(1)}%`,
+        }))}
+        xTicks={x.map((d, i) => ({ at: i, label: fmtMonth(d) }))
+          .filter((_, i) => i % Math.max(1, Math.floor(x.length / 5)) === 0)}
+        yFormat={(v) => `${(v * 100).toFixed(0)}%`}
+        ariaLabel="Gross, operating and net margin over the issuer's filed quarters"
+        tipRows={(i) => margins.map((s, k) => ({
+          label: s.label, colour: colours[k % colours.length],
+          value: at(s)[i] == null ? "—" : `${((at(s)[i] as number) * 100).toFixed(2)}%`,
+        }))}
+      />
+      <Legend items={margins.map((s, i) => ({
+        label: s.label, colour: colours[i % colours.length], shape: "line" as const,
+      }))} />
+    </ChartCard>
+  );
+}
+
+// ── how a composed figure is assembled ───────────────────────────────────────
+
+/**
+ * The containment engine's own account of a composed figure (V13, planned in
+ * S3 and built after the cover fix landed): which lines were summed, which
+ * were SET ASIDE because part of them was already inside a taken line, and
+ * which are absent — at this date, or entirely.
+ *
+ * The set-aside row is the whole point. Two parents sharing one child is how a
+ * total debt came out a billion high through every check this desk has; the
+ * fix records the candidates it refuses, and this card is where a reader sees
+ * the refusal instead of taking the narrower total on faith. There is no
+ * total at the bottom on purpose — a value summed here would carry no calc_id,
+ * and the assembled figure belongs to the calculation that mints one.
+ */
+export function HowAssembled({ data, onOpen }: {
+  data: Containment;
+  onOpen?: (id: string) => void;
+}) {
+  const money = (v: number | null) =>
+    v == null ? "—" : Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` : `$${(v / 1e6).toFixed(0)}M`;
+
+  const row = (t: { label: string; value?: number | null; fact_id?: string | null }, tail?: React.ReactNode) => (
+    <li key={t.label} className="flex items-baseline gap-2 py-1">
+      {t.fact_id && onOpen ? (
+        <button onClick={() => onOpen(t.fact_id as string)}
+          className="text-slate-300 hover:text-slate-100 hover:underline decoration-dotted underline-offset-2 text-left">
+          {t.label}
+        </button>
+      ) : (
+        <span className="text-slate-400">{t.label}</span>
+      )}
+      {t.value !== undefined && (
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-300">{money(t.value)}</span>
+      )}
+      {tail}
+    </li>
+  );
+
+  return (
+    <ChartCard
+      title={`How ${data.formula.replace(/_/g, " ")} is assembled`}
+      aside={data.as_of ? `as of ${fmtDate(data.as_of)}` : undefined}
+      note={data.note ?? data.detail}>
+      {data.definition == null ? (
+        <p className="text-xs text-slate-500 py-4">{data.detail ?? "Nothing to assemble at any held date."}</p>
+      ) : (
+        <div className="text-[12px] flex flex-col gap-3">
+          <p className="font-mono text-[11.5px] text-slate-200">{data.definition.replace(/_/g, " ")}</p>
+          <div>
+            <h4 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Summed</h4>
+            <ul>{data.taken.map((t) => row(t))}</ul>
+          </div>
+          {data.overlapping_not_added.length > 0 && (
+            <div>
+              <h4 className="text-[10px] uppercase tracking-wider text-amber-500/90 mb-1">
+                Reported, and set aside — part of it is already summed
+              </h4>
+              <ul>
+                {data.overlapping_not_added.map((o) => (
+                  <li key={o.metric} className="py-1">
+                    <div className="flex items-baseline gap-2">
+                      {o.fact_id && onOpen ? (
+                        <button onClick={() => onOpen(o.fact_id as string)}
+                          className="text-slate-300 hover:text-slate-100 hover:underline decoration-dotted underline-offset-2 text-left">
+                          {o.label}
+                        </button>
+                      ) : <span className="text-slate-400">{o.label}</span>}
+                      <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-300">{money(o.value)}</span>
+                    </div>
+                    {o.because.map((b) => (
+                      <p key={b.part} className="text-[11px] text-slate-500 mt-0.5">
+                        its {b.part_label.toLowerCase()} is already inside {b.already_in_label.toLowerCase()},
+                        so adding this line would count that part twice.
+                      </p>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(data.missing_at_this_date.length > 0 || data.no_facts_for_issuer.length > 0) && (
+            <div>
+              <h4 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Absent</h4>
+              <ul className="text-[11.5px] text-slate-500">
+                {data.missing_at_this_date.map((m) => (
+                  <li key={m.metric} className="py-0.5">
+                    {m.label} — not reported at this date
+                    {m.last_reported && <>; last seen {fmtDate(m.last_reported)}</>}
+                  </li>
+                ))}
+                {data.no_facts_for_issuer.map((m) => (
+                  <li key={m.metric} className="py-0.5">{m.label} — never filed by this issuer</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </ChartCard>
   );
