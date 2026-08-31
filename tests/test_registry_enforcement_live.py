@@ -120,11 +120,17 @@ async def test_a_session_cannot_talk_an_id_into_its_own_evidence_trail():
         async with mk() as db:
             assert run_id not in await trail.collect_trail(db, sid), (
                 "an echo is not a retrieval; nothing this session called returned that id")
-            refused = await R.invoke(reg, db, sid, "respond",
-                                     {"text": "The book is fine.", "citations": [run_id]})
+            # V14-C: respond takes blocks, and a figure is a slot naming its
+            # evidence. The laundering attempt is the same — an id this session
+            # never retrieved, offered as support — and so is the refusal.
+            refused = await R.invoke(reg, db, sid, "respond", {"blocks": [
+                {"type": "paragraph", "runs": [
+                    "The book is fine at ", {"ref": run_id, "value": 1.0}, "."]},
+            ]})
             await db.commit()
-            assert refused["error"] == "invalid_citations"
-            assert refused["problems"] == [{"id": run_id, "reason": "not_in_evidence_trail"}]
+            assert refused["error"] == "invalid_citations", refused
+            assert any(p.get("id") == run_id and p.get("reason") == "not_in_evidence_trail"
+                       for p in refused["problems"]), refused
     finally:
         await engine.dispose()
 
@@ -159,11 +165,21 @@ async def test_a_share_count_survives_the_whole_path_from_tool_to_gate():
             )).scalars().first()
             assert any(r["type"] == "position" for r in step.evidence_refs)
 
-            out = await R.invoke(reg, db, sid, "respond", {
-                "text": f"You hold {holding['quantity']:,.0f} shares of {holding['ticker']}.",
-                "citations": [holding["pos_id"]]})
+            # V14-C: the share count travels as a slot and the ledger's own
+            # value is what the reader is shown — the four-things-line-up claim
+            # this test exists for, now with the gate RESOLVING rather than
+            # re-reading a sentence.
+            out = await R.invoke(reg, db, sid, "respond", {"blocks": [
+                {"type": "paragraph", "runs": [
+                    "You hold ",
+                    {"ref": holding["pos_id"], "value": holding["quantity"]},
+                    f" shares of {holding['ticker']}."]},
+            ]})
             await db.commit()
             assert out.get("responded") is True, out
+            assert out["verified"]["figures"] == 1 and holding["pos_id"] in out["citations"]
+            # The rendered text carries the ledger's figure back into the prose.
+            assert str(int(holding["quantity"])) in out["text"].replace(",", "")
     finally:
         await engine.dispose()
 
