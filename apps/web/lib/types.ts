@@ -211,6 +211,14 @@ export interface Freshness {
   detail: string | null;
 }
 
+export interface Me {
+  user_id: string;
+  email: string | null;
+  // V13-S7 (§9-②): when this person first confirmed the disclaimer; null = not
+  // yet, and the confirmation bar shows until it is set. Set once, never moved.
+  disclaimer_acknowledged_at: string | null;
+}
+
 // ─── Daily quota (V2-E4) ──────────────────────────────────────────────────────
 
 export interface UsagePool {

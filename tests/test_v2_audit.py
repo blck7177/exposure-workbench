@@ -95,9 +95,12 @@ def test_every_write_route_requires_a_user(route):
     assert "require_user" in signature, f"{name} accepts writes without authentication"
 
 
-# Route modules with a POST that deliberately charges nothing. Empty, and it
-# should stay that way — an entry here is a decision someone has to defend.
-UNCHARGED_WRITE_MODULES: set[str] = set()
+# Route modules with a POST that deliberately charges nothing. An entry here is
+# a decision someone has to defend, so: "me" carries acknowledge-disclaimer
+# (V13-S7, §9-②) — one column on the caller's own row, set at most once per
+# account lifetime, triggering nothing downstream; a quota refusal there would
+# stand between a person and the confirmation the product itself asked for.
+UNCHARGED_WRITE_MODULES: set[str] = {"me"}
 
 
 def test_every_module_with_a_write_route_charges_something():

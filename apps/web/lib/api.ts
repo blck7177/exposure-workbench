@@ -1,4 +1,4 @@
-import type { Portfolio, Position, ExposureRun, ExposureRunSummary, Freshness, Task, Usage } from "./types";
+import type { Me, Portfolio, Position, ExposureRun, ExposureRunSummary, Freshness, Task, Usage } from "./types";
 import { apiFetch as fetchJson } from "./http";
 
 // setAuthTokenGetter now lives in ./http (the shared transport); re-export so
@@ -99,6 +99,14 @@ export async function listTasks(status?: string): Promise<Task[]> {
 }
 
 // ─── Daily quota (V2-E4) ──────────────────────────────────────────────────────
+
+export async function getMe(): Promise<Me> {
+  return fetchJson<Me>("/api/me");
+}
+
+export async function acknowledgeDisclaimer(): Promise<{ disclaimer_acknowledged_at: string | null }> {
+  return fetchJson("/api/me/acknowledge-disclaimer", { method: "POST" });
+}
 
 export async function getMyUsage(): Promise<Usage> {
   return fetchJson<Usage>("/api/me/usage");

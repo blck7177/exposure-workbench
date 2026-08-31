@@ -27,6 +27,9 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # V13-S7: when this person first confirmed the disclaimer. NULL = not yet.
+    # Set once and never moved — see /api/me/acknowledge-disclaimer.
+    disclaimer_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # ─── Security master (V2-D: the investable US universe; shared, no RLS) ─────────

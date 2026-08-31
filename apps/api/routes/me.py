@@ -10,7 +10,7 @@ from apps.api.auth_deps import require_user
 from exposure_workbench.auth.clerk import UserClaims
 from sqlalchemy import func, select
 
-from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
+from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep, User
 from exposure_workbench.db.session import get_db
 from exposure_workbench.services import usage_service
 from exposure_workbench.utils.dates import today_utc
@@ -19,8 +19,46 @@ router = APIRouter()
 
 
 @router.get("/me")
-async def me(user: UserClaims = Depends(require_user)):
-    return {"user_id": user.user_id, "email": user.email}
+async def me(
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # The row exists by the time any authed route runs — auth_deps upserts it in
+    # its own transaction before the route is entered — but a read that assumes
+    # so still answers None-shaped rather than 500 if that ever changes.
+    acked = (await db.execute(
+        select(User.disclaimer_acknowledged_at).where(User.id == user.user_id)
+    )).scalar_one_or_none()
+    return {"user_id": user.user_id, "email": user.email,
+            "disclaimer_acknowledged_at": acked.isoformat() if acked else None}
+
+
+@router.post("/me/acknowledge-disclaimer")
+async def acknowledge_disclaimer(
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record that this person has read the disclaimer — once (V13-S7, §9-②).
+
+    COALESCE keeps the FIRST timestamp: an acknowledgement is a record of when
+    something happened, and a record that a second click can move is not one.
+    Idempotent by the same token — the UI may retry freely.
+
+    Deliberately uncharged (see test_v2_audit.UNCHARGED_WRITE_MODULES): it
+    triggers nothing downstream, writes one column on the caller's own row at
+    most once per account lifetime, and charging it would put a quota refusal
+    between a person and the confirmation the product asked them for.
+    """
+    from sqlalchemy import update
+    acked = (await db.execute(
+        update(User)
+        .where(User.id == user.user_id)
+        .values(disclaimer_acknowledged_at=func.coalesce(
+            User.disclaimer_acknowledged_at, func.now()))
+        .returning(User.disclaimer_acknowledged_at)
+    )).scalar_one_or_none()
+    await db.commit()
+    return {"disclaimer_acknowledged_at": acked.isoformat() if acked else None}
 
 
 class PoolOut(BaseModel):

@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 import { AuditProvider } from "./components/audit";
+import { DisclaimerGate } from "./components/Disclaimer";
 import { TopBar } from "./components/TopBar";
 import { AnalystDock, DockContextProvider } from "./components/analyst/Dock";
 import { EvidenceProvider } from "./components/evidence/Column";
@@ -58,6 +59,7 @@ export default function RootLayout({
           <DockContextProvider>
             <div className="h-screen flex flex-col">
               <TopBar />
+              <DisclaimerGate />
               <div className="flex-1 flex min-h-0">
                 <EvidenceProvider>
                   {children}

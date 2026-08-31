@@ -1,0 +1,11 @@
+-- V13-S7 (§9-② option A): the disclaimer acknowledgement, recorded.
+--
+-- One nullable timestamp, kept forever: WHEN this person first confirmed they
+-- had read the disclaimer. NULL means "has not yet" — the UI shows the
+-- confirmation bar until it is set, and sets it exactly once (the route keeps
+-- the FIRST timestamp; a second acknowledgement is a no-op, because a record
+-- that can be re-stamped is not a record).
+--
+-- Additive and idempotent, like every V13 migration; no backfill — an account
+-- that existed before this column genuinely has not acknowledged anything.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS disclaimer_acknowledged_at TIMESTAMPTZ;
