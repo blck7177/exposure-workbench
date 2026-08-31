@@ -98,7 +98,8 @@ export function Heatmap({ labels, matrix, ariaLabel, window: win }: {
 export type LadderRow = {
   months: number;
   label: string;
-  slots: { start: string; end: string; value: number | null; terms?: { fact_id: string; sign: number }[];
+  slots: { start: string; end: string; value: number | null;
+           fact_ids?: string[]; terms?: { fact_id: string; sign: number }[];
            derivation?: string; unreachable?: string }[];
 };
 
@@ -113,11 +114,16 @@ export type LadderRow = {
  * engine cannot reach at all keeps its place, outlined, because dropping it
  * would let its neighbours close ranks and read as consecutive.
  */
-export function WindowLadder({ rows, format, today, ariaLabel }: {
+export function WindowLadder({ rows, format, today, ariaLabel, onOpen }: {
   rows: LadderRow[];
   format: (v: number) => string;
   today?: string;
   ariaLabel: string;
+  /** Open a slot's evidence. A slot's value stands on its boundary facts — a
+   *  reported window on one, a derived window on each term of its signed path —
+   *  and the click opens the first; the tooltip already names the whole path.
+   *  An unreachable slot has no fact to open and stays inert. */
+  onOpen?: (factId: string) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -182,6 +188,12 @@ export function WindowLadder({ rows, format, today, ariaLabel }: {
                         fill={derived ? "#9ec5f4" : "#fff"} pointerEvents="none">{label}</text>
                     )}
                     <rect x={x0} y={y - 3} width={bw} height={24} fill="transparent"
+                      style={onOpen && (s.fact_ids?.length || s.terms?.length)
+                        ? { cursor: "pointer" } : undefined}
+                      onClick={() => {
+                        const id = s.fact_ids?.[0] ?? s.terms?.[0]?.fact_id;
+                        if (id && onOpen) onOpen(id);
+                      }}
                       onPointerMove={(e) => show(e.clientX, e.clientY, `${s.start} → ${s.end}`,
                         s.value == null
                           ? [{ label: "Not derivable", value: s.unreachable ?? "no path" }]

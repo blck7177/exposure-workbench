@@ -262,6 +262,9 @@ export type Meter = {
   current: number | null; warning: number | null; breach: number | null;
   status: "ok" | "warning" | "breach" | null;
   utilisation: number | null;
+  /** The alert a fired check wrote — the evidence a click opens. A check that
+   *  did not fire has no row to open, and gets no affordance pretending it does. */
+  openId?: string | null;
 };
 
 /**
@@ -272,9 +275,10 @@ export type Meter = {
  * way to breach. A check with no recorded levels draws no bar and says so —
  * an empty meter would read as "measured, and at zero".
  */
-export function Meters({ meters, format }: {
+export function Meters({ meters, format, onOpen }: {
   meters: Meter[];
   format: (v: number | null) => string;
+  onOpen?: (id: string) => void;
 }) {
   const { tip, show, hide } = useTooltip();
   const groups = Array.from(new Set(meters.map((m) => m.group)));
@@ -290,7 +294,14 @@ export function Meters({ meters, format }: {
             const tickAt = m.warning != null && m.breach ? (m.warning / m.breach) * 100 : null;
             return (
               <div key={m.key}
-                className="grid grid-cols-[minmax(0,1fr)_110px_120px] gap-3 items-center py-1 text-[11.5px]"
+                role={m.openId && onOpen ? "button" : undefined}
+                tabIndex={m.openId && onOpen ? 0 : undefined}
+                onClick={m.openId && onOpen ? () => onOpen(m.openId as string) : undefined}
+                onKeyDown={m.openId && onOpen
+                  ? (e) => { if (e.key === "Enter") onOpen(m.openId as string); }
+                  : undefined}
+                className={`grid grid-cols-[minmax(0,1fr)_110px_120px] gap-3 items-center py-1 text-[11.5px] ${
+                  m.openId && onOpen ? "cursor-pointer rounded hover:bg-[#161b22]" : ""}`}
                 onPointerMove={(e) => show(e.clientX, e.clientY, m.label, [
                   { label: "Measured", value: format(m.current) },
                   { label: "Warning tier", value: format(m.warning) },

@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { AuditOnly } from "../audit";
+import { useEffect, useState } from "react";
+
+import { AuditOnly, useAudit } from "../audit";
 import { C, fmtDate, fmtMoney, fmtPct, fmtSignedPct, titleFromKey } from "../charts/frame";
 import { ReturnHistogram, Sparkline } from "../charts/line";
 import { collapseSteps, stepPhrase } from "../steps";
-import type { History } from "@/lib/charts";
+import { useEvidence } from "../evidence/Column";
+import { getAuditSummary, type AuditSummary, type History } from "@/lib/charts";
 import { explainRunError } from "@/lib/errors";
 import { formatDateTime, formatDuration } from "@/lib/formatting";
 import type {
@@ -210,6 +213,7 @@ export function Warnings({ alerts, labels, onAsk }: {
   labels: Record<string, string>;
   onAsk: (q: string) => void;
 }) {
+  const { open } = useEvidence();
   if (alerts.length === 0) return null;
   return (
     <section className="rounded-lg border border-[#21262d] bg-[#11161d] overflow-hidden">
@@ -236,7 +240,10 @@ export function Warnings({ alerts, labels, onAsk }: {
                 className={`mt-1 w-0.5 self-stretch rounded ${a.severity === "breach" ? "bg-red-500" : "bg-amber-500"}`} />
               <div className="min-w-0 flex-1">
                 <p className="text-[12.5px] text-slate-300 leading-snug">
-                  <b className="font-medium text-slate-200">{subject}</b>
+                  <button onClick={() => open(a.id)} title="Open this alert as evidence"
+                    className="font-medium text-slate-200 hover:text-white hover:underline decoration-dotted underline-offset-2">
+                    {subject}
+                  </button>
                   {a.current_value != null && <> is <b className="text-slate-100">{fmtPct(a.current_value, 1)}</b></>}
                   {a.limit_value != null && <>, against a {fmtPct(a.limit_value, 1)} {a.severity} tier</>}
                   .
@@ -323,6 +330,72 @@ export function Holdings({ issuers, asOf, portfolioId, onAsk }: {
             ))}
           </tbody>
         </table>
+      </div>
+    </section>
+  );
+}
+
+// ── this desk's record, behind the switch ────────────────────────────────────
+
+/**
+ * The audit strip (V13-S4, wired in S6c follow-up).
+ *
+ * Six numbers the market sells as marketing — "No Hallucination Guarantee", an
+ * accuracy score from an LLM judge — served here as a record instead: what the
+ * gate passed and refused, what the budget refused, what the turns cost. All of
+ * it is read off rows the system wrote at the time (the endpoint's own comment
+ * says why it refuses to recount), and none of it is addressed to a reader,
+ * which is why the whole strip lives behind the audit switch.
+ *
+ * The fetch happens when the switch is ON and the viewer is signed in — the
+ * numbers are RLS-scoped to the caller's own desk, so an anonymous viewer has
+ * no record to show and is told that rather than shown an empty one.
+ */
+export function AuditStrip({ signedIn }: { signedIn: boolean | null }) {
+  const { audit } = useAudit();
+  const [summary, setSummary] = useState<AuditSummary | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!audit || !signedIn) return;
+    let ignore = false;
+    getAuditSummary()
+      .then((s) => { if (!ignore) { setSummary(s); setFailed(false); } })
+      .catch(() => { if (!ignore) setFailed(true); });
+    return () => { ignore = true; };
+  }, [audit, signedIn]);
+
+  if (!audit) return null;
+  const cell = (v: React.ReactNode, label: string) => (
+    <div key={label}>
+      <div className="font-mono text-base text-slate-200 tabular-nums">{v}</div>
+      <div className="text-[10px] text-slate-500 leading-tight">{label}</div>
+    </div>
+  );
+  return (
+    <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
+      <header className="flex items-center gap-2 px-4 py-2 border-b border-[#21262d]">
+        <h3 className="text-[12px] font-medium text-slate-300">Audit · this desk, all time</h3>
+        <span className="font-mono text-[10px] text-slate-600">agent_steps · agent_messages</span>
+      </header>
+      <div className="px-4 py-2.5">
+        {!signedIn ? (
+          <p className="text-[11px] text-slate-500">
+            The record is scoped to a desk. Sign in to read yours.
+          </p>
+        ) : failed ? (
+          <p className="text-[11px] text-slate-500">The record could not be read just now.</p>
+        ) : !summary ? (
+          <p className="text-[11px] text-slate-600">Reading…</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-x-6 gap-y-2">
+            {cell(summary.answers_gated, "answers passed the gate")}
+            {cell(summary.answers_refused, "answers refused — nothing verifiable")}
+            {cell(summary.figures_checked, "figures checked in those answers")}
+            {cell(`${summary.lookups_refused} / ${summary.lookups_made}`, "look-ups refused for budget")}
+            {cell(summary.model_calls, "model calls")}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -12,6 +12,7 @@ import { Heatmap } from "../charts/grids";
 import { Legend } from "../charts/frame";
 import type { FactorCorrelation, History, LimitBook, Scenario } from "@/lib/charts";
 import type { FactorAttribution, IssuerExposure } from "@/lib/types";
+import { useEvidence } from "../evidence/Column";
 
 /**
  * The book's panels (V13-S6c).
@@ -190,6 +191,7 @@ export function WhereTheDayWent({ factors, issuers, dailyReturn, dailyPnl, names
 
 export function MandateBook({ book, inert }: { book: LimitBook; inert: string[] }) {
   const withLevels = book.checks.filter((c) => c.current != null).length;
+  const { open } = useEvidence();
   return (
     <ChartCard
       title="Mandate book"
@@ -227,7 +229,15 @@ export function MandateBook({ book, inert }: { book: LimitBook; inert: string[] 
             {book.checks.map((c) => (
               <li key={c.key} className="flex items-center gap-2 truncate">
                 <span aria-hidden className={c.fired ? "text-amber-500" : "text-slate-700"}>●</span>
-                <span className={c.fired ? "text-slate-300" : "text-slate-500"}>{c.label}</span>
+                {c.alert_id ? (
+                  <button onClick={() => open(c.alert_id as string)}
+                    title="Open the alert this check wrote"
+                    className="truncate text-left text-slate-300 hover:text-slate-100 hover:underline decoration-dotted underline-offset-2">
+                    {c.label}
+                  </button>
+                ) : (
+                  <span className={c.fired ? "text-slate-300" : "text-slate-500"}>{c.label}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -237,9 +247,10 @@ export function MandateBook({ book, inert }: { book: LimitBook; inert: string[] 
           meters={book.checks.map((c) => ({
             key: c.key, label: c.label, group: c.group,
             current: c.current, warning: c.warning, breach: c.breach,
-            status: c.status, utilisation: c.utilisation,
+            status: c.status, utilisation: c.utilisation, openId: c.alert_id,
           }))}
           format={(v) => (v == null ? "—" : fmtPct(v, 2))}
+          onOpen={open}
         />
       )}
     </ChartCard>

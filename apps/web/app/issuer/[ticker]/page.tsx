@@ -338,7 +338,7 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
   return (
     <div className="flex flex-col gap-3">
       {windows && (
-        <Windows data={windows} metrics={options} metric={metric} onMetric={setMetric} />
+        <Windows data={windows} metrics={options} metric={metric} onMetric={setMetric} onOpen={open} />
       )}
       {calcs && calcs.length > 0 && (
         <section className="rounded-lg border border-[#21262d] bg-[#11161d]">

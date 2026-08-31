@@ -83,11 +83,12 @@ export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
 
 // ── the windows a measure can be produced over ───────────────────────────────
 
-export function Windows({ data, metrics, metric, onMetric }: {
+export function Windows({ data, metrics, metric, onMetric, onOpen }: {
   data: ReportedWindows;
   metrics: { metric: string; label: string }[];
   metric: string;
   onMetric: (m: string) => void;
+  onOpen?: (factId: string) => void;
 }) {
   const money = (v: number) =>
     Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(2)}B`
@@ -120,7 +121,7 @@ export function Windows({ data, metrics, metric, onMetric }: {
           {data.detail ?? `Nothing filed for ${data.label} that this desk holds.`}
         </p>
       ) : (
-        <WindowLadder rows={data.rows} format={money}
+        <WindowLadder rows={data.rows} format={money} onOpen={onOpen}
           ariaLabel={`Windows of ${data.label} this desk can produce, by window length`} />
       )}
       <Legend items={[

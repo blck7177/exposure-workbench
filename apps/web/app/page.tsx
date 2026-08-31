@@ -12,7 +12,8 @@ import {
   FactorBetas, FactorCorrelations, MandateBook, Stress, ValueAndDrawdown, WhereTheDayWent,
 } from "./components/book/panels";
 import {
-  Briefing, FreshnessLine, Holdings, RunRail, Tiles, Warnings, WhatThisRunFound, readStepFacts,
+  AuditStrip, Briefing, FreshnessLine, Holdings, RunRail, Tiles, Warnings, WhatThisRunFound,
+  readStepFacts,
 } from "./components/book/sections";
 import { createRun, getFreshness, getPositions, getRun, listPortfolios, listRuns } from "@/lib/api";
 import {
@@ -297,6 +298,8 @@ export default function BookPage() {
                   : { evaluated: facts.evaluated, fired: alerts.length }} />
             </>
           )}
+
+          <AuditStrip signedIn={signedIn} />
 
           {history && history.points.length > 1 && <ValueAndDrawdown history={history} />}
 
