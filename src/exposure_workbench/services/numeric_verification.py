@@ -56,7 +56,12 @@ measured against the live corpus first:
      now reaches the value and is matched exactly, which also means a claim that
      carries its sign in a verb ("the factor detracted 0.8%") is refused rather
      than guessed at. Accepting either sign would be a two-way "I do not know
-     the sign" in the module whose job is refusing.
+     the sign" in the module whose job is refusing. Two spellings joined later:
+     a minus written as U+2212 (which used to match from the '$', dropping the
+     sign — a loss read as a gain) and a sign inside the currency mark,
+     "$-141,973" (which used to break the money pattern and fall through as an
+     unchecked COUNT). Both are ways of writing the same sign, so both
+     normalise; what a sign may MEAN is unchanged.
 
 Extraction and matching are pure functions and testable without a database;
 resolve_cited_values() is the only part that reads one.
@@ -232,7 +237,22 @@ _EXEMPTION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
 # case where a sign is actually consumed — in front of the whole pattern it would
 # also refuse "US$5B", whose match starts on a character preceded by a letter,
 # and silently demote it to a unitless count.
-_SIGN = r"(?:(?<![\w.])[+-])?"
+#
+# U+2212, the typographic minus, is another way of WRITING a sign — the same
+# class of edit as "percent" beside "%", never a widening of the tolerance.
+# Before it was accepted here, "−$141,973" matched from the '$' and the sign was
+# silently dropped: a loss read as a gain, produced by the gate's own parsing
+# rather than by the model, on the one corruption this domain punishes hardest.
+# The lookbehind covers it the same way — "15−20%" is still a range.
+_SIGN = r"(?:(?<![\w.])[+\-−])?"
+
+# A sign written INSIDE the currency mark. "$-141,973" is malformed, but the
+# money patterns failing at the '-' did not refuse it — the bare pattern picked
+# the digits up as a COUNT, sign intact and unit checking silently bypassed for
+# exactly the spelling most likely to accompany a malformed claim. Closed to
+# the one position between '$' and the digits; no lookbehind, because the '$'
+# it must follow already rules out the range and name shapes.
+_SIGN_AFTER_CURRENCY = r"[+\-−]?"
 
 # Ordered longest-form-first: "$111.184 billion" must not be read as "$111.184".
 # IGNORECASE on the scale forms because "$81.615B" and "$111.184 billion" are the
@@ -241,8 +261,8 @@ _SIGN = r"(?:(?<![\w.])[+-])?"
 _NUMBER_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
     (name, re.compile(pattern, flags))
     for name, pattern, flags in (
-        ("money_scaled", rf"{_SIGN}\$\s?{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
-        ("money_plain", rf"{_SIGN}\$\s?{_LIT}", 0),
+        ("money_scaled", rf"{_SIGN}\$\s?{_SIGN_AFTER_CURRENCY}{_LIT}\s*{_SCALE_WORD}", re.IGNORECASE),
+        ("money_plain", rf"{_SIGN}\$\s?{_SIGN_AFTER_CURRENCY}{_LIT}", 0),
         # "82 percent" is the same claim as "82%", and a filing that spells it out
         # made it uncitable in BOTH spellings: written as words it typed as a
         # COUNT and fell under the three-digit floor for bare numbers, written
@@ -262,6 +282,11 @@ _NUMBER_PATTERNS: tuple[tuple[str, re.Pattern], ...] = tuple(
 )
 
 _DIGITS = re.compile(_LIT)
+
+# Everything a matched surface can hold in front of its first digit: sign(s),
+# the currency mark, spaces. Stops at '.' as well as at a digit so that a
+# leading-zero-less ".5%" keeps its empty head.
+_HEAD = re.compile(r"[^\d.]*")
 
 
 @dataclass(frozen=True)
@@ -329,8 +354,12 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
             # The sign is read off the SURFACE, because the literal cannot carry
             # it: _LIT begins at a digit, and _DIGITS re-parses the surface from
             # the first one. That gap is the whole defect this closes — every
-            # negative in the corpus was checked as its own positive.
-            if surface.startswith("-"):
+            # negative in the corpus was checked as its own positive. Read from
+            # everything in front of the first digit, not surface[0]: the sign
+            # may sit inside the currency mark ("$-141,973"), and a minus is a
+            # minus whether written as '-' or U+2212.
+            head = surface[:_HEAD.match(surface).end()]
+            if "-" in head or "−" in head:
                 magnitude = -magnitude
 
             decimals = _decimals(literal)

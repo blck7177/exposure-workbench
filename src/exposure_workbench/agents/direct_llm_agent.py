@@ -22,7 +22,12 @@ def _load_system_prompt() -> str:
 
 def _build_user_message(inp: ReportInput) -> str:
     pct = lambda x: f"{x * 100:.2f}%" if x is not None else "N/A"
-    usd = lambda x: f"${x:,.0f}" if x is not None else "N/A"
+    # The sign goes OUTSIDE the currency mark. The report model is told to copy
+    # figures exactly, so a plain f"${x:,.0f}" put "$-141,973" in front of it and
+    # "down $-141,973" in the published briefing. ASCII "-$", not U+2212: this
+    # string passes through the verification gate, and "-$141,973" is the form it
+    # parses as negative MONEY.
+    usd = lambda x: ("-$" if x < 0 else "$") + f"{abs(x):,.0f}" if x is not None else "N/A"
 
     lines = [
         f"## Portfolio Risk Data — {inp.as_of_date}",
