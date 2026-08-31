@@ -36,6 +36,10 @@ export type History = {
   portfolio_id: string;
   span: string;
   benchmark: string;
+  /** The episodes scan's ledger row — the chart's series-level citation. Daily
+   *  points have no row each and never will; this is what "how was this worked
+   *  out" opens. */
+  episodes_calc_id?: string;
   window?: { from: string; to: string; sessions: number };
   points: HistoryPoint[];
   episodes: Episode[];

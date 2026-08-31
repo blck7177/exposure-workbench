@@ -73,3 +73,23 @@ async def test_the_read_cites_the_calculation_that_was_performed():
     assert a["identity_positions"] == b["identity_positions"], (
         "the figures are recomputed on every read and must be identical"
     )
+
+
+async def test_reading_the_history_reuses_the_days_scan(  # noqa: D103 — module docstring covers it
+):
+    PORT = os.getenv("SMOKE_PORTFOLIO_ID", "port_001")
+    async with httpx.AsyncClient(timeout=60) as c:
+        first = await c.get(f"{API}/api/portfolios/{PORT}/history")
+        assert first.status_code == 200, first.text
+        cid = first.json().get("episodes_calc_id")
+        if not cid:
+            pytest.skip("no episodes scan on this book")
+        before = await _rows()
+        for _ in range(2):
+            r = await c.get(f"{API}/api/portfolios/{PORT}/history")
+            assert r.status_code == 200
+            assert r.json().get("episodes_calc_id") == cid, (
+                "a re-read must cite the same scan, not a fresh id"
+            )
+        after = await _rows()
+    assert after == before, f"re-reads minted {after - before} row(s)"

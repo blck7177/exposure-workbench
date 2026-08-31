@@ -327,7 +327,7 @@ export default function BookPage() {
             </div>
           )}
 
-          {scenarios && scenarios.length > 0 && <Stress scenarios={scenarios} />}
+          {scenarios && scenarios.length > 0 && run && <Stress scenarios={scenarios} runId={run.id} />}
 
           {run?.daily_report && (
             <Briefing report={run.daily_report} checked={facts.numbersChecked} />

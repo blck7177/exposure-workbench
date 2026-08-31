@@ -98,14 +98,7 @@ async def get_drawdown_episodes(db: AsyncSession, portfolio_id: str,
     # The depths need an id, or nothing can support them. Before this the tool
     # returned numbers a citation could not reach — the same gap V8-A closed for
     # the run's children, one layer out.
-    calc_id = await cs._record(
-        db, None, "portfolio.drawdown_episodes",
-        {"portfolio_id": portfolio_id, "span": span, "sessions": int(len(returns)),
-         "floor": 0.05},
-        {"deepest_depth": None if deepest is None else deepest.depth,
-         "episode_depths": [e.depth for e in episodes]},
-        [portfolio_id], {"episodes": len(episodes)}, current_session_id(),
-    )
+    calc_id = await record_episodes(db, portfolio_id, span, returns, episodes, deepest)
     return {
         "calc_id": calc_id,
         "portfolio_id": portfolio_id,
@@ -131,6 +124,40 @@ async def get_drawdown_episodes(db: AsyncSession, portfolio_id: str,
             "the book has one position snapshot and no holding history to replay"
         ),
     }
+
+
+OP_EPISODES = "portfolio.drawdown_episodes"
+
+
+def identifying_params(portfolio_id: str, span: str, through: str) -> dict:
+    """The part of the record's params that says WHICH scan this is.
+
+    `through` is load-bearing: the same (portfolio, span) tomorrow is a
+    DIFFERENT calculation over a shifted window, and a lookup keyed without it
+    would hand today's chart the id of yesterday's numbers. `sessions` and
+    `floor` stay outside the key — one is what the scan turned out to cover,
+    the other is configuration the operation records about itself.
+    find_recorded matches by containment, so both may sit beside these in the
+    row (tests/test_v13_read_endpoints.py holds the two key sets together, the
+    same guard shape the reconcile lookup earned).
+    """
+    return {"portfolio_id": portfolio_id, "span": span, "through": through}
+
+
+async def record_episodes(db: AsyncSession, portfolio_id: str, span: str,
+                          returns, episodes, deepest) -> str:
+    """Mint the row for a scan that was just performed — the ONE recorder, used
+    by the agent's tool and by the page's first read alike, so the chart and an
+    answer citing a depth point at the same calculation."""
+    through = str(returns.index[-1].date())
+    return await cs._record(
+        db, None, OP_EPISODES,
+        {**identifying_params(portfolio_id, span, through),
+         "sessions": int(len(returns)), "floor": 0.05},
+        {"deepest_depth": None if deepest is None else deepest.depth,
+         "episode_depths": [e.depth for e in episodes]},
+        [portfolio_id], {"episodes": len(episodes)}, current_session_id(),
+    )
 
 
 async def explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough: str) -> dict:

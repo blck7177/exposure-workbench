@@ -129,6 +129,8 @@ export type TierBar = {
   key: string; label: string; value: number;
   warning?: number | null; breach?: number | null;
   tip?: TipRow[];
+  /** Evidence a click opens — for a stress bar, the run that measured it. */
+  openId?: string | null;
 };
 
 /**
@@ -138,12 +140,13 @@ export type TierBar = {
  * a value crosses, and drawing it as a bar would make the reader compare two
  * lengths when the question is which side of a mark they are on.
  */
-export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max }: {
+export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpen }: {
   bars: TierBar[];
   format: (v: number) => string;
   labelWidth?: number;
   ariaLabel: string;
   max?: number;
+  onOpen?: (id: string) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -181,6 +184,8 @@ export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max }: {
               <text x={X(b.value) + 6} y={y + 11} fontSize={11} fill="#e6edf3"
                 fontFamily="var(--font-geist-mono)">{format(b.value)}</text>
               <rect x={0} y={y - 4} width={w} height={rowH} fill="transparent"
+                style={b.openId && onOpen ? { cursor: "pointer" } : undefined}
+                onClick={b.openId && onOpen ? () => onOpen(b.openId as string) : undefined}
                 onPointerMove={(e) => show(e.clientX, e.clientY, b.label, b.tip ?? [
                   { label: "Value", value: format(b.value) },
                 ])}

@@ -218,3 +218,37 @@ def test_the_benchmark_is_indexed_rather_than_given_a_second_axis():
     for f in ("portfolios.py", "issuers.py"):
         src = (ROOT / "apps" / "api" / "routes" / f).read_text()
         assert "base_bench" in src, f"{f} does not index its benchmark"
+
+
+def test_the_drawdown_lookup_key_is_a_subset_of_what_the_recorder_writes():
+    """The reconcile guard's shape, applied to the second read that reuses a
+    calculation. Here the key also carries `through` — the window's end — and
+    that is the half worth pinning: a lookup WITHOUT it would hand today's chart
+    the id of yesterday's scan, which is worse than minting, because the id
+    would resolve and its numbers would describe a different window."""
+    import re
+    from exposure_workbench.services import drawdown_service
+
+    lookup = set(drawdown_service.identifying_params("p", "3y", "2026-01-01"))
+    assert "through" in lookup, "the window's end identifies the scan"
+
+    recorder = inspect.getsource(drawdown_service.record_episodes)
+    block = recorder[recorder.index("{**identifying_params"):]
+    block = block[:block.index("}") + 1]
+    recorded = set(re.findall(r'"(\w+)":', block)) | lookup
+    assert lookup <= recorded
+    assert recorded - lookup, "vacuous unless the record carries more than the key"
+
+
+def test_the_history_route_reuses_the_scan_and_mints_through_the_one_recorder():
+    """First read of a window mints once, through the same recorder the agent's
+    tool uses; every later read finds it. The behavioural half lives in
+    tests/test_reconcile_reuse_live.py."""
+    src = (ROOT / "apps" / "api" / "routes" / "portfolios.py").read_text()
+    body = src[src.index("episodes = dd.find_episodes"):]
+    body = body[:body.index("return {")]
+    assert "calc_service.find_recorded(" in body
+    assert "drawdown_service.identifying_params(" in body
+    assert "drawdown_service.record_episodes(" in body, (
+        "the miss path must go through the shared recorder, not a second _record"
+    )

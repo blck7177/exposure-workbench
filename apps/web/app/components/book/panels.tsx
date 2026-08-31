@@ -32,6 +32,7 @@ import { useEvidence } from "../evidence/Column";
 // ── value and drawdown ───────────────────────────────────────────────────────
 
 export function ValueAndDrawdown({ history }: { history: History }) {
+  const { open } = useEvidence();
   const pts = history.points;
   const x = pts.map((p) => p.date);
   const step = Math.max(1, Math.floor(pts.length / 6));
@@ -68,7 +69,15 @@ export function ValueAndDrawdown({ history }: { history: History }) {
         ? `${history.window.sessions} sessions to ${fmtDate(history.window.to)} · ${history.benchmark} indexed to the same start`
         : undefined}
       table={table}
-      note={history.valuation_assumption}>
+      note={<>{history.valuation_assumption}
+        {history.episodes_calc_id && (
+          <>{" — "}
+            <button onClick={() => open(history.episodes_calc_id as string)}
+              className="text-teal-400 hover:text-teal-300 hover:underline">
+              how the episodes were worked out
+            </button>
+          </>
+        )}.</>}>
       <LineChart
         x={x}
         height={260}
@@ -349,7 +358,8 @@ function strongestPair(corr: FactorCorrelation): string | null {
 
 // ── stress ───────────────────────────────────────────────────────────────────
 
-export function Stress({ scenarios }: { scenarios: Scenario[] }) {
+export function Stress({ scenarios, runId }: { scenarios: Scenario[]; runId: string }) {
+  const { open } = useEvidence();
   const evaluated = scenarios.filter((s) => s.loss_pct != null);
   const unevaluated = scenarios.filter((s) => s.loss_pct == null);
   const anyTier = evaluated.some((s) => s.warning != null || s.breach != null);
@@ -371,9 +381,13 @@ export function Stress({ scenarios }: { scenarios: Scenario[] }) {
         Hover a bar for the shocks it applies and what it leaves still.
         {!anyTier && evaluated.length > 0 && " This run recorded no tiers for these, so nothing here judges the losses."}</>}>
       <TierBars
+        onOpen={open}
         bars={evaluated.map((s) => ({
           key: s.key, label: s.label, value: s.loss_pct as number,
           warning: s.warning, breach: s.breach,
+          // Stress rows are children of the run, not ledger rows of their own —
+          // the honest click-through is the run that measured them.
+          openId: runId,
           tip: [
             ...Object.entries(s.shocks).map(([k, v]) => ({ label: k, value: fmtSignedPct(v, 1) })),
             { label: "Held flat", value: s.held_flat.join(", ") || "nothing" },

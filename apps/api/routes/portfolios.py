@@ -18,8 +18,8 @@ from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.analytics import drawdown as dd
 from exposure_workbench.analytics.risk_metrics import _TRADING_DAYS_PER_YEAR
 from exposure_workbench.services import (
-    exposure_run_service, market_data_service, portfolio_csv, portfolio_service,
-    run_reads_service, usage_service,
+    calc_service, drawdown_service, exposure_run_service, market_data_service,
+    portfolio_csv, portfolio_service, run_reads_service, usage_service,
 )
 
 router = APIRouter()
@@ -395,10 +395,29 @@ async def get_portfolio_history(
         })
 
     episodes = dd.find_episodes(returns.dropna())
+
+    # The chart's series-level citation (V13 §9 判据 B). Each daily point is not
+    # a ledger row and never will be — minting one per point would be fabricating
+    # provenance — but the EPISODES are a recorded calculation, and this is its
+    # id. Same reuse discipline as /reconcile: the identifying key includes the
+    # window's end, because tomorrow's scan of the same span is a different
+    # calculation; found → reuse, absent → mint once through the same recorder
+    # the agent's tool uses, so the chart and an answer cite one row.
+    clean = returns.dropna()
+    existing = await calc_service.find_recorded(
+        db, drawdown_service.OP_EPISODES,
+        drawdown_service.identifying_params(portfolio_id, span, str(clean.index[-1].date())))
+    if existing is not None:
+        episodes_calc_id = existing.id
+    else:
+        episodes_calc_id = await drawdown_service.record_episodes(
+            db, portfolio_id, span, clean, episodes, dd.deepest(clean))
+
     return {
         "portfolio_id": portfolio_id,
         "span": span,
         "benchmark": benchmark,
+        "episodes_calc_id": episodes_calc_id,
         "window": {"from": points[0]["date"], "to": points[-1]["date"],
                    "sessions": len(points)},
         "points": points,
