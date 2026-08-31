@@ -325,8 +325,19 @@ def validate_shape(blocks) -> list[dict]:
             if not isinstance(b.get("absence_ref"), str) or not b.get("absence_ref"):
                 problems.append({
                     "at": at, "reason": "absence_without_ref",
-                    "detail": "a claim that something was not reported rests on the row "
-                              "that recorded the absence, which a refused read mints",
+                    # The way out matters more here than in any other refusal.
+                    # An absence block asserts the ISSUER did not report a thing,
+                    # and that needs the row a refused read minted. But most of
+                    # what a model wants to say in this shape is weaker and true
+                    # — this desk could not compute it, the window does not
+                    # reach — and that is ordinary prose with no figures in it.
+                    # Without the second sentence the model has a claim it can
+                    # neither support nor rephrase, and spends the turn trying.
+                    "detail": "a claim that the issuer did not report something rests on "
+                              "the row a refused read minted. If you have no such row — if "
+                              "what you mean is that the desk could not compute it, or the "
+                              "window does not reach — say that in a paragraph instead: it "
+                              "is prose, and prose with no figures in it needs nothing",
                 })
 
     return problems

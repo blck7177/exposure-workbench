@@ -111,3 +111,89 @@ hold without C.
 - If any part of B is kept, the candidate is the precision rule, which is the
   one mechanical sentence among them — and §3 cannot attribute the precision
   movement to it.
+
+---
+
+# V14-C — the block exit: what it buys, what it costs, and the criterion it fails
+
+## 7. The switch, and the four probes it took
+
+The exit stopped accepting prose. An answer is blocks; a figure is a slot; text
+may not carry a number. Four probes of the same three questions, each failure
+diagnosed to a deterministic cause rather than to model capacity:
+
+| probe | answered | causes found and fixed |
+|---|---|---|
+| 1 | 0/3 | the contract never said a slot holds ONE NUMBER — alert sentences and ids went into slots |
+| 2 | 2/3 | a refusal named no way out when a figure sat under a different ref |
+| 3 | 2/3 | limit thresholds were **unciteable**: V13-S5 added the three columns, `_RUN_CHILDREN` still declared limit_checks as holding no values |
+| 4 | 3/3 | tables in two of three, 21 and 10 slots, all resolving |
+
+The third is the same omission as this batch's other repair, one layer over: the
+columns were written and nothing could quote them, so "MSFT at 16.3% against a
+15% warning level" was refused for a level living in a row the resolver did not
+read. A run now resolves **235 values where it resolved 154**.
+
+## 8. What the exit demonstrably buys
+
+V2 — the question the original session answered with ten `describe_issuer` calls
+and sell-side prose — now comes back as a table: ticker, business, main macro
+risks, one row per holding. That is the integration V14-B asked for in words and
+did not get. Nothing suggested it; the schema made a table the natural shape.
+
+Also standing, and mechanical rather than suggested: every figure a reader sees
+is the ledger's own value, formatted by the renderer (16.3%, $10.87M) with the
+exact value on hover. Two assertion classes are gated for the first time — a
+trend must carry the series it was read from, an absence the row a refused read
+minted. Neither claim contains a number, so neither was ever visible to the
+numeric gate; the risk-history answer round 4 could not refuse is refusable now.
+
+## 9. The criterion it fails
+
+The plan set three acceptance criteria for the switch. ① correctness holds by
+construction — a slot resolves to a ledger row or the answer is refused. ③ model
+capability is cleared — 8 of 8 answered. **② the ratchet disappears: FAILED.**
+
+| | baseline | after C |
+|---|---|---|
+| gate refusals, median | 1 | **5** |
+| answers reaching the exit | 8/8 | 8/8 |
+| questions that exhausted every attempt | 0 | **2** (V4, V7) |
+| rubric total | 17/33 | 8/33 |
+
+The ratchet did not go away. It moved: from transcribing one figure at a time to
+getting twenty slots' refs right at once. V1 in probe 4 carried 21 slots; an
+answer that size, refused, is an answer where the model fixes five slots and
+breaks two.
+
+**The rubric total is partly an artefact and must not be read as a fourfold
+regression.** The judge scores the STORED PROSE, and for a block answer that
+string carries ledger precision and renders a table as pipe-separated lines —
+the display conventions live in the renderer, which the judge never sees. So
+`precision` and `ranking` are being measured on an artefact the reader is not
+shown. V2 scored 3/4 through that handicap. What is NOT an artefact: two
+questions produced no answer at all, and those score zero honestly.
+
+## 10. Diagnosed and open
+
+- **Fixed, not yet deployed**: an `absence` block with no ref was a dead end. Most
+  of what a model wants to say in that shape is weaker and true — the desk could
+  not compute it, the window does not reach — and that is ordinary prose. The
+  refusal now says so. V7 spent eight attempts in this trap.
+- **Open**: a twenty-slot answer refused once is hard to repair in one edit. The
+  refusal reports every problem at once, which is necessary and not sufficient.
+- **Open**: `held_instead_by` searches only the refs already in the answer. A
+  figure whose row the model never cited gets no hint, and the session trail
+  would give one.
+- **Open, methodological**: the instrument scores the wrong artefact for block
+  answers. Either the rubric reads the rendered form, or the display conventions
+  move server-side — and they cannot simply be copied, because two rules about
+  how a number looks disagree the first time one changes.
+
+## 11. Standing
+
+C is committed and live. It is the first thing in V14 to change the SHAPE of an
+answer rather than ask for it, and it fails the ratchet criterion its own plan
+set. Both are true. The decision it leaves open is whether to hold the exit
+while the four items in §10 are worked, or to revert to prose and keep the block
+layer for the renderer — and that is a product call, not a measurement.
