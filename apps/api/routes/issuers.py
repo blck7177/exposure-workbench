@@ -18,6 +18,7 @@ from exposure_workbench.db.models import (
     ResearchRun, ResearchSource,
 )
 from exposure_workbench.db.session import get_db
+from exposure_workbench.analytics import containment as ct
 from exposure_workbench.analytics import display_names as dn, interval_algebra as ia
 from exposure_workbench.services import (
     calc_service, company_service, fundamentals_service, market_data_service, period_semantics,
@@ -358,6 +359,191 @@ async def citation_map(ticker: str, db: AsyncSession = Depends(get_db)):
                                    if isinstance(x, str) and x.startswith(kind + "_"))
                          for kind in ("fact", "calc", "chunk", "src")} if brief else {},
     }
+
+
+# ── containment view (V13-S6): how a composed figure was assembled ────────────
+
+# Which containment family assembles each cover-composed measure. The KEY SET is
+# the formula registry's own — every formula whose op is "cover" — and the family
+# each name sums is the one its producer passes (formula_service._total_debt says
+# family="debt"). Both halves are pinned to their sources by
+# tests/test_v13_issuer_panels.py, so a cover formula added without a row here,
+# or a producer that moves to a different family, goes red rather than serving
+# the wrong tree under the right name.
+_FAMILY_OF_COVER_FORMULA = {"total_debt": "debt"}
+
+
+@router.get("/issuers/{ticker}/containment", dependencies=[Depends(optional_user)])
+async def containment_view(ticker: str, formula: str = "total_debt",
+                           db: AsyncSession = Depends(get_db)):
+    """What a composed total took, what it set aside, and why it is narrower
+    than the lines.
+
+    Reads the same balance sheet the formula path reads and asks the same
+    engine the same question — one instant, ct.cover over it — so the tree
+    drawn here and the total a panel serves can never describe different
+    assemblies. What this does NOT do is sum: the assembled value and its
+    calc_id belong to evaluate_formula, which ledgers every step, and a value
+    published here without one would be a number no evidence supports. Every
+    figure on this view is a filed fact carrying its own fact_id.
+
+    The set-aside lines get their explanation from the engine's own edges —
+    which parts of each a wider taken node already holds — derived per request
+    rather than kept as a map, because a hand-kept map here would be the eight
+    debt recipes back again.
+
+    `formula` names a cover-composed measure (total_debt) or a containment
+    family directly (debt, equity, operating_leases); both sets come from
+    their sources, not a list in this file.
+    """
+    c = await _company(db, ticker)
+    if formula in _FAMILY_OF_COVER_FORMULA:
+        family = _FAMILY_OF_COVER_FORMULA[formula]
+    elif formula in ct.FAMILIES:
+        family = formula
+    else:
+        raise HTTPException(422, {
+            "error": "unknown_formula", "formula": formula,
+            "known": sorted(set(_FAMILY_OF_COVER_FORMULA) | set(ct.FAMILIES))})
+
+    members = ct.FAMILIES[family]
+    empty = {"ticker": c.ticker, "formula": formula, "family": family,
+             "as_of": None, "definition": None, "taken": [],
+             "overlapping_not_added": [], "missing_at_this_date": [],
+             "no_facts_for_issuer": [], "outside_family": [], "edges": []}
+
+    bs = await fundamentals_service.get_balance_sheet(db, c.ticker)
+    if bs.get("error"):
+        return empty | {"detail": f"this desk holds no balance sheet for {c.ticker}"}
+
+    available = {m: line["value"] for m, line in bs["balances"].items()}
+    # Everything this issuer files, at this date or another one — without it the
+    # cover cannot tell "never filed" from "not on this instant" (see _total_debt,
+    # which this read path is the visible half of).
+    ever = frozenset(bs["balances"]) | frozenset(bs.get("not_reported_at_this_date", {}))
+    cover = ct.cover(available, family=family, ever_reported=ever)
+    absent = bs.get("not_reported_at_this_date") or {}
+    if isinstance(cover, ct.NoCover):
+        seen = [absent[m]["last_reported"] for m in members if m in absent]
+        detail = f"{cover.reason} ({bs['as_of']})"
+        if seen:
+            detail += f"; {family} components were last reported at {max(seen)}"
+        return empty | {"as_of": bs["as_of"], "detail": detail}
+
+    def _line(m: str) -> dict:
+        return {"metric": m, "label": dn.metric(m),
+                "value": bs["balances"][m]["value"],
+                "fact_id": bs["balances"][m]["fact_id"]}
+
+    # Why each set-aside line was set aside: the parts of it a wider taken node
+    # already holds, walked out of EDGES through the engine's own `contains`.
+    # NVDA is the canonical case — debt_current_total is reported and real, and
+    # its current portion of long-term debt is already inside the taken
+    # long_term_debt_total, so adding the line whole would sum that part twice.
+    reachable = {child for _p, child, _n in ct.EDGES}
+    overlapping = []
+    for m in cover.overlapping_not_added:
+        because = []
+        for part in sorted(p for p in reachable if ct.contains(m, p)):
+            holder = (part if part in cover.terms
+                      else next((t for t in cover.terms if ct.contains(t, part)), None))
+            if holder is not None:
+                because.append({"part": part, "part_label": dn.metric(part),
+                                "already_in": holder,
+                                "already_in_label": dn.metric(holder)})
+        overlapping.append(_line(m) | {"because": because})
+
+    return empty | {
+        "as_of": bs["as_of"],
+        "definition": cover.formula,
+        "taken": [_line(m) for m in cover.terms],
+        "overlapping_not_added": overlapping,
+        "missing_at_this_date": [
+            {"metric": m, "label": dn.metric(m),
+             "last_reported": absent[m]["last_reported"]}
+            for m in cover.missing_at_this_date],
+        "no_facts_for_issuer": [{"metric": m, "label": dn.metric(m)}
+                                for m in cover.no_facts_for_issuer],
+        "outside_family": [{"metric": m, "label": dn.metric(m)}
+                           for m in sorted(bs["balances"]) if m not in members],
+        # The family's containment edges among the metrics on this instant's
+        # sheet, with the corpus count each was validated over kept beside it —
+        # what a UI needs to draw the tree, straight from the module's own data.
+        "edges": [{"parent": p, "child": ch, "observed": n}
+                  for p, ch, n in ct.EDGES
+                  if p in members and ch in members
+                  and p in bs["balances"] and ch in bs["balances"]],
+        "note": ("the assembled value and its calc_id come from evaluate_formula, "
+                 "which ledgers every step; this view is the assembly itself, and "
+                 "each figure on it is a filed fact"),
+    }
+
+
+# ── margins panel series (V13-S6) ─────────────────────────────────────────────
+
+@router.get("/issuers/{ticker}/panel-series", dependencies=[Depends(optional_user)])
+async def panel_series(ticker: str, metrics: str = "",
+                       db: AsyncSession = Depends(get_db)):
+    """Point series for the margins panel, filtered out of the financials rows.
+
+    A filter, not a query: this calls the financials read above and serves the
+    `points` its manifest rows already hold, so the panel and the Financials
+    tab can never disagree — same manifest, same ledger rows, same calc_id per
+    series. Nothing is computed and nothing is minted;
+    tests/test_v13_issuer_panels_live.py counts the ledger across three reads
+    to hold the second half of that. The ids the points do not have are not
+    invented either: a series was one calculation, and its calc_id is the row
+    that performed it.
+
+    Which rows ARE a series is the manifest's own answer — the row's result
+    carries points — and the default set is derived from each row's declared
+    type rather than a list of names: a margin is a share of revenue, so the
+    panel takes every series whose result_type says it was derived from
+    revenue. The three margins and revenue year-on-year today, and whatever
+    the recipe adds tomorrow, without this endpoint hearing about it.
+
+    A requested name this manifest cannot chart is answered in the body —
+    which name, why not, what is chartable — rather than with a 500: an
+    unknown metric in a query string is a UI one release ahead or behind, not
+    a server error.
+    """
+    fin = await financials(ticker, db)
+    rows = {r["label"]: r for r in fin["calcs"]}
+    chartable = {label: r for label, r in rows.items()
+                 if isinstance((r.get("result") or {}).get("points"), list)}
+
+    def _derived_from(r: dict) -> tuple[str, ...]:
+        d = ((r.get("params") or {}).get("result_type") or {}).get("derived_from") or ()
+        return (d,) if isinstance(d, str) else tuple(d)
+
+    wanted = ([m.strip() for m in metrics.split(",") if m.strip()]
+              or [label for label, r in chartable.items()
+                  if "revenue" in _derived_from(r)])
+
+    series, unavailable = [], []
+    for m in wanted:
+        r = chartable.get(m)
+        if r is not None:
+            series.append({"metric": m, "label": r["display"],
+                           "calc_id": r["calc_id"], "operation": r["operation"],
+                           "points": r["result"]["points"]})
+        elif m in rows:
+            unavailable.append({
+                "metric": m,
+                "detail": rows[m].get("unavailable")
+                or "a single figure in the manifest, not a series"})
+        else:
+            unavailable.append({"metric": m,
+                                "detail": "not a row this issuer's recipe produced"})
+
+    out = {"ticker": fin["ticker"], "as_of": fin.get("as_of"),
+           "recipe_version": fin.get("recipe_version"), "series": series}
+    if unavailable:
+        out["unavailable"] = unavailable
+        out["chartable"] = sorted(chartable)
+    if not rows:
+        out["note"] = fin.get("note")
+    return out
 
 
 # ── filings tab ────────────────────────────────────────────────────────────────────
