@@ -55,13 +55,31 @@ def _build_user_message(inp: ReportInput) -> str:
     lines.append(f"- Max Drawdown: {pct(inp.max_drawdown)}")
 
     if inp.factor_attributions:
-        lines.append("\n### Factor Attribution (top 5)")
-        for fa in inp.factor_attributions[:5]:
+        if inp.factors_collinear:
+            # No per-factor figures, on purpose. Under collinearity no single
+            # beta or contribution is individually determined, and the gate
+            # refuses each one quoted alone (V11-F) — which it did, correctly,
+            # to the first two runs' drafts, costing both their briefing. The
+            # prose needs direction and rank, so that is all the model is given;
+            # a figure that never enters the context cannot be written.
+            vif = f" (max VIF {inp.factors_max_vif:.0f})" if inp.factors_max_vif else ""
             lines.append(
-                f"- {fa['factor_name']} (β={fa['beta']:.2f}): "
-                f"factor return {pct(fa.get('factor_return'))}, "
-                f"contribution {pct(fa.get('contribution'))}"
-            )
+                "\n### Factor Attribution (direction and rank only — the factors are "
+                f"collinear{vif}, so no single factor's figure is individually "
+                "determined and none is supplied; describe influence in words)")
+            ranked = sorted(inp.factor_attributions[:5],
+                            key=lambda fa: abs(fa.get("contribution") or 0.0), reverse=True)
+            for i, fa in enumerate(ranked, 1):
+                sign = "negative" if (fa.get("contribution") or 0.0) < 0 else "positive"
+                lines.append(f"- #{i} {fa['factor_name']}: {sign} contribution")
+        else:
+            lines.append("\n### Factor Attribution (top 5)")
+            for fa in inp.factor_attributions[:5]:
+                lines.append(
+                    f"- {fa['factor_name']} (β={fa['beta']:.2f}): "
+                    f"factor return {pct(fa.get('factor_return'))}, "
+                    f"contribution {pct(fa.get('contribution'))}"
+                )
 
     if inp.stress_scenarios:
         lines.append("\n### Stress Scenarios")

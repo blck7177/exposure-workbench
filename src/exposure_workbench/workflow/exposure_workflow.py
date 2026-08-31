@@ -929,6 +929,7 @@ class ExposureWorkflow:
         method's job is to make sure the refusal has a sentence in it.
         """
         from exposure_workbench.agents.direct_llm_agent import ReportUnavailable
+
         from exposure_workbench.agents.report_agent import get_report_agent
         from exposure_workbench.agents.schemas import ReportInput
 
@@ -950,6 +951,8 @@ class ExposureWorkflow:
             var_95_1d=risk.var_95_1d,
             vol_30d=risk.vol_30d,
             max_drawdown=risk.max_drawdown,
+            factors_collinear=factor_result.collinear,
+            factors_max_vif=factor_result.max_vif,
             factor_attributions=[
                 {
                     "factor_name": fr.factor_name,
@@ -994,11 +997,7 @@ class ExposureWorkflow:
             raise ReportUnavailable(
                 f"{len(verdict.problems)} of {verdict.checked} numbers in the "
                 "report are not supported by this run: "
-                + "; ".join(
-                    f"{p.get('number')} (nearest: "
-                    f"{(p.get('nearest') or {}).get('label', 'nothing comparable')})"
-                    for p in verdict.problems[:5]
-                )
+                + "; ".join(_describe_problem(p) for p in verdict.problems[:5])
             )
 
         report_id = new_id("report_")
@@ -1027,6 +1026,25 @@ class ExposureWorkflow:
 
 
 # ── Step context manager ───────────────────────────────────────────────────────
+
+
+def _describe_problem(p: dict) -> str:
+    """One refused report number, described by its actual reason.
+
+    The first version flattened every problem to `nearest.label` with a
+    "nothing comparable" default — and a figure refused as NOT INDIVIDUALLY
+    DETERMINED, which carries `matched` rather than `nearest`, read as if the
+    run held nothing like it. That wording pointed the investigation of the
+    first two refused briefings at a fan-out gap that did not exist; a wrong
+    error message charges exactly this.
+    """
+    n = p.get("number")
+    if p.get("reason") == "not_quotable_individually":
+        matched = ", ".join(p.get("matched") or []) or "a collinear coefficient"
+        return f"{n} (matched {matched}, which is not individually determined)"
+    nearest = p.get("nearest") or {}
+    label = nearest.get("label") if nearest else None
+    return f"{n} (nearest: {label or 'nothing comparable'})"
 
 class _StepContext:
     """Logs workflow_event start and completion around a step."""

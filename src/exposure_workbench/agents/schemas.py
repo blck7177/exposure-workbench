@@ -20,6 +20,12 @@ class ReportInput:
     vol_30d: float | None = None
     max_drawdown: float | None = None
     factor_attributions: list[dict[str, Any]] = field(default_factory=list)
+    # V13: whether the regression behind those rows is collinear. When True the
+    # per-factor figures are withheld from the model's context entirely — a
+    # number it never saw is a number it cannot quote, and the gate would refuse
+    # every one of them alone (V11-F).
+    factors_collinear: bool = False
+    factors_max_vif: float | None = None
     stress_scenarios: list[dict[str, Any]] = field(default_factory=list)
     alerts: list[dict[str, Any]] = field(default_factory=list)
     audience: str = "portfolio_manager"
