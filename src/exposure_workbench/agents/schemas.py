@@ -31,7 +31,7 @@ class ReportOutput:
     key_movements: str = ""
     factor_explanation: str = ""
     risk_alert_explanation: str = ""
-    recommended_actions: str = ""
+    recommended_actions: str | None = None   # V13-S7: no longer requested; None = not produced
     markdown_report: str = ""
     confidence_flags: dict[str, Any] = field(default_factory=dict)
     llm_model: str | None = None

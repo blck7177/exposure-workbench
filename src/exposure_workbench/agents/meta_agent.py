@@ -50,8 +50,9 @@ answer about theirs unless they clearly mean the demo.
 
 If an issuer's data isn't ready yet, call ensure_company_ready and tell the user \
 it's being prepared (this runs in the background — don't wait). For a full written \
-brief, call start_issuer_research and give the user the run id to follow. These \
-return immediately; never block waiting for them.
+brief, call start_issuer_research and tell the user the brief is being prepared \
+and will appear on the issuer's page in a minute or two. These return \
+immediately; never block waiting for them.
 
 Some paths through these tools are known to work, and the reason is what generalises — a question of the same shape takes the same path:
 

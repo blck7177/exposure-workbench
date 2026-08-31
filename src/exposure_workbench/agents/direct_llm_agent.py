@@ -102,9 +102,14 @@ class ReportUnavailable(RuntimeError):
         self.reason = reason
 
 
+# recommended_actions left this set in V13-S7: the prompt stopped asking for
+# trade suggestions — "Consider trimming LLY" is a verdict, and the desk's rule
+# is that verdicts are the reader's (the same sentence _SYSTEM applies to the
+# analyst). The column stays on daily_reports for the reports that were written
+# under the old prompt; new rows record NULL, which reads as "not produced".
 _REQUIRED_FIELDS = (
     "executive_summary", "key_movements", "factor_explanation",
-    "risk_alert_explanation", "recommended_actions", "markdown_report",
+    "risk_alert_explanation", "markdown_report",
 )
 
 
@@ -159,7 +164,6 @@ class DirectLlmAgent:
             key_movements=data["key_movements"],
             factor_explanation=data["factor_explanation"],
             risk_alert_explanation=data["risk_alert_explanation"],
-            recommended_actions=data["recommended_actions"],
             markdown_report=data["markdown_report"],
             confidence_flags={},
             llm_model=model_name,

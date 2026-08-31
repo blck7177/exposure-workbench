@@ -25,7 +25,7 @@ from exposure_workbench.tools.registry import extract_evidence_refs
 
 GOOD = {
     "executive_summary": "s", "key_movements": "k", "factor_explanation": "f",
-    "risk_alert_explanation": "r", "recommended_actions": "a",
+    "risk_alert_explanation": "r",
     "markdown_report": "# m",
 }
 
@@ -115,8 +115,15 @@ def test_the_mock_report_generator_is_gone():
 
 def test_the_gate_reads_every_field_a_reader_can_see():
     """markdown_report included: no UI renders it today, but the API serves it,
-    so a number wrong only there is still a number this system published."""
-    assert set(_CHECKED_FIELDS) == set(GOOD)
+    so a number wrong only there is still a number this system published.
+
+    Pinned to the agent's own required set rather than a dict kept here, so the
+    two ends cannot drift: a field the prompt starts requesting is a field the
+    gate must check, in the same commit. recommended_actions left both sets in
+    V13-S7 when the prompt stopped asking for verdicts.
+    """
+    from exposure_workbench.agents.direct_llm_agent import _REQUIRED_FIELDS
+    assert set(_CHECKED_FIELDS) == set(_REQUIRED_FIELDS) == set(GOOD)
 
 
 def test_a_verdict_bounds_what_it_writes_into_the_timeline():

@@ -416,11 +416,14 @@ export function Briefing({ report, checked }: {
   report: DailyReport;
   checked: number | null;
 }) {
+  // recommended_actions is deliberately absent (V13-S7): the prompt stopped
+  // asking for trade suggestions — a verdict is the reader's, and the mandate
+  // facts are already on this page from the run's own rows. Old reports still
+  // hold the field; it is not rendered, same as any other retired column.
   const parts: [string, string | null][] = [
     ["Key movements", report.key_movements],
     ["What explained the day", report.factor_explanation],
     ["The warnings", report.risk_alert_explanation],
-    ["What to consider", report.recommended_actions],
   ];
   return (
     <section className="rounded-lg border border-[#21262d] bg-[#11161d]">

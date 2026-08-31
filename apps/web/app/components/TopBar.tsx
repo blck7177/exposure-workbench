@@ -22,8 +22,8 @@ export function TopBar() {
   return (
     <header className="h-11 shrink-0 border-b border-[#21262d] bg-[#0d1117] flex items-center gap-3 px-4">
       <Link href="/" className="flex items-baseline gap-1.5 group">
-        <span className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">
-          Exposure Workbench
+        <span className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors tracking-tight">
+          desk<span className="text-slate-500">·</span>for<span className="text-slate-500">·</span>one
         </span>
       </Link>
       <div className="ml-auto flex items-center gap-2">

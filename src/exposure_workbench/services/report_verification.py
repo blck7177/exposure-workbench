@@ -77,7 +77,9 @@ _CHECKED_FIELDS = (
     "key_movements",
     "factor_explanation",
     "risk_alert_explanation",
-    "recommended_actions",
+    # recommended_actions was here until V13-S7 removed the field from the
+    # prompt; reports written before that were checked under the old set and
+    # are not re-judged.
     "markdown_report",
 )
 

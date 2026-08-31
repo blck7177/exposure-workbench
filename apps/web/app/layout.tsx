@@ -23,8 +23,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Exposure Workbench",
-  description: "Portfolio exposure workflow — analytics + LLM reporting",
+  title: "desk-for-one",
+  description: "Portfolio exposure and issuer intelligence, every figure traceable to its source.",
 };
 
 /**
