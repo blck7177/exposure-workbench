@@ -86,6 +86,28 @@ async def validate_citations(
     return (len(problems) == 0, problems)
 
 
+async def rows_for(db: AsyncSession, ref_ids: list[str]) -> dict:
+    """The ledger rows behind whichever of these ids are calc ids.
+
+    V14-C. Two of the assertion checks ask what a row IS rather than what it
+    holds — a trend rests on a series, an absence on a refusal — and neither
+    question is answerable from the values the numeric resolver returns, because
+    both kinds of claim contain no number at all.
+
+    Ids that are not calc ids are simply absent from the result. The caller
+    treats a missing row as a failed check, which is the right answer for both:
+    a fact id is not a series, and a run id did not record a refusal.
+    """
+    from exposure_workbench.db.models import CalcLedger
+
+    wanted = [r for r in ref_ids if r.startswith("calc_")]
+    if not wanted:
+        return {}
+    rows = (await db.execute(
+        select(CalcLedger).where(CalcLedger.id.in_(wanted)))).scalars().all()
+    return {r.id: r for r in rows}
+
+
 async def materialize_pack(db: AsyncSession, session_id: str) -> list[dict]:
     """The trail as a stored refs list (evidence_packs.pack). A refs list, not a
     snapshot — the append-only stores keep the referenced rows immutable."""

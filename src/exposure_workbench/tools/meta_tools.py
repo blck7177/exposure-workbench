@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
+from exposure_workbench.services import answer_blocks as ab
 from exposure_workbench.services import evidence_trail_service as trail
 from exposure_workbench.services import numeric_verification as numeric
 from exposure_workbench.services import trajectory_gate
@@ -152,6 +153,86 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
 
 
 # ── respond gate ────────────────────────────────────────────────────────────────
+
+async def _respond_blocks(db: AsyncSession, blocks: list) -> dict:
+    """V14-C. The exit, when the answer is blocks and its figures are slots.
+
+    The inversion this batch is about: the gate stops checking numbers the model
+    wrote and starts RESOLVING references the model gave. Nothing here reads a
+    figure out of a sentence, because a sentence may not contain one.
+
+    The order is the prose gate's, and for the same reasons. Shape first, because
+    it costs no queries. Then the ids, because a claim resting on an id that was
+    never returned is not worth resolving. Then the sentences the model did write
+    — quotes are still a claim of verbatim reproduction. Then the slots. Then the
+    two assertion classes, which no numeric check can see. The trajectory
+    criteria last and unchanged, still budget-free, still escapable by editing
+    the reply alone.
+    """
+    problems = ab.validate_shape(blocks)
+    if problems:
+        return {"error": "malformed_answer", "problems": problems,
+                "detail": "an answer is a list of blocks; every figure is a slot naming "
+                          "the evidence it comes from. Text carries the sentence"}
+
+    refs = ab.refs_in(blocks)
+    prose = ab.text_of(blocks)
+
+    if refs:
+        ok, bad_ids = await trail.validate_citations(db, current_session_id(), refs)
+        if not ok:
+            return {"error": "invalid_citations", "problems": bad_ids,
+                    "detail": "every id an answer leans on must come from a tool result "
+                              "you called this session"}
+
+        bad_quotes = numeric.verify_quotes(
+            prose, await numeric.resolve_cited_passages(db, refs))
+        if bad_quotes:
+            return {"error": "unverified_quote", "problems": bad_quotes,
+                    "detail": "quotation marks say these words appear in a cited passage "
+                              "exactly as written. Reproduce the source wording, cite the "
+                              "passage that carries it, or drop the marks and paraphrase"}
+
+        values, _quoted = await numeric.resolve_cited_values(db, refs)
+        resolved, slot_problems = ab.resolve(blocks, values)
+        if slot_problems:
+            return {"error": "unresolved_slots", "problems": slot_problems,
+                    "detail": "each slot names one figure held by the id it points at. A "
+                              "problem carrying `available` lists the labels that id holds"}
+
+        assertion_problems = ab.check_assertion_refs(
+            blocks, await trail.rows_for(db, refs))
+        if assertion_problems:
+            return {"error": "unsupported_assertion", "problems": assertion_problems,
+                    "detail": "a claim about a sequence, and a claim that something was "
+                              "not reported, each rest on the row that recorded it"}
+    else:
+        resolved = []
+        # No refs at all is legitimate — a greeting, a clarifying question — and
+        # the shape check has already established there are no slots to resolve,
+        # because a slot without a ref is refused there. Nothing further to do.
+
+    trajectory = await trajectory_gate.check(
+        db, current_session_id(), current_message_id(), prose, refs)
+    if trajectory:
+        return trajectory
+
+    filled = ab.rendered(blocks, resolved)
+    # Two strings, and they are not the same string. `prose` is what the model
+    # WROTE — the quote rule and the trajectory criteria read it, and a figure
+    # the ledger supplied must not appear there or it would be judged as the
+    # model's wording. What is returned as the answer's text has the figures put
+    # back, because "net rates exposure is , and it loses if rates rise" is not
+    # an answer, and that is what a transcript or a reader without a block
+    # renderer would otherwise be shown.
+    return {"responded": True, "format": "blocks",
+            "blocks": filled, "text": ab.prose_of(filled),
+            "citations": refs,
+            "verified": {"figures": len(resolved), "sources": len(refs),
+                         "matches": [{"label": r.label, "value": r.value,
+                                      "unit_class": r.unit_class, "source_id": r.ref}
+                                     for r in resolved]}}
+
 
 async def _respond(db: AsyncSession, text: str, citations: list[str] | None = None) -> dict:
     """Meta-agent exit. A reply that states no number may cite nothing — a
@@ -333,26 +414,54 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="respond",
-        display="Checking every figure against the evidence, then answering",
-        description="Reply to the user. Any reply that states a number must cite the evidence "
-                    "ids that number came from; a reply with no numbers (a greeting, a "
-                    "clarifying question) may cite nothing. Whatever you cite must be real.",
+        display="Resolving every figure against the ledger, then answering",
+        description=(
+            "Reply to the user. An answer is a list of BLOCKS, and every figure in it is a "
+            "SLOT naming the evidence it comes from — you do not write numbers into "
+            "sentences, because the ledger's own value is what the reader is shown. "
+            "Blocks: `paragraph` (runs: a list mixing strings and slots, in reading order), "
+            "`metric_table` (columns + rows, each cell a string or a slot — use it whenever "
+            "you are comparing or ranking), `chart` (kind bar/line/waterfall + series_ref, "
+            "the calc id of a series you read), `trend` (text + series_ref: a claim that "
+            "something rose or fell rests on the sequence it was read from), `absence` "
+            "(text + absence_ref: a claim that something was not reported rests on the row "
+            "the refused read minted). A slot is {ref, label} or {ref, value} — label is "
+            "the ledger's own name for the figure, value is the figure as the tool "
+            "returned it — a NUMBER either way. Everything that is not a figure is "
+            "text: ids, tickers, dates, period labels and whole sentences go in the "
+            "run beside the slot, not inside it. A reply that states nothing factual "
+            "needs no slots at all."
+        ),
         json_schema={"type": "object", "properties": {
-            "text": {"type": "string"},
+            "blocks": {
+                "type": "array",
+                "description": "the answer, in reading order",
+                "items": {"type": "object", "properties": {
+                    "type": {"type": "string",
+                             "enum": list(ab.BLOCK_TYPES)},
+                    "runs": {"type": "array",
+                             "description": "paragraph only: strings and slots in order",
+                             "items": {"type": ["string", "object"]}},
+                    "columns": {"type": "array", "items": {"type": "string"},
+                                "description": "metric_table only: the column headings"},
+                    "rows": {"type": "array",
+                             "description": "metric_table only: one list of cells per row, "
+                                            "each cell a string or a slot",
+                             "items": {"type": "array",
+                                       "items": {"type": ["string", "object"]}}},
+                    "title": {"type": "string"},
+                    "text": {"type": "string",
+                             "description": "trend and absence only: the claim, without figures"},
+                    "kind": {"type": "string", "enum": list(ab.CHART_KINDS),
+                             "description": "chart only"},
+                    "series_ref": {"type": "string",
+                                   "description": "chart and trend only: the calc id of the series"},
+                    "absence_ref": {"type": "string",
+                                    "description": "absence only: the calc id of the recorded refusal"},
+                }, "required": ["type"], "additionalProperties": False},
+            },
             # The sharpest of the nullable cases: respond is the session's only
-            # exit, so a refusal here is not a tool error the model recovers
-            # from — it burns turns until the user gets the gate-exhausted
-            # message in answer to a greeting. `citations: list[str] | None`,
-            # and `citations or []` on the first line of the fn.
-            #
-            # items stays `string` deliberately. The gate resolves plain ids
-            # (`cid.startswith(...)`), so an object-shaped citation cannot be
-            # checked. Since V6 the fn REFUSES one with a named error rather
-            # than dropping it, which is what this comment used to complain of.
-            "citations": {"type": ["array", "null"], "items": {"type": "string"},
-                          "description": "evidence ids (fact_/chunk_/calc_/src_/alert_/run_/pos_) "
-                                         "returned by tools you called this session"},
-        }, "required": ["text"], "additionalProperties": False},
-        fn=_respond, tool_class=GATE,
+        }, "required": ["blocks"], "additionalProperties": False},
+        fn=_respond_blocks, tool_class=GATE,
     ))
     return reg

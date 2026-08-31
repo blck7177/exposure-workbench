@@ -576,12 +576,18 @@ _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], 
     # be cited separately made a citation set that had to be assembled by hand
     # out of two kinds of id to describe one run.
     (RiskAlert, (), ("current_value", "limit_value", "utilization"), "alert_type"),
-    # V8-P3/P4. A limit check holds no measurement — it holds the fact that a
-    # check RAN and whether it fired. It is listed here with no value columns so
-    # that "a run child" means one thing in this module: every table _from_run
-    # reads is declared in one tuple, and the count map below can require that
-    # what it counts is something the resolver already reads.
-    (LimitCheckRow, (), (), "limit_type"),
+    # V8-P3/P4 listed this with no value columns, and said so plainly: a limit
+    # check held no measurement, only the fact that a check RAN and whether it
+    # fired. V13-S5 changed that — it added the three numbers the check actually
+    # saw — and this line was not revisited, so the columns were written and
+    # remained unciteable. The second half of the same omission that left them
+    # unwritten until V14: a value nothing can quote is a value the product does
+    # not have, and "MSFT sits at 16.3% against a 15% warning level" was a
+    # sentence the gate refused because the level it names lives here.
+    #
+    # All three are fractions — ck_risk_limits_unit makes that a database fact,
+    # and LimitBook refuses a row whose unit is anything else.
+    (LimitCheckRow, (), ("current_value", "warning_level", "breach_level"), "limit_type"),
 )
 
 # V8-P4. How MANY of those children there are. Every value above is a

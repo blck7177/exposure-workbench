@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from exposure_workbench.services import answer_blocks as ab
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.registries import build_meta_registry
 from exposure_workbench.tools.registry import DELEGATION, GATE
@@ -26,16 +27,19 @@ def test_delegation_tools_require_reason():
         assert "reason" in reg.get(name).json_schema["required"], name
 
 
-def test_respond_requires_only_text():
-    """Schema-optional on purpose. The rule "a reply stating a number must cite"
-    is enforced in the gate (V3-A0-1), not by making citations a required field:
-    required-in-schema would also block the number-free replies — greetings,
-    clarifying questions — that are legitimately uncited. See
-    test_the_gate_refuses_a_number_without_a_citation for the enforced half."""
+def test_respond_requires_only_blocks():
+    """V14-C. The answer is the only required field, and evidence is no longer a
+    field beside it: an id reaches the gate by being NAMED IN A SLOT, so there is
+    no way to write a figure whose evidence was left out of a separate list. The
+    property the old `citations`-optional schema protected — that a reply stating
+    nothing factual needs no evidence — survives as an answer with no slots in
+    it, which needs no ids and is refused by nothing."""
     reg = build_meta_registry()
     schema = reg.get("respond").json_schema
-    assert schema["required"] == ["text"]
-    assert "citations" in schema["properties"]
+    assert schema["required"] == ["blocks"]
+    assert "citations" not in schema["properties"]
+    assert set(schema["properties"]["blocks"]["items"]["properties"]["type"]["enum"]) == set(
+        ab.BLOCK_TYPES)
 
 
 def test_respond_description_states_the_rule_the_gate_enforces():

@@ -17,6 +17,7 @@ import { CitationList } from "../evidence/Cite";
 import { useEvidence } from "../evidence/Column";
 import { Activity } from "./Activity";
 import { AnswerText, idsIn } from "./AnswerText";
+import { AnswerBlocks, type Block } from "./AnswerBlocks";
 import { VerifiedBadge } from "./Verified";
 
 /**
@@ -80,6 +81,9 @@ type ChatMsg = {
   citations: string[];
   gateFailed?: boolean;
   verified?: Verified;
+  // V14-C. Present on an answer whose figures were slots; absent on every
+  // answer written before the exit changed, which keeps its prose renderer.
+  blocks?: Block[];
   seconds?: number;
 };
 
@@ -157,6 +161,7 @@ export function AnalystDock() {
         citations: m.citations ?? [],
         gateFailed: (m.meta as { gate?: string } | undefined)?.gate === "exhausted",
         verified: (m.meta as { verified?: Verified } | undefined)?.verified,
+        blocks: (m.meta as { blocks?: Block[] } | undefined)?.blocks,
       }));
       setMessages(msgs);
       setSteps(d.steps);
@@ -219,6 +224,7 @@ export function AnalystDock() {
       citations: m.citations ?? [],
       gateFailed: (m.meta as { gate?: string } | undefined)?.gate === "exhausted",
       verified: (m.meta as { verified?: Verified } | undefined)?.verified,
+      blocks: (m.meta as { blocks?: Block[] } | undefined)?.blocks,
     }));
     setMessages(msgs);
     setSteps(d.steps);
@@ -236,10 +242,11 @@ export function AnalystDock() {
     try {
       const sid = await ensureSession();
       const r = await postMessage(sid, text);
-      const meta = r.meta as { gate?: string; verified?: Verified } | undefined;
+      const meta = r.meta as { gate?: string; verified?: Verified; blocks?: Block[] } | undefined;
       setMessages((m) => [...m, {
         role: "assistant", text: r.text, citations: r.citations ?? [],
         gateFailed: meta?.gate === "exhausted",
+        blocks: meta?.blocks,
         verified: meta?.verified,
         seconds: Math.round((Date.now() - started) / 1000),
       }]);
@@ -349,8 +356,16 @@ export function AnalystDock() {
               {m.role === "user" ? (
                 <span className="whitespace-pre-wrap">{m.text}</span>
               ) : (
-                <AnswerText text={m.text} citations={m.citations}
-                  matches={m.verified?.matches} labels={labels} onOpen={evidence.open} />
+                m.blocks ? (
+                  // V14-C. A v1 answer keeps its prose renderer: the figures are
+                  // IN its sentences and its spans were recorded against that
+                  // string. Migrating them would mean inventing slots for
+                  // numbers nobody recorded as slots.
+                  <AnswerBlocks blocks={m.blocks} onOpen={evidence.open} />
+                ) : (
+                  <AnswerText text={m.text} citations={m.citations}
+                    matches={m.verified?.matches} labels={labels} onOpen={evidence.open} />
+                )
               )}
               {m.role !== "user" && (
                 <CitationList citations={m.citations} labels={labels} onOpen={evidence.open} />

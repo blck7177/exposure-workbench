@@ -78,11 +78,31 @@ attribute to the wrong one.
 
 Say what your data is AS OF. Filings arrive months after the period they describe, and anything since is invisible to you. When you quote what management said, quote them verbatim from the passage — a paraphrase presented as a quotation is not one. Risk factors in a 10-K are standing disclosure, not news about this week.
 
-Finish every turn by calling respond. A reply with no numbers in it — a greeting, \
-a clarifying question — needs no citations; any reply that states a number must \
-cite the evidence that number came from. If respond rejects a citation, fix that \
-id — never invent one. If it says citations_required, you stated a number you did \
-not fetch: call the tool that produces it, then cite what comes back."""
+Finish every turn by calling respond. An answer is a list of BLOCKS, and you do \
+not write figures into sentences — a figure is a SLOT naming the evidence it came \
+from, and the reader is shown the ledger's own value. So text carries the \
+sentence and slots carry the numbers. A slot holds ONE NUMBER: ids, tickers, \
+dates and sentences are text, and go in the run beside the slot rather than \
+inside it.
+
+    {"type": "paragraph", "runs": [
+        "MSFT is the largest position at ",
+        {"ref": "run_9f2c...", "value": 0.1627},
+        ", which is past its warning level."]}
+
+That is the whole of it — a list mixing strings and slots, read in order.
+
+Use a metric_table whenever you are ranking or comparing: a table is what the \
+reader can scan, and a list of figures in prose is not. Use a chart when you have \
+read a series and its shape is the point. A claim that something rose or fell is \
+a trend block and rests on the series you read it from; a claim that something \
+was not reported is an absence block and rests on the row the refused read \
+minted. Neither can be asserted in prose, because neither is checkable there.
+
+If respond refuses, it names the block and what is wrong with it. A slot whose \
+label is unknown comes back with the labels that id actually holds — use one of \
+them, or give the figure as `value` and let the ledger name it. Never invent an \
+id, and never restate a refused figure as text to get past the check."""
 
 
 # What the user is told when the loop ended without the gate ever accepting an
@@ -164,6 +184,7 @@ async def handle_message(
     # the one that let it through, and the honest record is what the gate
     # actually found at the moment it decided.
     reply_verified: dict | None = None
+    reply_blocks: list | None = None
     # What the gate refused, in order. Empty is a fact, not a gap: it means the
     # turn never reached the gate, which is a different failure from one the gate
     # turned away, and the two must not read the same afterwards.
@@ -245,6 +266,13 @@ async def handle_message(
                     if result.get("responded"):
                         reply_text, reply_citations = result["text"], result.get("citations", [])
                         reply_verified = result.get("verified")
+                        # V14-C. The blocks, with every slot carrying the value
+                        # the ledger holds. `text` beside them is the prose the
+                        # model wrote, which is what the quote and trajectory
+                        # checks read and what a caller with no block renderer
+                        # can still show — the figures are simply absent from
+                        # it, because they were never written into it.
+                        reply_blocks = result.get("blocks")
                     elif result.get("error"):
                         # Every refusal, in order. Diagnosing V7-Q2 meant
                         # rebuilding the turn out of agent_steps by hand, because
@@ -263,6 +291,9 @@ async def handle_message(
     meta: dict = {"prompt_tokens": prompt_peak}
     if reply_verified is not None:
         meta["verified"] = reply_verified
+    if reply_blocks is not None:
+        meta["blocks"] = reply_blocks
+        meta["format"] = "blocks"
     if reply_text is None:
         reply_text, reply_citations = _GATE_EXHAUSTED_TEXT, []
         meta |= _GATE_EXHAUSTED_META | {"gate_refusals": gate_refusals}
