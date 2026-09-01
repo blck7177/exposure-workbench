@@ -834,6 +834,12 @@ class IssuerBrief(Base):
     # sorted(set(...)) at submit time, so the block association only survives if
     # it is written separately. NULL on briefs written before V3.
     block_citations: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # V15-S5: {section: [rendered blocks]} — the brief as the model wrote it,
+    # every slot filled with the table's own figure. The text columns above are
+    # the prose rendering of these and carry the figures at reader precision;
+    # the blocks keep which id each figure came from, which prose cannot. NULL
+    # on briefs written before V15, whose text was the whole submission.
+    blocks: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     # No llm_model/prompt_tokens/completion_tokens (V4-S2, dropped in
     # infra/migrations/v4_cost.sql). They were a fossil of the v2 shape where one

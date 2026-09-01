@@ -66,6 +66,11 @@ class Resource:
     columns: tuple[Column, ...]
     count_label: str | None = None
     count_split: str | None = None
+    # V15-S2a. A second column that tells two rows of one label apart. Two
+    # issuer-concentration alerts on one run are the same alert_type for MSFT
+    # and for LLY, and a name that stops at the type is one name for two
+    # figures — the three duplicates in 235 that test_quantities found.
+    qualifier_column: str | None = None
 
     @property
     def table(self) -> str:
@@ -137,7 +142,7 @@ RUN_CHILDREN: tuple[Resource, ...] = (
         RiskAlert, "alert_type",
         _ratio(("current_value", "measured"), ("limit_value", "limit"),
                ("utilization", "limit used")),
-        count_label="alerts",
+        count_label="alerts", qualifier_column="entity_id",
     ),
     # V13-S5 added the three numbers a check actually saw; V8-P3 had listed this
     # with no value columns and the line was not revisited, so the columns were

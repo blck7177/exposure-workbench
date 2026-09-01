@@ -1,80 +1,59 @@
-"""V14-C. The exit's vocabulary: an answer is blocks, and a figure is a slot.
+"""V15-S3. The exit's grammar: an answer is blocks, and every claim names its evidence.
 
-WHY THIS EXISTS. Until now the model wrote prose with numbers in it and the gate
-read the numbers back out. That put the model in the position of a transcriber:
-it had already been handed 0.800770 by a tool, and its job was to copy the digits
-into a sentence without dropping one. Every failure of that copy is a refusal,
-and a refusal costs a turn — sess_16b176ea4c9b spent five of its nine model calls
-negotiating with the gate over figures it had already been given correctly.
+WHY THIS EXISTS. Until V14 the model wrote prose with numbers in it and the gate
+read the numbers back out. V14-C made a figure a SLOT — but a slot could still
+be authored as `{ref, value}`, and the gate then went looking for which of the
+ref's figures the value was. Measured on 442 bad slots: values do not carry
+intent (the same 0.06 is TLT's weight and a stress warning level on one run),
+and a resolver that guesses from a value hands the reader the wrong identity
+with the gate's blessing.
 
-So the numbers stop being written. A figure in an answer is a SLOT: a reference
-to a row in the ledger, resolved to its value at render time. Text may not carry
-a substantive number at all, which is the invariant the whole design rests on —
-there is nothing to transcribe, so there is nothing to transcribe wrongly. The
-class of error is gone rather than checked.
+So a slot is `{ref, name}` and nothing else. The name is one the table showed
+the model (services/table.py), and resolving it is a dictionary lookup. There
+is no value form, because the value form is the one channel through which a
+figure could arrive without its identity.
 
-Two things follow that the prose exit could not do. Presentation stops being the
-model's business: the ledger holds 0.8007699, the reader sees 0.80, and neither
-is a claim the model made. And structure becomes possible — a table's cell and a
-chart's series are slots like any other, so a ranked table is expressible and a
-picture of a series cannot be drawn from numbers nobody recorded.
+CLAIM TYPES. Each kind of claim has one shape and one evidence predicate, and
+the set is closed — a claim with no shape here has nowhere to be written, which
+is the point (the model used to write "Evidence ids: chunk_…" into a sentence
+because a passage-backed claim had no slot):
 
-A slot names its value one of two ways, and this is a migration, not a
-preference. `label` is the ledger's own name for the value and writes no number
-at all. `value` is the figure as read from the tool payload, which is what a
-model can author on its first attempt without having been taught the label
-vocabulary; it is checked against that ONE ref rather than against the pool of
-everything cited, and what gets rendered is still the ledger's value and not the
-model's copy. Refusals name the labels available under the ref, so the second
-attempt can use the stronger form. Both are exact; neither is a fallback for the
-other failing.
+    paragraph     text runs and slots; `cites` names the passages the prose
+                  rests on (chunk_/src_) — checked for membership, and any
+                  quotation marks in the text are checked against them
+    metric_table  cells are text or slots; `cites` as above
+    chart         kind + series_ref → the ref must be a series row
+    trend         text + series_ref → a claim about a sequence rests on one
+    absence       text + absence_ref → a claim that something was not reported
+                  rests on the row the refused read minted
+    action        text + task_ref → work this turn started, by its id
 
-WHAT IS NOT HERE. `action` — "the research you kicked off" — is checkable, and
-trajectory_gate's R2 already checks it: a turn that enqueues runs and names none
-is refused there. A second implementation would be a second opinion about the
-same turn, and this codebase has been bitten by mirrored rules more than once.
+Text carries no digits (dates and the handful of non-measurement token classes
+below excepted). Shape is the JSON Schema's job (tools/meta_tools.py); what is
+here is the one text rule and the renderers.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
-from exposure_workbench.services import numeric_verification as nv
+from exposure_workbench.analytics import display_conventions as dc
 
-# The closed vocabulary. A block whose type is not here is refused rather than
-# ignored: an exit that silently drops what it does not understand is an exit
-# that can be talked past.
-BLOCK_TYPES = ("paragraph", "metric_table", "chart", "trend", "absence")
-
-# Chart kinds, closed for the same reason and short on purpose. Each is a way of
-# reading a series or a set of figures that the renderer knows how to draw; a
-# kind nobody can draw is a promise the answer cannot keep.
+BLOCK_TYPES = ("paragraph", "metric_table", "chart", "trend", "absence", "action")
 CHART_KINDS = ("bar", "line", "waterfall")
 
-# Ledger operations whose rows carry a series of points rather than one figure.
-# A trend claim rests on one of these — "it has been rising" is a statement about
-# a sequence, and the sequence has to exist. This is the first of round 4's three
-# assertion checks: the risk-history answer that said VaR had been climbing for a
-# month, from a library holding exactly one run, drew zero refusals twice.
-_SERIES_OPS = ("series", "flow.series", "balance.series", "change.")
-
-# Absence rows. V11 minted these so that "the issuer does not report this" could
-# be cited like anything else; until now nothing required an absence CLAIM to
-# rest on one, so the model could simply assert a company files nothing and the
-# gate — which checks numbers — saw a sentence with no numbers in it and passed.
-_ABSENCE_PREFIX = "absence."
+# Rows an assertion block may point at, by kind (services/quantities.py,
+# services/table.py).
+SERIES_KINDS = ("series",)
+ABSENCE_KINDS = ("absence",)
+TASK_KINDS = ("task",)
 
 
 @dataclass(frozen=True)
 class Resolved:
-    """One slot, after the ledger has been consulted.
-
-    `label` is always the ledger's, never the model's: a slot authored by value
-    is resolved to the row that holds it and takes that row's name. So a reader
-    hovering a figure is shown what the ledger calls it, whichever way the slot
-    was written.
-    """
+    """One slot, after the table has been consulted."""
 
     ref: str
     label: str
@@ -82,159 +61,100 @@ class Resolved:
     unit_class: str
 
 
+# ── the one text rule ─────────────────────────────────────────────────────────
+# Digits that are not measurements. Closed and short: a date, a year, a filing
+# form, a fiscal period label, a regulation reference, and a product designator
+# written attached to its digits (H200). Everything else with a digit in it is a
+# figure typed as text, which this exit does not accept. Adding a class is an
+# edit here plus a case in test_output_grammar.
+_NOT_A_FIGURE = tuple(re.compile(p, f) for p, f in (
+    (r"\b\d{4}-\d{2}-\d{2}\b", 0),                                             # 2026-03-31
+    (r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b(?:,\s*\d{4}\b)?", 0),
+    (r"(?<![\d.$])\b(?:19|20)\d{2}\b(?![\d%])(?!\.\d)", 0),                    # 2026
+    (r"\b(?:10-[KQ]|8-K|20-F|6-K|S-[13]|DEF\s?14A)(?:/A)?\b", 0),              # 10-K
+    (r"\b(?:[QH][1-4]|FY\d{2,4}|CY\d{2,4})\b", 0),                             # Q4, FY2025
+    (r"\b(?:C&DI|Item|Rule|Reg(?:ulation)?|Section|§|ASC|ASU|IFRS|IAS|SFAS)\s*"
+     r"\d+[0-9A-Za-z]*(?:[.\-][0-9A-Za-z]+)*\b", re.IGNORECASE),               # Item 1A
+    (r"\b[A-Z][A-Za-z&.]{0,14}\d{2,4}\b(?!\s*%)", 0),                          # H200, GB200
+    # A window label is the NAME of a measure, not its value: "30-day rolling
+    # volatility", "60d", "the last 3 years". The exposure report's own headings
+    # are written this way, and three stored block answers tripped on it.
+    (r"\b\d{1,3}(?:[-\s]?(?:day|week|month|quarter|year|session|trading day)s?|[dwmy])\b(?!\s*%)", re.IGNORECASE),
+    # A confidence level is a PARAMETER of the measure, not a measurement:
+    # "VaR (95%)", "95% VaR", "1-day 95 VaR". The first V15 battery spent eight
+    # of one turn's nine attempts on this one token. Anchored to the measure's
+    # name, like the V3 gate's own class: a bare "95%" elsewhere is a figure.
+    (r"\b(?:90|95|97\.5|99)\s*%?\s*(?:VaR|ES|CVaR|confidence|CI)\b"
+     r"|\b(?:VaR|ES|CVaR)\s*\(?\s*(?:90|95|97\.5|99)\s*%?", re.IGNORECASE),
+))
+_DIGIT_RUN = re.compile(r"[+\-−]?\$?\d[\d,]*(?:\.\d+)?%?")
+# An evidence id written into text is refused as a whole token, not as the
+# fragments of digits inside it: "run_d1bbfadbbb7e" is what the model wrote,
+# and a refusal naming '1' and '7' is a refusal it cannot act on. Ids belong in
+# a slot's ref or a block's cites — the reason it is a refusal at all.
+_ID_TOKEN = re.compile(r"\b(?:fact|calc|chunk|src|alert|run|pos|task|rrun|brief|sess|msg)_[A-Za-z0-9_]{4,}\b")
+
+
+def figures_in_text(text: str) -> list[str]:
+    """Every digit run in `text` that is not one of the non-measurement classes,
+    plus every evidence id written as text — whole."""
+    if not text:
+        return []
+    out: list[str] = []
+    taken: list[tuple[int, int]] = []
+    for m in _ID_TOKEN.finditer(text):
+        out.append(m.group(0))
+        taken.append((m.start(), m.end()))
+    exempt: list[tuple[int, int]] = list(taken)
+    for pattern in _NOT_A_FIGURE:
+        exempt.extend((m.start(), m.end()) for m in pattern.finditer(text))
+    for m in _DIGIT_RUN.finditer(text):
+        if any(m.start() < e and s < m.end() for s, e in exempt):
+            continue
+        out.append(m.group(0).strip())
+    return out
+
+
 def _is_slot(x) -> bool:
     return isinstance(x, dict)
 
 
-def _slot_problem(slot: dict, i: str) -> dict | None:
-    """Shape errors, before anything is looked up.
+def _text_problems(text: str, at: str) -> list[dict]:
+    figures = figures_in_text(text)
+    if not figures:
+        return []
+    ids = [f for f in figures if _ID_TOKEN.fullmatch(f)]
+    numbers = [f for f in figures if f not in ids]
+    detail = []
+    if numbers:
+        detail.append("text carries no figures — put each one in a slot {ref, name} using a "
+                      "name from the table a tool returned (counts too: count.* names)")
+    if ids:
+        detail.append("an id is never written into text — a figure points at it through a "
+                      "slot, a passage through the block's `cites`; a run or alert the prose "
+                      "rests on goes in `cites` as well, and the reader follows it from there")
+    return [{"at": at, "reason": "digits_in_text", "figures": figures, "detail": "; ".join(detail)}]
 
-    Reported all at once and per slot, because a model fixing one slot at a time
-    is the ratchet this batch exists to remove.
-    """
+
+def _slot_problem(slot: dict, at: str) -> dict | None:
     if not isinstance(slot.get("ref"), str) or not slot["ref"]:
-        return {"at": i, "reason": "slot_without_ref",
-                "detail": "a slot names the evidence id its figure comes from"}
-    has_label = isinstance(slot.get("label"), str) and slot["label"] != ""
-    has_value = isinstance(slot.get("value"), (int, float)) and not isinstance(slot.get("value"), bool)
-    # A slot holds ONE NUMBER, and the first thing the exit met in the wild was
-    # slots holding sentences — an alert's whole reads_as line, an id, a ticker,
-    # a date — because "a reference to evidence" is what a slot looks like from
-    # outside. It is not: a reference to evidence is what a REF is, and the slot
-    # exists to carry the one figure that ref holds. So the refusal says which
-    # kind of thing was passed rather than reporting it as missing, because a
-    # model told "give the slot a value" when it gave one learns nothing.
-    if isinstance(slot.get("value"), str):
-        return {"at": i, "ref": slot["ref"], "reason": "slot_value_is_text",
-                "value": slot["value"][:80],
-                "detail": "a slot carries one number and nothing else. Words — an id, a "
-                          "ticker, a date, a whole sentence — are written as text in the "
-                          "run beside it; only the figure goes in the slot"}
-    if has_label and has_value:
-        return {"at": i, "ref": slot["ref"], "reason": "slot_with_both",
-                "detail": "name the value either by label or by figure, not both — "
-                          "two names for one slot can disagree"}
-    if not has_label and not has_value:
-        return {"at": i, "ref": slot["ref"], "reason": "slot_without_value",
-                "detail": "give the slot a label (the ledger's name for the figure) "
-                          "or a value (the figure as the tool returned it, as a "
-                          "number). If what you are placing is not a figure, it is "
-                          "text and belongs in the run beside the slot"}
+        return {"at": at, "reason": "slot_without_ref"}
+    if not isinstance(slot.get("name"), str) or not slot["name"]:
+        return {"at": at, "ref": slot["ref"], "reason": "slot_without_name",
+                "detail": "a slot is {ref, name}: the id and the name the table gave the figure"}
     return None
 
 
-def _decimals_of(v: float) -> int:
-    """How precisely the figure was written.
-
-    repr gives the shortest string that round-trips, which is the authored form
-    for anything a model types: 0.16 stays 0.16 and does not become 0.1600000001.
-    The tolerance that follows is the gate's own — half an ulp of the precision
-    WRITTEN — so a slot authored to two places is held to two places, exactly as
-    a figure in prose was.
-    """
-    s = repr(float(v))
-    if "e" in s or "E" in s:
-        return 12
-    return len(s.split(".")[1]) if "." in s else 0
-
-
-def resolve_slot(slot: dict, by_ref: dict[str, list[nv.EvidenceValue]], at: str) -> tuple[Resolved | None, dict | None]:
-    """One slot against the values its ref holds."""
-    ref = slot["ref"]
-    holds = by_ref.get(ref, [])
-    if not holds:
-        return None, {
-            "at": at, "ref": ref, "reason": "ref_holds_no_figures",
-            "detail": "this id carries no numeric value. A passage or a source is "
-                      "cited for what it says, not slotted for a figure",
-        }
-
-    if isinstance(slot.get("label"), str) and slot["label"]:
-        for v in holds:
-            if v.label == slot["label"]:
-                return Resolved(ref, v.label, v.value, v.unit_class), None
-        return None, {
-            "at": at, "ref": ref, "reason": "unknown_label",
-            "label": slot["label"],
-            # The whole list, not the nearest few. A refusal that names some of
-            # the options is a refusal the model answers by guessing again, and
-            # guessing again is the ratchet. Capped only where a run's own
-            # children run to the hundreds, and the cap says so.
-            "available": sorted(v.label for v in holds)[:60],
-            "truncated": len(holds) > 60,
-            "detail": "use one of the labels this id actually holds, or give the "
-                      "figure as `value` and let the ledger name it",
-        }
-
-    want = float(slot["value"])
-    atol = 0.5 * (10 ** -_decimals_of(want))
-    near = [v for v in holds if abs(v.value - want) <= atol]
-    if not near:
-        # V11-G's discipline, in the shape this exit needs it. Pinning a figure
-        # to ONE ref is stronger than the prose gate, which matched it against
-        # everything cited pooled — and the first thing that strength costs is
-        # an answer whose figures are right and whose refs are swapped. A limit
-        # threshold slotted against the run reads as invented, when the alert
-        # the same answer already cites holds it.
-        #
-        # So the refusal looks across the other refs in this answer and names
-        # the one that does hold it. The model is not told to guess again; it is
-        # told which id it already has.
-        elsewhere = [
-            {"ref": other, "label": v.label}
-            for other, vals in by_ref.items() if other != ref
-            for v in vals if abs(v.value - want) <= atol
-        ]
-        problem = {
-            "at": at, "ref": ref, "reason": "figure_not_held_by_this_ref",
-            "value": want,
-            "detail": "this id holds no such figure. Slot the id that carries it, "
-                      "or compute it with a tool so that a row does",
-        }
-        if elsewhere:
-            problem["held_instead_by"] = elsewhere[:5]
-            problem["detail"] = ("this id does not hold that figure, but another id in "
-                                 "this answer does — `held_instead_by` names it. Point "
-                                 "the slot there")
-        return None, problem
-    # More than one row of the same id holding the same number is not an error —
-    # a weight and a share can coincide — but the label has to be decided. First
-    # in resolver order, which is table order, which is stable.
-    v = near[0]
-    return Resolved(ref, v.label, v.value, v.unit_class), None
-
-
-def _text_problems(text: str, at: str) -> list[dict]:
-    """A number written into prose, which this exit does not accept.
-
-    The exemptions are the gate's own closed list — dates, form numbers, regulation
-    citations, years — so what stays refused is a MEASUREMENT typed as text. That
-    is the invariant: a figure reaches the reader through a slot or it does not
-    reach the reader.
-    """
-    stated = nv.extract_numbers(text)
-    if not stated:
-        return []
-    return [{
-        "at": at, "reason": "figure_written_as_text",
-        "figures": [n.surface for n in stated],
-        "detail": "put each figure in a slot naming the evidence it comes from. "
-                  "Text carries the sentence; slots carry the numbers",
-    }]
-
-
 def validate_shape(blocks) -> list[dict]:
-    """Everything checkable without the database: types, required fields, prose.
+    """The text rule, plus enough structure to walk without crashing.
 
-    Runs before any lookup so that a malformed answer costs no queries, and
-    reports every problem rather than the first — the argument validator's rule,
-    for the same reason.
+    The schema on `respond` refuses malformed blocks before this runs; a direct
+    caller (a test, the brief gate) gets the same answers here, one list, all
+    problems at once.
     """
     problems: list[dict] = []
     if not isinstance(blocks, list) or not blocks:
-        return [{"at": "blocks", "reason": "no_blocks",
-                 "detail": "an answer is a non-empty list of blocks"}]
-
+        return [{"at": "blocks", "reason": "no_blocks", "detail": "an answer is a non-empty list of blocks"}]
     for i, b in enumerate(blocks):
         at = f"blocks[{i}]"
         if not isinstance(b, dict):
@@ -245,41 +165,42 @@ def validate_shape(blocks) -> list[dict]:
             problems.append({"at": at, "reason": "unknown_block_type", "type": repr(kind),
                              "allowed": list(BLOCK_TYPES)})
             continue
-
+        if isinstance(b.get("title"), str):
+            problems += _text_problems(b["title"], f"{at}.title")
+        if isinstance(b.get("text"), str):
+            problems += _text_problems(b["text"], f"{at}.text")
         if kind == "paragraph":
             runs = b.get("runs")
             if not isinstance(runs, list) or not runs:
-                problems.append({"at": at, "reason": "paragraph_without_runs",
-                                 "detail": "runs is a list of strings and slots, in order"})
+                problems.append({"at": at, "reason": "paragraph_without_runs"})
                 continue
+            # The text rule reads the paragraph's prose as ONE string, with the
+            # slots lifted out. Checked run by run, "VaR (" + slot + ") at 95%"
+            # shows the rule a bare "95%" with the measure's name in another
+            # run, and refuses the confidence level it would have recognised.
+            problems += _text_problems("".join(r for r in runs if isinstance(r, str)), f"{at}.runs")
             for j, r in enumerate(runs):
                 if isinstance(r, str):
-                    problems += _text_problems(r, f"{at}.runs[{j}]")
+                    continue
                 elif _is_slot(r):
                     p = _slot_problem(r, f"{at}.runs[{j}]")
                     if p:
                         problems.append(p)
                 else:
                     problems.append({"at": f"{at}.runs[{j}]", "reason": "run_not_text_or_slot"})
-
         elif kind == "metric_table":
             cols, rows = b.get("columns"), b.get("rows")
-            if not isinstance(cols, list) or not all(isinstance(c, str) for c in cols) or not cols:
+            if not isinstance(cols, list) or not cols or not all(isinstance(c, str) for c in cols):
                 problems.append({"at": at, "reason": "table_without_columns"})
                 continue
             if not isinstance(rows, list) or not rows:
                 problems.append({"at": at, "reason": "table_without_rows"})
                 continue
             for j, row in enumerate(rows):
-                if not isinstance(row, list):
-                    problems.append({"at": f"{at}.rows[{j}]", "reason": "row_not_a_list"})
-                    continue
-                if len(row) != len(cols):
-                    # A short row is a cell silently shifted under the wrong
-                    # heading — a figure filed under a column it does not belong
-                    # to reads as a different measurement entirely.
+                if not isinstance(row, list) or len(row) != len(cols):
                     problems.append({"at": f"{at}.rows[{j}]", "reason": "row_width_mismatch",
-                                     "columns": len(cols), "cells": len(row)})
+                                     "columns": len(cols),
+                                     "cells": len(row) if isinstance(row, list) else None})
                     continue
                 for k, cell in enumerate(row):
                     if isinstance(cell, str):
@@ -289,80 +210,91 @@ def validate_shape(blocks) -> list[dict]:
                         if p:
                             problems.append(p)
                     else:
-                        problems.append({"at": f"{at}.rows[{j}][{k}]",
-                                         "reason": "cell_not_text_or_slot"})
-            if isinstance(b.get("title"), str):
-                problems += _text_problems(b["title"], f"{at}.title")
-
+                        problems.append({"at": f"{at}.rows[{j}][{k}]", "reason": "cell_not_text_or_slot"})
         elif kind == "chart":
             if b.get("kind") not in CHART_KINDS:
-                problems.append({"at": at, "reason": "unknown_chart_kind",
-                                 "kind": repr(b.get("kind")), "allowed": list(CHART_KINDS)})
-            if not isinstance(b.get("series_ref"), str) or not b.get("series_ref"):
-                problems.append({"at": at, "reason": "chart_without_series",
-                                 "detail": "a chart draws a series that was recorded: give "
-                                           "the calc id of the series it plots"})
-            if isinstance(b.get("title"), str):
-                problems += _text_problems(b["title"], f"{at}.title")
-
+                problems.append({"at": at, "reason": "unknown_chart_kind", "allowed": list(CHART_KINDS)})
+            if not isinstance(b.get("series_ref"), str) or not b["series_ref"]:
+                problems.append({"at": at, "reason": "chart_without_series"})
         elif kind == "trend":
             if not isinstance(b.get("text"), str) or not b["text"].strip():
                 problems.append({"at": at, "reason": "trend_without_text"})
-            else:
-                problems += _text_problems(b["text"], f"{at}.text")
-            if not isinstance(b.get("series_ref"), str) or not b.get("series_ref"):
-                problems.append({
-                    "at": at, "reason": "trend_without_series",
-                    "detail": "a claim that something rose, fell or held is a claim about "
-                              "a sequence. Give the calc id of the series it was read from",
-                })
-
+            if not isinstance(b.get("series_ref"), str) or not b["series_ref"]:
+                problems.append({"at": at, "reason": "trend_without_series"})
         elif kind == "absence":
             if not isinstance(b.get("text"), str) or not b["text"].strip():
                 problems.append({"at": at, "reason": "absence_without_text"})
-            else:
-                problems += _text_problems(b["text"], f"{at}.text")
-            if not isinstance(b.get("absence_ref"), str) or not b.get("absence_ref"):
-                problems.append({
-                    "at": at, "reason": "absence_without_ref",
-                    # The way out matters more here than in any other refusal.
-                    # An absence block asserts the ISSUER did not report a thing,
-                    # and that needs the row a refused read minted. But most of
-                    # what a model wants to say in this shape is weaker and true
-                    # — this desk could not compute it, the window does not
-                    # reach — and that is ordinary prose with no figures in it.
-                    # Without the second sentence the model has a claim it can
-                    # neither support nor rephrase, and spends the turn trying.
-                    "detail": "a claim that the issuer did not report something rests on "
-                              "the row a refused read minted. If you have no such row — if "
-                              "what you mean is that the desk could not compute it, or the "
-                              "window does not reach — say that in a paragraph instead: it "
-                              "is prose, and prose with no figures in it needs nothing",
-                })
-
+            if not isinstance(b.get("absence_ref"), str) or not b["absence_ref"]:
+                problems.append({"at": at, "reason": "absence_without_ref"})
+        elif kind == "action":
+            if not isinstance(b.get("text"), str) or not b["text"].strip():
+                problems.append({"at": at, "reason": "action_without_text"})
+            if not isinstance(b.get("task_ref"), str) or not b["task_ref"]:
+                problems.append({"at": at, "reason": "action_without_task"})
+        cites = b.get("cites")
+        if cites is not None and (not isinstance(cites, list)
+                                  or not all(isinstance(c, str) and c for c in cites)):
+            problems.append({"at": f"{at}.cites", "reason": "cites_not_a_list_of_ids"})
     return problems
 
 
-def refs_in(blocks) -> list[str]:
-    """Every id the answer leans on, slots and block-level refs alike.
+# ── walking ───────────────────────────────────────────────────────────────────
 
-    One list, because they are checked the same way: an id that was not returned
-    to this session is not evidence, whether it names a figure or a series.
-    """
-    out: list[str] = []
-    for b in blocks if isinstance(blocks, list) else []:
+def slots_in(blocks) -> list[tuple[str, dict]]:
+    """Every slot with its address, in reading order."""
+    out: list[tuple[str, dict]] = []
+    for i, b in enumerate(blocks if isinstance(blocks, list) else []):
         if not isinstance(b, dict):
             continue
-        for key in ("series_ref", "absence_ref"):
-            if isinstance(b.get(key), str) and b[key]:
-                out.append(b[key])
-        for r in b.get("runs") or []:
-            if _is_slot(r) and isinstance(r.get("ref"), str):
-                out.append(r["ref"])
-        for row in b.get("rows") or []:
-            for cell in row if isinstance(row, list) else []:
-                if _is_slot(cell) and isinstance(cell.get("ref"), str):
-                    out.append(cell["ref"])
+        at = f"blocks[{i}]"
+        for j, r in enumerate(b.get("runs") or []):
+            if _is_slot(r):
+                out.append((f"{at}.runs[{j}]", r))
+        for j, row in enumerate(b.get("rows") or []):
+            for k, cell in enumerate(row if isinstance(row, list) else []):
+                if _is_slot(cell):
+                    out.append((f"{at}.rows[{j}][{k}]", cell))
+    return out
+
+
+def cites_in(blocks) -> list[tuple[str, str]]:
+    """Every passage citation with its block address."""
+    out: list[tuple[str, str]] = []
+    for i, b in enumerate(blocks if isinstance(blocks, list) else []):
+        if isinstance(b, dict):
+            for c in b.get("cites") or []:
+                if isinstance(c, str):
+                    out.append((f"blocks[{i}]", c))
+    return out
+
+
+def assertions_in(blocks) -> list[tuple[str, str, str]]:
+    """(address, kind, ref) for every trend / chart / absence / action block."""
+    out: list[tuple[str, str, str]] = []
+    for i, b in enumerate(blocks if isinstance(blocks, list) else []):
+        if not isinstance(b, dict):
+            continue
+        at = f"blocks[{i}]"
+        t = b.get("type")
+        if t in ("trend", "chart") and isinstance(b.get("series_ref"), str):
+            out.append((at, "series", b["series_ref"]))
+        elif t == "absence" and isinstance(b.get("absence_ref"), str):
+            out.append((at, "absence", b["absence_ref"]))
+        elif t == "action" and isinstance(b.get("task_ref"), str):
+            out.append((at, "task", b["task_ref"]))
+    return out
+
+
+def refs_in(blocks) -> list[str]:
+    """Every id the answer leans on — slots, cites and block-level refs alike."""
+    out: list[str] = []
+    for _, s in slots_in(blocks):
+        if isinstance(s.get("ref"), str):
+            out.append(s["ref"])
+    for _, c in cites_in(blocks):
+        out.append(c)
+    for _, _, r in assertions_in(blocks):
+        out.append(r)
     seen, uniq = set(), []
     for r in out:
         if r not in seen:
@@ -372,13 +304,7 @@ def refs_in(blocks) -> list[str]:
 
 
 def text_of(blocks) -> str:
-    """The answer's prose, for the checks that read sentences.
-
-    The quote rule and the trajectory criteria were written against a string and
-    are unchanged by this batch; they get one. Slots contribute nothing here —
-    they hold no words — so what these checks see is exactly what the model
-    wrote as text.
-    """
+    """The answer's prose, for the checks that read sentences. Slots contribute nothing."""
     parts: list[str] = []
     for b in blocks if isinstance(blocks, list) else []:
         if not isinstance(b, dict):
@@ -388,11 +314,6 @@ def text_of(blocks) -> str:
         if isinstance(b.get("text"), str):
             parts.append(b["text"])
         if b.get("runs"):
-            # A paragraph's runs are CONTIGUOUS prose with figures lifted out of
-            # it, so they join with nothing between them. Joining with a newline
-            # would put a break wherever a slot sits, and the quote rule reads
-            # this string — a quoted phrase with a figure inside it would be
-            # split down the middle and refused for not appearing in its source.
             parts.append("".join(r for r in b["runs"] if isinstance(r, str)))
         for row in b.get("rows") or []:
             for cell in row if isinstance(row, list) else []:
@@ -401,83 +322,32 @@ def text_of(blocks) -> str:
     return "\n".join(parts)
 
 
-def check_assertion_refs(blocks, rows_by_id: dict) -> list[dict]:
-    """Trend and absence blocks against what their rows actually are.
-
-    Two of round 4's three assertion checks, and the reason they are here rather
-    than in the numeric gate: neither claim contains a number, so nothing the
-    numeric gate does can see them. "VaR has been climbing all month" needs a
-    series to have been read; "they report no debt" needs a refusal to have been
-    recorded. Both are mechanical, which is why they can be gated at all.
-    """
-    problems: list[dict] = []
+def text_by_block(blocks) -> list[tuple[str, str]]:
+    """(address, prose) per block — the quote rule reads each block against ITS cites."""
+    out: list[tuple[str, str]] = []
     for i, b in enumerate(blocks if isinstance(blocks, list) else []):
         if not isinstance(b, dict):
             continue
-        at = f"blocks[{i}]"
-        if b.get("type") in ("trend", "chart"):
-            ref = b.get("series_ref")
-            row = rows_by_id.get(ref)
-            op = getattr(row, "operation", "") or ""
-            has_points = bool((getattr(row, "result", None) or {}).get("points"))
-            if row is None or not (has_points or op.startswith(_SERIES_OPS)):
-                problems.append({
-                    "at": at, "ref": ref,
-                    "reason": "not_a_series",
-                    "detail": ("a trend is a claim about a sequence and a chart draws one; "
-                               "this id is not a series. Read the series first — the row "
-                               "that comes back is what the claim rests on"),
-                })
-        elif b.get("type") == "absence":
-            ref = b.get("absence_ref")
-            row = rows_by_id.get(ref)
-            op = getattr(row, "operation", "") or ""
-            if row is None or not op.startswith(_ABSENCE_PREFIX):
-                problems.append({
-                    "at": at, "ref": ref,
-                    "reason": "not_an_absence",
-                    "detail": ("a claim that something was not reported rests on the row a "
-                               "refused read mints. This id records something else, so the "
-                               "absence is being asserted rather than shown"),
-                })
-    return problems
+        parts = []
+        for key in ("title", "text"):
+            if isinstance(b.get(key), str):
+                parts.append(b[key])
+        if b.get("runs"):
+            parts.append("".join(r for r in b["runs"] if isinstance(r, str)))
+        for row in b.get("rows") or []:
+            parts.extend(c for c in (row if isinstance(row, list) else []) if isinstance(c, str))
+        out.append((f"blocks[{i}]", "\n".join(parts)))
+    return out
 
 
-def resolve(blocks, values: list[nv.EvidenceValue]) -> tuple[list[Resolved], list[dict]]:
-    """Every slot, resolved or refused. Shape is assumed checked."""
-    by_ref: dict[str, list[nv.EvidenceValue]] = {}
-    for v in values:
-        by_ref.setdefault(v.source_id, []).append(v)
-
-    resolved: list[Resolved] = []
-    problems: list[dict] = []
-
-    def one(slot: dict, at: str) -> None:
-        r, p = resolve_slot(slot, by_ref, at)
-        if p:
-            problems.append(p)
-        else:
-            resolved.append(r)
-
-    for i, b in enumerate(blocks):
-        at = f"blocks[{i}]"
-        for j, r in enumerate(b.get("runs") or []):
-            if _is_slot(r):
-                one(r, f"{at}.runs[{j}]")
-        for j, row in enumerate(b.get("rows") or []):
-            for k, cell in enumerate(row if isinstance(row, list) else []):
-                if _is_slot(cell):
-                    one(cell, f"{at}.rows[{j}][{k}]")
-    return resolved, problems
-
+# ── rendering ─────────────────────────────────────────────────────────────────
 
 def rendered(blocks, resolved: list[Resolved]) -> list[dict]:
-    """The answer as it will be stored and shown: slots carrying their values.
+    """The answer as stored and shown: every slot carrying the table's figure.
 
-    The model's `value`, where it wrote one, does not survive this. What is
-    stored is what the ledger holds and what the ledger calls it, so a figure on
-    the page is the row's figure and a reader following it back arrives at the
-    row it came from.
+    `resolved` is in `slots_in` order. The model's slot ({ref, name}) becomes
+    {slot: {ref, label, value, unit_class}} — `label` is the name, kept under
+    the key the renderer has read since V14.
     """
     it = iter(resolved)
     out: list[dict] = []
@@ -485,8 +355,7 @@ def rendered(blocks, resolved: list[Resolved]) -> list[dict]:
     def fill(x):
         if _is_slot(x):
             r = next(it)
-            return {"slot": {"ref": r.ref, "label": r.label,
-                             "value": r.value, "unit_class": r.unit_class}}
+            return {"slot": {"ref": r.ref, "label": r.label, "value": r.value, "unit_class": r.unit_class}}
         return x
 
     for b in blocks:
@@ -499,20 +368,18 @@ def rendered(blocks, resolved: list[Resolved]) -> list[dict]:
     return out
 
 
+def _number(run) -> str:
+    slot = (run or {}).get("slot") if isinstance(run, dict) else None
+    if not slot or slot.get("value") is None:
+        return ""
+    return dc.display(slot["value"], slot.get("unit_class") or "")
+
+
 def prose_of(rendered_blocks) -> str:
-    """The answer as a complete sentence, for every reader that has no renderer.
+    """The answer as complete sentences, with figures at reader precision.
 
-    `text_of` deliberately drops the figures: it feeds the quote and trajectory
-    checks, and those must see ONLY what the model wrote, or a figure the ledger
-    supplied would be judged as the model's wording. What gets STORED has the
-    opposite requirement — "net rates exposure is , and it loses if rates rise"
-    is not an answer, and a transcript, an export or a client that predates
-    blocks would show exactly that.
-
-    So the figures go back in, from the ledger, at full precision. Not the
-    reader-facing rounding: that lives in the renderer with the rest of the
-    display conventions, and a second copy here would be two rules about how a
-    number looks, disagreeing the first time one of them changed.
+    One rule for how a number looks (analytics/display_conventions), so the
+    transcript, the export and the rubric read what the renderer shows.
     """
     parts: list[str] = []
     for b in rendered_blocks if isinstance(rendered_blocks, list) else []:
@@ -523,34 +390,14 @@ def prose_of(rendered_blocks) -> str:
         if isinstance(b.get("text"), str):
             parts.append(b["text"])
         if b.get("runs"):
-            parts.append("".join(
-                r if isinstance(r, str) else _number(r) for r in b["runs"]))
+            parts.append("".join(r if isinstance(r, str) else _number(r) for r in b["runs"]))
         for row in b.get("rows") or []:
-            parts.append(" | ".join(
-                c if isinstance(c, str) else _number(c) for c in row))
+            parts.append(" | ".join(c if isinstance(c, str) else _number(c) for c in row))
     return "\n".join(p for p in parts if p)
 
 
-def _number(run) -> str:
-    slot = (run or {}).get("slot") if isinstance(run, dict) else None
-    if not slot:
-        return ""
-    v = slot.get("value")
-    if v is None:
-        return ""
-    # Not %g: a market value goes through it as 1.08663e+07, and this string is
-    # the one a transcript or an export shows. Plain decimal, trailing zeros
-    # trimmed, so ten million reads as ten million and a ratio keeps its digits.
-    return f"{float(v):.10f}".rstrip("0").rstrip(".") if abs(float(v)) < 1e15 else str(v)
-
-
 def figure_count(blocks) -> int:
-    return len(refs_in(blocks)) and sum(
-        1
-        for b in blocks if isinstance(b, dict)
-        for x in list(b.get("runs") or []) + [c for row in (b.get("rows") or []) for c in row]
-        if _is_slot(x)
-    )
+    return len(slots_in(blocks))
 
 
 def as_json(blocks) -> str:

@@ -609,5 +609,8 @@ async def latest_brief(ticker: str, db: AsyncSession = Depends(get_db)):
         "management_explanation": brief.management_explanation, "market_context": brief.market_context,
         "portfolio_implications": brief.portfolio_implications, "open_questions": brief.open_questions,
         "citations": brief.citations, "confidence_flags": brief.confidence_flags,
+        # V15-S5: the sections as blocks with every slot filled; None on a brief
+        # written before the block exit, which the text columns alone describe.
+        "blocks": brief.blocks,
         "created_at": brief.created_at.isoformat() if brief.created_at else None,
     }}

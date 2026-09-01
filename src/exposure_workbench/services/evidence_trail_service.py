@@ -1,115 +1,24 @@
-"""Evidence trail (M7) + citation gate (M9 core).
+"""Evidence pack (M7): what a research session actually put on its table.
 
-The Evidence Trail is NOT an input pack assembled up front. It is derived from
-what the session ACTUALLY touched: the union of evidence_refs across the
-session's trace steps. So it answers "what did the agent really look at while
-writing this brief", which is a stronger audit property than a hand-built list.
-
-A citation is valid iff its id is in the session's trail (the agent retrieved it)
-AND still resolves in the DB. Both are checked: trail membership stops the agent
-citing something it never fetched; DB existence stops a dangling id.
+V15-S2a: the trail IS the table. What a session may cite is the union of what
+its tools declared (services/table.py), and the pack a research run stores is
+that set as a refs list. There is no separate walk over step payloads and no
+separate existence check — a declared id was built from a row, so it exists.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import (
-    AgentStep,
-    CalcLedger,
-    ExposureRun,
-    FilingChunk,
-    FinancialFact,
-    Position,
-    ResearchSource,
-    RiskAlert,
-)
-
-# id prefix -> (table, column) for DB existence checks. Must stay in sync with the
-# evidence resolver's prefixes: an id the agent can retrieve and drill through is
-# an id it must be able to cite. alert_/run_ are portfolio-level evidence
-# (get_portfolio_snapshot); without them a portfolio claim can't pass this gate.
-_RESOLVERS = {
-    "calc_": (CalcLedger, CalcLedger.id),
-    "fact_": (FinancialFact, FinancialFact.id),
-    "chunk_": (FilingChunk, FilingChunk.id),
-    "src_": (ResearchSource, ResearchSource.id),
-    "alert_": (RiskAlert, RiskAlert.id),
-    "run_": (ExposureRun, ExposureRun.id),
-    # A holding is evidence for exactly one thing — how many shares are held —
-    # and the memory tool that reads the book back (C3) cannot support that
-    # number without it. Under RLS this row is only visible on the user's own or
-    # a public portfolio, which is the behaviour to want: citing a holding you
-    # cannot see does not resolve.
-    "pos_": (Position, Position.id),
-}
+from exposure_workbench.services import table as tb
 
 
-async def collect_trail(db: AsyncSession, session_id: str) -> set[str]:
-    """All evidence ids the session's completed tool calls surfaced."""
-    rows = (
-        await db.execute(
-            select(AgentStep.evidence_refs).where(
-                AgentStep.session_id == session_id, AgentStep.status == "completed"
-            )
-        )
-    ).all()
-    trail: set[str] = set()
-    for (refs,) in rows:
-        for ref in refs or []:
-            rid = ref.get("id") if isinstance(ref, dict) else None
-            if rid:
-                trail.add(rid)
-    return trail
-
-
-async def _exists_in_db(db: AsyncSession, ref_id: str) -> bool:
-    for prefix, (model, col) in _RESOLVERS.items():
-        if ref_id.startswith(prefix):
-            found = (await db.execute(select(col).where(col == ref_id))).scalar_one_or_none()
-            return found is not None
-    return False       # unknown prefix -> cannot be resolved -> invalid
-
-
-async def validate_citations(
-    db: AsyncSession, session_id: str, citation_ids: list[str]
-) -> tuple[bool, list[dict]]:
-    """Return (all_valid, problems). Each problem is {id, reason}."""
-    trail = await collect_trail(db, session_id)
-    problems: list[dict] = []
-    for cid in citation_ids:
-        if cid not in trail:
-            problems.append({"id": cid, "reason": "not_in_evidence_trail"})
-        elif not await _exists_in_db(db, cid):
-            problems.append({"id": cid, "reason": "unresolved_in_db"})
-    return (len(problems) == 0, problems)
-
-
-async def rows_for(db: AsyncSession, ref_ids: list[str]) -> dict:
-    """The ledger rows behind whichever of these ids are calc ids.
-
-    V14-C. Two of the assertion checks ask what a row IS rather than what it
-    holds — a trend rests on a series, an absence on a refusal — and neither
-    question is answerable from the values the numeric resolver returns, because
-    both kinds of claim contain no number at all.
-
-    Ids that are not calc ids are simply absent from the result. The caller
-    treats a missing row as a failed check, which is the right answer for both:
-    a fact id is not a series, and a run id did not record a refusal.
-    """
-    from exposure_workbench.db.models import CalcLedger
-
-    wanted = [r for r in ref_ids if r.startswith("calc_")]
-    if not wanted:
-        return {}
-    rows = (await db.execute(
-        select(CalcLedger).where(CalcLedger.id.in_(wanted)))).scalars().all()
-    return {r.id: r for r in rows}
+async def collect_ids(db: AsyncSession, session_id: str) -> set[str]:
+    """Every id on the session's table."""
+    return set((await tb.load(db, session_id)).refs)
 
 
 async def materialize_pack(db: AsyncSession, session_id: str) -> list[dict]:
-    """The trail as a stored refs list (evidence_packs.pack). A refs list, not a
+    """The table as a stored refs list (evidence_packs.pack). A refs list, not a
     snapshot — the append-only stores keep the referenced rows immutable."""
-    trail = await collect_trail(db, session_id)
-    return [{"id": rid} for rid in sorted(trail)]
+    return [{"id": rid} for rid in sorted(await collect_ids(db, session_id))]

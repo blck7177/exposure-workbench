@@ -59,6 +59,31 @@ def _fields(error) -> list[str]:
     return [_path(error)]
 
 
+def _unpack(error):
+    """A oneOf's own message is "not valid under any of the given schemas", which
+    names nothing the model can act on. When the instance says which branch it
+    meant — the block grammar's `type` — report that branch's problems instead,
+    at their own paths. Any other oneOf failure stays as it was."""
+    if error.validator not in ("oneOf", "anyOf") or not error.context:
+        return [error]
+    if not isinstance(error.instance, dict):
+        return [error]
+    branches = error.schema.get(error.validator) or []
+    kind = error.instance.get("type")
+    if isinstance(kind, str):
+        chosen = next((i for i, b in enumerate(branches)
+                       if kind in ((b.get("properties") or {}).get("type") or {}).get("enum", ())), None)
+    else:
+        # A slot written as an object: the one object branch is what was meant.
+        objects = [i for i, b in enumerate(branches) if b.get("type") == "object"]
+        chosen = objects[0] if len(objects) == 1 else None
+    if chosen is None:
+        return [error]
+    inner = [e for e in error.context if e.relative_schema_path and e.relative_schema_path[0] == chosen
+             and not (e.validator == "enum" and list(e.relative_path) == ["type"])]
+    return [e2 for e in inner for e2 in _unpack(e)] or [error]
+
+
 def validate_args(schema: dict, args: Any) -> list[dict]:
     """Every way `args` fails `schema`, as {field, problem}. Empty means valid."""
     if not isinstance(args, dict):
@@ -68,7 +93,8 @@ def validate_args(schema: dict, args: Any) -> list[dict]:
     validator = Draft202012Validator(schema)
     problems = [
         {"field": field, "problem": e.message}
-        for e in validator.iter_errors(args)
+        for top in validator.iter_errors(args)
+        for e in _unpack(top)
         for field in _fields(e)
     ]
     # Stable across runs; ties broken by the message so two problems on one

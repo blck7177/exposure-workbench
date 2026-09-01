@@ -151,8 +151,10 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
 
     ids = [bs["balances"][m]["fact_id"] for m in cover.terms]
     running_id, running_value = ids[0], bs["balances"][cover.terms[0]]["value"]
-    for term, fid in zip(cover.terms[1:], ids[1:]):
-        step = await tc.calculate(db, "add", running_id, fid, invoked_by=invoked_by)
+    for i, (term, fid) in enumerate(zip(cover.terms[1:], ids[1:])):
+        # The final row IS the issuer's total debt; the table calls it that.
+        step = await tc.calculate(db, "add", running_id, fid, invoked_by=invoked_by,
+                                  as_quantity="total_debt" if i == len(ids) - 2 else None)
         if step.get("error"):
             return step
         running_id, running_value = step["calc_id"], step["value"]
@@ -330,10 +332,14 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                       months, invoked_by, cache)
         operands.append(got)
 
+    # The last step carries the formula's name onto its row (as_quantity), so
+    # the table calls the value what the caller asked for.
     if f.op == "sum":
         acc = operands[0]
-        for nxt in operands[1:]:
-            step = await tc.calculate(db, "add", acc["id"], nxt["id"], invoked_by=invoked_by)
+        for i, nxt in enumerate(operands[1:]):
+            last = i == len(operands) - 2
+            step = await tc.calculate(db, "add", acc["id"], nxt["id"], invoked_by=invoked_by,
+                                      as_quantity=name if last else None)
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
                         "detail": step["detail"], "definition": f.expression,
@@ -341,9 +347,11 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     elif f.op == "difference":
         acc = operands[0]
-        for nxt, sign in zip(operands[1:], f.signs[1:]):
+        for i, (nxt, sign) in enumerate(zip(operands[1:], f.signs[1:])):
+            last = i == len(operands) - 2
             step = await tc.calculate(db, "add" if sign > 0 else "subtract",
-                                      acc["id"], nxt["id"], invoked_by=invoked_by)
+                                      acc["id"], nxt["id"], invoked_by=invoked_by,
+                                      as_quantity=name if last else None)
             if step.get("error"):
                 return {"error": "not_combinable", "formula": name,
                         "detail": step["detail"], "definition": f.expression,
@@ -351,7 +359,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     else:  # divide
         step = await tc.calculate(db, "divide", operands[0]["id"], operands[1]["id"],
-                                  invoked_by=invoked_by)
+                                  invoked_by=invoked_by,
+                                  as_quantity=None if name in fm.DAYS_FORMULAS else name)
         if step.get("error"):
             return {"error": "not_combinable", "formula": name,
                     "detail": step["detail"], "definition": f.expression,

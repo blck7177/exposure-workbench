@@ -695,6 +695,10 @@ CREATE TABLE IF NOT EXISTS issuer_briefs (
     -- sorted(set(...)) at submit time, which destroys the block association;
     -- briefs written before V3 keep NULL here rather than a guessed mapping.
     block_citations         JSONB,
+    -- V15-S5: {section: [rendered blocks]} — the brief as blocks, every slot
+    -- carrying the id and the figure the table resolved it to. The text columns
+    -- are the prose rendering of these. NULL on briefs written before V15.
+    blocks                  JSONB,
     confidence_flags        JSONB NOT NULL DEFAULT '{}',
     llm_model               VARCHAR(64),
     prompt_tokens           INTEGER,

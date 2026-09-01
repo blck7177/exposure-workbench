@@ -1,4 +1,11 @@
-"""Numeric verification (V3-A1) — a number in an answer must come from evidence.
+"""Numeric verification (V3-A1) — a number in PROSE must come from evidence.
+
+V15: this is the v1 path. The block exit (services/resolver.py) resolves names
+against the table and never extracts a number from text; what remains here
+serves the daily report — prose, server-assembled evidence set, no citations —
+and the read-time faithfulness eval over v1 answers. The value resolvers moved
+to services/quantities.py, the one namer; what is re-exported below is so the
+report gate and its tests read as they always have.
 
 The citation gate proves an id is real. It says nothing about the NUMBER standing
 next to it, and "right citation, wrong number" is the failure a finance desk
@@ -76,21 +83,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.analytics import resources
-from exposure_workbench.db.models import (
-    CalcLedger,
-    ExposureMetrics,
-    FactorAttribution,
-    FilingChunk,
-    FinancialFact,
-    IssuerExposure,
-    LimitCheck as LimitCheckRow,
-    Position,
-    ResearchSource,
-    RiskAlert,
-    SectorExposure,
-    StressResult as StressResultRow,
-)
+from exposure_workbench.services import quantities as _qn
 
 # ── unit classes ───────────────────────────────────────────────────────────────
 # What a number MEANS, so that comparison is between commensurable things. The
@@ -400,65 +393,24 @@ def extract_numbers(text: str) -> list[ExtractedNumber]:
     return found
 
 
-# The prose route matches the number AS WRITTEN, unit and all, not its bare
-# digits. Found in live acceptance: a brief claimed H200 shipments face "a 25%
-# import tariff" citing two chunks containing neither "H200" nor "tariff", and it
-# was accepted because "25" occurs somewhere in one of them — nine of that
-# chunk's seventeen digit keys are two characters or shorter. Requiring "25%" to
-# appear as a percentage kills the coincidence without refusing the very common
-# "revenue grew 17%" quoted straight out of a filing, which a bare minimum-length
-# rule did refuse (measured: six such figures in three briefs).
-#
-# A bare number still needs length, because there is no unit to make it
-# improbable: three significant digits.
-_MIN_BARE_QUOTED_DIGITS = 3
 
 
-# Matched against a window wide enough to hold the whole word. Two characters
-# was enough for "%" and is not enough here: `\s*p` also accepts "5 points" and
-# "3 pages", which would let a written "5%" verify against a passage that says
-# five of something else. A false accept in the module whose job is refusing.
-_PERCENT_WORD = re.compile(r"\s*percent\b", re.IGNORECASE)
-_PERCENT_WORD_WINDOW = 9
 
 
-def quoted_keys(text: str) -> set[str]:
-    """The digit sequences a passage literally contains.
 
-    The prose route, used for chunk_ and src_ citations. It is an EXISTENCE check
-    on the digits, not a magnitude check: a filing table's scale ("in millions")
-    lives in a header the chunker may not have kept, so the passage cannot always
-    say what its own numbers mean. It cannot speak to SIGN either, for a sister
-    reason — a table writes a negative as "(16,450)" at least as often as
-    "-16,450", so requiring the minus to appear verbatim would refuse the
-    ordinary case. Both are recorded as A1's irreducible limits rather than
-    papered over: a scale- and sign-blind accept is still strictly narrower than
-    accepting any number that has a citation attached, which is what happened
-    before, and the structured route (calc_, fact_, alert_, run_) checks both
-    exactly.
-    """
-    text = text or ""
-    keys: set[str] = set()
-    for m in _DIGITS.finditer(text):
-        digits = m.group(0).replace(",", "")
-        before = text[max(0, m.start() - 2):m.start()]
-        after = text[m.end():m.end() + 2]
-        after_word = text[m.end():m.end() + _PERCENT_WORD_WINDOW]
-        if after.lstrip().startswith("%") or _PERCENT_WORD.match(after_word):
-            keys.add(f"%:{digits}")
-        elif "$" in before:
-            keys.add(f"$:{digits}")
-        keys.add(f":{digits}")          # the untagged form, for bare numbers
-    return keys
+
+# ══ resolving what the cited evidence actually holds ═══════════════════════════
+# V15-S4: the resolvers live in services/quantities.py — one namer for the table
+# the model reads and the values this gate compares against. Re-exported here
+# for the report gate and the v1 eval.
+
+EvidenceValue = _qn.EvidenceValue
+resolve_cited_values = _qn.resolve_cited_values
+quoted_keys = _qn.quoted_keys
 
 
 def raw_forms(numbers: Iterable[ExtractedNumber]) -> list[str]:
-    """The surfaces, deduped BY SPAN, in encounter order — what to show the model.
-
-    By span rather than by value: "revenue grew to $94.9B from $81.6B, up 16.2%"
-    must report three numbers, and two different spans holding the same magnitude
-    are still two claims.
-    """
+    """The surfaces, deduped BY SPAN, in encounter order — what to show the model."""
     seen: set[tuple[int, int]] = set()
     out: list[str] = []
     for n in sorted(numbers, key=lambda x: x.span):
@@ -469,35 +421,13 @@ def raw_forms(numbers: Iterable[ExtractedNumber]) -> list[str]:
     return out
 
 
-# ══ resolving what the cited evidence actually holds ═══════════════════════════
-# Everything below this line touches the database. Above it is pure.
-
-
-@dataclass(frozen=True)
-class EvidenceValue:
-    """One number a cited row actually holds, with what it means and where from.
-
-    `label` is the correction signal: "you wrote 15.8%, the nearest thing this
-    alert holds is 79.2% (utilization)" is actionable, where a bare float is not.
-    """
-
-    value: float
-    unit_class: str
-    label: str
-    source_id: str
-    # V11-F. Set when the row itself says this number is not determinate on its
-    # own. The regression records collinearity (max VIF above 5), under which the
-    # SUM over the factor set is well determined and no single coefficient is —
-    # a statement the model was already given, in words, on every factor row, and
-    # ignored in two answers out of three. `not_alone` carries what to quote
-    # instead, and verify() refuses a figure that only these support.
-    not_alone: str | None = None
-
+# The prose route matches the number AS WRITTEN, unit and all. A bare number
+# still needs length: three significant digits.
+_MIN_BARE_QUOTED_DIGITS = 3
 
 # Which written class may be compared with which stored class. A bare number
 # states no unit, so it may match anything; a percent may only meet a ratio; and
-# money may only meet money. This table IS the safety property — see the module
-# docstring for the live row that a scale-blind rule mis-reads.
+# money may only meet money. This table IS the safety property.
 _COMPATIBLE: dict[str, tuple[str, ...]] = {
     PERCENT: (RATIO,),
     MULTIPLE: (RATIO,),
@@ -505,314 +435,15 @@ _COMPATIBLE: dict[str, tuple[str, ...]] = {
     COUNT: (RATIO, MONEY, COUNT),
 }
 
-# A calc's unit is fully determined by its operation name and nothing else.
-# Ratio-valued operations divide two commensurable things or measure change;
-# everything else carries the unit of the metric underneath, which for every
-# citable fact in this database is USD.
-# TRANSITIONAL, and shrinking: a calc row now carries its own unit_class
-# (v15_calc_unit.sql), so the unit of a calculation is a property of the
-# calculation rather than a rule about its name. This set types rows written
-# before that column existed; _from_calc prefers the column wherever it is set.
-_CALC_RATIO_OPS = resources.LEGACY_RATIO_OPS
-
-# Operations whose result carries MORE THAN ONE computed quantity, and what each
-# one is. Every operation in this ledger until V8-B produced a single `value` or
-# a series of them, so the resolver read exactly those two shapes and a result
-# with other numeric keys carried nothing — silently.
-#
-# A per-key map rather than a second inference rule: _CALC_RATIO_OPS types an
-# operation's `value`, and an op like this one computes a share (a ratio) beside
-# an observation count (not one). Typing them alike would let "750%" verify
-# against 750 observations. Enumerated, like _RUN_CHILDREN and _RUN_COUNTS,
-# because the alternative is a walker that guesses.
-_CALC_RESULT_KEYS: dict[str, dict[str, str]] = resources.CALC_RESULTS
-
-# run_ resolves through its children: exposure_runs itself has no numeric column.
-# (model, column, unit_class) — the label names the row so the model can tell
-# which of ten issuer weights it nearly matched.
-# Derived from analytics/resources.py (V15-S1), which is where "these columns
-# carry values, in these units" is now written once. This tuple keeps its shape
-# so the walker below is unchanged; what went away is the second copy of the
-# fact, and with it the way a column could be added to a table and stay
-# unciteable because nobody remembered a list in the gate.
-_RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], ...] = tuple(
-    (r.model,
-     tuple(c.name for c in r.columns if c.unit == MONEY),
-     tuple(c.name for c in r.columns if c.unit == RATIO),
-     r.label_column)
-    for r in resources.RUN_CHILDREN
-)
-
-# V8-P4. How MANY of those children there are. Every value above is a
-# measurement some row holds; a count is a fact about the run itself, and the run
-# row has no column for it, so "three limits are breached" and "twenty-four
-# checks were clear" were unsupportable sentences made entirely of supportable
-# numbers.
-#
-# (model, label, split_column | None). A split names ONE column whose distinct
-# values partition the rows — `fired`, `status` — because that column is the
-# thing its table exists to record. That is the whole vocabulary: no predicate,
-# no caller-chosen grouping, no filter by value. The restraint is the point.
-# Counting is arithmetic over rows, and an open counting facility reachable
-# through a citation id would be the portfolio-arithmetic surface this desk
-# decided not to open (DP1), arrived at by the back door.
-_RUN_COUNTS: tuple[tuple[type, str, str | None], ...] = resources.countable()
-
-
-def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
-    """Numeric leaves of a JSONB blob, as COUNT values.
-
-    Used for calc quality_flags, which is where a real live answer's "the series
-    only returned 2 recent points" comes from: the 2 is genuinely in the cited
-    calc row, under insufficient_history.have.
-    """
-    if isinstance(payload, dict):
-        for k, v in payload.items():
-            _numbers_in(v, f"{prefix}.{k}", out, source_id)
-    elif isinstance(payload, list):
-        for i, v in enumerate(payload):
-            _numbers_in(v, f"{prefix}[{i}]", out, source_id)
-    elif isinstance(payload, (int, float)) and not isinstance(payload, bool):
-        out.append(EvidenceValue(float(payload), COUNT, prefix, source_id))
-
-
-async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], set[str]]:
-    row = (await db.execute(select(CalcLedger).where(CalcLedger.id == cid))).scalar_one_or_none()
-    if row is None:
-        return [], set()
-    # V10-S2. A row that recorded its own type (V9's calculator, and every
-    # series producer since) is believed; the operation-name table below is for
-    # the rows that did not. The table cannot type a `stat.latest` over a
-    # margin series — the op says nothing about what it was taken over — and
-    # the recorded type can.
-    # V15-S1: the row's own column first — the promoted form of what the typed
-    # producers have always stated in params. Then the params blob, for rows
-    # written before the column. Then, and only then, the operation-name table,
-    # which is transitional and may not grow (test_resources).
-    if row.unit_class in (MONEY, RATIO, COUNT):
-        unit = row.unit_class
-        recorded = None
-    else:
-        recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
-    if row.unit_class in (MONEY, RATIO, COUNT):
-        pass
-    elif recorded in ("money", "ratio", "count"):
-        # V11-T. "count" arrives from calc.scalar.scale, the only producer of a
-        # quantity whose unit a constant decided: days_inventory is a ratio until
-        # it is multiplied by 365. Typed MONEY by the fallthrough below, the days
-        # figures the panel prints could be quoted by nothing.
-        unit = {"ratio": RATIO, "money": MONEY, "count": COUNT}[recorded]
-    else:
-        unit = RATIO if row.operation in _CALC_RATIO_OPS else MONEY
-    result = row.result or {}
-    values: list[EvidenceValue] = []
-    if "points" in result:
-        for p in result.get("points") or []:
-            v = (p or {}).get("value")
-            if isinstance(v, (int, float)) and not isinstance(v, bool):
-                values.append(EvidenceValue(
-                    float(v), unit, f"{row.operation}@{(p or {}).get('period_end')}", cid))
-    v = result.get("value")
-    if isinstance(v, (int, float)) and not isinstance(v, bool):
-        values.append(EvidenceValue(float(v), unit, row.operation, cid))
-    for key, key_unit in _CALC_RESULT_KEYS.get(row.operation, {}).items():
-        kv = result.get(key)
-        # A declared key may hold one number or a list of them in one unit — an
-        # episode list is n depths, all distances below a running high. Declared
-        # either way, so the list is not a licence to walk arbitrary structure.
-        #
-        # V14-A adds the third shape, and only the third: a list of {label,
-        # value} pairs, one unit for the family. It exists for the same reason
-        # _RUN_CHILDREN carries a label column — a positional label makes four
-        # net betas and four distances read alike, and "which of these did the
-        # answer nearly match" is the question a refusal has to be able to
-        # answer. Still declared, still closed: an entry that is not a number
-        # under `value` contributes nothing.
-        for i, item in enumerate(kv if isinstance(kv, list) else [kv]):
-            if isinstance(item, dict):
-                v, name = item.get("value"), item.get("label")
-                if isinstance(v, (int, float)) and not isinstance(v, bool) and isinstance(name, str):
-                    values.append(EvidenceValue(
-                        float(v), key_unit, f"{row.operation}.{key}.{name}", cid))
-                continue
-            if isinstance(item, (int, float)) and not isinstance(item, bool):
-                label = f"{row.operation}.{key}" + (f"[{i}]" if isinstance(kv, list) else "")
-                values.append(EvidenceValue(float(item), key_unit, label, cid))
-    _numbers_in(result.get("quality_flags") or {}, "quality_flags", values, cid)
-    return values, set()
-
-
-async def _from_fact(db: AsyncSession, fid: str) -> tuple[list[EvidenceValue], set[str]]:
-    row = (await db.execute(select(FinancialFact).where(FinancialFact.id == fid))).scalar_one_or_none()
-    if row is None or row.value is None:
-        return [], set()
-    # Facts are stored in absolute units with no scaling applied anywhere; `unit`
-    # is the only magnitude-bearing column. Every fact that can reach a tool
-    # result is USD (the non-USD rows have no normalized_metric, and the loader
-    # filters on it), so anything else is reported as unitless rather than
-    # guessed at.
-    unit = MONEY if (row.unit or "").upper() == "USD" else COUNT
-    return [EvidenceValue(float(row.value), unit,
-                          f"{row.normalized_metric or row.raw_concept}@{row.period_end}", fid)], set()
-
-
-async def _from_alert(db: AsyncSession, aid: str) -> tuple[list[EvidenceValue], set[str]]:
-    row = (await db.execute(select(RiskAlert).where(RiskAlert.id == aid))).scalar_one_or_none()
-    if row is None:
-        return [], set()
-    out = [
-        EvidenceValue(float(getattr(row, col)), RATIO, col, aid)
-        for col in ("current_value", "limit_value", "utilization")
-        if getattr(row, col) is not None
-    ]
-    return out, set()
-
-
-async def _from_run(db: AsyncSession, rid: str) -> tuple[list[EvidenceValue], set[str]]:
-    """exposure_runs has no numeric columns — every number lives on a child."""
-    out: list[EvidenceValue] = []
-    by_model: dict[type, list] = {}
-    for model, abs_cols, ratio_cols, name_col in _RUN_CHILDREN:
-        rows = (await db.execute(select(model).where(model.run_id == rid))).scalars().all()
-        by_model[model] = list(rows)
-        for row in rows:
-            who = f".{getattr(row, name_col)}" if name_col else ""
-            for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO)):
-                for col in cols:
-                    v = getattr(row, col, None)
-                    if v is not None:
-                        out.append(EvidenceValue(
-                            float(v), unit, f"{model.__tablename__}{who}.{col}", rid))
-
-    # Under collinearity a single beta is not identified, and the tools have said
-    # so on every factor row since V8 — `quotable_individually: false`, plus a
-    # factor_note spelling out the substitute. Asked why the book was down, the
-    # battery's agent quoted the market factor's -0.00989278 anyway; it is 138%
-    # of the total factor contribution, because growth and small_cap offset it,
-    # and the sentence it supported ("plus a broad market leg") rests entirely on
-    # a coefficient the regression cannot pin down. A field the model may ignore
-    # is not a guard. The sum stays quotable — it is what is determined.
-    metrics = next(iter(by_model.get(ExposureMetrics) or []), None)
-    if metrics is not None and getattr(metrics, "collinear", None):
-        total = sum(float(r.contribution) for r in by_model.get(FactorAttribution) or []
-                    if r.contribution is not None)
-        instead = (f"these factors are collinear, so no single beta is determined; "
-                   f"their sum, {total:.8f}, is")
-        out = [v if not v.label.startswith(f"{FactorAttribution.__tablename__}.")
-               else EvidenceValue(v.value, v.unit_class, v.label, v.source_id, instead)
-               for v in out]
-        out.append(EvidenceValue(total, RATIO,
-                                 f"{FactorAttribution.__tablename__}.sum_of_contributions", rid))
-
-    # V8-P4: the counts. COUNT, not RATIO — _COMPATIBLE lets a bare written
-    # number meet a stored COUNT, so "3 alerts" verifies while "3%" does not,
-    # which is exactly the distinction between counting things and measuring
-    # them. Zero is emitted as a value: "no scenario was left unevaluated" is a
-    # claim about this run and it is checkable.
-    for model, label, split in _RUN_COUNTS:
-        rows = by_model.get(model)
-        if rows is None:
-            continue
-        out.append(EvidenceValue(float(len(rows)), COUNT, f"count.{label}", rid))
-        if split is None:
-            continue
-        seen: dict[str, int] = {}
-        for row in rows:
-            key = getattr(row, split, None)
-            seen[str(key).lower()] = seen.get(str(key).lower(), 0) + 1
-        for key, n in seen.items():
-            out.append(EvidenceValue(float(n), COUNT, f"count.{label}.{split}={key}", rid))
-        # The complement of a partition this run happens not to exhibit is still
-        # a true count of zero, and it is the half an answer usually wants:
-        # "none of the eight fired". Only for a boolean split, where the domain
-        # is known; an enum's unseen values are not enumerable from the rows.
-        if isinstance(getattr(model.__table__.columns[split].type, "python_type", None), type) and \
-           model.__table__.columns[split].type.python_type is bool:
-            for key in ("true", "false"):
-                if key not in seen:
-                    out.append(EvidenceValue(0.0, COUNT, f"count.{label}.{split}={key}", rid))
-    return out, set()
-
-
-async def _from_position(db: AsyncSession, pid: str) -> tuple[list[EvidenceValue], set[str]]:
-    """A holding supports its QUANTITY and nothing else.
-
-    Not its price and not its market_value, both of which sit on this row: they
-    are a snapshot written once by the seed and superseded by every run, and
-    positions_with_weights already refuses to value a book from them for exactly
-    that reason (V2-E5 cut this codebase back to one valuation convention).
-    Letting them in here would restore the other two, with a citable id attached.
-
-    A share count is a COUNT: the text says "5,000 shares", the unit is in the
-    noun, and the number itself claims none.
-    """
-    row = (await db.execute(select(Position).where(Position.id == pid))).scalar_one_or_none()
-    if row is None or row.quantity is None:
-        return [], set()
-    return [EvidenceValue(float(row.quantity), COUNT, f"{row.ticker}.quantity@{row.as_of_date}", pid)], set()
-
-
-async def _from_chunk(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], set[str]]:
-    row = (await db.execute(select(FilingChunk).where(FilingChunk.id == cid))).scalar_one_or_none()
-    return ([], quoted_keys(row.text)) if row is not None else ([], set())
-
-
-async def _from_source(db: AsyncSession, sid: str) -> tuple[list[EvidenceValue], set[str]]:
-    row = (await db.execute(select(ResearchSource).where(ResearchSource.id == sid))).scalar_one_or_none()
-    if row is None:
-        return [], set()
-    return [], quoted_keys(f"{row.title or ''} {row.snippet or ''}")
-
-
-# Data, not an if-chain: the symmetry test asserts this covers every prefix the
-# citation gate accepts, so a newly citable prefix cannot arrive without a value
-# source and be reported as the model's fault.
-_VALUE_SOURCES = {
-    "calc_": _from_calc,
-    "fact_": _from_fact,
-    "alert_": _from_alert,
-    "run_": _from_run,
-    "pos_": _from_position,
-    "chunk_": _from_chunk,
-    "src_": _from_source,
-}
-
-
-async def resolve_cited_values(
-    db: AsyncSession, citation_ids: Iterable[str]
-) -> tuple[list[EvidenceValue], set[str]]:
-    """Every number the cited rows hold, plus the digits their prose contains."""
-    values: list[EvidenceValue] = []
-    quoted: set[str] = set()
-    for cid in citation_ids:
-        for prefix, fn in _VALUE_SOURCES.items():
-            if cid.startswith(prefix):
-                v, q = await fn(db, cid)
-                values.extend(v)
-                quoted |= q
-                break
-    return values, quoted
-
-
-# The prose routes, and only those: a fact row or a calc row holds numbers, not
-# sentences, so a quotation attributed to one is a quotation from nowhere.
-_PASSAGE_SOURCES = {"chunk_": FilingChunk, "src_": ResearchSource}
-
 
 async def resolve_cited_passages(db: AsyncSession, citation_ids: Iterable[str]) -> list[str]:
     """The text of every cited passage, for checking what quotation marks assert."""
     out: list[str] = []
     for cid in citation_ids:
-        if cid.startswith("chunk_"):
-            row = (await db.execute(
-                select(FilingChunk).where(FilingChunk.id == cid))).scalar_one_or_none()
-            if row is not None:
-                out.append(row.text or "")
-        elif cid.startswith("src_"):
-            row = (await db.execute(
-                select(ResearchSource).where(ResearchSource.id == cid))).scalar_one_or_none()
-            if row is not None:
-                out.append(f"{row.title or ''} {row.snippet or ''}")
+        if cid.startswith(("chunk_", "src_")):
+            r = await _qn.of_ref(db, cid)
+            if r.text is not None:
+                out.append(r.text)
     return out
 
 
@@ -821,9 +452,6 @@ def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
     if n.unit_class == PERCENT:
         return f"%:{n.key}" in quoted
     if n.unit_class == MONEY:
-        # A money claim may be quoted with or without the sign in the source
-        # ("$111.184 billion" vs a table cell reading 111,184), so both count —
-        # but only at bare-number length when the sign is absent.
         if f"$:{n.key}" in quoted:
             return True
         return (len(n.key.replace(".", "")) >= _MIN_BARE_QUOTED_DIGITS
@@ -832,116 +460,10 @@ def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
             and f":{n.key}" in quoted)
 
 
-# The four operations `calculate` offers, searched over the cited values when a
-# number is refused. V11-G, from the battery: asked about NVDA, the agent wrote
-# "net debt was negative 3.767bn" — correct, derivable from two figures in the
-# same sentence, and refused for having no calc id. Rather than compute it, the
-# model swapped in a different measure it could cite cheaply, and the sentence
-# that survived does not follow from the numbers it states. Refusing is right;
-# refusing without naming the one legal move that fixes it is what made the
-# cheap wrong answer the cheapest answer.
-#
-# This does NOT relax the gate. The number is still refused. It costs 4k^2
-# comparisons over the cited values, is closed at two operands, and suggests
-# nothing it has not arithmetically confirmed.
-_DERIVATIONS = (("subtract", lambda a, b: a - b), ("add", lambda a, b: a + b),
-                ("divide", lambda a, b: a / b if b else None),
-                ("multiply", lambda a, b: a * b))
-
-
-def _derived_class(op: str, left: str, right: str) -> str | None:
-    """What class `calculate` would give the result, or None if it would refuse.
-
-    A mirror of typed_calculator._result_type, and it has to be one: the hint
-    names a calculate() call, so a hint the calculator would reject is worse than
-    no hint. It is also why the search cannot run over the candidates the unit
-    rule already narrowed — division CHANGES the class, and leverage written as
-    "1.3978x" is two MONEY values the compatibility table had excluded.
-    """
-    if op in ("add", "subtract"):
-        return left if left == right else None      # the calculator refuses the mix
-    if op == "divide":
-        return RATIO if left == right else left
-    return left                                      # multiply
-
-
-def _derivation(n: ExtractedNumber, values: list[EvidenceValue]) -> dict | None:
-    """One two-operand combination of cited values that rounds to what was written."""
-    allowed = _COMPATIBLE.get(n.unit_class, ())
-    for op, fn in _DERIVATIONS:
-        for left in values:
-            for right in values:
-                if left.source_id == right.source_id and left.label == right.label:
-                    continue
-                result_class = _derived_class(op, left.unit_class, right.unit_class)
-                if result_class is None or result_class not in allowed:
-                    continue
-                try:
-                    got = fn(left.value, right.value)
-                except (TypeError, ZeroDivisionError):
-                    continue
-                if got is None:
-                    continue
-                # Percent-written claims are canonicalised to fractions, so a
-                # ratio derivation meets them without a second rule.
-                if abs(got - n.value) <= n.atol:
-                    return {"op": op, "a": left.source_id, "b": right.source_id,
-                            "detail": (f"{left.label} {op} {right.label} is {got:g} — "
-                                       f"calculate(op='{op}', a='{left.source_id}', "
-                                       f"b='{right.source_id}') gives it an id")}
-    return None
-
-
 # ── quoted text (V11-Q) ───────────────────────────────────────────────────────
-# The gate had a numeric half and no textual half. A filings answer is prose with
-# no numbers in it, so the verification actually performed on one was: extract
-# zero claims, compare none, pass. Four quotations from MSFT's 10-K and 10-Q went
-# out in the battery and all four were verbatim — because the model was faithful,
-# not because anything checked. Changing one word would have looked identical.
-#
-# What is checkable without semantics is what quotation marks assert: that these
-# exact words appear in the cited passage. So that is what is checked, and only
-# that. A paraphrase outside the marks is a summary, is not a verbatim claim, and
-# is not touched here — recorded as this check's limit rather than implied away.
-
-_QUOTE_PAIRS = (('"', '"'), ("\u201c", "\u201d"), ("\u2018", "\u2019"))
-# Below this, a "quotation" is a term of art in scare quotes ("free cash flow",
-# a metric name) rather than a passage being reproduced. Measured against the
-# battery's answers: every real quotation ran well past it, every bare term fell
-# under. Four, because three admits "cash and equivalents".
-_MIN_QUOTED_WORDS = 4
-_WS = re.compile(r"\s+")
-_TYPOGRAPHIC = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'",
-                              "\u2013": "-", "\u2014": "-", "\u00a0": " "})
-
-
-def _normalise(text: str) -> str:
-    """Whitespace and typography only — never letters, never punctuation."""
-    return _WS.sub(" ", (text or "").translate(_TYPOGRAPHIC)).strip().lower()
-
-
-def quoted_spans(text: str) -> list[str]:
-    """Every passage the answer puts in quotation marks and asserts as verbatim."""
-    out: list[str] = []
-    for open_q, close_q in _QUOTE_PAIRS:
-        pattern = (re.escape(open_q) + r"([^" + re.escape(open_q + close_q) + r"]+)"
-                   + re.escape(close_q)) if open_q != close_q else (
-            re.escape(open_q) + r"([^" + re.escape(open_q) + r"]+)" + re.escape(close_q))
-        for m in re.finditer(pattern, text or ""):
-            span = m.group(1).strip()
-            if len(span.split()) >= _MIN_QUOTED_WORDS:
-                out.append(span)
-    return out
-
-
-def verify_quotes(text: str, passages: Iterable[str]) -> list[dict]:
-    """Problems, one per quoted span that no cited passage contains verbatim."""
-    haystack = " \u2026 ".join(_normalise(p) for p in passages)
-    problems: list[dict] = []
-    for span in quoted_spans(text):
-        if _normalise(span) not in haystack:
-            problems.append({"quote": span, "reason": "not_in_cited_passages"})
-    return problems
+# The block exit checks quotations in services/resolver.py against the block's
+# own cites. This copy serves the v1 eval over stored prose answers.
+from exposure_workbench.services.resolver import quoted_spans, verify_quotes  # noqa: E402,F401
 
 
 def verify(
@@ -950,13 +472,6 @@ def verify(
     quoted: set[str] | None = None,
 ) -> list[dict]:
     """Problems, one per number that no cited evidence supports.
-
-    A number is supported when some compatible evidence value is within half an
-    ulp of what was written, or when its digits appear verbatim in a cited
-    passage. Each problem carries the nearest compatible value, and — when the
-    written number is two cited values away — the operation that would earn it an
-    id, because the point is for the model to re-cite or compute, not to guess
-    again or to quietly write about something else.
 
     The gate's own entry point, unchanged in signature and in judgement. It
     delegates so that the ONE place a number is decided against evidence stays
@@ -972,21 +487,12 @@ def verify_with_matches(
 ) -> tuple[list[dict], list[dict]]:
     """The same pass, returning what it REFUSED and what it ACCEPTED (V13-S3).
 
-    The gate has always known, for every figure in an answer, which cited row
-    supports it — and thrown that away, keeping only the failures. Keeping it is
-    what lets a reader hover a number and be shown what stands behind it, which
-    is the whole difference between a product whose numbers are checked and one
-    that says its numbers are checked.
-
-    The judgement is not duplicated and not re-derived: this IS the pass, and
-    verify() is now a call to it. A second implementation that agreed today is
-    the shape of defect this codebase has been bitten by more than once — a
-    mirrored table, a re-built join key — and here it would be worse than most,
-    because the two copies would disagree about whether an answer may be shown.
-
-    A match carries the span so the UI can find the figure it belongs to without
-    searching the text for a substring, which would attach the basis for "1.39"
-    to the "1.39" inside "21.39" the first time both appeared.
+    A number is supported when some compatible evidence value is within half an
+    ulp of what was written, or when its digits appear verbatim in a cited
+    passage. Each problem carries the nearest compatible value. There is no
+    search for a derivation (V11-G, retired in V15: equivalent derivations ran
+    to a median of 24 per figure, so the hint named one of many and the model
+    followed it).
     """
     quoted = quoted or set()
     values = list(values)
@@ -1002,22 +508,13 @@ def verify_with_matches(
 
     for n in numbers:
         if _is_quoted(n, quoted):
-            # Verbatim inside a passage the answer cited. The passage is the
-            # support, so the match names no single value — there is none.
             _match(n, "quoted")
             continue
         allowed = _COMPATIBLE.get(n.unit_class, ())
         candidates = [v for v in values if v.unit_class in allowed]
         matched = [v for v in candidates if abs(v.value - n.value) <= n.atol]
         if matched:
-            # Supported by something determinate: done. Supported ONLY by values
-            # the row itself declared indeterminate: refused, and told what is
-            # determinate instead. The distinction has to be "only", because a
-            # figure that also equals a quotable value is quotable.
             if any(v.not_alone is None for v in matched):
-                # Prefer a determinate row as the one shown: a figure supported
-                # by both is quotable, and naming the indeterminate one would
-                # explain it with the row the gate would have refused.
                 _match(n, "value", next(v for v in matched if v.not_alone is None))
                 continue
             problems.append({
@@ -1028,14 +525,10 @@ def verify_with_matches(
             })
             continue
         nearest = min(candidates, key=lambda v: abs(v.value - n.value), default=None)
-        problem = {
+        problems.append({
             "number": n.surface,
             "reason": "not_in_cited_evidence",
             "nearest": None if nearest is None else {"value": nearest.value, "label": nearest.label,
                                                      "id": nearest.source_id},
-        }
-        derived = _derivation(n, values)
-        if derived is not None:
-            problem["derivable"] = derived
-        problems.append(problem)
+        })
     return problems, matches

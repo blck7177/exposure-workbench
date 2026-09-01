@@ -451,8 +451,16 @@ def _result_type_within(op: str, a: Typed, b: Typed, value: float) -> Typed:
 
 
 async def calculate(db: AsyncSession, op: str, a: str, b: str,
-                    invoked_by: str = "agent") -> dict:
-    """Combine two quantities, if their types permit it."""
+                    invoked_by: str = "agent", as_quantity: str | None = None) -> dict:
+    """Combine two quantities, if their types permit it.
+
+    `as_quantity` is the name the CALLER gives the result — a formula naming
+    its final step `net_margin`. The row records it as result_type.quantity,
+    which is what the table calls the value (services/quantities.py); without
+    it a measure the model asked for by name came back named `calc.scalar.
+    divide`, and the model wrote the name it knew and was refused for it.
+    The typing is unchanged: a named quantity is still checked like any other.
+    """
     if op not in OPS:
         return _err("unsupported_op", f"{op!r}; supported: {', '.join(OPS)}")
 
@@ -479,8 +487,8 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     result = _result_type(op, left, right, value)
     basis = result.basis()
 
-    rt = {"unit_class": result.unit_class, "basis": basis, "quantity": result.quantity,
-          "issuers": list(result.issuers)}
+    rt = {"unit_class": result.unit_class, "basis": basis,
+          "quantity": as_quantity or result.quantity, "issuers": list(result.issuers)}
     calc_id = await cs._record(
         db, None, f"calc.scalar.{op}",
         {"op": op, "operands": [a, b],

@@ -6,16 +6,16 @@ The wrapper does four things automatically around every LLM-driven call:
   1. validate the arguments against the tool's own schema — before any spend
   2. reserve budget (agent_session_service) — before the tool runs
   3. run the fn, catching failures as structured results (never crashes the loop)
-  4. record a trace step (trace_service) — success, rejection, or error alike,
-     auto-extracting evidence_refs from the return value
+  4. put what the tool DECLARED on the table (services/table.py) — the slice the
+     model reads is attached as result["table"], and the declaration is the
+     step's evidence_refs. The gate loads the same declarations.
 
-Evidence-ref extraction is automatic: any returned id-shaped field (fact_/chunk_/
-calc_/src_/alert_/run_ or an explicit {type,id}/citation) becomes a trace ref, so
-tool authors can't forget to report what a call touched. Two limits are
-deliberate: the prefix set is exactly what the citation gate can resolve, and
-only a RETRIEVAL is harvested — never a gate's verdict, a reflection, or an
-error payload, all three of which can hand the model's own words back to it
-(see _harvestable).
+Evidence is declared, not harvested (V15-S2a). A tool's registration says what
+its results put on the table (`Tool.evidence`): the ids it returns, the run
+child tables it read, the delegated work it started. A tool registered without
+a declaration puts nothing on the table — visible in the first live test that
+tries to cite it, which is the intended direction. Nothing walks a result
+looking for id-shaped strings and guessing whether it was a retrieval.
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -32,6 +32,7 @@ from typing import Any, Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.services import agent_session_service as sess
+from exposure_workbench.services import table as tbl
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.arg_validation import validate_args
 
@@ -77,11 +78,21 @@ GATE = "gate"                # respond / submit_brief — session exits
 # once, rather than a tuple that drifts.
 BUDGET_FREE_CLASSES = (REFLECTION, GATE)
 
-# Exactly the prefixes the citation gate can resolve (evidence_trail_service.
-# _RESOLVERS), and the symmetry is the point: harvesting an id the gate can never
-# accept hands the model something it can retrieve, quote and then be refused
-# for. co_/rrun_/filing_ used to be harvested and were never citable.
-_ID_PREFIXES = ("fact_", "chunk_", "calc_", "src_", "alert_", "run_", "pos_")
+
+
+@dataclass(frozen=True)
+class Evidence:
+    """What a tool's results put on the table (V15-S2a).
+
+    Every id-shaped string in a result is declared. A run id is declared with
+    `scope` — the run child tables this tool read — or, when `names_from` names
+    a result key, with the exact quantity names under it; a run id with neither
+    is not on the table. `tasks_from` names result keys holding ids of delegated
+    work, which go on the table as rows of kind `task`.
+    """
+    scope: tuple[str, ...] = ()
+    names_from: str | None = None
+    tasks_from: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -108,6 +119,10 @@ class Tool:
     # registered tool without one — and defaulted here only so the dataclass
     # stays constructible in the argument order every registration already uses.
     display: str = ""
+    # What this tool's results put on the table. None for a gate, a reflection,
+    # and any tool whose results are not evidence (get_task_status reads state,
+    # list_risk_limits reads policy).
+    evidence: Evidence | None = None
 
 
 @dataclass
@@ -136,60 +151,7 @@ class ToolRegistry:
         ]
 
 
-# ── evidence-ref extraction ─────────────────────────────────────────────────────
 
-def _looks_like_id(v: Any) -> bool:
-    return isinstance(v, str) and v.startswith(_ID_PREFIXES)
-
-
-def extract_evidence_refs(result: Any) -> list[dict]:
-    """Walk a tool result and collect {type, id} refs into the four evidence stores.
-
-    Recognises id-shaped strings, explicit {'type','id'} dicts, and 'citation(s)'
-    keys, deduped in encounter order.
-    """
-    refs: list[dict] = []
-    seen: set[tuple] = set()
-
-    def add(ref_type: str, ref_id: str, extra: dict | None = None):
-        key = (ref_type, ref_id)
-        if ref_id and key not in seen:
-            seen.add(key)
-            refs.append({"type": ref_type, "id": ref_id, **(extra or {})})
-
-    def walk(node: Any, key_hint: str | None = None):
-        if isinstance(node, dict):
-            # Both branches below now go through _looks_like_id, which is the
-            # ONE definition of "this string is an evidence id". They were the
-            # two ways around it, and each trusted something other than the id
-            # itself: the first trusted a sibling "type" key, the second trusted
-            # the key's own name.
-            #
-            # Caught live, one row: list_alerts returns {"id": ..., "type":
-            # alert_type}, so `alertb41eec529430` — an id from before the
-            # alert-prefix fix, with no underscore — was harvested under
-            # ref_type "issuer_concentration", which is an alert TYPE and not an
-            # evidence type at all. It can never be cited, never resolved and
-            # never valued: all three resolver tables key on `id.startswith`.
-            # So it was a permanent dead entry in a session's evidence trail,
-            # put there by a path that existed to make ids easier to find.
-            if "type" in node and _looks_like_id(node.get("id")):
-                add(str(node["type"]), node["id"])
-            for k, v in node.items():
-                if k in ("calc_id", "fact_id", "chunk_id") and _looks_like_id(v):
-                    add(k.replace("_id", ""), v)
-                else:
-                    walk(v, k)
-        elif isinstance(node, (list, tuple)):
-            for item in node:
-                walk(item, key_hint)
-        elif _looks_like_id(node):
-            prefix = node.split("_", 1)[0]
-            add({"src": "source", "co": "company", "rrun": "research_run",
-                 "pos": "position"}.get(prefix, prefix), node)
-
-    walk(result)
-    return refs
 
 
 def _summarize(result: Any) -> str:
@@ -296,8 +258,28 @@ async def invoke(
         except Exception:  # noqa: BLE001 — nothing left to salvage either way
             logger.exception("could not roll back after %s failed", tool_name)
 
-    # 4) trace (auto-extract evidence refs)
-    refs = extract_evidence_refs(result) if _harvestable(tool, status, result) else []
+    # 4) the table. The tool's registration says what its result puts on it;
+    # build() names those quantities (services/quantities.py), attaches the
+    # slice the model reads, and returns the declaration as stored — narrowed
+    # to what fit, so the record and the payload agree. A gate's verdict, a
+    # reflection and any tool registered without a declaration put nothing on
+    # the table, which is what stops a refusal's echoed ids from becoming
+    # evidence on the next attempt.
+    refs: list[dict] = []
+    if status == "completed" and tool.evidence is not None and isinstance(result, dict):
+        declared = tbl.declare(
+            result, scope=tool.evidence.scope or None,
+            names=_names_from(result, tool.evidence.names_from),
+            tasks=[v for k in tool.evidence.tasks_from
+                   for v in [result.get(k)] if isinstance(v, str)],
+        ).pop("evidence", [])
+        try:
+            refs, slice_ = await tbl.build(db, declared)
+        except Exception:  # noqa: BLE001 — a table that cannot be built is a result with nothing citable
+            logger.exception("could not build the table for %s (session %s)", tool_name, session_id)
+            refs, slice_ = [], {}
+        if slice_:
+            result["table"] = slice_
     try:
         await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
@@ -312,40 +294,16 @@ async def invoke(
     return result
 
 
-def _harvestable(tool: Tool, status: str, result: dict) -> bool:
-    """Whether a call's return value may contribute evidence to the trail.
-
-    Evidence is what a tool RETRIEVED. Everything below is that one sentence
-    read against the ways a return value can fail to be a retrieval, and each
-    clause was written after a payload got through the previous set:
-
-    A GATE's output is never evidence — it is the session's verdict on evidence
-    — and its REJECTION payload is actively poisonous: invalid_citations echoes
-    the ids it just refused under problems[].id. The call itself completes
-    successfully, so the harvester used to walk that payload and write the
-    fabricated ids into the trail. On the next attempt they passed the trail
-    check, leaving only _exists_in_db between a made-up id and an accepted
-    answer, and materialize_pack wrote them into the run's evidence pack.
-
-    A REFLECTION is the model talking to itself; think returns the thought
-    verbatim, so any id-shaped string the model typed became evidence it had
-    "retrieved". An ERROR PAYLOAD is a refusal, and the three that name their
-    argument back — unknown_job, unknown_portfolio, not_your_portfolio — carry
-    an id the model supplied rather than one a lookup produced.
-
-    Two rules for three vectors, deliberately: a per-tool exclusion list would
-    have to be extended by whoever writes the fourth echoing tool, and they will
-    not know to. Nothing legitimate is lost — no error return anywhere in the
-    tool layer carries a citable id that a successful call does not also carry.
-
-    Note this closes the fabricated-id loop and nothing else: the explicit
-    {type,id} branch and the calc_id/fact_id key branch are separate ingestion
-    paths, and one malformed id from before V1's alert-prefix fix is still
-    sitting in agent_steps.evidence_refs by way of the former.
-    """
-    if status != "completed" or tool.tool_class in (GATE, REFLECTION):
-        return False
-    return not (isinstance(result, dict) and "error" in result)
+def _names_from(result: dict, key: str | None) -> list[str] | None:
+    """The exact quantity names a read-by-name tool returned, for its declaration."""
+    if key is None:
+        return None
+    got = result.get(key)
+    if isinstance(got, dict):
+        return [n for names in got.values() if isinstance(names, dict) for n in names]
+    if isinstance(got, list):
+        return [n for n in got if isinstance(n, str)]
+    return None
 
 
 def _step_type(tool: Tool) -> str:

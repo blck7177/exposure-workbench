@@ -75,6 +75,10 @@ META_ONLY_READS = [
     # question and is called first every time, and putting a run's whole
     # analysis into it would make every conversation pay for one.
     "get_portfolio_analysis",
+    # V15-S2b. The book's own manifest and its read-by-name: what a run holds,
+    # named the way the exit takes it, and the exact quantities a question
+    # needs in one call. Meta-only like everything about THIS DESK's book.
+    "describe_run", "read_quantities",
     # V8-D. When the book fell and what the window between two dates held. Both
     # are about a portfolio, so both are meta-only.
     "get_drawdown_episodes", "explain_episode",

@@ -206,6 +206,11 @@ async def explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough
         {"portfolio_id": portfolio_id, "start": peak, "end": trough,
          "sessions": int(len(returns))},
         {"value": book_return}, [portfolio_id], {}, current_session_id(),
+        # A window return is a ratio, and the row says so (V15-S1). The legacy
+        # operation-name table never learned this op, so every row written
+        # before this line was typed MONEY by the gate and "-11.95%" could not
+        # meet the -0.1195 it cited; v15_window_return_unit.sql backfills them.
+        unit_class="RATIO",
     )
 
     return {

@@ -43,7 +43,10 @@ def _largest_container(obj: dict) -> str | None:
     """The top-level key holding the most serialized bytes, if it is a container."""
     best, best_len = None, -1
     for key, value in obj.items():
-        if not isinstance(value, (dict, list)) or not value:
+        # The table is what the gate resolves against; a payload that dropped
+        # part of it would show the model less than it may cite. It is capped
+        # where it is built (services/table.py) and never here.
+        if key == "table" or not isinstance(value, (dict, list)) or not value:
             continue
         size = len(dumps(value))
         if size > best_len:

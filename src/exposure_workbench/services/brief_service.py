@@ -47,6 +47,10 @@ async def latest_visible(db: AsyncSession, company_id: str) -> dict | None:
         return None
 
     per_block = brief.block_citations or {}
+    # V15-S5: the section as blocks, every slot filled. Present only on briefs
+    # written through the block exit — an older brief is prose alone and says
+    # so by omission, the same way it does for block_citations.
+    per_section_blocks = brief.blocks or {}
     return {
         "brief_id": brief.id,               # a plain field: NOT a citable ref
         "created_at": brief.created_at,
@@ -67,6 +71,7 @@ async def latest_visible(db: AsyncSession, company_id: str) -> dict | None:
                 # carry the flat list alone and say so by omission rather than by
                 # having it invented for them.
                 **({"citations": per_block[name]} if name in per_block else {}),
+                **({"blocks": per_section_blocks[name]} if name in per_section_blocks else {}),
             }
             for name in _BLOCKS
             if getattr(brief, name)

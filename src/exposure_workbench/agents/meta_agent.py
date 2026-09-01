@@ -62,11 +62,12 @@ An issuer's reported financials:
 - Why is a measure defined the way it is? → evaluate_formula(name=...). The result carries an authority you may name: cite_as is the section to say, url is where to read it. Name it rather than 'the registry'.
 
 The portfolio:
+- What is this book exposed to / how much room is left / what should I watch? → get_portfolio_snapshot → describe_run(run_id=...) → read_quantities(run_id=..., names=[...]). describe_run names everything the run holds, grouped by the question it answers, and says what this face cannot do; read_quantities brings the exact figures in one call instead of one call per table.
 - Why are there large drawdowns? → get_drawdown_episodes() → explain_episode(peak=..., trough=...). A drawdown is a peak-to-trough episode over many sessions; reconcile_move explains ONE session. Measure the episodes before explaining them.
 - Was the loss market-driven or company-specific? → reconcile_move(run_id=...). factor_share and unexplained_share come back with it and the larger one is the answer. Positions and factors are two decompositions of the same number, so the position table cannot argue a move was idiosyncratic.
-- Which factor hurt the most? → get_attribution(run_id=...). Each row carries quotable_individually: under collinearity no single beta is determined, so name the sum — a lone coefficient is refused.
+- Which factor hurt the most? → get_attribution(run_id=...). Under collinearity no single beta is on the table — name the sum, factor_attributions.sum_of_contributions, or the net betas.
 
-Nothing has to be pre-built, and nothing above is a route to follow when the question is a different shape. describe_issuer and get_portfolio_snapshot each carry what their own data means — periods, which lines nest, which tag superseded which — so read what comes back before choosing the next call.
+Nothing has to be pre-built, and nothing above is a route to follow when the question is a different shape. describe_issuer, describe_run and get_portfolio_snapshot each carry what their own data means — periods, which lines nest, which tag superseded which, what this desk can and cannot do — so read what comes back before choosing the next call.
 
 Three rules for those answers, and they are what makes them worth reading. Every number carries its PERIOD — a balance is as of a date, a flow is over a window, and the tools hand you both; say which. Every computed number carries its DEFINITION: "net debt (total debt − cash)" not "net debt", because the name does not say how it was built. And a figure the issuer does not report is UNAVAILABLE, with the reason — never zero, never filled from a nearby date, never quietly swapped for a different measure.
 
@@ -79,31 +80,30 @@ attribute to the wrong one.
 
 Say what your data is AS OF. Filings arrive months after the period they describe, and anything since is invisible to you. When you quote what management said, quote them verbatim from the passage — a paraphrase presented as a quotation is not one. Risk factors in a 10-K are standing disclosure, not news about this week.
 
-Finish every turn by calling respond. An answer is a list of BLOCKS, and you do \
-not write figures into sentences — a figure is a SLOT naming the evidence it came \
-from, and the reader is shown the ledger's own value. So text carries the \
-sentence and slots carry the numbers. A slot holds ONE NUMBER: ids, tickers, \
-dates and sentences are text, and go in the run beside the slot rather than \
-inside it.
+Finish every turn by calling respond. An answer is a list of BLOCKS and you never \
+write a number: every tool result carries a `table` of names and values, and a \
+figure in your answer is a SLOT {ref, name} pointing at one of those names — the \
+reader is shown the table's own value. Text carries the sentence; slots carry the \
+figures; dates are the only digits text may hold.
 
     {"type": "paragraph", "runs": [
         "MSFT is the largest position at ",
-        {"ref": "run_9f2c...", "value": 0.1627},
-        ", which is past its warning level."]}
+        {"ref": "run_9f2c...", "name": "issuer_exposures.MSFT.weight"},
+        ", which is past its warning level."],
+     "cites": []}
 
-That is the whole of it — a list mixing strings and slots, read in order.
+A sentence that rests on a filing passage, a web source, a run or an alert names it \
+in the block's `cites` — an id is never written into the text, and neither is a \
+count: "twenty-seven checks ran" is the slot count.limit_checks. Use a metric_table whenever you rank \
+or compare. A claim that something rose or fell is a trend block on the series you \
+read; a claim that something was not reported is an absence block on the row the \
+refused read minted; work you started this turn is an action block on its id. \
+None of these can be asserted in prose, because none is checkable there.
 
-Use a metric_table whenever you are ranking or comparing: a table is what the \
-reader can scan, and a list of figures in prose is not. Use a chart when you have \
-read a series and its shape is the point. A claim that something rose or fell is \
-a trend block and rests on the series you read it from; a claim that something \
-was not reported is an absence block and rests on the row the refused read \
-minted. Neither can be asserted in prose, because neither is checkable there.
-
-If respond refuses, it names the block and what is wrong with it. A slot whose \
-label is unknown comes back with the labels that id actually holds — use one of \
-them, or give the figure as `value` and let the ledger name it. Never invent an \
-id, and never restate a refused figure as text to get past the check."""
+If respond refuses, it names the block and what is wrong with it. An unknown name \
+comes back with the names that id actually holds — use one of them, or read the \
+figure you need with read_quantities. Never invent an id, and never write a \
+refused figure as text to get past the check."""
 
 
 # What the user is told when the loop ended without the gate ever accepting an
@@ -136,16 +136,20 @@ _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 # How much of one tool result reaches the model. Entries come off the tail of the
 # largest container and are named in a `truncated` field, so a payload that does
-# not fit says so — see utils.json.dumps_capped.
+# not fit says so — see utils.json.dumps_capped. The `table` slice is never cut
+# here: it is capped where it is built (services/table.py, 12k characters) so
+# that what the model sees is exactly what the gate holds.
 #
 # Derived rather than picked. The binding constraint is context_soft_limit_tokens
-# (80k); a turn may make turn_tool_budget (15) calls, so 12kB each is ~45k
-# characters, ~12k tokens, well inside it. The largest legitimate payload is the
-# fundamental panel — sixteen measures, and for an issuer with several
-# unavailable ones, sixteen measures plus the sentences saying why — which runs
-# to 6.7kB. The previous 6000 was a byte-slice guard nobody had costed against
-# either number, and it silently deleted four panel lines per NVDA call.
-TOOL_RESULT_LIMIT = 12_000
+# (80k); a turn may make turn_tool_budget (15) calls. A result now carries its
+# own payload plus the table slice — a whole run's quantities at reader
+# precision plus its derived row are ~15k characters, and describe_run's manifest
+# beside them ~9k — so 28k characters (~7k tokens) is the ceiling that lets the
+# book's one manifest call arrive whole. Fifteen such calls would not fit the
+# soft limit, and no turn makes them: the manifest is read once, then
+# read_quantities brings named figures at a few hundred characters a call
+# (measured peak before V15: 22k prompt tokens a turn).
+TOOL_RESULT_LIMIT = 28_000
 
 
 # What a turn keeps once its evidence budget is spent: the pause and the exit.

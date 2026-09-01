@@ -1,10 +1,15 @@
 """Research-face tools (M6/M9) — external search + the submit_brief gate.
 
-Registered onto the base read registry to form FACE_RESEARCH. submit_brief is the
-session's exit: it enforces, at generation time, that every cited id is in the
-session's evidence trail and resolves in the DB. A rejected submission comes back
-as a structured error the agent can fix within its retry budget — no partial /
-degraded brief is ever persisted.
+Registered onto the base read registry to form FACE_RESEARCH. submit_brief is
+the session's exit, and since V15-S5 it is the SAME exit `respond` is: six
+sections, each a list of blocks in the grammar of tools/meta_tools.BLOCK_SCHEMAS,
+every pointer resolved against the session's table by services/resolver.py. The
+brief used to have its own gate — prose with figures in it, a number extractor,
+a per-block value search — and that gate was the second implementation of a
+rule the desk wanted to hold once. Now there is one grammar, one table and one
+resolver, and this module only shapes the verdict per section and persists what
+was accepted. A rejected submission names the section and the block; nothing
+partial is ever written.
 """
 
 from __future__ import annotations
@@ -15,19 +20,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
-from exposure_workbench.services import evidence_trail_service as trail
-from exposure_workbench.services import numeric_verification as numeric
+from exposure_workbench.services import answer_blocks as ab
 from exposure_workbench.services import research_search_service as rss
-from exposure_workbench.tools.registry import DELEGATION, GATE, Tool, ToolRegistry, current_session_id
+from exposure_workbench.services import resolver
+from exposure_workbench.services import table as tbl
+from exposure_workbench.tools.meta_tools import BLOCK_SCHEMAS
+from exposure_workbench.tools.registry import DELEGATION, GATE, Evidence, Tool, ToolRegistry, current_session_id
 from exposure_workbench.utils.ids import new_brief_id
 
 logger = logging.getLogger(__name__)
 
-# Five evidence-bearing blocks + open_questions (the one block exempt from
-# citations, because a question is not a factual claim).
-_CITED_BLOCKS = ("financial_summary", "key_changes", "management_explanation",
-                 "market_context", "portfolio_implications")
-_ALL_BLOCKS = _CITED_BLOCKS + ("open_questions",)
+# The five evidence-bearing sections, plus open_questions — the one section that
+# need not point at anything, because a question is not a factual claim. The
+# same six names are the brief's text columns (db/models.IssuerBrief) and the
+# keys brief_service reads back.
+CITED_SECTIONS = ("financial_summary", "key_changes", "management_explanation",
+                  "market_context", "portfolio_implications")
+SECTIONS = CITED_SECTIONS + ("open_questions",)
 
 
 async def _run_for_session(db: AsyncSession, session_id: str) -> ResearchRun | None:
@@ -53,124 +62,90 @@ async def _search_external_research(db: AsyncSession, ticker: str, query: str, r
     return {"ticker": tk, "query": query, "reason": reason, "sources": sources}
 
 
-# ── submit_brief gate (M9) ────────────────────────────────────────────────────────
+# ── submit_brief gate (M9, V15-S5) ────────────────────────────────────────────────
 
-def _collect_citation_ids(blocks: dict) -> list[str]:
-    ids: list[str] = []
-    for name in _CITED_BLOCKS:
-        block = blocks.get(name) or {}
-        for cid in (block.get("citations") or []):
-            if isinstance(cid, str):
-                ids.append(cid)
-    return ids
+async def _submit_brief(db: AsyncSession, **sections) -> dict:
+    """The exit: six sections of blocks, every pointer on the table, or a refusal
+    naming the section and the block.
 
+    The table is loaded once and every section is resolved against it, because
+    the brief is one answer written in six parts — a passage read while writing
+    key_changes is just as much on the table for market_context. What stays
+    per-section is the structural rule from V3: each of the five cited sections
+    must lean on at least one id of its own. Without it a section could be all
+    prose, pass every check (there is nothing to resolve), and read to the desk
+    as a supported paragraph that supports nothing.
 
-async def _unverified_blocks(db: AsyncSession, blocks: dict, citation_ids: list[str]) -> dict[str, list[dict]]:
-    """Which blocks state a figure their evidence does not hold.
-
-    Each cited block is checked against THAT block's own citations. Pooling them
-    would let a figure in market_context be justified by an id cited only under
-    financial_summary — which is how a brief ends up internally consistent and
-    individually unsupported.
-
-    open_questions is the exception, and it used to be the omission: it carries
-    no citations by design, because it is where the analyst writes down what is
-    still unknown, and the loop over the cited blocks therefore never saw it. A
-    brief could ask "will capex stay above $23B?" with $23B appearing in none of
-    its evidence, and that number is rendered to the reader exactly like every
-    other one. It is verified against the UNION of everything the brief cites —
-    the honest denominator for a block that cannot name its own support. A
-    question built on the brief's own figures passes; one built on a figure from
-    nowhere is an unsupported claim with a question mark on the end.
+    Persistence happens only after all six are clean. There is no partial
+    brief: a section the resolver refused is a section the model gets to fix,
+    and the retry is cheaper than a reader discovering a hole.
     """
-    unverified: dict[str, list[dict]] = {}
-    for name in _ALL_BLOCKS:
-        block = blocks.get(name) or {}
-        stated = numeric.extract_numbers(block.get("text") or "")
-        if not stated:
-            continue
-        if name == "open_questions":
-            ids = list(citation_ids)
-        else:
-            ids = [c for c in (block.get("citations") or []) if isinstance(c, str)]
-        values, quoted = await numeric.resolve_cited_values(db, ids)
-        bad = numeric.verify(stated, values, quoted)
-        if bad:
-            unverified[name] = bad
-    return unverified
-
-
-async def _submit_brief(db: AsyncSession, **blocks) -> dict:
-    """Gate: validate citations against the evidence trail; persist only if clean."""
     session_id = current_session_id()
     run = await _run_for_session(db, session_id)
     if run is None:
         return {"error": "no_research_run", "detail": "submit_brief called outside a research run"}
 
-    # structural check: every cited block must carry a non-empty citations list
-    missing_cites = [b for b in _CITED_BLOCKS
-                     if not ((blocks.get(b) or {}).get("citations"))]
-    if missing_cites:
-        return {"error": "missing_citations", "blocks": missing_cites,
-                "detail": "every block except open_questions must cite evidence"}
+    missing = [name for name in CITED_SECTIONS if not ab.refs_in(sections[name]["blocks"])]
+    if missing:
+        return {"error": "missing_citations", "sections": missing,
+                "detail": "every section except open_questions must point at evidence — a slot "
+                          "{ref, name}, a `cites` list, or a series/absence ref — from a tool "
+                          "result this session"}
 
-    citation_ids = _collect_citation_ids(blocks)
-    ok, problems = await trail.validate_citations(db, session_id, citation_ids)
-    if not ok:
-        return {"error": "invalid_citations", "problems": problems,
-                "detail": "cited ids must be in this session's evidence trail and resolve in the DB"}
+    table = await tbl.load(db, session_id)
+    accepted: dict[str, dict] = {}
+    for name in SECTIONS:
+        blocks = sections[name]["blocks"]
+        verdict = resolver.resolve_against(blocks, table)
+        if not verdict.ok:
+            return {**verdict.as_refusal(), "section": name}
+        accepted[name] = resolver.accepted(blocks, verdict)
 
-    unverified = await _unverified_blocks(db, blocks, citation_ids)
-    if unverified:
-        return {"error": "unverified_numbers", "blocks": unverified,
-                "detail": "each figure must match a value held by the evidence cited in the "
-                          "SAME block; re-cite the id that carries it, or drop the figure. "
-                          "A figure in open_questions is checked against everything the brief "
-                          "cites — ask the question without inventing a number for it"}
-
+    # The flat list is the union over all six: an id open_questions pointed at
+    # was resolved like any other and belongs on the record, even though the
+    # per-section map keeps to the five sections that are required to cite.
+    citations = sorted({ref for a in accepted.values() for ref in a["citations"]})
     brief_id = new_brief_id()
-    all_citations = sorted(set(citation_ids))
     db.add(IssuerBrief(
         id=brief_id, research_run_id=run.id, company_id=run.company_id,
         owner_id=run.owner_id,   # V2-C: brief belongs to who triggered the research (RLS WITH CHECK)
-        financial_summary=(blocks.get("financial_summary") or {}).get("text"),
-        key_changes=(blocks.get("key_changes") or {}).get("text"),
-        management_explanation=(blocks.get("management_explanation") or {}).get("text"),
-        market_context=(blocks.get("market_context") or {}).get("text"),
-        portfolio_implications=(blocks.get("portfolio_implications") or {}).get("text"),
-        open_questions=(blocks.get("open_questions") or {}).get("text"),
-        citations=all_citations,
-        block_citations={n: [c for c in ((blocks.get(n) or {}).get("citations") or [])
-                             if isinstance(c, str)] for n in _CITED_BLOCKS},
-        confidence_flags=blocks.get("confidence_flags") or {},
+        **{name: accepted[name]["text"] for name in SECTIONS},
+        blocks={name: accepted[name]["blocks"] for name in SECTIONS},
+        citations=citations,
+        block_citations={name: accepted[name]["citations"] for name in CITED_SECTIONS},
     ))
     await db.flush()
-    return {"accepted": True, "brief_id": brief_id, "citations_validated": len(all_citations)}
+    return {"accepted": True, "brief_id": brief_id, "citations_validated": len(citations)}
 
 
 # ── schema ────────────────────────────────────────────────────────────────────────
 
-def _block_schema(cited: bool) -> dict:
-    props: dict = {"text": {"type": "string", "minLength": 1}}
-    required = ["text"]
-    if cited:
-        props["citations"] = {"type": "array", "items": {"type": "string"}, "minItems": 1,
-                              "description": "evidence ids (fact_/calc_/chunk_/src_) supporting every claim"}
-        required.append("citations")
-    # Closed, and it matters more here than anywhere else: _submit_brief takes
-    # **blocks, so an unknown key is not a TypeError — it is dropped in silence.
-    # `citations` on open_questions was accepted and then ignored, because the
-    # gate collects citations from the five cited blocks only. Ids that are never
-    # trail-checked, never stored and never shown, in the one tool whose whole
-    # job is citation discipline.
-    return {"type": "object", "properties": props, "required": required,
-            "additionalProperties": False}
+# One section: a non-empty list of blocks in the exit's grammar. BLOCK_SCHEMAS is
+# imported, not copied — the brief and the reply are the same grammar, and a
+# block shape added there is a block shape a brief may use.
+#
+# Closed, and it matters more here than anywhere else: _submit_brief takes
+# **sections, so an unknown key is not a TypeError — it is dropped in silence,
+# and a mistyped section name would produce a brief that looks complete and is
+# missing a section.
+_SECTION_SCHEMA = {
+    "type": "object",
+    "properties": {"blocks": {"type": "array", "minItems": 1, "items": {"oneOf": BLOCK_SCHEMAS},
+                              "description": "the section, in reading order"}},
+    "required": ["blocks"], "additionalProperties": False,
+}
+
+SUBMIT_BRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {name: _SECTION_SCHEMA for name in SECTIONS},
+    "required": list(SECTIONS), "additionalProperties": False,
+}
 
 
 def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
     reg.register(Tool(
         name="search_external_research",
-        display="Searching the web for \u201c{query}\u201d",
+        display="Searching the web for “{query}”",
         description="Search current external developments for an issuer (news, industry, regulatory). "
                     "reason states why the existing evidence is insufficient.",
         json_schema={"type": "object", "properties": {
@@ -179,21 +154,25 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
             "reason": {"type": "string", "description": "why this search is needed now"},
         }, "required": ["ticker", "query", "reason"], "additionalProperties": False},
         fn=_search_external_research, tool_class=DELEGATION, budget_key="external_search",
+        # Its sources are the brief's evidence: src_ ids go on the table.
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="submit_brief",
-        display="Submitting the brief for checking",
-        description="Submit the Issuer Risk Brief. Five blocks require citations; open_questions does not. "
-                    "Every cited id must come from a tool result you actually called this session.",
-        json_schema={"type": "object", "properties": {
-            "financial_summary": _block_schema(True),
-            "key_changes": _block_schema(True),
-            "management_explanation": _block_schema(True),
-            "market_context": _block_schema(True),
-            "portfolio_implications": _block_schema(True),
-            "open_questions": _block_schema(False),
-            "confidence_flags": {"type": "object"},
-        }, "required": list(_ALL_BLOCKS), "additionalProperties": False},
+        display="Resolving every figure in the brief against the table, then filing it",
+        description=(
+            "Submit the Issuer Risk Brief: six sections (financial_summary, key_changes, "
+            "management_explanation, market_context, portfolio_implications, open_questions), "
+            "each a list of BLOCKS. A figure is a SLOT {ref, name} using a name from the `table` "
+            "a tool result carried — the reader is shown the table's own value; you never write "
+            "a number. Blocks: `paragraph` (runs of strings and slots; `cites`: the chunk_/src_ "
+            "ids its prose rests on), `metric_table` (columns + rows of strings/slots), `chart` "
+            "(kind + series_ref), `trend` (text + series_ref), `absence` (text + absence_ref), "
+            "`action` (text + task_ref). Text carries no digits except dates. Every section but "
+            "open_questions must point at evidence from this session. A refusal names the "
+            "section and the block; fix that block and resubmit."
+        ),
+        json_schema=SUBMIT_BRIEF_SCHEMA,
         fn=_submit_brief, tool_class=GATE,
     ))
     return reg

@@ -225,6 +225,9 @@ class BriefOut(BaseModel):
     open_questions: str | None
     citations: list
     confidence_flags: dict
+    # V15-S5: {section: [rendered blocks]}; None on briefs written before the
+    # block exit, whose text columns were the whole submission.
+    blocks: dict | None = None
 
     model_config = {"from_attributes": True}
 

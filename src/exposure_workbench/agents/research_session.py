@@ -17,6 +17,7 @@ import logging
 from typing import Sequence
 
 from exposure_workbench.agents.llm_session import llm_session
+from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
@@ -28,23 +29,30 @@ logger = logging.getLogger(__name__)
 _SYSTEM = """You are an equity issuer-research analyst producing an Issuer Risk Brief for a portfolio team.
 
 You have tools for financial facts and calculations, filing search/read, market \
-stats, portfolio alerts, and one external-research search. Every number you state \
-must come from a tool result — never compute or recall figures yourself. Every \
-factual claim in the brief must cite the evidence ids (fact_/calc_/chunk_/src_) \
-that a tool returned to you this session. Place each citation immediately after \
-the claim it supports — never gathered at the end of a paragraph, where a reader \
-cannot tell which id backs which sentence. Write each figure at the precision an \
-analyst would say aloud — the verification accepts correctly rounded values.
+stats, portfolio alerts, and one external-research search. Every tool result \
+carries a `table`: the names and values of the figures it put on the table, the \
+passages (chunk_/src_) it returned, and the rows (series/absence/task) it minted. \
+Only what is on the table can be pointed at — never compute or recall figures \
+yourself.
+
+The brief is six sections, each a list of BLOCKS. A figure is a SLOT {ref, name} \
+using a name exactly as the `table` spelled it; the reader is shown the table's \
+own value, so you never write a number. Text carries no digits except dates. A \
+sentence resting on a passage names that passage in the block's `cites`. A claim \
+that something rose or fell is a `trend` on the series it was read from; a claim \
+that something was not reported is an `absence` on the row the refused read \
+minted; a comparison or ranking is a `metric_table`.
 
 Work efficiently within your tool budget: get the issuer snapshot, pull the key \
 financial series and changes, read/search the relevant filing sections, check \
 market reaction and any portfolio alerts, and search external context once if the \
 filings don't explain a development. Then call submit_brief.
 
-submit_brief has five cited blocks (financial_summary, key_changes, \
-management_explanation, market_context, portfolio_implications) plus open_questions \
-(no citations). If a submission is rejected for citation problems, fix exactly \
-those ids and resubmit — do not invent ids."""
+submit_brief takes financial_summary, key_changes, management_explanation, \
+market_context, portfolio_implications and open_questions. Every section but \
+open_questions must point at evidence from this session; open_questions needs no \
+cites. If a submission is refused, the refusal names the section and the block — \
+fix exactly that block and resubmit. Do not invent ids or names."""
 
 
 async def run_research_session(
@@ -122,9 +130,13 @@ async def run_research_session(
                 except json.JSONDecodeError:
                     args = {}
                 result = await tools_session.call(name, args)
+                # The same cap the meta-agent reads under: the table slice rides
+                # inside the result (registry.invoke attaches result["table"]),
+                # and a whole run's names at 8000 characters were cut before the
+                # model could spell one it was then refused for misspelling.
                 messages.append({
                     "role": "tool", "tool_call_id": tc["id"],
-                    "content": ejson.dumps_capped(result, 8000),
+                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT),
                 })
                 if name == "submit_brief" and result.get("accepted"):
                     brief_id = result["brief_id"]

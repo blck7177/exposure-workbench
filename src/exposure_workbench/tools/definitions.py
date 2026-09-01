@@ -1,9 +1,10 @@
 """Tool definitions (M10) — read + reflection tools.
 
 Every fn is a THIN wrapper over a service: it validates/normalizes args and
-returns a JSON-able dict whose id-shaped fields the wrapper harvests as evidence
-refs. No business logic lives here (that stays in services/analytics), and no
-tool touches the network directly.
+returns a JSON-able dict. What of that result goes on the table is DECLARED at
+registration (`evidence=`): the ids it returns, and for a run the child tables
+it read (services/table.py). No business logic lives here (that stays in
+services/analytics), and no tool touches the network directly.
 
 Delegation and gate tools (ensure_company_ready, start_*, respond, submit_brief)
 are registered in P6/P7 where their targets exist.
@@ -32,7 +33,8 @@ from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import series_service
 from exposure_workbench.services import trace_service
-from exposure_workbench.tools.registry import READ, REFLECTION, Tool, ToolRegistry, current_session_id
+from exposure_workbench.services import quantities as qn
+from exposure_workbench.tools.registry import READ, REFLECTION, Evidence, Tool, ToolRegistry, current_session_id
 
 _PERIOD_TYPES = ["quarterly", "annual", "instant"]
 
@@ -287,6 +289,167 @@ async def _explain_episode(db: AsyncSession, portfolio_id: str, peak: str, troug
     return await drawdown_service.explain_episode(db, portfolio_id, peak, trough)
 
 
+
+# ── the book's own manifest (V15-S2b) ───────────────────────────────────────────
+
+# What this face can and cannot do, said where the model reads it. R4 measured
+# the failure: with no capability statement, the model called "no operator for
+# this" "not enough data" and, asked for a web search, silently searched
+# filings instead.
+_FACE_CAPABILITIES = {
+    "can": [
+        "read this book's runs by name (describe_run → read_quantities) and every issuer's "
+        "filed figures, filing passages and named measures",
+        "compute with calculate / series_stat / evaluate_formula, each minting a citable id",
+        "start background work: a readiness pass, an exposure run, an issuer research run",
+    ],
+    "cannot": [
+        "search the web from this face — a research run (start_issuer_research) can, and "
+        "its brief is read with read_issuer_brief",
+        "produce a figure no tool returned: a quantity not on the table cannot be written",
+    ],
+}
+
+# The question each family of a run's quantities answers. The groups are how
+# the manifest is read; the names inside them are the table's own.
+_RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("book", "size, day P&L and net/gross exposure of the whole book",
+     ("exposure_metrics.portfolio_market_value", "exposure_metrics.daily_pnl", "exposure_metrics.daily_return",
+      "exposure_metrics.gross_exposure", "exposure_metrics.net_exposure",
+      "exposure_metrics.gross_exposure_pct", "exposure_metrics.net_exposure_pct")),
+    ("concentration", "which issuers and sectors the book is concentrated in",
+     ("issuer_exposures.*.weight", "sector_exposures.*.weight", "issuer_exposures.*.market_value")),
+    ("mandate", "how each limit check stands against its warning and breach tiers, and the room left",
+     ("limit_checks.*.current_value", "limit_checks.*.warning_level", "limit_checks.*.breach_level",
+      "portfolio.integration.room_to_warning.*", "portfolio.integration.room_to_breach.*",
+      "risk_alerts.*.current_value", "risk_alerts.*.limit_value", "risk_alerts.*.utilization")),
+    ("stress", "what each scenario would cost, ranked by get_portfolio_analysis",
+     ("stress_results.*.loss_pct", "stress_results.*.loss_usd",
+      "exposure_metrics.stress_loss_market", "exposure_metrics.stress_loss_rates",
+      "exposure_metrics.stress_loss_credit", "exposure_metrics.stress_loss_tech")),
+    ("factor_exposure", "which way the book moves with each risk — net betas with their legs",
+     ("portfolio.integration.net_beta.*", "portfolio.integration.gross_beta.*",
+      "factor_attributions.*.beta", "factor_attributions.sum_of_contributions")),
+    ("attribution", "what moved the book on the run's date, by position and by factor",
+     ("issuer_exposures.*.contribution", "issuer_exposures.*.daily_return",
+      "factor_attributions.*.contribution", "factor_attributions.*.factor_return",
+      "exposure_metrics.attribution_portfolio_return", "exposure_metrics.alpha", "exposure_metrics.residual")),
+    ("risk", "volatility, tail measures and drawdown as the run measured them",
+     ("exposure_metrics.rolling_vol_30d", "exposure_metrics.rolling_vol_60d", "exposure_metrics.var_95_1d",
+      "exposure_metrics.expected_shortfall_95", "exposure_metrics.max_drawdown",
+      "exposure_metrics.model_r_squared", "exposure_metrics.observations", "exposure_metrics.max_vif")),
+    ("counts", "how many positions, factors, scenarios, alerts and checks the run holds",
+     ("count.*",)),
+)
+
+
+def _matches(pattern: str, name: str) -> bool:
+    if "*" not in pattern:
+        return name == pattern
+    head, _, tail = pattern.partition("*")
+    return name.startswith(head) and name.endswith(tail) and len(name) > len(head) + len(tail)
+
+
+def _factored(names: list[str]) -> dict:
+    """Names, stated as patterns over their row labels where that is shorter.
+
+    A run's mandate group is 27 checks × 3 columns + 54 distances: 144 names
+    that are five patterns over 27 labels. The model composes a name from a
+    pattern and a label exactly as it would copy one, and the payload stays
+    readable — measured: the flat listing was 18k characters, over the cap.
+    Names that do not share a shape with three others are listed whole.
+    """
+    by_shape: dict[tuple[str, str], list[str]] = {}
+    plain: list[str] = []
+    for n in names:
+        parts = n.split(".")
+        if len(parts) == 3:
+            by_shape.setdefault((parts[0], parts[2]), []).append(parts[1])
+        elif len(parts) == 4 and parts[0] == "portfolio":
+            # portfolio.integration.<key>.<label>
+            by_shape.setdefault((".".join(parts[:3]), ""), []).append(parts[3])
+        else:
+            plain.append(n)
+    # Patterns that range over the same labels share one label list: the
+    # mandate group's five patterns over 27 checks are one list of 27, not five.
+    by_labels: dict[tuple[str, ...], list[str]] = {}
+    for (head, tail), labels in by_shape.items():
+        if len(labels) <= 3:
+            plain.extend(f"{head}.{lb}.{tail}" if tail else f"{head}.{lb}" for lb in labels)
+            continue
+        by_labels.setdefault(tuple(sorted(labels)), []).append(
+            f"{head}.<label>.{tail}" if tail else f"{head}.<label>")
+    out: dict = {}
+    if plain:
+        out["names"] = sorted(plain)
+    if by_labels:
+        out["patterns"] = [{"patterns": pats, "labels": list(labels)} for labels, pats in by_labels.items()]
+    return out
+
+
+async def _describe_run(db: AsyncSession, run_id: str) -> dict:
+    """Everything one run holds, named the way the exit takes it, grouped by the
+    question each group answers. The values arrive on the table beside this."""
+    from exposure_workbench.analytics import resources as _rs
+    run = await run_reads_service._run_or_error(db, run_id)
+    if isinstance(run, dict):
+        return run
+    if run.status != "completed":
+        return {"error": "run_not_completed", "run_id": run_id, "status": run.status}
+    resolved = await qn.of_ref(db, run_id)
+    names = [q.label for q in resolved.quantities if q.not_alone is None]
+    withheld = sorted({q.label for q in resolved.quantities if q.not_alone is not None})
+    # The derived quantities — net betas, room to each tier — live on the row
+    # get_portfolio_analysis mints; minting it here puts them on the table with
+    # the rest, which is what "the whole book on one page" means.
+    analysis = await integration_service.get_portfolio_analysis(db, run_id)
+    analysis_id = analysis.get("calc_id") if isinstance(analysis, dict) else None
+    derived = [q.label for q in (await qn.of_ref(db, analysis_id)).quantities] if analysis_id else []
+    everything = names + derived
+    groups, grouped = [], set()
+    for key, question, patterns in _RUN_GROUPS:
+        members = [n for n in everything if n not in grouped and any(_matches(p, n) for p in patterns)]
+        if members:
+            grouped.update(members)
+            groups.append({"group": key, "answers": question, **_factored(members)})
+    rest = [n for n in everything if n not in grouped]
+    return {
+        "run_id": run_id, "portfolio_id": run.portfolio_id, "as_of": run.as_of_date.isoformat(),
+        "how_to_read": ("every name here is a figure on this run's table, with its value beside it "
+                        "under `table`. Write it in a slot {ref, name}: ref is the run_id, except "
+                        "portfolio.integration.* names, whose ref is analysis_calc_id. A pattern "
+                        "with <label> is one name per label"),
+        "analysis_calc_id": analysis_id,
+        "groups": groups,
+        **({"other": _factored(rest)} if rest else {}),
+        "units": {r.table: {c.name: c.unit for c in r.columns} for r in _rs.RUN_CHILDREN},
+        "not_available": {
+            "stress_unevaluated": analysis.get("stress_unevaluated") if isinstance(analysis, dict) else None,
+            "headroom_not_recorded": analysis.get("headroom_not_recorded") if isinstance(analysis, dict) else None,
+            "withheld_collinear": _factored(withheld) if withheld else None,
+        },
+        "collinear_note": ("these factors are collinear: no single beta is on the table; "
+                           "factor_attributions.sum_of_contributions and the net betas are"
+                           if withheld else None),
+        "capabilities": _FACE_CAPABILITIES,
+    }
+
+
+async def _read_quantities(db: AsyncSession, run_id: str, names: list[str]) -> dict:
+    """The exact quantities a question needs, by name, in one call."""
+    run = await run_reads_service._run_or_error(db, run_id)
+    if isinstance(run, dict):
+        return run
+    resolved = await qn.of_ref(db, run_id)
+    held = {q.label: q for q in resolved.quantities if q.not_alone is None}
+    wanted = [str(n) for n in names]
+    found = [n for n in wanted if n in held]
+    unknown = [n for n in wanted if n not in held]
+    return {"run_id": run_id, "as_of": run.as_of_date.isoformat(), "names": found,
+            "units": {n: held[n].unit_class for n in found},
+            **({"unknown": unknown, "detail": "not names this run holds; describe_run lists them"}
+               if unknown else {})}
+
 # ── filing retrieval ────────────────────────────────────────────────────────────
 
 async def _search_filing_passages(db: AsyncSession, ticker: str, query: str, k: int = 5,
@@ -408,6 +571,7 @@ def build_read_registry() -> ToolRegistry:
                                       "Use months=3 for quarters, 12 for fiscal years."},
         }, "required": ["ticker", "metric"], "additionalProperties": False},
         fn=_get_flow, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_balance_series",
@@ -425,6 +589,7 @@ def build_read_registry() -> ToolRegistry:
                        "description": "how many most-recent dates (default 12)"},
         }, "required": ["ticker", "metric"], "additionalProperties": False},
         fn=_get_balance_series, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="series_stat",
@@ -441,6 +606,7 @@ def build_read_registry() -> ToolRegistry:
             "op": {"type": "string", "enum": list(series_service.OPS)},
         }, "required": ["series_id", "op"], "additionalProperties": False},
         fn=_series_stat, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="describe_issuer",
@@ -454,6 +620,7 @@ def build_read_registry() -> ToolRegistry:
         json_schema={"type": "object", "properties": {"ticker": _TICKER},
                      "required": ["ticker"], "additionalProperties": False},
         fn=_describe_issuer, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_balance_sheet",
@@ -470,6 +637,7 @@ def build_read_registry() -> ToolRegistry:
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD; defaults to latest"},
         }, "required": ["ticker"], "additionalProperties": False},
         fn=_get_balance_sheet, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="calculate",
@@ -491,6 +659,7 @@ def build_read_registry() -> ToolRegistry:
             "b": {"type": "string", "description": "fact_… or calc_… id"},
         }, "required": ["op", "a", "b"], "additionalProperties": False},
         fn=_calculate, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="evaluate_formula",
@@ -508,6 +677,7 @@ def build_read_registry() -> ToolRegistry:
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
         }, "required": ["ticker", "name"], "additionalProperties": False},
         fn=_evaluate_formula, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_fundamental_panel",
@@ -526,6 +696,7 @@ def build_read_registry() -> ToolRegistry:
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
         }, "required": ["ticker"], "additionalProperties": False},
         fn=_get_fundamental_panel, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_portfolio_snapshot",
@@ -536,6 +707,7 @@ def build_read_registry() -> ToolRegistry:
                     "carry the run_id that produced them; cite run_id (and alert ids) for portfolio claims.",
         json_schema={"type": "object", "properties": {}, "additionalProperties": False},
         fn=_get_portfolio_snapshot, tool_class=READ,
+        evidence=Evidence(scope=("exposure_metrics", "issuer_exposures", "sector_exposures", "risk_alerts", "count")),
     ))
     reg.register(Tool(
         name="get_task_status",
@@ -558,6 +730,7 @@ def build_read_registry() -> ToolRegistry:
             "portfolio_id": {"type": "string"},
         }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_get_portfolio_positions, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="read_issuer_brief",
@@ -566,6 +739,7 @@ def build_read_registry() -> ToolRegistry:
                     "each block. Cite those ids, not the brief.",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_read_issuer_brief, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_attribution",
@@ -586,6 +760,7 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_attribution, tool_class=READ,
+        evidence=Evidence(scope=("factor_attributions", "issuer_exposures", "exposure_metrics")),
     ))
     reg.register(Tool(
         name="get_risk_state",
@@ -601,6 +776,7 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_risk_state, tool_class=READ,
+        evidence=Evidence(scope=("exposure_metrics", "stress_results", "risk_alerts", "limit_checks", "count")),
     ))
     reg.register(Tool(
         name="list_run_alerts",
@@ -615,6 +791,7 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_list_run_alerts, tool_class=READ,
+        evidence=Evidence(scope=("risk_alerts", "count")),
     ))
     reg.register(Tool(
         name="list_risk_limits",
@@ -659,6 +836,7 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_reconcile_move, tool_class=READ,
+        evidence=Evidence(scope=("issuer_exposures", "factor_attributions", "exposure_metrics")),
     ))
     reg.register(Tool(
         name="get_portfolio_analysis",
@@ -679,6 +857,40 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_portfolio_analysis, tool_class=READ,
+        evidence=Evidence(scope=("stress_results", "limit_checks", "factor_attributions", "issuer_exposures", "exposure_metrics", "count")),
+    ))
+    reg.register(Tool(
+        name="describe_run",
+        display="Reading what the run holds, by name",
+        description=(
+            "Start here for any question about THIS BOOK: everything one completed run "
+            "holds, named exactly as a slot takes it, grouped by the question each group "
+            "answers — book size, concentration, mandate (each check against its tiers and "
+            "the room left), stress, factor exposure, attribution, risk, counts. The values "
+            "come back on the table beside the names. Also says what this face can and "
+            "cannot do. Read it before reaching for the per-table tools."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "an exposure run id (run_...) from get_portfolio_snapshot"},
+        }, "required": ["run_id"], "additionalProperties": False},
+        fn=_describe_run, tool_class=READ,
+        evidence=Evidence(scope=tuple(qn.RUN_TABLES)),
+    ))
+    reg.register(Tool(
+        name="read_quantities",
+        display="Reading the named figures from the run",
+        description=(
+            "The exact figures a question needs, by name, in one call — names from "
+            "describe_run (or any table you have seen), e.g. issuer_exposures.MSFT.weight, "
+            "limit_checks.sector_concentration:Technology.breach_level. Unknown names are "
+            "returned as unknown, not guessed."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string"},
+            "names": {"type": "array", "minItems": 1, "maxItems": 120, "items": {"type": "string"}},
+        }, "required": ["run_id", "names"], "additionalProperties": False},
+        fn=_read_quantities, tool_class=READ,
+        evidence=Evidence(names_from="names"),
     ))
     reg.register(Tool(
         name="get_drawdown_episodes",
@@ -698,6 +910,7 @@ def build_read_registry() -> ToolRegistry:
                      "description": "history to search (default 1y)"},
         }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_get_drawdown_episodes, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="explain_episode",
@@ -715,6 +928,7 @@ def build_read_registry() -> ToolRegistry:
             "trough": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
         }, "required": ["portfolio_id", "peak", "trough"], "additionalProperties": False},
         fn=_explain_episode, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_market_stats",
@@ -729,6 +943,7 @@ def build_read_registry() -> ToolRegistry:
             "benchmark": {"type": ["string", "null"], "default": "SPY"},
         }, "required": ["ticker"], "additionalProperties": False},
         fn=_get_market_stats, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="search_filing_passages",
@@ -742,6 +957,7 @@ def build_read_registry() -> ToolRegistry:
                           "description": "narrow to an Item, e.g. 'Item 1A'"},
         }, "required": ["ticker", "query"], "additionalProperties": False},
         fn=_search_filing_passages, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="get_filing_section",
@@ -752,6 +968,7 @@ def build_read_registry() -> ToolRegistry:
             "form_type": _FORM_TYPE,
         }, "required": ["ticker", "item_code"], "additionalProperties": False},
         fn=_get_filing_section, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="list_alerts",
@@ -759,6 +976,7 @@ def build_read_registry() -> ToolRegistry:
         description="Portfolio risk alerts naming this issuer (concentration, etc.).",
         json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
         fn=_list_alerts, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="think",
