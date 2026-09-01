@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import interval_algebra as ia
+from exposure_workbench.analytics import units
 from exposure_workbench.db.models import Company, FinancialFact, Filing
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
@@ -60,6 +61,31 @@ async def _flow_facts(db: AsyncSession, company_id: str, metric: str) -> list[ia
     return [ia.FlowFact(fact_id=fid, period_start=ps, period_end=pe, value=float(v),
                         source_accession=acc, filing_date=fd)
             for fid, ps, pe, v, acc, fd in rows]
+
+
+async def _facts_unit(db: AsyncSession, fact_ids, ticker: str, metric: str) -> str | dict:
+    """The one unit a set of facts is denominated in, judged by units.fact_unit.
+
+    One metric's facts share a unit or the derived number is nonsense, and a
+    unit the algebra does not know is refused rather than binned as money —
+    the bin is how an EPS flow spent two versions typed as money. Refusals are
+    dicts in the services' usual shape, returned by the caller as-is.
+    """
+    raws = set((await db.execute(
+        select(FinancialFact.unit).where(FinancialFact.id.in_(list(fact_ids))))
+    ).scalars().all())
+    judged = {raw: units.fact_unit(raw) for raw in raws}
+    unknown = sorted(repr(raw) for raw, u in judged.items() if u is None)
+    if unknown:
+        return {"error": "unknown_unit", "ticker": ticker, "metric": metric,
+                "detail": f"{metric} facts for {ticker} are denominated in "
+                          f"{', '.join(unknown)}, which this desk cannot do algebra on"}
+    got = sorted(set(judged.values()))
+    if len(got) != 1:
+        return {"error": "inconsistent_units", "ticker": ticker, "metric": metric,
+                "detail": f"{metric} facts for {ticker} mix units ({', '.join(got)}); "
+                          f"one metric is one unit, so this window cannot be derived"}
+    return got[0]
 
 
 def _unknown_metric(metric: str) -> dict:
@@ -167,10 +193,16 @@ async def get_flow(
             invoked_by=invoked_by, detail=window.reason, data_covers=covers)
 
     terms = [{"fact_id": fid, "sign": sign} for fid, sign in window.terms]
+    unit = await _facts_unit(db, [t["fact_id"] for t in terms], ticker, metric)
+    if isinstance(unit, dict):
+        return unit
     period = {"start": window.start.isoformat(), "end": window.end.isoformat()}
     calc_id = await cs._record(
         db, ticker, OP_FLOW,
-        {"metric": metric, "period": period, "terms": terms, "derivation": window.formula},
+        {"metric": metric, "period": period, "terms": terms, "derivation": window.formula,
+         # V16: the row states what it is. Before this, the resolver hardcoded
+         # "a derive.interval is money" — which an EPS flow is not.
+         "result_type": {"unit_class": unit, "kind": "flow", "quantity": metric}},
         {"value": window.value}, [t["fact_id"] for t in terms], {}, invoked_by,
     )
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric,
@@ -242,7 +274,7 @@ async def get_balance_sheet(
 # ── series (V10-S2) ───────────────────────────────────────────────────────────
 
 def _slot(w: ia.SeriesWindow) -> dict:
-    base = {"start": w.start.isoformat(), "end": w.end.isoformat()}
+    base = {"start": w.start.isoformat(), units.POINT_PERIOD_KEY: w.end.isoformat()}
     if isinstance(w.window, ia.Derived):
         return base | {"value": w.window.value,
                        "fact_ids": list(w.window.fact_ids),
@@ -266,23 +298,30 @@ async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) ->
             detail=(f"no {months}-month window of {metric} can be derived from the "
                     f"periods {ticker} reports; it may report this metric only over "
                     f"longer periods — ask for a longer `months`"))
+    input_ids = sorted({f for w in derived for f in w.window.fact_ids})
+    unit = await _facts_unit(db, input_ids, ticker, metric)
+    if isinstance(unit, dict):
+        return unit
     points = [_slot(w) for w in slots]
     calc_id = await cs._record(
         db, ticker, OP_FLOW_SERIES,
         {"metric": metric, "months": months, "last_n": last_n,
          # What every point IS, once, so the resolver and the calculator need
-         # no table keyed on the operation name.
-         "result_type": {"unit_class": "money", "kind": "flow", "quantity": metric,
+         # no table keyed on the operation name. The unit is judged from the
+         # facts, not asserted: an EPS series is money_per_share, a share-count
+         # series is a count.
+         "result_type": {"unit_class": unit, "kind": "flow", "quantity": metric,
                          "months": months}},
         {"points": points},
-        sorted({f for w in derived for f in w.window.fact_ids}),
+        input_ids,
         {"unreachable_slots": len(slots) - len(derived)} if len(slots) != len(derived) else {},
         invoked_by,
     )
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "months": months,
             "points": points,
             "basis": (f"{len(derived)} consecutive {months}-month windows on {ticker}'s own "
-                      f"reporting grid, {points[0]['start']}..{points[-1]['end']}"
+                      f"reporting grid, "
+                      f"{points[0]['start']}..{points[-1][units.POINT_PERIOD_KEY]}"
                       + (f"; {len(slots) - len(derived)} slot(s) not derivable, kept in place"
                          if len(slots) != len(derived) else ""))}
 
@@ -327,17 +366,23 @@ async def get_balance_series(
         if prev is None or ia.restatement_key(fd, acc) > ia.restatement_key(prev[3], prev[2]):
             best[pe] = (float(value), fid, acc, fd)
     dates = sorted(best)[-max(1, last_n):]
-    points = [{"as_of": d.isoformat(), "value": best[d][0], "fact_ids": [best[d][1]]}
+    unit = await _facts_unit(db, [best[d][1] for d in dates], ticker, metric)
+    if isinstance(unit, dict):
+        return unit
+    points = [{units.POINT_PERIOD_KEY: d.isoformat(), "value": best[d][0],
+               "fact_ids": [best[d][1]]}
               for d in dates]
     calc_id = await cs._record(
         db, ticker, OP_BALANCE_SERIES,
         {"metric": metric, "last_n": last_n,
-         "result_type": {"unit_class": "money", "kind": "instant", "quantity": metric}},
+         "result_type": {"unit_class": unit, "kind": "instant", "quantity": metric}},
         {"points": points}, [p["fact_ids"][0] for p in points], {}, invoked_by,
     )
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "points": points,
             "basis": f"{metric} as reported at each of {len(points)} instants, "
-                     f"{points[0]['as_of']}..{points[-1]['as_of']}; no value is carried across dates"}
+                     f"{points[0][units.POINT_PERIOD_KEY]}.."
+                     f"{points[-1][units.POINT_PERIOD_KEY]}; "
+                     f"no value is carried across dates"}
 
 
 async def quarterly_points(db: AsyncSession, ticker: str, metric: str, *, last_n: int = 8):

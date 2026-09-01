@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import series_ops as so
+from exposure_workbench.analytics import units
 from exposure_workbench.db.models import CalcLedger
 from exposure_workbench.services import calc_service as cs
 
@@ -64,7 +65,9 @@ async def load_series(db: AsyncSession, series_id: str) -> tuple[list[so.SeriesP
                           f"Recompute it with get_flow(last_n=…) or get_balance_series."}
     out = []
     for p in points:
-        end = p.get("end") or p.get("as_of")
+        # Writers use POINT_PERIOD_KEY and only that since V16; the other two
+        # keys are the frozen legacy vocabulary of rows written before it.
+        end = p.get(units.POINT_PERIOD_KEY) or p.get("end") or p.get("as_of")
         if end is None:
             continue
         out.append(so.SeriesPoint(period_end=date.fromisoformat(end), value=p.get("value"),
@@ -83,12 +86,23 @@ async def series_stat(db: AsyncSession, series_id: str, op: str,
         return loaded
     points, rtype = loaded
 
+    # The result is named for what it did to what — revenue.yoy — instead of
+    # quantity=None with the real name hidden in derived_from, where no reader
+    # of the row could act on it. Inherited units are inherited, not defaulted:
+    # a typed series that lacks its unit is refused, never presumed money.
+    base = rtype.get("quantity") or series_id
+    inherited = rtype.get("unit_class")
+    if inherited is None:
+        return {"error": "untyped_series", "series_id": series_id,
+                "detail": f"{series_id} recorded a result_type without a unit_class. "
+                          f"Recompute it with get_flow(last_n=…) or get_balance_series."}
+
     if op in CHANGE_OPS:
         res = so.compute_change(points, op)
-        unit = "ratio" if op in _RATIO_CHANGES else rtype.get("unit_class", "money")
-        result_type = {"unit_class": unit, "kind": "series", "quantity": None,
+        unit = "ratio" if op in _RATIO_CHANGES else inherited
+        result_type = {"unit_class": unit, "kind": "series", "quantity": f"{base}.{op}",
                        "derived_from": rtype.get("quantity")}
-        out_points = [{"end": p.period_end.isoformat(), "value": p.value,
+        out_points = [{units.POINT_PERIOD_KEY: p.period_end.isoformat(), "value": p.value,
                        "fact_ids": p.input_fact_ids, **({"flags": p.quality_flags} if p.quality_flags else {})}
                       for p in res.points]
         calc_id = await cs._record(
@@ -100,8 +114,8 @@ async def series_stat(db: AsyncSession, series_id: str, op: str,
                          f"never by position"}
 
     res = so.compute_stat(points, op)
-    unit = "ratio" if op in _RATIO_STATS else rtype.get("unit_class", "money")
-    result_type = {"unit_class": unit, "kind": "scalar", "quantity": None,
+    unit = "ratio" if op in _RATIO_STATS else inherited
+    result_type = {"unit_class": unit, "kind": "scalar", "quantity": f"{base}.{op}",
                    "derived_from": rtype.get("quantity"),
                    "basis": {"series": series_id, "points": len([p for p in points if p.value is not None])}}
     calc_id = await cs._record(

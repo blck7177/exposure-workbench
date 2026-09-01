@@ -53,6 +53,13 @@ async def load_price_series(
 
 # ── Ledger ─────────────────────────────────────────────────────────────────────
 
+# The ledger column spells units upper-case (v15_calc_unit.sql); result_type
+# spells them as analytics/units.py does. One table, so a new unit class lands
+# in both vocabularies with one edit.
+_UNIT_COLUMN = {"money": "MONEY", "ratio": "RATIO", "count": "COUNT",
+                "money_per_share": "MONEY_PER_SHARE"}
+
+
 async def _record(
     db: AsyncSession,
     company_ticker: str | None,
@@ -71,12 +78,27 @@ async def _record(
     it was reachable only by digging into a JSONB blob, so the gate kept a
     second rule that typed a row by its OPERATION NAME instead. Promoting the
     fact it already had to a column is what retires that rule. An explicit
-    argument wins; otherwise the params are read; a row that states neither
-    leaves the column NULL, which reads as "this row did not record it".
+    argument wins; otherwise the params are read.
+
+    V16: a row that carries a numeric result — a scalar `value` or a series of
+    `points` — and states no unit, or no result_type.quantity, is refused with
+    ValueError instead of written with NULLs. The NULL was a fallback, and every
+    such row was one the unit algebra could not check. Rows with no numeric
+    result (an absence, a manifest, a reconciliation report) record something
+    other than a quantity and stay exempt.
     """
     calc_id = new_calc_id()
     stated = ((params or {}).get("result_type") or {}).get("unit_class")
-    unit = unit_class or ({"ratio": "RATIO", "money": "MONEY", "count": "COUNT"}.get(stated))
+    unit = unit_class or _UNIT_COLUMN.get(stated)
+    if result.get("value") is not None or isinstance(result.get("points"), list):
+        if unit is None:
+            raise ValueError(
+                f"{operation}: a row carrying a numeric result must state its unit — "
+                f"pass unit_class, or write params.result_type.unit_class")
+        if not ((params or {}).get("result_type") or {}).get("quantity"):
+            raise ValueError(
+                f"{operation}: a row carrying a numeric result must name what the "
+                f"number is — write params.result_type.quantity")
     db.add(
         CalcLedger(
             id=calc_id,
@@ -151,7 +173,10 @@ async def window_return(
     bench = await load_price_series(db, benchmark, start, end) if benchmark else None
     res = so.compute_window_return(prices, start, end, benchmark=bench)
     params = {"ticker": ticker, "start": start.isoformat(), "end": end.isoformat(),
-              "benchmark": benchmark}
+              "benchmark": benchmark,
+              # A return is a ratio whatever it was a return on; stating it here
+              # is what lets the V16 refusal in _record pass this row.
+              "result_type": {"unit_class": "ratio", "quantity": res.operation}}
     refs = [f"price:{ticker}:{start.isoformat()}:{end.isoformat()}"]
     if benchmark:
         refs.append(f"price:{benchmark}:{start.isoformat()}:{end.isoformat()}")

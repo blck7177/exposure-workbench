@@ -44,21 +44,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import containment as ct
+from exposure_workbench.analytics import units
+from exposure_workbench.analytics.units import COUNT, MONEY, MONEY_PER_SHARE, RATIO
 from exposure_workbench.db.models import CalcLedger, Company, FinancialFact
 from exposure_workbench.services import calc_service as cs
 
 OPS = ("add", "subtract", "multiply", "divide")
-# COUNT is what a ratio becomes when a constant with a unit is applied to it:
-# a fraction of a year times 365 is a number of days. It is never inferred —
-# only `scale` produces it, and only because its caller says so.
-MONEY, RATIO, COUNT = "money", "ratio", "count"
 
 
 @dataclass(frozen=True)
 class Typed:
     """A number and everything needed to decide what it may be combined with."""
     value: float
-    unit_class: str                       # money | ratio | count
+    unit_class: str                       # one of analytics.units.UNIT_CLASSES
     instant: date | None = None           # a balance: as of this date
     interval: tuple[date, date] | None = None   # a flow: over these days
     quantity: str | None = None           # the metric, for containment
@@ -103,9 +101,19 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         ticker = (await db.execute(
             select(Company.ticker).where(Company.id == row.company_id)
         )).scalar_one_or_none()
+        # The one judgement of a fact's unit lives in analytics.units. This
+        # function used to make its own (dollars → money, everything else →
+        # ratio) while quantities made a different one, and the same fact
+        # combined differently depending on who resolved it.
+        unit = units.fact_unit(row.unit)
+        if unit is None:
+            return _err("unknown_unit",
+                        f"{ref} is denominated in {row.unit!r}, which is not a unit "
+                        f"this desk can do algebra on; it can be quoted and cited, "
+                        f"not combined")
         return Typed(
             value=float(row.value),
-            unit_class=MONEY if (row.unit or "").upper() == "USD" else RATIO,
+            unit_class=unit,
             instant=row.period_end if row.period_start is None else None,
             interval=None if row.period_start is None else (row.period_start, row.period_end),
             quantity=row.normalized_metric, source_id=ref,
@@ -123,12 +131,15 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         if isinstance(points, list):
             return _resolve_series(ref, row.operation, params, points, owned)
         value = (row.result or {}).get("value")
-        # derive.interval rows predate result_type but carry everything needed.
+        # derive.interval rows since V16 state their type; older ones predate
+        # result_type but carry everything needed, and every one was a dollar flow.
         if row.operation == cs_op_flow() and params.get("period"):
             p = params["period"]
-            return Typed(value=float(value), unit_class=MONEY,
+            rt0 = params.get("result_type") or {}
+            return Typed(value=float(value), unit_class=rt0.get("unit_class", MONEY),
                          interval=(date.fromisoformat(p["start"]), date.fromisoformat(p["end"])),
-                         quantity=params.get("metric"), source_id=ref, issuers=owned)
+                         quantity=rt0.get("quantity") or params.get("metric"),
+                         source_id=ref, issuers=owned)
         t = params.get("result_type")
         if not t or value is None:
             return _err(
@@ -136,9 +147,15 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
                 f"{ref} was recorded before quantities carried their type, so what it "
                 f"may be combined with cannot be established. Recompute it with "
                 f"get_flow, get_balance_sheet or calculate.")
+        unit = t.get("unit_class")
+        if unit is None:
+            # A result_type without a unit is not "probably money": refusing it
+            # is what keeps the unit algebra's blind spot from being silent.
+            return _err("untyped_operand",
+                        f"{ref} recorded a result_type without a unit_class; recompute it")
         basis = t.get("basis") or {}
         return Typed(
-            value=float(value), unit_class=t.get("unit_class", MONEY),
+            value=float(value), unit_class=unit,
             instant=date.fromisoformat(basis["instant"]) if basis.get("instant") else None,
             interval=(date.fromisoformat(basis["interval"][0]),
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
@@ -202,12 +219,18 @@ def _resolve_series(ref: str, operation: str, params: dict, points: list,
         return _err("untyped_operand",
                     f"{ref} is a series recorded before series carried their type. "
                     f"Recompute it with get_flow(last_n=…) or get_balance_series.")
-    unit = rt.get("unit_class", MONEY)
+    unit = rt.get("unit_class")
+    if unit is None:
+        return _err("untyped_operand",
+                    f"{ref} is a series whose recorded type has no unit_class; "
+                    f"recompute it with get_flow(last_n=…) or get_balance_series.")
     kind = rt.get("kind", "series")
     quantity = rt.get("quantity")
     typed: list[tuple[date, Typed]] = []
     for p in points:
-        end_s = p.get("end") or p.get("as_of")
+        # Writers use POINT_PERIOD_KEY and only that; the other two keys are
+        # the frozen legacy vocabulary of rows written before V16.
+        end_s = p.get(units.POINT_PERIOD_KEY) or p.get("end") or p.get("as_of")
         if end_s is None or p.get("value") is None:
             continue                       # an unreachable slot has no quantity to combine
         end = date.fromisoformat(end_s)
@@ -242,8 +265,24 @@ def _shared_issuer(a: Typed, b: Typed) -> bool:
 
 
 def _check(op: str, a: Typed, b: Typed) -> dict | None:
-    if op in ("multiply", "divide"):
-        return None                      # a ratio may cross bases; it says which
+    # Multiply and divide are exempt from the period and basis rules below —
+    # a ratio may cross bases; it says which — but not from the unit algebra:
+    # whether a product means anything is a lookup in units.PRODUCTS/QUOTIENTS,
+    # and a combination with no row is undefined, not defaulted.
+    if op == "multiply":
+        if units.product_unit(a.unit_class, b.unit_class) is None:
+            return _err("undefined_product",
+                        f"{a.source_id} is {a.unit_class} and {b.source_id} is "
+                        f"{b.unit_class}; {a.unit_class} × {b.unit_class} has no row "
+                        f"in units.PRODUCTS, so the product is undefined on this desk")
+        return None
+    if op == "divide":
+        if units.quotient_unit(a.unit_class, b.unit_class) is None:
+            return _err("undefined_quotient",
+                        f"{a.source_id} is {a.unit_class} and {b.source_id} is "
+                        f"{b.unit_class}; {a.unit_class} ÷ {b.unit_class} has no row "
+                        f"in units.QUOTIENTS, so the quotient is undefined on this desk")
+        return None
 
     if a.unit_class != b.unit_class:
         return _err("incompatible_units",
@@ -270,8 +309,12 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
         return None
 
     for t in (a, b):
-        if (t.unit_class != RATIO and t.instant is None and t.interval is None
+        if (t.unit_class not in (RATIO, COUNT) and t.instant is None and t.interval is None
                 and (t.recorded_basis or {}).get("leaves")):
+            # COUNT is exempt alongside RATIO (V16): the guard exists to stop a
+            # MONEY sum across periods being counted twice, and a day-count —
+            # DSO + days_inventory − days_payable is the cash conversion cycle —
+            # has no money in it to double-count.
             # A money quantity resting on several periods is a sum across
             # issuers (the only way one arises), and this operand shares an
             # issuer with it. Whether that issuer's slice is being counted a
@@ -398,7 +441,14 @@ def _mixed_basis(op: str, a: Typed, b: Typed) -> dict:
 def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
     issuers = tuple(sorted(set(a.issuers) | set(b.issuers)))
     if op in ("multiply", "divide"):
-        unit = RATIO if (op == "divide" and a.unit_class == b.unit_class) else a.unit_class
+        # The unit is the table's answer, never the operand order's: before V16
+        # this line read `a.unit_class`, so money × ratio was money but
+        # ratio × money was ratio. _check already refused any pair with no row.
+        unit = (units.product_unit(a.unit_class, b.unit_class) if op == "multiply"
+                else units.quotient_unit(a.unit_class, b.unit_class))
+        if unit is None:
+            raise ValueError(f"{op} of {a.unit_class} and {b.unit_class} reached "
+                             f"_result_type without a row in the unit tables")
         return Typed(value=value, unit_class=unit, quantity=None,
                      recorded_basis=_mixed_basis(op, a, b), issuers=issuers)
     if (not _shared_issuer(a, b)
@@ -450,8 +500,22 @@ def _result_type_within(op: str, a: Typed, b: Typed, value: float) -> Typed:
     return Typed(value=value, unit_class=a.unit_class)
 
 
+def _derived_name(op: str, a, b) -> str:
+    """The name a derived quantity answers to when its caller gave none.
+
+    `net_income.divide.total_revenues` is nobody's word for a margin, but the
+    ledger now refuses a valued row with no quantity at all (V16, _record), and
+    a lineage name states what the number is where None stated nothing.
+    Containment does not know these names, so R3 has nothing to say about them
+    — the same silence None bought, without the blank column.
+    """
+    return (f"{getattr(a, 'quantity', None) or a.source_id}.{op}."
+            f"{getattr(b, 'quantity', None) or b.source_id}")
+
+
 async def calculate(db: AsyncSession, op: str, a: str, b: str,
-                    invoked_by: str = "agent", as_quantity: str | None = None) -> dict:
+                    invoked_by: str = "agent", as_quantity: str | None = None,
+                    named_by: str | None = None) -> dict:
     """Combine two quantities, if their types permit it.
 
     `as_quantity` is the name the CALLER gives the result — a formula naming
@@ -488,7 +552,13 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     basis = result.basis()
 
     rt = {"unit_class": result.unit_class, "basis": basis,
-          "quantity": as_quantity or result.quantity, "issuers": list(result.issuers)}
+          "quantity": as_quantity or result.quantity or _derived_name(op, left, right),
+          "issuers": list(result.issuers)}
+    if named_by and as_quantity:
+        # Who chose the name — "session" when the model named its own
+        # composition (Tier 2). Recorded so a misnamed row is attributable,
+        # never authoritative: the typing above treated it like any other.
+        rt["named_by"] = named_by
     calc_id = await cs._record(
         db, None, f"calc.scalar.{op}",
         {"op": op, "operands": [a, b],
@@ -526,7 +596,8 @@ async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
     if isinstance(left, dict):
         return left
     value = left.value * factor
-    rt = {"unit_class": unit_class, "basis": left.basis(), "quantity": quantity,
+    rt = {"unit_class": unit_class, "basis": left.basis(),
+          "quantity": quantity or f"{left.quantity or ref}.scale",
           "issuers": list(left.issuers)}
     calc_id = await cs._record(
         db, None, "calc.scalar.scale",
@@ -613,14 +684,14 @@ async def _calculate_series(db, op, a, b, left, right, invoked_by) -> dict:
     for end, lt, rt in order:
         if op == "divide" and rt.value == 0:
             div_zero += 1
-            points.append({"end": end.isoformat(), "value": None, "flags": {"division_by_zero": True},
-                           "fact_ids": []})
+            points.append({units.POINT_PERIOD_KEY: end.isoformat(), "value": None,
+                           "flags": {"division_by_zero": True}, "fact_ids": []})
             continue
         value = {"add": lt.value + rt.value, "subtract": lt.value - rt.value,
                  "multiply": lt.value * rt.value, "divide": lt.value / rt.value}[op]
         r = _result_type(op, lt, rt, value)
         sample_type = sample_type or r
-        pt = {"end": end.isoformat(), "value": value, "fact_ids": []}
+        pt = {units.POINT_PERIOD_KEY: end.isoformat(), "value": value, "fact_ids": []}
         if r.interval:
             pt["start"] = r.interval[0].isoformat()
         points.append(pt)
@@ -628,7 +699,10 @@ async def _calculate_series(db, op, a, b, left, right, invoked_by) -> dict:
     unit = sample_type.unit_class if sample_type else left.unit_class
     kind = ("flow" if sample_type and sample_type.interval else
             "instant" if sample_type and sample_type.instant else "series")
-    rt_out = {"unit_class": unit, "kind": kind, "quantity": None,
+    rt_out = {"unit_class": unit, "kind": kind, "quantity": _derived_name(op, left, right),
+              # The panel's default selection reads derived_from
+              # (apps/api/routes/issuers.panel_series), so the inputs' own
+              # names stay recorded beside the synthesized one.
               "derived_from": [getattr(left, "quantity", None), getattr(right, "quantity", None)],
               "issuers": sorted(set(getattr(left, "issuers", ())) | set(getattr(right, "issuers", ())))}
     flags = {}

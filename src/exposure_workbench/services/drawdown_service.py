@@ -204,7 +204,10 @@ async def explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough
     calc_id = await cs._record(
         db, None, "portfolio.window_return",
         {"portfolio_id": portfolio_id, "start": peak, "end": trough,
-         "sessions": int(len(returns))},
+         "sessions": int(len(returns)),
+         # A window return is a ratio and the row names itself (V16: a row that
+         # carries a value and no quantity is refused at the write).
+         "result_type": {"unit_class": "ratio", "quantity": "portfolio.window_return"}},
         {"value": book_return}, [portfolio_id], {}, current_session_id(),
         # A window return is a ratio, and the row says so (V15-S1). The legacy
         # operation-name table never learned this op, so every row written
