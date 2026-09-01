@@ -38,8 +38,12 @@ def test_respond_requires_only_blocks():
     schema = reg.get("respond").json_schema
     assert schema["required"] == ["blocks"]
     assert "citations" not in schema["properties"]
-    assert set(schema["properties"]["blocks"]["items"]["properties"]["type"]["enum"]) == set(
-        ab.BLOCK_TYPES)
+    # V15-S3: one closed branch per claim type, and the branches together are
+    # exactly the block types the renderer knows.
+    branches = schema["properties"]["blocks"]["items"]["oneOf"]
+    kinds = [b["properties"]["type"]["enum"] for b in branches]
+    assert all(len(k) == 1 for k in kinds), "each branch is one claim type"
+    assert {k[0] for k in kinds} == set(ab.BLOCK_TYPES)
 
 
 def test_respond_description_states_the_rule_the_gate_enforces():

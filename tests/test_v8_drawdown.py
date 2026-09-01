@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from exposure_workbench.analytics import drawdown as dd
+from exposure_workbench.services import quantities as qn
 from exposure_workbench.analytics.risk_metrics import calc_risk_metrics
 
 
@@ -151,6 +152,6 @@ def test_episode_depths_are_citable():
     gate will refuse. Declared as a list under one unit, so a list is not a
     licence to walk arbitrary structure."""
     from exposure_workbench.services import numeric_verification as nv
-    keys = nv._CALC_RESULT_KEYS["portfolio.drawdown_episodes"]
+    keys = qn._CALC_RESULT_KEYS["portfolio.drawdown_episodes"]
     assert keys == {"deepest_depth": nv.RATIO, "episode_depths": nv.RATIO}
-    assert "portfolio.drawdown_episodes" in nv._CALC_RATIO_OPS
+    assert "portfolio.drawdown_episodes" in qn._CALC_RATIO_OPS

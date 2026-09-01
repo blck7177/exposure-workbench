@@ -28,6 +28,7 @@ from pathlib import Path
 import pytest
 
 from exposure_workbench.db.models import LimitCheck, StressResult as StressResultRow
+from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import numeric_verification as nv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,7 +77,7 @@ def test_the_scenario_carries_the_shocks_it_applied():
 
 
 def test_a_scenarios_loss_is_citable_under_the_run():
-    entry = next((m, money, ratio, label) for m, money, ratio, label in nv._RUN_CHILDREN
+    entry = next((m, money, ratio, label) for m, money, ratio, label, _qual in qn._RUN_CHILDREN
                  if m is StressResultRow)
     _model, money, ratio, label = entry
     assert "loss_usd" in money and "loss_pct" in ratio

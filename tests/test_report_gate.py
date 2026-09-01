@@ -21,7 +21,7 @@ from exposure_workbench.agents.direct_llm_agent import DirectLlmAgent, ReportUna
 from exposure_workbench.agents.schemas import ReportInput
 from exposure_workbench.services import numeric_verification as nv
 from exposure_workbench.services.report_verification import ReportVerdict, _CHECKED_FIELDS
-from exposure_workbench.tools.registry import extract_evidence_refs
+from exposure_workbench.services import table as tbl
 
 GOOD = {
     "executive_summary": "s", "key_movements": "k", "factor_explanation": "f",
@@ -165,25 +165,26 @@ def test_a_plain_number_of_days_is_still_a_claim():
     assert "30" in keys
 
 
-# ── evidence ingestion has one definition of an id ─────────────────────────────
+# ── the table has one definition of an id ─────────────────────────────────────
 
 def test_an_object_shaped_result_cannot_smuggle_a_malformed_id():
     """Caught live, one row. list_alerts returns {"id": ..., "type": alert_type},
     so `alertb41eec529430` — no underscore, from before the prefix fix — was
     harvested under ref_type "issuer_concentration", which is an alert type and
-    not an evidence type. It could never be cited, resolved or valued."""
-    refs = extract_evidence_refs(
-        [{"id": "alertb41eec529430", "type": "issuer_concentration"},
-         {"id": "alert_1a2b3c4d5e6f", "type": "issuer_concentration"}]
-    )
+    not an evidence type. It could never be cited, resolved or valued. The
+    declaration (V15-S2a) keys on the id's own prefix and nothing else."""
+    refs = tbl.declare({"alerts": [
+        {"id": "alertb41eec529430", "type": "issuer_concentration"},
+        {"id": "alert_1a2b3c4d5e6f", "type": "issuer_concentration"}]})["evidence"]
     ids = {r["id"] for r in refs}
     assert "alert_1a2b3c4d5e6f" in ids
     assert "alertb41eec529430" not in ids
+    assert not any(r["type"] == "issuer_concentration" for r in refs)
 
 
 def test_a_key_named_calc_id_does_not_make_its_value_an_id():
     """The second bypass trusted the KEY's name rather than the id."""
-    refs = extract_evidence_refs({"calc_id": "not-an-id", "fact_id": "fact_abc123"})
+    refs = tbl.declare({"calc_id": "not-an-id", "fact_id": "fact_abc123"})["evidence"]
     ids = {r["id"] for r in refs}
     assert "fact_abc123" in ids
     assert "not-an-id" not in ids

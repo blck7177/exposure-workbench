@@ -95,6 +95,24 @@ def _stub_llm(monkeypatch, chat):
     monkeypatch.setattr(meta_agent, "llm_session", _fake)
 
 
+def _BLOCKS(text: str, slot: bool = False) -> str:
+    """The arguments a V15 model sends respond: blocks, a figure as a {ref, name}
+    slot. The stubbed tool session never reads them, and they are written in the
+    real shape anyway so a reader of these tests sees the real contract."""
+    import json
+    runs = [text] + ([{"ref": "run_never_read", "name": "exposure_metrics.market_value"}] if slot else [])
+    return json.dumps({"blocks": [{"type": "paragraph", "runs": runs}]})
+
+
+def _ACCEPTED(text: str) -> dict:
+    """What respond returns when the resolver accepts: the V15 result shape the
+    loop reads `text`, `citations`, `verified` and `blocks` from."""
+    return {"responded": True, "format": "blocks",
+            "blocks": [{"type": "paragraph", "runs": [text]}],
+            "text": text, "citations": [],
+            "verified": {"figures": 0, "sources": 0, "matches": []}}
+
+
 @pytest.mark.asyncio
 async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(monkeypatch):
     """The path that mattered most: on the final turn the loop used to assign the
@@ -156,10 +174,10 @@ async def test_an_accepted_answer_carries_no_marker(monkeypatch):
     """The marker must mean something, so it has to be absent on the happy path."""
     async def _responds(**_kw):
         return ("", [{"id": "c1", "function": {"name": "respond",
-                                               "arguments": '{"text":"Hello.","citations":[]}'}}])
+                                               "arguments": _BLOCKS("Hello.")}}])
 
     _stub_llm(monkeypatch, _responds)
-    _stub_tools(monkeypatch, {"responded": True, "text": "Hello.", "citations": []})
+    _stub_tools(monkeypatch, _ACCEPTED("Hello."))
     store: list = []
     out = await handle_message(_factory(store), "sess_4", "hi", max_turns=4)
 
@@ -234,14 +252,17 @@ async def test_what_the_gate_actually_refused_is_recorded_for_the_desk(monkeypat
     exactly what would have answered it in one query."""
     async def _always_responds(**_kw):
         return ("", [{"id": "c1", "function": {"name": "respond",
-                                               "arguments": '{"text":"x","citations":[]}'}}])
+                                               "arguments": _BLOCKS("x", slot=True)}}])
 
     _stub_llm(monkeypatch, _always_responds)
-    _stub_tools(monkeypatch, {"error": "unverified_numbers", "problems": [{"value": "999.9"}]})
+    # The shape a V15 refusal really has: the code, and one problem per pointer.
+    _stub_tools(monkeypatch, {"error": "not_on_table",
+                              "problems": [{"id": "run_never_read", "reason": "not_on_table"}],
+                              "detail": "every id an answer points at must be on the table"})
     out = await handle_message(_factory([]), "sess_codes", "how did NVDA do?", max_turns=3)
 
     assert out["meta"]["gate"] == "exhausted"
-    assert out["meta"]["gate_refusals"] == ["unverified_numbers"] * 3
+    assert out["meta"]["gate_refusals"] == ["not_on_table"] * 3
 
 
 @pytest.mark.asyncio
@@ -283,15 +304,14 @@ async def test_a_spent_budget_narrows_the_face_to_its_exits(monkeypatch):
             return ("", [{"id": "c1", "function": {
                 "name": "get_flow", "arguments": '{"ticker":"NVDA","metric":"revenue"}'}}])
         return ("", [{"id": "c2", "function": {
-            "name": "respond", "arguments": '{"text":"Here is what I have.","citations":[]}'}}])
+            "name": "respond", "arguments": _BLOCKS("Here is what I have.")}}])
 
     _stub_llm(monkeypatch, _chat)
     _stub_tools(
         monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
         by_name={"get_flow": {"error": "budget_exceeded", "kind": "turn_tool",
                               "used": 15, "limit": 15},
-                 "respond": {"responded": True, "text": "Here is what I have.",
-                             "citations": []}})
+                 "respond": _ACCEPTED("Here is what I have.")})
     out = await handle_message(_factory([]), "sess_5", "everything about NVDA", max_turns=4)
 
     assert offered[0] == ["get_flow", "think", "respond"]
@@ -312,14 +332,14 @@ async def test_only_an_evidence_pool_running_dry_narrows_the_face(monkeypatch):
         if len(offered) == 1:
             return ("", [{"id": "c1", "function": {"name": "get_flow", "arguments": "{}"}}])
         return ("", [{"id": "c2", "function": {
-            "name": "respond", "arguments": '{"text":"Hi.","citations":[]}'}}])
+            "name": "respond", "arguments": _BLOCKS("Hi.")}}])
 
     _stub_llm(monkeypatch, _chat)
     _stub_tools(
         monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
         by_name={"get_flow": {"error": "budget_exceeded", "kind": "external_search",
                               "used": 5, "limit": 5},
-                 "respond": {"responded": True, "text": "Hi.", "citations": []}})
+                 "respond": _ACCEPTED("Hi.")})
     await handle_message(_factory([]), "sess_6", "hi", max_turns=4)
 
     assert offered[1] == ["get_flow", "think", "respond"]

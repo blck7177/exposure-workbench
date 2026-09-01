@@ -23,15 +23,16 @@ from __future__ import annotations
 import inspect
 
 from exposure_workbench.services import numeric_verification as nv
+from exposure_workbench.services import quantities as qn
 
 
 def test_the_count_map_is_a_literal_enumeration():
     """Not a query builder. The set of countable things is written down, so
     reading this module tells an auditor the whole surface — the same property
     _RUN_CHILDREN has, for the same reason."""
-    assert isinstance(nv._RUN_COUNTS, tuple)
-    assert nv._RUN_COUNTS, "at least the alerts, the checks and the scenarios"
-    for entry in nv._RUN_COUNTS:
+    assert isinstance(qn._RUN_COUNTS, tuple)
+    assert qn._RUN_COUNTS, "at least the alerts, the checks and the scenarios"
+    for entry in qn._RUN_COUNTS:
         model, label, split = entry
         assert isinstance(label, str)
         # split is either None (count the lot) or a column name whose distinct
@@ -44,8 +45,8 @@ def test_counts_are_declared_over_direct_children_only():
     """Every counted model must also be a model the resolver already reads as a
     child of the run. A count over something the gate cannot otherwise see would
     be a second, weaker path to the same evidence."""
-    children = {model for model, *_ in nv._RUN_CHILDREN}
-    for model, _label, _split in nv._RUN_COUNTS:
+    children = {model for model, *_ in qn._RUN_CHILDREN}
+    for model, _label, _split in qn._RUN_COUNTS:
         assert model in children, f"{model.__name__} is counted but is not a run child"
 
 
@@ -53,5 +54,5 @@ def test_a_count_is_a_count_not_a_ratio():
     """`_COMPATIBLE` lets a bare written number meet a stored COUNT, and lets a
     percent meet only a RATIO. Emitting these as RATIO would make "3 alerts"
     verify a claim of "3%"."""
-    src = inspect.getsource(nv._from_run)
+    src = inspect.getsource(qn._from_run)
     assert "COUNT" in src, "row counts must be emitted in the COUNT unit class"

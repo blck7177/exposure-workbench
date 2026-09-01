@@ -10,7 +10,7 @@ from __future__ import annotations
 import inspect
 
 from exposure_workbench.services import integration_service as isvc
-from exposure_workbench.services import numeric_verification as nv
+from exposure_workbench.services import quantities as nv  # the namer holds the derivation tables since V15-S2a
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 

@@ -136,25 +136,33 @@ def test_neither_entry_point_mutates_the_evidence_it_was_given(fn):
     assert values == before
 
 
-def test_the_respond_gate_returns_what_it_verified():
+def test_the_respond_gate_returns_what_the_resolver_accepted():
     """Read off the tool, because this is the seam the UI depends on.
 
-    `verified` is bound on every path out of the checks, including the ones
-    where no number was stated — an answer that verified nothing reports zero
-    rather than omitting the field, so the badge can say "0 figures checked"
-    instead of disappearing and leaving the reader to guess which it was.
+    V15-S4: the gate no longer reads figures out of a sentence and matches them.
+    The verified matches come from the one resolver — `_respond_blocks` hands
+    the blocks to `resolver.resolve` and returns `resolver.accepted(...)`, whose
+    `verified` carries a count and a match per slot on every accepted path,
+    including an answer with no slots at all (zero, not an absent field, so the
+    badge can say "0 figures checked" rather than disappearing).
     """
     import inspect
 
+    from exposure_workbench.services import resolver
     from exposure_workbench.tools import meta_tools
 
-    body = inspect.getsource(meta_tools)
-    assert 'verified: list[dict] = []' in body, (
-        "`verified` must be bound before the branches, or an answer with no "
-        "numbers in it raises NameError on the successful return"
+    body = inspect.getsource(meta_tools._respond_blocks)
+    assert "resolver.resolve(" in body
+    assert "return {\"responded\": True, \"format\": \"blocks\", **resolver.accepted(blocks, verdict)}" in body
+    assert "verify_with_matches" not in inspect.getsource(meta_tools), (
+        "the exit must not run the prose checker: a second judgement beside the "
+        "resolver's is free to disagree with it"
     )
-    assert '"figures": len(verified)' in body
-    assert "verify_with_matches(stated, values, quoted)" in body
+    # The shape the UI reads, pinned on the resolver rather than on the tool.
+    accepted = resolver.accepted([{"type": "paragraph", "runs": ["Nothing changed."]}],
+                                 resolver.Verdict())
+    assert accepted["verified"] == {"figures": 0, "sources": 0, "matches": []}
+    assert accepted["citations"] == []
 
 
 def test_the_agent_records_what_the_gate_found_rather_than_re_deriving_it():

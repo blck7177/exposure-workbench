@@ -12,6 +12,7 @@ from datetime import date
 import pytest
 
 from exposure_workbench.analytics import interval_algebra as ia, series_ops as so
+from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import numeric_verification as nv
 from exposure_workbench.services import series_service as ss
 from exposure_workbench.services import typed_calculator as tc
@@ -146,7 +147,7 @@ def test_the_resolver_believes_a_recorded_type_over_the_op_table():
     """A `stat.latest` over a margin series is a ratio; the operation name says
     nothing about what it was taken over. Rows that recorded their type are
     believed; the table stays for the rows that did not."""
-    src = inspect.getsource(nv._from_calc)
+    src = inspect.getsource(qn._calc_unit)
     assert 'result_type' in src
     assert src.index("result_type") < src.index("_CALC_RATIO_OPS")
 

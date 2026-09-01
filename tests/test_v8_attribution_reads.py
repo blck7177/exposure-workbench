@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from exposure_workbench.db.models import ExposureMetrics
+from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import numeric_verification as nv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,7 @@ def test_the_numeric_metadata_is_citable_under_the_run():
     "58%" correctly does not.
     """
     ratio_cols = next(
-        ratio for model, _money, ratio, _label in nv._RUN_CHILDREN
+        ratio for model, _money, ratio, _label, _qual in qn._RUN_CHILDREN
         if model is ExposureMetrics
     )
     for column, numeric in NEW_COLUMNS:

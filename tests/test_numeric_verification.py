@@ -1,5 +1,10 @@
 """V3-A1 numeric verification — extraction and exemptions (offline).
 
+V15-S4: this is the v1 PROSE route, kept for the daily report and the eval over
+stored prose answers. The chat exit no longer reads figures out of sentences —
+it resolves slots by name (services/resolver.py) — so the old group C, which
+drove `_respond` with prose, has no subject and is gone.
+
 Group A pins the written forms the live corpus actually contains; group B pins
 the exemption set. Four of these are regressions against bugs the first draft
 had, each found by running the extractor over the real agent_messages and
@@ -11,7 +16,6 @@ from __future__ import annotations
 
 import pytest
 
-from exposure_workbench.tools.meta_tools import _respond
 from exposure_workbench.services.numeric_verification import (
     COUNT,
     MONEY,
@@ -188,16 +192,6 @@ def test_the_designator_exemption_is_two_shapes_and_a_closed_list():
         assert extract_numbers(f"tracking the {name} today") == [], name
 
 
-@pytest.mark.asyncio
-async def test_the_gate_no_longer_lets_a_reply_made_of_share_counts_through():
-    """The bypass, end to end. Nothing about A0-1 changed; it was never reached,
-    because a reply the extractor reads as number-free is a reply with nothing
-    to demand citations for."""
-    out = await _respond(None, "Your holdings are AAPL 5000, MSFT 3500.", [])
-    assert out["error"] == "citations_required"
-    assert out["numbers_found"] == ["5000", "3500"]
-
-
 def test_an_id_is_exempt_whole_not_digit_by_digit():
     """A naive scan of calc_50c612fc9f59 yields 50, 612 and 59 — three numbers
     the model never claimed, in a reply that is otherwise number-free."""
@@ -229,43 +223,6 @@ def test_a_scale_letter_that_starts_another_word_is_not_a_scale():
 def test_a_number_free_reply_yields_nothing():
     assert extract_numbers("Sure — what would you like to know about the portfolio?") == []
     assert extract_numbers("") == []
-
-
-# ── group C: the gate that consumes it (A0-1) ─────────────────────────────────
-# db is None throughout: with no message scope the trajectory check returns before
-# its first query, so the empty-citations branch still reaches no database,
-# and a test that needed a database to prove a pure refusal would be testing the
-# database.
-
-@pytest.mark.asyncio
-async def test_the_gate_refuses_a_number_without_a_citation():
-    out = await _respond(None, "NVDA's most recent quarterly revenue was $81.615B.", [])
-    assert out["error"] == "citations_required"
-    assert out["numbers_found"] == ["$81.615B"]
-    assert "responded" not in out
-
-
-@pytest.mark.asyncio
-async def test_the_gate_lets_a_number_free_reply_through_uncited():
-    out = await _respond(None, "Sure — which issuer would you like me to look at?", [])
-    assert out["responded"] is True
-    assert out["citations"] == []
-
-
-@pytest.mark.asyncio
-async def test_an_id_in_the_reply_is_not_a_number_the_gate_demands_evidence_for():
-    """The live corpus contains exactly this reply, uncited and legitimate: it
-    hands the user a run id to follow. Keying the id exemption to the six
-    citable prefixes would have refused it, because rrun_ is not one of them."""
-    out = await _respond(None, "Started it. You can follow it with run id rrun_0bef53cb5360.", [])
-    assert out["responded"] is True
-
-
-@pytest.mark.asyncio
-async def test_every_refused_number_is_reported_so_the_model_can_fix_them():
-    out = await _respond(None, "Technology is 32.9% of the book, with AAPL 15.8%.", None)
-    assert out["error"] == "citations_required"
-    assert out["numbers_found"] == ["32.9%", "15.8%"]
 
 
 # ── group D: matching a number against the evidence (A1) ──────────────────────
@@ -363,12 +320,12 @@ def test_no_evidence_at_all_reports_nearest_none_rather_than_crashing():
 
 
 def test_every_citable_prefix_has_a_value_source():
-    """A prefix the gate accepts but the verifier cannot resolve would report the
-    model's correct number as unverified, blaming it for a hole in this table.
-    run_ and chunk_/src_ were both missing from the first design."""
-    from exposure_workbench.services import evidence_trail_service as trail
-    from exposure_workbench.services.numeric_verification import _VALUE_SOURCES
-    assert set(trail._RESOLVERS) == set(_VALUE_SOURCES)
+    """A prefix the table can place but the namer cannot value would put an id on
+    the table that holds nothing and says nothing. run_ and chunk_/src_ were
+    both missing from the first design."""
+    from exposure_workbench.services import quantities as qn
+    from exposure_workbench.services import table as tb
+    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(qn.CITABLE_PREFIXES)
 
 
 def test_a_short_digit_string_cannot_be_verified_by_prose_alone():

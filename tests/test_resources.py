@@ -19,10 +19,13 @@ import pytest
 
 from exposure_workbench.analytics import resources as R
 from exposure_workbench.services import numeric_verification as nv
+from exposure_workbench.services import quantities as qn
 
 
 def test_the_gate_derives_its_lists_rather_than_keeping_them():
-    src = inspect.getsource(nv)
+    """V15-S2a moved the walk into services/quantities.py, the one namer; the
+    derivation lives there now and the gate has no list of its own."""
+    src = inspect.getsource(qn)
     for name in ("_RUN_CHILDREN", "_RUN_COUNTS", "_CALC_RESULT_KEYS", "_CALC_RATIO_OPS"):
         block = src[src.index(f"{name}"):]
         block = block[:block.index("\n\n")]
@@ -84,7 +87,7 @@ def test_the_unit_of_a_calculation_comes_from_the_row_not_its_name():
 
     assert "unit_class" in CalcLedger.__table__.columns
 
-    src = inspect.getsource(nv._from_calc)
+    src = inspect.getsource(qn._calc_unit)
     assert "row.unit_class" in src
     assert src.index("row.unit_class") < src.index("_CALC_RATIO_OPS"), (
         "the row's own unit must be preferred over the operation-name table"
@@ -108,4 +111,4 @@ def test_the_writer_stores_the_unit_it_was_given_or_could_read():
 def test_unit_class_strings_agree_across_the_two_modules():
     """resources names them without importing the gate; the gate must mean the
     same strings or the derivation types everything wrong and nothing fails."""
-    assert (R.MONEY, R.RATIO, R.COUNT) == (nv.MONEY, nv.RATIO, nv.COUNT)
+    assert (R.MONEY, R.RATIO, R.COUNT) == (nv.MONEY, nv.RATIO, nv.COUNT) == (qn.MONEY, qn.RATIO, qn.COUNT)

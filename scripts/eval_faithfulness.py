@@ -40,6 +40,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -52,8 +53,9 @@ sys.path.insert(0, str(ROOT / "src"))
 load_dotenv(ROOT / ".env", override=True)
 
 from exposure_workbench.db.models import AgentMessage, IssuerBrief  # noqa: E402
-from exposure_workbench.services import evidence_trail_service as trail  # noqa: E402
+from exposure_workbench.services import answer_blocks as ab  # noqa: E402
 from exposure_workbench.services import numeric_verification as nv  # noqa: E402
+from exposure_workbench.services import quantities as qn  # noqa: E402
 
 URL = os.getenv("DATABASE_URL_LOCAL", "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
 # open_questions is measured too, against the union of the brief's citations —
@@ -64,7 +66,23 @@ BLOCKS = ("financial_summary", "key_changes", "management_explanation",
           "market_context", "portfolio_implications", "open_questions")
 
 
-async def _check_blocks(db, blocks) -> tuple[int, list[dict]]:
+# An id token in a text run. V14-C answers wrote "Evidence ids: run_… / alert_…"
+# into runs because a passage- or run-backed claim had no block of its own;
+# V15-S3 gives every claim a shape and the exit refuses digits in text, so this
+# is a class the corpus carries and nothing written after S3 can add to. It is
+# counted under its own key, not as an unverified figure: no magnitude was
+# stated, so there is nothing for the evidence to fail to support.
+_ID_TOKEN = re.compile(r"\b(?:fact|chunk|calc|src|co|rrun|run|filing|alert|brief|msg|sess|task|pack|"
+                       r"step|port|pos|report)_[A-Za-z0-9_]{3,}")
+
+
+def _only_ids(text: str) -> bool:
+    """Every flagged digit run sits inside an id token: with the tokens taken
+    out, the exit's own rule finds nothing."""
+    return bool(_ID_TOKEN.search(text)) and not ab.figures_in_text(_ID_TOKEN.sub(" ", text))
+
+
+async def _check_blocks(db, blocks) -> tuple[int, list[dict], list[dict]]:
     """A block answer, checked as one: slots against their rows, text against
     the rule that it carries no figures.
 
@@ -73,11 +91,18 @@ async def _check_blocks(db, blocks) -> tuple[int, list[dict]]:
     is the same promise citation resolution makes one level up, and it is the
     only thing about a slot that can decay: the model never wrote the figure, so
     there is nothing here it could have written wrongly.
-    """
-    from exposure_workbench.services import answer_blocks as ab
 
+    Text runs are held to the exit's own rule (answer_blocks.figures_in_text):
+    no digits but the closed non-measurement classes. The prose extractor is
+    not used here — it reads magnitudes out of sentences, which is the v1
+    instrument, and a block answer has no magnitudes in its text by construction.
+
+    Returns (slots, problems, ids_in_text): the third is the V14-C class above,
+    reported beside the metrics rather than inside `unverified`.
+    """
     slots: list[dict] = []
     text_problems: list[dict] = []
+    ids_in_text: list[dict] = []
     for i, b in enumerate(blocks if isinstance(blocks, list) else []):
         if not isinstance(b, dict):
             continue
@@ -88,12 +113,15 @@ async def _check_blocks(db, blocks) -> tuple[int, list[dict]]:
             if isinstance(r, dict) and isinstance(r.get("slot"), dict):
                 slots.append(r["slot"])
             elif isinstance(r, str):
-                stated = nv.extract_numbers(r)
-                if stated:
+                figures = ab.figures_in_text(r)
+                if figures and _only_ids(r):
+                    ids_in_text.append({
+                        "reason": "id_written_as_text", "at": f"blocks[{i}].runs[{j}]",
+                        "ids": _ID_TOKEN.findall(r)})
+                elif figures:
                     text_problems.append({
-                        "reason": "figure_written_as_text",
-                        "at": f"blocks[{i}].runs[{j}]",
-                        "numbers": nv.raw_forms(stated)})
+                        "reason": "figure_written_as_text", "at": f"blocks[{i}].runs[{j}]",
+                        "numbers": figures, "text": r[:120]})
 
     refs = sorted({s["ref"] for s in slots if isinstance(s.get("ref"), str)})
     values, _quoted = await nv.resolve_cited_values(db, refs) if refs else ([], set())
@@ -107,16 +135,28 @@ async def _check_blocks(db, blocks) -> tuple[int, list[dict]]:
         if not isinstance(want, (int, float)):
             continue
         holds = by_ref.get(ref, [])
-        atol = 0.5 * (10 ** -ab._decimals_of(float(want)))
+        atol = 0.5 * (10 ** -_decimals_of(float(want)))
         if not any(abs(v.value - float(want)) <= atol for v in holds):
             problems.append({
                 "reason": "slot_no_longer_held" if holds else "slot_ref_holds_nothing",
                 "ref": ref, "label": s.get("label"), "number": want})
-    return len(slots), problems
+    return len(slots), problems, ids_in_text
+
+
+def _decimals_of(x: float) -> int:
+    """Decimal places the stored value carries. A V15 slot stores the row's own
+    value, so this is exact; a V14-C slot stored the value at the precision the
+    model wrote it, and half an ulp of that is the honest read-time tolerance."""
+    s = repr(float(x))
+    if "e" in s or "E" in s:
+        return 12
+    return len(s.split(".")[1].rstrip("0")) if "." in s else 0
 
 
 async def _resolves(db, ids) -> tuple[int, list[str]]:
-    dangling = [i for i in ids if not await trail._exists_in_db(db, i)]
+    """A citation resolves when the namer can place it on a row (V15: the one
+    existence check is `quantities.of_ref`, whose kind is None for nothing)."""
+    dangling = [i for i in ids if (await qn.of_ref(db, i)).kind is None]
     return len(ids), dangling
 
 
@@ -132,15 +172,20 @@ async def evaluate() -> dict:
             )).scalars().all()
             numbers = bad = cited = dangling_total = uncited_with_numbers = 0
             v2_messages = v2_slots = 0
+            id_text_runs, id_text_messages = 0, set()
             for m in msgs:
                 blocks = (m.meta or {}).get("blocks") if isinstance(m.meta, dict) else None
                 if blocks:
                     v2_messages += 1
-                    n_slots, problems = await _check_blocks(db, blocks)
+                    n_slots, problems, ids_in_text = await _check_blocks(db, blocks)
                     v2_slots += n_slots
                     numbers += n_slots
                     bad += len(problems)
                     for p in problems:
+                        out["refusals"].append({"where": m.id, **p})
+                    for p in ids_in_text:
+                        id_text_runs += 1
+                        id_text_messages.add(m.id)
                         out["refusals"].append({"where": m.id, **p})
                     ids = list(m.citations or [])
                     n, dangling = await _resolves(db, ids)
@@ -168,7 +213,9 @@ async def evaluate() -> dict:
             out["chat"] = {"messages": len(msgs), "numbers": numbers, "unverified": bad,
                            "citations": cited, "dangling_citations": dangling_total,
                            "number_bearing_uncited": uncited_with_numbers,
-                           "block_messages": v2_messages, "block_slots": v2_slots}
+                           "block_messages": v2_messages, "block_slots": v2_slots,
+                           "id_in_text_runs": id_text_runs,
+                           "id_in_text_messages": len(id_text_messages)}
 
             # ── briefs (per block, against that block's own citations) ──────
             briefs = (await db.execute(select(IssuerBrief))).scalars().all()

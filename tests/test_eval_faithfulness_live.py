@@ -81,7 +81,17 @@ async def test_every_citation_still_resolves():
 #
 # The ceiling is 9 again, and the lesson is kept: a measurement that disagrees
 # with the gate is a measurement to read before a constant to raise.
+#
+# V15-S4 retired the derivation search and the instrument now reads block text
+# under the exit's own rule (answer_blocks.figures_in_text). What that surfaced
+# is kept OUT of this number on purpose, under its own key: thirteen V14-C block
+# answers (2026-08-31 to 09-01) whose text runs are id tokens — "run_… /
+# alert_…", the "Evidence ids" habit a claim with no block of its own produced.
+# No magnitude was stated in any of them, so they are not unverified figures;
+# they are the shape V15-S3 refuses at the exit (`digits_in_text`), and nothing
+# written after S3 can add to the class. ID_IN_TEXT_MESSAGES holds them.
 CHAT_REFUSAL_CEILING = 9
+ID_IN_TEXT_MESSAGES = 13
 
 
 async def test_chat_answers_verify_almost_completely():
@@ -99,9 +109,23 @@ async def test_chat_answers_verify_almost_completely():
     )
     # The classification is part of the ceiling: a ninth refusal of a different
     # kind must not hide under a count that eight of one kind filled up.
-    kinds = {p["reason"] for p in r["refusals"]
-             if p.get("reason") in ("not_in_cited_evidence", "not_quotable_individually")}
+    kinds = {p["reason"] for p in r["refusals"] if p.get("reason") != "id_written_as_text"}
     assert kinds <= {"not_in_cited_evidence", "not_quotable_individually"}, kinds
+
+
+async def test_ids_written_into_text_are_a_closed_class_of_old_answers():
+    """The V14-C habit, enumerated: every run the exit's text rule flags in a
+    stored block answer is an id token and nothing else, and the set of answers
+    carrying one cannot grow — after V15-S3 the exit refuses the shape."""
+    from scripts.eval_faithfulness import _ID_TOKEN, evaluate
+
+    r = await evaluate()
+    assert r["chat"]["id_in_text_messages"] <= ID_IN_TEXT_MESSAGES, (
+        f"{r['chat']['id_in_text_messages']} block answers carry an id in a text run; "
+        f"the class was closed at {ID_IN_TEXT_MESSAGES} by V15-S3. Read the new one"
+    )
+    for p in (x for x in r["refusals"] if x["reason"] == "id_written_as_text"):
+        assert p["ids"] and all(_ID_TOKEN.fullmatch(i) for i in p["ids"]), p
 
 
 async def test_brief_refusals_stay_within_the_classified_set():
@@ -138,3 +162,6 @@ async def test_a_block_answer_is_measured_as_blocks_not_as_prose():
         f"{len(slot_problems)} block-answer problems: a slot whose row no longer holds "
         f"its value, or a figure written into text. {slot_problems[:3]}"
     )
+    # Ids in text are the one class the old exit let through (see the module
+    # constant); they are reported beside the metrics, never inside them.
+    assert "id_in_text_messages" in chat

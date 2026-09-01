@@ -93,7 +93,9 @@ def _normalise(value):
     if isinstance(value, str):
         return _MINTED.sub("calc_<minted>", value)
     if isinstance(value, dict):
-        return {k: _normalise(v) for k, v in value.items()}
+        # V15: a minted id is also a KEY in the table slice (quantities/rows are
+        # keyed by ref), so keys are blanked the same way values are.
+        return {_normalise(k): _normalise(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_normalise(v) for v in value]
     return value

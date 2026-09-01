@@ -1,0 +1,71 @@
+{
+  "_note": "One set of cases for analytics/display_conventions.py (Python) and apps/web/lib/display.ts (TypeScript). Both suites read this file; a change to either side that the other does not mirror fails one of them.",
+  "cases": [
+    {
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "display": "16.3%",
+      "reader_value": 0.1634
+    },
+    {
+      "value": 0.0129,
+      "unit_class": "RATIO",
+      "display": "1.29%",
+      "reader_value": 0.0129
+    },
+    {
+      "value": -0.80469151,
+      "unit_class": "RATIO",
+      "display": "-80.5%",
+      "reader_value": -0.8047
+    },
+    {
+      "value": 0.08,
+      "unit_class": "PERCENT",
+      "display": "8.00%",
+      "reader_value": 0.08
+    },
+    {
+      "value": 10869311,
+      "unit_class": "MONEY",
+      "display": "$10.87M",
+      "reader_value": 10869311
+    },
+    {
+      "value": -141972.82,
+      "unit_class": "MONEY",
+      "display": "$-142K",
+      "reader_value": -141973
+    },
+    {
+      "value": 84697000000,
+      "unit_class": "MONEY",
+      "display": "$84.70B",
+      "reader_value": 84697000000
+    },
+    {
+      "value": 512.5,
+      "unit_class": "MONEY",
+      "display": "$512",
+      "reader_value": 512
+    },
+    {
+      "value": 1.3978,
+      "unit_class": "MULTIPLE",
+      "display": "1.40×",
+      "reader_value": 1.398
+    },
+    {
+      "value": 27,
+      "unit_class": "COUNT",
+      "display": "27",
+      "reader_value": 27
+    },
+    {
+      "value": 143.67,
+      "unit_class": "COUNT",
+      "display": "143.67",
+      "reader_value": 143.67
+    }
+  ]
+}

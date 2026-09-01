@@ -24,7 +24,7 @@ from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools import definitions as D
-from exposure_workbench.tools.registry import extract_evidence_refs
+from exposure_workbench.services import table as tbl
 
 pytestmark = pytest.mark.live
 
@@ -64,10 +64,10 @@ async def test_a_brief_can_be_read_back_with_the_evidence_under_each_block():
 
 
 async def test_reading_a_brief_never_makes_the_brief_itself_citable():
-    """brief_id is a plain string field on purpose. Returned as {"type","id"} the
-    wrapper would harvest it into the evidence trail, where it would pass the
-    trail check and then fail DB existence with a misleading "unresolved_in_db" —
-    and a brief is a conclusion drawn from evidence, so citing it is a loop."""
+    """brief_ is not a prefix the table places, on purpose: a brief is a
+    conclusion drawn from evidence, so citing it is a loop. What the tool
+    DECLARES (V15-S2a, the registration's Evidence()) is the evidence under the
+    blocks, and that must reach the table."""
     engine, mk = await _session()
     try:
         async with mk() as db:
@@ -78,10 +78,11 @@ async def test_reading_a_brief_never_makes_the_brief_itself_citable():
                 pytest.skip("no brief in this database")
 
             out = await D._read_issuer_brief(db, ticker)
-            harvested = {r["id"] for r in extract_evidence_refs(out)}
-            assert out["brief_id"] not in harvested
-            # the underlying evidence, however, must be harvested — that is the point
-            assert harvested, "the block citations must reach the trail"
+            assert D.build_read_registry().get("read_issuer_brief").evidence is not None
+            declared = {e["id"] for e in tbl.declare(dict(out))["evidence"]}
+            assert out["brief_id"] not in declared
+            # the underlying evidence, however, must be declared — that is the point
+            assert declared, "the block citations must reach the table"
     finally:
         await engine.dispose()
 

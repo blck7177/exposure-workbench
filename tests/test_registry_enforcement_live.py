@@ -26,7 +26,7 @@ async def _mk():
     return engine, async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def test_wrapper_writes_trace_and_extracts_refs():
+async def test_wrapper_writes_trace_and_declares_refs():
     engine, mk = await _mk()
     try:
         reg = build_read_registry()
@@ -81,25 +81,26 @@ async def test_budget_exhaustion_rejects_and_is_traced():
         await engine.dispose()
 
 
-async def test_a_session_cannot_talk_an_id_into_its_own_evidence_trail():
+async def test_a_session_cannot_talk_an_id_onto_its_own_table():
     """V3-R2, replayed end to end on a REAL id — which is what makes it a hole
-    rather than a curiosity. A fabricated id dies at the DB-existence check
-    anyway; an id that exists and is visible, reached without ever retrieving
-    it, is the case the trail alone can stop.
+    rather than a curiosity. A fabricated id dies at the resolver anyway; an id
+    that exists and is visible, reached without ever retrieving it, is the case
+    the table alone can stop.
 
     The sequence is the one the review reproduced. A session calls exactly two
     tools, both of which hand the model's own argument straight back —
     get_portfolio_positions on an id that is not a portfolio, and think — and
-    then cites the run. Before this, both echoes were harvested as evidence, the
-    citation passed the trail check, the run resolved, and its children's
-    numbers were available to verify an answer built on a run the session never
-    read. Provenance is the trail's whole promise, and it was false."""
+    then points at the run. V15-S2a: neither tool DECLARES the echo (an error
+    payload with no absence row; a reflection registered without evidence), so
+    the run is not on the table, the slot is refused as `not_on_table`, and the
+    refusal's own echo of the id — a gate declares nothing — leaves the table
+    exactly as it was."""
     engine, mk = await _mk()
     try:
         reg = build_read_registry()
         from exposure_workbench.tools.meta_tools import register_meta_tools
         register_meta_tools(reg)
-        from exposure_workbench.services import evidence_trail_service as trail
+        from exposure_workbench.services import table as tb
 
         async with mk() as db:
             run_id = (await db.execute(text(
@@ -118,19 +119,23 @@ async def test_a_session_cannot_talk_an_id_into_its_own_evidence_trail():
             await db.commit()
 
         async with mk() as db:
-            assert run_id not in await trail.collect_trail(db, sid), (
-                "an echo is not a retrieval; nothing this session called returned that id")
-            # V14-C: respond takes blocks, and a figure is a slot naming its
-            # evidence. The laundering attempt is the same — an id this session
-            # never retrieved, offered as support — and so is the refusal.
+            assert not (await tb.load(db, sid)).holds(run_id), (
+                "an echo is not a retrieval; nothing this session called declared that id")
             refused = await R.invoke(reg, db, sid, "respond", {"blocks": [
                 {"type": "paragraph", "runs": [
-                    "The book is fine at ", {"ref": run_id, "value": 1.0}, "."]},
+                    "The book is worth ", {"ref": run_id, "name": "exposure_metrics.market_value"}, "."]},
             ]})
             await db.commit()
-            assert refused["error"] == "invalid_citations", refused
-            assert any(p.get("id") == run_id and p.get("reason") == "not_in_evidence_trail"
+            assert refused["error"] == "not_on_table", refused
+            assert any(p.get("id") == run_id and p.get("reason") == "not_on_table"
                        for p in refused["problems"]), refused
+
+        async with mk() as db:
+            # The refusal echoed the id under problems[].id and the call
+            # completed. The old harvester wrote that echo into the trail and
+            # the retry passed; a gate declares nothing, so it is still off.
+            assert not (await tb.load(db, sid)).holds(run_id), (
+                "a gate's refusal put the id it refused on the table")
     finally:
         await engine.dispose()
 
@@ -138,10 +143,14 @@ async def test_a_session_cannot_talk_an_id_into_its_own_evidence_trail():
 async def test_a_share_count_survives_the_whole_path_from_tool_to_gate():
     """V3-R4 end to end, which is C3's acceptance query and nothing less: read
     the book, state a holding, cite the holding. Four things have to line up for
-    it — the tool must return the id, the harvester must recognise the prefix,
-    the gate must resolve it, and the numeric check must find the quantity
-    behind it — and before this commit the first of them was missing, so the
-    other three had nothing to do."""
+    it — the tool must return the id, its registration must declare it, the
+    table must name the quantity, and the resolver must find that name under
+    the id — and before this commit the first of them was missing, so the
+    other three had nothing to do.
+
+    V15: the name is read off the `table` the tool result carried, never spelled
+    here — the slice the model reads and the set the gate holds are one
+    construction, and this test asserts that by using it the way the model does."""
     engine, mk = await _mk()
     try:
         reg = build_read_registry()
@@ -158,26 +167,28 @@ async def test_a_share_count_survives_the_whole_path_from_tool_to_gate():
             if book.get("error"):
                 pytest.skip(f"demo book unavailable: {book['error']}")
             holding = book["holdings"][0]
-            assert holding["pos_id"].startswith("pos_")
+            pos_id = holding["pos_id"]
+            assert pos_id.startswith("pos_")
+            # The table the tool result carried: one name per holding, the
+            # quantity at reader precision beside it.
+            names = book["table"]["quantities"][pos_id]
+            assert len(names) == 1, names
+            name = next(iter(names))
+            assert name.startswith(f"{holding['ticker']}.quantity@"), name   # quantities._from_position
         async with mk() as db:
             step = (await db.execute(
                 select(AgentStep).where(AgentStep.session_id == sid).order_by(AgentStep.seq.desc())
             )).scalars().first()
-            assert any(r["type"] == "position" for r in step.evidence_refs)
+            assert any(r["type"] == "position" and r["id"] == pos_id for r in step.evidence_refs)
 
-            # V14-C: the share count travels as a slot and the ledger's own
-            # value is what the reader is shown — the four-things-line-up claim
-            # this test exists for, now with the gate RESOLVING rather than
-            # re-reading a sentence.
             out = await R.invoke(reg, db, sid, "respond", {"blocks": [
                 {"type": "paragraph", "runs": [
-                    "You hold ",
-                    {"ref": holding["pos_id"], "value": holding["quantity"]},
-                    f" shares of {holding['ticker']}."]},
+                    "You hold ", {"ref": pos_id, "name": name}, f" shares of {holding['ticker']}."]},
             ]})
             await db.commit()
             assert out.get("responded") is True, out
-            assert out["verified"]["figures"] == 1 and holding["pos_id"] in out["citations"]
+            assert out["verified"]["figures"] == 1 and pos_id in out["citations"]
+            assert out["verified"]["matches"][0]["label"] == name
             # The rendered text carries the ledger's figure back into the prose.
             assert str(int(holding["quantity"])) in out["text"].replace(",", "")
     finally:

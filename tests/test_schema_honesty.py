@@ -170,10 +170,31 @@ def test_nested_objects_forbid_unknown_arguments_too(name, tool):
     free-form map — confidence_flags is one, an open set of flags landing in a
     JSONB column — and closing it would say 'no keys at all', which is a
     different claim and a false one.
+
+    Walked to every depth, through `items`, `oneOf` and `anyOf`: respond's
+    grammar (V15-S3) is a oneOf of block shapes whose runs are an anyOf of
+    string or slot, and a slot that accepted a stray `value` key would be the
+    one channel through which a figure arrives without its identity.
     """
+    open_objects: list[str] = []
+
+    def _walk(schema, at: str) -> None:
+        if not isinstance(schema, dict):
+            return
+        if schema.get("type") == "object" and schema.get("properties"):
+            if schema.get("additionalProperties") is not False:
+                open_objects.append(at)
+            for prop, sub in schema["properties"].items():
+                _walk(sub, f"{at}.{prop}")
+        if isinstance(schema.get("items"), dict):
+            _walk(schema["items"], f"{at}[]")
+        for key in ("oneOf", "anyOf"):
+            for i, branch in enumerate(schema.get(key) or []):
+                _walk(branch, f"{at}<{key}[{i}]>")
+
     for prop, sub in (tool.json_schema.get("properties") or {}).items():
-        if isinstance(sub, dict) and sub.get("type") == "object" and sub.get("properties"):
-            assert sub.get("additionalProperties") is False, f"{name}.{prop}"
+        _walk(sub, f"{name}.{prop}")
+    assert open_objects == [], open_objects
 
 
 _WINDOWED = {

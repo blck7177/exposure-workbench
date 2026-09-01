@@ -11,6 +11,7 @@ import inspect
 import pytest
 
 from exposure_workbench.services import numeric_verification as nv
+from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import reconcile_service as rs
 from exposure_workbench.tools.registries import build_meta_registry
 
@@ -20,7 +21,7 @@ def test_the_ledger_operation_is_typed_as_a_ratio():
     before it could happen: an operation missing from _CALC_RATIO_OPS is typed
     MONEY, so the gate refuses the share figure the tool itself produced and the
     refusal reads as the model having made something up."""
-    assert rs.OP_RECONCILE in nv._CALC_RATIO_OPS
+    assert rs.OP_RECONCILE in qn._CALC_RATIO_OPS
 
 
 def test_the_unexplained_remainder_is_not_called_specific_return():
