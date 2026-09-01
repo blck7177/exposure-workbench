@@ -17,6 +17,9 @@ const PERCENT_DIGITS = { ge10: 1, lt10: 2 } as const;
 const MONEY_SCALES: readonly [number, string][] = [[1e9, "B"], [1e6, "M"], [1e3, "K"]];
 const MONEY_DIGITS = { ge100: 0, lt100: 2 } as const;
 const MULTIPLE_DIGITS = 2;
+// A per-share figure reads like a share price: dollars and cents, never the
+// K/M/B compression that only makes sense for market values.
+const MONEY_PER_SHARE_DIGITS = 2;
 
 /**
  * Python's `f"{v:.{d}f}"` — which is NOT `toFixed`. Both are exact on the
@@ -64,6 +67,9 @@ export function display(value: number, unit_class: string): string {
     const scaled = v / scale;
     const digits = Math.abs(scaled) >= 100 ? MONEY_DIGITS.ge100 : MONEY_DIGITS.lt100;
     return `$${fixed(scaled, digits)}${suffix}`;
+  }
+  if (unit_class === "MONEY_PER_SHARE") {
+    return `$${fixed(v, MONEY_PER_SHARE_DIGITS)}`;
   }
   if (unit_class === "MULTIPLE") {
     return `${fixed(v, MULTIPLE_DIGITS)}×`;

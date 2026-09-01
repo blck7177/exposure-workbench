@@ -39,6 +39,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.analytics import resources as rs
 from exposure_workbench.db.models import AgentStep
 from exposure_workbench.services import quantities as qn
 
@@ -54,10 +55,11 @@ KIND_TASK = "task"
 
 # Characters of serialized table one tool result may carry. Derived: the
 # context soft limit is 80k tokens over at most 15 evidence calls a turn; a
-# whole run's quantities at reader precision serialise to ~11k characters
-# (~3k tokens) and the run's derived row (net betas, distances to each tier)
-# adds ~2.5k, so 16k lets one run arrive whole with its analysis and two
-# would not — which is what scope is for.
+# whole run's quantities at reader precision serialise to ~14k characters
+# (~4k tokens; ~11k before V16 — each name's short group key and the one
+# groups legend add ~3.2k), so 16k lets one run arrive whole and two would
+# not — which is what scope is for. The run's derived row (net betas,
+# distances to each tier) rides on its own calc id's slice, not this one.
 TABLE_CHAR_LIMIT = 16_000
 
 
@@ -118,6 +120,10 @@ class Table:
     passages: dict[str, str] = field(default_factory=dict)                        # chunk_/src_ -> text
     rows: dict[str, str] = field(default_factory=dict)                            # id -> kind
     refs: set[str] = field(default_factory=set)
+    # V16. Why a name is NOT here: a quantity the row marked not_alone is
+    # projected off the table, and the row's reason is kept (ref -> name ->
+    # sentence) so a refusal for that exact name can say it.
+    projected: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def holds(self, ref: str) -> bool:
         return ref in self.refs
@@ -130,6 +136,9 @@ class Table:
 
     def kind(self, ref: str) -> str | None:
         return self.rows.get(ref)
+
+    def projected_reason(self, ref: str, name: str) -> str | None:
+        return self.projected.get(ref, {}).get(name)
 
 
 def _filter_run(quantities: Iterable[qn.Quantity], entry: dict) -> list[qn.Quantity]:
@@ -162,6 +171,12 @@ async def _place(db: AsyncSession, table: Table, entry: dict) -> None:
         qs = _filter_run(qs, entry)
     # Projection: a quantity the row says may not stand alone is not on the
     # table. The sum the regression does determine is a separate quantity.
+    # The reason is kept (V16): it has been on the row since V11-F, and until
+    # now it never reached the model — a slot naming the projected figure got
+    # a bare "unknown_name" when the row itself says what to use instead.
+    for q in qs:
+        if q.not_alone is not None:
+            table.projected.setdefault(rid, {})[q.label] = q.not_alone
     qs = [q for q in qs if q.not_alone is None]
     table.refs.add(rid)
     table.rows[rid] = r.kind
@@ -174,11 +189,19 @@ async def _place(db: AsyncSession, table: Table, entry: dict) -> None:
 
 
 def _payload(table: Table, order: list[str]) -> dict:
-    """The slice as the model reads it: names to reader-precision values."""
+    """The slice as the model reads it: name -> [value, group], the value at
+    reader precision, the group a short key whose question the `groups` legend
+    states once per payload (M2: meaning arrives with the names)."""
     out: dict = {}
-    qs = {ref: {name: dc.reader_value(q.value, q.unit_class) for name, q in table.quantities[ref].items()}
+    qs = {ref: {name: [dc.reader_value(q.value, q.unit_class), q.group]
+                for name, q in table.quantities[ref].items()}
           for ref in order if ref in table.quantities}
     if qs:
+        # The legend, first and once: only the groups this slice uses, in the
+        # declaration order of resources.GROUP_QUESTIONS, so the increment is
+        # a few hundred characters and never a copy of the whole vocabulary.
+        used = {g for names in qs.values() for _v, g in names.values()}
+        out["groups"] = {k: q for k, q in rs.GROUP_QUESTIONS.items() if k in used}
         out["quantities"] = qs
     passages = [ref for ref in order if ref in table.passages]
     if passages:

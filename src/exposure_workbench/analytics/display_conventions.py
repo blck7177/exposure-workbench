@@ -21,9 +21,14 @@ PERCENT_DIGITS = {"ge10": 1, "lt10": 2}
 MONEY_SCALES = ((1e9, "B"), (1e6, "M"), (1e3, "K"))
 MONEY_DIGITS = {"ge100": 0, "lt100": 2}
 MULTIPLE_DIGITS = 2
+# A per-share figure reads like a share price: dollars and cents, never the
+# K/M/B compression that only makes sense for market values ("$2.18", not
+# "$2.18" scaled). The class exists in analytics/units.py (V16).
+MONEY_PER_SHARE_DIGITS = 2
 
 # Decimal places kept in the model-facing table, per unit class.
-MODEL_DECIMALS = {"RATIO": 4, "PERCENT": 4, "MONEY": 0, "MULTIPLE": 3, "COUNT": 2}
+MODEL_DECIMALS = {"RATIO": 4, "PERCENT": 4, "MONEY": 0, "MONEY_PER_SHARE": 2,
+                  "MULTIPLE": 3, "COUNT": 2}
 
 
 def reader_value(value: float, unit_class: str) -> float | int:
@@ -51,6 +56,8 @@ def display(value: float, unit_class: str) -> str:
         scaled = v / scale
         digits = MONEY_DIGITS["ge100"] if abs(scaled) >= 100 else MONEY_DIGITS["lt100"]
         return f"${scaled:.{digits}f}{suffix}"
+    if unit_class == "MONEY_PER_SHARE":
+        return f"${v:.{MONEY_PER_SHARE_DIGITS}f}"
     if unit_class == "MULTIPLE":
         return f"{v:.{MULTIPLE_DIGITS}f}×"
     if unit_class == "COUNT":

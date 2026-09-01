@@ -28,13 +28,15 @@ the resolver is where a name that survived anyway is refused.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import resources
+from exposure_workbench.analytics import units
 from exposure_workbench.db.models import (
     CalcLedger,
     ExposureMetrics,
@@ -53,6 +55,13 @@ RATIO = "RATIO"
 MONEY = "MONEY"
 COUNT = "COUNT"
 MULTIPLE = "MULTIPLE"
+MONEY_PER_SHARE = "MONEY_PER_SHARE"
+
+# units.fact_unit speaks the algebra's lowercase names; the gate speaks these.
+# One total bridge over the algebra's classes, so a stored fact's unit is
+# judged once (analytics/units.py) and only translated here.
+_UNIT_CLASS_OF = {units.MONEY: MONEY, units.RATIO: RATIO, units.COUNT: COUNT,
+                  units.MONEY_PER_SHARE: MONEY_PER_SHARE}
 
 # What a ledger row IS, for the assertion checks (trend needs a series, absence
 # needs a refusal). `scalar` is everything else a calc row can be.
@@ -82,6 +91,10 @@ class Quantity:
     # SUM over the factor set is well determined and no single coefficient is.
     not_alone: str | None = None
     table: str | None = None
+    # V16 (M2). Which question this figure answers — a key of
+    # resources.GROUP_QUESTIONS. The table prints it beside the value with one
+    # legend per payload, so the model reads meaning, not only a name.
+    group: str = "other"
 
 
 # The name the gate has used for this since V3; kept so the daily-report path and
@@ -123,11 +136,12 @@ _RUN_COUNTS = resources.countable()
 RUN_TABLES: tuple[str, ...] = tuple(r.table for r in resources.RUN_CHILDREN) + ("count",)
 
 
-# The period a series point is dated by, under the key its producer wrote:
-# interval windows end on `end`, balance readings are `as_of`, the V3-era and
-# change-series rows say `period_end`. Three producers, three keys, one name —
-# a point named "@None" is a point nobody can slot, and every point of a
-# get_flow series was.
+# The period a series point is dated by, under the key its producer wrote.
+# READ side only, and FROZEN (test_quantities pins the tuple): since V16 every
+# writer uses units.POINT_PERIOD_KEY — the first entry here — and the other
+# two keys exist to read rows the three-producer era already wrote ("end" on
+# interval windows, "as_of" on balance readings). This tuple dies with those
+# rows; it does not grow.
 _POINT_PERIOD_KEYS = ("period_end", "end", "as_of")
 
 
@@ -162,11 +176,12 @@ def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
 
 def _calc_unit(row: CalcLedger) -> str:
     """The row's own column first, then the params blob, then the legacy table."""
-    if row.unit_class in (MONEY, RATIO, COUNT):
+    if row.unit_class in (MONEY, RATIO, COUNT, MONEY_PER_SHARE):
         return row.unit_class
     recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
-    if recorded in ("money", "ratio", "count"):
-        return {"ratio": RATIO, "money": MONEY, "count": COUNT}[recorded]
+    if recorded in ("money", "ratio", "count", "money_per_share"):
+        return {"ratio": RATIO, "money": MONEY, "count": COUNT,
+                "money_per_share": MONEY_PER_SHARE}[recorded]
     return RATIO if row.operation in _CALC_RATIO_OPS else MONEY
 
 
@@ -203,6 +218,12 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
                 label = f"{row.operation}.{key}" + (f"[{i}]" if isinstance(kv, list) else "")
                 values.append(Quantity(float(item), key_unit, label, cid))
     _numbers_in(result.get("quality_flags") or {}, "quality_flags", values, cid)
+    # The group: a label that is one of a run's families (a portfolio.integration
+    # row's net betas and rooms) keeps that family; otherwise the row's head
+    # decides — a measure the formula registry defines is `derived`, everything
+    # else is a filed figure or a read over filed figures.
+    fallback = "derived" if head in fm.FORMULAS else "fundamentals"
+    values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
     return Resolved(tuple(values), frozenset(), calc_kind(row))
 
 
@@ -210,10 +231,25 @@ async def _from_fact(db: AsyncSession, fid: str) -> Resolved:
     row = (await db.execute(select(FinancialFact).where(FinancialFact.id == fid))).scalar_one_or_none()
     if row is None or row.value is None:
         return Resolved((), frozenset(), None)
-    unit = MONEY if (row.unit or "").upper() == "USD" else COUNT
-    return Resolved((Quantity(float(row.value), unit,
-                              f"{row.normalized_metric or row.raw_concept}@{row.period_end}", fid),),
+    unit = units.fact_unit(row.unit)
+    if unit is None:
+        # A unit the desk has no algebra for — a segment count, MWh, jobs
+        # (analytics/units.py returns None). The row is real and stays citable,
+        # but it puts no figure on the table: the resolver's own refusal
+        # ("this id holds no figures; it can be cited, not slotted") is the
+        # trace the model sees, the same one a passage gets.
+        return Resolved((), frozenset(), "fact")
+    unit_class = _UNIT_CLASS_OF[unit]
+    return Resolved((Quantity(float(row.value), unit_class,
+                              f"{row.normalized_metric or row.raw_concept}@{row.period_end}", fid,
+                              group="price" if unit_class == MONEY_PER_SHARE else "fundamentals"),),
                     frozenset(), "fact")
+
+
+# What an alert row carries is declared once, in resources.py, beside the other
+# run children; reading the declaration here is what deleted the hand-written
+# second copy of the three columns (test_symmetry pins the derivation).
+_ALERT_COLUMNS = next(r for r in resources.RUN_CHILDREN if r.model is RiskAlert).columns
 
 
 async def _from_alert(db: AsyncSession, aid: str) -> Resolved:
@@ -221,9 +257,9 @@ async def _from_alert(db: AsyncSession, aid: str) -> Resolved:
     if row is None:
         return Resolved((), frozenset(), None)
     return Resolved(tuple(
-        Quantity(float(getattr(row, col)), RATIO, col, aid)
-        for col in ("current_value", "limit_value", "utilization")
-        if getattr(row, col) is not None
+        Quantity(float(v), c.unit, c.name, aid, group="mandate")
+        for c in _ALERT_COLUMNS
+        if (v := getattr(row, c.name)) is not None
     ), frozenset(), "alert")
 
 
@@ -286,6 +322,10 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
                 if key not in seen:
                     out.append(Quantity(0.0, COUNT, f"count.{label}.{split}={key}", rid, table="count"))
     kind = "run" if any(by_model.values()) else None
+    # Every run quantity's group is a pure function of its name (the RUN_GROUPS
+    # patterns); "other" for a name no pattern claims, which the manifest lists
+    # under `other` for the same reason.
+    out = [replace(q, group=resources.group_of(q.label) or "other") for q in out]
     return Resolved(tuple(out), frozenset(), kind)
 
 

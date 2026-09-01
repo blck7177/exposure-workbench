@@ -19,7 +19,7 @@ from exposure_workbench.analytics import display_conventions as dc
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "display_cases.json"
 TS_MIRROR = ROOT / "apps" / "web" / "lib" / "display.ts"
-UNIT_CLASSES = ("RATIO", "PERCENT", "MONEY", "MULTIPLE", "COUNT")
+UNIT_CLASSES = ("RATIO", "PERCENT", "MONEY", "MONEY_PER_SHARE", "MULTIPLE", "COUNT")
 
 CASES = json.loads(FIXTURE.read_text())["cases"]
 
@@ -46,7 +46,7 @@ def test_the_fixture_covers_every_unit_class():
 
 @pytest.mark.parametrize("value,unit", [
     (1.5e-7, "RATIO"), (8.4e10, "MONEY"), (2.3e12, "MONEY"), (1e-9, "PERCENT"),
-    (123456789.123, "COUNT"), (1e-5, "MULTIPLE"),
+    (123456789.123, "COUNT"), (1e-5, "MULTIPLE"), (1.5e-7, "MONEY_PER_SHARE"),
 ])
 def test_no_surface_ever_shows_scientific_notation(value, unit):
     """"科学计数法零出口": the model reads the table as figures, the person

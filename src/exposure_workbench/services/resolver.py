@@ -10,9 +10,11 @@ Six invariants, each a lookup, none a judgement about content:
     V6 kind       a trend's ref is a series, an absence's ref is a refusal, an
                   action's ref is delegated work
 
-(V4, the text rule, is inside V1.) `not_alone` needs no check here: the table
+(V4, the text rule, is inside V1.) Collinearity needs no check here: the table
 builder never put a collinear coefficient on the table, so its name is unknown
-like any other name that was never shown.
+like any other name that was never shown — but the builder keeps the row's own
+reason for the projection, and the refusal's detail says it (V16), which is
+truer than a bare "unknown name". Same error class, better sentence.
 
 There is deliberately nothing else. No search for which other ref holds a value
 (values are not written), no arithmetic over cited values to suggest a call, no
@@ -117,10 +119,15 @@ def resolve_against(blocks, table: tb.Table) -> Verdict:
         q = table.quantity(slot["ref"], slot["name"])
         if q is None:
             names = table.names(slot["ref"])
+            # A name the builder projected off the table has a truer detail
+            # than "unknown": the row's own reason — why the figure may not
+            # stand alone and what to name instead.
+            projected = table.projected_reason(slot["ref"], slot["name"])
             v.problems.append({
                 "at": at, "ref": slot["ref"], "name": slot["name"], "reason": "unknown_name",
                 "available": names[:_MAX_NAMES], "truncated": len(names) > _MAX_NAMES,
-                "detail": ("use one of the names this id holds on the table"
+                "detail": projected if projected else
+                          ("use one of the names this id holds on the table"
                            if names else "this id holds no figures; it can be cited, not slotted"),
             })
             continue

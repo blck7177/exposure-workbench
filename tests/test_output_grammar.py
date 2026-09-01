@@ -260,3 +260,13 @@ def test_a_confidence_level_is_a_parameter_of_the_measure_not_a_figure():
 def test_a_refusal_for_an_id_in_text_says_where_the_id_belongs():
     [p] = ab.validate_shape([{"type": "paragraph", "runs": ["see run_1d6e9e05bee6 for 27 checks"]}])
     assert "cites" in p["detail"] and "count." in p["detail"]
+
+
+def test_the_exempt_token_classes_are_frozen_at_nine():
+    """The precedent is resources.LEGACY_RATIO_OPS: an enumerated exemption is
+    frozen the day it is complete, and may not grow. Nine classes exist. The
+    escape from any of them is M2 — the label becomes a NAME on the table and
+    is written as a slot — never a tenth regex; a genuinely new token class is
+    a design decision taken in review, with its case beside it, not a wider
+    tuple."""
+    assert len(ab._NOT_A_FIGURE) == 9

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+from exposure_workbench.analytics import resources as rs
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import resolver
 from exposure_workbench.services import table as tb
@@ -76,8 +77,8 @@ def test_an_id_under_an_error_key_is_declared_all_the_same():
 
 # ── Table ─────────────────────────────────────────────────────────────────────
 
-def _q(value, unit, label, ref, table=None, not_alone=None):
-    return qn.Quantity(value, unit, label, ref, not_alone, table)
+def _q(value, unit, label, ref, table=None, not_alone=None, group="other"):
+    return qn.Quantity(value, unit, label, ref, not_alone, table, group)
 
 
 def _table() -> tb.Table:
@@ -86,9 +87,9 @@ def _table() -> tb.Table:
     t.rows = {"run_1": "run", "chunk_1": "passage", "calc_s": qn.KIND_SERIES,
               "calc_a": qn.KIND_ABSENCE, "task_1": tb.KIND_TASK, "calc_x": qn.KIND_SCALAR}
     t.quantities = {"run_1": {
-        "issuer_exposures.MSFT.weight": _q(0.1633512, RATIO, "issuer_exposures.MSFT.weight", "run_1", "issuer_exposures"),
-        "exposure_metrics.portfolio_market_value": _q(10869311, MONEY, "exposure_metrics.portfolio_market_value", "run_1", "exposure_metrics"),
-        "count.positions": _q(27, COUNT, "count.positions", "run_1", "count"),
+        "issuer_exposures.MSFT.weight": _q(0.1633512, RATIO, "issuer_exposures.MSFT.weight", "run_1", "issuer_exposures", group="concentration"),
+        "exposure_metrics.portfolio_market_value": _q(10869311, MONEY, "exposure_metrics.portfolio_market_value", "run_1", "exposure_metrics", group="book"),
+        "count.positions": _q(27, COUNT, "count.positions", "run_1", "count", group="counts"),
     }}
     t.passages = {"chunk_1": "We expect capital expenditures to increase in fiscal 2026 to support cloud demand."}
     return t
@@ -136,10 +137,13 @@ def test_a_legacy_entry_without_scope_is_the_whole_run():
 def test_payload_shows_reader_precision_values_passages_as_ids_and_only_assertable_rows():
     t = _table()
     out = tb._payload(t, ["run_1", "chunk_1", "calc_s", "calc_a", "task_1", "calc_x"])
+    # V16 (M2): a name arrives with its meaning — [value, group] — and the
+    # legend states each used group's question once, first, per payload.
+    assert out["groups"] == {k: rs.GROUP_QUESTIONS[k] for k in ("book", "concentration", "counts")}
     assert out["quantities"] == {"run_1": {
-        "issuer_exposures.MSFT.weight": 0.1634,
-        "exposure_metrics.portfolio_market_value": 10869311,
-        "count.positions": 27,
+        "issuer_exposures.MSFT.weight": [0.1634, "concentration"],
+        "exposure_metrics.portfolio_market_value": [10869311, "book"],
+        "count.positions": [27, "counts"],
     }}
     assert out["passages"] == ["chunk_1"], "the text stays in the tool result; the table lists the id"
     assert out["rows"] == {"calc_s": "series", "calc_a": "absence", "task_1": "task"}, (

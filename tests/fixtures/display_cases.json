@@ -50,6 +50,24 @@
       "reader_value": 512
     },
     {
+      "value": 2.176,
+      "unit_class": "MONEY_PER_SHARE",
+      "display": "$2.18",
+      "reader_value": 2.18
+    },
+    {
+      "value": 1234.5,
+      "unit_class": "MONEY_PER_SHARE",
+      "display": "$1234.50",
+      "reader_value": 1234.5
+    },
+    {
+      "value": -0.44,
+      "unit_class": "MONEY_PER_SHARE",
+      "display": "$-0.44",
+      "reader_value": -0.44
+    },
+    {
       "value": 1.3978,
       "unit_class": "MULTIPLE",
       "display": "1.40×",

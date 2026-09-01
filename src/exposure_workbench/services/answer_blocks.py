@@ -40,6 +40,8 @@ import re
 from dataclasses import dataclass
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.services import quantities as qn
+from exposure_workbench.services import table as tb
 
 BLOCK_TYPES = ("paragraph", "metric_table", "chart", "trend", "absence", "action")
 CHART_KINDS = ("bar", "line", "waterfall")
@@ -92,7 +94,19 @@ _DIGIT_RUN = re.compile(r"[+\-−]?\$?\d[\d,]*(?:\.\d+)?%?")
 # fragments of digits inside it: "run_d1bbfadbbb7e" is what the model wrote,
 # and a refusal naming '1' and '7' is a refusal it cannot act on. Ids belong in
 # a slot's ref or a block's cites — the reason it is a refusal at all.
-_ID_TOKEN = re.compile(r"\b(?:fact|calc|chunk|src|alert|run|pos|task|rrun|brief|sess|msg)_[A-Za-z0-9_]{4,}\b")
+#
+# The prefixes are built, not hand-written (V16): the citable ones are owned by
+# quantities.SOURCES and the task ones by table._TASK_PREFIXES — the two tables
+# the rest of the desk already resolves by, so a prefix added there is refused
+# in text from the same commit. What remains is the desk's OTHER ids: minted
+# and shown to the model (a brief, a session, a message id) but resolvable by
+# nothing, so writing one into text is refused the same way — an id has no
+# legal place in prose whether or not something can be cited by it.
+_REJECT_ONLY_PREFIXES: tuple[str, ...] = ("brief_", "sess_", "msg_")
+_ID_PREFIXES: tuple[str, ...] = tuple(dict.fromkeys(
+    qn.CITABLE_PREFIXES + tb._TASK_PREFIXES + _REJECT_ONLY_PREFIXES))
+_ID_TOKEN = re.compile(
+    r"\b(?:" + "|".join(re.escape(p[:-1]) for p in _ID_PREFIXES) + r")_[A-Za-z0-9_]{4,}\b")
 
 
 def figures_in_text(text: str) -> list[str]:

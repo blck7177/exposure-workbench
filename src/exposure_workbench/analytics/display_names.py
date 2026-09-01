@@ -74,6 +74,17 @@ METRIC: dict[str, str] = {
     "operating_lease_liability_noncurrent": "Operating lease liabilities, non-current",
     "current_assets": "Current assets",
     "current_liabilities": "Current liabilities",
+    # V16 — the per-share and capital-allocation layer (mapping v4). Three share
+    # counts, three captions that keep the distinction audible: weighted counts
+    # are EPS denominators over a period, outstanding is a point-in-time count.
+    "eps_diluted": "Earnings per share, diluted",
+    "eps_basic": "Earnings per share, basic",
+    "shares_diluted_weighted": "Weighted average shares, diluted",
+    "shares_basic_weighted": "Weighted average shares, basic",
+    "shares_outstanding": "Shares outstanding",
+    "buybacks": "Share repurchases",
+    "dividends_paid": "Dividends paid",
+    "sbc": "Share-based compensation",
 }
 
 # ── regression factors (configs/factor_config.yaml) ──────────────────────────
@@ -165,6 +176,25 @@ FORMULA: dict[str, str] = {
     "days_sales_outstanding": "days sales outstanding",
     "days_inventory": "days inventory",
     "days_payable": "days payable",
+    # V16 Tier 1 — returns, reinvestment and quality. The acronym rule above
+    # holds (ROE stays ROE); a derived numerator says how it was built, because
+    # a reader who cannot reconstruct "accruals" cannot check it.
+    "roe": "ROE",
+    "roa": "ROA",
+    "roic": "ROIC",
+    "nopat": "NOPAT",
+    "tax_burden": "tax burden",
+    "invested_capital": "invested capital",
+    "asset_turnover": "asset turnover",
+    "equity_multiplier": "equity multiplier",
+    "quick_assets": "quick assets",
+    "quick_ratio": "quick ratio",
+    "fcf_margin": "free cash flow margin",
+    "capex_intensity": "capex intensity",
+    "net_debt_to_ebitda": "net debt / EBITDA",
+    "cash_conversion_cycle": "cash conversion cycle",
+    "accruals": "accruals (net income − cash from operations)",
+    "accruals_ratio": "accruals ratio",
 }
 
 # ── sectors (as they arrive from the price provider) ─────────────────────────

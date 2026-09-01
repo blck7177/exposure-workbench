@@ -102,10 +102,54 @@ def test_run_group_patterns_are_well_formed():
     """One star at most, and every literal head is a table a run has or the
     analysis row's own prefix — so a typo in a pattern cannot match nothing forever."""
     heads = tuple(f"{t}." for t in qn.RUN_TABLES) + ("portfolio.integration.",)
-    for key, _question, patterns in definitions._RUN_GROUPS:
+    for key, _question, patterns in resources.RUN_GROUPS:
         for p in patterns:
             assert p.count("*") <= 1, (key, p)
             assert p.startswith(heads), (key, p)
+
+
+def test_the_groups_live_in_resources_and_definitions_only_reads_them():
+    """V16 moved RUN_GROUPS to the data layer: the manifest describe_run builds
+    and the group each quantity carries on the table come from the one table,
+    so they cannot drift."""
+    assert definitions._RUN_GROUPS is resources.RUN_GROUPS
+    assert definitions._matches is resources.matches
+
+
+def test_the_group_vocabulary_is_closed_and_every_key_answers_a_question():
+    """A group is a question the desk knows how to ask. The run groups plus the
+    four non-run groups quantities.py can stamp (a fact is fundamentals or —
+    per-share — price, a formula's measure is derived, the rest other) — and
+    nothing else, so the payload legend can state every key it prints."""
+    run_keys = {key for key, _q, _p in resources.RUN_GROUPS}
+    assert set(resources.GROUP_QUESTIONS) == run_keys | {"fundamentals", "derived", "price", "other"}
+    assert all(q.strip() for q in resources.GROUP_QUESTIONS.values())
+
+
+def test_the_id_prefixes_refused_in_text_are_built_from_their_owners():
+    """answer_blocks refuses an id written into prose, by prefix. That list was
+    a third hand-written copy; now it is the union of the two owners — citable
+    prefixes from quantities.SOURCES, task prefixes from table._TASK_PREFIXES —
+    plus a short reject-only tail of ids the desk mints but nothing resolves."""
+    from exposure_workbench.services import answer_blocks as ab
+    assert set(ab._ID_PREFIXES) == (
+        set(qn.CITABLE_PREFIXES) | set(tb._TASK_PREFIXES) | set(ab._REJECT_ONLY_PREFIXES))
+    assert set(ab._REJECT_ONLY_PREFIXES).isdisjoint(
+        set(qn.CITABLE_PREFIXES) | set(tb._TASK_PREFIXES)), (
+        "a prefix something resolves belongs to its owner, not the reject-only tail")
+    for p in ab._ID_PREFIXES:
+        assert ab._ID_TOKEN.fullmatch(p + "abcd1234"), p
+
+
+def test_an_alerts_citable_columns_are_the_resource_declaration():
+    """RiskAlert's three columns were declared twice — resources.py for the run
+    child, a hand-written tuple in quantities._from_alert for the standalone
+    id. The second copy is now a read of the first."""
+    import inspect
+    res = next(r for r in resources.RUN_CHILDREN if r.table == "risk_alerts")
+    assert qn._ALERT_COLUMNS == res.columns
+    src = inspect.getsource(qn)
+    assert "current_value" not in src, "quantities.py spells an alert column the resources already declare"
 
 
 def _expand(factored: dict | None) -> set[str]:

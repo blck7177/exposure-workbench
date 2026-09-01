@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 load_dotenv(".env", override=True)
 
-from exposure_workbench.analytics import resources
+from exposure_workbench.analytics import resources, units
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import table as tb
 
@@ -65,6 +65,24 @@ def test_unit_class_strings_agree_between_quantities_and_resources():
     ratio for the gate."""
     assert (qn.MONEY, qn.RATIO, qn.COUNT) == (resources.MONEY, resources.RATIO, resources.COUNT)
     assert set(qn.RUN_TABLES) == {r.table for r in resources.RUN_CHILDREN} | {"count"}
+
+
+def test_legacy_point_period_keys_are_a_frozen_read_end():
+    """Writers use units.POINT_PERIOD_KEY — one key, one owner (V16). This
+    tuple exists to read rows the three-producer era already wrote, and may
+    not grow: a fourth key would be a fourth producer, the exact bug the
+    single owner forbids. It dies with those rows."""
+    assert qn._POINT_PERIOD_KEYS == ("period_end", "end", "as_of")
+    assert qn._POINT_PERIOD_KEYS[0] == units.POINT_PERIOD_KEY
+
+
+def test_a_facts_unit_is_judged_once_by_the_algebra():
+    """quantities only TRANSLATES units.fact_unit's judgement — the bridge is
+    total over the algebra's vocabulary and adds no class of its own, so a
+    fact's unit cannot be judged a second time here (the old
+    MONEY-if-USD-else-COUNT guess made EPS a count)."""
+    assert set(qn._UNIT_CLASS_OF) == set(units.UNIT_CLASSES)
+    assert qn._UNIT_CLASS_OF[units.MONEY_PER_SHARE] == qn.MONEY_PER_SHARE
 
 
 # ── live ──────────────────────────────────────────────────────────────────────

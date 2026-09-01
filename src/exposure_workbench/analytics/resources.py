@@ -204,3 +204,71 @@ def countable() -> tuple[tuple[type, str, str | None], ...]:
     """The counting vocabulary, derived — (model, label, split)."""
     return tuple((r.model, r.count_label, r.count_split)
                  for r in RUN_CHILDREN if r.count_label)
+
+
+# ── the groups ───────────────────────────────────────────────────────────────
+#
+# The question each family of a run's quantities answers. V16 moved this here
+# from tools/definitions.py: describe_run reads it to build its manifest, and
+# services/quantities.py reads it to stamp each quantity with its group, so it
+# is a fact about the resources, not about one tool.
+RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("book", "size, day P&L and net/gross exposure of the whole book",
+     ("exposure_metrics.portfolio_market_value", "exposure_metrics.daily_pnl", "exposure_metrics.daily_return",
+      "exposure_metrics.gross_exposure", "exposure_metrics.net_exposure",
+      "exposure_metrics.gross_exposure_pct", "exposure_metrics.net_exposure_pct")),
+    ("concentration", "which issuers and sectors the book is concentrated in",
+     ("issuer_exposures.*.weight", "sector_exposures.*.weight", "issuer_exposures.*.market_value")),
+    ("mandate", "how each limit check stands against its warning and breach tiers, and the room left",
+     ("limit_checks.*.current_value", "limit_checks.*.warning_level", "limit_checks.*.breach_level",
+      "portfolio.integration.room_to_warning.*", "portfolio.integration.room_to_breach.*",
+      "risk_alerts.*.current_value", "risk_alerts.*.limit_value", "risk_alerts.*.utilization")),
+    ("stress", "what each scenario would cost, ranked by get_portfolio_analysis",
+     ("stress_results.*.loss_pct", "stress_results.*.loss_usd",
+      "exposure_metrics.stress_loss_market", "exposure_metrics.stress_loss_rates",
+      "exposure_metrics.stress_loss_credit", "exposure_metrics.stress_loss_tech")),
+    ("factor_exposure", "which way the book moves with each risk — net betas with their legs",
+     ("portfolio.integration.net_beta.*", "portfolio.integration.gross_beta.*",
+      "factor_attributions.*.beta", "factor_attributions.sum_of_contributions")),
+    ("attribution", "what moved the book on the run's date, by position and by factor",
+     ("issuer_exposures.*.contribution", "issuer_exposures.*.daily_return",
+      "factor_attributions.*.contribution", "factor_attributions.*.factor_return",
+      "exposure_metrics.attribution_portfolio_return", "exposure_metrics.alpha", "exposure_metrics.residual")),
+    ("risk", "volatility, tail measures and drawdown as the run measured them",
+     ("exposure_metrics.rolling_vol_30d", "exposure_metrics.rolling_vol_60d", "exposure_metrics.var_95_1d",
+      "exposure_metrics.expected_shortfall_95", "exposure_metrics.max_drawdown",
+      "exposure_metrics.model_r_squared", "exposure_metrics.observations", "exposure_metrics.max_vif")),
+    ("counts", "how many positions, factors, scenarios, alerts and checks the run holds",
+     ("count.*",)),
+)
+
+
+def matches(pattern: str, name: str) -> bool:
+    if "*" not in pattern:
+        return name == pattern
+    head, _, tail = pattern.partition("*")
+    return name.startswith(head) and name.endswith(tail) and len(name) > len(head) + len(tail)
+
+
+def group_of(name: str) -> str | None:
+    """The run group a quantity name falls in, or None: None means the name is
+    not one of a run's families, and the caller decides from what it knows
+    about the row (a fact is fundamentals, a formula's measure is derived)."""
+    for key, _question, patterns in RUN_GROUPS:
+        if any(matches(p, name) for p in patterns):
+            return key
+    return None
+
+
+# Every group key a quantity may carry, with the question it answers — the
+# legend services/table.py prints once per payload. The run groups above, plus
+# the four groups of quantities that do not live on a run. Closed on purpose:
+# a group is a question the desk knows how to ask, and test_symmetry pins that
+# no quantity ever carries a key outside this table.
+GROUP_QUESTIONS: dict[str, str] = {
+    **{key: question for key, question, _patterns in RUN_GROUPS},
+    "fundamentals": "figures as the issuer filed them, and series or windows read over them",
+    "derived": "measures this desk computed from filed figures by a named formula",
+    "price": "per-share figures — a share price or per-share earnings",
+    "other": "quantities not otherwise grouped",
+}
