@@ -119,8 +119,11 @@ Switch criteria now: ① ✅, ③ ✅ except the refusal rate (20% against ≤10
 ② half — linear locating gone, `read_required_inputs` 1/4 (the criterion still counts tool
 names; the quantities it wants were on the table from `describe_run` in V1 and V4).
 
-The two refusals: one `invalid_arguments` (a slot written with `value`, refused by the
-schema before the gate), one `digits_in_text`. No id written into prose this round.
+The two refusals, reconstructed from the stored arguments: V2 wrote `run_1d6e9e05bee6`
+into three table cells (`digits_in_text`, the id-in-prose habit — one turn this round, three
+last round); V6 sent three blocks of a type the grammar does not have (`invalid_arguments`
+from the schema, before the gate). No `unknown_name`, no `not_on_table` this round — the
+formula naming (`as_quantity`) removed the class that cost V7 two attempts before.
 
 What the rubric drop is: `precision` 5/8 → 3/8 and `read_required_inputs` 2 → 1 are the
 model slotting the WRONG name — V3 "net exposure to rates is 100.0% of portfolio value"
