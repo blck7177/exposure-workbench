@@ -1,0 +1,14 @@
+-- V15-S1: a calculation carries its own unit.
+--
+-- The gate typed a ledger row by matching its OPERATION NAME against a set
+-- (numeric_verification._CALC_RATIO_OPS), which the comment there admitted was
+-- "a mirror of typed_calculator._result_type, and it has to be one". A mirror
+-- is two rules about one fact, and this one had to be extended by hand every
+-- time an operation was added — silently typing a new ratio as money until
+-- someone noticed.
+--
+-- The unit is a property of the calculation. It is written when the row is
+-- written, by the code that knows. Additive, idempotent, and NOT backfilled by
+-- this file: the transitional set still types the history, and a row written
+-- after this column exists is typed by the column.
+ALTER TABLE calc_ledger ADD COLUMN IF NOT EXISTS unit_class TEXT;

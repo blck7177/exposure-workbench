@@ -698,6 +698,10 @@ class CalcLedger(Base):
     result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     input_refs: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     primitive_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    # V15-S1: the unit of what this row computed, written by the code that
+    # knows. NULL on rows minted before the column; the gate's transitional set
+    # types those and nothing new may join it (test_resources).
+    unit_class: Mapped[str | None] = mapped_column(String(16))
     invoked_by: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

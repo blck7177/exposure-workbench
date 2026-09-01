@@ -76,6 +76,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import resources
 from exposure_workbench.db.models import (
     CalcLedger,
     ExposureMetrics,
@@ -508,31 +509,11 @@ _COMPATIBLE: dict[str, tuple[str, ...]] = {
 # Ratio-valued operations divide two commensurable things or measure change;
 # everything else carries the unit of the metric underneath, which for every
 # citable fact in this database is USD.
-_CALC_RATIO_OPS = frozenset({
-    "change.yoy", "change.qoq", "change.pct", "combine.divide",
-    "stat.cagr", "window_return", "window_return.relative",
-    # V9-A5. Dividing two money quantities yields a ratio; without this the gate
-    # types its own product as MONEY and then refuses the leverage figure it
-    # just produced, reporting it as the model's fault.
-    "calc.scalar.divide",
-    # V8-B. reconcile_move divides two returns to state what share of a move the
-    # factors account for. Without this line the gate types its own product as
-    # MONEY, refuses the share it just computed, and reports the refusal as the
-    # model's fault — the failure mode this frozenset exists to prevent, which
-    # the V8 plan named in its baseline before it happened.
-    "portfolio.reconcile",
-    # V8-D2. A book's cumulative return over a window is a return. Without this
-    # the gate types it MONEY and refuses the one figure explain_episode exists
-    # to produce — the same omission _CALC_RATIO_OPS was created for.
-    "portfolio.window_return",
-    # V8-D2. A drawdown depth is a fraction of a peak, not an amount of money.
-    "portfolio.drawdown_episodes",
-    # V14-A. Betas and distances between two fractions are both ratios. This op
-    # records every quantity under a declared key with its own unit, so nothing
-    # reads the default today — the line is here so that the day someone adds a
-    # bare `value` to it, the default is the true one rather than MONEY.
-    "portfolio.integration",
-})
+# TRANSITIONAL, and shrinking: a calc row now carries its own unit_class
+# (v15_calc_unit.sql), so the unit of a calculation is a property of the
+# calculation rather than a rule about its name. This set types rows written
+# before that column existed; _from_calc prefers the column wherever it is set.
+_CALC_RATIO_OPS = resources.LEGACY_RATIO_OPS
 
 # Operations whose result carries MORE THAN ONE computed quantity, and what each
 # one is. Every operation in this ledger until V8-B produced a single `value` or
@@ -544,79 +525,22 @@ _CALC_RATIO_OPS = frozenset({
 # an observation count (not one). Typing them alike would let "750%" verify
 # against 750 observations. Enumerated, like _RUN_CHILDREN and _RUN_COUNTS,
 # because the alternative is a walker that guesses.
-_CALC_RESULT_KEYS: dict[str, dict[str, str]] = {
-    # V8-D2. Episode depths are distances below a running high, all in one unit,
-    # and there are as many as the span holds — so the declared key carries a
-    # list. Without this the depths a tool returned could be quoted by nothing.
-    "portfolio.drawdown_episodes": {
-        "deepest_depth": RATIO,
-        "episode_depths": RATIO,
-    },
-    "portfolio.reconcile": {
-        "sum_of_position_contributions": RATIO,
-        "sum_of_factor_contributions": RATIO,
-        "alpha_plus_residual": RATIO,
-        "factor_share": RATIO,
-        "unexplained_share": RATIO,
-    },
-    # V14-A. The quantities that read DERIVED, and only those: a net beta is a
-    # sum it performed and a distance to a threshold is a subtraction it
-    # performed. The stress losses, the betas and the limit levels it ORDERS are
-    # columns of the run's own children and resolve through the run id already —
-    # declaring them here would build a second, weaker path to the same evidence.
-    # Each is a labelled family (see the third shape in _from_calc): four risks,
-    # and as many distances as there were checks that recorded their value.
-    "portfolio.integration": {
-        "net_beta": RATIO,
-        "gross_beta": RATIO,
-        "room_to_warning": RATIO,
-        "room_to_breach": RATIO,
-    },
-}
+_CALC_RESULT_KEYS: dict[str, dict[str, str]] = resources.CALC_RESULTS
 
 # run_ resolves through its children: exposure_runs itself has no numeric column.
 # (model, column, unit_class) — the label names the row so the model can tell
 # which of ten issuer weights it nearly matched.
-_RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], ...] = (
-    (ExposureMetrics,
-     ("portfolio_market_value", "daily_pnl", "gross_exposure", "net_exposure"),
-     # V8-P1 adds the regression's own numbers to the ratio group. None of them
-     # is an amount of money, and a bare figure is written as COUNT, which
-     # _COMPATIBLE lets meet a stored RATIO — so "58 observations" verifies
-     # while "58%" correctly does not.
-     ("daily_return", "gross_exposure_pct", "net_exposure_pct", "rolling_vol_30d",
-      "rolling_vol_60d", "var_95_1d", "expected_shortfall_95", "max_drawdown",
-      "stress_loss_tech", "stress_loss_rates", "stress_loss_credit", "stress_loss_market",
-      "attribution_portfolio_return", "alpha", "residual", "model_r_squared", "observations",
-      "regression_window_days", "max_vif"),
-     None),
-    (IssuerExposure, ("market_value", "daily_pnl"),
-     ("weight", "weight_change", "daily_return", "contribution"), "ticker"),
-    (SectorExposure, ("market_value",), ("weight", "weight_change"), "sector"),
-    # V8-P2. A scenario's loss, labelled by scenario so ten losses do not look
-    # alike. An unevaluated scenario holds NULLs and therefore contributes no
-    # value here — which is the correct behaviour: there is no number to quote.
-    (StressResultRow, ("loss_usd",), ("loss_pct",), "scenario"),
-    (FactorAttribution, (), ("beta", "factor_return", "contribution", "r_squared"), "factor_name"),
-    # A run's own alerts. Without this, `run_` alone could not support the limit
-    # levels the run itself set off — measured on a live report, citing the run
-    # left 14 of 45 numbers unverified and adding the run's three alert ids
-    # brought it to 8. The alert rows ARE children of the run; requiring them to
-    # be cited separately made a citation set that had to be assembled by hand
-    # out of two kinds of id to describe one run.
-    (RiskAlert, (), ("current_value", "limit_value", "utilization"), "alert_type"),
-    # V8-P3/P4 listed this with no value columns, and said so plainly: a limit
-    # check held no measurement, only the fact that a check RAN and whether it
-    # fired. V13-S5 changed that — it added the three numbers the check actually
-    # saw — and this line was not revisited, so the columns were written and
-    # remained unciteable. The second half of the same omission that left them
-    # unwritten until V14: a value nothing can quote is a value the product does
-    # not have, and "MSFT sits at 16.3% against a 15% warning level" was a
-    # sentence the gate refused because the level it names lives here.
-    #
-    # All three are fractions — ck_risk_limits_unit makes that a database fact,
-    # and LimitBook refuses a row whose unit is anything else.
-    (LimitCheckRow, (), ("current_value", "warning_level", "breach_level"), "limit_type"),
+# Derived from analytics/resources.py (V15-S1), which is where "these columns
+# carry values, in these units" is now written once. This tuple keeps its shape
+# so the walker below is unchanged; what went away is the second copy of the
+# fact, and with it the way a column could be added to a table and stay
+# unciteable because nobody remembered a list in the gate.
+_RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], ...] = tuple(
+    (r.model,
+     tuple(c.name for c in r.columns if c.unit == MONEY),
+     tuple(c.name for c in r.columns if c.unit == RATIO),
+     r.label_column)
+    for r in resources.RUN_CHILDREN
 )
 
 # V8-P4. How MANY of those children there are. Every value above is a
@@ -632,13 +556,7 @@ _RUN_CHILDREN: tuple[tuple[type, tuple[str, ...], tuple[str, ...], str | None], 
 # Counting is arithmetic over rows, and an open counting facility reachable
 # through a citation id would be the portfolio-arithmetic surface this desk
 # decided not to open (DP1), arrived at by the back door.
-_RUN_COUNTS: tuple[tuple[type, str, str | None], ...] = (
-    (RiskAlert, "alerts", None),
-    (LimitCheckRow, "limit_checks", "fired"),
-    (StressResultRow, "stress_scenarios", "status"),
-    (IssuerExposure, "positions", None),
-    (FactorAttribution, "factors", None),
-)
+_RUN_COUNTS: tuple[tuple[type, str, str | None], ...] = resources.countable()
 
 
 def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
@@ -667,8 +585,18 @@ async def _from_calc(db: AsyncSession, cid: str) -> tuple[list[EvidenceValue], s
     # the rows that did not. The table cannot type a `stat.latest` over a
     # margin series — the op says nothing about what it was taken over — and
     # the recorded type can.
-    recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
-    if recorded in ("money", "ratio", "count"):
+    # V15-S1: the row's own column first — the promoted form of what the typed
+    # producers have always stated in params. Then the params blob, for rows
+    # written before the column. Then, and only then, the operation-name table,
+    # which is transitional and may not grow (test_resources).
+    if row.unit_class in (MONEY, RATIO, COUNT):
+        unit = row.unit_class
+        recorded = None
+    else:
+        recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
+    if row.unit_class in (MONEY, RATIO, COUNT):
+        pass
+    elif recorded in ("money", "ratio", "count"):
         # V11-T. "count" arrives from calc.scalar.scale, the only producer of a
         # quantity whose unit a constant decided: days_inventory is a ratio until
         # it is multiplied by 365. Typed MONEY by the fallthrough below, the days

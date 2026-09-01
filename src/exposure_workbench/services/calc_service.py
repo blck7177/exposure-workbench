@@ -62,8 +62,21 @@ async def _record(
     input_refs: list[str],
     quality_flags: dict,
     invoked_by: str,
+    unit_class: str | None = None,
 ) -> str:
+    """Record one calculation.
+
+    V15-S1: the row carries its own unit. Every typed producer already stated it
+    — `params.result_type.unit_class`, written by the calculator since V9 — and
+    it was reachable only by digging into a JSONB blob, so the gate kept a
+    second rule that typed a row by its OPERATION NAME instead. Promoting the
+    fact it already had to a column is what retires that rule. An explicit
+    argument wins; otherwise the params are read; a row that states neither
+    leaves the column NULL, which reads as "this row did not record it".
+    """
     calc_id = new_calc_id()
+    stated = ((params or {}).get("result_type") or {}).get("unit_class")
+    unit = unit_class or ({"ratio": "RATIO", "money": "MONEY", "count": "COUNT"}.get(stated))
     db.add(
         CalcLedger(
             id=calc_id,
@@ -71,6 +84,7 @@ async def _record(
             operation=operation,
             params=params,
             result={**result, "quality_flags": quality_flags},
+            unit_class=unit,
             input_refs=input_refs,
             primitive_version=so.PRIMITIVE_VERSION,
             invoked_by=invoked_by,

@@ -70,21 +70,18 @@ async def test_every_citation_still_resolves():
 #
 #   1  pre-V3 laundering, inherited from a flawed brief (see above)
 #   8  collinear coefficients quoted alone (V11-F)
-#  27  one message, msg_07105e9d805c (2026-08-31, a V14-C block answer): its
-#      figures were SLOTS, resolved from the ledger at answer time and rendered
-#      into the text as raw float reprs — `1.08663e+07` — which this eval then
-#      re-parses as prose and shreds: the exponent's `07` judged as a bare
-#      count, `1.08663` matched against nothing, and weights refused while
-#      EQUAL to their nearest because the mantissa alone changed the written
-#      precision. Every one of the 27 is an artifact of re-reading a rendered
-#      block answer as if the model had written it; the figures themselves are
-#      the ledger's own values by construction. Two durable fixes are on the
-#      books and neither is a ceiling bump: this eval should skip figures a
-#      block answer carried as slots (re-judging a resolved slot judges the
-#      renderer, not the model), and the renderer should write floats the way
-#      a reader would — scientific notation reaching a reader is its own
-#      defect. Until then the 27 stay counted, named, and explained here.
-CHAT_REFUSAL_CEILING = 36
+# The 27 that briefly sat here were an artefact of the INSTRUMENT, not of any
+# answer: a V14-C block message's figures are slots, and the eval was
+# re-extracting them from the prose the renderer had put them back into —
+# shredding `1.08663e+07` into a mantissa and a bare `07`, refusing weights that
+# were EQUAL to the rows they came from. V15-S0 measures a block answer as a
+# block answer (slots against their rows, text runs against the no-figures
+# rule), and they went away as they should: 36 back to 9, with 193 slots across
+# 18 block messages all still held by the rows they name.
+#
+# The ceiling is 9 again, and the lesson is kept: a measurement that disagrees
+# with the gate is a measurement to read before a constant to raise.
+CHAT_REFUSAL_CEILING = 9
 
 
 async def test_chat_answers_verify_almost_completely():
@@ -118,4 +115,26 @@ async def test_brief_refusals_stay_within_the_classified_set():
     assert r["briefs"]["unverified"] <= BRIEF_REFUSAL_CEILING, (
         f"{r['briefs']['unverified']} refusals across the stored briefs, above the "
         f"classified {BRIEF_REFUSAL_CEILING}; read the new one before raising this"
+    )
+
+
+async def test_a_block_answer_is_measured_as_blocks_not_as_prose():
+    """The instrument's own invariant, so it cannot regress into re-reading
+    rendered text: every slot of every stored block answer still resolves to the
+    row it names, and no text run carries a figure. Both are read-time promises
+    about the LEDGER; neither judges the model for how the renderer spells a
+    number."""
+    from scripts.eval_faithfulness import evaluate
+
+    r = await evaluate()
+    chat = r["chat"]
+    if chat["block_messages"] == 0:
+        pytest.skip("no block answers stored yet")
+    assert chat["block_slots"] > 0
+    slot_problems = [x for x in r["refusals"]
+                     if x["reason"] in ("slot_no_longer_held", "slot_ref_holds_nothing",
+                                        "figure_written_as_text")]
+    assert slot_problems == [], (
+        f"{len(slot_problems)} block-answer problems: a slot whose row no longer holds "
+        f"its value, or a figure written into text. {slot_problems[:3]}"
     )

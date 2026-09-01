@@ -280,6 +280,11 @@ docker compose build
 # V13 replaced. NULL reads as "this run did not record it", and the UI answers
 # with its generic sentence rather than a claim about a cause it does not have.
 #
+# v15_calc_unit.sql adds calc_ledger.unit_class and does not backfill: every
+# typed producer already states the unit in params.result_type, the gate reads
+# that for older rows, and a row that stated neither is one whose unit nobody
+# recorded — which is what NULL says.
+#
 # v13_users_ack.sql adds users.disclaimer_acknowledged_at and does not backfill:
 # an account that existed before the column genuinely has not acknowledged
 # anything, and the bar shows until the person does.
@@ -307,6 +312,8 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v13_limit_checks_values.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v13_users_ack.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v15_calc_unit.sql
 
 docker compose up -d
 

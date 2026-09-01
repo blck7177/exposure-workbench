@@ -1,0 +1,7 @@
+{"captured_at" : "2026-09-01 13:51:11", "era_note" : "V14-C blocks exit, before V15", "by_day" : [{"d":"2026-09-01","attempts":14,"accepted":3,"refused_pct":79}, 
+ {"d":"2026-08-31","attempts":119,"accepted":17,"refused_pct":86}, 
+ {"d":"2026-08-30","attempts":153,"accepted":53,"refused_pct":65}, 
+ {"d":"2026-08-29","attempts":89,"accepted":46,"refused_pct":48}, 
+ {"d":"2026-08-28","attempts":123,"accepted":74,"refused_pct":40}, 
+ {"d":"2026-08-27","attempts":213,"accepted":129,"refused_pct":39}, 
+ {"d":"2026-08-26","attempts":6,"accepted":3,"refused_pct":50}], "refusal_mix_blocks_era" : { "accepted" : 20, "invalid_arguments" : 12, "invalid_citations" : 6, "malformed_answer" : 60, "unresolved_slots" : 34, "unverified_quote" : 1 }, "attempts_per_turn_blocks_era" : { "1" : 2, "2" : 4, "3" : 2, "4" : 3, "5" : 4, "6" : 1, "7" : 1, "8" : 1, "9" : 1, "11" : 5 }, "no_answer_rate" : {"turns" : 23, "no_answer" : 5}, "peak_prompt_tokens" : {"avg" : 21891, "max" : 57707}, "gate_rule_count" : {"exemption_patterns" : 20, "block_shape_codes" : 26, "numeric_reason_codes" : 3, "assertion_checks" : 2, "trajectory_rules" : 2, "exits" : 4}}
