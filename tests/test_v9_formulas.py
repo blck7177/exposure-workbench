@@ -125,6 +125,10 @@ def test_every_formula_says_what_it_may_be_cited_as():
 def test_every_formula_belongs_to_a_family():
     """"More leveraged" is a question about a ratio; a dollar amount of debt is
     not one. The family is what lets a comparison pick a commensurable measure."""
-    known = {"earnings", "cash", "leverage", "coverage", "liquidity", "margin", "turnover"}
+    known = {"earnings", "cash", "leverage", "coverage", "liquidity", "margin",
+             "turnover",
+             # V16 Tier 1: returns on capital, reinvestment intensity, and
+             # earnings quality are questions none of the pre-V16 families ask.
+             "returns", "reinvestment", "quality"}
     for name, f in fm.FORMULAS.items():
         assert f.family in known, f"{name}: {f.family!r}"

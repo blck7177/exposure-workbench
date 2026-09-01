@@ -26,6 +26,38 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 SEC_NON_GAAP = "https://www.sec.gov/corpfin/non-gaap-financial-measures"
+CFA_FAT = ("https://www.cfainstitute.org/insights/professional-learning/refresher-readings/"
+           "2026/financial-analysis-techniques")
+DAMODARAN_RETURNS = "https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/returnmeasures.pdf"
+SLOAN_1996 = "https://www.stern.nyu.edu/sites/default/files/assets/documents/con_032093.pdf"
+
+# Why a measure is refused for a financial issuer, as data. The default is the
+# sentence the service has always used — V11-A found it was the best refusal
+# sentence this codebase produced, so it stays verbatim — and a formula whose
+# reason is DIFFERENT (a bank has no inventory; a bank's debt is raw material)
+# carries its own sentence in `not_for_financials`. None means the measure DOES
+# apply to a financial issuer: ROE is the profitability measure banks report.
+NOT_FOR_FINANCIALS_DEFAULT = (
+    "these are non-financial credit measures and they do not apply to a "
+    "financial issuer: interest expense is an operating cost for a bank, so "
+    "coverage and leverage built on adding it back describe nothing")
+_NOT_FOR_BANKS_CAPITAL = (
+    "for a financial issuer debt is not financing to be netted against "
+    "operations — deposits and borrowings are the raw material of the "
+    "business — so an invested capital assembled as debt plus equity minus "
+    "cash describes nothing")
+_NOT_FOR_BANKS_CLASSIFIED_BS = (
+    "a financial issuer does not present a classified balance sheet: current "
+    "assets, inventory and current liabilities are not lines a bank reports, "
+    "so this measure has no inputs and no meaning there")
+_NOT_FOR_BANKS_WORKING_CAPITAL = (
+    "a financial issuer holds no inventory and its receivables and payables "
+    "are not trade credit, so a working-capital cycle measured in days "
+    "describes nothing")
+_NOT_FOR_BANKS_CAPEX = (
+    "operating cash flow less capital expenditure does not describe a bank, "
+    "whose cash generation and reinvestment run through the loan book and "
+    "deposits rather than property and equipment")
 
 
 @dataclass(frozen=True)
@@ -57,6 +89,17 @@ class Formula:
     # result's definition, the way the margins name which revenue line they
     # divided by. Data, so adding one is an edit here and not a branch.
     alternatives: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # Refused for a financial issuer, and WHY, or None when the measure applies
+    # to banks (ROE, ROA, the accruals ratio). A reason, not a flag, so the
+    # refusal the reader sees is about the measure and never a tautology about
+    # the sector. The default keeps every pre-V16 formula refusing exactly as
+    # it always did.
+    not_for_financials: str | None = NOT_FOR_FINANCIALS_DEFAULT
+    # For a divide formula: refuse when the denominator is ≤ 0, and say why.
+    # Empty means no such condition. ROE over negative equity is the canonical
+    # case — a loss over negative equity prints as a positive return, so the
+    # number is suppressed rather than displayed (Damodaran, return measures).
+    denominator_must_be_positive: str = ""
 
 
 FORMULAS: dict[str, Formula] = {
@@ -192,9 +235,261 @@ FORMULAS: dict[str, Formula] = {
         unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
+
+    # ── returns on capital (V16, Tier 1) ─────────────────────────────────────
+    "roe": Formula(
+        expression="net income ÷ stockholders' equity",
+        inputs=("net_income", "stockholders_equity"), op="divide", basis="mixed",
+        unit_class="ratio", family="returns",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=None,
+        denominator_must_be_positive=(
+            "stockholders' equity at or below zero makes ROE meaningless: a loss "
+            "divided by negative equity prints as a positive return, so the ratio "
+            "is refused rather than displayed"),
+        note=("Ending equity, not a two-point average: an average needs two dates and "
+              "doubles the surface a missing quarter can remove; stated in the result. "
+              "Applies to financial issuers — ROE is the profitability measure banks "
+              "themselves report. DuPont: roe = net_margin × asset_turnover × "
+              "equity_multiplier, an identity, so a move in ROE can be read against "
+              "which leg moved."),
+    ),
+    "roa": Formula(
+        expression="net income ÷ total assets",
+        inputs=("net_income", "total_assets"), op="divide", basis="mixed",
+        unit_class="ratio", family="returns",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=None,
+        note=("Ending total assets, not an average; stated in the result. This is the "
+              "common form with net income in the numerator — after interest, over "
+              "assets financed partly by debt — not the after-tax-EBIT variant."),
+    ),
+    "tax_burden": Formula(
+        expression="net income ÷ pretax income",
+        inputs=("net_income", "pretax_income"), op="divide", basis="window",
+        unit_class="ratio", family="returns",
+        citation="CFA Institute, Financial Analysis Techniques (DuPont five-step)",
+        source_url=CFA_FAT, not_for_financials=None,
+        note=("The DuPont tax-burden term. Equals one minus the effective tax rate "
+              "exactly when net income is pretax income less tax expense; items "
+              "between the tax line and net income (noncontrolling interests) are "
+              "the gap, and the division is on the page either way."),
+    ),
+    "nopat": Formula(
+        expression="operating income × tax burden",
+        inputs=("operating_income", "tax_burden"), op="product", basis="window",
+        unit_class="money", family="earnings",
+        citation="Damodaran, Return Measures (NYU Stern working paper)",
+        source_url=DAMODARAN_RETURNS, not_for_financials=_NOT_FOR_BANKS_CAPITAL,
+        note=("Operating income × (1 − effective tax rate), with the DuPont tax "
+              "burden standing in for one minus the effective rate — see tax_burden "
+              "for what the stand-in assumes. Effective rate, not marginal: a period "
+              "with discrete tax items moves it, and the period is stated."),
+    ),
+    "invested_capital": Formula(
+        expression="total debt + stockholders' equity − cash and equivalents",
+        inputs=("total_debt", "stockholders_equity", "cash_and_equivalents"),
+        signs=(1, 1, -1), op="difference", basis="instant",
+        unit_class="money", family="leverage",
+        citation="Damodaran, Return Measures (NYU Stern working paper)",
+        source_url=DAMODARAN_RETURNS, not_for_financials=_NOT_FOR_BANKS_CAPITAL,
+        note=("The financing-side book construction, at ending balances of one "
+              "instant. All cash is netted, not only surplus cash — the operating/"
+              "excess split needs inputs this desk does not hold, and which "
+              "construction was used travels with the number."),
+    ),
+    "roic": Formula(
+        expression="NOPAT ÷ invested capital",
+        inputs=("nopat", "invested_capital"), op="divide", basis="mixed",
+        unit_class="ratio", family="returns",
+        citation="Damodaran, Return Measures (NYU Stern working paper)",
+        source_url=DAMODARAN_RETURNS, not_for_financials=_NOT_FOR_BANKS_CAPITAL,
+        note=("Ending invested capital, not beginning-of-period or an average: one "
+              "date, one filing surface. Damodaran notes ending-balance ROIC "
+              "understates when capital grew during the period; the instant used is "
+              "stated with the number."),
+    ),
+
+    # ── efficiency and structure (V16, Tier 1) ───────────────────────────────
+    "asset_turnover": Formula(
+        expression="revenue ÷ total assets",
+        inputs=("revenue", "total_assets"),
+        alternatives={"revenue": ("total_revenues",)}, op="divide", basis="mixed",
+        unit_class="ratio", family="turnover",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=None,
+        note=("Ending total assets, not an average; stated in the result. The middle "
+              "DuPont term. Whichever top line the issuer reports is named in the "
+              "result."),
+    ),
+    "equity_multiplier": Formula(
+        expression="total assets ÷ stockholders' equity",
+        inputs=("total_assets", "stockholders_equity"), op="divide", basis="instant",
+        unit_class="ratio", family="leverage",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=None,
+        denominator_must_be_positive=(
+            "stockholders' equity at or below zero makes the equity multiplier "
+            "meaningless: assets over negative equity prints as a negative "
+            "multiple of leverage, so the ratio is refused rather than displayed"),
+        note=("Both sides at one instant. The leverage leg of DuPont: assets per "
+              "unit of equity."),
+    ),
+
+    # ── liquidity (V16, Tier 1) ──────────────────────────────────────────────
+    "quick_assets": Formula(
+        expression="current assets − inventory",
+        inputs=("current_assets", "inventory"), signs=(1, -1),
+        op="difference", basis="instant", unit_class="money", family="liquidity",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=_NOT_FOR_BANKS_CLASSIFIED_BS,
+        note=("Current assets less inventory, one instant. An approximation of the "
+              "textbook numerator (cash + short-term securities + receivables): it "
+              "keeps prepaid expenses in, and which construction was used travels "
+              "with the number."),
+    ),
+    "quick_ratio": Formula(
+        expression="(current assets − inventory) ÷ current liabilities",
+        inputs=("quick_assets", "current_liabilities"), op="divide", basis="instant",
+        unit_class="ratio", family="liquidity",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=_NOT_FOR_BANKS_CLASSIFIED_BS,
+        note=("Both sides at one instant. Differs from the current ratio only by "
+              "inventory, which it declines to treat as near-cash; see quick_assets "
+              "for what the numerator approximates."),
+    ),
+
+    # ── cash generation as a share of revenue (V16, Tier 1) ──────────────────
+    "fcf_margin": Formula(
+        expression="free cash flow ÷ revenue",
+        inputs=("free_cash_flow", "revenue"),
+        alternatives={"revenue": ("total_revenues",)}, op="divide", basis="window",
+        unit_class="ratio", family="margin",
+        citation="SEC C&DI 102.07", source_url=SEC_NON_GAAP,
+        not_for_financials=_NOT_FOR_BANKS_CAPEX,
+        note=("Both sides over one window. Free cash flow carries its own definition "
+              "(C&DI 102.07: the title does not describe how it is calculated), so "
+              "the margin inherits it; the revenue line used is named in the "
+              "result."),
+    ),
+    "capex_intensity": Formula(
+        expression="capital expenditures ÷ revenue",
+        inputs=("capex", "revenue"),
+        alternatives={"revenue": ("total_revenues",)}, op="divide", basis="window",
+        unit_class="ratio", family="reinvestment",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=_NOT_FOR_BANKS_CAPEX,
+        note=("Both sides over one window. Read beside asset_turnover: capex as a "
+              "share of revenue is the reinvestment the turnover has to earn a "
+              "return on."),
+    ),
+
+    # ── leverage (V16, Tier 1) ───────────────────────────────────────────────
+    "net_debt_to_ebitda": Formula(
+        expression="net debt ÷ EBITDA",
+        inputs=("net_debt", "ebitda"), op="divide", basis="mixed",
+        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
+        note=("A balance over a flow — the covenant form; the instant and the window "
+              "are both stated. Net debt here is total debt less all cash, NOT an "
+              "agency net debt (see net_debt)."),
+    ),
+
+    # ── the working-capital cycle (V16, Tier 1) ──────────────────────────────
+    "cash_conversion_cycle": Formula(
+        expression="days sales outstanding + days inventory − days payable",
+        inputs=("days_sales_outstanding", "days_inventory", "days_payable"),
+        signs=(1, 1, -1), op="difference", basis="mixed",
+        unit_class="count", family="turnover",
+        citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
+        not_for_financials=_NOT_FOR_BANKS_WORKING_CAPITAL,
+        note=("A count of days: how long operations must be self-funded. Each days "
+              "measure is built on ending balances and states its own window in the "
+              "result."),
+    ),
+
+    # ── earnings quality (V16, Tier 1) ───────────────────────────────────────
+    "accruals": Formula(
+        expression="net income − operating cash flow",
+        inputs=("net_income", "operating_cash_flow"), signs=(1, -1),
+        op="difference", basis="window", unit_class="money", family="quality",
+        citation="Sloan (1996), The Accounting Review 71(3); Hribar & Collins (2002)",
+        source_url=SLOAN_1996, not_for_financials=None,
+        note=("The cash-flow construction (Hribar & Collins 2002), not Sloan's "
+              "balance-sheet one: acquisitions and divestitures contaminate the "
+              "balance-sheet form, which is why the cash-flow form became standard. "
+              "Both flows over one window."),
+    ),
+    "accruals_ratio": Formula(
+        expression="(net income − operating cash flow) ÷ total assets",
+        inputs=("accruals", "total_assets"), op="divide", basis="mixed",
+        unit_class="ratio", family="quality",
+        citation="Sloan (1996), The Accounting Review 71(3)",
+        source_url=SLOAN_1996, not_for_financials=None,
+        note=("Sloan deflates by average total assets; this desk uses the ending "
+              "balance for the same one-date reason as the days measures, and says "
+              "so. Sloan's finding is about persistence — the accrual component of "
+              "earnings is less persistent than the cash component — and the "
+              "reading of any level belongs to the reader."),
+    ),
 }
 
-DAYS_FORMULAS = ("days_sales_outstanding", "days_inventory", "days_payable")
+# The ops the evaluator dispatches on. Nothing else may appear in a Formula:
+# an op outside this set used to fall through an else-branch into `divide`,
+# which is the quietest possible way to compute the wrong thing.
+KNOWN_OPS = ("sum", "difference", "divide", "product", "cover")
+UNIT_CLASSES = ("money", "ratio", "count")
+
+
+def validate(formulas: dict[str, "Formula"]) -> None:
+    """Refuse a malformed registry at import, not at a user.
+
+    Each rule below removes a silent-failure class the V16 audit found in the
+    evaluator: `difference` with signs=() looped zero times and returned its
+    first operand as the answer; an unknown op fell through to divide; a
+    divide with three inputs evaluated the first two and dropped the third.
+    None of those can now be WRITTEN, so the evaluator does not need a branch
+    for any of them.
+    """
+    for name, f in formulas.items():
+        if f.op not in KNOWN_OPS:
+            raise ValueError(f"{name}: op {f.op!r} is not one of {KNOWN_OPS}")
+        if f.unit_class not in UNIT_CLASSES:
+            raise ValueError(f"{name}: unit_class {f.unit_class!r} is not one of "
+                             f"{UNIT_CLASSES}")
+        if f.op in ("divide", "product") and len(f.inputs) != 2:
+            raise ValueError(f"{name}: {f.op} takes exactly two inputs, got "
+                             f"{len(f.inputs)}")
+        if f.op in ("sum", "difference") and len(f.inputs) < 2:
+            raise ValueError(f"{name}: {f.op} needs at least two inputs — a "
+                             f"one-term {f.op} is its input under another name, "
+                             f"and the evaluator would return it unrenamed")
+        if f.op == "difference":
+            if len(f.signs) != len(f.inputs):
+                raise ValueError(f"{name}: difference needs one sign per input "
+                                 f"({len(f.inputs)}), got {len(f.signs)} — with "
+                                 f"too few, trailing inputs are silently dropped")
+            if f.signs[0] != 1:
+                raise ValueError(f"{name}: signs[0] must be +1 — the evaluator "
+                                 f"starts FROM the first operand and never reads "
+                                 f"its sign, so -1 there would be silently ignored")
+            if any(s not in (1, -1) for s in f.signs):
+                raise ValueError(f"{name}: signs must be +1 or -1, got {f.signs}")
+        elif f.signs:
+            raise ValueError(f"{name}: signs are only read by difference; on "
+                             f"{f.op} they would be silently ignored")
+        if f.op == "divide" and f.unit_class == "count" and "365" not in f.expression:
+            # A count that comes out of a division IS a days measure: the
+            # evaluator scales the quotient by 365 and the expression must say
+            # so, or the printed formula and the printed number disagree.
+            raise ValueError(f"{name}: a divide formula with unit_class 'count' "
+                             f"is scaled by 365, and its expression must state "
+                             f"the × 365")
+        if f.denominator_must_be_positive and f.op != "divide":
+            raise ValueError(f"{name}: denominator_must_be_positive only means "
+                             f"something on a divide formula")
+
+
+validate(FORMULAS)
 
 
 def authority(f: "Formula") -> dict:
@@ -231,3 +526,21 @@ def evaluation_order() -> tuple[str, ...]:
     for n in sorted(FORMULAS):
         visit(n, ())
     return tuple(order)
+
+
+# The reading order (V16-S3). An analyst reads a company cash-first — cash →
+# earnings → margins → returns → activity → balance sheet → screens — and the
+# catalogue lists measures in the order the method reads them, so the model
+# meets them the way an analyst does. Data, not behaviour: reordering is an
+# edit here and changes every describe_issuer at once.
+FAMILY_ORDER: tuple[str, ...] = (
+    "cash", "earnings", "margin", "returns", "turnover",
+    "liquidity", "coverage", "leverage", "reinvestment", "quality",
+)
+
+_UNORDERED_FAMILIES = {f.family for f in FORMULAS.values()} - set(FAMILY_ORDER)
+if _UNORDERED_FAMILIES:
+    raise ValueError(
+        f"formulas carry families the reading order does not place: "
+        f"{sorted(_UNORDERED_FAMILIES)} — add them to FAMILY_ORDER"
+    )

@@ -43,13 +43,15 @@ async def _sector(db: AsyncSession, ticker: str) -> str | None:
     )).scalar_one_or_none()
 
 
-_BANK_REASON = ("these are non-financial credit measures and they do not apply to a "
-                "financial issuer: interest expense is an operating cost for a bank, so "
-                "coverage and leverage built on adding it back describe nothing")
+# The default reason lives with the formulas now — it is data about the
+# measures, and V16 made it per-formula so a bank's ROE (which banks report)
+# stops being refused with a sentence about interest add-backs.
+_BANK_REASON = fm.NOT_FOR_FINANCIALS_DEFAULT
 
 
 async def _bank_refusal(db: AsyncSession, ticker: str, name: str | None = None,
-                        invoked_by: str = "agent") -> dict | None:
+                        invoked_by: str = "agent", reason: str | None = None,
+                        cache: dict | None = None) -> dict | None:
     """Refused for being a bank — with an id, and with the reason kept verbatim.
 
     V11-A. The reason was already the best sentence any refusal in this codebase
@@ -59,23 +61,40 @@ async def _bank_refusal(db: AsyncSession, ticker: str, name: str | None = None,
     citation gate. Both failures come from the same missing thing: an absence
     with no identity of its own.
 
+    V16: `reason` is the FORMULA's own sentence (Formula.not_for_financials);
+    the pre-V16 default stays for every formula that does not carry one. Within
+    one panel call, formulas refused for the same reason share one absence row
+    through `cache`, the way _unavailable shares a missing input's row.
+
     No stand-in is proposed. Which measures DO describe a bank is a claim about
     bank analysis, and manufacturing one here would be exactly the issuer-
     behaviour rule this design refuses to hold.
     """
-    sector = await _sector(db, ticker)
+    reason = reason or _BANK_REASON
+    if cache is not None and "_sector" in cache:
+        sector = cache["_sector"]
+    else:
+        sector = await _sector(db, ticker)
+        if cache is not None:
+            cache["_sector"] = sector
     if sector not in FINANCIAL_SECTORS:
         return None
-    statement = (f"{name or 'This measure'} is not applicable to {ticker}: " + _BANK_REASON
+    shared = None if cache is None else cache.get(("_absence_bank", reason))
+    if shared is not None:
+        return {**shared, **({"formula": name} if name else {})}
+    statement = (f"{name or 'This measure'} is not applicable to {ticker}: " + reason
                  + ". This is a statement about the measure, not about the issuer's "
                    "creditworthiness, and this desk proposes no substitute for it.")
-    return await ab.refuse(
+    out = await ab.refuse(
         db, "not_applicable", kind="not_applicable", ticker=ticker,
         statement=statement,
         tried={"formula": name, "sector": sector},
         stopped_at={"sector": sector},
         invoked_by=invoked_by,
-        sector=sector, detail=_BANK_REASON, **({"formula": name} if name else {}))
+        sector=sector, detail=reason, **({"formula": name} if name else {}))
+    if cache is not None:
+        cache[("_absence_bank", reason)] = out
+    return out
 
 
 async def _operand(db: AsyncSession, ticker: str, name: str, months: int,
@@ -150,14 +169,32 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
         return {"error": "not_reported", "metric": "total_debt", "detail": detail}
 
     ids = [bs["balances"][m]["fact_id"] for m in cover.terms]
-    running_id, running_value = ids[0], bs["balances"][cover.terms[0]]["value"]
-    for i, (term, fid) in enumerate(zip(cover.terms[1:], ids[1:])):
-        # The final row IS the issuer's total debt; the table calls it that.
-        step = await tc.calculate(db, "add", running_id, fid, invoked_by=invoked_by,
-                                  as_quantity="total_debt" if i == len(ids) - 2 else None)
-        if step.get("error"):
-            return step
-        running_id, running_value = step["calc_id"], step["value"]
+    if len(ids) == 1:
+        # A one-component cover still gets a ledger row that CARRIES THE NAME.
+        # Returning the bare fact id was the audit's finding: the panel's
+        # total_debt line pointed at a row named long_term_debt_total, and the
+        # quantity name the caller asked for landed nowhere. An identity scale
+        # (×1) is the smallest step that records "this issuer's total debt IS
+        # this one component" — loud in the ledger, never a silent alias.
+        named = await tc.scale(db, ids[0], 1.0, unit_class=tc.MONEY,
+                               quantity="total_debt", invoked_by=invoked_by)
+        if named.get("error"):
+            return named
+        running_id, running_value = named["calc_id"], named["value"]
+    else:
+        running_id, running_value = ids[0], bs["balances"][cover.terms[0]]["value"]
+        # `consumed` counts components folded in so far; the step that consumes
+        # the LAST component is the final row, and the final row IS the
+        # issuer's total debt — the table calls it that. (The old form's
+        # `i == len(ids) - 2` sentinel said the same thing illegibly, and said
+        # nothing at all for the one-component cover above.)
+        for consumed, fid in enumerate(ids[1:], start=2):
+            final = consumed == len(ids)
+            step = await tc.calculate(db, "add", running_id, fid, invoked_by=invoked_by,
+                                      as_quantity="total_debt" if final else None)
+            if step.get("error"):
+                return step
+            running_id, running_value = step["calc_id"], step["value"]
     return {"id": running_id, "value": running_value,
             "basis": f"as of {bs['as_of']}", "formula": cover.formula,
             "missing_at_this_date": list(cover.missing_at_this_date),
@@ -284,11 +321,16 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
     if name not in fm.FORMULAS and name != "total_debt":
         return {"error": "unknown_formula", "formula": name,
                 "known": sorted(fm.FORMULAS)}
-    refusal = await _bank_refusal(db, ticker, name, invoked_by)
-    if refusal:
-        return refusal
-
     cache = _cache if _cache is not None else {}
+    # Per-formula, per-reason: ROE applies to a bank (not_for_financials=None)
+    # while debt_to_ebitda does not, and each refused measure carries its own
+    # sentence rather than the registry-wide one.
+    reason = fm.FORMULAS[name].not_for_financials if name in fm.FORMULAS else _BANK_REASON
+    if reason is not None:
+        refusal = await _bank_refusal(db, ticker, name, invoked_by,
+                                      reason=reason, cache=cache)
+        if refusal:
+            return refusal
     if name == "total_debt":
         got = await _total_debt(db, ticker, at, invoked_by)
         if got.get("error"):
@@ -332,41 +374,76 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                       months, invoked_by, cache)
         operands.append(got)
 
+    def _not_combinable(step: dict) -> dict:
+        return {"error": "not_combinable", "formula": name,
+                "detail": step["detail"], "definition": f.expression,
+                "authority": fm.authority(f)}
+
     # The last step carries the formula's name onto its row (as_quantity), so
-    # the table calls the value what the caller asked for.
+    # the table calls the value what the caller asked for. Import-time
+    # validation (fm.validate) guarantees sum/difference have ≥2 inputs — so
+    # each loop below runs at least once and the final row is always named —
+    # and divide/product exactly 2.
     if f.op == "sum":
         acc = operands[0]
-        for i, nxt in enumerate(operands[1:]):
-            last = i == len(operands) - 2
+        # `consumed` counts operands folded in; the step consuming the last
+        # one is the final, named row.
+        for consumed, nxt in enumerate(operands[1:], start=2):
+            final = consumed == len(operands)
             step = await tc.calculate(db, "add", acc["id"], nxt["id"], invoked_by=invoked_by,
-                                      as_quantity=name if last else None)
+                                      as_quantity=name if final else None)
             if step.get("error"):
-                return {"error": "not_combinable", "formula": name,
-                        "detail": step["detail"], "definition": f.expression,
-                    "authority": fm.authority(f)}
+                return _not_combinable(step)
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
     elif f.op == "difference":
+        # signs[0] is +1 by import-time validation: the fold STARTS from the
+        # first operand, so its sign is structural, never read.
         acc = operands[0]
-        for i, (nxt, sign) in enumerate(zip(operands[1:], f.signs[1:])):
-            last = i == len(operands) - 2
+        for consumed, (nxt, sign) in enumerate(zip(operands[1:], f.signs[1:]), start=2):
+            final = consumed == len(operands)
             step = await tc.calculate(db, "add" if sign > 0 else "subtract",
                                       acc["id"], nxt["id"], invoked_by=invoked_by,
-                                      as_quantity=name if last else None)
+                                      as_quantity=name if final else None)
             if step.get("error"):
-                return {"error": "not_combinable", "formula": name,
-                        "detail": step["detail"], "definition": f.expression,
-                    "authority": fm.authority(f)}
+                return _not_combinable(step)
             acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
-    else:  # divide
+    elif f.op == "product":
+        step = await tc.calculate(db, "multiply", operands[0]["id"], operands[1]["id"],
+                                  invoked_by=invoked_by, as_quantity=name)
+        if step.get("error"):
+            return _not_combinable(step)
+        acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
+    elif f.op == "divide":
+        if f.denominator_must_be_positive and operands[1]["value"] <= 0:
+            # A failure condition the REGISTRY declares: ROE over negative
+            # equity prints a sign no reader can interpret, so the number is
+            # refused with the formula's own sentence, not displayed.
+            denominator = used_instead.get(f.inputs[1], f.inputs[1])
+            statement = (f"{name} is not produced for {ticker}: "
+                         f"{f.denominator_must_be_positive}. {ticker}'s "
+                         f"{denominator} is not positive at this date.")
+            return await ab.refuse(
+                db, "not_meaningful", kind="not_meaningful", ticker=ticker,
+                statement=statement,
+                tried={"formula": name, "definition": f.expression},
+                stopped_at={"denominator": denominator,
+                            "value": operands[1]["value"],
+                            "basis": operands[1].get("basis")},
+                invoked_by=invoked_by,
+                formula=name, definition=f.expression, authority=fm.authority(f))
+        # A divide formula whose unit_class is `count` is a days measure: the
+        # quotient is a fraction of a year and the ×365 is part of the
+        # definition (import-time validation requires the expression to say
+        # so). Derived from the registry's own unit_class — this used to be a
+        # separate DAYS_FORMULAS list, one edit away from disagreeing with it.
+        scaled_to_days = f.unit_class == "count"
         step = await tc.calculate(db, "divide", operands[0]["id"], operands[1]["id"],
                                   invoked_by=invoked_by,
-                                  as_quantity=None if name in fm.DAYS_FORMULAS else name)
+                                  as_quantity=None if scaled_to_days else name)
         if step.get("error"):
-            return {"error": "not_combinable", "formula": name,
-                    "detail": step["detail"], "definition": f.expression,
-                    "authority": fm.authority(f)}
+            return _not_combinable(step)
         acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
-        if name in fm.DAYS_FORMULAS:
+        if scaled_to_days:
             # The x365 gets its own ledger row. Doing it here in Python was the
             # first version, and it published a number no evidence could support:
             # the panel printed 143.67 days beside a calc_id holding 0.3936.
@@ -374,11 +451,17 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                     unit_class=tc.COUNT, quantity=name,
                                     invoked_by=invoked_by)
             if scaled.get("error"):
-                return {"error": "not_combinable", "formula": name,
-                        "detail": scaled["detail"], "definition": f.expression,
-                    "authority": fm.authority(f)}
+                return _not_combinable(scaled)
             acc = {"id": scaled["calc_id"], "value": scaled["value"],
                    "basis": acc["basis"]}
+    else:
+        # Unreachable while fm.validate runs at import; loud rather than a
+        # fallthrough if the two files ever disagree. The old else-branch here
+        # WAS divide, so a formula with a typo'd op divided its first two
+        # operands and called the quotient by the formula's name.
+        raise ValueError(f"formula {name} has op {f.op!r}, which this evaluator "
+                         f"does not dispatch; fm.KNOWN_OPS and this dispatch "
+                         f"have drifted apart")
 
     definition = f.expression
     for wanted, actual in used_instead.items():
@@ -396,12 +479,15 @@ _REGISTRY_PROSE = ("note", "authority")
 
 async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
                       at: str | None = None, invoked_by: str = "agent") -> dict:
-    """Every formula in the registry, evaluated once. No logic of its own."""
-    ticker = ticker.upper()
-    refusal = await _bank_refusal(db, ticker, "this panel", invoked_by)
-    if refusal:
-        return refusal
+    """Every formula in the registry, evaluated once. No logic of its own.
 
+    No panel-wide bank refusal any more (V16): which measures describe a
+    financial issuer is per-formula data (Formula.not_for_financials), so a
+    bank's panel carries its ROE and ROA while the credit measures on it are
+    refused each with its own reason — refusals for one reason sharing one
+    absence row through the cache, deduped below like any other absence.
+    """
+    ticker = ticker.upper()
     lines: dict[str, dict] = {}
     shared: dict = {}
     seen_absences: set[str] = set()
