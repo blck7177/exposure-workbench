@@ -1,0 +1,258 @@
+{
+ "scored": [
+  {
+   "tag": "V1-macro-breakdown",
+   "question_tag": "V1-macro-breakdown",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 5,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_attribution, get_risk_state"
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe main macro exposures are to broad equity downside, then credit spreads, with rates a smaller net risk\u201d clearly orders drivers by magnitude."
+    },
+    "netting": {
+     "met": true,
+     "why": "\u201cThe main macro exposures are to broad equity downside, then credit spreads, with rates a smaller net risk\u201d states the net direction clearly."
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with actionable implications: \u201cthese are the current book readings\u201d plus warnings that \u201cMSFT and LLY are the active warnings\u201d and \u201cthe market-downside stress alert is also active.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\"The main macro exposures are to broad equity downside, then credit spreads, with rates a smaller net risk\" uses reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "V2-fundamental-lens",
+   "question_tag": "V2-fundamental-lens",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 11,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "no_linear_locating": {
+     "met": false,
+     "why": "11 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It gives business and macro-risk claims with named firms and periods like \u201cportfolio snapshot shows it,\u201d not generic sector prose."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actable implication: \u201crising real yields or term premiums can pressure returns, while falling yields can help.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded, reader-friendly figures like \u201clargest issuer weight\u201d and no ledger-raw precision appears."
+    }
+   }
+  },
+  {
+   "tag": "V3-rate-exposure",
+   "question_tag": "V3-rate-exposure",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_attribution"
+    },
+    "netting": {
+     "met": true,
+     "why": "It states the net exposure and direction: \u201cit cuts against rates: a rates shock is a loss in this book.\u201d"
+    },
+    "ranking": {
+     "met": true,
+     "why": "It names the rates exposure specifically and says it \"cuts against rates: a rates shock is a loss in this book.\""
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c1.53%\u201d is reported at reader-appropriate precision, not ledger-raw precision, and the direction is clearly stated as \u201ccuts against rates.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "V4-what-to-watch",
+   "question_tag": "V4-what-to-watch",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "trigger": {
+     "met": true,
+     "why": "It gives quantified thresholds like \u201c7.46% against a warning at 6.00% and a breach at 8.00%\u201d and \u201cMSFT | 16.3% | 15.0% | 20.0%.\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable implication: \u201cthe next month watch is whether concentration there stays below its warning tier.\u201d"
+    },
+    "ranking": {
+     "met": true,
+     "why": "It explicitly orders by magnitude: \u201cthe tightest current headroom is the market downside stress check,\u201d and \u201cTechnology remains the largest sector weight.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "The answer reproduces raw percentages like \u201c16.3% | 15.0% | 20.0%\u201d and \u201c7.46%,\u201d more precise than the reader needs."
+    }
+   }
+  },
+  {
+   "tag": "V5-drawdown-forensics",
+   "question_tag": "V5-drawdown-forensics",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": true,
+     "why": "all required reads present"
+    },
+    "ranking": {
+     "met": true,
+     "why": "The answer orders episodes by size and explicitly says \u201cThe book\u2019s biggest drawdown\u201d first, then \u201cThe second episode,\u201d with larger negative returns listed before smaller ones."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with \u201crepeated concentration in a few large growth holdings, with diversifying sleeves not large enough to fully cushion the moves,\u201d which is an actionable implication."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded, reader-appropriate figures like \u201c12.0%,\u201d \u201c6.24%,\u201d and \u201c-26.0%,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "V6-concentration-mandate",
+   "question_tag": "V6-concentration-mandate",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": true,
+     "why": "all required reads present"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating exposures\u2014\u201croom remains\u201d / \u201cbelow warning\u201d\u2014without a portfolio-manager action or implication."
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201cMSFT issuer concentration | 16.3% | 15.0%\u201d and \u201cLLY issuer concentration | 12.8% | 12.0%\u201d give quantified thresholds that change the assessment."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded percentages like \u201c16.3%,\u201d \u201c12.8%,\u201d and \u201c7.17%,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "V7-single-name-integration",
+   "question_tag": "V7-single-name-integration",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites specific filed figures and dated periods: \u201cnet margin is 35.0%\u2026 to 2026-03-31,\u201d \u201cinterest coverage\u2026 2025,\u201d and \u201ctotal debt\u2026 as of 2026-03-31.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI cannot tell you whether to add or trim here\u201d and \u201cI cannot give a verdict,\u201d not an actionable implication."
+    },
+    "precision": {
+     "met": false,
+     "why": "\"35.0%, 2975.0%, 149.7%, $43.37B, $38.09B, 211.8%\" are overly precise for prose and use ledger-style decimals."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer lists metrics, not ordered drivers, and never names the largest driver as the largest."
+    }
+   }
+  },
+  {
+   "tag": "V8-cross-issuer",
+   "question_tag": "V8-cross-issuer",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "ranking": {
+     "met": false,
+     "why": "The answer lists weights, but it never orders the drivers by magnitude or names the largest as the largest."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives weights only: \u201c14.7%,\u201d \u201c16.3%,\u201d \u201c14.6%,\u201d and \u201c4.06%,\u201d but no grounded leverage or balance-sheet-risk comparison."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c5565.3%\u201d and \u201c49720.7%\u201d are ledger-raw precision, far beyond the two or three significant figures needed."
+    },
+    "netting": {
+     "met": false,
+     "why": "The answer lists bank and megacap weights side by side, but never nets offsetting exposures or states a net direction."
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "read_required_inputs": [
+   2,
+   4
+  ],
+  "ranking": [
+   4,
+   6
+  ],
+  "netting": [
+   2,
+   3
+  ],
+  "so_what": [
+   4,
+   6
+  ],
+  "precision": [
+   5,
+   8
+  ],
+  "no_linear_locating": [
+   0,
+   1
+  ],
+  "grounded_claims": [
+   2,
+   3
+  ],
+  "trigger": [
+   2,
+   2
+  ]
+ }
+}

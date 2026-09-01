@@ -829,3 +829,32 @@ A 批五个读、B 批一个方法工具,全部 META_ONLY:它们回答的是**�
 
 - **切一块代码时,数它中间夹着什么**。从 `SeriesSpec` 切到 `load_price_series` 把 `_company_id` 一起切走了——五个序列函数都在那一段,它们共用的那个 helper 也在。offline 全绿(没有测试碰数据库),live 第一条就 NameError。V3 那句"全绿只是测试碰巧盖到的"又一次。
 - **一个真实的 store 规则只能有一个家**。`_benchmark_series` 的选表规则(V8-D 写在 drawdown_service)搬进 `market_data_service.price_points`,`window_return` 与 `explain_episode` 都经它;`get_market_stats` 同时改用服务端日期(V5 修 recipe 时漏了这个工具)。
+
+## M19 — 桌面:量带名字上桌、出口按论断类型指名、验证只解析(V15,2026-09-01 完成)
+
+**一句话**:模型可以指的东西放进一个对象(桌面),由一个构造器建一次,同时是上下文载荷、门的全集、审计记录;出口只写桌面上的名字,门只做查找。组合半边由此拿到发行人半边早有的四件套——身份、清单、具名生产者、挂在对象上的知识。
+
+### 为什么是这个形状(而不是修出口)
+
+V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)全部被实测证否:同值多标签 45%、等价推导中位 24 条、结构性重复只占歧义 30%。共同死因是**值不携带意图**。9/1 一条真实 session 把它演到底:模型写 `{value: 0.06}` 说是预警线,门按半 ulp 在 235 个值里找到 `issuer_exposures.TLT.weight = 0.0607` 并**接受**,读者看到 "0.06073614 warning level",hover 显示 TLT weight。这不是模型错、不是门实现错,是身份没有随值交付。
+
+同一 session 还演了另外两件:靠两段 10-K 原文支撑的段落没有数字,块文法里没有"引原文"这种论断,模型把 `Evidence ids: chunk_…` 写进正文,引号核对因语料空而没查,渲染为纯文本;一条消息 20 个并行 `describe_issuer`/`get_market_stats`,因为 book 作用域的问题只有 issuer 作用域的定位工具。
+
+### 三条边界 + 一个构造器
+
+- **A 输入**:`Tool.evidence` 是注册时的声明(`Evidence(scope=…|names_from=…|tasks_from=…)`),关口据此 `table.declare` → `table.build`,把 `result["table"] = {quantities: {ref: {唯一名: 读者精度值}}, passages, rows}` 附在结果上,并把声明存为 `agent_steps.evidence_refs`。名字由 `services/quantities.py` 唯一拼出(`resources` 列 × `display_names` 行标签;alert 加 `entity_id` 限定后 235/235 唯一)。共线单系数**不上桌**(投影,不是验证)。`describe_run` 是 book 侧的 `describe_issuer`:按"回答什么"分组的名字清单(pattern × labels 压到 7.9k 字符)、缺什么、共线、face 能力声明;`read_quantities(run_id, names)` 是 book 侧的 `evaluate_formula(name)`。
+- **B 出口**:`RESPOND_SCHEMA` 用 oneOf 表达六种论断:paragraph/metric_table(槽 `{ref,name}`、`cites`)、chart、trend、absence、action。`slot.value` 不存在;文本 `\d` 为空,豁免类封闭且短(日期、年份、表单号、期间标签、法规引证、附着型号、窗口标签),id 写进正文按整个 token 拒。`submit_brief` = 六节 × 同一文法(`BLOCK_SCHEMAS` 直接 import),`issuer_briefs.blocks` 落 JSONB。
+- **C 验证**:`services/resolver.py` 六不变量,全是集合/字典查找:形状(schema)→ ref ∈ 桌面 → name ∈ 该 ref 的量 → 引号 ∈ 该块 `cites` 的原文 → kind 谓词。四出口同一函数(`test_one_resolver`)。
+- **构造器**:`table.load(session)` = 全部 completed 步声明的并集,session 作用域即跨轮继承;跨会话永不上桌。
+
+### 整体删除(DP3)
+
+`extract_evidence_refs` 遍历、`_harvestable`、`collect_trail` + 存在性查询、`trajectory_gate`(R1 进 rubric,R2 由 action 谓词取代)、`_COMPATIBLE`/`_DERIVATIONS`/`held_instead_by`/按值解析槽、26 个运行时形状码、散文 `_respond`。`numeric_verification` 只剩 v1 散文路径(日报门 + 读时 eval),1041 → 534 行。
+
+### 实测纠正了计划的三处
+
+① 计划说"日期唯一豁免";实测三条已存储的块答案因 "30-day rolling volatility" 被拒——窗口标签是量的**名字**不是值,豁免类是封闭的七项而非一项。② 计划写 "ref ∈ 本轮账本";代码里 trail 一直是 session 作用域,"跨轮继承"是既有事实而不是新动作。③ `portfolio.window_return` 43 行既无 `unit_class` 也无 `result_type`,又不在冻结的 14 项 legacy 集里,被门当 MONEY——写入侧改为带单位,`v15_window_return_unit.sql` 回填。
+
+### 守卫
+
+`test_table`(三出口同源)、`test_quantities`(235/235 唯一、载荷 ≤ 16k)、`test_symmetry`(每个面上每个工具要么声明证据要么在显式白名单;分组 pattern 双向覆盖真实名字)、`test_output_grammar`(schema 拒一切非文法形状;`slot.value` 不存在于源码)、`test_one_resolver`(两出口同一解析器;`not_alone` 只在 table.py 决定)、`test_display_conventions`(py/ts 共读 `tests/fixtures/display_cases.json`)、`test_v15_table_live`(缺席行经 `get_flow` 拒绝 → 上桌 → absence 块过门)。

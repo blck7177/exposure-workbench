@@ -289,6 +289,19 @@ docker compose build
 # an account that existed before the column genuinely has not acknowledged
 # anything, and the bar shows until the person does.
 #
+# v15_brief_blocks.sql adds issuer_briefs.blocks and does not backfill: a brief
+# written through the prose gate has no blocks, and its text columns stay what
+# they were — the page renders the prose path for it, and says nothing it did
+# not have.
+#
+# v15_window_return_unit.sql DOES backfill, and says which rows: calc_ledger
+# rows whose operation is portfolio.window_return and whose unit_class is NULL
+# become RATIO. That is not a guess about a unit nobody recorded — a window
+# return is a ratio by construction, the writer now says so on every new row,
+# and the transitional operation-name table never learned this op, so the old
+# rows were typed MONEY and a stated "-11.95%" could not meet the -0.1195 they
+# hold.
+#
 # v13_limit_checks_values.sql records what each mandate check measured, and does
 # not backfill for the fifth time. Recomputing from today's risk_limits rows
 # would be worse than a guess — the thresholds may have been edited since — and
@@ -314,6 +327,10 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v13_users_ack.sql
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v15_calc_unit.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v15_brief_blocks.sql
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v15_window_return_unit.sql
 
 docker compose up -d
 

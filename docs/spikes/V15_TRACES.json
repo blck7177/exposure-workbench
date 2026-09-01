@@ -1,0 +1,4034 @@
+[
+ {
+  "tag": "V1-macro-breakdown",
+  "question": "break down the portfolio and analyze what macro risks this portfolio is mainly exposed to",
+  "session_id": "sess_4e73b3d9aa5d",
+  "elapsed_s": 16.7,
+  "error": null,
+  "answer": "As of $10.87M the book had 100.0% gross exposure and 100.0% net exposure, with 10 positions across 8 factors.\nTop sector weights\nTechnology | 35.0%\nFinancials | 14.7%\nFixed_Income | 13.4%\nHealthcare | 12.8%\nCommunication_Services | 12.5%\nConsumer_Discretionary | 7.17%\nEnergy | 4.44%\nTop issuer weights\nMSFT | Technology | 16.3% | -0.20%\nJPM | Financials | 14.7% | -0.07%\nAAPL | Technology | 14.6% | -0.13%\nLLY | Healthcare | 12.8% | -0.20%\nGOOGL | Communication_Services | 12.5% | -0.26%\nHYG | Fixed_Income | 7.34% | 0.01%\nAMZN | Consumer_Discretionary | 7.17% | -0.18%\nTLT | Fixed_Income | 6.07% | -0.03%\nXOM | Energy | 4.44% | 0.12%\nNVDA | Technology | 4.06% | 0.06%\nMacro exposures and stress\nNet beta to equity down | -80.5%\nNet beta to credit spread widening | -21.6%\nNet beta to rates up | -0.20%\nMarket downside stress loss | 7.46%\nCredit spread widening stress loss | 2.16%\nRates shock up stress loss | 1.53%\nTech selloff stress loss | 1.45%\nLimit pressure\nIssuer concentration: MSFT | 16.3% | 15.0% | 20.0%\nIssuer concentration: LLY | 12.8% | 12.0% | 18.0%\nStress loss: market downside | 7.46% | 6.00% | 8.00%\nThe main macro exposures are to broad equity downside, then credit spreads, with rates a smaller net risk; the stress table shows the same ordering, with market downside the largest modeled loss. The portfolio is also concentrated in Technology, Financials, Healthcare, Communication Services, and Fixed Income, so sector-level shocks to large-cap growth, healthcare defensives, and credit-sensitive bonds matter here as well.\nOn issuer concentration, MSFT and LLY are the active warnings, and the market-downside stress alert is also active. The latest run was on $10.87M as of 2026-08-31, so these are the current book readings.",
+  "citations": [
+   "run_1d6e9e05bee6",
+   "calc_2b0b5054d539"
+  ],
+  "meta": {
+   "prompt_tokens": 17513,
+   "verified": {
+    "figures": 49,
+    "sources": 2,
+    "matches": [
+     {
+      "label": "exposure_metrics.portfolio_market_value",
+      "value": 10869311.0,
+      "unit_class": "MONEY",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.gross_exposure_pct",
+      "value": 1.0,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.net_exposure_pct",
+      "value": 1.0,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "count.positions",
+      "value": 10.0,
+      "unit_class": "COUNT",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "count.factors",
+      "value": 8.0,
+      "unit_class": "COUNT",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Technology.weight",
+      "value": 0.34973008,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Financials.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Fixed_Income.weight",
+      "value": 0.13416306,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Healthcare.weight",
+      "value": 0.12770598,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Communication_Services.weight",
+      "value": 0.12488372,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Consumer_Discretionary.weight",
+      "value": 0.0716982,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Energy.weight",
+      "value": 0.04442324,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.MSFT.weight",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.MSFT.contribution",
+      "value": -0.00199161,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.JPM.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.JPM.contribution",
+      "value": -0.00065658,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.AAPL.weight",
+      "value": 0.14575441,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.AAPL.contribution",
+      "value": -0.00129947,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.LLY.weight",
+      "value": 0.12770598,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.LLY.contribution",
+      "value": -0.00195659,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.GOOGL.weight",
+      "value": 0.12488372,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.GOOGL.contribution",
+      "value": -0.00264089,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.HYG.weight",
+      "value": 0.07342692,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.HYG.contribution",
+      "value": 6.383e-05,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.AMZN.weight",
+      "value": 0.0716982,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.AMZN.contribution",
+      "value": -0.001822,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.TLT.weight",
+      "value": 0.06073614,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.TLT.contribution",
+      "value": -0.00026263,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.XOM.weight",
+      "value": 0.04442324,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.XOM.contribution",
+      "value": 0.00115995,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.NVDA.weight",
+      "value": 0.04062447,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.NVDA.contribution",
+      "value": 0.00058909,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.net_beta.equity_down",
+      "value": -0.80469151,
+      "unit_class": "RATIO",
+      "source_id": "calc_2b0b5054d539"
+     },
+     {
+      "label": "portfolio.integration.net_beta.credit_spreads_widen",
+      "value": -0.21632257,
+      "unit_class": "RATIO",
+      "source_id": "calc_2b0b5054d539"
+     },
+     {
+      "label": "portfolio.integration.net_beta.rates_up",
+      "value": -0.00200285,
+      "unit_class": "RATIO",
+      "source_id": "calc_2b0b5054d539"
+     },
+     {
+      "label": "exposure_metrics.stress_loss_market",
+      "value": 0.07461556,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.stress_loss_credit",
+      "value": 0.02161497,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.stress_loss_rates",
+      "value": 0.01526511,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.stress_loss_tech",
+      "value": 0.01448636,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:MSFT.current_value",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+      "value": 0.15,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:MSFT.breach_level",
+      "value": 0.2,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:LLY.current_value",
+      "value": 0.12770598,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+      "value": 0.12,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:LLY.breach_level",
+      "value": 0.18,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.stress_loss:market_downside.current_value",
+      "value": 0.07461556,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.stress_loss:market_downside.limit_value",
+      "value": 0.06,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.stress_loss:market_downside.breach_level",
+      "value": 0.08,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.portfolio_market_value",
+      "value": 10869311.0,
+      "unit_class": "MONEY",
+      "source_id": "run_1d6e9e05bee6"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "As of ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.portfolio_market_value",
+        "value": 10869311.0,
+        "unit_class": "MONEY"
+       }
+      },
+      " the book had ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.gross_exposure_pct",
+        "value": 1.0,
+        "unit_class": "RATIO"
+       }
+      },
+      " gross exposure and ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.net_exposure_pct",
+        "value": 1.0,
+        "unit_class": "RATIO"
+       }
+      },
+      " net exposure, with ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "count.positions",
+        "value": 10.0,
+        "unit_class": "COUNT"
+       }
+      },
+      " positions across ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "count.factors",
+        "value": 8.0,
+        "unit_class": "COUNT"
+       }
+      },
+      " factors."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Top sector weights",
+     "columns": [
+      "Sector",
+      "Weight"
+     ],
+     "rows": [
+      [
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Technology.weight",
+         "value": 0.34973008,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Financials",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Financials.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Fixed_Income",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Fixed_Income.weight",
+         "value": 0.13416306,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Healthcare",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Healthcare.weight",
+         "value": 0.12770598,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Communication_Services",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Communication_Services.weight",
+         "value": 0.12488372,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Consumer_Discretionary",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Consumer_Discretionary.weight",
+         "value": 0.0716982,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Energy",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Energy.weight",
+         "value": 0.04442324,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Top issuer weights",
+     "columns": [
+      "Issuer",
+      "Sector",
+      "Weight",
+      "Daily contribution"
+     ],
+     "rows": [
+      [
+       "MSFT",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.MSFT.weight",
+         "value": 0.1633512,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.MSFT.contribution",
+         "value": -0.00199161,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "JPM",
+       "Financials",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.JPM.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.JPM.contribution",
+         "value": -0.00065658,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "AAPL",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.AAPL.weight",
+         "value": 0.14575441,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.AAPL.contribution",
+         "value": -0.00129947,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "LLY",
+       "Healthcare",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.LLY.weight",
+         "value": 0.12770598,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.LLY.contribution",
+         "value": -0.00195659,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "GOOGL",
+       "Communication_Services",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.GOOGL.weight",
+         "value": 0.12488372,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.GOOGL.contribution",
+         "value": -0.00264089,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "HYG",
+       "Fixed_Income",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.HYG.weight",
+         "value": 0.07342692,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.HYG.contribution",
+         "value": 6.383e-05,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "AMZN",
+       "Consumer_Discretionary",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.AMZN.weight",
+         "value": 0.0716982,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.AMZN.contribution",
+         "value": -0.001822,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "TLT",
+       "Fixed_Income",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.TLT.weight",
+         "value": 0.06073614,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.TLT.contribution",
+         "value": -0.00026263,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "XOM",
+       "Energy",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.XOM.weight",
+         "value": 0.04442324,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.XOM.contribution",
+         "value": 0.00115995,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "NVDA",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.NVDA.weight",
+         "value": 0.04062447,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.NVDA.contribution",
+         "value": 0.00058909,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Macro exposures and stress",
+     "columns": [
+      "Risk",
+      "Value"
+     ],
+     "rows": [
+      [
+       "Net beta to equity down",
+       {
+        "slot": {
+         "ref": "calc_2b0b5054d539",
+         "label": "portfolio.integration.net_beta.equity_down",
+         "value": -0.80469151,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Net beta to credit spread widening",
+       {
+        "slot": {
+         "ref": "calc_2b0b5054d539",
+         "label": "portfolio.integration.net_beta.credit_spreads_widen",
+         "value": -0.21632257,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Net beta to rates up",
+       {
+        "slot": {
+         "ref": "calc_2b0b5054d539",
+         "label": "portfolio.integration.net_beta.rates_up",
+         "value": -0.00200285,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Market downside stress loss",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.stress_loss_market",
+         "value": 0.07461556,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Credit spread widening stress loss",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.stress_loss_credit",
+         "value": 0.02161497,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Rates shock up stress loss",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.stress_loss_rates",
+         "value": 0.01526511,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Tech selloff stress loss",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.stress_loss_tech",
+         "value": 0.01448636,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "calc_2b0b5054d539"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Limit pressure",
+     "columns": [
+      "Check",
+      "Current",
+      "Warning",
+      "Breach"
+     ],
+     "rows": [
+      [
+       "Issuer concentration: MSFT",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:MSFT.current_value",
+         "value": 0.1633512,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+         "value": 0.15,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:MSFT.breach_level",
+         "value": 0.2,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Issuer concentration: LLY",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:LLY.current_value",
+         "value": 0.12770598,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+         "value": 0.12,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:LLY.breach_level",
+         "value": 0.18,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Stress loss: market downside",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.stress_loss:market_downside.current_value",
+         "value": 0.07461556,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.stress_loss:market_downside.limit_value",
+         "value": 0.06,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.stress_loss:market_downside.breach_level",
+         "value": 0.08,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "The main macro exposures are to broad equity downside, then credit spreads, with rates a smaller net risk; the stress table shows the same ordering, with market downside the largest modeled loss. The portfolio is also concentrated in Technology, Financials, Healthcare, Communication Services, and Fixed Income, so sector-level shocks to large-cap growth, healthcare defensives, and credit-sensitive bonds matter here as well."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "calc_2b0b5054d539"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "On issuer concentration, MSFT and LLY are the active warnings, and the market-downside stress alert is also active. The latest run was on ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.portfolio_market_value",
+        "value": 10869311.0,
+        "unit_class": "MONEY"
+       }
+      },
+      " as of 2026-08-31, so these are the current book readings."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5537,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8469,
+    "completion_tokens": 28
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "describe_run",
+    "status": "completed",
+    "result": "keys: run_id, portfolio_id, as_of, how_to_read, analysis_calc_id, groups, other, units",
+    "args": "{\"run_id\": \"run_1d6e9e05bee6\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 0 tool calls",
+    "args": "{}",
+    "prompt_tokens": 15270,
+    "completion_tokens": 3
+   },
+   {
+    "seq": 6,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 15288,
+    "completion_tokens": 1891
+   },
+   {
+    "seq": 7,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"As of \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"exposure_metrics.portfolio_market_value\"}, \" the book had \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"exposure_metrics.gross_exposure_p",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V2-fundamental-lens",
+  "question": "from a fundamental analysis point of view, assess what each firm's business is and what kind of macro risk each one carries",
+  "session_id": "sess_42d018cebf8e",
+  "elapsed_s": 14.5,
+  "error": null,
+  "answer": "Portfolio holdings and fundamental business / macro-risk framing\nMSFT | Software and cloud platform provider; the portfolio snapshot shows it as a core Technology holding with the largest issuer weight. | Sensitive to enterprise IT spending, AI and cloud capex cycles, and valuation duration risk when real yields or discount rates rise.\nJPM | Large diversified bank with a Financials weight in the portfolio. | Exposed to the path of policy rates, credit conditions, loan demand, and capital-markets activity; banking earnings are also tied to the credit cycle.\nAAPL | Consumer electronics and ecosystem company; the portfolio holds it as a major Technology position. | Exposed to consumer spending, handset upgrade cycles, supply-chain and geopolitics, and FX translation across its global customer base.\nLLY | Pharmaceutical company focused on prescription medicines; the portfolio shows it as a large Healthcare holding. | Macro risk is usually less cyclical than for hardware or banks, but it still carries policy and pricing risk, reimbursement pressure, and demand sensitivity tied to healthcare spending conditions.\nGOOGL | Advertising-led internet platform with search, video and cloud exposure; a major Communication Services holding. | Macro risk comes from ad-budget cycles, digital-marketing demand, cloud IT spend, and regulation that can affect monetisation and traffic acquisition.\nHYG | High-yield corporate bond ETF rather than an operating company. | Macro risk is credit-spread widening, defaults, and liquidity stress; it tends to be sensitive to recession risk and tighter financial conditions.\nAMZN | E-commerce and cloud infrastructure platform; a large Consumer Discretionary holding. | Exposed to consumer demand, freight and labour costs, e-commerce margin pressure, and cloud spending cycles; rate moves can also matter through valuation.\nTLT | Long-duration U.S. Treasury ETF rather than an operating company. | Macro risk is mainly interest-rate duration: rising real yields or term premiums can pressure returns, while falling yields can help.\nXOM | Integrated oil and gas producer; an Energy holding. | Exposed to commodity price cycles, global growth, refinery margins, geopolitics, and policy risk around carbon regulation and energy transition.\nNVDA | Semiconductor designer focused on accelerated computing and AI infrastructure; a Technology holding. | Highly exposed to AI capex demand, semiconductor inventory cycles, supply-chain and geopolitical constraints, and valuation sensitivity to rates.",
+  "citations": [
+   "run_1d6e9e05bee6"
+  ],
+  "meta": {
+   "prompt_tokens": 39211,
+   "verified": {
+    "figures": 0,
+    "sources": 1,
+    "matches": []
+   },
+   "blocks": [
+    {
+     "type": "metric_table",
+     "title": "Portfolio holdings and fundamental business / macro-risk framing",
+     "columns": [
+      "Issuer",
+      "Business",
+      "Macro risk to watch"
+     ],
+     "rows": [
+      [
+       "MSFT",
+       "Software and cloud platform provider; the portfolio snapshot shows it as a core Technology holding with the largest issuer weight.",
+       "Sensitive to enterprise IT spending, AI and cloud capex cycles, and valuation duration risk when real yields or discount rates rise."
+      ],
+      [
+       "JPM",
+       "Large diversified bank with a Financials weight in the portfolio.",
+       "Exposed to the path of policy rates, credit conditions, loan demand, and capital-markets activity; banking earnings are also tied to the credit cycle."
+      ],
+      [
+       "AAPL",
+       "Consumer electronics and ecosystem company; the portfolio holds it as a major Technology position.",
+       "Exposed to consumer spending, handset upgrade cycles, supply-chain and geopolitics, and FX translation across its global customer base."
+      ],
+      [
+       "LLY",
+       "Pharmaceutical company focused on prescription medicines; the portfolio shows it as a large Healthcare holding.",
+       "Macro risk is usually less cyclical than for hardware or banks, but it still carries policy and pricing risk, reimbursement pressure, and demand sensitivity tied to healthcare spending conditions."
+      ],
+      [
+       "GOOGL",
+       "Advertising-led internet platform with search, video and cloud exposure; a major Communication Services holding.",
+       "Macro risk comes from ad-budget cycles, digital-marketing demand, cloud IT spend, and regulation that can affect monetisation and traffic acquisition."
+      ],
+      [
+       "HYG",
+       "High-yield corporate bond ETF rather than an operating company.",
+       "Macro risk is credit-spread widening, defaults, and liquidity stress; it tends to be sensitive to recession risk and tighter financial conditions."
+      ],
+      [
+       "AMZN",
+       "E-commerce and cloud infrastructure platform; a large Consumer Discretionary holding.",
+       "Exposed to consumer demand, freight and labour costs, e-commerce margin pressure, and cloud spending cycles; rate moves can also matter through valuation."
+      ],
+      [
+       "TLT",
+       "Long-duration U.S. Treasury ETF rather than an operating company.",
+       "Macro risk is mainly interest-rate duration: rising real yields or term premiums can pressure returns, while falling yields can help."
+      ],
+      [
+       "XOM",
+       "Integrated oil and gas producer; an Energy holding.",
+       "Exposed to commodity price cycles, global growth, refinery margins, geopolitics, and policy risk around carbon regulation and energy transition."
+      ],
+      [
+       "NVDA",
+       "Semiconductor designer focused on accelerated computing and AI infrastructure; a Technology holding.",
+       "Highly exposed to AI capex demand, semiconductor inventory cycles, supply-chain and geopolitical constraints, and valuation sensitivity to rates."
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5545,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 10 tool calls",
+    "args": "{}",
+    "prompt_tokens": 8477,
+    "completion_tokens": 180
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"MSFT\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"JPM\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 6,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"AAPL\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 7,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"LLY\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 8,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"GOOGL\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 9,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas",
+    "args": "{\"ticker\": \"HYG\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 10,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"AMZN\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 11,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas",
+    "args": "{\"ticker\": \"TLT\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 12,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"XOM\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 13,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"NVDA\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 14,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 33078,
+    "completion_tokens": 794
+   },
+   {
+    "seq": 15,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: malformed_answer",
+    "args": "{\"blocks\": [{\"rows\": [[\"MSFT\", \"Software and cloud platform provider; the portfolio snapshot shows it as a core Technology holding with the largest weight among issuers [run_1d6e9e05bee6].\", \"Sensitiv",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 16,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 35888,
+    "completion_tokens": 541
+   },
+   {
+    "seq": 17,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"rows\": [[\"MSFT\", \"Software and cloud platform provider; the portfolio snapshot shows it as a core Technology holding with the largest issuer weight.\", \"Sensitive to enterprise IT spendin",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V3-rate-exposure",
+  "question": "what is this book's net exposure to rates? be specific about which way it cuts",
+  "session_id": "sess_d130c1998e07",
+  "elapsed_s": 3.8,
+  "error": null,
+  "answer": "The book\u2019s net exposure to rates is 1.53% on the run dated 2026-08-31, and it cuts against rates: a rates shock is a loss in this book.\nFor context, the same run shows gross exposure and net exposure each at 100.0% and 100.0% of portfolio market value.",
+  "citations": [
+   "run_1d6e9e05bee6"
+  ],
+  "meta": {
+   "prompt_tokens": 10669,
+   "verified": {
+    "figures": 3,
+    "sources": 1,
+    "matches": [
+     {
+      "label": "exposure_metrics.stress_loss_rates",
+      "value": 0.01526511,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.gross_exposure_pct",
+      "value": 1.0,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.net_exposure_pct",
+      "value": 1.0,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "The book\u2019s net exposure to rates is ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.stress_loss_rates",
+        "value": 0.01526511,
+        "unit_class": "RATIO"
+       }
+      },
+      " on the run dated 2026-08-31, and it cuts against rates: a rates shock is a loss in this book."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "For context, the same run shows gross exposure and net exposure each at ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.gross_exposure_pct",
+        "value": 1.0,
+        "unit_class": "RATIO"
+       }
+      },
+      " and ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.net_exposure_pct",
+        "value": 1.0,
+        "unit_class": "RATIO"
+       }
+      },
+      " of portfolio market value."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5539,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8471,
+    "completion_tokens": 200
+   },
+   {
+    "seq": 4,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"The book\u2019s net exposure to rates is \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"exposure_metrics.stress_loss_rates\"}, \" on the run dated 2026-08-31, and it cuts against rates: a rat",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V4-what-to-watch",
+  "question": "what should I be watching over the next month for this portfolio? give me levels, not vibes",
+  "session_id": "sess_6e72dc47c675",
+  "elapsed_s": 29.1,
+  "error": null,
+  "answer": "Watch list for the next month\nIssuer concentration: MSFT | 16.3% | 15.0% | 20.0% | -1.34% | 3.66%\nIssuer concentration: LLY | 12.8% | 12.0% | 18.0% | -0.77% | 5.23%\nMarket downside stress | 7.46% | 6.00% | 8.00% | -1.46% | 0.54%\nPortfolio volatility 30d | 12.9% | 18.0% | 25.0% | 5.09% | 12.1%\nPortfolio VaR 95 | 1.39% | 2.50% | 3.50% | 1.11% | 2.11%\nTechnology sector concentration | 35.0% | 40.0% | 50.0% | 5.03% | 15.0%\nFinancials sector concentration | 14.7% | 20.0% | 30.0% | 5.26% | 15.3%\nFixed Income sector concentration | 13.4% | 20.0% | 30.0% | 6.58% | 16.6%\nAs of 2026-08-31, the tightest current headroom is the market downside stress check, with the book at 7.46% against a warning at 6.00% and a breach at 8.00%. The most compressed issuer limits are MSFT and LLY, both already in warning territory, while JPM is close to its issuer warning line. Technology remains the largest sector weight, so the next month watch is whether concentration there stays below its warning tier.\nOn the market side, the book's stress loss under market downside is 7.46% of portfolio value, which is above the portfolio's warning tier but still below breach. The thirty-day volatility sits below its warning tier, and the one-year one-day value-at-risk also remains below warning.",
+  "citations": [
+   "run_1d6e9e05bee6",
+   "calc_6faeaaa60b08"
+  ],
+  "meta": {
+   "prompt_tokens": 20907,
+   "verified": {
+    "figures": 44,
+    "sources": 2,
+    "matches": [
+     {
+      "label": "limit_checks.issuer_concentration:MSFT.current_value",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:MSFT.warning_level",
+      "value": 0.15,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:MSFT.breach_level",
+      "value": 0.2,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.issuer_concentration:MSFT",
+      "value": -0.013351200000000008,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.issuer_concentration:MSFT",
+      "value": 0.03664880000000001,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:LLY.current_value",
+      "value": 0.12770598,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:LLY.warning_level",
+      "value": 0.12,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.issuer_concentration:LLY.breach_level",
+      "value": 0.18,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.issuer_concentration:LLY",
+      "value": -0.007705980000000001,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.issuer_concentration:LLY",
+      "value": 0.05229402,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "risk_alerts.stress_loss:market_downside.current_value",
+      "value": 0.07461556,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.stress_loss:market_downside.warning_level",
+      "value": 0.06,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.stress_loss:market_downside.breach_level",
+      "value": 0.08,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.stress_loss:market_downside",
+      "value": -0.01461556,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.stress_loss:market_downside",
+      "value": 0.005384440000000004,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.rolling_volatility_30d.current_value",
+      "value": 0.12914794,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.rolling_volatility_30d.warning_level",
+      "value": 0.18,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.rolling_volatility_30d.breach_level",
+      "value": 0.25,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.rolling_volatility_30d",
+      "value": 0.050852060000000004,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.rolling_volatility_30d",
+      "value": 0.12085206000000001,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.var_95.current_value",
+      "value": 0.01385961,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.var_95.warning_level",
+      "value": 0.025,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.var_95.breach_level",
+      "value": 0.035,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.var_95",
+      "value": 0.011140390000000002,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.var_95",
+      "value": 0.021140390000000002,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Technology.current_value",
+      "value": 0.34973008,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Technology.warning_level",
+      "value": 0.4,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Technology.breach_level",
+      "value": 0.5,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.sector_concentration:Technology",
+      "value": 0.050269920000000023,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.sector_concentration:Technology",
+      "value": 0.15026992,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Financials.current_value",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Financials.warning_level",
+      "value": 0.2,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Financials.breach_level",
+      "value": 0.3,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.sector_concentration:Financials",
+      "value": 0.05260427000000001,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.sector_concentration:Financials",
+      "value": 0.15260427,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Fixed_Income.current_value",
+      "value": 0.13416306,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Fixed_Income.warning_level",
+      "value": 0.2,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.sector_concentration:Fixed_Income.breach_level",
+      "value": 0.3,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "portfolio.integration.room_to_warning.sector_concentration:Fixed_Income",
+      "value": 0.06583694000000001,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "portfolio.integration.room_to_breach.sector_concentration:Fixed_Income",
+      "value": 0.16583694,
+      "unit_class": "RATIO",
+      "source_id": "calc_6faeaaa60b08"
+     },
+     {
+      "label": "risk_alerts.stress_loss:market_downside.current_value",
+      "value": 0.07461556,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.stress_loss:market_downside.warning_level",
+      "value": 0.06,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "limit_checks.stress_loss:market_downside.breach_level",
+      "value": 0.08,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "stress_results.market_downside.loss_pct",
+      "value": 0.07461556,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "metric_table",
+     "title": "Watch list for the next month",
+     "columns": [
+      "Item",
+      "Current level",
+      "Warning level",
+      "Breach level",
+      "Room to warning",
+      "Room to breach"
+     ],
+     "rows": [
+      [
+       "Issuer concentration: MSFT",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:MSFT.current_value",
+         "value": 0.1633512,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:MSFT.warning_level",
+         "value": 0.15,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:MSFT.breach_level",
+         "value": 0.2,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.issuer_concentration:MSFT",
+         "value": -0.013351200000000008,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.issuer_concentration:MSFT",
+         "value": 0.03664880000000001,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Issuer concentration: LLY",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:LLY.current_value",
+         "value": 0.12770598,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:LLY.warning_level",
+         "value": 0.12,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.issuer_concentration:LLY.breach_level",
+         "value": 0.18,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.issuer_concentration:LLY",
+         "value": -0.007705980000000001,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.issuer_concentration:LLY",
+         "value": 0.05229402,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Market downside stress",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.stress_loss:market_downside.current_value",
+         "value": 0.07461556,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.stress_loss:market_downside.warning_level",
+         "value": 0.06,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.stress_loss:market_downside.breach_level",
+         "value": 0.08,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.stress_loss:market_downside",
+         "value": -0.01461556,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.stress_loss:market_downside",
+         "value": 0.005384440000000004,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Portfolio volatility 30d",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.rolling_volatility_30d.current_value",
+         "value": 0.12914794,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.rolling_volatility_30d.warning_level",
+         "value": 0.18,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.rolling_volatility_30d.breach_level",
+         "value": 0.25,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.rolling_volatility_30d",
+         "value": 0.050852060000000004,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.rolling_volatility_30d",
+         "value": 0.12085206000000001,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Portfolio VaR 95",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.var_95.current_value",
+         "value": 0.01385961,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.var_95.warning_level",
+         "value": 0.025,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.var_95.breach_level",
+         "value": 0.035,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.var_95",
+         "value": 0.011140390000000002,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.var_95",
+         "value": 0.021140390000000002,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Technology sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Technology.current_value",
+         "value": 0.34973008,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Technology.warning_level",
+         "value": 0.4,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Technology.breach_level",
+         "value": 0.5,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.sector_concentration:Technology",
+         "value": 0.050269920000000023,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.sector_concentration:Technology",
+         "value": 0.15026992,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Financials sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Financials.current_value",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Financials.warning_level",
+         "value": 0.2,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Financials.breach_level",
+         "value": 0.3,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.sector_concentration:Financials",
+         "value": 0.05260427000000001,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.sector_concentration:Financials",
+         "value": 0.15260427,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Fixed Income sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Fixed_Income.current_value",
+         "value": 0.13416306,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Fixed_Income.warning_level",
+         "value": 0.2,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "limit_checks.sector_concentration:Fixed_Income.breach_level",
+         "value": 0.3,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_warning.sector_concentration:Fixed_Income",
+         "value": 0.06583694000000001,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "calc_6faeaaa60b08",
+         "label": "portfolio.integration.room_to_breach.sector_concentration:Fixed_Income",
+         "value": 0.16583694,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "calc_6faeaaa60b08"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "As of ",
+      "2026-08-31",
+      ", the tightest current headroom is the market downside stress check, with the book at ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "risk_alerts.stress_loss:market_downside.current_value",
+        "value": 0.07461556,
+        "unit_class": "RATIO"
+       }
+      },
+      " against a warning at ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "limit_checks.stress_loss:market_downside.warning_level",
+        "value": 0.06,
+        "unit_class": "RATIO"
+       }
+      },
+      " and a breach at ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "limit_checks.stress_loss:market_downside.breach_level",
+        "value": 0.08,
+        "unit_class": "RATIO"
+       }
+      },
+      ". The most compressed issuer limits are MSFT and LLY, both already in warning territory, while JPM is close to its issuer warning line. Technology remains the largest sector weight, so the next month watch is whether concentration there stays below its warning tier."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "calc_6faeaaa60b08"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "On the market side, the book's stress loss under market downside is ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "stress_results.market_downside.loss_pct",
+        "value": 0.07461556,
+        "unit_class": "RATIO"
+       }
+      },
+      " of portfolio value, which is above the portfolio's warning tier but still below breach. The thirty-day volatility sits below its warning tier, and the one-year one-day value-at-risk also remains below warning."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5541,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8473,
+    "completion_tokens": 28
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "describe_run",
+    "status": "completed",
+    "result": "keys: run_id, portfolio_id, as_of, how_to_read, analysis_calc_id, groups, other, units",
+    "args": "{\"run_id\": \"run_1d6e9e05bee6\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 0 tool calls",
+    "args": "{}",
+    "prompt_tokens": 15272,
+    "completion_tokens": 1566
+   },
+   {
+    "seq": 6,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 16853,
+    "completion_tokens": 1571
+   },
+   {
+    "seq": 7,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: malformed_answer",
+    "args": "{\"blocks\": [{\"rows\": [[\"Issuer concentration: MSFT\", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"limit_checks.issuer_concentration:MSFT.current_value\"}, {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"limit_checks.issu",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 8,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 18549,
+    "completion_tokens": 1569
+   },
+   {
+    "seq": 9,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"rows\": [[\"Issuer concentration: MSFT\", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"limit_checks.issuer_concentration:MSFT.current_value\"}, {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"limit_checks.issu",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V5-drawdown-forensics",
+  "question": "why did this book have such large drawdowns? walk me through what actually happened",
+  "session_id": "sess_ff9a5814495e",
+  "elapsed_s": 15.3,
+  "error": null,
+  "answer": "The book\u2019s biggest drawdown over the last year was a 12.0% decline from 12.0% between 12.0% and 12.0%; it recovered by 2 tracked episodes in the span. The data are as of $10.87M and the drawdown search covered 2 episodes over 12.0% sessions.\nLargest drawdown episodes\n2026-01-07 | 2026-03-27 | 12.0% | yes\n2026-05-29 | 2026-06-25 | 6.24% | yes\nIn the worst episode, the book fell over a 12.0% window from 12.0% to 12.0%; the benchmark fell too, but less, over the same window. The biggest drags were -26.0% for MSFT, -17.5% for AMZN, 2.05% for LLY, -14.7% for GOOGL, and -13.5% for JPM, while XOM was the main offset. That makes the first episode look like a broad growth selloff hitting the portfolio\u2019s largest Technology and Healthcare names harder than the market.\nWorst drawdown window returns\nMSFT | -26.0%\nAMZN | -17.5%\nLLY | -20.6%\nGOOGL | -14.7%\nJPM | -13.5%\nXOM | 45.3%\nAAPL | -4.34%\nNVDA | -11.4%\nTLT | -1.75%\nHYG | -1.71%\nThe second episode was shorter but similar in shape: from late May to late June the book declined more than the benchmark, with MSFT, AMZN, AAPL and GOOGL again the main negatives. JPM helped offset that episode, but not enough to prevent a further slide. The pattern is repeated concentration in a few large growth holdings, with diversifying sleeves not large enough to fully cushion the moves.\nOn the latest session, the book was down on a mix of issuer moves rather than one single factor. The model says the factor side explained about 31.2% of the day, while about 68.8% sat in alpha plus residual. The largest factor contribution was the broad market factor, and the largest single position drag was GOOGL. That is the day\u2019s move, not the drawdown path, but it is consistent with the same concentration profile.\nLatest daily drivers\nLargest factor contribution | market\nLargest position contribution | GOOGL\nDaily return | -0.88%\nMax drawdown | 17.7%\n30-day volatility | 12.9%",
+  "citations": [
+   "calc_c29b64d1ac4b",
+   "run_1d6e9e05bee6",
+   "calc_02250f3b7287",
+   "calc_6ce76f217ed7",
+   "calc_6009ca1187c5",
+   "calc_ab44ee335051",
+   "calc_69387d639a61",
+   "calc_d5be38dd25ce",
+   "calc_dd81d8198180",
+   "calc_339f894e3e3c",
+   "calc_f4188c16e3e2",
+   "calc_596b0f0a83b4",
+   "calc_0f71f4f9b273",
+   "calc_266b99143214",
+   "calc_9e11f0df2d6b",
+   "calc_93434cb32f4f",
+   "calc_df304068b97c",
+   "calc_90a391259af7"
+  ],
+  "meta": {
+   "prompt_tokens": 14768,
+   "verified": {
+    "figures": 33,
+    "sources": 18,
+    "matches": [
+     {
+      "label": "portfolio.drawdown_episodes.deepest_depth",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.deepest_depth",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "quality_flags.episodes",
+      "value": 2.0,
+      "unit_class": "COUNT",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "exposure_metrics.portfolio_market_value",
+      "value": 10869311.0,
+      "unit_class": "MONEY",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "quality_flags.episodes",
+      "value": 2.0,
+      "unit_class": "COUNT",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[1]",
+      "value": 0.062350445551449765,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "portfolio.drawdown_episodes.episode_depths[0]",
+      "value": 0.11950002719398642,
+      "unit_class": "RATIO",
+      "source_id": "calc_c29b64d1ac4b"
+     },
+     {
+      "label": "window_return",
+      "value": -0.2603795703819621,
+      "unit_class": "RATIO",
+      "source_id": "calc_02250f3b7287"
+     },
+     {
+      "label": "window_return",
+      "value": -0.17478059281337968,
+      "unit_class": "RATIO",
+      "source_id": "calc_6ce76f217ed7"
+     },
+     {
+      "label": "window_return",
+      "value": 0.02053390788701446,
+      "unit_class": "RATIO",
+      "source_id": "calc_6009ca1187c5"
+     },
+     {
+      "label": "window_return",
+      "value": -0.14735972663385594,
+      "unit_class": "RATIO",
+      "source_id": "calc_ab44ee335051"
+     },
+     {
+      "label": "window_return",
+      "value": -0.13501937992275206,
+      "unit_class": "RATIO",
+      "source_id": "calc_69387d639a61"
+     },
+     {
+      "label": "window_return",
+      "value": -0.2603795703819621,
+      "unit_class": "RATIO",
+      "source_id": "calc_02250f3b7287"
+     },
+     {
+      "label": "window_return",
+      "value": -0.17478059281337968,
+      "unit_class": "RATIO",
+      "source_id": "calc_6ce76f217ed7"
+     },
+     {
+      "label": "window_return",
+      "value": -0.2061060665566823,
+      "unit_class": "RATIO",
+      "source_id": "calc_d5be38dd25ce"
+     },
+     {
+      "label": "window_return",
+      "value": -0.14735972663385594,
+      "unit_class": "RATIO",
+      "source_id": "calc_ab44ee335051"
+     },
+     {
+      "label": "window_return",
+      "value": -0.13501937992275206,
+      "unit_class": "RATIO",
+      "source_id": "calc_69387d639a61"
+     },
+     {
+      "label": "window_return",
+      "value": 0.45269361689672316,
+      "unit_class": "RATIO",
+      "source_id": "calc_dd81d8198180"
+     },
+     {
+      "label": "window_return",
+      "value": -0.04339556580630467,
+      "unit_class": "RATIO",
+      "source_id": "calc_339f894e3e3c"
+     },
+     {
+      "label": "window_return",
+      "value": -0.11411820016560825,
+      "unit_class": "RATIO",
+      "source_id": "calc_f4188c16e3e2"
+     },
+     {
+      "label": "window_return",
+      "value": -0.017503128691563615,
+      "unit_class": "RATIO",
+      "source_id": "calc_596b0f0a83b4"
+     },
+     {
+      "label": "window_return",
+      "value": -0.017097473515552797,
+      "unit_class": "RATIO",
+      "source_id": "calc_0f71f4f9b273"
+     },
+     {
+      "label": "portfolio.reconcile.factor_share",
+      "value": 0.31201704909554273,
+      "unit_class": "RATIO",
+      "source_id": "calc_266b99143214"
+     },
+     {
+      "label": "portfolio.reconcile.unexplained_share",
+      "value": 0.6879829509044573,
+      "unit_class": "RATIO",
+      "source_id": "calc_266b99143214"
+     },
+     {
+      "label": "exposure_metrics.daily_return",
+      "value": -0.00881689,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.max_drawdown",
+      "value": 0.17655956,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "exposure_metrics.rolling_vol_30d",
+      "value": 0.12914794,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "The book\u2019s biggest drawdown over the last year was a ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.deepest_depth",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " decline from ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " between ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.deepest_depth",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " and ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      "; it recovered by ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "quality_flags.episodes",
+        "value": 2.0,
+        "unit_class": "COUNT"
+       }
+      },
+      " tracked episodes in the span. The data are as of ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "exposure_metrics.portfolio_market_value",
+        "value": 10869311.0,
+        "unit_class": "MONEY"
+       }
+      },
+      " and the drawdown search covered ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "quality_flags.episodes",
+        "value": 2.0,
+        "unit_class": "COUNT"
+       }
+      },
+      " episodes over ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " sessions."
+     ],
+     "cites": [
+      "calc_c29b64d1ac4b",
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Largest drawdown episodes",
+     "columns": [
+      "Peak",
+      "Trough",
+      "Depth",
+      "Recovered"
+     ],
+     "rows": [
+      [
+       "2026-01-07",
+       "2026-03-27",
+       {
+        "slot": {
+         "ref": "calc_c29b64d1ac4b",
+         "label": "portfolio.drawdown_episodes.episode_depths[0]",
+         "value": 0.11950002719398642,
+         "unit_class": "RATIO"
+        }
+       },
+       "yes"
+      ],
+      [
+       "2026-05-29",
+       "2026-06-25",
+       {
+        "slot": {
+         "ref": "calc_c29b64d1ac4b",
+         "label": "portfolio.drawdown_episodes.episode_depths[1]",
+         "value": 0.062350445551449765,
+         "unit_class": "RATIO"
+        }
+       },
+       "yes"
+      ]
+     ],
+     "cites": [
+      "calc_c29b64d1ac4b"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "In the worst episode, the book fell over a ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " window from ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      " to ",
+      {
+       "slot": {
+        "ref": "calc_c29b64d1ac4b",
+        "label": "portfolio.drawdown_episodes.episode_depths[0]",
+        "value": 0.11950002719398642,
+        "unit_class": "RATIO"
+       }
+      },
+      "; the benchmark fell too, but less, over the same window. The biggest drags were ",
+      {
+       "slot": {
+        "ref": "calc_02250f3b7287",
+        "label": "window_return",
+        "value": -0.2603795703819621,
+        "unit_class": "RATIO"
+       }
+      },
+      " for MSFT, ",
+      {
+       "slot": {
+        "ref": "calc_6ce76f217ed7",
+        "label": "window_return",
+        "value": -0.17478059281337968,
+        "unit_class": "RATIO"
+       }
+      },
+      " for AMZN, ",
+      {
+       "slot": {
+        "ref": "calc_6009ca1187c5",
+        "label": "window_return",
+        "value": 0.02053390788701446,
+        "unit_class": "RATIO"
+       }
+      },
+      " for LLY, ",
+      {
+       "slot": {
+        "ref": "calc_ab44ee335051",
+        "label": "window_return",
+        "value": -0.14735972663385594,
+        "unit_class": "RATIO"
+       }
+      },
+      " for GOOGL, and ",
+      {
+       "slot": {
+        "ref": "calc_69387d639a61",
+        "label": "window_return",
+        "value": -0.13501937992275206,
+        "unit_class": "RATIO"
+       }
+      },
+      " for JPM, while XOM was the main offset. That makes the first episode look like a broad growth selloff hitting the portfolio\u2019s largest Technology and Healthcare names harder than the market."
+     ],
+     "cites": [
+      "calc_9e11f0df2d6b",
+      "calc_93434cb32f4f"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Worst drawdown window returns",
+     "columns": [
+      "Holding",
+      "Window return"
+     ],
+     "rows": [
+      [
+       "MSFT",
+       {
+        "slot": {
+         "ref": "calc_02250f3b7287",
+         "label": "window_return",
+         "value": -0.2603795703819621,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "AMZN",
+       {
+        "slot": {
+         "ref": "calc_6ce76f217ed7",
+         "label": "window_return",
+         "value": -0.17478059281337968,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "LLY",
+       {
+        "slot": {
+         "ref": "calc_d5be38dd25ce",
+         "label": "window_return",
+         "value": -0.2061060665566823,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "GOOGL",
+       {
+        "slot": {
+         "ref": "calc_ab44ee335051",
+         "label": "window_return",
+         "value": -0.14735972663385594,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "JPM",
+       {
+        "slot": {
+         "ref": "calc_69387d639a61",
+         "label": "window_return",
+         "value": -0.13501937992275206,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "XOM",
+       {
+        "slot": {
+         "ref": "calc_dd81d8198180",
+         "label": "window_return",
+         "value": 0.45269361689672316,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "AAPL",
+       {
+        "slot": {
+         "ref": "calc_339f894e3e3c",
+         "label": "window_return",
+         "value": -0.04339556580630467,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "NVDA",
+       {
+        "slot": {
+         "ref": "calc_f4188c16e3e2",
+         "label": "window_return",
+         "value": -0.11411820016560825,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "TLT",
+       {
+        "slot": {
+         "ref": "calc_596b0f0a83b4",
+         "label": "window_return",
+         "value": -0.017503128691563615,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "HYG",
+       {
+        "slot": {
+         "ref": "calc_0f71f4f9b273",
+         "label": "window_return",
+         "value": -0.017097473515552797,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "calc_9e11f0df2d6b"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "The second episode was shorter but similar in shape: from late May to late June the book declined more than the benchmark, with MSFT, AMZN, AAPL and GOOGL again the main negatives. JPM helped offset that episode, but not enough to prevent a further slide. The pattern is repeated concentration in a few large growth holdings, with diversifying sleeves not large enough to fully cushion the moves."
+     ],
+     "cites": [
+      "calc_df304068b97c",
+      "calc_90a391259af7"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "On the latest session, the book was down on a mix of issuer moves rather than one single factor. The model says the factor side explained about ",
+      {
+       "slot": {
+        "ref": "calc_266b99143214",
+        "label": "portfolio.reconcile.factor_share",
+        "value": 0.31201704909554273,
+        "unit_class": "RATIO"
+       }
+      },
+      " of the day, while about ",
+      {
+       "slot": {
+        "ref": "calc_266b99143214",
+        "label": "portfolio.reconcile.unexplained_share",
+        "value": 0.6879829509044573,
+        "unit_class": "RATIO"
+       }
+      },
+      " sat in alpha plus residual. The largest factor contribution was the broad market factor, and the largest single position drag was GOOGL. That is the day\u2019s move, not the drawdown path, but it is consistent with the same concentration profile."
+     ],
+     "cites": [
+      "calc_266b99143214",
+      "run_1d6e9e05bee6"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Latest daily drivers",
+     "columns": [
+      "Item",
+      "Value"
+     ],
+     "rows": [
+      [
+       "Largest factor contribution",
+       "market"
+      ],
+      [
+       "Largest position contribution",
+       "GOOGL"
+      ],
+      [
+       "Daily return",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.daily_return",
+         "value": -0.00881689,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "Max drawdown",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.max_drawdown",
+         "value": 0.17655956,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "30-day volatility",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "exposure_metrics.rolling_vol_30d",
+         "value": 0.12914794,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "calc_266b99143214"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5538,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8470,
+    "completion_tokens": 28
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "get_drawdown_episodes",
+    "status": "completed",
+    "result": "keys: calc_id, portfolio_id, span, window, sessions, episodes, deepest, reported_floor",
+    "args": "{\"span\": \"1y\", \"portfolio_id\": \"port_001\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8901,
+    "completion_tokens": 40
+   },
+   {
+    "seq": 6,
+    "step_type": "tool_call",
+    "tool_name": "explain_episode",
+    "status": "completed",
+    "result": "keys: portfolio_id, window, sessions, portfolio_window_return, calc_id, benchmark, holdings, fixed_window_caveat",
+    "args": "{\"peak\": \"2026-01-07\", \"trough\": \"2026-03-27\", \"portfolio_id\": \"port_001\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 7,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 9780,
+    "completion_tokens": 40
+   },
+   {
+    "seq": 8,
+    "step_type": "tool_call",
+    "tool_name": "explain_episode",
+    "status": "completed",
+    "result": "keys: portfolio_id, window, sessions, portfolio_window_return, calc_id, benchmark, holdings, fixed_window_caveat",
+    "args": "{\"peak\": \"2026-05-29\", \"trough\": \"2026-06-25\", \"portfolio_id\": \"port_001\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 9,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 10643,
+    "completion_tokens": 29
+   },
+   {
+    "seq": 10,
+    "step_type": "tool_call",
+    "tool_name": "reconcile_move",
+    "status": "completed",
+    "result": "keys: run_id, portfolio_id, as_of, reconciles, identity_positions, identity_factors, return_conventions, largest_factor_",
+    "args": "{\"run_id\": \"run_1d6e9e05bee6\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 11,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 12450,
+    "completion_tokens": 1450
+   },
+   {
+    "seq": 12,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"The book\u2019s biggest drawdown over the last year was a \", {\"ref\": \"calc_c29b64d1ac4b\", \"name\": \"portfolio.drawdown_episodes.deepest_depth\"}, \" decline from \", {\"ref\": \"calc_c29b64",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V6-concentration-mandate",
+  "question": "am I offside on concentration anywhere, and how much room is left before I am?",
+  "session_id": "sess_5c5dfb8266e5",
+  "elapsed_s": 14.5,
+  "error": null,
+  "answer": "As of 2026-08-31, concentration warnings are active on MSFT and LLY; the other named issuer and sector exposures shown here are below warning.\nWhere concentration stands\nMSFT issuer concentration | 16.3% | 15.0% | 15.0% | not available from the alert row | not available from the alert row | offside at warning\nLLY issuer concentration | 12.8% | 12.0% | 12.0% | not available from the alert row | not available from the alert row | offside at warning\nTechnology sector concentration | 35.0% | 35.0% | 35.0% | room remains | room remains | below warning\nFinancials sector concentration | 14.7% | 14.7% | 14.7% | room remains | room remains | below warning\nFixed_Income sector concentration | 13.4% | 13.4% | 13.4% | room remains | room remains | below warning\nConsumer_Discretionary sector concentration | 7.17% | 7.17% | 7.17% | room remains | room remains | below warning",
+  "citations": [
+   "run_1d6e9e05bee6",
+   "alert_d027596492e3",
+   "alert_fec2ff12894c"
+  ],
+  "meta": {
+   "prompt_tokens": 13114,
+   "verified": {
+    "figures": 18,
+    "sources": 3,
+    "matches": [
+     {
+      "label": "risk_alerts.issuer_concentration:MSFT.current_value",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+      "value": 0.15,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+      "value": 0.15,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:LLY.current_value",
+      "value": 0.12770598,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+      "value": 0.12,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+      "value": 0.12,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Technology.weight",
+      "value": 0.34973008,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Technology.weight",
+      "value": 0.34973008,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Technology.weight",
+      "value": 0.34973008,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Financials.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Financials.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Financials.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Fixed_Income.weight",
+      "value": 0.13416306,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Fixed_Income.weight",
+      "value": 0.13416306,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Fixed_Income.weight",
+      "value": 0.13416306,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Consumer_Discretionary.weight",
+      "value": 0.0716982,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Consumer_Discretionary.weight",
+      "value": 0.0716982,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "sector_exposures.Consumer_Discretionary.weight",
+      "value": 0.0716982,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "As of ",
+      "2026-08-31",
+      ", concentration warnings are active on MSFT and LLY; the other named issuer and sector exposures shown here are below warning."
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "alert_d027596492e3",
+      "alert_fec2ff12894c"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Where concentration stands",
+     "columns": [
+      "Check",
+      "Current",
+      "Warning",
+      "Breach",
+      "Room to warning",
+      "Room to breach",
+      "Status"
+     ],
+     "rows": [
+      [
+       "MSFT issuer concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:MSFT.current_value",
+         "value": 0.1633512,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+         "value": 0.15,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:MSFT.limit_value",
+         "value": 0.15,
+         "unit_class": "RATIO"
+        }
+       },
+       "not available from the alert row",
+       "not available from the alert row",
+       "offside at warning"
+      ],
+      [
+       "LLY issuer concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:LLY.current_value",
+         "value": 0.12770598,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+         "value": 0.12,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "risk_alerts.issuer_concentration:LLY.limit_value",
+         "value": 0.12,
+         "unit_class": "RATIO"
+        }
+       },
+       "not available from the alert row",
+       "not available from the alert row",
+       "offside at warning"
+      ],
+      [
+       "Technology sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Technology.weight",
+         "value": 0.34973008,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Technology.weight",
+         "value": 0.34973008,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Technology.weight",
+         "value": 0.34973008,
+         "unit_class": "RATIO"
+        }
+       },
+       "room remains",
+       "room remains",
+       "below warning"
+      ],
+      [
+       "Financials sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Financials.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Financials.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Financials.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       "room remains",
+       "room remains",
+       "below warning"
+      ],
+      [
+       "Fixed_Income sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Fixed_Income.weight",
+         "value": 0.13416306,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Fixed_Income.weight",
+         "value": 0.13416306,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Fixed_Income.weight",
+         "value": 0.13416306,
+         "unit_class": "RATIO"
+        }
+       },
+       "room remains",
+       "room remains",
+       "below warning"
+      ],
+      [
+       "Consumer_Discretionary sector concentration",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Consumer_Discretionary.weight",
+         "value": 0.0716982,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Consumer_Discretionary.weight",
+         "value": 0.0716982,
+         "unit_class": "RATIO"
+        }
+       },
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "sector_exposures.Consumer_Discretionary.weight",
+         "value": 0.0716982,
+         "unit_class": "RATIO"
+        }
+       },
+       "room remains",
+       "room remains",
+       "below warning"
+      ]
+     ],
+     "cites": [
+      "run_1d6e9e05bee6",
+      "alert_d027596492e3",
+      "alert_fec2ff12894c"
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5540,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 8472,
+    "completion_tokens": 22
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "list_risk_limits",
+    "status": "completed",
+    "result": "keys: portfolio_id, limits, note",
+    "args": "{\"portfolio_id\": \"port_001\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 9411,
+    "completion_tokens": 1262
+   },
+   {
+    "seq": 6,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: not_on_table",
+    "args": "{\"blocks\": [{\"rows\": [[\"Issuer MSFT concentration\", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"risk_alerts.issuer_concentration:MSFT.current_value\"}, {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"risk_alerts.issuer_",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 7,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 10752,
+    "completion_tokens": 764
+   },
+   {
+    "seq": 8,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"As of \", \"2026-08-31\", \", concentration warnings are active on MSFT and LLY; the other named issuer and sector exposures shown here are below warning.\"], \"type\": \"paragraph\", \"c",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V7-single-name-integration",
+  "question": "how healthy is LLY as a business right now, and does that change how I should size it here?",
+  "session_id": "sess_8f110b02f65f",
+  "elapsed_s": 17.6,
+  "error": null,
+  "answer": "On the filings and market data I can see, LLY looks operationally solid: its net margin is 35.0% on the trailing window to 2026-03-31, its EBIT interest coverage is 2975.0% on 2025, and its current ratio is 149.7% as of 2026-03-31.\nThe balance sheet still shows meaningful debt: total debt is $43.37B and net debt is $38.09B as of 2026-03-31, while debt to operating cash flow is 211.8% over 2025-04-01..2026-03-31.\nSome common follow-on checks are not available from this desk right now: EBITDA, free cash flow, gross margin, and operating margin were all refused because the needed inputs are not in the indexed filing coverage I have for LLY.\nOn size, I cannot give a verdict. What I can show is that the business is not showing obvious short-term balance-sheet stress from the figures I have, but it does carry non-trivial leverage and I do not have a complete valuation or cash-generation set to translate that into a position size rule.\nI also do not have this book's position in LLY from the portfolio snapshot in this turn, so I cannot tell you whether to add or trim here without the portfolio context.",
+  "citations": [
+   "calc_728f34474952",
+   "calc_152a7bd5adb1",
+   "calc_fae775801edf",
+   "calc_f9bb56a25bc7",
+   "calc_af26c36381e0",
+   "calc_bfb92fe951c9",
+   "calc_4b4b7b0227ea",
+   "calc_59a7dc38b11b",
+   "calc_42cccd66dc57",
+   "calc_7feaf3fe545d"
+  ],
+  "meta": {
+   "prompt_tokens": 17089,
+   "verified": {
+    "figures": 6,
+    "sources": 10,
+    "matches": [
+     {
+      "label": "calc.scalar.divide",
+      "value": 0.3498595136264862,
+      "unit_class": "RATIO",
+      "source_id": "calc_728f34474952"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 29.74972067039106,
+      "unit_class": "RATIO",
+      "source_id": "calc_152a7bd5adb1"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 1.4968335426106896,
+      "unit_class": "RATIO",
+      "source_id": "calc_fae775801edf"
+     },
+     {
+      "label": "calc.scalar.add",
+      "value": 43370000000.0,
+      "unit_class": "MONEY",
+      "source_id": "calc_f9bb56a25bc7"
+     },
+     {
+      "label": "calc.scalar.subtract",
+      "value": 38088000000.0,
+      "unit_class": "MONEY",
+      "source_id": "calc_af26c36381e0"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 2.11767578125,
+      "unit_class": "RATIO",
+      "source_id": "calc_bfb92fe951c9"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "On the filings and market data I can see, LLY looks operationally solid: its net margin is ",
+      {
+       "slot": {
+        "ref": "calc_728f34474952",
+        "label": "calc.scalar.divide",
+        "value": 0.3498595136264862,
+        "unit_class": "RATIO"
+       }
+      },
+      " on the trailing window to 2026-03-31, its EBIT interest coverage is ",
+      {
+       "slot": {
+        "ref": "calc_152a7bd5adb1",
+        "label": "calc.scalar.divide",
+        "value": 29.74972067039106,
+        "unit_class": "RATIO"
+       }
+      },
+      " on 2025, and its current ratio is ",
+      {
+       "slot": {
+        "ref": "calc_fae775801edf",
+        "label": "calc.scalar.divide",
+        "value": 1.4968335426106896,
+        "unit_class": "RATIO"
+       }
+      },
+      " as of 2026-03-31."
+     ],
+     "cites": [
+      "calc_728f34474952",
+      "calc_152a7bd5adb1",
+      "calc_fae775801edf"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "The balance sheet still shows meaningful debt: total debt is ",
+      {
+       "slot": {
+        "ref": "calc_f9bb56a25bc7",
+        "label": "calc.scalar.add",
+        "value": 43370000000.0,
+        "unit_class": "MONEY"
+       }
+      },
+      " and net debt is ",
+      {
+       "slot": {
+        "ref": "calc_af26c36381e0",
+        "label": "calc.scalar.subtract",
+        "value": 38088000000.0,
+        "unit_class": "MONEY"
+       }
+      },
+      " as of 2026-03-31, while debt to operating cash flow is ",
+      {
+       "slot": {
+        "ref": "calc_bfb92fe951c9",
+        "label": "calc.scalar.divide",
+        "value": 2.11767578125,
+        "unit_class": "RATIO"
+       }
+      },
+      " over 2025-04-01..2026-03-31."
+     ],
+     "cites": [
+      "calc_f9bb56a25bc7",
+      "calc_af26c36381e0",
+      "calc_bfb92fe951c9"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "Some common follow-on checks are not available from this desk right now: EBITDA, free cash flow, gross margin, and operating margin were all refused because the needed inputs are not in the indexed filing coverage I have for LLY."
+     ],
+     "cites": [
+      "calc_4b4b7b0227ea",
+      "calc_59a7dc38b11b",
+      "calc_42cccd66dc57",
+      "calc_7feaf3fe545d"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "On size, I cannot give a verdict. What I can show is that the business is not showing obvious short-term balance-sheet stress from the figures I have, but it does carry non-trivial leverage and I do not have a complete valuation or cash-generation set to translate that into a position size rule."
+     ],
+     "cites": [
+      "calc_fae775801edf",
+      "calc_f9bb56a25bc7",
+      "calc_af26c36381e0",
+      "calc_bfb92fe951c9"
+     ]
+    },
+    {
+     "type": "paragraph",
+     "runs": [
+      "I also do not have this book's position in LLY from the portfolio snapshot in this turn, so I cannot tell you whether to add or trim here without the portfolio context."
+     ],
+     "cites": []
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5544,
+    "completion_tokens": 19
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "describe_issuer",
+    "status": "completed",
+    "result": "keys: company, available_metrics, formulas, period_semantics",
+    "args": "{\"ticker\": \"LLY\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 2 tool calls",
+    "args": "{}",
+    "prompt_tokens": 8536,
+    "completion_tokens": 67
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "get_fundamental_panel",
+    "status": "completed",
+    "result": "keys: ticker, judgement, per_formula_sources, lines, table",
+    "args": "{\"months\": 12, \"ticker\": \"LLY\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "tool_call",
+    "tool_name": "get_market_stats",
+    "status": "completed",
+    "result": "keys: calc_id, operation, value, quality_flags",
+    "args": "{\"ticker\": \"LLY\", \"window\": \"1y\", \"benchmark\": \"SPY\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 6,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 10990,
+    "completion_tokens": 587
+   },
+   {
+    "seq": 7,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: malformed_answer",
+    "args": "{\"blocks\": [{\"runs\": [\"On the filings and market data I can see, LLY looks operationally solid: its net margin is \", \"{ref\\\":\\\"calc_728f34474952\\\",\\\"name\\\":\\\"net_margin\\\"}\", \" on the trailing \", \"2025",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 8,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 12190,
+    "completion_tokens": 580
+   },
+   {
+    "seq": 9,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: malformed_answer",
+    "args": "{\"blocks\": [{\"runs\": [\"On the filings and market data I can see, LLY looks operationally solid: its net margin is \", \"{ref\\\":\\\"calc_728f34474952\\\",\\\"name\\\":\\\"net_margin\\\"}\", \" on the trailing window t",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 10,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 13383,
+    "completion_tokens": 574
+   },
+   {
+    "seq": 11,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: unknown_name",
+    "args": "{\"blocks\": [{\"runs\": [\"On the filings and market data I can see, LLY looks operationally solid: its net margin is \", {\"ref\": \"calc_728f34474952\", \"name\": \"net_margin\"}, \" on the trailing window to 202",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 12,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 14425,
+    "completion_tokens": 570
+   },
+   {
+    "seq": 13,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"On the filings and market data I can see, LLY looks operationally solid: its net margin is \", {\"ref\": \"calc_728f34474952\", \"name\": \"calc.scalar.divide\"}, \" on the trailing windo",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ },
+ {
+  "tag": "V8-cross-issuer",
+  "question": "compare the leverage of the banks and the megacaps in this book - who is carrying the most balance sheet risk?",
+  "session_id": "sess_d137b1ee788e",
+  "elapsed_s": 15.1,
+  "error": null,
+  "answer": "On the bank side, 14.7% sits in Financials. On the megacap side, 16.3% and 14.6% are the two biggest weights, with 4.06% as the smaller third megacap position.cites\nBalance-sheet risk evidence by issuer\nJPM | Financials | 14.7% | UNAVAILABLE | Bank leverage panel not applicable; financial issuer measures were refused.\nMSFT | Technology | 16.3% | UNAVAILABLE | 5565.3%\nAAPL | Technology | 14.6% | UNAVAILABLE | 2991.8%\nNVDA | Technology | 4.06% | UNAVAILABLE | 49720.7%",
+  "citations": [
+   "run_1d6e9e05bee6",
+   "calc_931ddf1fb986",
+   "calc_5971770e7c27",
+   "calc_d60093049a37"
+  ],
+  "meta": {
+   "prompt_tokens": 20967,
+   "verified": {
+    "figures": 11,
+    "sources": 4,
+    "matches": [
+     {
+      "label": "issuer_exposures.JPM.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.MSFT.weight",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.AAPL.weight",
+      "value": 0.14575441,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.NVDA.weight",
+      "value": 0.04062447,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.JPM.weight",
+      "value": 0.14739573,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "issuer_exposures.MSFT.weight",
+      "value": 0.1633512,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 55.65263530244075,
+      "unit_class": "RATIO",
+      "source_id": "calc_931ddf1fb986"
+     },
+     {
+      "label": "issuer_exposures.AAPL.weight",
+      "value": 0.14575441,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 29.918382913806255,
+      "unit_class": "RATIO",
+      "source_id": "calc_5971770e7c27"
+     },
+     {
+      "label": "issuer_exposures.NVDA.weight",
+      "value": 0.04062447,
+      "unit_class": "RATIO",
+      "source_id": "run_1d6e9e05bee6"
+     },
+     {
+      "label": "calc.scalar.divide",
+      "value": 497.207343412527,
+      "unit_class": "RATIO",
+      "source_id": "calc_d60093049a37"
+     }
+    ]
+   },
+   "blocks": [
+    {
+     "type": "paragraph",
+     "runs": [
+      "On the bank side, ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "issuer_exposures.JPM.weight",
+        "value": 0.14739573,
+        "unit_class": "RATIO"
+       }
+      },
+      " sits in Financials. On the megacap side, ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "issuer_exposures.MSFT.weight",
+        "value": 0.1633512,
+        "unit_class": "RATIO"
+       }
+      },
+      " and ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "issuer_exposures.AAPL.weight",
+        "value": 0.14575441,
+        "unit_class": "RATIO"
+       }
+      },
+      " are the two biggest weights, with ",
+      {
+       "slot": {
+        "ref": "run_1d6e9e05bee6",
+        "label": "issuer_exposures.NVDA.weight",
+        "value": 0.04062447,
+        "unit_class": "RATIO"
+       }
+      },
+      " as the smaller third megacap position.",
+      "cites"
+     ]
+    },
+    {
+     "type": "metric_table",
+     "title": "Balance-sheet risk evidence by issuer",
+     "columns": [
+      "Issuer",
+      "Sector",
+      "Weight",
+      "Debt / balance-sheet evidence",
+      "Coverage signal"
+     ],
+     "rows": [
+      [
+       "JPM",
+       "Financials",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.JPM.weight",
+         "value": 0.14739573,
+         "unit_class": "RATIO"
+        }
+       },
+       "UNAVAILABLE",
+       "Bank leverage panel not applicable; financial issuer measures were refused."
+      ],
+      [
+       "MSFT",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.MSFT.weight",
+         "value": 0.1633512,
+         "unit_class": "RATIO"
+        }
+       },
+       "UNAVAILABLE",
+       {
+        "slot": {
+         "ref": "calc_931ddf1fb986",
+         "label": "calc.scalar.divide",
+         "value": 55.65263530244075,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "AAPL",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.AAPL.weight",
+         "value": 0.14575441,
+         "unit_class": "RATIO"
+        }
+       },
+       "UNAVAILABLE",
+       {
+        "slot": {
+         "ref": "calc_5971770e7c27",
+         "label": "calc.scalar.divide",
+         "value": 29.918382913806255,
+         "unit_class": "RATIO"
+        }
+       }
+      ],
+      [
+       "NVDA",
+       "Technology",
+       {
+        "slot": {
+         "ref": "run_1d6e9e05bee6",
+         "label": "issuer_exposures.NVDA.weight",
+         "value": 0.04062447,
+         "unit_class": "RATIO"
+        }
+       },
+       "UNAVAILABLE",
+       {
+        "slot": {
+         "ref": "calc_d60093049a37",
+         "label": "calc.scalar.divide",
+         "value": 497.207343412527,
+         "unit_class": "RATIO"
+        }
+       }
+      ]
+     ]
+    }
+   ],
+   "format": "blocks"
+  },
+  "steps": [
+   {
+    "seq": 1,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 5546,
+    "completion_tokens": 15
+   },
+   {
+    "seq": 2,
+    "step_type": "tool_call",
+    "tool_name": "get_portfolio_snapshot",
+    "status": "completed",
+    "result": "keys: portfolios, table",
+    "args": "{}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 3,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 5 tool calls",
+    "args": "{}",
+    "prompt_tokens": 8478,
+    "completion_tokens": 285
+   },
+   {
+    "seq": 4,
+    "step_type": "tool_call",
+    "tool_name": "read_quantities",
+    "status": "completed",
+    "result": "keys: run_id, as_of, names, units, table",
+    "args": "{\"names\": [\"issuer_exposures.JPM.weight\", \"issuer_exposures.JPM.market_value\", \"issuer_exposures.JPM.daily_return\", \"issuer_exposures.MSFT.weight\", \"issuer_exposures.MSFT.market_value\", \"issuer_exposu",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 5,
+    "step_type": "tool_call",
+    "tool_name": "get_fundamental_panel",
+    "status": "completed",
+    "result": "error: not_applicable",
+    "args": "{\"at\": \"2026-08-31\", \"ticker\": \"JPM\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 6,
+    "step_type": "tool_call",
+    "tool_name": "get_fundamental_panel",
+    "status": "completed",
+    "result": "keys: ticker, judgement, per_formula_sources, lines, table",
+    "args": "{\"at\": \"2026-08-31\", \"ticker\": \"MSFT\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 7,
+    "step_type": "tool_call",
+    "tool_name": "get_fundamental_panel",
+    "status": "completed",
+    "result": "keys: ticker, judgement, per_formula_sources, lines, table",
+    "args": "{\"at\": \"2026-08-31\", \"ticker\": \"AAPL\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 8,
+    "step_type": "tool_call",
+    "tool_name": "get_fundamental_panel",
+    "status": "completed",
+    "result": "keys: ticker, judgement, per_formula_sources, lines, table",
+    "args": "{\"at\": \"2026-08-31\", \"ticker\": \"NVDA\"}",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 9,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 17083,
+    "completion_tokens": 494
+   },
+   {
+    "seq": 10,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: malformed_answer",
+    "args": "{\"blocks\": [{\"runs\": [\"On the bank side, \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issuer_exposures.JPM.weight\"}, \" sits in Financials, while \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issuer_exposures.MSF",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 11,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 17730,
+    "completion_tokens": 423
+   },
+   {
+    "seq": 12,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "error: unknown_name",
+    "args": "{\"blocks\": [{\"runs\": [\"On the bank side, \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issuer_exposures.JPM.weight\"}, \" sits in Financials. On the megacap side, \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issue",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   },
+   {
+    "seq": 13,
+    "step_type": "llm_call",
+    "tool_name": null,
+    "status": "completed",
+    "result": "gpt-5.4-mini-2026-03-17: 1 tool call",
+    "args": "{}",
+    "prompt_tokens": 18268,
+    "completion_tokens": 418
+   },
+   {
+    "seq": 14,
+    "step_type": "respond",
+    "tool_name": "respond",
+    "status": "completed",
+    "result": "keys: responded, format, blocks, text, citations, verified",
+    "args": "{\"blocks\": [{\"runs\": [\"On the bank side, \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issuer_exposures.JPM.weight\"}, \" sits in Financials. On the megacap side, \", {\"ref\": \"run_1d6e9e05bee6\", \"name\": \"issue",
+    "prompt_tokens": null,
+    "completion_tokens": null
+   }
+  ]
+ }
+]

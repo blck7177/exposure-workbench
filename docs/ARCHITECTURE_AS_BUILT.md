@@ -1,13 +1,13 @@
-# Architecture As Built — 2026-08-28
+# Architecture As Built — 2026-09-01
 
 > **性质**:现状快照。不变量与目标拓扑见 [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)(v3),逐模块设计见 [MODULE_NOTES.md](MODULE_NOTES.md)(M1–M18),部署与租户见 [PRODUCTION.md](PRODUCTION.md)。本文只回答"今天有什么、怎么连、能做什么"。
-> **规模**:`src/` 17.6k 行 Python(95 个模块)、`apps/web` 3.0k 行 TS;95 个测试文件,**1082 offline / 232 live**;HEAD `ec64079`(V12)。线上 https://desk-for-one.com。
+> **规模**:`src/` ~21k 行 Python、`apps/web` ~3.3k 行 TS;**1560 offline** 测试;V15(桌面)已落地,见 §7。线上 https://desk-for-one.com。
 
 ---
 
 ## 1. 一句话
 
-**用户只面对一个 meta-agent;它能调 29 个工具;每一个数字都能回溯到账本里的一行;算错的类别由代码消灭,选错的类别由知识降低,剩下的交给门拒绝。**
+**用户只面对一个 meta-agent;它能调 32 个工具;每一个数字都能回溯到账本里的一行;模型不写数字,只写桌面上的名字(V15);算错的类别由代码消灭,选错的类别由知识降低,指错的类别由结构消灭,剩下的交给门拒绝。**
 
 四条设计律贯穿一切(TARGET §0):**A** 边界处大声失败,无静默降级;**B** 用 schema 消灭解析规则;**C** 正交能力替代路由规则,不写问题分类器;**D**(V9 起)世界结构进代码、方法定义进数据、分析交给智能,**不存在发行人行为规则**。
 
@@ -80,13 +80,13 @@
 
 **V11–V12 新增的"诚实层"**:`absence_service`(六种拒绝各铸可引的行,statement 服务端拼,带 `superseded_by` 与逐输入覆盖)· `period_semantics`(财年历从年度事实推;累计申报是指标属性)
 
-**门(出口)**:`numeric_verification` + `evidence_trail` + `trajectory_gate`(见 §7)
+**桌面与门(V15)**:`quantities`(唯一拼名)· `table`(声明/构造/加载)· `resolver`(六不变量)· `answer_blocks`(文法与渲染)· `display_conventions`(读者精度,py/ts 双向锁);`numeric_verification` 只剩 v1 散文路径(日报门)(见 §7)
 
 **运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
 
 ## 6. 工具面(`tools/`,29 + 15)
 
-面是声明式数据(`faces.py`),缺一个工具即构建错误。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。
+面是声明式数据(`faces.py`),缺一个工具即构建错误。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
 
 | 组 | 工具 | 说明 |
 |---|---|---|
@@ -94,6 +94,7 @@
 | **取数** | `get_flow`(窗口或序列)· `get_balance_sheet`(单时点)· `get_balance_series` | 区间代数直出;不可导出即拒绝,带 `absence_id` |
 | **算** | `calculate`(类型化四则,标量或序列)· `series_stat` · `evaluate_formula` · `get_fundamental_panel` | 每一步落账本 |
 | **文本** | `search_filing_passages` · `get_filing_section` | 语义检索 / 整节原文,带引用锚 |
+| **book 清单(V15)** | `describe_run` · `read_quantities` | book 侧的 `describe_issuer` / `evaluate_formula(name)`:一个 run 持有的全部量按"回答什么"分组(book/concentration/mandate/stress/factor_exposure/attribution/risk/counts,pattern × labels),缺什么、共线撤下了什么、这个面能做什么不能做什么;`read_quantities(run_id, names)` 按名一次取 |
 | **组合** | `get_portfolio_snapshot`(入口)· `get_portfolio_positions` · `get_attribution` · `get_risk_state` · `list_run_alerts` · `list_risk_limits` · `get_run_freshness` · `reconcile_move` · `get_drawdown_episodes` · `explain_episode` · `list_alerts` · `get_market_stats` | 全集返回、**禁 top_k**;共线时 `quotable_individually: false` |
 | **委派** | `ensure_company_ready` · `start_issuer_research` · `start_exposure_run` · `get_task_status` · `read_issuer_brief` | 立即返回 id,不阻塞;预算计入 |
 | **反思/门** | `think`(免预算)· `respond`(**唯一出口**,GATE 类,免预算) | |
@@ -102,26 +103,29 @@
 
 研究面 = READ_CORE 13 + `search_external_research` + `submit_brief`。
 
-## 7. 门(`respond` 的检查链)——可追溯是怎么被执行的
+## 7. 门(`respond` / `submit_brief` 的解析链,V15)——可追溯是怎么被执行的
 
-按顺序,全部**机械、封闭、无阈值、无 fallback**:
+**桌面**(`services/table.py`)是唯一的对象:每轮工具声明的并集,同时是上下文载荷、门的全集、审计记录。出口只能写桌面上的名字,门只做查找。
 
-1. **引用可解析**(`evidence_trail`):每个 id 必须是本会话工具返回过的 `fact_/calc_/chunk_/src_/alert_/run_/pos_`;无数字的回答可空引用(V11 起拒绝信会说)
-2. **引号逐字**(V11-Q):成对引号内 ≥4 词必须逐字见于被引 `chunk_/src_`
-3. **数值**(V3-A1):每个数 ∈ 被引证据的值集,**半个 ulp 容差 + 单位类**(MONEY/RATIO/PERCENT/COUNT/MULTIPLE),符号是数的一部分;豁免集封闭(id、日期、表单号、期间标签、产品型号、时长、置信度、年份、序号、**法规引证**(V12));"N percent" 与 "N%" 同等可引
-4. **共线单引**(V11-F):`collinear` 的 run 上单个因子系数被拒,合计可引
-5. **拒绝带出路**(V11-G):被拒的数若是被引值的两两四则组合,拒绝信点名 `calculate(op, a, b)`
-6. **轨迹判据**(V8-C2,`trajectory_gate`):R1 分解未做不得引 filing 讲组合原因;R2 入队的研究必须被提及。两条都零成本可脱——DP4
+按顺序,全部**机械、封闭、无阈值、无按值反推**(`services/resolver.py`):
 
-门校验的是**数与证据相符**;不含数字的断言(方法句、范围句、判决)门看不见——这是 [GAPS.md](../dev_note/portfolio-demo/agent-battery/GAPS.md) 右列,由 V12 的知识层降低而非消灭。
+1. **形状**:`RESPOND_SCHEMA`(oneOf 六种论断:paragraph / metric_table / chart / trend / absence / action)在关口拒绝一切非文法形状;槽只有 `{ref, name}`;文本 `\d` 为空,豁免类封闭且短(日期、年份、表单号、期间标签、法规引证、附着型号、窗口标签),id 写进正文按整个 token 拒
+2. **来源**:每个 ref ∈ 本 session 桌面(`not_on_table`)
+3. **名字**:每个槽的 name ∈ 该 ref 持有的量(`unknown_name`,拒绝信列出该 ref 的全部名字)
+4. **引号逐字**:引号内 ≥4 词 ∈ 该块 `cites` 指向的原文
+5. **断言行类型**:trend/chart → 序列行;absence → 缺席行;action → 本轮任务
+
+`not_alone`(共线单系数)不在门里判:它们**不上桌**(`table._place`),模型看不见就写不出。四个出口(`respond`、`submit_brief`)调同一个 `resolver.resolve`;日报门保留 v1 散文路径(`numeric_verification.verify`,证据集由服务端装配)。
+
+被整体删除的:按值解析(`_COMPATIBLE`、半 ulp 匹配槽、`held_instead_by`)、`_DERIVATIONS` 出路搜索、20 条豁免正则、26 个运行时形状码、`trajectory_gate`(R1 进 rubric,R2 由 action 谓词取代)、id 形状收割器与 `collect_trail`。
 
 ## 8. Agent 层
 
 **拓扑 1 + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ research 子会话(worker 内,产 brief)。
 
-**meta-agent 循环**(`agents/meta_agent.py`):系统提示(1,101 tokens:六条不变量 + **六条带"为什么"的已验证示例**,V12)+ 29 个 schema(4,652 tokens)→ `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,12KB)进上下文 → 直到 `respond` 过门。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
+**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 32 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
 
-**research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief` 提交门(每块 citations 必填)→ `issuer_briefs`。
+**research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief`(六节 × 同一块文法,同一解析器;五节各须指向证据)→ `issuer_briefs`(文本列 + `blocks` JSONB)。
 
 **ExposureWorkflow**(`workflow/exposure_workflow.py`,确定性,worker 执行):加载 → 校验 → 行情 → `calculate_exposure` → `calculate_attribution`(8 因子回归)→ `calculate_risk`(VaR/ES/压力/限额)→ `generate_report`;每步 `workflow_events`,run 三切片(metrics / attributions / alerts)。
 

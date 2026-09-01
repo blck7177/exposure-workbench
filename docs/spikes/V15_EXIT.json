@@ -1,0 +1,30 @@
+{
+  "sessions": 8,
+  "turns": 8,
+  "respond_attempts": {
+    "total": 16,
+    "accepted": 8,
+    "refused_pct": 50,
+    "per_turn_median": 2,
+    "per_turn": {
+      "1": 3,
+      "2": 3,
+      "4": 1,
+      "3": 1
+    }
+  },
+  "refusal_mix": {
+    "malformed_answer": 5,
+    "not_on_table": 1,
+    "unknown_name": 2
+  },
+  "no_answer": {
+    "turns": 8,
+    "no_answer": 0
+  },
+  "tool_calls_per_turn": 4.0,
+  "peak_prompt_tokens": {
+    "avg": 16761,
+    "max": 35888
+  }
+}
