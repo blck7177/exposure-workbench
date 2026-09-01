@@ -8,6 +8,7 @@ import { ArrowLeft, ExternalLink, FileText, Loader2, Play } from "lucide-react";
 import { AuditOnly } from "../../components/audit";
 import { AuthGate } from "../../components/Auth";
 import { useDockContext } from "../../components/analyst/Dock";
+import { AnswerBlocks, idsInBlocks, type Block } from "../../components/analyst/AnswerBlocks";
 import { AnswerText, idsIn } from "../../components/analyst/AnswerText";
 import { CitationList } from "../../components/evidence/Cite";
 import { useEvidence } from "../../components/evidence/Column";
@@ -26,7 +27,7 @@ import { explainApiError, explainRunError } from "@/lib/errors";
 import {
   getFilings, getFinancials, getLatestBrief, getResearchRun, getResearchSources,
   getSection, getSnapshot, startResearch,
-  type Brief, type CalcRow, type FilingRow, type ResearchRun, type Snapshot, type SourceRow,
+  type Brief, type BriefSection, type CalcRow, type FilingRow, type ResearchRun, type Snapshot, type SourceRow,
 } from "@/lib/issuer";
 import { collapseSteps, stepPhrase } from "../../components/steps";
 import type { Position } from "@/lib/types";
@@ -481,6 +482,17 @@ function FilingsTab({ ticker }: { ticker: string }) {
 
 // ── the brief ────────────────────────────────────────────────────────────────
 
+// The six sections of a brief, in reading order, each with the key it is
+// stored under — one list serves both the text and the block form.
+const SECTIONS: [string, BriefSection][] = [
+  ["Financial summary", "financial_summary"],
+  ["Key changes", "key_changes"],
+  ["What management said", "management_explanation"],
+  ["Market and industry context", "market_context"],
+  ["What it means for this book", "portfolio_implications"],
+  ["Open questions", "open_questions"],
+];
+
 function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | null }) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -500,11 +512,14 @@ function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | n
   // One request for every caption on the page, rather than one per chip.
   useEffect(() => {
     if (!brief) return;
-    const ids = idsIn(
-      [brief.financial_summary, brief.key_changes, brief.management_explanation,
-       brief.market_context, brief.portfolio_implications, brief.open_questions]
-        .filter(Boolean).join("\n"),
-      brief.citations);
+    const inBlocks = brief.blocks ? idsInBlocks(SECTIONS.flatMap(([, key]) => brief.blocks?.[key] ?? [])) : null;
+    const ids = inBlocks
+      ? inBlocks.concat(brief.citations.filter((c) => !inBlocks.includes(c)))
+      : idsIn(
+        [brief.financial_summary, brief.key_changes, brief.management_explanation,
+         brief.market_context, brief.portfolio_implications, brief.open_questions]
+          .filter(Boolean).join("\n"),
+        brief.citations);
     if (ids.length === 0) return;
     let ignore = false;
     getEvidenceLabels(ids).then((r) => { if (!ignore) setLabels(r.labels); }).catch(() => {});
@@ -513,14 +528,12 @@ function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | n
 
   if (!loaded) return <p className="text-xs text-slate-500 py-6">Loading…</p>;
 
-  const blocks: [string, string | null][] = brief ? [
-    ["Financial summary", brief.financial_summary],
-    ["Key changes", brief.key_changes],
-    ["What management said", brief.management_explanation],
-    ["Market and industry context", brief.market_context],
-    ["What it means for this book", brief.portfolio_implications],
-    ["Open questions", brief.open_questions],
-  ] : [];
+  // A brief written as blocks (V15) is rendered from them, section by section,
+  // through the same renderer a chat answer uses; one written before that is
+  // still prose with ids inside it and goes through the prose renderer.
+  const sections: [string, Block[] | string | null][] = brief
+    ? SECTIONS.map(([title, key]) => [title, brief.blocks ? brief.blocks[key] ?? null : brief[key]])
+    : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -544,11 +557,15 @@ function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | n
             </AuditOnly>
           </header>
           <div className="px-4 py-3 flex flex-col gap-4 text-[12.5px] text-slate-300">
-            {blocks.filter(([, body]) => body).map(([title, body]) => (
+            {sections.filter(([, body]) => body && body.length > 0).map(([title, body]) => (
               <div key={title}>
                 <h4 className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">{title}</h4>
-                <AnswerText text={body as string} citations={brief.citations}
-                  labels={labels} onOpen={open} />
+                {typeof body === "string" ? (
+                  <AnswerText text={body} citations={brief.citations}
+                    labels={labels} onOpen={open} />
+                ) : (
+                  <AnswerBlocks blocks={body as Block[]} labels={labels} onOpen={open} />
+                )}
               </div>
             ))}
             <CitationList citations={brief.citations} labels={labels} onOpen={open} />

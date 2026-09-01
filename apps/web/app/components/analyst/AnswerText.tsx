@@ -67,12 +67,19 @@ export function planAnnotations(text: string, matches?: VerifiedMatch[]): Annota
   return spans;
 }
 
-export function AnswerText({ text, citations, matches, labels, onOpen }: {
+/**
+ * `inline` is for a text run inside a block answer (V15): the enclosing
+ * AnswerBlocks owns the numbering and draws the audit id-map once for the whole
+ * answer, so this instance draws none — a footer per run would repeat the same
+ * list after every sentence and break the paragraph's flow.
+ */
+export function AnswerText({ text, citations, matches, labels, onOpen, inline }: {
   text: string;
   citations: string[];
   matches?: VerifiedMatch[];
   labels?: Record<string, { type: string; label: string }>;
   onOpen: (id: string) => void;
+  inline?: boolean;
 }) {
   const { audit } = useAudit();
   const order = [...citations];
@@ -122,7 +129,7 @@ export function AnswerText({ text, citations, matches, labels, onOpen }: {
   return (
     <>
       <span className="whitespace-pre-wrap leading-relaxed">{out}</span>
-      {audit && order.length > 0 && (
+      {audit && !inline && order.length > 0 && (
         <span className="block mt-1 font-mono text-[10px] text-slate-600 break-all">
           {order.map((id, i) => `[${i + 1}] ${id}`).join("  ")}
         </span>

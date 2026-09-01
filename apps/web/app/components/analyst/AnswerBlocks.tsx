@@ -2,7 +2,9 @@
 
 import React from "react";
 
+import { display as displayValue } from "@/lib/display";
 import { useAudit } from "../audit";
+import { AnswerText, idsIn } from "./AnswerText";
 
 /**
  * An answer made of blocks, with every figure resolved from the ledger (V14-C).
@@ -14,11 +16,17 @@ import { useAudit } from "../audit";
  * the ledger's own name for it.
  *
  * That moves one decision out of the model's hands entirely. How many digits a
- * reader sees is a property of the unit, decided here, once — so `0.1627` is
- * shown as `16.3%` and `10866320` as `$10.87M` without anyone having asked the
- * model to round, and without a rounded figure having to be verified all over
- * again. The exact value stays on the element, which is what the reader gets on
- * hover and what the audit layer shows outright.
+ * reader sees is a property of the unit — decided in lib/display, once, and
+ * held to the server's own rule by a shared fixture — so `0.1627` is shown as
+ * `16.3%` and `10866320` as `$10.87M` without anyone having asked the model to
+ * round, and without a rounded figure having to be verified all over again.
+ * The exact value stays on the element, which is what the reader gets on hover
+ * and what the audit layer shows outright.
+ *
+ * V15 adds two things a block can rest on besides a row: `cites`, the passages
+ * a paragraph's or table's prose was checked against, shown as numbered
+ * footnotes after the block; and `action`, work this turn started, by its id.
+ * The same shapes now make up an issuer brief's six sections.
  */
 
 export type Slot = {
@@ -31,46 +39,77 @@ export type Slot = {
 export type Run = string | { slot: Slot };
 
 export type Block =
-  | { type: "paragraph"; runs: Run[] }
-  | { type: "metric_table"; title?: string; columns: string[]; rows: Run[][] }
+  | { type: "paragraph"; runs: Run[]; cites?: string[] }
+  | { type: "metric_table"; title?: string; columns: string[]; rows: Run[][]; cites?: string[] }
   | { type: "chart"; kind: string; title?: string; series_ref: string }
   | { type: "trend"; text: string; series_ref: string }
-  | { type: "absence"; text: string; absence_ref: string };
+  | { type: "absence"; text: string; absence_ref: string }
+  | { type: "action"; text: string; task_ref: string };
 
-/**
- * The display conventions, in the one place they live.
- *
- * Reader precision, not ledger precision: a portfolio weight is read to a tenth
- * of a percent and a market value to two significant cents of a million. The
- * ledger keeps every digit and the citation drawer will show them; a sentence
- * that carries all of them reads as a machine rather than an analyst, which the
- * V14 baseline measured at 3 of 8 answers.
- */
+/** The reader's form of a slot — see lib/display for the rule itself. */
 export function display(slot: Slot): string {
-  const v = slot.value;
-  switch (slot.unit_class) {
-    case "RATIO":
-    case "PERCENT": {
-      const pct = v * 100;
-      const digits = Math.abs(pct) >= 10 ? 1 : 2;
-      return `${pct.toFixed(digits)}%`;
-    }
-    case "MONEY": {
-      const abs = Math.abs(v);
-      const [scale, suffix] =
-        abs >= 1e9 ? [1e9, "B"] : abs >= 1e6 ? [1e6, "M"] : abs >= 1e3 ? [1e3, "K"] : [1, ""];
-      const scaled = v / scale;
-      const digits = Math.abs(scaled) >= 100 ? 0 : 2;
-      return `$${scaled.toFixed(digits)}${suffix}`;
-    }
-    case "MULTIPLE":
-      return `${v.toFixed(2)}×`;
-    case "COUNT":
-      return Number.isInteger(v) ? String(v) : v.toFixed(2);
+  return displayValue(slot.value, slot.unit_class);
+}
+
+function stringRuns(b: Block): string[] {
+  switch (b.type) {
+    case "paragraph":
+      return b.runs.filter((r): r is string => typeof r === "string");
+    case "metric_table":
+      return b.rows.flat().filter((r): r is string => typeof r === "string");
     default:
-      return String(v);
+      return [];
   }
 }
+
+/**
+ * Every id the answer's prose cites, in reading order: a block's `cites`, then
+ * any bare id written inside its text. This is the numbering — computed once
+ * for the whole answer so the same passage is footnote 2 in every block that
+ * leans on it, rather than 1 in each.
+ */
+export function citedIds(blocks: Block[]): string[] {
+  const out: string[] = [];
+  for (const b of blocks) {
+    const cites = b.type === "paragraph" || b.type === "metric_table" ? b.cites ?? [] : [];
+    for (const id of idsIn(stringRuns(b).join("\n"), cites)) {
+      if (!out.includes(id)) out.push(id);
+    }
+  }
+  return out;
+}
+
+/** Every id the answer leans on — cites, slots and block-level refs alike —
+ *  which is what to ask the label endpoint for. */
+export function idsInBlocks(blocks: Block[]): string[] {
+  const out = citedIds(blocks);
+  const add = (id: string) => {
+    if (!out.includes(id)) out.push(id);
+  };
+  for (const b of blocks) {
+    switch (b.type) {
+      case "paragraph":
+        for (const r of b.runs) if (typeof r !== "string") add(r.slot.ref);
+        break;
+      case "metric_table":
+        for (const r of b.rows.flat()) if (typeof r !== "string") add(r.slot.ref);
+        break;
+      case "chart":
+      case "trend":
+        add(b.series_ref);
+        break;
+      case "absence":
+        add(b.absence_ref);
+        break;
+      case "action":
+        add(b.task_ref);
+        break;
+    }
+  }
+  return out;
+}
+
+type Labels = Record<string, { type: string; label: string }>;
 
 function Figure({ slot, onOpen }: { slot: Slot; onOpen: (id: string) => void }) {
   const { audit } = useAudit();
@@ -98,12 +137,43 @@ function Figure({ slot, onOpen }: { slot: Slot; onOpen: (id: string) => void }) 
   );
 }
 
-function Runs({ runs, onOpen }: { runs: Run[]; onOpen: (id: string) => void }) {
+/**
+ * A text run goes through the prose renderer's annotation walk rather than
+ * straight to the page, because a brief's historical text — and a model that
+ * writes "as chunk_… shows" — puts evidence ids INSIDE the sentence, and those
+ * should be footnotes a reader can open, not hex. The numbering is the
+ * answer-wide one, so a run's footnote agrees with the block's own.
+ */
+function Text({
+  text,
+  order,
+  labels,
+  onOpen,
+}: {
+  text: string;
+  order: string[];
+  labels?: Labels;
+  onOpen: (id: string) => void;
+}) {
+  return <AnswerText text={text} citations={order} labels={labels} onOpen={onOpen} inline />;
+}
+
+function Runs({
+  runs,
+  order,
+  labels,
+  onOpen,
+}: {
+  runs: Run[];
+  order: string[];
+  labels?: Labels;
+  onOpen: (id: string) => void;
+}) {
   return (
     <>
       {runs.map((r, i) =>
         typeof r === "string" ? (
-          <React.Fragment key={i}>{r}</React.Fragment>
+          <Text key={i} text={r} order={order} labels={labels} onOpen={onOpen} />
         ) : (
           <Figure key={i} slot={r.slot} onOpen={onOpen} />
         ),
@@ -113,12 +183,49 @@ function Runs({ runs, onOpen }: { runs: Run[]; onOpen: (id: string) => void }) {
 }
 
 /**
- * A claim about a sequence, or about something not being reported.
+ * The passages a block's prose was checked against, as footnotes after it —
+ * the same buttons AnswerText draws for an id inside a sentence, so a reader
+ * learns one visual language for "this rests on that".
+ */
+function Cites({
+  ids,
+  order,
+  labels,
+  onOpen,
+}: {
+  ids: string[];
+  order: string[];
+  labels?: Labels;
+  onOpen: (id: string) => void;
+}) {
+  if (ids.length === 0) return null;
+  return (
+    <span className="whitespace-nowrap">
+      {ids.map((id) => (
+        <sup key={id} className="align-super leading-none">
+          <button
+            type="button"
+            onClick={() => onOpen(id)}
+            title={labels?.[id]?.label ?? id}
+            className="font-mono text-[10px] leading-none align-baseline ml-0.5 px-1 py-px rounded border border-teal-800/60 bg-teal-950/40 text-teal-300 hover:bg-teal-500 hover:text-[#0b0f14] transition-colors"
+          >
+            {order.indexOf(id) + 1}
+          </button>
+        </sup>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * A claim about a sequence, about something not being reported, or about work
+ * this turn set going.
  *
- * Both carry the row they rest on, and the row is reachable — which is the
- * point of having made them blocks. "VaR has been climbing" used to be a
+ * All three carry the row they rest on, and the row is reachable — which is
+ * the point of having made them blocks. "VaR has been climbing" used to be a
  * sentence nothing could check; now it is a sentence with a series behind it,
- * and the reader can go and look at the series.
+ * and the reader can go and look at the series. "I have started a research
+ * run" likewise names the task, and the reader can go and watch it.
  */
 function Claim({
   text,
@@ -128,16 +235,18 @@ function Claim({
 }: {
   text: string;
   refId: string;
-  kind: "trend" | "absence";
+  kind: "trend" | "absence" | "action";
   onOpen: (id: string) => void;
 }) {
+  const label = { trend: "trend", absence: "not reported", action: "started" }[kind];
+  const link = { trend: "see the series", absence: "see the record", action: "see the task" }[kind];
   return (
     <p style={{ margin: "0.5rem 0", display: "flex", gap: "0.5rem", alignItems: "baseline" }}>
       <span
         aria-hidden
         style={{ opacity: 0.55, fontSize: "0.8em", flex: "0 0 auto" }}
       >
-        {kind === "trend" ? "trend" : "not reported"}
+        {label}
       </span>
       <span>
         {text}{" "}
@@ -153,7 +262,7 @@ function Claim({
             cursor: "pointer",
           }}
         >
-          {kind === "trend" ? "see the series" : "see the record"}
+          {link}
         </button>
       </span>
     </p>
@@ -162,11 +271,15 @@ function Claim({
 
 export function AnswerBlocks({
   blocks,
+  labels,
   onOpen,
 }: {
   blocks: Block[];
+  labels?: Labels;
   onOpen: (id: string) => void;
 }) {
+  const { audit } = useAudit();
+  const order = citedIds(blocks);
   return (
     <div>
       {blocks.map((b, i) => {
@@ -174,7 +287,8 @@ export function AnswerBlocks({
           case "paragraph":
             return (
               <p key={i} style={{ margin: "0.5rem 0", lineHeight: 1.65 }}>
-                <Runs runs={b.runs} onOpen={onOpen} />
+                <Runs runs={b.runs} order={order} labels={labels} onOpen={onOpen} />
+                <Cites ids={b.cites ?? []} order={order} labels={labels} onOpen={onOpen} />
               </p>
             );
 
@@ -217,13 +331,22 @@ export function AnswerBlocks({
                               fontVariantNumeric: "tabular-nums",
                             }}
                           >
-                            {typeof cell === "string" ? cell : <Figure slot={cell.slot} onOpen={onOpen} />}
+                            {typeof cell === "string" ? (
+                              <Text text={cell} order={order} labels={labels} onOpen={onOpen} />
+                            ) : (
+                              <Figure slot={cell.slot} onOpen={onOpen} />
+                            )}
                           </td>
                         ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {b.cites && b.cites.length > 0 ? (
+                  <div style={{ marginTop: "0.25rem" }}>
+                    <Cites ids={b.cites} order={order} labels={labels} onOpen={onOpen} />
+                  </div>
+                ) : null}
               </div>
             );
 
@@ -261,10 +384,18 @@ export function AnswerBlocks({
               <Claim key={i} text={b.text} refId={b.absence_ref} kind="absence" onOpen={onOpen} />
             );
 
+          case "action":
+            return <Claim key={i} text={b.text} refId={b.task_ref} kind="action" onOpen={onOpen} />;
+
           default:
             return null;
         }
       })}
+      {audit && order.length > 0 ? (
+        <span className="block mt-1 font-mono text-[10px] text-slate-600 break-all">
+          {order.map((id, i) => `[${i + 1}] ${id}`).join("  ")}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // Uses the shared transport (lib/http) so its POST writes (chat, research,
 // ensure-ready) carry the Clerk bearer token, same as lib/api.
 
+import type { Block } from "@/app/components/analyst/AnswerBlocks";
 import { apiFetch as j } from "./http";
 import type { RunError } from "./types";
 
@@ -43,10 +44,18 @@ export type TimelineEvent = {
   error?: RunError | null;
 };
 
+// `blocks` is the brief in the chat exit's own shape (V15): six sections, keyed
+// by the text column they stand beside, each a list of the same blocks an
+// answer is made of — slots resolved from the ledger, prose with the passages
+// it cites. The text columns stay for briefs written before this; a brief with
+// `blocks` is rendered from them and its text is not consulted.
+export type BriefSection = "financial_summary" | "key_changes" | "management_explanation"
+  | "market_context" | "portfolio_implications" | "open_questions";
 export type Brief = {
   id: string; research_run_id: string;
   financial_summary: string | null; key_changes: string | null; management_explanation: string | null;
   market_context: string | null; portfolio_implications: string | null; open_questions: string | null;
+  blocks?: Partial<Record<BriefSection, Block[]>> | null;
   citations: string[]; confidence_flags: Record<string, unknown>; created_at: string | null;
 };
 // `label` is what this piece of evidence IS, in words — "Gross profit · Dec 28,
