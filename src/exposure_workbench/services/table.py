@@ -224,6 +224,7 @@ async def build(db: AsyncSession, declared: list[dict] | None,
     declared = [dict(e) for e in (declared or [])]
     if not declared:
         return [], {}
+    dropped_entries: list[str] = []
     while True:
         table = Table()
         for entry in declared:
@@ -231,6 +232,12 @@ async def build(db: AsyncSession, declared: list[dict] | None,
         order = [e["id"] for e in declared if isinstance(e.get("id"), str)]
         payload = _payload(table, order)
         if len(json.dumps(payload)) <= limit:
+            if dropped_entries:
+                payload["truncated"] = {
+                    "dropped": dropped_entries,
+                    "detail": "these ids' figures did not fit the message size "
+                              "limit and are not on the table",
+                }
             return declared, payload
         # Narrow: the last run entry with a scope still holding tables loses its
         # last table. Names are exact reads and are not narrowed.
@@ -241,9 +248,29 @@ async def build(db: AsyncSession, declared: list[dict] | None,
                 entry.setdefault("truncated", []).append(dropped)
                 narrowed = True
                 break
-        if not narrowed:
-            return [], {"truncated": {"detail": "the result's evidence did not fit the "
-                                                "message size limit; request it by name"}}
+        if narrowed:
+            continue
+        # Second phase (V16, found live): no run scope left to narrow. get_beta
+        # declares two ~250-point returns series beside three scalars; the
+        # series alone overflow the limit, and the old dead-end declared
+        # EVERYTHING empty — the beta itself died for the size of its inputs.
+        # So whole entries come off now, series first (a scalar is never the
+        # reason a slice does not fit), and the drop is recorded on the payload
+        # and reflected in the returned declaration: the record and what the
+        # model was shown still agree.
+        victim = None
+        for entry in reversed(declared):
+            if table.rows.get(entry.get("id")) == qn.KIND_SERIES:
+                victim = entry
+                break
+        if victim is None and len(declared) > 1:
+            victim = declared[-1]
+        if victim is not None and len(declared) > 1:
+            declared.remove(victim)
+            dropped_entries.append(victim.get("id"))
+            continue
+        return [], {"truncated": {"detail": "the result's evidence did not fit the "
+                                            "message size limit; request it by name"}}
 
 
 async def load(db: AsyncSession, session_id: str) -> Table:

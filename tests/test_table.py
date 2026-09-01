@@ -247,3 +247,41 @@ async def test_a_collinear_coefficient_is_not_on_the_table_so_its_name_is_unknow
         [{"type": "paragraph", "runs": ["beta ", {"ref": "run_1", "name": "factor_attributions.market.beta"}]}], t)
     assert v.error == "unknown_name"
     assert v.problems[0]["available"] == ["factor_attributions.sum_of_contributions"]
+
+
+# ── build: the second narrowing phase (V16) ───────────────────────────────────
+
+async def test_when_no_run_scope_is_left_series_entries_drop_before_everything_dies(monkeypatch):
+    """Found live: get_beta declares two ~250-point returns series beside three
+    scalars; the series alone overflow the limit, and the old dead-end declared
+    EVERYTHING empty — the beta itself died for the size of its inputs. Whole
+    entries now come off, series first, and the drop is recorded on the payload
+    so the model is told what is not on the table (the NameError in this path's
+    first draft survived a full green suite — which is why this test exists)."""
+    async def fake_of_ref(db, ref):
+        if ref == "calc_fat":
+            pts = tuple(_q(0.001 * i, RATIO, f"XOM.returns@2025-{i:02d}-01", "calc_fat")
+                        for i in range(1, 60))
+            return qn.Resolved(pts, frozenset(), qn.KIND_SERIES)
+        return qn.Resolved((_q(-0.54, RATIO, "XOM.beta.SPY", ref),), frozenset(), qn.KIND_SCALAR)
+    monkeypatch.setattr(qn, "of_ref", fake_of_ref)
+
+    refs, payload = await tb.build(None, [{"type": "calc", "id": "calc_thin"},
+                                          {"type": "calc", "id": "calc_fat"}], limit=600)
+    assert [e["id"] for e in refs] == ["calc_thin"]
+    assert payload["truncated"]["dropped"] == ["calc_fat"]
+    assert "XOM.beta.SPY" in payload["quantities"]["calc_thin"]
+
+
+async def test_a_single_entry_too_big_to_fit_is_still_declared_empty(monkeypatch):
+    """The dead-end survives for the case it is true of: ONE entry that cannot
+    fit alone has nothing to keep, and pretending otherwise would put a partial
+    series on the table under a whole series' id."""
+    async def fake_of_ref(db, ref):
+        pts = tuple(_q(0.001 * i, RATIO, f"XOM.returns@2025-{i:02d}-01", "calc_fat")
+                    for i in range(1, 60))
+        return qn.Resolved(pts, frozenset(), qn.KIND_SERIES)
+    monkeypatch.setattr(qn, "of_ref", fake_of_ref)
+    refs, payload = await tb.build(None, [{"type": "calc", "id": "calc_fat"}], limit=400)
+    assert refs == []
+    assert "dropped" not in payload["truncated"]

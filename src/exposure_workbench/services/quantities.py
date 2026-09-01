@@ -222,7 +222,8 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     # row's net betas and rooms) keeps that family; otherwise the row's head
     # decides — a measure the formula registry defines is `derived`, everything
     # else is a filed figure or a read over filed figures.
-    fallback = "derived" if head in fm.FORMULAS else "fundamentals"
+    fallback = ("price" if (row.operation or "").startswith("price.")
+                else "derived" if head in fm.FORMULAS else "fundamentals")
     values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
     return Resolved(tuple(values), frozenset(), calc_kind(row))
 
