@@ -1,0 +1,258 @@
+{
+ "scored": [
+  {
+   "tag": "V1-macro-breakdown",
+   "question_tag": "V1-macro-breakdown",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_attribution, get_risk_state"
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe largest macro sensitivity is to a broad equity drawdown: the market downside scenario shows the biggest loss at 7.46%.\u201d"
+    },
+    "netting": {
+     "met": true,
+     "why": "The answer states the net direction for factors: \"net beta to equity down at -80.5%\" and \"net beta to credit spread widening at -21.6%.\""
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cThe market downside stress alert is also already above its limit at 7.46% versus 6.00%\u201d gives an actionable implication a portfolio manager could use."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c80.9%\u201d and \u201c7.46%\u201d are ledger-style overprecise figures; the criterion requires reader-appropriate rounding."
+    }
+   }
+  },
+  {
+   "tag": "V2-fundamental-lens",
+   "question_tag": "V2-fundamental-lens",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer gives non-generic, security-specific business and macro-risk claims for named holdings like \u201cMSFT,\u201d \u201cJPM,\u201d and \u201cXOM.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with a restatement of macro channels and concentration, not an actionable implication a portfolio manager could use."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c16.3%,\u201d \u201c14.7%,\u201d \u201c7.34%,\u201d and \u201c6.07%\u201d reproduce ledger-raw precision instead of reader-appropriate rounded figures."
+    }
+   }
+  },
+  {
+   "tag": "V3-rate-exposure",
+   "question_tag": "V3-rate-exposure",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: get_attribution"
+    },
+    "netting": {
+     "met": true,
+     "why": "It states a net rates exposure and its direction: \u201c1.53% under the run\u2019s stress set,\u201d i.e. downside sensitivity."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It states the exposure and direction, but does not rank drivers by magnitude or name the largest driver."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c100.0%\u201d and \u201c$10.87M\u201d use reader-appropriate precision; no ledger-raw overprecision appears."
+    }
+   }
+  },
+  {
+   "tag": "V4-what-to-watch",
+   "question_tag": "V4-what-to-watch",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "trigger": {
+     "met": true,
+     "why": "\u201cmarket downside stress | 7.46% | 6.00% | 8.00%\u201d and \u201cMSFT concentration | 16.3% | 15.0% | 20.0%\u201d give quantified thresholds that change the assessment."
+    },
+    "so_what": {
+     "met": true,
+     "why": "The closing sentence gives an actionable implication: \u201calready spending most of its headroom on the market-downside scenario and the two single-name concentration warnings.\u201d"
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe biggest scenario loss to monitor is market downside at 7.46%... the next most important are credit spread widening... and energy shock...\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses ledger-raw precision like \u201c7.46%,\u201d \u201c12.9%,\u201d and \u201c1.39%\u201d instead of rounding to reader-friendly figures."
+    }
+   }
+  },
+  {
+   "tag": "V5-drawdown-forensics",
+   "question_tag": "V5-drawdown-forensics",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": true,
+     "why": "all required reads present"
+    },
+    "ranking": {
+     "met": true,
+     "why": "The answer orders drivers by magnitude: \u201cMSFT fell the most,\u201d then \u201cAMZN, GOOGL, LLY, JPM, NVDA and AAPL,\u201d and later names the strongest diversifier."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable implication: \u201cthe book was heavily concentrated... left the book vulnerable to synchronized weakness.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses ledger-raw precision like \u201c12.0%12.0%\u201d and \u201c-26.0%,\u201d which is not reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "V6-concentration-mandate",
+   "question_tag": "V6-concentration-mandate",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "read_required_inputs": {
+     "met": false,
+     "why": "never called: list_risk_limits"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with raw concentration data only: \u201cLLY | 12.8% ... warning\u201d and \u201cMSFT | 16.3% ... warning,\u201d with no actionable implication."
+    },
+    "trigger": {
+     "met": true,
+     "why": "It gives quantified thresholds: \u201c12.0%\u201d for LLY and \u201c15.0%\u201d for MSFT, which define when the warning changes."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c12.8%\u201d and \u201c16.3%\u201d are rounded to reader-appropriate precision, not ledger-raw detail."
+    }
+   }
+  },
+  {
+   "tag": "V7-single-name-integration",
+   "question_tag": "V7-single-name-integration",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites named periods and filed figures like \u201c2026-03-31,\u201d \u201c2025-01-01..2025-12-31,\u201d and \u201cEBIT / interest expense | 2975.0%.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI can\u2019t\u2026 give a yes/no verdict\u201d and \u201cI can\u2019t fold recent trading into that sizing judgment,\u201d not an actionable sizing implication."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c2975.0%\u201d and \u201c211.8%\u201d reproduce ledger-raw precision instead of reader-appropriate figures."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer lists metrics in prose and bullets, but no drivers are explicitly ordered by magnitude or named as the largest."
+    }
+   }
+  },
+  {
+   "tag": "V8-cross-issuer",
+   "question_tag": "V8-cross-issuer",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "ranking": {
+     "met": false,
+     "why": "It does not rank the drivers by magnitude or clearly name the largest; it says \u201cMSFT is the largest single position\u201d but not as an ordered driver list."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cOn the book as of 2026-08-31\u201d and the named holdings/weights show the answer is grounded in system evidence, not generic prose."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"JPM, 14.7%\" and \"MSFT, 16.3%\" are rounded to reader-appropriate precision rather than raw ledger precision."
+    },
+    "netting": {
+     "met": true,
+     "why": "It does not add opposite exposures; it explicitly says the snapshot \"does not contain issuer balance-sheet leverage measures\" and avoids netting legs together."
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "read_required_inputs": [
+   1,
+   4
+  ],
+  "ranking": [
+   3,
+   6
+  ],
+  "netting": [
+   3,
+   3
+  ],
+  "so_what": [
+   3,
+   6
+  ],
+  "precision": [
+   3,
+   8
+  ],
+  "no_linear_locating": [
+   1,
+   1
+  ],
+  "grounded_claims": [
+   3,
+   3
+  ],
+  "trigger": [
+   2,
+   2
+  ]
+ }
+}

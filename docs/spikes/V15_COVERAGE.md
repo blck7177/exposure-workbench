@@ -96,3 +96,37 @@ id is on the table), no `figure_not_held_by_this_ref`, no `held_instead_by`.
 2. A book-scoped issuer manifest (the V2 shape) — the remaining asymmetry.
 3. Whether the id-in-prose habit warrants a structural answer after one more battery.
 4. The daily report stays on the v1 prose gate (plan §7-⑥); block it or leave it.
+
+## 7. Pass 3 — after the post-run fixes, measured, nothing changed
+
+> 2026-09-01 evening, same instrument, same 8 questions, n=1. Traces `V15_TRACES_pass3.json`,
+> exit `V15_EXIT_pass3.json`, scores `V15_RUBRIC_pass3.json`. Recorded as measured; no code was
+> touched after this run.
+
+| | S0 | official | **pass 3** |
+|---|---|---|---|
+| respond attempts (total / refused) | 38 / 30 (79%) | 16 / 8 (50%) | **10 / 2 (20%)** |
+| attempts per turn, median | 5 | 2 | **1** (6 turns at 1, 2 at 2) |
+| no answer | 0/8 | 0/8 | **0/8** |
+| peak prompt tokens avg / max | 22.4k / 35.5k | 16.8k / 35.9k | **11.0k / 15.3k** (−51% / −57%) |
+| tool calls per turn | 5.9 | 4.0 | **2.6** |
+| rubric | 15/33 | 21/33 | **19/33** |
+| no_linear_locating | 0/1 | 0/1 | **1/1** (V2 answered from the snapshot's table, one call) |
+| read_required_inputs | 2/4 | 2/4 | 1/4 |
+| precision | 1/8 | 5/8 | 3/8 |
+
+Switch criteria now: ① ✅, ③ ✅ except the refusal rate (20% against ≤10%), ④ ✅, ⑤ ✅;
+② half — linear locating gone, `read_required_inputs` 1/4 (the criterion still counts tool
+names; the quantities it wants were on the table from `describe_run` in V1 and V4).
+
+The two refusals: one `invalid_arguments` (a slot written with `value`, refused by the
+schema before the gate), one `digits_in_text`. No id written into prose this round.
+
+What the rubric drop is: `precision` 5/8 → 3/8 and `read_required_inputs` 2 → 1 are the
+model slotting the WRONG name — V3 "net exposure to rates is 100.0% of portfolio value"
+(slotted `net_exposure_pct` for a rates figure), V7 "latest filed balance-sheet date is
+$43.37B" (a money quantity where a date belonged). These pass the gate by construction —
+the figure is a real row's value under its real name — and are the residue V14-B predicted:
+a mechanical property is enforced, a prose property (the right name for the sentence) is
+not. Three rounds: attempts 3 → 2 → 1, refusals 70% → 50% → 20%, no answer 0 throughout;
+the abort criterion is not in reach, and the next defect is named — wrong-name slots.
