@@ -27,6 +27,7 @@ from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
+from exposure_workbench.services import price_analytics_service
 from exposure_workbench.services import drawdown_service
 from exposure_workbench.services import integration_service
 from exposure_workbench.services import reconcile_service
@@ -34,7 +35,9 @@ from exposure_workbench.services import run_reads_service
 from exposure_workbench.services import series_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.services import quantities as qn
-from exposure_workbench.tools.registry import READ, REFLECTION, Evidence, Tool, ToolRegistry, current_session_id
+from exposure_workbench.tools.registry import (
+    NOT_EVIDENCE, READ, REFLECTION, Evidence, Tool, ToolRegistry, current_session_id,
+)
 
 _PERIOD_TYPES = ["quarterly", "annual", "instant"]
 
@@ -129,8 +132,20 @@ async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
             out |= leaves(inp, seen | {inp})
         return out
 
+    # V16: which measures describe THIS issuer. A bank's catalogue used to say
+    # quick_ratio was "computable" — inputs present, measure meaningless — and
+    # computable answered a different question than the reader asked. The check
+    # is the same one evaluate_formula applies; the refusal's full sentence
+    # stays there (registry prose travels where it is load-bearing).
+    sector = await formula_service._sector(db, ticker.upper())
+    is_financial = sector in formula_service.FINANCIAL_SECTORS
+
     formulas = []
-    for name, f in sorted(_fm.FORMULAS.items()):
+    _order = {fam: i for i, fam in enumerate(_fm.FAMILY_ORDER)}
+    # Reading order, not alphabetical (V16-S3): families in the order an
+    # analyst reads a company — cash first — then by name within a family.
+    for name, f in sorted(_fm.FORMULAS.items(),
+                          key=lambda kv: (_order.get(kv[1].family, len(_order)), kv[0])):
         needed = leaves(name, {name})
         missing = sorted(needed - have)
         # No `authority` and no `note` here. Both are registry prose — the same
@@ -139,10 +154,14 @@ async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
         # beside the number, in evaluate_formula, which has always shipped them.
         # This is the V11-T lesson applied to the other listing tool; measured,
         # the two cost 3.8kB of an 18.7kB payload against a 12kB cap.
-        formulas.append({"name": name, "definition": f.expression, "basis": f.basis,
-                         "family": f.family, "unit_class": f.unit_class,
-                         "computable": not missing,
-                         **({"missing_inputs": missing} if missing else {})})
+        row = {"name": name, "definition": f.expression, "basis": f.basis,
+               "family": f.family, "unit_class": f.unit_class,
+               "computable": not missing,
+               **({"missing_inputs": missing} if missing else {})}
+        if is_financial and f.not_for_financials is not None:
+            row["computable"] = False
+            row["not_for_this_issuer"] = True
+        formulas.append(row)
 
     out = {"company": company, "available_metrics": metrics["metrics"],
            "formulas": formulas}
@@ -179,8 +198,14 @@ async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = Non
         db, ticker, at=at, invoked_by=current_session_id())
 
 
-async def _calculate(db: AsyncSession, op: str, a: str, b: str) -> dict:
-    return await typed_calculator.calculate(db, op, a, b, invoked_by=current_session_id())
+async def _calculate(db: AsyncSession, op: str, a: str, b: str,
+                     as_quantity: str | None = None) -> dict:
+    # Tier 2 (V16): the session names its own composition. The name rides into
+    # result_type.quantity like a formula's would; named_by records that a
+    # session, not the registry, chose it — visible, never authoritative.
+    return await typed_calculator.calculate(
+        db, op, a, b, invoked_by=current_session_id(),
+        as_quantity=as_quantity, named_by="session" if as_quantity else None)
 
 
 async def _evaluate_formula(db: AsyncSession, ticker: str, name: str,
@@ -310,44 +335,14 @@ _FACE_CAPABILITIES = {
     ],
 }
 
-# The question each family of a run's quantities answers. The groups are how
-# the manifest is read; the names inside them are the table's own.
-_RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("book", "size, day P&L and net/gross exposure of the whole book",
-     ("exposure_metrics.portfolio_market_value", "exposure_metrics.daily_pnl", "exposure_metrics.daily_return",
-      "exposure_metrics.gross_exposure", "exposure_metrics.net_exposure",
-      "exposure_metrics.gross_exposure_pct", "exposure_metrics.net_exposure_pct")),
-    ("concentration", "which issuers and sectors the book is concentrated in",
-     ("issuer_exposures.*.weight", "sector_exposures.*.weight", "issuer_exposures.*.market_value")),
-    ("mandate", "how each limit check stands against its warning and breach tiers, and the room left",
-     ("limit_checks.*.current_value", "limit_checks.*.warning_level", "limit_checks.*.breach_level",
-      "portfolio.integration.room_to_warning.*", "portfolio.integration.room_to_breach.*",
-      "risk_alerts.*.current_value", "risk_alerts.*.limit_value", "risk_alerts.*.utilization")),
-    ("stress", "what each scenario would cost, ranked by get_portfolio_analysis",
-     ("stress_results.*.loss_pct", "stress_results.*.loss_usd",
-      "exposure_metrics.stress_loss_market", "exposure_metrics.stress_loss_rates",
-      "exposure_metrics.stress_loss_credit", "exposure_metrics.stress_loss_tech")),
-    ("factor_exposure", "which way the book moves with each risk — net betas with their legs",
-     ("portfolio.integration.net_beta.*", "portfolio.integration.gross_beta.*",
-      "factor_attributions.*.beta", "factor_attributions.sum_of_contributions")),
-    ("attribution", "what moved the book on the run's date, by position and by factor",
-     ("issuer_exposures.*.contribution", "issuer_exposures.*.daily_return",
-      "factor_attributions.*.contribution", "factor_attributions.*.factor_return",
-      "exposure_metrics.attribution_portfolio_return", "exposure_metrics.alpha", "exposure_metrics.residual")),
-    ("risk", "volatility, tail measures and drawdown as the run measured them",
-     ("exposure_metrics.rolling_vol_30d", "exposure_metrics.rolling_vol_60d", "exposure_metrics.var_95_1d",
-      "exposure_metrics.expected_shortfall_95", "exposure_metrics.max_drawdown",
-      "exposure_metrics.model_r_squared", "exposure_metrics.observations", "exposure_metrics.max_vif")),
-    ("counts", "how many positions, factors, scenarios, alerts and checks the run holds",
-     ("count.*",)),
-)
-
-
-def _matches(pattern: str, name: str) -> bool:
-    if "*" not in pattern:
-        return name == pattern
-    head, _, tail = pattern.partition("*")
-    return name.startswith(head) and name.endswith(tail) and len(name) > len(head) + len(tail)
+# The question each family of a run's quantities answers — now declared with
+# the resources it describes (analytics/resources.py, V16): quantities.py stamps
+# every quantity with its group from the same table this manifest is built
+# from, so the group the model reads beside a value and the group describe_run
+# files the name under cannot drift. The old names stay as aliases because this
+# module is where the manifest is assembled.
+from exposure_workbench.analytics.resources import RUN_GROUPS as _RUN_GROUPS  # noqa: E402
+from exposure_workbench.analytics.resources import matches as _matches  # noqa: E402
 
 
 def _factored(names: list[str]) -> dict:
@@ -657,6 +652,11 @@ def build_read_registry() -> ToolRegistry:
             "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]},
             "a": {"type": "string", "description": "fact_… or calc_… id"},
             "b": {"type": "string", "description": "fact_… or calc_… id"},
+            "as_quantity": {"type": ["string", "null"],
+                            "description": "name the result IS — 'market_cap', 'fcf_yield' — "
+                                           "so the table calls it that and your answer can "
+                                           "slot it by the name; omitted, the row is named "
+                                           "by its lineage (a.divide.b)"},
         }, "required": ["op", "a", "b"], "additionalProperties": False},
         fn=_calculate, tool_class=READ,
         evidence=Evidence(),
@@ -718,6 +718,7 @@ def build_read_registry() -> ToolRegistry:
             "job_id": {"type": "string", "description": "task_… / run_… / rrun_…"},
         }, "required": ["job_id"], "additionalProperties": False},
         fn=_get_task_status, tool_class=READ,
+        evidence=NOT_EVIDENCE,  # reads state, not the world — cite the delegated run's own rows
     ))
     reg.register(Tool(
         name="get_portfolio_positions",
@@ -805,6 +806,7 @@ def build_read_registry() -> ToolRegistry:
             "portfolio_id": {"type": "string"},
         }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_list_risk_limits, tool_class=READ,
+        evidence=NOT_EVIDENCE,  # policy, not measurement — for a breached level, cite the alert
     ))
     reg.register(Tool(
         name="get_run_freshness",
@@ -819,6 +821,7 @@ def build_read_registry() -> ToolRegistry:
             "portfolio_id": {"type": "string"},
         }, "required": ["portfolio_id"], "additionalProperties": False},
         fn=_get_run_freshness, tool_class=READ,
+        evidence=NOT_EVIDENCE,  # two dates about the desk's own work, not the world
     ))
     reg.register(Tool(
         name="reconcile_move",
@@ -945,6 +948,31 @@ def build_read_registry() -> ToolRegistry:
         fn=_get_market_stats, tool_class=READ,
         evidence=Evidence(),
     ))
+
+    # ── V16: the price side of price × fundamentals (H1) and the single-name
+    # price analytics the portfolio layer always had (H3). Registered from the
+    # service's own _TOOL_SPECS — the schema, display, description and evidence
+    # declaration are data beside the producer they describe, so the face and
+    # the service cannot drift apart.
+    def _price_fn(service_fn: str):
+        svc = getattr(price_analytics_service, service_fn)
+
+        async def _fn(db: AsyncSession, **args):
+            # None means "use the default" — the schemas admit null because a
+            # model with non-strict function calling sends it (see the
+            # benchmark note on get_market_stats).
+            return await svc(db, invoked_by=current_session_id(),
+                             **{k: v for k, v in args.items() if v is not None})
+        return _fn
+
+    for _spec in price_analytics_service._TOOL_SPECS:
+        reg.register(Tool(
+            name=_spec["name"], display=_spec["display"],
+            description=_spec["description"], json_schema=_spec["json_schema"],
+            fn=_price_fn(_spec["service_fn"]), tool_class=READ,
+            evidence=Evidence(**_spec["evidence"]),
+        ))
+
     reg.register(Tool(
         name="search_filing_passages",
         display="Searching {ticker}'s filings for \u201c{query}\u201d",
@@ -986,5 +1014,7 @@ def build_read_registry() -> ToolRegistry:
             "thought": {"type": "string"},
         }, "required": ["thought"], "additionalProperties": False},
         fn=_think, tool_class=REFLECTION,
+        evidence=NOT_EVIDENCE,  # the model talking to itself
+
     ))
     return reg

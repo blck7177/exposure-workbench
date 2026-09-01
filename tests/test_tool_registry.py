@@ -147,7 +147,7 @@ async def test_a_gates_refusal_echoing_ids_puts_nothing_on_the_table(monkeypatch
     assert {e["id"] for e in tbl.declare(dict(refusal))["evidence"]} == {"calc_fabricated", "fact_nope"}, (
         "the ids are there to be found — which is why the decision is made above declare()")
     gate = Tool(name="respond", description="", json_schema={"type": "object"},
-                fn=_returning(refusal), tool_class=GATE)
+                fn=_returning(refusal), tool_class=GATE, evidence=R.NOT_EVIDENCE)
     out = await R.invoke(_registry(gate), _Db(), "sess_1", "respond", {})
 
     assert out["error"] == "not_on_table"
@@ -167,7 +167,7 @@ async def test_a_reflection_echoing_an_id_declares_nothing(monkeypatch):
     assert build_read_registry().get("think").evidence is None
 
     think = Tool(name="think", description="", json_schema={"type": "object"},
-                 fn=_think, tool_class=REFLECTION)
+                 fn=_think, tool_class=REFLECTION, evidence=R.NOT_EVIDENCE)
     await R.invoke(_registry(think), _Db(), "sess_1", "think", {"thought": "calc_deadbeefcafe"})
     assert log["built"] == [] and log["recorded"] == [[]]
 

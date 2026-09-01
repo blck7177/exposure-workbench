@@ -21,7 +21,7 @@ from exposure_workbench.services import company_service, research_run_service, t
 from exposure_workbench.services import answer_blocks as ab
 from exposure_workbench.services import resolver
 from exposure_workbench.tools.registry import (
-    DELEGATION, GATE, Evidence, Tool, ToolRegistry, current_session_id,
+    DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -279,5 +279,6 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         ),
         json_schema=RESPOND_SCHEMA,
         fn=_respond_blocks, tool_class=GATE,
+        evidence=NOT_EVIDENCE,  # a verdict is not evidence — a refusal's echoed ids must not become citable
     ))
     return reg

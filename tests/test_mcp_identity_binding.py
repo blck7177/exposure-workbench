@@ -70,7 +70,7 @@ def _registry(gate: asyncio.Barrier | None = None) -> R.ToolRegistry:
     registry.register(R.Tool(
         name="whoami", description="Report the identity this call is running under.",
         json_schema={"type": "object", "properties": {}, "additionalProperties": False},
-        fn=whoami, tool_class=R.REFLECTION,
+        fn=whoami, tool_class=R.REFLECTION, evidence=R.NOT_EVIDENCE,
     ))
     return registry
 

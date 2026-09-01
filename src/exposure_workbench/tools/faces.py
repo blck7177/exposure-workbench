@@ -40,6 +40,18 @@ READ_CORE = [
     "evaluate_formula",
     "get_fundamental_panel",
     "get_market_stats",
+    # V16 — the price side of price × fundamentals (H1) and the single-name
+    # price analytics the book already had at portfolio level (H3). On both
+    # faces for the same reason get_market_stats is: an issuer's market data
+    # is issuer-scoped.
+    "get_price",
+    "get_price_series",
+    "get_rolling_volatility",
+    "get_beta",
+    "regress_series",
+    "get_momentum_12_1",
+    "get_distance_from_52w_high",
+    "get_adv",
     "search_filing_passages",
     "get_filing_section",
     "list_alerts",

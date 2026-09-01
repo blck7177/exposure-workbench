@@ -95,6 +95,17 @@ class Evidence:
     tasks_from: tuple[str, ...] = ()
 
 
+# The explicit "this tool's results are not evidence" marker. None is the value
+# invoke() reads; the NAME exists so a registration says the decision out loud.
+# What no longer exists is a silent DEFAULT: register() refuses a tool that
+# never stated either — the default was how search_external_research's src_ ids
+# vanished from the table for a whole battery (V15) with nothing going red.
+NOT_EVIDENCE: None = None
+
+# Registration-time sentinel: "the author never said". Never a valid value.
+_UNDECLARED = Evidence(scope=("<undeclared>",))
+
+
 @dataclass(frozen=True)
 class Tool:
     name: str
@@ -119,10 +130,12 @@ class Tool:
     # registered tool without one — and defaulted here only so the dataclass
     # stays constructible in the argument order every registration already uses.
     display: str = ""
-    # What this tool's results put on the table. None for a gate, a reflection,
-    # and any tool whose results are not evidence (get_task_status reads state,
-    # list_risk_limits reads policy).
-    evidence: Evidence | None = None
+    # What this tool's results put on the table. Required: Evidence(...) for a
+    # tool whose results are citable, NOT_EVIDENCE for a gate, a reflection and
+    # any tool whose results are not evidence (get_task_status reads state,
+    # list_risk_limits reads policy). There is no default — register() refuses
+    # a tool that says neither.
+    evidence: Evidence | None = _UNDECLARED
 
 
 @dataclass
@@ -132,6 +145,11 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         if tool.name in self.tools:
             raise ValueError(f"duplicate tool {tool.name!r}")
+        if tool.evidence is _UNDECLARED:
+            raise ValueError(
+                f"tool {tool.name!r} does not say what its results put on the table: "
+                "pass evidence=Evidence(...) or evidence=NOT_EVIDENCE"
+            )
         self.tools[tool.name] = tool
 
     def get(self, name: str) -> Tool:

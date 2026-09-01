@@ -25,7 +25,9 @@ from exposure_workbench.services import research_search_service as rss
 from exposure_workbench.services import resolver
 from exposure_workbench.services import table as tbl
 from exposure_workbench.tools.meta_tools import BLOCK_SCHEMAS
-from exposure_workbench.tools.registry import DELEGATION, GATE, Evidence, Tool, ToolRegistry, current_session_id
+from exposure_workbench.tools.registry import (
+    DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
+)
 from exposure_workbench.utils.ids import new_brief_id
 
 logger = logging.getLogger(__name__)
@@ -174,5 +176,6 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
         ),
         json_schema=SUBMIT_BRIEF_SCHEMA,
         fn=_submit_brief, tool_class=GATE,
+        evidence=NOT_EVIDENCE,  # the filing verdict — same reason respond declares none
     ))
     return reg
