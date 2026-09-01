@@ -122,7 +122,11 @@ async def test_an_unavailable_input_names_itself_and_keeps_the_definition():
     assert got["definition"]
 
 
-async def test_a_bank_is_refused_before_any_number_is_produced():
+async def test_a_bank_is_refused_per_measure_not_wholesale():
+    """V16: which measures describe a bank is per-formula data
+    (Formula.not_for_financials), not a sector-wide wall. ROE is THE bank
+    return measure and computes for JPM; the EBITDA family still refuses,
+    each measure with its own sentence."""
     engine, mk = await _mk()
     try:
         async with mk() as db:
@@ -130,7 +134,11 @@ async def test_a_bank_is_refused_before_any_number_is_produced():
             one = await svc.evaluate_formula(db, "JPM", "ebit_interest_coverage")
     finally:
         await engine.dispose()
-    assert panel["error"] == "not_applicable" and "lines" not in panel
+    assert "lines" in panel and "error" not in panel
+    lines = panel["lines"]
+    assert "value" in lines["roe"] and not lines["roe"].get("error"), lines["roe"]
+    assert lines["debt_to_ebitda"].get("error") == "not_applicable"
+    assert lines["quick_ratio"].get("error") == "not_applicable"
     assert one["error"] == "not_applicable"
 
 

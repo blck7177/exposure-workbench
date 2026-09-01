@@ -195,9 +195,9 @@ async def test_the_exit_is_not_charged_against_the_budget_it_needs(monkeypatch):
 
             r = reg.ToolRegistry()
             r.register(reg.Tool(name="a_read", description="", json_schema={}, fn=_fn,
-                                tool_class=reg.READ))
+                                tool_class=reg.READ, evidence=reg.Evidence()))
             r.register(reg.Tool(name="an_exit", description="", json_schema={}, fn=_fn,
-                                tool_class=reg.GATE))
+                                tool_class=reg.GATE, evidence=reg.NOT_EVIDENCE))
 
             # The budget still works — that is the half that must not regress.
             refused = await reg.invoke(r, db, sid, "a_read", {"who": "read"})

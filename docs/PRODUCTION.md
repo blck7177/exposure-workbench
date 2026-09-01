@@ -332,6 +332,13 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v15_window_return_unit.sql
 
+# V16 has no schema migration — mapping v4 is code plus a data backfill.
+# remap_concepts re-normalizes financial_facts under the current mapping
+# (v4 names the per-share and capital-allocation layer: 2,472 rows went
+# NULL -> named on 2026-09-01, no renames). Idempotent; --dry-run first.
+python scripts/remap_concepts.py --dry-run
+python scripts/remap_concepts.py --apply
+
 docker compose up -d
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.

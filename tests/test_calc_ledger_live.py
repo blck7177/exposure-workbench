@@ -73,9 +73,9 @@ async def test_margin_number_is_reproducible_from_the_same_facts():
             await db.commit()
 
             # independent recompute from the two series' own points
-            gp_pts = {p["end"]: p["value"] for p in gp["points"] if p.get("value") is not None}
-            rev_pts = {p["end"]: p["value"] for p in rev["points"] if p.get("value") is not None}
-            got = {p["end"]: p["value"] for p in out["points"]}
+            gp_pts = {(p.get("period_end") or p.get("end")): p["value"] for p in gp["points"] if p.get("value") is not None}
+            rev_pts = {(p.get("period_end") or p.get("end")): p["value"] for p in rev["points"] if p.get("value") is not None}
+            got = {(p.get("period_end") or p.get("end")): p["value"] for p in out["points"]}
             for end in gp_pts.keys() & rev_pts.keys():
                 assert got[end] == pytest.approx(gp_pts[end] / rev_pts[end])
             # NVDA gross margin is ~0.70-0.78 — a sanity band, not a hardcoded value

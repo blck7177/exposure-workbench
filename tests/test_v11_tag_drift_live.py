@@ -86,6 +86,13 @@ CLASSIFIED: dict[tuple[str, str], str] = {
     ("LLY", "net_income_including_noncontrolling"): "issuer_stopped",  # plain NetIncomeLoss continues
     ("MSFT", "commercial_paper"): "issuer_stopped",
     ("NVDA", "commercial_paper"): "issuer_stopped",
+    # Named by mapping v4 (2026-09-01), silent since then: AMZN's cash
+    # repurchases (PaymentsForRepurchaseOfCommonStock) end 2024-12-31 — the
+    # company stopped buying back, so the cash-flow line drops out. What still
+    # arrives is the program's shell: StockRepurchasedDuringPeriodShares and
+    # the remaining-authorization amount, both through 2026-03-31. A refusal
+    # for AMZN buybacks after FY2024 is therefore the correct answer.
+    ("AMZN", "buybacks"): "issuer_stopped",
 
     # us-gaap:PaymentsToAcquireOtherPropertyPlantAndEquipment, 26 periods through
     # 2026-03-31, normalized_metric NULL. LLY's free cash flow is refused for
