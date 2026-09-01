@@ -1,0 +1,10 @@
+[
+ {"tag":"G1-msft-expensive","q":"Is MSFT expensive right now?"},
+ {"tag":"G2-nvda-tsr-decomp","q":"Over the past year, how much of NVDA's total shareholder return came from earnings growth versus multiple expansion?"},
+ {"tag":"G3-aapl-buyback-shares","q":"Did AAPL's buybacks actually reduce its share count?"},
+ {"tag":"G4-lly-roe-dupont","q":"What is LLY's ROE? Break it down with a DuPont decomposition."},
+ {"tag":"G5-jpm-ev-ebitda","q":"What is JPM's EV/EBITDA?"},
+ {"tag":"G6-accruals-highest","q":"Which of the ten holdings has the highest accruals ratio?"},
+ {"tag":"G7-xom-beta-nobs","q":"What is XOM's beta, and how many observations was it estimated from?"},
+ {"tag":"G8-cf-ni-divergence","q":"Last quarter, which holding had the largest divergence between operating cash flow and net income?"}
+]

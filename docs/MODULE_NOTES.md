@@ -858,3 +858,28 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 ### 守卫
 
 `test_table`(三出口同源)、`test_quantities`(235/235 唯一、载荷 ≤ 16k)、`test_symmetry`(每个面上每个工具要么声明证据要么在显式白名单;分组 pattern 双向覆盖真实名字)、`test_output_grammar`(schema 拒一切非文法形状;`slot.value` 不存在于源码)、`test_one_resolver`(两出口同一解析器;`not_alone` 只在 table.py 决定)、`test_display_conventions`(py/ts 共读 `tests/fixtures/display_cases.json`)、`test_v15_table_live`(缺席行经 `get_flow` 拒绝 → 上桌 → absence 块过门)。
+
+## M20 — 单位代数与器械:值出生即完整,方法是数据,Agent 只做分析(V16,2026-09-01 完成)
+
+**一句话**:Agent 的工作是做分析,tool/skill/validation 是服务于分析的器械——tool 是值的唯一出生地(名字/单位/期间/意义齐了才出生),skill 是带 authority 与失效条件的方法数据,validation 是永久封闭的五种查找(本批**零新增**,源码钉住的测试未动)。两条元规则铺满全表面:跨模块约定=共享常量或对称测试二选一;"作者必须记住"=构造期报错/红测试/删除约定三选一。
+
+### 形状
+
+- **单位代数**(`analytics/units.py`,单一属主):四元 {money, ratio, count, money_per_share};乘除查 PRODUCTS/QUOTIENTS(交换键,结果与操作数顺序无关;money×money **未定义即拒绝**,不再默认 money);`fact_unit()` 单点判定(此前 quantities 判 COUNT、typed_calculator 判 RATIO,同一行两个答案);`POINT_PERIOD_KEY` 统一写端(读端三键 tuple 冻结,随旧行消亡)。`calc_service._record` 拒绝携值而无 quantity/unit_class 的行——NULL 后备整体删除。
+- **映射 v4**:每股/资本配置层。三个股数是三个量(语料期间形态实证:weighted=duration 配 flow,outstanding=instant 配市值),互为 do_not_combine;eps 不重导(ASC 260);dividends 双 tag 发行人集合零交集,broad tag 或含 preferred——注在 semantics,不隐藏。
+- **意义上桌(M2)**:载荷 `名字→[值, 组]` + 每表一次的组图例(RUN_GROUPS 移居 resources,manifest 与桌面同源);被投影量的 not_alone 理由随 unknown_name 到达模型(此前死在无人读的字段里);id 前缀正则由常量程序化构建(三份手写收敛为一);`_NOT_A_FIGURE` 九条冻结禁增(死法是 M2,不是第十条正则)。
+- **Tier 1 / Tier 2**:登记表 +16 条(returns/reinvestment/quality),每条带 authority 与自己的失效条件(负权益拒 roe 并给理由;银行不适用是 per-formula 数据 `not_for_financials`,ROE 正是银行指标所以**不**排除——JPM 面板从整面拒绝变成逐条如实);`calculate(as_quantity=)` 开放给面,`named_by="session"` 记录谁起的名(可见,永不权威)。formula_service 五处位置耦合(len-2 哨兵、signs[0] 不读、else-即-divide、双列表)全部改为 import 期校验或显式命名。
+- **价格线(H1+H3)**:`price_analytics_service` 八工具(两价分立、vol/beta/momentum/52w/ADV 各携 n),最低观测数是**生产者参数**(vol 20/beta 60/momentum 200,注释带 C 路出处);不足即有原因拒绝(needs/have 可引用),绝不静默缩窗。工具由模块自带 `_TOOL_SPECS` 数据注册,schema/display/evidence 与生产者同居。
+- **注册期强制**:`Tool.evidence` 无默认——`Evidence(...)` 或显式 `NOT_EVIDENCE`,都不说就 register() 拒绝(静默默认曾让 src_ 证据整批不可引)。prompt 收缩 6.6k→2.6k 字符:路径归工具描述、方法归登记表、规则归拒绝信,留下角色与 why。
+
+### 实测纠正(S6 电池抓到、套件没盖到的)
+
+`get_beta` 的两条 ~250 点 returns series 撑爆 16k 切片,`build()` 收缩无路时把**整个申报清空**——beta 因输入太大而死,模型被告知自己刚算的数不在桌上,诚实拒绝了。修:第二收缩相(整条掉尾、series 优先、掉了记录在案)。该修的初稿带一个 NameError 而全绿套件毫无反应——路径零覆盖,两条 pin 测试因此存在。这是两条元规则在本批自己的修复上现身说法。
+
+### 电池(S0→S6,8 题缺口电池,判据=顶替=0)
+
+顶替 S0 ≥2(beta 问题拿 debt/EBITDA 顶、TSR 拿收入增长顶)→ **S6 = 0**。S6 新答对:股数下降(G3)、ROE DuPont 全具名(G4)、应计比率跨发行人(G6)、OCF/NI 背离表(G8);正确拒绝:JPM EV/EBITDA(G5)、TSR 分解(G2,缺口=倍数序列,本批声明不做)。残余是另一类:槽全真而句子错(as-of 日期不可 slot 于是价格槽被误用;比较级排序断言为假)——门保证指向不保证句子,由电池计量,非阻塞批评者留 V17。细节 `docs/spikes/V16_COVERAGE.md`。
+
+### 守卫
+
+`test_unit_algebra`(代数表逐行+交换律+_record 拒绝)、`test_share_counts`、`test_price_quantities`/`test_determinacy`(n 不足=有原因拒绝,决不缩窗)、`test_table_meaning`(三元组+图例+投影理由全链路)、`test_registry_conditions`(失效条件逐条+import 校验反例)、`test_table` 第二收缩相双 pin、`test_symmetry` 扩(前缀三处一集合、RUN_GROUPS 同源、alert 列派生)、registration 拒绝无声明工具(白名单从测试移进注册处本身)。
