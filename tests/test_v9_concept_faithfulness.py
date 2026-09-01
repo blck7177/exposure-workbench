@@ -91,7 +91,7 @@ def test_revenue_keeps_only_the_net_of_tax_family():
 def test_the_version_moved():
     """Facts carry mapping_version, and a remap that does not change it leaves
     no way to tell which reading produced a stored row."""
-    assert cm.MAPPING_VERSION == "v3"
+    assert cm.MAPPING_VERSION == "v4"
 
 
 # ── the detector for everything this batch did NOT split ──────────────────────
@@ -106,6 +106,12 @@ def test_the_unsplit_multi_concept_metrics_are_named_and_few():
       cost_of_revenue     CostOfRevenue is broader than CostOfGoodsAndServicesSold
       operating_cash_flow total vs continuing operations only
       capex               PP&E purchases vs productive assets (broader)
+      dividends_paid      the two Payments tags' issuer sets are disjoint in
+                          this corpus (measured 2026-09-01: AAPL/GOOGL/JPM/LLY/
+                          NVDA use the broad tag, MSFT/XOM the common-only
+                          one), so no series ever mixes them — but the broad
+                          tag may include preferred/NCI dividends (JPM has
+                          preferred), which the semantics note states
 
     So this is a bounded bet, not a clean bill. What makes it allowable is
     test_no_metric_is_two_quantities_in_the_live_corpus, which goes red the day
@@ -115,7 +121,7 @@ def test_the_unsplit_multi_concept_metrics_are_named_and_few():
     """
     multi = {m for m, cs in cm._METRIC_CONCEPTS.items() if len(cs) > 1}
     assert multi == {"revenue", "pretax_income", "cost_of_revenue",
-                     "operating_cash_flow", "capex"}, (
+                     "operating_cash_flow", "capex", "dividends_paid"}, (
         f"a metric grew or lost a second concept without a decision: {sorted(multi)}"
     )
 

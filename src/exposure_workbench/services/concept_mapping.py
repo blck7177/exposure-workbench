@@ -34,7 +34,7 @@ Empirically grounded (measured against live EDGAR data):
 
 from __future__ import annotations
 
-MAPPING_VERSION = "v3"   # v3: split five metrics that were holding two quantities (V9-M1)
+MAPPING_VERSION = "v4"   # v4: per-share/capital-allocation layer (V16 Lane B); v3: V9-M1 splits
 
 # normalized_metric -> the us-gaap concepts (without taxonomy prefix) that mean it
 _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
@@ -256,6 +256,69 @@ _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
     ),
     "current_liabilities": (
         "LiabilitiesCurrent",
+    ),
+
+    # ── V16 Lane B: the per-share and capital-allocation layer ────────────────
+    # Corpus verified before mapping (V11 rule), 2026-09-01: every concept below
+    # carries exactly ONE unit string ("USD per share" for EPS, "shares" for the
+    # three counts, "USD" for the cash flows) and exactly ONE period shape — EPS,
+    # the weighted counts and the cash flows are all durations; the outstanding
+    # count is instant-only. No mixed-shape concept was found.
+
+    # Per-share earnings as the issuer computed them. Diluted and basic are two
+    # quantities by construction — different denominators — so two names.
+    # Neither is derivable here from net_income and a share count: the issuer's
+    # own division handles participating securities and the treasury stock
+    # method, and recomputing it is a CALCULATION (M3), not a mapping. 8/8 each.
+    "eps_diluted": (
+        "EarningsPerShareDiluted",
+    ),
+    "eps_basic": (
+        "EarningsPerShareBasic",
+    ),
+
+    # ── share counts: three concepts, three quantities ────────────────────────
+    # The weighted averages are DURATIONS — ASC 260's EPS denominators, the
+    # average count over a period — while CommonStockSharesOutstanding is an
+    # INSTANT, the count on one date. Same word "shares", three numbers; the
+    # corpus shows the shapes directly (weighted rows all carry a period_start,
+    # outstanding rows never do), so mapping any two onto one name would merge a
+    # flow denominator with a stock denominator. 7/8, 8/8, 7/8.
+    #
+    # dei:EntityCommonStockSharesOutstanding (the cover-page count, 157 rows) is
+    # deliberately NOT here: normalize_concept normalizes us-gaap only, and
+    # widening that rule is its own decision, not a side effect of this batch.
+    "shares_diluted_weighted": (
+        "WeightedAverageNumberOfDilutedSharesOutstanding",
+    ),
+    "shares_basic_weighted": (
+        "WeightedAverageNumberOfSharesOutstandingBasic",
+    ),
+    "shares_outstanding": (
+        "CommonStockSharesOutstanding",
+    ),
+
+    # ── capital returns and the SBC add-back ──────────────────────────────────
+    # Cash paid to repurchase common stock — the financing outflow, which is not
+    # the change in the share count (timing and treasury reissuance sit between
+    # them; the count has its own metrics above). 8/8.
+    "buybacks": (
+        "PaymentsForRepurchaseOfCommonStock",
+    ),
+    # Cash dividends paid. Two tags, ONE metric — and this time the corpus
+    # supports the merge where it refused the V9 ones: each issuer files exactly
+    # one of the two (five file PaymentsOfDividends, two file the CommonStock
+    # variant; zero overlap in issuers, so zero overlap in periods), so no
+    # series can switch basis and no last-filed-wins is possible. The residual
+    # semantic gap — the broader tag may include preferred/NCI dividends where
+    # the variant is common-only — is stated in semantics.METRICS, not hidden.
+    "dividends_paid": (
+        "PaymentsOfDividends",
+        "PaymentsOfDividendsCommonStock",
+    ),
+    # Non-cash share-based compensation expense, the cash-flow add-back. 7/8.
+    "sbc": (
+        "ShareBasedCompensation",
     ),
 }
 

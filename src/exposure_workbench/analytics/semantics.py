@@ -196,6 +196,60 @@ METRICS: dict[str, MetricSemantics] = {
              "issuer reported.",
         do_not_combine_with=("depreciation",),
     ),
+
+    # ── share counts: three quantities wearing one word ───────────────────────
+    # The containment graph has nothing to say here — none of the three contains
+    # another. A weighted average over a period and a count on a date are
+    # different kinds of quantity, which is exactly what do_not_combine_with is
+    # for: confusable, not interchangeable.
+    "shares_diluted_weighted": MetricSemantics(
+        note="The period-average diluted count — ASC 260's diluted EPS "
+             "denominator, so it pairs with flows (EPS, buyback-dilution checks), "
+             "NOT with a point-in-time price; market cap wants shares_outstanding.",
+        do_not_combine_with=("shares_basic_weighted", "shares_outstanding"),
+    ),
+    "shares_basic_weighted": MetricSemantics(
+        note="The period-average basic count — ASC 260's basic EPS denominator. "
+             "NOT the diluted count and NOT the count on a date, so say which of "
+             "the three a per-share figure divided by.",
+        do_not_combine_with=("shares_diluted_weighted", "shares_outstanding"),
+    ),
+    "shares_outstanding": MetricSemantics(
+        note="The count on one date — an instant, so it pairs with instants such "
+             "as a price for market cap, NOT with a period's earnings; EPS wants "
+             "the weighted counts instead.",
+        do_not_combine_with=("shares_diluted_weighted", "shares_basic_weighted"),
+    ),
+
+    # ── per-share earnings and capital returns ────────────────────────────────
+    "eps_diluted": MetricSemantics(
+        note="Diluted EPS as the issuer computed it — already a blend of price "
+             "and fundamentals, because ASC 260's treasury stock method folds the "
+             "period's average share price into the diluted denominator; so cite "
+             "ASC 260 rather than rederiving it.",
+        do_not_combine_with=("eps_basic",),
+    ),
+    "eps_basic": MetricSemantics(
+        note="Basic EPS as the issuer computed it, with no dilutive instruments "
+             "in the denominator — NOT interchangeable with eps_diluted, so say "
+             "which of the two a per-share multiple used.",
+        do_not_combine_with=("eps_diluted",),
+    ),
+    "buybacks": MetricSemantics(
+        note="Cash paid to repurchase common stock — a financing outflow, NOT the "
+             "change in the share count, so read the share-count series rather "
+             "than inferring dilution or retirement from this line.",
+    ),
+    "dividends_paid": MetricSemantics(
+        note="Cash dividends paid. Two tags feed it and each issuer files exactly "
+             "one; the broader tag can include preferred dividends, so a "
+             "common-only comparison should say which tag a figure came from.",
+    ),
+    "sbc": MetricSemantics(
+        note="Share-based compensation expense — the non-cash add-back on the "
+             "cash-flow statement, NOT a cash cost, so cash arithmetic must not "
+             "subtract it a second time.",
+    ),
 }
 
 
