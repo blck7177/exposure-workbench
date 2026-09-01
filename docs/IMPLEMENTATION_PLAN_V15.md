@@ -1,135 +1,121 @@
-# IMPLEMENTATION_PLAN_V15 — 出口重构:模型读数字、写指向;验证即来源解析
+# IMPLEMENTATION_PLAN_V15 — 量有名字:出口指名,验证解析来源
 
-> **状态:草稿,待拍板(§9)。** 依据不是权威(V8 纪律):执行中计划与代码不符时以实测为准并回写。起草 2026-09-01。
-> **依据**:V14-C 验收自记("the shape changed, the ratchet did not go away",判据②失败);活库 8/26–9/1 全部会话的出口统计;ROUND4 §4–§5;V14-B 撤回结论;本文 §0 的规则清单。
+> **状态:草稿,待拍板(§8)。** 依据不是权威(V8 纪律):执行中计划与代码不符时以实测为准并回写。
+> 重写于 2026-09-01,取代同名初稿——初稿的三个方案(绑定器自动重指 / 引擎自动补算 / 规范量归并)**全部被本文 §1 的实测证否**,过程与数字保留在此,因为它们是本设计的依据。
 
 ---
 
-## §0 诊断
+## §0 病灶(196 次真实引用失败的完整分解)
 
-**核心对,病灶在出口。** 分析层 + 账本 + 工具在 43+24+24 次会话里零算术错;出口的拒绝率从 39%(8/27,散文)升到 86%(8/31,块),每轮 respond 尝试中位数 1→5,整轮无答案 0→25%,单轮峰值 prompt 9.4k→29.5k tokens。V14-C 消灭了"抄错数字"(0 次),却把棘轮换了单位:一次修五个槽、弄坏两个。
+出口拒绝率 39%(8/27 散文)→ 86%(8/31 块),每轮 respond 尝试中位数 1→5,整轮无答案 0→25%。把**每一条**引用类拒绝的原始参数与该会话实际取到的 id 对照后:
 
-**根因三条**:
-1. **出口把"组装"交给模型、把"验证"留给引擎——应当反过来。** 引擎持有本轮全部证据与其句柄,`held_instead_by`/`available` 证明它知道正确答案,却把修复权退回模型。
-2. **验证是加性的,修复不是。** 六道门 + 三道块检查叠在一个出口,唯一修复动作是"LLM 整篇重写"。每加一道检查拒绝率单调上升。
-3. **验证对象选错了。** 只要门要"从散文里认数字",豁免集就是无穷的:`_EXEMPTION_PATTERNS` 20 条正则各修一起事故;`_COMPATIBLE` 为容忍裸数松绑;`_DERIVATIONS`/`_CALC_RATIO_OPS` 是别处规则的镜像;`answer_blocks` 26 个拒绝码大半是 JSON Schema 能表达的形状。核心不变量约 6 条,外围约 50 条规则/补丁/镜像。同一套不变量在 respond 散文 / respond 块 / submit_brief / report **四份实现**,已分歧(块门漏 `not_alone`)。
+| 现象 | 实测 | 真因 |
+|---|---|---|
+| 引用"不存在"的 id(145 次拒绝) | 191 个未在轨迹中的 id 里 **164 个真实存在**;170/191 是标准 12 位;**189/191 与本会话任何 id 都不沾边**(仅 2 例笔误) | **不是幻觉,是范围**:门的作用域是"本会话轨迹",模型的记忆是跨轮跨会话的。104 个来自别处产生、74 个另一会话取过、11 个来自本会话上一轮自己的回答 |
+| 槽位解析失败(51 次拒绝 = 442 个坏槽) | 276 值无据 / 123 标签短名歧义 / 18 非度量词 / 13 值多持有者 / 12 可自动修 | 见下两行 |
+| 276 个"无据之数" | **85% 是同一个量:档位 − 实测**(`breach_level−weight` 115、`limit_value−weight` 59…);真编造约 18% | `room_to_*` **原语已存在**,但 **231/238 次不在答案的证据里** |
+| 123 个标签歧义 | 同一 ref 下短名重名仅 10% | 唯一全名**不在模型眼前** |
 
-## §1 逻辑(一句话)
+## §1 三条被证否的路径(不要再提)
 
-**模型看全部可引数字(为了判断),写词与指向(不写数);读者看到的每个数字由引擎按指向从账本查出。验证不检查文本,只解析来源;引擎能修的不拒绝。**
+| 路径 | 证否数据 |
+|---|---|
+| 绑定器按值自动重指 | 同值多标签 **45%**;`0.0` 同时是 daily_return/var_95/ES/stress_loss_tech,`0.18` 同时是 max_drawdown 与两个档位 |
+| 引擎按值反推运算并补铸行 | 等价推导**中位 24 条**,唯一推导仅 **1%**;类型计算器 100% 会接受,所以它筛不掉 |
+| 规范量层归并消歧 | 结构性重复只占歧义的 **30%**;剩下 78% 是**不同种类的量碰巧同值**——市值=总敞口=净敞口(账簿无杠杆的真实性质)、四个板块共用 40% 档位(mandate 的真实内容),**没有任何归并能分开它们** |
 
-## §2 边界(输出文法)
+**共同死因:三条都从"值"反推"意图"。值不携带意图**;在 235 个数的空间里同值碰撞是必然而非缺陷。
 
+**推论(本设计的全部依据)**:trace 记录了意图(哪个工具、什么参数、算了什么),答案里的**值丢掉了意图**。所以答案必须携带**指向 trace 的意图**,而不是携带值——并且必须让"指对"变得容易。
+
+## §2 可行性(已实测,非估计)
+
+| 事实 | 数字 |
+|---|---|
+| 一次回答的可引 id 空间 | 中位 **5**,最大 **19** → 小整数索引可行 |
+| 一个 run 的量空间 | 235 |
+| 量的名字唯一性 | **232/235 唯一** |
+| 全部量带唯一名字 + 读者精度进上下文 | **3.5k tokens**(今天单轮峰值 22k,成本可忽略) |
+| `room_to_breach`/`room_to_warning` | **已是 `portfolio.integration` 的输出键** |
+
+## §3 架构:三条边界
+
+**A. 输入边界——量带着名字上桌。** 工具结果里每个可引量以 `唯一全名 = 读者精度值` 出现。模型看见全部数字(判断需要量),看见的和读者看见的是同一个数,且每个数**自带它该被怎么指**。规则禁引的值(共线单系数)不进上下文——not_alone 从"验证"前移为"投影"。
+
+**B. 输出边界——模型写名字,不写数。**
 ```
-answer     := block+
-block      := paragraph(run+) | table(columns: text+, rows: run+[]) | assertion
-run        := text | slot
-text       := 不含 [0-9] 的字符串(唯一例外:日期字面量,§9-①)
-slot       := { ref: evidence_id, hint?: label | value }     ← hint 给绑定器,不是输出
-assertion  := { kind: trend | absence | action | comparison, ref(s), text }
-comparison := { a_ref, b_ref, relation ∈ {gt, lt, near} }     ← 新增,§9-④
+run  := text | slot
+slot := { ref, name }          ← name 是 A 里那个唯一全名。**没有 value 形式**
 ```
-模型**不产出**:数值、单位、精度、年份、序号、法规引证(随 chunk ref 走)。
+`value` 是唯一一条"丢掉意图"的通道,276 个无据之数全部走它。取消后:模型要么指名(有意图,可解析),要么无处可写。文本 run 不含数字(日期为唯一豁免,§8-①)。
 
-## §3 最小正交验证集(从 §2 推导,互不重叠)
+**C. 验证边界——只做来源解析,不做内容检查。**
 
 | # | 不变量 | 执行 | 取代 |
 |---|---|---|---|
-| V1 形状 | 符合 §2 文法 | **JSON Schema**(Law B),运行时零规则 | `answer_blocks` 26 个形状码 |
-| V2 来源 | 每个 ref ∈ 本轮证据轨迹 | 集合查询 | 保留 `validate_citations` |
-| V3 绑定 | 每个 slot 解析为其 ref 持有的恰好一个值;`not_alone` **唯一在此**执行 | **绑定器**(§4) | `resolve_slot` + 三处 not_alone |
-| V4 无裸数 | 正文 `\d` 为空(日期除外) | 一条正则 | 20 条豁免、`_COMPATIBLE`、提取器 |
+| V1 形状 | 符合 B 的文法 | **JSON Schema**(Law B) | `answer_blocks` 26 个运行时形状码 |
+| V2 来源 | ref ∈ 本轮账本 | 集合查询 | `validate_citations` |
+| V3 解析 | name ∈ 该 ref 持有的量;`not_alone` 唯一在此 | 字典查找 | `resolve_slot` + 三处散落的共线检查 |
+| V4 无裸数 | 文本 `\d` 为空(日期除外) | 一条正则 | **20 条豁免正则 + `_COMPATIBLE` + 整个 extract_numbers** |
 | V5 引述逐字 | 引号内 ≥4 词 ∈ 被引 chunk | 保留 | 保留 |
-| V6 断言有据 | kind → 行类型谓词(trend→序列行、absence→缺席行、action→本轮 task) | 一个函数 | 2 条断言检查 + 轨迹 R2 |
-| V7 比较成立 | `comparison` 的不等式由引擎对两行求值 | 一个函数 | 无(今天的"一直在涨"/"没有超过 3x"零拒绝) |
+| V6 断言有据 | kind → 行类型谓词(trend/absence/action) | 一个函数 | 2 条断言检查 + 轨迹 R2 |
 
-**删除**:`_DERIVATIONS`(要算就调 `calculate`)、`_COMPATIBLE`、`_CALC_RATIO_OPS`(单位改存账本列)、`not_in_cited_evidence` 的邻近提示(变绑定行为)、轨迹 R1(前移到工具层,§S5)。
+**删除**:`_DERIVATIONS` 出路搜索(§1 已证其无效——24 条等价推导)、`_COMPATIBLE`、`not_in_cited_evidence` 的邻近提示、轨迹 R1(前移工具层)。
 
-## §4 绑定器:验证与修复分离
+## §4 缺口修复:量不在桌上
 
-```
-respond(blocks)
-  V1 schema 拒绝                          零查询
-  V2 来源检查                             一次集合查询
-  V3 绑定器,对每个 slot:
-       ref 持有值、hint 匹配             → 绑定
-       hint 不匹配、别的 ref 持有        → 自动重指,记录 repointed_from(§9-②)
-       hint 是 label 短名                → 展成全名
-       值 not_alone                      → 换成同 run 的合计(若存在)否则拒绝
-       无解                              → 拒绝;信里只剩真问题
-  V4–V7 判定
-```
-**一个绑定器,四个出口共用**:respond 块、`submit_brief`、report 门(轨迹 = run 子表)、散文 v1 只读渲染不迁移。
+203 个心算是 `room_to_limit`,原语已存在但没送到。**这不是出口问题,是编排问题**:凡是 mandate 类问题,`room_to_*` 必须与档位、实测一起出现在 A 的量清单里。同理适用于任何"引擎能算、模型正在心算"的量——判据是本文的测量方法可复跑(`scripts/` 留下)。
 
-## §5 输入侧配对规则
+## §5 跨轮引用(164/191 的真因)
 
-1. 工具结果里每个可引值以 `label: value (unit)` 出现——label 就是绑定器认的名字。
-2. **读者精度**呈现,账本原精度留在行里。模型看到的 = 读者看到的。
-3. **规则禁引的值不进上下文**(共线单系数、不可单引成分):not_alone 从验证前移为投影;方向/位次仍给。W5 已实证(19→0 拒,分析未变差)。
-4. **一份资源声明**(表 → 可引列 → 单位 → 显示名)替代 `_RUN_CHILDREN` / `_CALC_RESULT_KEYS` / `display_names` / resolver 四处描述;工具输出、绑定器、渲染器、审计层同读。
+门的作用域是本会话轨迹;74 例来自另一会话、11 例来自本会话上一轮的回答。多轮研究的通行做法是**显式支持证据跨轮复用**而非一律拒绝。本批的最小动作:**上一轮回答引用过的 id 自动进入本轮账本**(仍是这个用户这个会话真的取到过的),消掉 11 例并让"模型引用自己上文"从缺陷变成能力。跨会话(74 例)**本批不做**,登记待议——它触及租户与审计语义。
 
-## §6 排程(单人约 7 人日;每步 offline 全绿 + 电池增量 → commit;S8 前不 build 镜像)
+## §6 排程(单人约 6 人日;每步 offline 全绿 → commit;S7 前不 build 镜像)
 
-### S0 · 基线(0.5 天,先做)
-- `scripts/rubric_battery.py` 全跑一轮存 `docs/spikes/V15_BASELINE.json`;从 `agent_steps` 抽出口指标快照(拒绝率 / 尝试中位数 / 无答案率 / 峰值 prompt)存同目录。
-- **修测量器**:`scripts/eval_faithfulness.py` 对块答案读 `meta.blocks` 的槽,不再重解析渲染文本(今晚 27 条假拒绝的来源)。
-- 判据:基线文件在;eval 对块答案零假拒绝。
+**S0 ✅ 已完成**(commit 2ddc7b5):基线 `docs/spikes/V15_BASELINE.json`(rubric 15/33、8/8 答出、门拒绝中位 4)+ 出口快照;并修好了在说谎的仪器——faithfulness eval 曾把块答案的渲染文本当散文重解析,36 拒里 27 条是假象,现按块测(193 槽全部仍被其行持有)。
 
-### S1 · 资源声明 + 账本单位列(1 天)
-- `analytics/resources.py`(数据):`{table: {column: (unit_class, display_name, citable)}}`。由它**生成** `_RUN_CHILDREN` / `_RUN_COUNTS` / `display_names.METRIC…` 的等价物;守卫断言四处不再各持清单。
-- 迁移 `v15_calc_unit.sql`:`calc_ledger.unit_class`(幂等);写入侧 `calc_service._record` 落单位;**一次性**用 `_CALC_RATIO_OPS` 回填历史行,然后该表退役(镜像消失)。
-- 判据:resolver 不再 import `_CALC_RATIO_OPS`;`test_display_names` 改读资源声明。
+**S1 ✅ 已完成**(同 commit):`analytics/resources.py` 一处声明可引列(44 列/7 资源,各带单位),门的四张表改为派生;`calc_ledger.unit_class` 把类型化生产者早已声明的单位提升为列,退役"按操作名猜单位"的镜像。
 
-### S2 · 文法与 schema(0.5 天)
-- `respond` v3 JSON Schema 表达 §2 全部形状(closed enums、required、items);`answer_blocks.validate_shape` 只剩 V4 一条正则。`comparison` 断言进 schema。
-- 判据:26 个形状码中 ≥20 个由 schema 拒绝(`arg_validation` 路径),`validate_shape` ≤ 30 行。
+### S2 · 量清单(1 天)
+- `services/quantities.py`:`quantities_of(refs) -> [(ref, name, value, unit)]`,名字取自 S1 资源声明 + `display_names`,**唯一性由测试钉住**(实测 232/235,剩余 3 个重复必须消解或具名豁免)。
+- 工具结果投影:`get_portfolio_analysis`/`get_attribution`/`describe_issuer` 等经它加名字与读者精度;共线单系数不进载荷。
+- **判据**:一个 run 的量清单名字唯一;进上下文 ≤4k tokens;`room_to_*` 在 mandate 类工具的清单里。
 
-### S3 · 绑定器(1.5 天,本批核心)
-- `services/binder.py`:§4 算法;`not_alone` 唯一实现;`repointed_from` 记录进 `verified.matches`。
-- `numeric_verification` 瘦身:删 `_EXEMPTION_PATTERNS`(留日期一条)、`_COMPATIBLE`、`_DERIVATIONS`、`_derived_class`、`extract_numbers` 的度量分类;`verify()` 保留给散文 v1 只读路径。
-- 判据:合成夹具上,今天的三类拒绝(`figure_not_held_by_this_ref` 有 `held_instead_by`、`unknown_label` 短名、共线单引有合计)**全部被绑定器自动修复**;`numeric_verification.py` 行数 ≥ 减半。
+### S3 · 出口文法(0.5 天)
+- `respond` v3 JSON Schema 表达 §3-B;`slot.value` 删除;`validate_shape` 只剩 V4 一条正则。
+- **判据**:26 个形状码 ≥20 个由 schema 拒绝;`answer_blocks.validate_shape` ≤30 行。
 
-### S4 · 四门合一(1 天)
-- `submit_brief`、`report_verification.verify_report` 改调绑定器(report 轨迹 = `evidence_ids_for_run`)。
-- 判据:守卫断言三处 import 同一个 `binder.resolve`;`not_alone` 在代码库只出现一处执行点。
+### S4 · 解析器(1 天)
+- `services/resolver.py`:V2+V3,`not_alone` 唯一实现;拒绝信只列该 ref 的可用名字(今天已有,保留)。
+- `numeric_verification` 瘦身:删 `_EXEMPTION_PATTERNS`(留日期一条)、`_COMPATIBLE`、`_DERIVATIONS`、`extract_numbers` 的度量分类;`verify()` 仅留给 v1 散文历史只读。
+- **判据**:`numeric_verification.py` 行数减半;123 个标签歧义在合成夹具上归零(名字唯一后无短名可写)。
 
-### S5 · 输入侧 + R1 前移(1 天)
-- 工具输出经资源声明加句柄与读者精度(`describe_issuer`、`get_portfolio_analysis`、`get_attribution`、`reconcile_move` 等 run 读);共线时单系数不进载荷(推广 W5)。
-- 轨迹 R1 移到工具层:`explain_episode` / `get_portfolio_analysis` 作为组合原因类回答的前置(工具描述 + `trajectory_gate` 删 R1;R2 并入 V6 action)。
-- 判据:模型看到的每个数字都能在资源声明里找到句柄;`trajectory_gate.py` 只剩 R2 或删除。
+### S5 · 四门合一 + 跨轮账本(1 天)
+- `submit_brief`、`report_verification` 改调同一解析器(report 的轨迹 = run 子表)。
+- 上一轮回答的引用进入本轮账本(§5)。
+- **判据**:`not_alone` 全库单执行点;11 例跨轮失败在重放中归零。
 
 ### S6 · 展示惯例前移(0.5 天)
-- `analytics/display_conventions.py` + `apps/web/lib/display.ts` 同一套(跨语言双向守卫仿 `lib/errors.ts`);`prose_of` 用它;`AnswerBlocks.display` 读它。
-- 判据:存储文本、渲染、审计层、rubric 输入四处显示一致;`1.08663e+07` 在代码库任何输出路径不可能出现(测试)。
+- `analytics/display_conventions.py` + `apps/web/lib/display.ts` 双向守卫;`prose_of` 用它。
+- **判据**:存储文本/渲染/审计/rubric 输入四处一致;科学计数法在任何输出路径不可能出现。
 
-### S7 · 删除与文档(0.5 天)
-- 删除 §3 列出的全部;`_SYSTEM` 块契约段改写为 §2 文法的自然语言(措辞过目);`TARGET_ARCHITECTURE` 加 Law E:**知识只投在"选哪个",形状交给 schema 与原语**(V14-B 教训)。
-- 判据:`grep` 零残留;`_SYSTEM` tokens 不增。
+### S7 · 验收与切换(0.5 天)
+- 电池全跑对照 S0;四镜像重建 → 容器内 grep → smoke_ui。
+- **切换判据**:① 槽值与 V14 逐位一致;② 拒绝率 ≤10%、尝试中位数 = 1、无答案 = 0;③ rubric ≥ 15/33;④ 峰值 prompt 降 ≥30%。
+- **中止判据(先写死)**:S4 后两轮电池尝试中位数 >2 或无答案 >0 且不收敛 → 停,保留 S0/S1/S2/S6(各自独立有价值),出口回 V14-C。**这条是 V14-C 写了没执行的那条**。
 
-### S8 · 验收与切换(0.5 天)
-- 电池全跑(rubric + 出口指标)对照 S0;四镜像重建 → 容器内 grep → smoke_ui → 一次真实排程 run(report 门走绑定器)。
-- **切换判据(不达标不切)**:① 已过门答案的槽值与 V14 逐位一致;② 拒绝率 ≤10%、尝试中位数 = 1、无答案 = 0;③ rubric 不低于 S0;④ 峰值 prompt 均值下降 ≥30%。
-- **中止判据(先写死)**:S3 后两轮电池尝试中位数 >2 或无答案 >0 且不收敛 → 停,保留 S0/S1/S5/S6(各自独立有价值),出口回 V14-C,再议。
-
-## §7 结构守卫(每条钉住一个消灭)
+## §7 结构守卫
 
 | 测试 | 钉住 |
 |---|---|
-| `test_binder.py` | 三类可修拒绝自动修复;无解才拒;`repointed_from` 记录 |
-| `test_one_resolver.py` | 四出口 import 同一绑定器;`not_alone` 单执行点(全库 grep) |
-| `test_output_grammar.py` | schema 拒绝 §2 外所有形状;正文 `\d` 除日期为空 |
-| `test_resources.py` | 四处清单由资源声明生成;新增可引列缺声明即红 |
+| `test_quantities.py` | 一个 run 的量名唯一;每个量有单位;`room_to_*` 在 mandate 清单里 |
+| `test_output_grammar.py` | schema 拒绝 §3-B 外所有形状;`slot.value` 不存在;文本 `\d` 除日期为空 |
+| `test_one_resolver.py` | 四出口同一解析器;`not_alone` 单执行点 |
 | `test_display_conventions.py` | py/ts 双向锁;科学计数法零出口 |
-| `test_comparison.py` | gt/lt/near 正例负例;跨单位类拒绝 |
-| `scripts/rubric_battery.py` | S0 vs S8 对照 |
+| `scripts/rubric_battery.py` | S0 vs S7 对照 |
 
-## §8 本批不动
-IPV/Brinson/货币归因;散文 v1 历史迁移;judge-revise 环;联网搜索进 meta 面(独立议题:今天模型对"你可以联网"未声明做不到——属 V6 action 类的反向,"没做的事要说",可在 S5 顺带:无该工具时 `_SYSTEM` 一句)。
-
-## §9 待拍板
-1. **日期是否唯一豁免类**(建议是;否则日期走 slot 属性)。
-2. **绑定器自动重指是否可接受**——渲染 ref 可能不是模型写的那个,但一定持有该值且有 `repointed_from` 记录。
-3. **R1 前移到工具层**,出口不再判轨迹。
-4. **`comparison` 断言纳入**(建议是:小、正交、封今天最大一类假话)。
-5. **输入侧不给不可引值**(建议是;W5 已实证)。
-6. 四门合一顺序:respond 先,brief/report 跟进(建议同批,爆炸半径由 S8 切换判据控制)。
+## §8 待拍板
+1. **日期是否唯一豁免类**(建议是;否则日期也走 slot)。
+2. **`slot.value` 取消**——模型必须学会名字词汇(建议是;A 让名字唾手可得是前提,两者不可拆)。
+3. **跨轮账本继承**(建议是);跨会话继承本批不做。
+4. **四门合一同批**(建议是,爆炸半径由 S7 中止判据控)。
