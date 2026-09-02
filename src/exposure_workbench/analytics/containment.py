@@ -31,17 +31,17 @@ from dataclasses import dataclass, field
 # (parent, child, times observed together in the corpus with child <= parent).
 # The count is the evidence, kept beside the claim.
 EDGES: tuple[tuple[str, str, int], ...] = (
-    ("long_term_debt_total", "long_term_debt_noncurrent", 92),
-    ("long_term_debt_total", "current_portion_long_term_debt", 86),
+    ("long_term_debt_total", "long_term_debt_noncurrent", 107),
+    ("long_term_debt_total", "current_portion_long_term_debt", 101),
     ("debt_current_total", "current_portion_long_term_debt", 25),
     ("debt_current_total", "commercial_paper", 22),
-    ("stockholders_equity_including_noncontrolling", "stockholders_equity", 40),
-    ("stockholders_equity_including_noncontrolling", "noncontrolling_interest", 40),
-    ("operating_lease_liability_total", "operating_lease_liability_current", 68),
-    ("operating_lease_liability_total", "operating_lease_liability_noncurrent", 89),
+    ("stockholders_equity_including_noncontrolling", "stockholders_equity", 63),
+    ("stockholders_equity_including_noncontrolling", "noncontrolling_interest", 63),
+    ("operating_lease_liability_total", "operating_lease_liability_current", 74),
+    ("operating_lease_liability_total", "operating_lease_liability_noncurrent", 95),
     ("total_liabilities", "current_liabilities", 111),
     ("total_liabilities", "long_term_debt_noncurrent", 76),
-    ("total_assets", "current_assets", 153),
+    ("total_assets", "current_assets", 176),
 )
 
 # What a caller may ask to be covered. A family is a question ("what does this
@@ -88,6 +88,22 @@ class Cover:
     # It is neither missing nor unfiled, so it is neither of the two above; a
     # reader who sees it here knows why the total is narrower than the lines.
     overlapping_not_added: tuple[str, ...] = field(default_factory=tuple)
+    # The members of `missing_at_this_date` whose ground the taken set does NOT
+    # already hold — the ones that make this cover SHORT of a total. Naming what
+    # was left out is not the same question as whether the sum is complete, and
+    # until V18 only the first was answered. Alphabet reports no
+    # long_term_debt_total at this date and both of its children instead: the
+    # parent is "missing" and the sum is complete. Coca-Cola reports neither the
+    # parent nor its children and only commercial paper: also "missing", and the
+    # sum is 250m against a debt two orders of magnitude larger. The two arrived
+    # in one list, and telling them apart needed the containment graph — which
+    # is in this module and not in the reader's hands. So it is answered here.
+    short_by: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def complete(self) -> bool:
+        """Whether this cover may be called the family's total."""
+        return not self.short_by
 
 
 @dataclass(frozen=True)
@@ -113,6 +129,22 @@ def _descendants(node: str) -> set[str]:
 def contains(ancestor: str, descendant: str) -> bool:
     """Transitive: total_liabilities contains current_liabilities contains ..."""
     return descendant in _descendants(ancestor)
+
+
+def _accounted_for(node: str, covered: set[str], members: set[str]) -> bool:
+    """Whether the taken set already holds everything `node` would contribute.
+
+    A node absent from this date is harmless exactly when the sum reaches its
+    ground another way — through its own children. A LEAF has no other way, so
+    an absent leaf is always a hole; a parent whose children are all in the sum
+    contributes nothing new, so its absence is bookkeeping.
+
+    Only the graph is consulted. There is no tolerance and no appeal to size:
+    a component missed is a component missed, whether it would have been 250m
+    or 25bn, because the whole point is that this desk cannot know which.
+    """
+    below = _descendants(node) & members
+    return bool(below) and below <= covered
 
 
 def cover(available: dict[str, float], family: str,
@@ -176,11 +208,18 @@ def cover(available: dict[str, float], family: str,
     taken_in_order = [m for m in members if m in taken]
     left_over = [m for m in members
                  if m not in taken and m not in covered and m not in overlapping]
+    missing_now = [m for m in left_over if m in ever_reported]
     return Cover(
         value=sum(available[m] for m in taken_in_order),
         terms=tuple(taken_in_order),
         formula=" + ".join(taken_in_order),
-        missing_at_this_date=tuple(m for m in left_over if m in ever_reported),
+        missing_at_this_date=tuple(missing_now),
         no_facts_for_issuer=tuple(m for m in left_over if m not in ever_reported),
         overlapping_not_added=tuple(m for m in members if m in overlapping),
+        # A component the issuer files and did not file here, whose ground the
+        # sum does not otherwise reach. `no_facts_for_issuer` is deliberately
+        # not consulted: a concept an issuer has never used is not debt this
+        # sum is missing, it is a concept that does not apply to it.
+        short_by=tuple(m for m in missing_now
+                       if not _accounted_for(m, covered, set(members))),
     )

@@ -194,3 +194,89 @@ def test_the_cover_is_still_an_antichain_after_the_fix():
     for x in got.terms:
         for y in got.terms:
             assert x == y or not ct.contains(x, y)
+
+
+# ── is the sum a TOTAL? (V18) ────────────────────────────────────────────────
+#
+# "What did the cover leave out" and "does what it took add up to a total" are
+# different questions, and only the first was answered. Both of the shapes below
+# report a missing long_term_debt_total; one of them is complete and the other is
+# short by two orders of magnitude, and telling them apart needs the containment
+# graph — which is here, and was not in the caller's hands.
+
+# What an issuer files is never the whole family — no issuer in the corpus files
+# all six. Each fixture below carries the set its own issuer actually files,
+# measured on the desk (2026-09-02), because `ever_reported` is what separates a
+# hole from a concept the issuer does not use.
+LONG_AND_PAPER = frozenset({"long_term_debt_total", "long_term_debt_noncurrent",
+                            "current_portion_long_term_debt", "commercial_paper"})
+
+
+def test_a_missing_parent_whose_children_are_both_summed_is_bookkeeping():
+    """Alphabet's shape: no long_term_debt_total at this date, both of its
+    children reported. The parent is missing and nothing is."""
+    c = ct.cover({"long_term_debt_noncurrent": 90.0,
+                  "current_portion_long_term_debt": 10.0}, "debt",
+                 ever_reported=LONG_AND_PAPER - {"commercial_paper"})
+    assert "long_term_debt_total" in c.missing_at_this_date
+    assert c.short_by == ()
+    assert c.complete
+    assert c.value == 100.0
+
+
+def test_a_missing_parent_whose_children_are_also_missing_is_a_hole():
+    """Coca-Cola's shape: commercial paper alone, with the long-term lines filed
+    at other dates and reached by nothing here. 250m was returned as a total."""
+    c = ct.cover({"commercial_paper": 0.25}, "debt", ever_reported=LONG_AND_PAPER)
+    assert not c.complete
+    assert "long_term_debt_total" in c.short_by
+    assert "long_term_debt_noncurrent" in c.short_by
+
+
+def test_a_missing_leaf_the_issuer_files_is_a_hole_however_small():
+    """Microsoft's and NVIDIA's shape. Commercial paper is usually a small part
+    of a large issuer's debt, and the rule does not ask how big: absent is not
+    zero, and an issuer that files a line and omits it at one date has not said
+    it went to zero."""
+    c = ct.cover({"long_term_debt_total": 40.0}, "debt", ever_reported=LONG_AND_PAPER)
+    assert not c.complete
+    assert c.short_by == ("commercial_paper",)
+
+
+def test_a_component_the_issuer_never_files_does_not_make_the_sum_short():
+    """Apple's shape, and the V11-U finding this rests on: Apple has never filed
+    debt_current_total or short_term_borrowings at any date, and reporting them
+    as debt left out read to a reader as a hole in a complete total.
+
+    `no_facts_for_issuer` is a statement about THIS DESK's coverage, and the
+    cover deliberately does not turn it into a claim about the issuer's debt —
+    that question belongs to concept_mapping, which is the layer that can tell
+    an unused concept from an unmapped tag."""
+    c = ct.cover({"long_term_debt_total": 84.0, "commercial_paper": 0.7}, "debt",
+                 ever_reported=frozenset({"long_term_debt_total",
+                                          "long_term_debt_noncurrent",
+                                          "current_portion_long_term_debt",
+                                          "commercial_paper"}))
+    assert c.complete
+    assert set(c.no_facts_for_issuer) == {"debt_current_total", "short_term_borrowings"}
+    assert c.short_by == ()
+
+
+def test_completeness_asks_the_graph_and_nothing_else():
+    """No threshold, no appeal to magnitude, no issuer rule. A leaf that is
+    absent and filed elsewhere is short; a parent whose ground is in the sum is
+    not; and that is the whole judgement."""
+    assert ct._accounted_for("long_term_debt_total",
+                             {"long_term_debt_noncurrent", "current_portion_long_term_debt"},
+                             set(ct.FAMILIES["debt"]))
+    assert not ct._accounted_for("long_term_debt_total", {"commercial_paper"},
+                                 set(ct.FAMILIES["debt"]))
+    # A leaf has no other way to be reached.
+    assert not ct._accounted_for("commercial_paper", {"long_term_debt_total"},
+                                 set(ct.FAMILIES["debt"]))
+
+
+def test_a_complete_cover_is_the_default_and_stays_quiet():
+    c = ct.cover({"long_term_debt_total": 84.0}, "debt",
+                 ever_reported=frozenset({"long_term_debt_total"}))
+    assert c.complete and c.short_by == ()

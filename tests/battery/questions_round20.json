@@ -1,0 +1,82 @@
+[
+ {
+  "tag": "R20-01-aapl-ttm-pe",
+  "q": "What P/E multiple is Apple trading at on its trailing twelve months of earnings?"
+ },
+ {
+  "tag": "R20-02-msft-netdebt-ebitda",
+  "q": "What's Microsoft's net debt to EBITDA? I need the leverage multiple for the credit file."
+ },
+ {
+  "tag": "R20-03-jpm-rotce",
+  "q": "What is JPM's ROTCE \u2014 return on tangible common equity \u2014 for the latest reported period?"
+ },
+ {
+  "tag": "R20-04-momentum-rank-10",
+  "q": "Rank all ten port_001 holdings by 12-1 momentum. Which name is the weakest, and is its momentum positive or negative?"
+ },
+ {
+  "tag": "R20-05-nvda-share-count-shrink",
+  "q": "Nvidia has spent tens of billions on buybacks. By how much has its share count actually shrunk over the last five fiscal years?"
+ },
+ {
+  "tag": "R20-06-hyg-tlt-correlation",
+  "q": "How correlated are HYG and TLT day to day? We hold both as the fixed-income sleeve and I want to know whether they actually diversify each other."
+ },
+ {
+  "tag": "R20-07-xom-quick-ratio",
+  "q": "What's Exxon's quick ratio? I want the liquidity picture with the inventory taken out."
+ },
+ {
+  "tag": "R20-08-limits-room-rank",
+  "q": "Which limits am I closest to breaching right now, and how much room is left on each? Rank them for me."
+ },
+ {
+  "tag": "R20-09-amzn-buyback-dividend",
+  "q": "How much cash did Amazon spend on buybacks and dividends over the trailing twelve months?"
+ },
+ {
+  "tag": "R20-10-xom-pe-vs-history",
+  "q": "Is Exxon's P/E high or low compared with where it has traded over the past three years?"
+ },
+ {
+  "tag": "R20-11-lly-market-cap",
+  "q": "How big is Eli Lilly as a company \u2014 what's its market cap?"
+ },
+ {
+  "tag": "R20-12-amzn-debt-sum",
+  "q": "Add up Amazon's debt for me - long-term debt, the current portion of long-term debt, and short-term borrowings - and then net the cash off so I have net debt."
+ },
+ {
+  "tag": "R20-13-selloff-10pct",
+  "q": "If the market falls 10% over the next month, how much does the book lose and which holding hurts most?"
+ },
+ {
+  "tag": "R20-14-lly-fcf-margin-trend",
+  "q": "Lilly's free cash flow margin has been improving \u2014 walk me through the trend."
+ },
+ {
+  "tag": "R20-15-nvda-beta-one-month",
+  "q": "NVDA has been all over the place this past month. What's its beta to SPY over the last month, and how many observations is that on?"
+ },
+ {
+  "tag": "R20-16-days-to-liquidate",
+  "q": "If we had to exit port_001 entirely, which single position takes the longest to get out of, and how many trading days is that?"
+ },
+ {
+  "tag": "R20-17-who-hurt-aug31",
+  "q": "Who hurt us most on the 31st? Rank the positions and show me the ranking ties back to the day's number."
+ },
+ {
+  "tag": "R20-18-nvda-single-name-drawdown",
+  "q": "What is the biggest peak-to-trough drawdown NVDA has had over the past year?"
+ },
+ {
+  "tag": "R20-19-rank-2025-net-income",
+  "q": "Rank our eight equity holdings by 2025 net income, biggest to smallest."
+ },
+ {
+  "tag": "R20-20-tlt-52w-high",
+  "q": "How far is TLT below its 52-week high, when was that high set, and what price does TLT have to trade back up to in order to make a new one?"
+ }
+]

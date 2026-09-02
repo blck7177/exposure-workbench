@@ -168,6 +168,46 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
             detail += f"; debt components were last reported at {max(seen)}"
         return {"error": "not_reported", "metric": "total_debt", "detail": detail}
 
+    if not cover.complete:
+        # V18. The cover named what it left out and never said whether what it
+        # TOOK adds up to a total, and those are different questions: Alphabet's
+        # absent long_term_debt_total is bookkeeping because both its children
+        # are in the sum, while Coca-Cola's absent long-term debt is a hole that
+        # left `total_debt` at 250m of commercial paper. Both arrived as
+        # `missing_at_this_date`, and telling them apart needed the containment
+        # graph — which lives in analytics, not in the reader.
+        #
+        # So a short cover no longer wears the name. The components it did reach
+        # are real, filed and citable under their OWN names one get_balance_sheet
+        # away; what is refused is calling their sum this issuer's total debt.
+        # Assuming the absent component is zero would be the fallback this desk
+        # does not take: an issuer that files a line and omits it at one date has
+        # not told us it went to zero.
+        absent = bs.get("not_reported_at_this_date") or {}
+        last = {m: absent[m]["last_reported"] for m in cover.short_by if m in absent}
+        was = "was" if len(cover.short_by) == 1 else "were"
+        statement = (
+            f"total_debt is not produced for {ticker} as of {bs['as_of']}: the widest "
+            f"non-overlapping set of components reported at that date is "
+            f"{cover.formula}, and {', '.join(cover.short_by)} — which {ticker} does "
+            f"file — {was} not reported there and {was} not reached through anything "
+            f"that is. Their sum would be short of a total by an amount this desk "
+            f"cannot state, so it is not offered as one. "
+            + (f"Last reported: {'; '.join(f'{m} at {d}' for m, d in sorted(last.items()))}. "
+               if last else "")
+            + "The components reported at this date are on the balance sheet under "
+              "their own names, and each may be quoted and cited as itself."
+        )
+        return await ab.refuse(
+            db, "incomplete_cover", kind="incomplete_cover", ticker=ticker,
+            statement=statement,
+            tried={"formula": "total_debt",
+                   "definition": fm.FORMULAS["total_debt"].expression},
+            stopped_at={"as_of": bs["as_of"], "reached": list(cover.terms),
+                        "short_by": list(cover.short_by), "last_reported": last},
+            invoked_by=invoked_by,
+            metric="total_debt", detail=statement)
+
     ids = [bs["balances"][m]["fact_id"] for m in cover.terms]
     if len(ids) == 1:
         # A one-component cover still gets a ledger row that CARRIES THE NAME.

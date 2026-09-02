@@ -102,6 +102,38 @@ CLASSIFIED: dict[tuple[str, str], str] = {
     # so it is a lead here rather than a mapping change made on a hunch.
     ("LLY", "capex"): "unmapped_candidate",
 
+    # KO, read 2026-09-02 — the first issuer admitted from the listed universe
+    # rather than seeded, and the first evidence that one unmapped tag family
+    # costs two issuers their debt totals.
+    #
+    # KO files its long-term debt as us-gaap:LongTermDebtAndCapitalLeaseObligations
+    # and its current portion as ...ObligationsCurrent, both 6 periods through
+    # 2026-04-03, both normalized_metric NULL. XOM files the same pair (38 and 9
+    # periods, through 2026-03-31) and is silent on the mapped names for the same
+    # reason. The consequence was measured before it was understood: KO's
+    # total_debt came back as 250m of commercial paper and XOM's as 14.5bn of
+    # current debt, both of them the widest cover of what this desk had MAPPED.
+    #
+    # Mapping the pair is one line and it is not made on a hunch — the same bar
+    # the containment edges and LLY's capex are held to: whether the tag ever
+    # co-occurs with the mapped names, and whether capital-lease obligations
+    # belong inside a debt total at all, are corpus questions. Until then the
+    # cover refuses rather than under-reaches (V18, incomplete_cover).
+    ("KO", "long_term_debt_noncurrent"): "unmapped_candidate",
+    ("KO", "current_portion_long_term_debt"): "unmapped_candidate",
+    # No total arrives at all; the two halves above do, under the unmapped pair.
+    # Once they are mapped this becomes LLY's case — composed by the cover.
+    ("KO", "long_term_debt_total"): "unmapped_candidate",
+    # us-gaap:OtherShortTermBorrowings, one annual observation at 2025-12-31,
+    # unmapped. Thin, and named here at its true thinness: KO's short end that
+    # this desk DOES read is commercial_paper, current through 2026-04-03.
+    ("KO", "short_term_borrowings"): "unmapped_candidate",
+    # Nothing of that shape arrives after 2023-12-31. The only amortisation
+    # concepts KO still files are AmortizationMethodQualifiedAffordableHousing
+    # ProjectInvestments*, which is amortisation of a tax-credit investment and
+    # not of intangibles.
+    ("KO", "amortization_of_intangibles"): "issuer_stopped",
+
     ("JPM", "interest_expense"): "unresolved",   # no successor of that shape arrives
     ("NVDA", "interest_paid"): "unresolved",     # not a formula input; low impact
 }
