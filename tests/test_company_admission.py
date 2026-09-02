@@ -204,3 +204,34 @@ def test_two_absent_ciks_do_not_match():
     assert not cik_util.same(None, None)
     assert not cik_util.same("", None)
     assert not cik_util.same("320193", "789019")
+
+
+# ── one decision, two callers ────────────────────────────────────────────────
+
+@pytest.mark.parametrize("listed,expected", [
+    (None, cs.CompanyNotFound),
+    (_Listed("SPY", is_etf=True), cs.NotInvestigable),
+    (_Listed("FOO", cik=None), cs.NotAnSecFiler),
+    (_Listed("XYZ", status="delisted"), cs.CompanyNotFound),
+])
+async def test_admissibility_reaches_the_same_verdict_as_admit(monkeypatch, listed, expected):
+    """The issuer page asks which silence a missing row is, so it can offer a
+    Prepare button for one of them and a sentence for the others. It asks THIS
+    function rather than re-deriving the rules — the first version asked only
+    "is it listed?", and offered to prepare SPY, an action the preparing call
+    could only refuse."""
+    ticker = listed.ticker if listed else "ZZZZ"
+    _universe(monkeypatch, listed)
+    with pytest.raises(expected):
+        await cs.admissibility(_DB([]), ticker)
+    _universe(monkeypatch, listed)
+    with pytest.raises(expected):
+        await cs.admit(_DB([None]), ticker)
+
+
+async def test_admissibility_does_not_write(monkeypatch):
+    """It is called on a read route, on every miss."""
+    _universe(monkeypatch, _Listed("TSLA"))
+    db = _DB([])
+    assert (await cs.admissibility(db, "TSLA")).ticker == "TSLA"
+    assert db.flushed == 0 and db.statements == []

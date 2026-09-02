@@ -22,7 +22,6 @@ from exposure_workbench.analytics import containment as ct
 from exposure_workbench.analytics import display_names as dn, interval_algebra as ia
 from exposure_workbench.services import (
     calc_service, company_service, fundamentals_service, market_data_service, period_semantics,
-    security_master_service,
 )
 from exposure_workbench.services import evidence_resolver_service as ev
 
@@ -38,14 +37,22 @@ async def _company(db: AsyncSession, ticker: str) -> Company:
     try:
         return await company_service.get_by_ticker(db, tk)
     except company_service.CompanyNotFound:
-        # Two different 404s (V17). A listed security this desk has not
-        # prepared is one button away from being readable, and the page shows
-        # that button; a symbol that is in no listing is a typo. Answering both
-        # with "not a symbol this desk knows" was true only of the second, and
-        # it was the sentence every holding outside the seeded eight got.
-        if await security_master_service.is_in_universe(db, tk):
-            raise HTTPException(404, {"error": "not_prepared", "ticker": tk})
+        pass
+    # Which silence is this? (V17.) A listed issuer nobody has prepared is one
+    # button away from being readable and the page shows that button; a fund, a
+    # non-filer and a typo are three different permanent answers. The verdict
+    # comes from company_service so the page cannot offer to prepare something
+    # the preparing call would refuse.
+    try:
+        await company_service.admissibility(db, tk)
+    except company_service.CompanyNotFound:
         raise HTTPException(404, {"error": "unknown_ticker", "ticker": tk})
+    except company_service.NotInvestigable as e:
+        raise HTTPException(404, {"error": "not_investigable", "ticker": tk,
+                                  "detail": e.reason})
+    except company_service.NotAnSecFiler:
+        raise HTTPException(404, {"error": "not_an_sec_filer", "ticker": tk})
+    raise HTTPException(404, {"error": "not_prepared", "ticker": tk})
 
 
 # ── evidence: the batch of labels, then the drill-through ────────────────────────

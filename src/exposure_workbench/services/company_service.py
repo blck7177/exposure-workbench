@@ -31,7 +31,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import Company
+from exposure_workbench.db.models import Company, SecurityMaster
 from exposure_workbench.services import security_master_service as sms
 from exposure_workbench.utils import cik as cik_util
 
@@ -84,24 +84,22 @@ async def require_investigable(db: AsyncSession, ticker: str) -> Company:
     return company
 
 
-async def admit(db: AsyncSession, ticker: str) -> Company:
-    """The company row for `ticker`, creating it from the listed universe if absent.
+async def admissibility(db: AsyncSession, ticker: str) -> SecurityMaster:
+    """The decision `admit` makes, without the write.
 
-    Idempotent and safe to race: the row is keyed by ticker, and a concurrent
-    admission of the same name is resolved by re-reading rather than by raising.
-    The id keeps the seed's convention (`co_<lowercase ticker>`) so a name that
-    was seeded and a name that was admitted are indistinguishable afterwards —
-    admission is how the table grows, not a second kind of row.
+    Split out because two callers need the same verdict for different reasons
+    and a second copy of the rules drifted immediately: the issuer route, asked
+    for a ticker it holds no row for, needs to say WHICH silence this is, and it
+    first answered "not prepared yet" for everything in the listed universe —
+    which offered the reader a Prepare button on SPY, an action that could only
+    refuse when clicked. A promise the next call cannot keep is worse than the
+    refusal it replaced.
 
-    Raises CompanyNotFound (not listed), NotInvestigable (an ETF, or a symbol
-    too long to be an issuer here) or NotAnSecFiler (listed, no CIK).
+    Returns the universe row an admission would build from. Raises
+    CompanyNotFound (not listed), NotInvestigable (an ETF, or a symbol too long
+    to be an issuer here) or NotAnSecFiler (listed, no CIK).
     """
     tk = ticker.strip().upper()
-    try:
-        return await require_investigable(db, tk)
-    except CompanyNotFound:
-        pass
-
     listed = await sms.get(db, tk)
     if listed is None or listed.status != "active":
         # Not "unknown to us": not in the listed universe at all. The universe
@@ -112,14 +110,35 @@ async def admit(db: AsyncSession, ticker: str) -> Company:
         raise NotInvestigable(tk, "an ETF files no 10-K or 10-Q")
     if len(tk) > _MAX_TICKER:
         raise NotInvestigable(tk, f"a symbol longer than {_MAX_TICKER} characters")
-    cik = cik_util.canonical(listed.cik)
-    if cik is None:
+    if cik_util.canonical(listed.cik) is None:
         raise NotAnSecFiler(tk)
+    return listed
 
+
+async def admit(db: AsyncSession, ticker: str) -> Company:
+    """The company row for `ticker`, creating it from the listed universe if absent.
+
+    Idempotent and safe to race: the row is keyed by ticker, and a concurrent
+    admission of the same name is resolved by re-reading rather than by raising.
+    The id keeps the seed's convention (`co_<lowercase ticker>`) so a name that
+    was seeded and a name that was admitted are indistinguishable afterwards —
+    admission is how the table grows, not a second kind of row.
+
+    Raises whatever `admissibility` raises; an existing row is returned as it
+    stands, so a ticker somebody deliberately marked not investigable is never
+    quietly promoted by a later admission.
+    """
+    tk = ticker.strip().upper()
+    try:
+        return await require_investigable(db, tk)
+    except CompanyNotFound:
+        pass
+
+    listed = await admissibility(db, tk)
     await db.execute(
         pg_insert(Company)
         .values(id=f"co_{tk.lower()}", ticker=tk, name=listed.name or tk,
-                cik=cik, exchange=listed.exchange,
+                cik=cik_util.canonical(listed.cik), exchange=listed.exchange,
                 is_investigable=True, resolved_by="security_master")
         .on_conflict_do_nothing(index_elements=["ticker"])
     )
