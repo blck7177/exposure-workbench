@@ -89,6 +89,20 @@ export function explainApiError(e: unknown): ExplainedError {
     return { notice: `${t} is not a symbol this desk knows. Check the spelling, or search for it from the portfolio page.` };
   }
 
+  // Listed, and this desk has simply never prepared it. Not an error about the
+  // symbol at all: the issuer page turns this one into a button (V17), and this
+  // sentence is what every OTHER caller says about the same state.
+  if (detail?.error === "not_prepared") {
+    const t = detail.ticker ? String(detail.ticker) : "That security";
+    return { notice: `${t} is listed but not yet prepared on this desk. Open its issuer page to add it — filings and figures are fetched in the background.` };
+  }
+
+  // Listed with no SEC CIK: there is nothing to read, however long we wait.
+  if (detail?.error === "not_an_sec_filer") {
+    const t = detail.ticker ? String(detail.ticker) : "That security";
+    return { notice: `${t} does not file with the SEC, so this desk cannot read statements for it. Its price history is still available on the book.` };
+  }
+
   // Known, but deliberately out of scope for research — not a failure and not
   // something retrying will change.
   if (detail?.error === "not_investigable") {

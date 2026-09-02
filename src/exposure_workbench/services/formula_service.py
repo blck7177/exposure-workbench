@@ -437,9 +437,16 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         # so). Derived from the registry's own unit_class — this used to be a
         # separate DAYS_FORMULAS list, one edit away from disagreeing with it.
         scaled_to_days = f.unit_class == "count"
+        # The registry's reading of its own quotient, checked by units.refine
+        # against what the algebra computed: `multiple` is accepted where the
+        # algebra said `ratio` (both are money ÷ money and only the reader
+        # separates them), anything else is refused. The days formulas declare
+        # their unit on the scale row below, not here — the quotient before the
+        # ×365 is still a fraction of a year.
         step = await tc.calculate(db, "divide", operands[0]["id"], operands[1]["id"],
                                   invoked_by=invoked_by,
-                                  as_quantity=None if scaled_to_days else name)
+                                  as_quantity=None if scaled_to_days else name,
+                                  as_unit_class=None if scaled_to_days else f.unit_class)
         if step.get("error"):
             return _not_combinable(step)
         acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}

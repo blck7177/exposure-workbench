@@ -41,12 +41,19 @@ async def ensure_ready(
     db: AsyncSession = Depends(get_db),
 ):
     tk = ticker.upper()
+    # admit, not require: this is the route a reader reaches for a name the desk
+    # has never prepared, and refusing it because no row exists yet was the
+    # whole gap (V17). The row is written here from the listed universe; the
+    # work that fills it runs on the worker below.
     try:
-        await company_service.require_investigable(db, tk)
+        await company_service.admit(db, tk)
     except company_service.CompanyNotFound:
         raise HTTPException(404, {"error": "unknown_ticker", "ticker": tk})
-    except company_service.NotInvestigable:
-        raise HTTPException(422, {"error": "not_investigable", "ticker": tk})
+    except company_service.NotInvestigable as e:
+        raise HTTPException(422, {"error": "not_investigable", "ticker": tk,
+                                  "detail": e.reason})
+    except company_service.NotAnSecFiler:
+        raise HTTPException(422, {"error": "not_an_sec_filer", "ticker": tk})
     try:
         task = await task_service.create_task(
             db, task_type="company_readiness",
@@ -108,11 +115,14 @@ async def create_research_run(
 ):
     tk = body.ticker.upper()
     try:
-        company = await company_service.require_investigable(db, tk)
+        company = await company_service.admit(db, tk)
     except company_service.CompanyNotFound:
         raise HTTPException(404, {"error": "unknown_ticker", "ticker": tk})
-    except company_service.NotInvestigable:
-        raise HTTPException(422, {"error": "not_investigable", "ticker": tk})
+    except company_service.NotInvestigable as e:
+        raise HTTPException(422, {"error": "not_investigable", "ticker": tk,
+                                  "detail": e.reason})
+    except company_service.NotAnSecFiler:
+        raise HTTPException(422, {"error": "not_an_sec_filer", "ticker": tk})
 
     # Check for an active run BEFORE enqueuing (V2-E3). create_run raises
     # ActiveRunExists after the fact, and charging quota for a request that is

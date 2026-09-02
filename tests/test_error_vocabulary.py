@@ -66,6 +66,11 @@ def test_the_ui_explains_the_refusals_a_person_can_act_on():
     allowance, a conversation that outgrew a turn, a container that is down, a
     run already going, a symbol that does not exist or is out of scope, and a
     session id that no longer belongs to anyone.
+
+    V17 adds the two states admission created. A listed name nobody has prepared
+    is not a bad symbol — it is one action away — and a listed name with no SEC
+    CIK is a permanent limit of this desk's reach. Both used to arrive as "not a
+    symbol this desk knows", which was true of neither.
     """
     assert _codes_the_ui_explains() == {
         "turn_in_flight",
@@ -76,6 +81,8 @@ def test_the_ui_explains_the_refusals_a_person_can_act_on():
         "unknown_session",
         "unknown_ticker",
         "not_investigable",
+        "not_prepared",
+        "not_an_sec_filer",
     }
 
 

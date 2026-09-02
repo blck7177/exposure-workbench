@@ -45,7 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import containment as ct
 from exposure_workbench.analytics import units
-from exposure_workbench.analytics.units import COUNT, MONEY, MONEY_PER_SHARE, RATIO
+from exposure_workbench.analytics.units import COUNT, MONEY, MONEY_PER_SHARE, MULTIPLE, RATIO
 from exposure_workbench.db.models import CalcLedger, Company, FinancialFact
 from exposure_workbench.services import calc_service as cs
 
@@ -125,6 +125,15 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         )).scalar_one_or_none()
         if row is None:
             return _err("unknown_operand", f"{ref} is not a calculation this desk holds")
+        if row.operation == RANK_OP:
+            # An ordering has no value of its own. Without this branch it fell
+            # through to the untyped_operand refusal, whose sentence ("recorded
+            # before quantities carried their type") is about a legacy row and
+            # would send the caller to recompute something that is not wrong.
+            return _err("not_a_quantity",
+                        f"{ref} is an ordering — a relation between quantities, not a "
+                        f"quantity. Its entries' own rows are the operands; its places "
+                        f"and values are on the table by name.")
         params = row.params or {}
         owned = _row_issuers(params.get("result_type"), row.company_id)
         points = (row.result or {}).get("points")
@@ -515,7 +524,8 @@ def _derived_name(op: str, a, b) -> str:
 
 async def calculate(db: AsyncSession, op: str, a: str, b: str,
                     invoked_by: str = "agent", as_quantity: str | None = None,
-                    named_by: str | None = None) -> dict:
+                    named_by: str | None = None,
+                    as_unit_class: str | None = None) -> dict:
     """Combine two quantities, if their types permit it.
 
     `as_quantity` is the name the CALLER gives the result — a formula naming
@@ -524,6 +534,13 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     it a measure the model asked for by name came back named `calc.scalar.
     divide`, and the model wrote the name it knew and was refused for it.
     The typing is unchanged: a named quantity is still checked like any other.
+
+    `as_unit_class` is the caller's declaration of how the result READS, and it
+    is checked, not obeyed: units.refine accepts it only where the algebra's own
+    answer leaves a genuine choice (a dimensionless quotient is a share or a
+    multiple; money ÷ money cannot tell), and refuses anything else. The registry
+    passes it for the eight measures whose quotient is a coverage or a turnover
+    — without it debt/EBITDA of 2.3 reached the reader as "230.0%".
     """
     if op not in OPS:
         return _err("unsupported_op", f"{op!r}; supported: {', '.join(OPS)}")
@@ -549,6 +566,15 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
              "divide": left.value / right.value if right.value else None}[op]
 
     result = _result_type(op, left, right, value)
+    recorded_unit = units.refine(result.unit_class, as_unit_class)
+    if recorded_unit is None:
+        return _err("undeclarable_unit",
+                    f"{op} of {left.unit_class} and {right.unit_class} is "
+                    f"{result.unit_class}, and {as_unit_class!r} is not a reading of it. "
+                    f"A declaration may choose between readings of one dimension "
+                    f"(a dimensionless quotient is a share or a multiple); it may not "
+                    f"change the dimension the algebra computed.")
+    result = replace(result, unit_class=recorded_unit)
     basis = result.basis()
 
     rt = {"unit_class": result.unit_class, "basis": basis,
@@ -718,3 +744,123 @@ async def _calculate_series(db, op, a, b, left, right, invoked_by) -> dict:
     return {"calc_id": calc_id, "op": op, "operands": [a, b], "points": points,
             "type": rt_out, "quality_flags": flags,
             "basis": f"{op}, element-wise over {len(points)} aligned period ends"}
+
+
+# ── ordering (V17) ────────────────────────────────────────────────────────────
+
+RANK_OP = "calc.set.rank"
+DIRECTIONS = ("highest", "lowest")
+
+
+def _label_of(t: Typed) -> str | None:
+    """What to call one entry in a ranking: the issuer it belongs to."""
+    return t.issuers[0] if len(t.issuers) == 1 else None
+
+
+async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
+               as_quantity: str | None = None, invoked_by: str = "agent") -> dict:
+    """Order quantities that are comparable, and record the order.
+
+    WHY THIS EXISTS. The gate guarantees where every figure came from; it says
+    nothing about the sentence between two figures. Asked which of five holdings
+    had the highest accruals ratio, the model laid out five true, correctly cited
+    values and then wrote "3.40% on JPM was the highest, above 4.11%" — every
+    slot true, the ordering claim false (V16 battery, G6). It had no ordering
+    primitive, so it compared by eye.
+
+    So an ordering becomes a computation like any other: it has operands, it has
+    refusals, it writes a ledger row, and its result is a set of NAMES the answer
+    can slot — `accruals_ratio.rank.JPM` is 1 or it is not. What this removes is
+    the class where the ordering was never computed at all. A superlative typed
+    into prose is still prose; the difference is that the correct ordering now
+    costs one call and arrives with the ordinals.
+
+    The refusals are the ones a league table can be wrong in before any
+    arithmetic happens: two different measures compared as one, two units
+    compared as one, the same figure entered twice, or entries with nothing to
+    tell them apart.
+    """
+    if direction not in DIRECTIONS:
+        return _err("unsupported_direction", f"{direction!r}; supported: {', '.join(DIRECTIONS)}")
+    refs = list(refs or [])
+    if len(refs) < 2:
+        return _err("too_few_operands",
+                    f"an ordering needs at least two quantities; got {len(refs)}")
+    if len(set(refs)) != len(refs):
+        dupes = sorted({r for r in refs if refs.count(r) > 1})
+        return _err("duplicate_operand",
+                    f"{', '.join(dupes)} appears more than once. One figure cannot hold "
+                    f"two places in an order.")
+
+    typed: list[Typed] = []
+    for ref in refs:
+        t = await _resolve(db, ref)
+        if isinstance(t, dict):
+            return t
+        if isinstance(t, TypedSeries):
+            return _err("unrankable_operand",
+                        f"{ref} is a series, which has no single value to place. Rank the "
+                        f"points' own rows, or take a statistic of the series first.")
+        typed.append(t)
+
+    units_seen = {t.unit_class for t in typed}
+    if len(units_seen) > 1:
+        return _err("incomparable_units",
+                    f"these are not one measure: {', '.join(sorted(units_seen))}. An order "
+                    f"over mixed units ranks dollars against percentages.")
+
+    quantities_seen = {t.quantity for t in typed}
+    if len(quantities_seen) > 1 or None in quantities_seen:
+        named = sorted(str(q) for q in quantities_seen)
+        return _err("incomparable_quantities",
+                    f"an ordering compares one measure across several holders; these are "
+                    f"{', '.join(named)}. Compute the same measure for each name first.")
+    quantity = typed[0].quantity
+
+    labels = [_label_of(t) for t in typed]
+    if None in labels or len(set(labels)) != len(labels):
+        # Two entries this function cannot tell apart would produce a table with
+        # two rows called the same thing, and a rank name that resolves to
+        # whichever was written last. Refused rather than numbered.
+        return _err("indistinguishable_operands",
+                    f"each entry in an ordering must belong to exactly one issuer, and to a "
+                    f"different one: got {[l or '?' for l in labels]}. Rank one measure "
+                    f"across issuers.")
+
+    entries = [{"label": lb, "ref": t.source_id, "value": t.value, "basis": _basis_str(t)}
+               for lb, t in zip(labels, typed)]
+    entries.sort(key=lambda e: e["value"], reverse=(direction == "highest"))
+    # Competition ranking: equal values share a place, because numbering them
+    # 1 and 2 asserts a difference the figures do not have.
+    ties = 0
+    for i, e in enumerate(entries):
+        if i and e["value"] == entries[i - 1]["value"]:
+            e["rank"] = entries[i - 1]["rank"]
+            ties += 1
+        else:
+            e["rank"] = i + 1
+
+    values = [e["value"] for e in entries]
+    name = as_quantity or quantity
+    unit = typed[0].unit_class
+    result = {
+        "ordering": entries,
+        "leader": entries[0]["label"],
+        "direction": direction,
+        "ranked": len(entries),
+        "spread": max(values) - min(values),
+    }
+    flags = {"tied_places": ties} if ties else {}
+    rt = {"unit_class": unit, "kind": "ranking", "quantity": name,
+          "issuers": sorted({lb for lb in labels if lb})}
+    calc_id = await cs._record(
+        db, None, RANK_OP,
+        {"op": "rank", "operands": refs, "direction": direction,
+         "operand_types": [t.as_dict() for t in typed], "result_type": rt},
+        result, refs, flags, invoked_by,
+    )
+    return {"calc_id": calc_id, "op": "rank", "quantity": name, "direction": direction,
+            "leader": result["leader"], "ordering": entries, "spread": result["spread"],
+            "type": rt, "operands": refs, "quality_flags": flags,
+            "basis": (f"{len(entries)} quantities named {quantity}, ordered {direction} "
+                      f"first; each entry keeps its own period")}

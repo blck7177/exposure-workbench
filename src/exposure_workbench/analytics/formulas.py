@@ -166,19 +166,19 @@ FORMULAS: dict[str, Formula] = {
         inputs=("ebit", "interest_expense"),
         alternatives={"interest_expense": ("interest_expense_nonoperating",)},
         op="divide", basis="window",
-        unit_class="ratio", family="coverage", source_url=SEC_NON_GAAP,
+        unit_class="multiple", family="coverage", source_url=SEC_NON_GAAP,
         note="Both sides over one window; the window is stated with the number.",
     ),
     "debt_to_ebitda": Formula(
         expression="total debt ÷ EBITDA",
         inputs=("total_debt", "ebitda"), op="divide", basis="mixed",
-        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
+        unit_class="multiple", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow: the instant and the window are both stated.",
     ),
     "debt_to_operating_cash_flow": Formula(
         expression="total debt ÷ operating cash flow",
         inputs=("total_debt", "operating_cash_flow"), op="divide", basis="mixed",
-        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
+        unit_class="multiple", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow; both bases stated.",
     ),
     "fcf_to_debt": Formula(
@@ -190,7 +190,7 @@ FORMULAS: dict[str, Formula] = {
     "current_ratio": Formula(
         expression="current assets ÷ current liabilities",
         inputs=("current_assets", "current_liabilities"), op="divide", basis="instant",
-        unit_class="ratio", family="liquidity", source_url=SEC_NON_GAAP,
+        unit_class="multiple", family="liquidity", source_url=SEC_NON_GAAP,
         note="Both sides at one instant.",
     ),
     "gross_margin": Formula(
@@ -315,7 +315,7 @@ FORMULAS: dict[str, Formula] = {
         expression="revenue ÷ total assets",
         inputs=("revenue", "total_assets"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="mixed",
-        unit_class="ratio", family="turnover",
+        unit_class="multiple", family="turnover",
         citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
         not_for_financials=None,
         note=("Ending total assets, not an average; stated in the result. The middle "
@@ -325,7 +325,7 @@ FORMULAS: dict[str, Formula] = {
     "equity_multiplier": Formula(
         expression="total assets ÷ stockholders' equity",
         inputs=("total_assets", "stockholders_equity"), op="divide", basis="instant",
-        unit_class="ratio", family="leverage",
+        unit_class="multiple", family="leverage",
         citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
         not_for_financials=None,
         denominator_must_be_positive=(
@@ -351,7 +351,7 @@ FORMULAS: dict[str, Formula] = {
     "quick_ratio": Formula(
         expression="(current assets − inventory) ÷ current liabilities",
         inputs=("quick_assets", "current_liabilities"), op="divide", basis="instant",
-        unit_class="ratio", family="liquidity",
+        unit_class="multiple", family="liquidity",
         citation="CFA Institute, Financial Analysis Techniques", source_url=CFA_FAT,
         not_for_financials=_NOT_FOR_BANKS_CLASSIFIED_BS,
         note=("Both sides at one instant. Differs from the current ratio only by "
@@ -388,7 +388,7 @@ FORMULAS: dict[str, Formula] = {
     "net_debt_to_ebitda": Formula(
         expression="net debt ÷ EBITDA",
         inputs=("net_debt", "ebitda"), op="divide", basis="mixed",
-        unit_class="ratio", family="leverage", source_url=SEC_NON_GAAP,
+        unit_class="multiple", family="leverage", source_url=SEC_NON_GAAP,
         note=("A balance over a flow — the covenant form; the instant and the window "
               "are both stated. Net debt here is total debt less all cash, NOT an "
               "agency net debt (see net_debt)."),
@@ -437,7 +437,10 @@ FORMULAS: dict[str, Formula] = {
 # an op outside this set used to fall through an else-branch into `divide`,
 # which is the quietest possible way to compute the wrong thing.
 KNOWN_OPS = ("sum", "difference", "divide", "product", "cover")
-UNIT_CLASSES = ("money", "ratio", "count")
+# The classes a NAMED measure may declare. money_per_share is absent on
+# purpose: no formula here divides down to a per-share figure — the price
+# side mints those (services/price_analytics_service.py).
+UNIT_CLASSES = ("money", "ratio", "count", "multiple")
 
 
 def validate(formulas: dict[str, "Formula"]) -> None:

@@ -31,12 +31,21 @@ logger = logging.getLogger(__name__)
 
 async def _ensure_company_ready(db: AsyncSession, ticker: str, reason: str) -> dict:
     tk = ticker.upper()
+    # The one tool that may bring a new issuer onto the desk (V17). `admit`
+    # writes the row from the listed universe; everything expensive happens on
+    # the worker, so this stays the immediate, non-blocking return it was.
     try:
-        await company_service.require_investigable(db, tk)
+        await company_service.admit(db, tk)
     except company_service.CompanyNotFound:
-        return {"error": "company_not_found", "ticker": tk}
-    except company_service.NotInvestigable:
-        return {"error": "not_investigable", "ticker": tk}
+        return {"error": "not_listed", "ticker": tk,
+                "detail": f"{tk} is not in the listed universe this desk holds, so there "
+                          f"is no issuer to prepare. Check the symbol."}
+    except company_service.NotInvestigable as e:
+        return {"error": "not_investigable", "ticker": tk, "detail": e.reason}
+    except company_service.NotAnSecFiler:
+        return {"error": "not_an_sec_filer", "ticker": tk,
+                "detail": f"{tk} is listed but files with no SEC CIK, so this desk cannot "
+                          f"read statements for it. Its price history is still available."}
     try:
         task = await task_service.create_task(db, task_type="company_readiness", payload={"ticker": tk},
                                               owner_user_id=current_user_id())
@@ -59,11 +68,16 @@ async def _ensure_company_ready(db: AsyncSession, ticker: str, reason: str) -> d
 async def _start_issuer_research(db: AsyncSession, ticker: str, reason: str) -> dict:
     tk = ticker.upper()
     try:
-        company = await company_service.require_investigable(db, tk)
+        company = await company_service.admit(db, tk)
     except company_service.CompanyNotFound:
-        return {"error": "company_not_found", "ticker": tk}
-    except company_service.NotInvestigable:
-        return {"error": "not_investigable", "ticker": tk}
+        return {"error": "not_listed", "ticker": tk,
+                "detail": f"{tk} is not in the listed universe this desk holds."}
+    except company_service.NotInvestigable as e:
+        return {"error": "not_investigable", "ticker": tk, "detail": e.reason}
+    except company_service.NotAnSecFiler:
+        return {"error": "not_an_sec_filer", "ticker": tk,
+                "detail": f"{tk} is listed but files with no SEC CIK; there are no "
+                          f"statements to research."}
     # Precheck before enqueuing: create_run raises ActiveRunExists only after the
     # task exists, and on this path the tool RETURNS normally, so meta_agent
     # commits — leaving an orphan task the worker is guaranteed to fail, and a
@@ -225,7 +239,13 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     reg.register(Tool(
         name="ensure_company_ready",
         display="Preparing {ticker}'s filings and prices",
-        description="Enqueue a data-readiness pass for an issuer (ingest/index/price). Returns immediately.",
+        description=(
+            "Enqueue a data-readiness pass for an issuer (ingest/index/price). Returns "
+            "immediately. Works for ANY listed SEC filer, not only issuers already on "
+            "the desk: a ticker with no filings or facts yet is prepared by this call, "
+            "and becomes readable a couple of minutes later. Refuses a symbol that is "
+            "not listed, an ETF, and a listing with no SEC CIK, each by name."
+        ),
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
             "reason": {"type": "string", "description": "why readiness is needed now"},

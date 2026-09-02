@@ -1,13 +1,13 @@
-# Architecture As Built — 2026-09-01
+# Architecture As Built — 2026-09-02
 
 > **性质**:现状快照。不变量与目标拓扑见 [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)(v3),逐模块设计见 [MODULE_NOTES.md](MODULE_NOTES.md)(M1–M18),部署与租户见 [PRODUCTION.md](PRODUCTION.md)。本文只回答"今天有什么、怎么连、能做什么"。
-> **规模**:`src/` ~21k 行 Python、`apps/web` ~3.3k 行 TS;**1560 offline** 测试;V15(桌面)已落地,见 §7。线上 https://desk-for-one.com。
+> **规模**:`src/` ~21k 行 Python、`apps/web` ~3.3k 行 TS;**1937 offline** 测试;V15(桌面)已落地,见 §7;V16(单位代数·方法登记·价格分析)与 V17(发行人自举·读法·排序)已落地,V17 待线上复核。线上 https://desk-for-one.com。
 
 ---
 
 ## 1. 一句话
 
-**用户只面对一个 meta-agent;它能调 32 个工具;每一个数字都能回溯到账本里的一行;模型不写数字,只写桌面上的名字(V15);算错的类别由代码消灭,选错的类别由知识降低,指错的类别由结构消灭,剩下的交给门拒绝。**
+**用户只面对一个 meta-agent;它能调 41 个工具;每一个数字都能回溯到账本里的一行;模型不写数字,只写桌面上的名字(V15);算错的类别由代码消灭,选错的类别由知识降低,指错的类别由结构消灭,剩下的交给门拒绝。**
 
 四条设计律贯穿一切(TARGET §0):**A** 边界处大声失败,无静默降级;**B** 用 schema 消灭解析规则;**C** 正交能力替代路由规则,不写问题分类器;**D**(V9 起)世界结构进代码、方法定义进数据、分析交给智能,**不存在发行人行为规则**。
 
@@ -30,8 +30,8 @@
         │ 入队 (tasks 表)                   │ bearer + JSON-RPC (仅 compose 内网)
         ▼                                 ▼
  ┌─ exposure-worker ×3 ─┐        ┌──────────── exposure-mcp ────────────┐
- │  exposure_update      │        │  /mcp/meta      29 工具                │
- │  company_readiness    │───────▶│  /mcp/research  15 工具                │
+ │  exposure_update      │        │  /mcp/meta      41 工具                │
+ │  company_readiness    │───────▶│  /mcp/research  24 工具                │
  │  issuer_research      │        │  中间件:验 token → 绑 user/session/face │
  │  market_data_sync     │        │  Registry wrapper:入参校验·预算·轨迹落盘 │
  │  scheduled_update     │        └──────────────────┬─────────────────────┘
@@ -49,7 +49,7 @@
 
 | 区 | 表 | 今天的规模 | 纪律 |
 |---|---|---|---|
-| **Raw** | companies · filings · filing_documents · market_prices · factor_prices · security_master | 10 家(8 发行人 + HYG/TLT)· 16 份申报 · 15,776 日价 · 6,601 因子价 | append-only,带 provider/retrieved_at |
+| **Raw** | companies(**V17 起有第二个写入者**:`company_service.admit` 从上市宇宙建行,见 §9-F5)· filings · filing_documents · market_prices · factor_prices · security_master | 10 家(8 发行人 + HYG/TLT)· 16 份申报 · 15,776 日价 · 6,601 因子价 | append-only,带 provider/retrieved_at |
 | **Normalized 证据** | filing_sections · filing_chunks(+embedding)· financial_facts · research_sources | 3,078 chunk · **62,473 事实,其中 8,352 已映射**(`mapping v3`,39 个指标)· 25 条外部来源 | raw_concept 与 normalized_metric 并存;映射不决定存储 |
 | **Calc Ledger** | calc_ledger | **25,119 行** | 每次计算一行:操作、参数、输入 refs、原语版本;**V11 起失败也铸行**(`absence.*`) |
 | **Artifact** | daily_reports · issuer_briefs · evidence_packs | 10 份 brief | LLM 产物**只**落这一区,永不回流成证据 |
@@ -84,7 +84,7 @@
 
 **运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
 
-## 6. 工具面(`tools/`,29 + 15)
+## 6. 工具面(`tools/`,41 + 24)
 
 面是声明式数据(`faces.py`),缺一个工具即构建错误。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
 
@@ -92,7 +92,7 @@
 |---|---|---|
 | **定位** | `describe_issuer` | 唯一定位工具(V10 三合一)。**V12 起携带知识**:`period_semantics`(财年历、财季是否对齐日历)、每条指标的 `kind`/`windows_filed`/`do_not_add_to`/`superseded_by`/`do_not_combine_with`/`for_a_total_call`/`note`、每个公式的 `family`/`computable`/`missing_inputs` |
 | **取数** | `get_flow`(窗口或序列)· `get_balance_sheet`(单时点)· `get_balance_series` | 区间代数直出;不可导出即拒绝,带 `absence_id` |
-| **算** | `calculate`(类型化四则,标量或序列)· `series_stat` · `evaluate_formula` · `get_fundamental_panel` | 每一步落账本 |
+| **算** | `calculate`(类型化四则,标量或序列)· `rank`(**V17**:类型化排序)· `series_stat` · `evaluate_formula` · `get_fundamental_panel` | 每一步落账本 |
 | **文本** | `search_filing_passages` · `get_filing_section` | 语义检索 / 整节原文,带引用锚 |
 | **book 清单(V15)** | `describe_run` · `read_quantities` | book 侧的 `describe_issuer` / `evaluate_formula(name)`:一个 run 持有的全部量按"回答什么"分组(book/concentration/mandate/stress/factor_exposure/attribution/risk/counts,pattern × labels),缺什么、共线撤下了什么、这个面能做什么不能做什么;`read_quantities(run_id, names)` 按名一次取 |
 | **组合** | `get_portfolio_snapshot`(入口)· `get_portfolio_positions` · `get_attribution` · `get_risk_state` · `list_run_alerts` · `list_risk_limits` · `get_run_freshness` · `reconcile_move` · `get_drawdown_episodes` · `explain_episode` · `list_alerts` · `get_market_stats` | 全集返回、**禁 top_k**;共线时 `quotable_individually: false` |
@@ -101,7 +101,7 @@
 
 预算:每 turn 15 次工具调用(REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
 
-研究面 = READ_CORE 13 + `search_external_research` + `submit_brief`。
+研究面 = READ_CORE 22 + `search_external_research` + `submit_brief`。
 
 ## 7. 门(`respond` / `submit_brief` 的解析链,V15)——可追溯是怎么被执行的
 
@@ -123,7 +123,7 @@
 
 **拓扑 1 + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ research 子会话(worker 内,产 brief)。
 
-**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 32 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
+**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 41 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
 
 **research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief`(六节 × 同一块文法,同一解析器;五节各须指向证据)→ `issuer_briefs`(文本列 + `blocks` JSONB)。
 
@@ -137,7 +137,7 @@
 | **F2** | **即问即答** | 发行人报表分析(任意窗口、任意具名度量、跨发行人比较、申报原文引用)+ 组合分解(单日 vs 回撤段、市场 vs 个股、因子) | ✅ V9–V12 主线;实测见 §10 |
 | **F3** | 深度调查 → Brief | `start_issuer_research` → 后台子会话 → 分块引用的 Issuer Risk Brief | ✅ M7+M9,10 份 |
 | **F4** | 证据浏览 | 发行人页四 tab(Financials recipe v2 / Filings / Brief / Research)+ 引用抽屉穿透到 fact/chunk/calc | ✅ |
-| **F5** | 数据就绪 | `ensure_company_ready` 隐式委派;readiness workflow | ✅ |
+| **F5** | 数据就绪 | `ensure_company_ready` 隐式委派;readiness workflow。**V17:发行人宇宙从 8 家封闭名单变为整个上市宇宙** —— `company_service.admit` 在请求路径上按 `security_master`(13,024 只在市证券,其中 7,096 有 CIK)建 company 行,昂贵的活仍在 worker 上;三种拒绝各说各的(不在上市宇宙 / ETF 无报表 / 上市但无 SEC CIK)。发行人页对未准备的持仓给出「Prepare」而不是「不认识这个代码」 | ✅ 待线上复核 |
 | **F6** | 审计 | `agent_steps` 逐步轨迹、`calc_ledger` 逐算、`workflow_events`、`/me/usage` 配额 | ✅ 横切 |
 
 **生产化**(V2/V7):Clerk 登录、Postgres RLS 多租户、日配额(`usage_daily`,`QUOTA_UNLIMITED_USERS` 白名单)、任务租约与回收、备份、公网可注册。
@@ -159,8 +159,11 @@
 - **G2 剩余项**:`describe_issuer.definition` 仍是未经计算的承诺;`computable` 仍是"名字存在"而非"窗口可达";`get_balance_sheet` 未带 `do_not_add_to`;`reconcile_move` 无 `larger_share`
 - **LLY capex 未映射**(`test_v11_tag_drift_live` 唯一的 `unmapped_candidate`),补映射前须先验证语料
 - **系统提示未变短**(V12 判据 6 未达标:4918→5071 字符),示例换了更便宜的位置而非变小
+- **比较级散文仍不被判**——门保证出处,不保证句子。V17 把「谁最高」变成一次 `rank` 计算(有操作数、有拒绝、落账本、每个名次是桌上的一个名字),消灭的是"顺序从未被算过"这一类;直接写进散文的最高级仍是散文
+- **历史行的读法靠迁移改正,不靠回算**:`v17_multiple_unit.sql` 只改 326 行的 `unit_class`(值、操作数、基准、输入引用一概不动)
 - 单价格源、无基准成分股、单币种:IPV / Brinson / 货币归因**明确不做**(MODULE_NOTES 插节)
+- **上市宇宙里约 45% 没有 CIK**(基金、部分外国发行人、`BRK.A` 这类 feed 里符号形式对不上的),它们拒绝在 `not_an_sec_filer`,价格侧照常可用
 
 ## 12. 版本弧(每批一句)
 
-V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)。
+V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)。

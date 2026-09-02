@@ -58,6 +58,7 @@ class Desk:
     def __init__(self, monkeypatch, *, balances: dict | None = None,
                  flows: dict | None = None, sector: object = None):
         self.calls: list[tuple] = []      # (op, a, b, as_quantity)
+        self.units: list[tuple] = []      # (op, as_quantity, as_unit_class)
         self.scales: list[tuple] = []     # (ref, factor, unit_class, quantity)
         self.refusals: list[dict] = []
         self._n = 0
@@ -76,9 +77,15 @@ class Desk:
                     "basis": f"{start or W0}..{end or W1}",
                     "period": {"start": start or W0, "end": end or W1}}
 
-        async def calculate(_db, op, a, b, invoked_by="agent", as_quantity=None):
+        async def calculate(_db, op, a, b, invoked_by="agent", as_quantity=None,
+                            as_unit_class=None):
             self._n += 1
             self.calls.append((op, a, b, as_quantity))
+            # The declared reading rides beside the name (V17). Recorded
+            # separately so a test can ask what the registry told the
+            # calculator without every existing case having to carry a fifth
+            # tuple element.
+            self.units.append((op, as_quantity, as_unit_class))
             return {"calc_id": f"calc_step_{self._n}", "op": op, "value": 1.0,
                     "basis": "stub"}
 
@@ -367,3 +374,39 @@ def test_every_new_formula_names_its_authority():
 
 def test_accruals_ratio_cites_sloan():
     assert "Sloan" in fm.FORMULAS["accruals_ratio"].citation
+
+
+# ── the reading travels with the name (V17) ──────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_a_multiple_formula_hands_the_calculator_its_declaration(monkeypatch):
+    """debt/EBITDA is money ÷ money, which the algebra can only call a ratio.
+    Displayed as one it read "230.0%". The registry's `multiple` has to reach
+    the divide call or the ledger row — and so the table, and so the reader —
+    keeps the algebra's answer."""
+    desk = Desk(monkeypatch, sector="Technology",
+                balances={"long_term_debt_total": 2.3e9},
+                flows={"net_income": 6.0e8, "interest_expense": 2.0e8,
+                       "income_tax_expense": 2.0e8,
+                       "depreciation_amortization": 1.0e9})
+    out = await fsvc.evaluate_formula(None, "TEST", "debt_to_ebitda")
+    assert not out.get("error"), out
+    assert ("divide", "debt_to_ebitda", "multiple") in desk.units
+
+
+@pytest.mark.asyncio
+async def test_a_percent_formula_declares_ratio_and_the_days_quotient_declares_nothing(monkeypatch):
+    """The other two branches of the same line: a share declares what the
+    algebra already computed (a no-op that must still be legal), and a days
+    measure declares nothing on the quotient — the ×365 that makes it a count
+    happens on the scale row after it."""
+    desk = Desk(monkeypatch, sector="Technology",
+                balances={"inventory": 3.0e9},
+                flows={"net_income": 5.0e8, "revenue": 2.0e10,
+                       "cost_of_revenue": 1.4e10})
+    assert not (await fsvc.evaluate_formula(None, "TEST", "net_margin")).get("error")
+    assert ("divide", "net_margin", "ratio") in desk.units
+
+    assert not (await fsvc.evaluate_formula(None, "TEST", "days_inventory")).get("error")
+    assert ("divide", None, None) in desk.units
+    assert [(f, u, q) for _r, f, u, q in desk.scales] == [(365, "count", "days_inventory")]

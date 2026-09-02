@@ -26,6 +26,7 @@ from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import typed_calculator as tc
 
 MONEY, RATIO, COUNT, MPS = units.MONEY, units.RATIO, units.COUNT, units.MONEY_PER_SHARE
+MULT = units.MULTIPLE
 
 
 def q(unit: str, v: float = 2.0, sid: str = "x", on: str | None = None,
@@ -43,6 +44,10 @@ PRODUCT_CASES = [
     (COUNT, RATIO, COUNT),      # shares × a fraction of them
     (MPS, RATIO, MPS),          # a per-share figure, scaled
     (RATIO, RATIO, RATIO),      # margin × turnover
+    (MONEY, MULT, MONEY),       # EBITDA × (debt/EBITDA) = debt
+    (MPS, MULT, MPS),           # EPS × P/E = price
+    (RATIO, MULT, RATIO),       # net margin × asset turnover = ROA
+    (MULT, MULT, MULT),         # asset turnover × equity multiplier
 ]
 
 QUOTIENT_CASES = [
@@ -55,6 +60,9 @@ QUOTIENT_CASES = [
     (COUNT, COUNT, RATIO),
     (COUNT, RATIO, COUNT),
     (RATIO, RATIO, RATIO),
+    (MONEY, MULT, MONEY),       # debt ÷ (debt/EBITDA) = EBITDA
+    (MPS, MULT, MPS),           # price ÷ (P/E) = EPS
+    (MULT, MULT, RATIO),        # this year's leverage against last year's
 ]
 
 
@@ -82,7 +90,7 @@ def test_the_cases_above_cover_both_tables_whole():
 # ── (b) what is not in the table is undefined, not defaulted ─────────────────
 
 @pytest.mark.parametrize("a,b", [(MONEY, MONEY), (MPS, MPS), (MONEY, COUNT),
-                                 (MONEY, MPS), (COUNT, COUNT)])
+                                 (MONEY, MPS), (COUNT, COUNT), (COUNT, MULT)])
 def test_an_undefined_product_is_refused_naming_both_units(a, b):
     r = tc._check("multiply", q(a, sid="l"), q(b, sid="r"))
     assert r["error"] == "undefined_product"
@@ -91,7 +99,8 @@ def test_an_undefined_product_is_refused_naming_both_units(a, b):
 
 @pytest.mark.parametrize("num,den", [(RATIO, MONEY), (COUNT, MONEY), (RATIO, COUNT),
                                      (COUNT, MPS), (MPS, COUNT), (RATIO, MPS),
-                                     (MPS, MONEY)])
+                                     (MPS, MONEY), (MULT, MONEY), (RATIO, MULT),
+                                     (MULT, RATIO), (COUNT, MULT)])
 def test_an_undefined_quotient_is_refused_naming_both_units(num, den):
     r = tc._check("divide", q(num, sid="l"), q(den, sid="r"))
     assert r["error"] == "undefined_quotient"
@@ -199,3 +208,86 @@ def test_series_writers_write_the_one_period_key():
     src = inspect.getsource(fs._slot)
     assert "units.POINT_PERIOD_KEY" in src
     assert '"end"' not in src
+
+
+# ── (d) the registry's reading of a quotient the algebra cannot separate ─────
+#
+# V17. money ÷ money is RATIO to the algebra and that is all it can be: net
+# margin and debt/EBITDA are the same operation on the same units. Read as a
+# percent, a coverage of 12.5 reached the reader as "1250.0%" and a current
+# ratio of 1.85 as "185.0%" — eight of the registry's nineteen dimensionless
+# measures wore the wrong dress, and so did every beta (the G7 residual,
+# "-54.3%"). So a named measure may DECLARE how its quotient reads, and the
+# declaration is checked rather than obeyed.
+
+def test_refine_keeps_the_algebras_answer_when_nothing_is_declared():
+    assert units.refine(RATIO, None) == RATIO
+    assert units.refine(MONEY, None) == MONEY
+    assert units.refine(MONEY, MONEY) == MONEY
+
+
+def test_refine_admits_a_multiple_where_the_algebra_said_ratio():
+    assert units.refine(RATIO, MULT) == MULT
+
+
+@pytest.mark.parametrize("computed,declared", [
+    (RATIO, MONEY),      # a share of one dollar amount by another is not money
+    (MONEY, MULT),       # a sum of dollars is not a multiple
+    (MONEY, RATIO),
+    (COUNT, MULT),       # a day count is not a multiple
+    (MULT, RATIO),       # one direction only: a declared multiple is the finer claim
+    (MPS, MULT),
+])
+def test_refine_refuses_a_declaration_that_changes_the_dimension(computed, declared):
+    assert units.refine(computed, declared) is None
+
+
+def test_the_refinement_table_stays_inside_the_dimensionless_family():
+    """Adding a row is a claim that two classes are one dimension."""
+    for (computed, declared), out in units.REFINEMENTS.items():
+        assert computed in units.DIMENSIONLESS and declared in units.DIMENSIONLESS
+        assert out == declared
+
+
+async def _calc(monkeypatch, *, a: tc.Typed, b: tc.Typed, op: str = "divide",
+                declared: str | None = None) -> dict:
+    """calculate() with its two collaborators held still: what is under test is
+    which unit reaches the row, not the ledger."""
+    async def resolve(_db, ref):
+        return a if ref == "a" else b
+
+    async def record(_db, _ticker, operation, params, result, *_args, **_kw):
+        record.rows.append({"operation": operation, "params": params, "result": result})
+        return "calc_stub"
+    record.rows = []
+
+    monkeypatch.setattr(tc, "_resolve", resolve)
+    monkeypatch.setattr(tc.cs, "_record", record)
+    out = await tc.calculate(None, op, "a", "b", as_quantity="m", as_unit_class=declared)
+    out["_rows"] = record.rows
+    return out
+
+
+@pytest.mark.asyncio
+async def test_a_declared_multiple_is_what_the_row_records(monkeypatch):
+    """debt ÷ EBITDA: the algebra says ratio, the registry says multiple, and
+    the ledger — which is what the table and the reader read — says multiple."""
+    out = await _calc(monkeypatch, a=q(MONEY, 2.3e9, sid="a", issuer="AAPL"),
+                      b=q(MONEY, 1.0e9, sid="b", issuer="AAPL"), declared=MULT)
+    assert out["type"]["unit_class"] == MULT
+    assert out["_rows"][0]["params"]["result_type"]["unit_class"] == MULT
+
+
+@pytest.mark.asyncio
+async def test_an_undeclared_quotient_stays_the_algebras_ratio(monkeypatch):
+    out = await _calc(monkeypatch, a=q(MONEY, 2.0, sid="a"), b=q(MONEY, 8.0, sid="b"))
+    assert out["type"]["unit_class"] == RATIO
+
+
+@pytest.mark.asyncio
+async def test_a_declaration_that_changes_the_dimension_is_refused_not_written(monkeypatch):
+    out = await _calc(monkeypatch, a=q(MONEY, 2.0, sid="a"), b=q(MONEY, 8.0, sid="b"),
+                      declared=MONEY)
+    assert out["error"] == "undeclarable_unit"
+    assert "money" in out["detail"] and "ratio" in out["detail"]
+    assert out["_rows"] == [], "a refused declaration must not reach the ledger"

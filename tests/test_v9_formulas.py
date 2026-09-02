@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import units
 from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
 
 
@@ -132,3 +133,54 @@ def test_every_formula_belongs_to_a_family():
              "returns", "reinvestment", "quality"}
     for name, f in fm.FORMULAS.items():
         assert f.family in known, f"{name}: {f.family!r}"
+
+
+# ── V17: which dimensionless measures are read as multiples ──────────────────
+#
+# Nineteen of the registry's measures are money ÷ money. Eleven are shares of a
+# whole and read as percents; eight are coverages, turnovers and leverage
+# ratios, and reading THOSE as percents is what put "230.0%" on a debt/EBITDA
+# of 2.3 and "185.0%" on a current ratio of 1.85. The algebra cannot tell the
+# two groups apart (test_unit_algebra §d), so the registry names them here and
+# the list is the claim.
+
+MULTIPLES = {"ebit_interest_coverage", "debt_to_ebitda", "debt_to_operating_cash_flow",
+             "net_debt_to_ebitda", "current_ratio", "quick_ratio",
+             "asset_turnover", "equity_multiplier"}
+
+
+def test_the_measures_read_as_multiples_are_exactly_the_declared_eight():
+    declared = {n for n, f in fm.FORMULAS.items() if f.unit_class == "multiple"}
+    assert declared == MULTIPLES
+
+
+@pytest.mark.parametrize("name", sorted(MULTIPLES))
+def test_a_multiple_is_a_quotient_the_evaluator_can_actually_declare(name):
+    """The declaration is checked at evaluation by units.refine, so a measure
+    declaring `multiple` on anything but a dimensionless quotient would refuse
+    itself at runtime rather than here."""
+    f = fm.FORMULAS[name]
+    assert f.op == "divide", f"{name} declares multiple but is a {f.op}"
+    assert units.refine(units.RATIO, f.unit_class) == units.MULTIPLE
+
+
+PERCENTS = {"gross_margin", "operating_margin", "net_margin", "roe", "roa", "roic",
+            "tax_burden", "fcf_margin", "capex_intensity", "accruals_ratio",
+            "fcf_to_debt"}
+
+
+def test_every_dimensionless_measure_is_named_in_exactly_one_of_the_two_lists():
+    """No heuristic decides this — a name is not evidence (fcf_to_debt says
+    "to" and is a percent, the way the agencies report it). Every measure that
+    comes out dimensionless is written down as a share or as a multiple, and a
+    new one fails here until someone decides which it is."""
+    dimensionless = {n for n, f in fm.FORMULAS.items()
+                     if f.unit_class in ("ratio", "multiple")}
+    assert MULTIPLES | PERCENTS == dimensionless
+    assert not (MULTIPLES & PERCENTS)
+
+
+@pytest.mark.parametrize("name", sorted(PERCENTS))
+def test_a_share_of_a_whole_stays_a_percent(name):
+    """Turning one of these into a multiple would print "0.25×" for a margin."""
+    assert fm.FORMULAS[name].unit_class == "ratio", name

@@ -481,17 +481,22 @@ async def regress(db: AsyncSession, series_x: str, series_y: str, *,
                            f"aligned by period key; {unmatched} unmatched points "
                            f"dropped and counted")}
     for key, value in (("beta", beta_hat), ("alpha", alpha_hat), ("r2", r2)):
+        # A slope is not a share. Beta says how many times the benchmark's move
+        # the name makes, and read as a percent a beta of -0.543 reached the
+        # reader as "-54.3%" (V16 battery, G7). Alpha is a return over the same
+        # bars and r² a share of variance: both are percents, and stay so.
+        unit = u.MULTIPLE if key == "beta" else u.RATIO
         calc_id = await cs._record(
             db, ticker, f"{OP_REGRESS}.{key}",
             {"series_x": series_x, "series_y": series_y, "n": n,
              "unmatched_points": unmatched,
-             "result_type": {"unit_class": u.RATIO, "kind": "scalar",
+             "result_type": {"unit_class": unit, "kind": "scalar",
                              "quantity": names[key],
                              "basis": {"interval": [window["from"], window["to"]]}}},
             {"value": value}, [series_x, series_y], flags, invoked_by,
         )
         out[key] = {"value": value, "calc_id": calc_id, "quantity": names[key],
-                    "unit_class": u.RATIO}
+                    "unit_class": unit}
     return out
 
 

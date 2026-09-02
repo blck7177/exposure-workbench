@@ -57,7 +57,7 @@ async def load_price_series(
 # spells them as analytics/units.py does. One table, so a new unit class lands
 # in both vocabularies with one edit.
 _UNIT_COLUMN = {"money": "MONEY", "ratio": "RATIO", "count": "COUNT",
-                "money_per_share": "MONEY_PER_SHARE"}
+                "money_per_share": "MONEY_PER_SHARE", "multiple": "MULTIPLE"}
 
 
 async def _record(

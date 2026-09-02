@@ -32,6 +32,7 @@ from exposure_workbench.services import drawdown_service
 from exposure_workbench.services import integration_service
 from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
+from exposure_workbench.services import security_master_service
 from exposure_workbench.services import series_service
 from exposure_workbench.services import trace_service
 from exposure_workbench.services import quantities as qn
@@ -46,10 +47,22 @@ _PERIOD_TYPES = ["quarterly", "annual", "instant"]
 # ── company / snapshot ──────────────────────────────────────────────────────────
 
 async def _resolve_company(db: AsyncSession, ticker: str) -> dict:
+    tk = ticker.upper()
     try:
-        c = await company_service.get_by_ticker(db, ticker.upper())
+        c = await company_service.get_by_ticker(db, tk)
     except company_service.CompanyNotFound:
-        return {"error": "company_not_found", "ticker": ticker.upper()}
+        # A read tool does not admit an issuer — that costs a queue slot and a
+        # quota unit, and both belong to a decision the model makes explicitly.
+        # What it does do is distinguish the two silences (V17): a name nobody
+        # has prepared yet is one call away from being readable, and saying so
+        # here is the difference between "come back with a ticker I know" and
+        # the reader's own holding being analysable.
+        if await security_master_service.is_in_universe(db, tk):
+            return {"error": "not_prepared", "ticker": tk,
+                    "detail": f"{tk} is a listed security this desk has not prepared yet, so "
+                              f"it holds no filings or facts for it. ensure_company_ready "
+                              f"puts it on the desk; the work runs in the background."}
+        return {"error": "company_not_found", "ticker": tk}
     return {
         "id": c.id, "ticker": c.ticker, "name": c.name, "cik": c.cik,
         "exchange": c.exchange, "sector": c.sector, "industry": c.industry,
@@ -206,6 +219,16 @@ async def _calculate(db: AsyncSession, op: str, a: str, b: str,
     return await typed_calculator.calculate(
         db, op, a, b, invoked_by=current_session_id(),
         as_quantity=as_quantity, named_by="session" if as_quantity else None)
+
+
+async def _rank(db: AsyncSession, refs: list[str], direction: str,
+                as_quantity: str | None = None) -> dict:
+    # direction has no default here on purpose: which end takes place 1 is the
+    # caller's claim, and a tool that guesses it would answer "which is worst?"
+    # with the best. The service keeps a default for its own callers.
+    return await typed_calculator.rank(
+        db, refs, direction=direction, as_quantity=as_quantity,
+        invoked_by=current_session_id())
 
 
 async def _evaluate_formula(db: AsyncSession, ticker: str, name: str,
@@ -659,6 +682,30 @@ def build_read_registry() -> ToolRegistry:
                                            "by its lineage (a.divide.b)"},
         }, "required": ["op", "a", "b"], "additionalProperties": False},
         fn=_calculate, tool_class=READ,
+        evidence=Evidence(),
+    ))
+    reg.register(Tool(
+        name="rank",
+        display="Ordering {direction} first",
+        description=(
+            "Put two or more quantities in order, and record the order. Use it whenever "
+            "an answer would say which is highest, lowest, largest or worst — the ranking "
+            "is computed here rather than read off by eye, and its result puts a PLACE on "
+            "the table for each name (`accruals_ratio.rank.JPM`) beside each value, so the "
+            "claim can be slotted like any other figure. Every entry must be the same "
+            "measure, in the same unit, and belong to a different issuer; anything else is "
+            "refused with the reason. Each entry keeps its own period, and they are stated."
+        ),
+        json_schema={"type": "object", "properties": {
+            "refs": {"type": "array", "minItems": 2, "items": {"type": "string"},
+                     "description": "fact_… or calc_… ids, one per name being ranked"},
+            "direction": {"type": "string", "enum": list(typed_calculator.DIRECTIONS),
+                          "description": "which end takes place 1"},
+            "as_quantity": {"type": ["string", "null"],
+                            "description": "what to call the ordered measure on the table; "
+                                           "omitted, the operands' own name is used"},
+        }, "required": ["refs", "direction"], "additionalProperties": False},
+        fn=_rank, tool_class=READ,
         evidence=Evidence(),
     ))
     reg.register(Tool(

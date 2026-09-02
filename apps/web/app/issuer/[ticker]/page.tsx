@@ -16,7 +16,7 @@ import { fmtDate, fmtMoney, fmtPct } from "../../components/charts/frame";
 import {
   BriefProvenance, Coverage, HowAssembled, Margins, PriceVsBenchmark, Windows,
 } from "../../components/issuer/panels";
-import { getPositions } from "@/lib/api";
+import { getPositions, listTasks } from "@/lib/api";
 import {
   getCitationMap, getContainment, getCoverage, getEvidenceLabels, getPanelSeries,
   getPriceIndex, getWindows,
@@ -24,8 +24,9 @@ import {
   type EvidenceLabel, type PanelSeriesResponse, type PriceIndex, type ReportedWindows,
 } from "@/lib/charts";
 import { explainApiError, explainRunError } from "@/lib/errors";
+import { apiErrorDetail } from "@/lib/http";
 import {
-  getFilings, getFinancials, getLatestBrief, getResearchRun, getResearchSources,
+  ensureReady, getFilings, getFinancials, getLatestBrief, getResearchRun, getResearchSources,
   getSection, getSnapshot, startResearch,
   type Brief, type BriefSection, type CalcRow, type FilingRow, type ResearchRun, type Snapshot, type SourceRow,
 } from "@/lib/issuer";
@@ -76,6 +77,15 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Listed, but never prepared on this desk (V17). Not an error — it is the
+  // state almost every holding outside the seeded eight is in, and the page
+  // offers the one action that changes it rather than a red bar saying the
+  // symbol is unknown.
+  const [unprepared, setUnprepared] = useState(false);
+  // Bumped when an issuer finishes being prepared: every read below is keyed on
+  // it, so the page fills from the data that now exists rather than from a
+  // reload that would lose the reader's place.
+  const [dataKey, setDataKey] = useState(0);
   const [index, setIndex] = useState<PriceIndex | null>(null);
   const [panel, setPanel] = useState<PanelSeriesResponse | null>(null);
   const [coverage, setCoverage] = useState<CoverageRow[] | null>(null);
@@ -96,13 +106,17 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   // held a sentence for that exact code, written for exactly this reader.
   useEffect(() => {
     let ignore = false;
-    getSnapshot(tk).then((s) => { if (!ignore) setSnap(s); })
-      .catch((e) => { if (!ignore) setError(explainApiError(e).notice); });
+    getSnapshot(tk).then((s) => { if (!ignore) { setSnap(s); setUnprepared(false); } })
+      .catch((e) => {
+        if (ignore) return;
+        if (apiErrorDetail(e)?.error === "not_prepared") { setUnprepared(true); return; }
+        setError(explainApiError(e).notice);
+      });
     getPriceIndex(tk).then((i) => { if (!ignore) setIndex(i); }).catch(() => setIndex(null));
     getPanelSeries(tk).then((ps) => { if (!ignore) setPanel(ps); }).catch(() => setPanel(null));
     getCoverage(tk).then((c) => { if (!ignore) setCoverage(c.measures); }).catch(() => setCoverage([]));
     return () => { ignore = true; };
-  }, [tk]);
+  }, [tk, dataKey]);
 
   const runResearch = async () => {
     setError(null);
@@ -190,12 +204,17 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
             </p>
           )}
 
+          {unprepared && (
+            <PrepareIssuer ticker={tk}
+              onReady={() => { setUnprepared(false); setDataKey((k) => k + 1); }} />
+          )}
+
           {/* The panel appears as soon as a run exists and STAYS once it settles.
               It does not auto-hide: a timer would race the reader's attention, and
               on a failed run this is the only place the reason is written. */}
           {run && <ResearchProgress run={run} stale={staleSince >= 2} />}
 
-          <div className="flex gap-1 border-b border-[#21262d]">
+          <div className={`flex gap-1 border-b border-[#21262d] ${unprepared ? "hidden" : ""}`}>
             {TABS.map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-3 py-1.5 text-[12.5px] border-b-2 -mb-px transition-colors ${
@@ -205,7 +224,7 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
             ))}
           </div>
 
-          {tab === "Overview" && (
+          {!unprepared && tab === "Overview" && (
             <div className="flex flex-col gap-3">
               {index && <PriceVsBenchmark index={index} />}
               {panel && <OverviewMargins panel={panel} />}
@@ -217,15 +236,103 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
               )}
             </div>
           )}
-          {tab === "Financials" && <FinancialsTab ticker={tk} coverage={coverage ?? []} />}
-          {tab === "Filings" && <FilingsTab ticker={tk} />}
-          {tab === "Brief" && <BriefTab ticker={tk} runStatus={runStatus} />}
+          {!unprepared && tab === "Financials" && <FinancialsTab ticker={tk} coverage={coverage ?? []} />}
+          {!unprepared && tab === "Filings" && <FilingsTab ticker={tk} />}
+          {!unprepared && tab === "Brief" && <BriefTab ticker={tk} runStatus={runStatus} />}
           <div className="h-6" />
         </div>
       </main>
     </>
   );
 }
+
+/**
+ * A listed issuer this desk has not prepared, and the one action that changes it.
+ *
+ * This is the state almost every holding is in: the book side accepts the whole
+ * listed universe, so a reader can hold forty names, and until V17 clicking any
+ * of them but the seeded eight said "not a symbol this desk knows" — a sentence
+ * about a typo, shown to someone who had just been shown the same symbol priced
+ * and weighted on their own book.
+ *
+ * The task is polled rather than the snapshot: admission writes the company row
+ * synchronously, so the snapshot starts answering a second later with an issuer
+ * that has no filings, no facts and no measures. Waiting for the WORK is the
+ * honest thing to show, and the step the queue is on is what the reader gets.
+ */
+function PrepareIssuer({ ticker, onReady }: { ticker: string; onReady: () => void }) {
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const start = async () => {
+    setError(null);
+    try {
+      const { task_id, status: s } = await ensureReady(ticker);
+      setTaskId(task_id);
+      setStatus(s);
+    } catch (e) {
+      setError(explainApiError(e).notice);
+    }
+  };
+
+  useEffect(() => {
+    if (!taskId || status === "completed" || status === "failed") return;
+    const iv = setInterval(async () => {
+      try {
+        const mine = await listTasks();
+        const t = mine.find((x) => x.id === taskId);
+        if (!t) return;
+        setStatus(t.status);
+        if (t.status === "failed") {
+          // The worker's own sentence. A readiness run fails loudly — a CIK that
+          // does not resolve, a filing that will not parse — and the reason is
+          // the only thing that tells a reader whether to try again.
+          setError(t.error_message || `Preparing ${ticker} failed.`);
+        }
+        if (t.status === "completed") onReady();
+      } catch {
+        // A poll that throws is a blip, not an outcome: keep waiting.
+      }
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [taskId, status, ticker, onReady]);
+
+  const working = !!taskId && status !== "completed" && status !== "failed";
+  return (
+    <div className="rounded-md border border-[#30363d] bg-[#161b22] px-4 py-4 flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-slate-200">
+        {ticker} is listed, and not yet on this desk
+      </h2>
+      <p className="text-[12px] text-slate-400 leading-relaxed max-w-[62ch]">
+        Preparing an issuer reads its 10-K and 10-Q filings from EDGAR, extracts the
+        reported figures, indexes the text for quotation and refreshes its prices.
+        It runs in the background and takes a couple of minutes; you can leave this
+        page and come back.
+      </p>
+      {error && (
+        <p className="rounded-md border border-amber-900/60 bg-amber-950/25 px-3 py-2 text-[12px] text-amber-300">
+          {error}
+        </p>
+      )}
+      <div className="flex items-center gap-3 mt-1">
+        <AuthGate fallback={<span className="text-[11.5px] text-slate-600">Sign in to prepare an issuer</span>}>
+          <button onClick={start} disabled={working}
+            className="flex items-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-3 py-1.5 text-xs font-medium text-white">
+            {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {working ? "Preparing…" : `Prepare ${ticker}`}
+          </button>
+        </AuthGate>
+        {status && (
+          <span className="text-[11.5px] text-slate-500">
+            {status === "pending" ? "queued" : status}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function OverviewMargins({ panel }: { panel: PanelSeriesResponse }) {
   const { open } = useEvidence();

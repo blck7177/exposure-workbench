@@ -50,7 +50,10 @@ def _stub(schema: dict):
         return {name: _stub(props[name]) for name in (schema.get("required") or [])}
     if kind == "array":
         items = schema.get("items") or {"type": "string"}
-        return [_stub(items)] if schema.get("minItems") else []
+        # As many as the schema asks for, not one: `rank` takes at least two
+        # operands, and a one-element stub failed its own schema — which reads
+        # as the tool refusing a null it accepts.
+        return [_stub(items)] * int(schema.get("minItems") or 0)
     if kind == "integer":
         return schema.get("minimum", 1)
     if kind == "number":

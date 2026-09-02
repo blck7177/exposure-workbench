@@ -61,7 +61,7 @@ MONEY_PER_SHARE = "MONEY_PER_SHARE"
 # One total bridge over the algebra's classes, so a stored fact's unit is
 # judged once (analytics/units.py) and only translated here.
 _UNIT_CLASS_OF = {units.MONEY: MONEY, units.RATIO: RATIO, units.COUNT: COUNT,
-                  units.MONEY_PER_SHARE: MONEY_PER_SHARE}
+                  units.MONEY_PER_SHARE: MONEY_PER_SHARE, units.MULTIPLE: MULTIPLE}
 
 # What a ledger row IS, for the assertion checks (trend needs a series, absence
 # needs a refusal). `scalar` is everything else a calc row can be.
@@ -71,6 +71,8 @@ KIND_ABSENCE = "absence"
 
 _SERIES_OPS = ("series", "flow.series", "balance.series", "change.")
 _ABSENCE_PREFIX = "absence."
+# The ordering row's operation, named once in the calculator that writes it.
+from exposure_workbench.services.typed_calculator import RANK_OP  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -176,12 +178,11 @@ def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
 
 def _calc_unit(row: CalcLedger) -> str:
     """The row's own column first, then the params blob, then the legacy table."""
-    if row.unit_class in (MONEY, RATIO, COUNT, MONEY_PER_SHARE):
+    if row.unit_class in (MONEY, RATIO, COUNT, MONEY_PER_SHARE, MULTIPLE):
         return row.unit_class
     recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
-    if recorded in ("money", "ratio", "count", "money_per_share"):
-        return {"ratio": RATIO, "money": MONEY, "count": COUNT,
-                "money_per_share": MONEY_PER_SHARE}[recorded]
+    if recorded in units.UNIT_CLASSES:
+        return _UNIT_CLASS_OF[recorded]
     return RATIO if row.operation in _CALC_RATIO_OPS else MONEY
 
 
@@ -198,6 +199,8 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     # net_margin and shown `calc.scalar.divide` wrote the name it knew.
     quantity = ((row.params or {}).get("result_type") or {}).get("quantity")
     head = quantity if isinstance(quantity, str) and quantity else row.operation
+    if row.operation == RANK_OP:
+        return _from_ranking(row, head, unit, cid)
     if "points" in result:
         for p in result.get("points") or []:
             v = (p or {}).get("value")
@@ -224,6 +227,35 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     # else is a filed figure or a read over filed figures.
     fallback = ("price" if (row.operation or "").startswith("price.")
                 else "derived" if head in fm.FORMULAS else "fundamentals")
+    values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
+    return Resolved(tuple(values), frozenset(), calc_kind(row))
+
+
+def _from_ranking(row: CalcLedger, head: str, unit: str, cid: str) -> Resolved:
+    """The names an ordering puts on the table (V17).
+
+    An ordering is the one row whose POINT is the relation between its entries,
+    so what it publishes is a place per entry as well as a value per entry:
+    `accruals_ratio.rank.JPM` is 1 or it is not, and an answer that says JPM is
+    the highest can slot the ordinal that says so. The leader is a label rather
+    than a figure and is not a quantity — it rides in the payload, where a
+    ticker is text the model may write.
+    """
+    entries = (row.result or {}).get("ordering") or []
+    values: list[Quantity] = []
+    for e in entries:
+        label, value, place = e.get("label"), e.get("value"), e.get("rank")
+        if not isinstance(label, str):
+            continue
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            values.append(Quantity(float(value), unit, f"{head}.{label}", cid))
+        if isinstance(place, int):
+            values.append(Quantity(float(place), COUNT, f"{head}.rank.{label}", cid))
+    spread = (row.result or {}).get("spread")
+    if isinstance(spread, (int, float)) and not isinstance(spread, bool):
+        values.append(Quantity(float(spread), unit, f"{head}.spread", cid))
+    values.append(Quantity(float(len(entries)), COUNT, f"{head}.ranked", cid))
+    fallback = "derived" if head in fm.FORMULAS else "fundamentals"
     values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
     return Resolved(tuple(values), frozenset(), calc_kind(row))
 

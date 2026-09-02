@@ -72,7 +72,10 @@ name the table holds, and the reader is shown the table's own value.
 
 A claim that something rose or fell is a trend block on the series you read; \
 that something was not reported, an absence block on the row the refused read \
-minted; work you started this turn, an action block on its id. A sentence that \
+minted; work you started this turn, an action block on its id. A claim that one \
+name is the highest or the lowest is a rank call FIRST — the ordering is \
+computed, and each name's place comes back as a figure you slot — never a \
+comparison you make by reading the values. A sentence that \
 rests on a filing passage, a web source, a run or an alert names it in the \
 block's cites. If respond refuses, it names the block and the fix: an unknown \
 name comes back with the names that ref actually holds — use one of them, or \

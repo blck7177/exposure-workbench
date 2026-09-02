@@ -26,6 +26,7 @@ from exposure_workbench.services import document_index_service as dix
 from exposure_workbench.services import filing_ingestion_service as fis
 from exposure_workbench.services import market_data_ingestion_service as mds
 from exposure_workbench.services import recipe
+from exposure_workbench.utils import cik as cik_util
 from exposure_workbench.workflow.step_context import mark_skipped, step
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,13 @@ async def run_readiness(
     async with step(db, run_id, "resolve_company", f"Resolving {ticker} via EDGAR"):
         company = await company_service.require_investigable(db, ticker)
         dto = filing_provider.resolve_company(ticker)
-        if dto.cik and company.cik and dto.cik != company.cik:
-            raise RuntimeError(f"CIK mismatch for {ticker}: seed={company.cik} edgar={dto.cik}")
-        company.cik = company.cik or dto.cik
+        # Compared as numbers, not as strings: the security master pads to ten
+        # digits (SEC's URL form) and edgartools does not, and a mismatch here
+        # is supposed to mean two different companies (utils/cik.py).
+        if dto.cik and company.cik and not cik_util.same(dto.cik, company.cik):
+            raise RuntimeError(f"CIK mismatch for {ticker}: stored={company.cik} "
+                               f"edgar={dto.cik}")
+        company.cik = cik_util.canonical(company.cik) or cik_util.canonical(dto.cik)
         company.industry = dto.industry or company.industry
         company.sector = company.sector or dto.sic
         company.resolved_by = "edgartools"
