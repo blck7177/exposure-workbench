@@ -39,6 +39,7 @@ from exposure_workbench.analytics import resources
 from exposure_workbench.analytics import units
 from exposure_workbench.db.models import (
     CalcLedger,
+    Company,
     ExposureMetrics,
     FactorAttribution,
     FilingChunk,
@@ -112,6 +113,11 @@ class Resolved:
     quoted: frozenset[str]          # digit keys a passage literally contains
     kind: str | None                # scalar | series | absence | passage | source | run | fact | alert | position
     text: str | None = None         # the passage, for chunk_/src_
+    # V19. Who the row is ABOUT, when that is not in the names it holds: a
+    # get_flow series is `net_income@2025-12-31` for every issuer and the
+    # issuer sits in the ledger row's params. The table renderer prefixes it
+    # when deriving a comparison table's row labels; the gate never reads it.
+    subject: str | None = None
 
 
 # A calc's unit is fully determined by its operation name and nothing else —
@@ -228,7 +234,13 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     fallback = ("price" if (row.operation or "").startswith("price.")
                 else "derived" if head in fm.FORMULAS else "fundamentals")
     values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
-    return Resolved(tuple(values), frozenset(), calc_kind(row))
+    # The ledger's company_id column holds the TICKER the row is about (a plain
+    # column, so SPY and the like fit); the params carry one only on the price
+    # rows. Column first, params second, and nothing for a row about no single
+    # issuer (a typed-calculator combination across two).
+    ticker = getattr(row, "company_id", None) or (row.params or {}).get("ticker")
+    return Resolved(tuple(values), frozenset(), calc_kind(row),
+                    subject=ticker.upper() if isinstance(ticker, str) and ticker else None)
 
 
 def _from_ranking(row: CalcLedger, head: str, unit: str, cid: str) -> Resolved:
@@ -273,10 +285,14 @@ async def _from_fact(db: AsyncSession, fid: str) -> Resolved:
         # trace the model sees, the same one a passage gets.
         return Resolved((), frozenset(), "fact")
     unit_class = _UNIT_CLASS_OF[unit]
+    company_id = getattr(row, "company_id", None)
+    ticker = None
+    if db is not None and company_id:
+        ticker = (await db.execute(select(Company.ticker).where(Company.id == company_id))).scalar_one_or_none()
     return Resolved((Quantity(float(row.value), unit_class,
                               f"{row.normalized_metric or row.raw_concept}@{row.period_end}", fid,
                               group="price" if unit_class == MONEY_PER_SHARE else "fundamentals"),),
-                    frozenset(), "fact")
+                    frozenset(), "fact", subject=ticker)
 
 
 # What an alert row carries is declared once, in resources.py, beside the other

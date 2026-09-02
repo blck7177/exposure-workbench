@@ -407,8 +407,8 @@ Brief 的 LLM 后处理/改写规则、多轮人工审批流、brief 版本 diff
 ### 工具面(face)是声明式配置
 
 ```
-FACE_META_AGENT = read 全集 + delegation{ensure_company_ready, start_issuer_research,
-                  start_exposure_run} + think + respond
+FACE_META_AGENT = read 全集 + search_external_research(V19) + delegation{ensure_company_ready,
+                  start_issuer_research, start_exposure_run} + think + respond
 FACE_RESEARCH   = read 全集 + search_external_research + think + submit_brief
                   (无 delegation → agent 树深度架构性封顶为 2,防递归不靠约定)
 FACE_RECIPE     = 数据+计算原语 fn 直调(无 LLM,无预算,只留台账)
@@ -883,3 +883,24 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 ### 守卫
 
 `test_unit_algebra`(代数表逐行+交换律+_record 拒绝)、`test_share_counts`、`test_price_quantities`/`test_determinacy`(n 不足=有原因拒绝,决不缩窗)、`test_table_meaning`(三元组+图例+投影理由全链路)、`test_registry_conditions`(失效条件逐条+import 校验反例)、`test_table` 第二收缩相双 pin、`test_symmetry` 扩(前缀三处一集合、RUN_GROUPS 同源、alert 列派生)、registration 拒绝无声明工具(白名单从测试移进注册处本身)。
+
+## M21 — 标签是派生的、联网在 chat 里、证据链到底(V19,2026-09-02)
+
+**一句话**:门证明数字有出处,证明不了数字旁边的字——9/2 电池里 `Peak-to-trough decline | $205.10`(槽是 `NVDA.adj_close@2026-06-05`,即 trough)、"market cap at $919.77"(槽是 `LLY.close`)、"要涨回的高点"(槽是最后收盘)三处都是**模型写的标签盖住了正确的数字**。表格与 trend 是标签结构化的两种块,所以在那里把标签变成**从槽名派生**,模型没有格子可写;段落散文留给门外的 critic(下一批,LLM 不进门)。
+
+### 形状
+
+- **`metric_table` 文法**:`rows` 只收槽,`columns` 删除;字符串格子在 schema(关口前)与 `validate_shape`(直接调用方)两处以同一句 `TABLE_RULE` 拒绝。渲染(`answer_blocks.rendered`)按槽名派生 `header`/`labels`/`explicit`:一列名字逐 token 对齐 → 公共 token 为表头、变化 token 为行标签(`net_income.rank.GOOGL` / `net_income.GOOGL` → 表头 "net income rank | net income",行 GOOGL);对不齐(电池里的回撤表:两个带日期的点 + `quality_flags.n`)→ 该列 explicit,每格写全名,**重复的槽显示成重复的行**而不是第二个度量。三个派生键模型不能自己带(unknown key 拒)。
+- **`trend` 块**:resolver 在判断言行类型时顺手把该序列的带日期点交给渲染(`Verdict.series`,读的是已加载的桌面,无第二次查询);渲染附 `series{label, from, to, direction, n}`,方向从首末两值**算出**。模型的句子照旧显示;"climbed"配一条向下的序列时读者两样都看见——门不判句子(9/1 契约,`test_the_direction_is_the_series_word_not_the_models` 钉住"不判")。
+- **联网进 meta 面**:`register_search_tool` 一处注册、两个 builder 都调;`FACE_META_AGENT` 列入;子预算 `external_search_budget`(5/session,含 chat)由 wrapper 按 `budget_key` 扣,`src_` 行经既有 `Evidence()` 声明上桌、既有 resolver 与 "Source · web" 卡片穿透。chat 里无 research run → `research_sources.research_run_id` NULL(列本可空,表无 RLS)。不在 `companies` 的票先 `company_service.admit`(V17,只读本地宇宙);ETF/无 CIK 具名拒绝——source 行按发行人挂,没有发行人就没有座位。`_FACE_CAPABILITIES` 联网从 cannot 移到 can;`_SYSTEM` 加一句何时用网。
+- **证据链两个断点**:`_fact` 带出 filing 的 `source_url/form_type/filing_date`(按 `filing_id`,否则按 fact 自己的 accession);`_run` 的 `upstream` 列出持仓(`pos_` + 标签),用 `portfolio_service.positions_for_run`——从 workflow 挪出来的同一个两步判定,run 算的和卡片列的是同一批行。
+
+### 有意不做
+
+- 门里不加"方向词与序列方向一致"的词法规则(9/1:validation 永久封闭)。
+- 单行多列表的每格写全名,不为它发明列头。
+- 联网搜索仍按发行人挂:一只 ETF 的新闻拒绝在 `not_investigable`,这是 `research_sources.company_id` 的形状,不是 prompt 的规矩。
+
+### 守卫
+
+`test_v19_labels`:schema 拒字符串格与 `columns`(指名字段)、三种真实形状的派生(排序表/run 子表/回撤表)、单行表、派生键模型不可自带、resolver→渲染的序列交接、方向算出且句子不判、两面同一注册、能力声明改口、搜索工具走 admit、fact 卡带 URL、run 卡经 `positions_for_run`、workflow 不再有第二份两步判定。

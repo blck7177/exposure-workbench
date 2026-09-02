@@ -53,6 +53,12 @@ class Verdict:
     # to a row of evidence; listing it among the citations would send the
     # evidence drawer to a row that does not exist.
     citations: list[str] = field(default_factory=list)
+    # V19. For every trend the answer makes, the series it points at as the
+    # table holds it: dated points, unit, name — so the renderer can let the
+    # series state its own first, last and direction beside the model's
+    # sentence. Read off the table already loaded; no second query.
+    series: dict[str, dict] = field(default_factory=dict)
+    subjects: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -132,6 +138,8 @@ def resolve_against(blocks, table: tb.Table) -> Verdict:
             })
             continue
         v.resolved.append(ab.Resolved(q.source_id, q.label, q.value, q.unit_class))
+        if slot["ref"] in table.subjects:
+            v.subjects[slot["ref"]] = table.subjects[slot["ref"]]
     if v.problems:
         v.error = "unknown_name"
         v.detail = "each slot names a figure by the name the table gave it; `available` lists them"
@@ -155,6 +163,8 @@ def resolve_against(blocks, table: tb.Table) -> Verdict:
         if table.kind(ref) not in wanted[need]:
             v.problems.append({"at": at, "ref": ref, "reason": f"not_a_{need}",
                                "kind": table.kind(ref)})
+        elif need == "series" and ref not in v.series:
+            v.series[ref] = _series_of(table, ref)
     if v.problems:
         v.error = "unsupported_assertion"
         v.detail = ("a trend or chart points at a series; an absence at the row a refused read "
@@ -168,9 +178,26 @@ async def resolve(db: AsyncSession, session_id: str, blocks) -> Verdict:
     return resolve_against(blocks, await tb.load(db, session_id))
 
 
+def _series_of(table: tb.Table, ref: str) -> dict:
+    """The dated points a series row put on the table, as (period, value).
+
+    A point's name is `<measure>@<period>` (quantities._from_calc); anything
+    else the row holds — a summary value, a count — is not a point.
+    """
+    points: list[tuple[str, float]] = []
+    label, unit = "", ""
+    for name, q in table.quantities.get(ref, {}).items():
+        head, sep, period = name.rpartition("@")
+        if not sep or not period:
+            continue
+        points.append((period, q.value))
+        label, unit = head, q.unit_class
+    return {"points": points, "label": label, "unit_class": unit}
+
+
 def accepted(blocks, verdict: Verdict) -> dict:
     """What an exit returns when the verdict is clean."""
-    filled = ab.rendered(blocks, verdict.resolved)
+    filled = ab.rendered(blocks, verdict.resolved, verdict.series, verdict.subjects)
     return {
         "blocks": filled,
         "text": ab.prose_of(filled),

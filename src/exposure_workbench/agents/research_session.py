@@ -41,7 +41,8 @@ own value, so you never write a number. Text carries no digits except dates. A \
 sentence resting on a passage names that passage in the block's `cites`. A claim \
 that something rose or fell is a `trend` on the series it was read from; a claim \
 that something was not reported is an `absence` on the row the refused read \
-minted; a comparison or ranking is a `metric_table`.
+minted; a comparison or ranking is a `metric_table` of slots — its labels are \
+derived from the slots' names, so a cell is never text.
 
 Work efficiently within your tool budget: get the issuer snapshot, pull the key \
 financial series and changes, read/search the relevant filing sections, check \

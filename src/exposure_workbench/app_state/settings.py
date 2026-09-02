@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Agent budgets (env-overridable; see IMPLEMENTATION_PLAN §0.5)
     session_tool_budget: int = 40       # tool calls per SESSION (research; and any
                                         # session with no per-turn budget of its own)
-    external_search_budget: int = 5     # Tavily searches per research run
+    external_search_budget: int = 5     # Tavily searches per SESSION (a research run or a chat; V19)
     # V3-B2: tool calls per TURN, for sessions that have turns. A lifetime budget
     # is the wrong shape for a conversation — it does not run out, it makes the
     # session progressively less able to answer, with no signal to the user. The

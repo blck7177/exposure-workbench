@@ -124,6 +124,9 @@ class Table:
     # projected off the table, and the row's reason is kept (ref -> name ->
     # sentence) so a refusal for that exact name can say it.
     projected: dict[str, dict[str, str]] = field(default_factory=dict)
+    # V19. ref -> who the row is about (quantities.Resolved.subject), for the
+    # renderer's row labels only; nothing the gate checks reads it.
+    subjects: dict[str, str] = field(default_factory=dict)
 
     def holds(self, ref: str) -> bool:
         return ref in self.refs
@@ -180,6 +183,8 @@ async def _place(db: AsyncSession, table: Table, entry: dict) -> None:
     qs = [q for q in qs if q.not_alone is None]
     table.refs.add(rid)
     table.rows[rid] = r.kind
+    if r.subject:
+        table.subjects[rid] = r.subject
     if qs:
         slot = table.quantities.setdefault(rid, {})
         for q in qs:

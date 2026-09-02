@@ -116,8 +116,18 @@ export function EvidenceCard({ evidence, onOpen }: {
             </Field>
             <Field label="Reported as">{String(b.raw_concept ?? "—")}</Field>
             <Field label="Filing">
-              {String(p.source_accession ?? "—")}
+              {typeof p.form_type === "string"
+                ? `${p.form_type} · filed ${String(p.filing_date ?? "—")} · ${String(p.source_accession ?? "—")}`
+                : String(p.source_accession ?? "—")}
             </Field>
+            {typeof p.source_url === "string" && (
+              <Field label="Source">
+                <a href={p.source_url} target="_blank" rel="noreferrer"
+                  className="text-sky-400 hover:underline">
+                  {p.source_url_kind === "edgar_index" ? "Open the filing's EDGAR index ↗" : "Open at SEC ↗"}
+                </a>
+              </Field>
+            )}
           </dl>
         </>
       )}
@@ -191,6 +201,18 @@ export function EvidenceCard({ evidence, onOpen }: {
           <Field label="Day">{fmtValue(b.daily_return)}</Field>
           <Field label="VaR 95% 1d">{fmtValue(b.var_95_1d)}</Field>
           <Field label="Max drawdown">{fmtValue(b.max_drawdown)}</Field>
+          {upstream.length > 0 && (
+            <Field label="Holdings">
+              <div className="flex flex-wrap gap-1.5 mt-0.5">
+                {upstream.map((u) => (
+                  <button key={u.id} onClick={() => onOpen(u.id)}
+                    className="text-[11px] px-2 py-0.5 rounded border border-[#30363d] text-slate-300 hover:border-slate-500">
+                    {u.label ?? u.type} →
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
         </dl>
       )}
 

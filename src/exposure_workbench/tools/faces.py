@@ -97,7 +97,13 @@ META_ONLY_READS = [
     "get_drawdown_episodes", "explain_episode",
 ]
 
+# V19: search_external_research is on BOTH faces. Until then the chat had no
+# web at all — asked for the news, the model searched filings and said so in a
+# capability statement only describe_run carried. The sub-budget
+# (external_search_budget per session) and the src_ declaration are the tool's
+# own and travel with it.
 FACE_META_AGENT = READ_CORE + META_ONLY_READS + [
+    "search_external_research",
     "ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond",
 ]
 FACE_RESEARCH = READ_CORE + ["search_external_research", "submit_brief"]

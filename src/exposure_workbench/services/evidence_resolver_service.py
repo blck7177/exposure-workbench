@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import display_names as dn
+from exposure_workbench.services import portfolio_service
 from exposure_workbench.db.models import (
     CalcLedger,
     Company,
@@ -175,13 +176,40 @@ class EvidenceNotFound(Exception):
         self.ref_id = ref_id
 
 
+def _edgar_index(cik: str, accession: str) -> str:
+    """The filing's folder on EDGAR: /Archives/edgar/data/<cik as int>/<accession without dashes>/."""
+    return f"https://www.sec.gov/Archives/edgar/data/{int(str(cik).strip())}/{accession.replace('-', '')}/"
+
+
 async def _fact(db: AsyncSession, fid: str) -> dict | None:
     row = (await db.execute(select(FinancialFact).where(FinancialFact.id == fid))).scalar_one_or_none()
     if row is None:
         return None
-    accession = None
+    # V19. The filing row carries the SEC URL, the form and the date; until
+    # now the card stopped at an accession number the reader had to go and
+    # look up. By filing_id when the fact has one, else by the accession the
+    # fact itself names (facts folded from a restatement keep their own).
+    filing = None
     if row.filing_id:
-        accession = (await db.execute(select(Filing.accession_number).where(Filing.id == row.filing_id))).scalar_one_or_none()
+        filing = (await db.execute(select(Filing).where(Filing.id == row.filing_id))).scalar_one_or_none()
+    if filing is None and row.source_accession:
+        filing = (await db.execute(
+            select(Filing).where(Filing.accession_number == row.source_accession))).scalar_one_or_none()
+    accession = filing.accession_number if filing else row.source_accession
+    # Most facts (12,239 of 13,343 at mapping v4) name an accession the desk
+    # never ingested as a filing row: the XBRL feed carries every filing the
+    # figure was reported in, the filings table only the documents read for
+    # passages. The EDGAR index of a filing is a function of (CIK, accession)
+    # and nothing else, so the pointer is derived rather than absent — and
+    # says which of the two it is (`source_url_kind`), because an index page
+    # is not the primary document.
+    source_url = filing.source_url if filing else None
+    url_kind = "document" if source_url else None
+    if source_url is None and accession:
+        cik = (await db.execute(select(Company.cik).where(Company.id == row.company_id))).scalar_one_or_none()
+        if cik:
+            source_url = _edgar_index(cik, accession)
+            url_kind = "edgar_index"
     return {
         "type": "fact", "id": fid,
         "label": " · ".join(x for x in (
@@ -197,6 +225,9 @@ async def _fact(db: AsyncSession, fid: str) -> dict | None:
         },
         "provenance": {
             "source_accession": row.source_accession or accession,
+            "form_type": filing.form_type if filing else None,
+            "filing_date": filing.filing_date.isoformat() if filing and filing.filing_date else None,
+            "source_url": source_url, "source_url_kind": url_kind,
             "provider": row.provider, "mapping_version": row.mapping_version,
             "quality_flags": row.quality_flags,
         },
@@ -312,7 +343,16 @@ async def _run(db: AsyncSession, rid: str) -> dict | None:
             "completed_at": row.completed_at.isoformat() if row.completed_at else None,
             "task_id": row.task_id,
         },
-        "upstream": [],
+        # V19. The holdings the run was computed over, resolved the one way
+        # the workflow resolves them (portfolio_service.positions_for_run).
+        # A weight or a day's P&L used to stop here; now it reaches the rows
+        # that were held.
+        "upstream": [
+            {"type": "position", "id": p.id,
+             "label": " · ".join(x for x in (
+                 p.ticker, f"{_num(p.quantity):,.0f} units" if p.quantity is not None else None) if x)}
+            for p in await portfolio_service.positions_for_run(db, row.portfolio_id, row.as_of_date)
+        ],
     }
 
 

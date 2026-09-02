@@ -94,6 +94,23 @@ async def get_positions_latest(
     return await get_positions(db, portfolio_id, as_of_date=None)
 
 
+async def positions_for_run(db: AsyncSession, portfolio_id: str, as_of_date: date) -> list[Position]:
+    """The holdings a run reports on, resolved the one way everything agrees on.
+
+    get_positions filters as_of_date by EXACT equality, while uploads date a
+    snapshot by max(price_date) and a run's as_of defaults to today — so the
+    two normally differ and the latest snapshot is the branch that actually
+    fires. One definition (V19, moved out of the exposure workflow): the run
+    computes over these rows, and the evidence card for the run lists these
+    rows, so a copy that skipped the second branch would show a reader no
+    holdings for a run that valued ten.
+    """
+    positions = await get_positions(db, portfolio_id, as_of_date)
+    if not positions:
+        positions = await get_positions_latest(db, portfolio_id)
+    return positions
+
+
 async def get_risk_limits(
     db: AsyncSession,
     portfolio_id: str,

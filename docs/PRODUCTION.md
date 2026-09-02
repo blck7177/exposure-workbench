@@ -158,7 +158,7 @@ one conversation, these bound one day — and since V3-B2 they run on two tracks
 **15 tool calls per TURN** for a conversation (reset when the turn is claimed,
 which is what an over-long answer runs into) and **40 per SESSION** as the
 lifetime ceiling, which is the only track a research run and the MCP host are on.
-External search stays a sub-budget of 5 per session.
+External search stays a sub-budget of 5 per session — and since V19 a chat session is one too, because `search_external_research` is on the meta face.
 
 `QUOTA_UNLIMITED_USERS` (V7-Q) is a comma-separated list of user ids exempt from
 the **refusal** — never from the count. Both rows are still written, so

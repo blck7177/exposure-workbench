@@ -77,7 +77,7 @@ def test_a_chart_of_unknown_kind_is_refused_naming_kind():
 
 @pytest.mark.parametrize("block", [
     {"type": "paragraph", "runs": ["fine"]},
-    {"type": "metric_table", "columns": ["a"], "rows": [["x"]]},
+    {"type": "metric_table", "rows": [[{"ref": "run_1", "name": "issuer_exposures.MSFT.weight"}]]},
     {"type": "chart", "kind": "bar", "series_ref": "calc_1"},
     {"type": "trend", "text": "rose", "series_ref": "calc_1"},
     {"type": "absence", "text": "not filed", "absence_ref": "calc_1"},
@@ -96,8 +96,8 @@ def test_an_unknown_key_on_any_block_is_refused_naming_the_key(block):
 @pytest.mark.parametrize("block", [
     {"type": "paragraph", "runs": ["MSFT weighs ", {"ref": "run_1", "name": "issuer_exposures.MSFT.weight"}],
      "cites": ["chunk_1"]},
-    {"type": "metric_table", "title": "Weights", "columns": ["issuer", "weight"],
-     "rows": [["MSFT", {"ref": "run_1", "name": "issuer_exposures.MSFT.weight"}]], "cites": ["src_1"]},
+    {"type": "metric_table", "title": "Weights",
+     "rows": [[{"ref": "run_1", "name": "issuer_exposures.MSFT.weight"}]], "cites": ["src_1"]},
     {"type": "chart", "kind": "line", "title": "Revenue", "series_ref": "calc_1"},
     {"type": "trend", "text": "revenue rose each quarter", "series_ref": "calc_1"},
     {"type": "absence", "text": "the issuer files no such line", "absence_ref": "calc_2"},
@@ -176,14 +176,14 @@ def test_text_of_drops_slots_and_text_by_block_keeps_prose_with_its_own_block():
     would let a quotation in block 2 be justified by a passage cited in block 1."""
     blocks = [
         {"type": "paragraph", "runs": ["MSFT weighs ", {"ref": "run_1", "name": "w"}, " of the book."]},
-        {"type": "metric_table", "title": "Weights", "columns": ["a", "b"],
-         "rows": [["MSFT", {"ref": "run_1", "name": "w"}]]},
+        {"type": "metric_table", "title": "Weights",
+         "rows": [[{"ref": "run_1", "name": "w"}]]},
         {"type": "trend", "text": "revenue rose", "series_ref": "calc_1"},
     ]
-    assert ab.text_of(blocks) == "MSFT weighs  of the book.\nWeights\nMSFT\nrevenue rose"
+    assert ab.text_of(blocks) == "MSFT weighs  of the book.\nWeights\nrevenue rose"
     assert ab.text_by_block(blocks) == [
         ("blocks[0]", "MSFT weighs  of the book."),
-        ("blocks[1]", "Weights\nMSFT"),
+        ("blocks[1]", "Weights"),
         ("blocks[2]", "revenue rose"),
     ]
 

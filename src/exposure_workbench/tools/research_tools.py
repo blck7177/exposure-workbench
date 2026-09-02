@@ -19,7 +19,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import Company, IssuerBrief, ResearchRun
+from exposure_workbench.db.models import IssuerBrief, ResearchRun
 from exposure_workbench.services import answer_blocks as ab
 from exposure_workbench.services import research_search_service as rss
 from exposure_workbench.services import resolver
@@ -49,19 +49,37 @@ async def _run_for_session(db: AsyncSession, session_id: str) -> ResearchRun | N
 
 # ── external research (M6) ───────────────────────────────────────────────────────
 
-async def _search_external_research(db: AsyncSession, ticker: str, query: str, reason: str) -> dict:
+async def _search_external_research(db: AsyncSession, ticker: str, query: str, reason: str,
+                                    days: int | None = None) -> dict:
     """Delegation tool: reason is REQUIRED by schema — the judgment is logged.
-    Persists results and returns citable src_ ids."""
+    Persists results and returns citable src_ ids.
+
+    V19: on both faces. Inside a research run the sources belong to the run;
+    in a chat turn there is no run and `research_run_id` stays NULL — the row
+    is keyed by the company either way, and the src_ id goes on the session's
+    table through the same declaration. A ticker the desk has not met is
+    admitted from the listed universe first (company_service.admit, V17), so
+    "what is the news on X" works for any listed filer; an ETF or a name with
+    no CIK is refused with its reason, because a source row is issuer-scoped
+    and there is no issuer to hang it on.
+    """
+    from exposure_workbench.services import company_service
     tk = ticker.upper()
-    company = (await db.execute(select(Company).where(Company.ticker == tk))).scalar_one_or_none()
-    if company is None:
-        return {"error": "company_not_found", "ticker": tk}
-    run = await _run_for_session(db, current_session_id())
     try:
-        sources = await rss.search(db, company.id, query, research_run_id=run.id if run else None)
+        company = await company_service.admit(db, tk)
+    except company_service.CompanyNotFound:
+        return {"error": "company_not_found", "ticker": tk,
+                "detail": "not a listed symbol in this desk's universe"}
+    except (company_service.NotInvestigable, company_service.NotAnSecFiler) as e:
+        return {"error": "not_investigable", "ticker": tk, "detail": str(e)}
+    run = await _run_for_session(db, current_session_id())
+    composed = rss.compose_query(company.name, tk, query)
+    try:
+        sources = await rss.search(db, company.id, composed, research_run_id=run.id if run else None,
+                                   days=days)
     except rss.ResearchProviderUnavailable as e:
         return {"error": "provider_unavailable", "detail": str(e)}
-    return {"ticker": tk, "query": query, "reason": reason, "sources": sources}
+    return {"ticker": tk, "query": composed, "days": days, "reason": reason, "sources": sources}
 
 
 # ── submit_brief gate (M9, V15-S5) ────────────────────────────────────────────────
@@ -144,21 +162,38 @@ SUBMIT_BRIEF_SCHEMA = {
 }
 
 
-def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
+def register_search_tool(reg: ToolRegistry) -> ToolRegistry:
+    """The one registration of the web search — called by both registry builders
+    (V19), so the meta face and the research face carry the same tool with the
+    same budget key and the same evidence declaration."""
     reg.register(Tool(
         name="search_external_research",
         display="Searching the web for “{query}”",
-        description="Search current external developments for an issuer (news, industry, regulatory). "
-                    "reason states why the existing evidence is insufficient.",
+        description=(
+            "Search the web for what the filings cannot hold: news, guidance, an event "
+            "after the last report, industry or regulatory developments — and anything the "
+            "user asks you to look up. Each result is a src_ id on the table; a sentence "
+            "resting on one names it in the block's cites. reason states why the filed "
+            "evidence is insufficient."
+        ),
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},
-            "query": {"type": "string"},
+            "query": {"type": "string", "description":
+                      "what to look for; the issuer's name is added by the tool, so do not repeat it"},
             "reason": {"type": "string", "description": "why this search is needed now"},
+            "days": {"type": ["integer", "null"], "minimum": 1, "maximum": 365, "description":
+                     "restrict to news published within this many days (the past week is 7); "
+                     "omit for no time restriction"},
         }, "required": ["ticker", "query", "reason"], "additionalProperties": False},
         fn=_search_external_research, tool_class=DELEGATION, budget_key="external_search",
-        # Its sources are the brief's evidence: src_ ids go on the table.
+        # Its sources are the answer's evidence: src_ ids go on the table.
         evidence=Evidence(),
     ))
+    return reg
+
+
+def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
+    register_search_tool(reg)
     reg.register(Tool(
         name="submit_brief",
         display="Resolving every figure in the brief against the table, then filing it",
@@ -168,7 +203,8 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
             "each a list of BLOCKS. A figure is a SLOT {ref, name} using a name from the `table` "
             "a tool result carried — the reader is shown the table's own value; you never write "
             "a number. Blocks: `paragraph` (runs of strings and slots; `cites`: the chunk_/src_ "
-            "ids its prose rests on), `metric_table` (columns + rows of strings/slots), `chart` "
+            "ids its prose rests on), `metric_table` (rows of slots only — the header and each "
+            "row's label are derived from the slots' names), `chart` "
             "(kind + series_ref), `trend` (text + series_ref), `absence` (text + absence_ref), "
             "`action` (text + task_ref). Text carries no digits except dates. Every section but "
             "open_questions must point at evidence from this session. A refusal names the "

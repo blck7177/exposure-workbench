@@ -35,11 +35,13 @@ from __future__ import annotations
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.meta_tools import register_meta_tools
 from exposure_workbench.tools.registry import ToolRegistry
-from exposure_workbench.tools.research_tools import register_research_tools
+from exposure_workbench.tools.research_tools import register_research_tools, register_search_tool
 
 
 def build_meta_registry() -> ToolRegistry:
-    return register_meta_tools(build_read_registry())
+    # V19: the web search is on the meta face too — registered by the one
+    # function the research builder also calls.
+    return register_search_tool(register_meta_tools(build_read_registry()))
 
 
 def build_research_registry() -> ToolRegistry:

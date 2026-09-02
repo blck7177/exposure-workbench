@@ -97,11 +97,12 @@
 | **book 清单(V15)** | `describe_run` · `read_quantities` | book 侧的 `describe_issuer` / `evaluate_formula(name)`:一个 run 持有的全部量按"回答什么"分组(book/concentration/mandate/stress/factor_exposure/attribution/risk/counts,pattern × labels),缺什么、共线撤下了什么、这个面能做什么不能做什么;`read_quantities(run_id, names)` 按名一次取 |
 | **组合** | `get_portfolio_snapshot`(入口)· `get_portfolio_positions` · `get_attribution` · `get_risk_state` · `list_run_alerts` · `list_risk_limits` · `get_run_freshness` · `reconcile_move` · `get_drawdown_episodes` · `explain_episode` · `list_alerts` · `get_market_stats` | 全集返回、**禁 top_k**;共线时 `quotable_individually: false` |
 | **委派** | `ensure_company_ready` · `start_issuer_research` · `start_exposure_run` · `get_task_status` · `read_issuer_brief` | 立即返回 id,不阻塞;预算计入 |
+| **联网(V19)** | `search_external_research` | 两个面共用同一处注册;每 session 5 次子预算;结果为 `src_` 行上桌,句子在 `cites` 指它;不在 `companies` 的上市发行人先经 `company_service.admit` 自举,ETF/无 CIK 具名拒绝 |
 | **反思/门** | `think`(免预算)· `respond`(**唯一出口**,GATE 类,免预算) | |
 
 预算:每 turn 15 次工具调用(REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
 
-研究面 = READ_CORE 22 + `search_external_research` + `submit_brief`。
+研究面 = READ_CORE 22 + `search_external_research` + `submit_brief`。V19 前 `search_external_research` 只在研究面,chat 里"帮我搜一下"没有工具可走,而"本面不能联网"那句能力声明只随 `describe_run` 返回、发行人问题从未读到。
 
 ## 7. 门(`respond` / `submit_brief` 的解析链,V15)——可追溯是怎么被执行的
 
@@ -109,7 +110,7 @@
 
 按顺序,全部**机械、封闭、无阈值、无按值反推**(`services/resolver.py`):
 
-1. **形状**:`RESPOND_SCHEMA`(oneOf 六种论断:paragraph / metric_table / chart / trend / absence / action)在关口拒绝一切非文法形状;槽只有 `{ref, name}`;文本 `\d` 为空,豁免类封闭且短(日期、年份、表单号、期间标签、法规引证、附着型号、窗口标签),id 写进正文按整个 token 拒
+1. **形状**:`RESPOND_SCHEMA`(oneOf 六种论断:paragraph / metric_table / chart / trend / absence / action)在关口拒绝一切非文法形状;槽只有 `{ref, name}`;文本 `\d` 为空,豁免类封闭且短(日期、年份、表单号、期间标签、法规引证、附着型号、窗口标签),id 写进正文按整个 token 拒。**V19:`metric_table` 的格子只能是槽,没有 `columns`**——表头与行标签在渲染时由槽的名字派生(`answer_blocks.derive_table`:一列的名字逐 token 对齐时,公共 token 是表头、变化 token 是行标签;对不齐则每格写全名),`trend` 块附带序列自己的首末点与**算出来的**方向。门本身零新增(9/1 契约)
 2. **来源**:每个 ref ∈ 本 session 桌面(`not_on_table`)
 3. **名字**:每个槽的 name ∈ 该 ref 持有的量(`unknown_name`,拒绝信列出该 ref 的全部名字)
 4. **引号逐字**:引号内 ≥4 词 ∈ 该块 `cites` 指向的原文
@@ -159,6 +160,7 @@
 - **G2 剩余项**:`describe_issuer.definition` 仍是未经计算的承诺;`computable` 仍是"名字存在"而非"窗口可达";`get_balance_sheet` 未带 `do_not_add_to`;`reconcile_move` 无 `larger_share`
 - **LLY capex 未映射**(`test_v11_tag_drift_live` 唯一的 `unmapped_candidate`),补映射前须先验证语料
 - **系统提示未变短**(V12 判据 6 未达标:4918→5071 字符),示例换了更便宜的位置而非变小
+- **段落里的错标仍不被判**——V19 把表格与 trend 的标签变成派生的(模型无处写),段落散文里"market cap at $919.77"(槽是 `LLY.close`)这一类仍在,只能由门外的非阻塞 critic 读(下一批)
 - **比较级散文仍不被判**——门保证出处,不保证句子。V17 把「谁最高」变成一次 `rank` 计算(有操作数、有拒绝、落账本、每个名次是桌上的一个名字),消灭的是"顺序从未被算过"这一类;直接写进散文的最高级仍是散文
 - **历史行的读法靠迁移改正,不靠回算**:`v17_multiple_unit.sql` 只改 326 行的 `unit_class`(值、操作数、基准、输入引用一概不动)
 - 单价格源、无基准成分股、单币种:IPV / Brinson / 货币归因**明确不做**(MODULE_NOTES 插节)
@@ -166,4 +168,4 @@
 
 ## 12. 版本弧(每批一句)
 
-V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)。
+V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)。

@@ -207,11 +207,15 @@ BLOCK_SCHEMAS = [
     _block("paragraph", {"runs": {"type": "array", "minItems": 1, "items": _RUN,
                                   "description": "strings and slots, in reading order"},
                          "cites": _CITES}, ["runs"]),
+    # V19: cells are slots only, and there is no `columns` — the header and
+    # the row labels are derived from the slots' names when the answer is
+    # rendered (services/answer_blocks.derive_table). A label the model wrote
+    # beside a figure was the one thing about a figure the gate could not see.
     _block("metric_table", {"title": {"type": "string"},
-                            "columns": {"type": "array", "minItems": 1, "items": {"type": "string"}},
                             "rows": {"type": "array", "minItems": 1,
-                                     "items": {"type": "array", "items": _RUN}},
-                            "cites": _CITES}, ["columns", "rows"]),
+                                     "description": ab.TABLE_RULE,
+                                     "items": {"type": "array", "minItems": 1, "items": _SLOT}},
+                            "cites": _CITES}, ["rows"]),
     _block("chart", {"kind": {"type": "string", "enum": list(ab.CHART_KINDS)},
                      "title": {"type": "string"},
                      "series_ref": {"type": "string", "description": "the calc id of a series you read"}},
@@ -289,8 +293,10 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "{ref, name} using a name from the `table` a tool result carried, and the "
             "reader is shown the table's own value — you never write a number. Blocks: "
             "`paragraph` (runs: strings and slots in reading order; `cites`: the chunk_/src_ "
-            "ids its prose rests on), `metric_table` (columns + rows of strings/slots — use "
-            "it whenever you compare or rank), `chart` (kind + series_ref), `trend` (text + "
+            "ids its prose rests on), `metric_table` (rows of slots, one row per thing compared "
+            "and one column per measure — the header and each row's label are derived from "
+            "the slots' names, so a cell is never text; use it whenever you compare or "
+            "rank), `chart` (kind + series_ref), `trend` (text + "
             "series_ref: a claim that something rose or fell rests on the series it was read "
             "from), `absence` (text + absence_ref: a claim that something was not reported "
             "rests on the row the refused read minted), `action` (text + task_ref: work you "

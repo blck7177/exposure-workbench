@@ -21,7 +21,12 @@ because a passage-backed claim had no slot):
     paragraph     text runs and slots; `cites` names the passages the prose
                   rests on (chunk_/src_) — checked for membership, and any
                   quotation marks in the text are checked against them
-    metric_table  cells are text or slots; `cites` as above
+    metric_table  cells are SLOTS and nothing else (V19); the header and the
+                  row labels are derived from the slots' names at render time,
+                  so the label beside a figure is the table's, never the
+                  model's — `Peak-to-trough decline | $205.10` was a slot named
+                  `NVDA.adj_close@2026-06-05` with a row label the model wrote.
+                  `cites` as above
     chart         kind + series_ref → the ref must be a series row
     trend         text + series_ref → a claim about a sequence rests on one
     absence       text + absence_ref → a claim that something was not reported
@@ -45,6 +50,13 @@ from exposure_workbench.services import table as tb
 
 BLOCK_TYPES = ("paragraph", "metric_table", "chart", "trend", "absence", "action")
 CHART_KINDS = ("bar", "line", "waterfall")
+
+# V19. The one sentence a table refusal carries — the schema (tools/meta_tools)
+# and validate_shape both point at it, so the model reads the same fix twice.
+TABLE_RULE = ("a table cell is a slot {ref, name} and nothing else. The header comes from the "
+              "slots' names and each row's label from the issuer or period the slots are "
+              "about — neither is written by you. One row per thing compared, one column per "
+              "measure; words go in the title or a paragraph")
 
 # Rows an assertion block may point at, by kind (services/quantities.py,
 # services/table.py).
@@ -203,28 +215,31 @@ def validate_shape(blocks) -> list[dict]:
                 else:
                     problems.append({"at": f"{at}.runs[{j}]", "reason": "run_not_text_or_slot"})
         elif kind == "metric_table":
-            cols, rows = b.get("columns"), b.get("rows")
-            if not isinstance(cols, list) or not cols or not all(isinstance(c, str) for c in cols):
-                problems.append({"at": at, "reason": "table_without_columns"})
-                continue
+            rows = b.get("rows")
+            if "columns" in b:
+                # V19. The header is derived from the slots' names; a header the
+                # model writes is the same channel a row label was — a name
+                # beside a figure that nothing checks.
+                problems.append({"at": f"{at}.columns", "reason": "table_names_its_own_columns",
+                                 "detail": TABLE_RULE})
             if not isinstance(rows, list) or not rows:
                 problems.append({"at": at, "reason": "table_without_rows"})
                 continue
+            width = len(rows[0]) if isinstance(rows[0], list) else None
             for j, row in enumerate(rows):
-                if not isinstance(row, list) or len(row) != len(cols):
+                if not isinstance(row, list) or not row or len(row) != width:
                     problems.append({"at": f"{at}.rows[{j}]", "reason": "row_width_mismatch",
-                                     "columns": len(cols),
+                                     "columns": width,
                                      "cells": len(row) if isinstance(row, list) else None})
                     continue
                 for k, cell in enumerate(row):
-                    if isinstance(cell, str):
-                        problems += _text_problems(cell, f"{at}.rows[{j}][{k}]")
-                    elif _is_slot(cell):
+                    if _is_slot(cell):
                         p = _slot_problem(cell, f"{at}.rows[{j}][{k}]")
                         if p:
                             problems.append(p)
                     else:
-                        problems.append({"at": f"{at}.rows[{j}][{k}]", "reason": "cell_not_text_or_slot"})
+                        problems.append({"at": f"{at}.rows[{j}][{k}]", "reason": "cell_not_a_slot",
+                                         "detail": TABLE_RULE})
         elif kind == "chart":
             if b.get("kind") not in CHART_KINDS:
                 problems.append({"at": at, "reason": "unknown_chart_kind", "allowed": list(CHART_KINDS)})
@@ -356,13 +371,104 @@ def text_by_block(blocks) -> list[tuple[str, str]]:
 
 # ── rendering ─────────────────────────────────────────────────────────────────
 
-def rendered(blocks, resolved: list[Resolved]) -> list[dict]:
+# ── derived labels (V19) ──────────────────────────────────────────────────────
+# A quantity's name is `<head>.<row>.<column>` for a run child, `<measure>@<period>`
+# for a dated point, `<measure>.rank.<entity>` for a place in an ordering
+# (services/quantities.py). Split on the two separators, the tokens of one
+# column's names either line up — the same count, most positions equal across
+# rows — or they do not. When they do, what is shared is the column's header
+# and what varies is the row's label; when they do not, every cell says its
+# whole name. Either way the label comes from the name the gate resolved.
+_SEP = re.compile(r"[.@]")
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in _SEP.split(name) if t]
+
+
+def _words(tokens: list[str]) -> str:
+    return " ".join(t.replace("_", " ") for t in tokens)
+
+
+def derive_table(names: list[list[str]]) -> dict:
+    """header/labels/explicit for a grid of slot names (rows × columns).
+
+    `header[j]` is the tokens every row of column j shares; `labels[i]` is
+    what varies in row i, read off column 0 (the first column is the row's
+    subject — a ticker, a period, a place); `explicit[j]` is True when column
+    j's names do not align token-for-token, in which case the renderer shows
+    each cell's own full name and the header for that column is empty.
+    """
+    if not names or not names[0]:
+        return {"header": [], "labels": [], "explicit": []}
+    width = len(names[0])
+    header: list[str] = []
+    explicit: list[bool] = []
+    varying: list[list[list[str]]] = [[] for _ in names]     # per row, per column
+    for j in range(width):
+        col = [_tokens(row[j]) for row in names]
+        n = len(col[0])
+        aligned = all(len(t) == n for t in col)
+        if not aligned:
+            header.append("")
+            explicit.append(True)
+            for i, t in enumerate(col):
+                varying[i].append(t)
+            continue
+        shared = [k for k in range(n) if len({t[k] for t in col}) == 1]
+        # A single-row table shares every token: the header is the whole name
+        # and the row has nothing left to say — so the name is the row's label
+        # and the header is empty, which reads as `label | value`.
+        if len(col) == 1:
+            header.append("")
+            explicit.append(True)
+            varying[0].append(col[0])
+            continue
+        header.append(_words([col[0][k] for k in shared]))
+        explicit.append(False)
+        for i, t in enumerate(col):
+            varying[i].append([t[k] for k in range(n) if k not in shared])
+    labels = [_words(varying[i][0]) for i in range(len(names))]
+    return {"header": header, "labels": labels, "explicit": explicit}
+
+
+def _trend_summary(points: list[tuple[str, float]], unit_class: str, label: str) -> dict | None:
+    """The series' own account of itself: first and last dated point, direction computed."""
+    if len(points) < 2:
+        return None
+    pts = sorted(points)
+    (p0, v0), (p1, v1) = pts[0], pts[-1]
+    direction = "up" if v1 > v0 else "down" if v1 < v0 else "flat"
+    return {"label": label.replace("_", " "), "unit_class": unit_class, "n": len(pts),
+            "from": {"period": p0, "value": v0}, "to": {"period": p1, "value": v1},
+            "direction": direction}
+
+
+def _derivation_name(label: str, subject: str | None) -> str:
+    """The name a cell is derived from: the row's subject first, unless the
+    name already says it (a run child's `issuer_exposures.MSFT.weight`, an
+    ordering's `net_income.rank.MSFT`)."""
+    if subject and subject not in _tokens(label):
+        return f"{subject}.{label}"
+    return label
+
+
+def rendered(blocks, resolved: list[Resolved], series: dict[str, dict] | None = None,
+             subjects: dict[str, str] | None = None) -> list[dict]:
     """The answer as stored and shown: every slot carrying the table's figure.
 
     `resolved` is in `slots_in` order. The model's slot ({ref, name}) becomes
     {slot: {ref, label, value, unit_class}} — `label` is the name, kept under
     the key the renderer has read since V14.
+
+    V19: a metric_table also carries `header`, `labels` and `explicit`, derived
+    from the slots' names (derive_table) with each ref's `subject` (the issuer
+    a ledger row is about) prefixed when the name does not carry it; a trend
+    carries `series` — the series' first and last point and the direction
+    between them — when `series` maps its ref to {"points": [(period, value)],
+    "unit_class", "label"}.
     """
+    subjects = subjects or {}
     it = iter(resolved)
     out: list[dict] = []
 
@@ -378,6 +484,22 @@ def rendered(blocks, resolved: list[Resolved]) -> list[dict]:
             nb["runs"] = [fill(r) for r in b["runs"]]
         if b.get("rows"):
             nb["rows"] = [[fill(c) for c in row] for row in b["rows"]]
+            if b.get("type") == "metric_table" and all(
+                    _is_slot(c) and "slot" in c for row in nb["rows"] for c in row):
+                names = [[_derivation_name(c["slot"]["label"], subjects.get(c["slot"]["ref"]))
+                          for c in row] for row in nb["rows"]]
+                nb.update(derive_table(names))
+                # Every cell carries the words it was derived from, so a column
+                # that could not be factored shows each cell's own subject and
+                # name (the page under the value, the transcript beside it).
+                for row, row_names in zip(nb["rows"], names):
+                    for c, n in zip(row, row_names):
+                        c["slot"]["caption"] = _words(_tokens(n))
+        if b.get("type") == "trend" and series and b.get("series_ref") in series:
+            s = series[b["series_ref"]]
+            summary = _trend_summary(s.get("points") or [], s.get("unit_class") or "", s.get("label") or "")
+            if summary is not None:
+                nb["series"] = summary
         out.append(nb)
     return out
 
@@ -401,12 +523,34 @@ def prose_of(rendered_blocks) -> str:
             continue
         if isinstance(b.get("title"), str):
             parts.append(b["title"])
+        if b.get("type") == "trend" and isinstance(b.get("series"), dict):
+            s = b["series"]
+            parts.append(f"{s['label']}: {dc.display(s['from']['value'], s['unit_class'])} "
+                         f"({s['from']['period']}) → {dc.display(s['to']['value'], s['unit_class'])} "
+                         f"({s['to']['period']}), {s['direction']}")
         if isinstance(b.get("text"), str):
             parts.append(b["text"])
         if b.get("runs"):
             parts.append("".join(r if isinstance(r, str) else _number(r) for r in b["runs"]))
-        for row in b.get("rows") or []:
-            parts.append(" | ".join(c if isinstance(c, str) else _number(c) for c in row))
+        header = b.get("header") or []
+        labels = b.get("labels") or []
+        explicit = b.get("explicit") or []
+        if any(header):
+            parts.append(" | ".join(["", *header]))
+        for i, row in enumerate(b.get("rows") or []):
+            cells = []
+            for k, c in enumerate(row):
+                if isinstance(c, str):
+                    cells.append(c)
+                elif k > 0 and k < len(explicit) and explicit[k]:
+                    # A column whose names did not align says each cell's own
+                    # name in the transcript, as the page does under the value.
+                    cells.append(f"{c['slot'].get('caption') or _words(_tokens(c['slot']['label']))}: {_number(c)}")
+                else:
+                    cells.append(_number(c))
+            if i < len(labels):
+                cells = [labels[i], *cells]
+            parts.append(" | ".join(cells))
     return "\n".join(p for p in parts if p)
 
 

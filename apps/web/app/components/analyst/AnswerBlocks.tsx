@@ -34,15 +34,32 @@ export type Slot = {
   label: string;
   value: number;
   unit_class: string;
+  /** V19: the words a table cell was derived from (subject + name), set on table cells only. */
+  caption?: string;
 };
 
 export type Run = string | { slot: Slot };
 
+/** A trend's series, stating its own first and last point (V19). */
+export type TrendSeries = {
+  label: string;
+  unit_class: string;
+  n: number;
+  from: { period: string; value: number };
+  to: { period: string; value: number };
+  direction: "up" | "down" | "flat";
+};
+
 export type Block =
   | { type: "paragraph"; runs: Run[]; cites?: string[] }
-  | { type: "metric_table"; title?: string; columns: string[]; rows: Run[][]; cites?: string[] }
+  // V19: `header`, `labels` and `explicit` are derived server-side from the
+  // slots' names (services/answer_blocks.derive_table) and the cells are slots
+  // only. `columns` and string cells are what answers stored before V19 carry,
+  // and they render as they did — the grammar changed, the record did not.
+  | { type: "metric_table"; title?: string; columns?: string[]; rows: Run[][]; cites?: string[];
+      header?: string[]; labels?: string[]; explicit?: boolean[] }
   | { type: "chart"; kind: string; title?: string; series_ref: string }
-  | { type: "trend"; text: string; series_ref: string }
+  | { type: "trend"; text: string; series_ref: string; series?: TrendSeries }
   | { type: "absence"; text: string; absence_ref: string }
   | { type: "action"; text: string; task_ref: string };
 
@@ -218,6 +235,31 @@ function Cites({
 }
 
 /**
+ * The series stating its own first and last point (V19). The direction is
+ * computed server-side from those two values, so "climbed" in the sentence
+ * under it is the model's word and the arrow is the series'. The two can
+ * disagree, and when they do the reader sees both.
+ */
+function SeriesLine({ series, onOpen }: { series: TrendSeries; onOpen: () => void }) {
+  const arrow = { up: "↑", down: "↓", flat: "→" }[series.direction];
+  const v = (x: number) => displayValue(x, series.unit_class);
+  return (
+    <p style={{ margin: "0.5rem 0 0", fontSize: "0.9em", opacity: 0.85, fontVariantNumeric: "tabular-nums" }}>
+      <button
+        type="button"
+        onClick={onOpen}
+        title={`${series.n} points`}
+        style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+      >
+        <span style={{ opacity: 0.7 }}>{series.label}</span>{" "}
+        {v(series.from.value)} <span style={{ opacity: 0.6 }}>({series.from.period})</span>{" "}
+        {arrow} {v(series.to.value)} <span style={{ opacity: 0.6 }}>({series.to.period})</span>
+      </button>
+    </p>
+  );
+}
+
+/**
  * A claim about a sequence, about something not being reported, or about work
  * this turn set going.
  *
@@ -301,7 +343,7 @@ export function AnswerBlocks({
                 <table style={{ borderCollapse: "collapse", fontSize: "0.95em", width: "100%" }}>
                   <thead>
                     <tr>
-                      {b.columns.map((c, j) => (
+                      {(b.header ? ["", ...b.header] : b.columns ?? []).map((c, j) => (
                         <th
                           key={j}
                           style={{
@@ -321,11 +363,22 @@ export function AnswerBlocks({
                   <tbody>
                     {b.rows.map((row, j) => (
                       <tr key={j}>
+                        {b.labels ? (
+                          <td
+                            style={{
+                              textAlign: "left",
+                              padding: "0.3rem 0.6rem",
+                              borderBottom: "1px solid var(--line-faint, #eef1ea)",
+                            }}
+                          >
+                            {b.labels[j]}
+                          </td>
+                        ) : null}
                         {row.map((cell, k) => (
                           <td
                             key={k}
                             style={{
-                              textAlign: k === 0 ? "left" : "right",
+                              textAlign: k === 0 && !b.labels ? "left" : "right",
                               padding: "0.3rem 0.6rem",
                               borderBottom: "1px solid var(--line-faint, #eef1ea)",
                               fontVariantNumeric: "tabular-nums",
@@ -334,7 +387,14 @@ export function AnswerBlocks({
                             {typeof cell === "string" ? (
                               <Text text={cell} order={order} labels={labels} onOpen={onOpen} />
                             ) : (
-                              <Figure slot={cell.slot} onOpen={onOpen} />
+                              <>
+                                <Figure slot={cell.slot} onOpen={onOpen} />
+                                {b.explicit?.[k] && k > 0 ? (
+                                  <div style={{ opacity: 0.6, fontSize: "0.8em" }}>
+                                    {cell.slot.caption ?? cell.slot.label.replace(/[.@]/g, " ").replace(/_/g, " ")}
+                                  </div>
+                                ) : null}
+                              </>
                             )}
                           </td>
                         ))}
@@ -377,7 +437,12 @@ export function AnswerBlocks({
             );
 
           case "trend":
-            return <Claim key={i} text={b.text} refId={b.series_ref} kind="trend" onOpen={onOpen} />;
+            return (
+              <div key={i}>
+                {b.series ? <SeriesLine series={b.series} onOpen={() => onOpen(b.series_ref)} /> : null}
+                <Claim text={b.text} refId={b.series_ref} kind="trend" onOpen={onOpen} />
+              </div>
+            );
 
           case "absence":
             return (

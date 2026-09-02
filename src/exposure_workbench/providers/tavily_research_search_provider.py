@@ -44,8 +44,11 @@ class TavilyResearchSearchProvider:
 
         self._client = TavilyClient(api_key=key)
 
-    def search(self, query: str, max_results: int = 5) -> list[SearchResultDTO]:
-        resp = self._client.search(query=query, max_results=max_results)
+    def search(self, query: str, max_results: int = 5, days: int | None = None) -> list[SearchResultDTO]:
+        # A day window is Tavily's news topic: "the past week" is `days=7` on
+        # the request, not a phrase in the query the engine may or may not read.
+        kwargs = {"topic": "news", "days": int(days)} if days else {}
+        resp = self._client.search(query=query, max_results=max_results, **kwargs)
         out: list[SearchResultDTO] = []
         for r in resp.get("results", []):
             url = r.get("url")

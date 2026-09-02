@@ -24,4 +24,6 @@ class SearchResultDTO:
 class ResearchSearchProvider(Protocol):
     name: str
 
-    def search(self, query: str, max_results: int = 5) -> list[SearchResultDTO]: ...
+    def search(self, query: str, max_results: int = 5, days: int | None = None) -> list[SearchResultDTO]:
+        """`days`, when given, restricts results to news published within that many days."""
+        ...

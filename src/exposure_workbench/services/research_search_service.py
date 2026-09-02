@@ -41,18 +41,32 @@ def default_provider() -> ResearchSearchProvider:
         raise ResearchProviderUnavailable(str(e)) from e
 
 
+def compose_query(company_name: str | None, ticker: str, query: str) -> str:
+    """The query the engine sees: the issuer, then the model's words.
+
+    The tool takes `ticker` and `query` as two arguments, and the first V19
+    live turn showed why binding them here is the tool's job and not the
+    model's: "latest news from the past week" went to the engine with no
+    issuer in it and came back as five front pages. The issuer is a parameter
+    of the search; the engine only knows what it is told.
+    """
+    who = f"{company_name} ({ticker})" if company_name and company_name.upper() != ticker.upper() else ticker
+    return f"{who}: {query.strip()}"
+
+
 async def search(
     db: AsyncSession,
     company_id: str,
     query: str,
     research_run_id: str | None = None,
     max_results: int = 5,
+    days: int | None = None,
 ) -> list[dict]:
     """Search with the default provider and persist results. Callers (tools) need
     not know which provider is used."""
     return await search_and_persist(
         db, default_provider(), company_id, query,
-        research_run_id=research_run_id, max_results=max_results,
+        research_run_id=research_run_id, max_results=max_results, days=days,
     )
 
 
@@ -63,10 +77,11 @@ async def search_and_persist(
     query: str,
     research_run_id: str | None = None,
     max_results: int = 5,
+    days: int | None = None,
 ) -> list[dict]:
     """Run one search, persist every result (deduped by url within the run),
-    return citable source records."""
-    results = provider.search(query, max_results=max_results)
+    return citable source records. `query` is the composed query (compose_query)."""
+    results = provider.search(query, max_results=max_results, days=days)
 
     existing_urls = set()
     if research_run_id:

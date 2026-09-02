@@ -359,8 +359,18 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
     """One named measure, built from the primitives an agent could call itself."""
     ticker = ticker.upper()
     if name not in fm.FORMULAS and name != "total_debt":
-        return {"error": "unknown_formula", "formula": name,
-                "known": sorted(fm.FORMULAS)}
+        out = {"error": "unknown_formula", "formula": name, "known": sorted(fm.FORMULAS)}
+        # V19. A filed metric asked for as a formula: the first V19 live rank
+        # question spent ten of fifteen calls on evaluate_formula("net_income")
+        # and read "unknown" ten times, when the figure was one get_flow away.
+        # The refusal says which tool holds the name (V16-S3: the reason
+        # reaches the model).
+        from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
+        if name in SUPPORTED_METRICS:
+            out["detail"] = (f"{name} is a filed metric, not a formula: read it with "
+                             f"get_flow(metric={name!r}, months=…) for a flow over a window, or "
+                             f"get_balance_sheet for a balance at a date")
+        return out
     cache = _cache if _cache is not None else {}
     # Per-formula, per-reason: ROE applies to a bank (not_for_financials=None)
     # while debt_to_ebitda does not, and each refused measure carries its own

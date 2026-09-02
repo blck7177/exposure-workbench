@@ -404,18 +404,10 @@ class ExposureWorkflow:
 
     @staticmethod
     async def _positions_for(db: AsyncSession, portfolio_id: str, as_of_date: date) -> list:
-        """The run's holdings, resolved the one way the whole workflow agrees on.
-
-        get_positions filters as_of_date by EXACT equality, while uploads date a
-        snapshot by max(price_date) and a run's as_of defaults to today — so the
-        two normally differ and the fallback is the branch that actually fires.
-        Shared rather than duplicated because a copy that skipped the fallback
-        would return nothing and turn its step into a permanently green no-op.
-        """
-        positions = await portfolio_service.get_positions(db, portfolio_id, as_of_date)
-        if not positions:
-            positions = await portfolio_service.get_positions_latest(db, portfolio_id)
-        return positions
+        """The run's holdings — portfolio_service.positions_for_run, which the
+        run's evidence card reads too (V19), so the rows a reader is shown are
+        the rows the run computed over."""
+        return await portfolio_service.positions_for_run(db, portfolio_id, as_of_date)
 
     async def _sync_prices(
         self,

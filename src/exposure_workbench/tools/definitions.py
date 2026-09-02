@@ -343,17 +343,18 @@ async def _explain_episode(db: AsyncSession, portfolio_id: str, peak: str, troug
 # What this face can and cannot do, said where the model reads it. R4 measured
 # the failure: with no capability statement, the model called "no operator for
 # this" "not enough data" and, asked for a web search, silently searched
-# filings instead.
+# filings instead. V19 put the web on this face; the statement says so.
 _FACE_CAPABILITIES = {
     "can": [
         "read this book's runs by name (describe_run → read_quantities) and every issuer's "
         "filed figures, filing passages and named measures",
         "compute with calculate / series_stat / evaluate_formula, each minting a citable id",
-        "start background work: a readiness pass, an exposure run, an issuer research run",
+        "search the web (search_external_research) for what the filings cannot hold — news, "
+        "guidance, events after the last report — each result a src_ id a sentence can cite",
+        "start background work: a readiness pass, an exposure run, an issuer research run "
+        "(whose brief is read with read_issuer_brief)",
     ],
     "cannot": [
-        "search the web from this face — a research run (start_issuer_research) can, and "
-        "its brief is read with read_issuer_brief",
         "produce a figure no tool returned: a quantity not on the table cannot be written",
     ],
 }

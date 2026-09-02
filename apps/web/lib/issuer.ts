@@ -61,7 +61,7 @@ export type Brief = {
 // `label` is what this piece of evidence IS, in words — "Gross profit · Dec 28,
 // 2025 – Mar 28, 2026" rather than `calc 2b5395` (V13-S3). Built server-side
 // from fields that are on the row, so one definition serves every surface.
-export type Evidence = { type: string; id: string; label?: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string }[] };
+export type Evidence = { type: string; id: string; label?: string; body: Record<string, any>; provenance: Record<string, any>; upstream: { type: string; id: string; label?: string }[] };
 // workflow_events is the run's outer timeline (V7-U1). It arrives empty from the
 // POST — the run has only just been enqueued — and fills in on the polls.
 // error_message is present ONLY when the failure's own words were written for a
