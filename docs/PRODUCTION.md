@@ -332,6 +332,27 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v15_window_return_unit.sql
 
+# v17_multiple_unit.sql is the one file that UPDATEs rows, and the exception is
+# narrower than it looks: it changes how 326 existing figures are READ, not what
+# any of them is. money / money is a RATIO to the unit algebra and always will
+# be — net margin and debt/EBITDA are the same operation on the same units — so
+# only the registry can say which of the two a named measure is, and until V17
+# it had no way to. Every coverage, turnover and leverage ratio on this desk was
+# therefore printed by the percent rule: 2.30 as "230.0%", a current ratio of
+# 1.85 as "185.0%", an OLS beta of -0.543 as "-54.3%".
+#
+# No value, operand, basis, period or input ref is touched, which is why this is
+# not a rewrite of an append-only ledger: a row whose VALUE changed would be a
+# new row, and there is none here. It corrects both the unit_class column (what
+# the table and the reader read) and params.result_type.unit_class (what the
+# calculator reads when the row becomes an operand) — leaving one behind would
+# be the two-rules-about-one-fact that v15_calc_unit.sql exists to end.
+#
+# Safe before the new code and safe to re-run: it matches on the eight names the
+# registry declares, and a second run matches nothing.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v17_multiple_unit.sql
+
 # V16 has no schema migration — mapping v4 is code plus a data backfill.
 # remap_concepts re-normalizes financial_facts under the current mapping
 # (v4 names the per-share and capital-allocation layer: 2,472 rows went
