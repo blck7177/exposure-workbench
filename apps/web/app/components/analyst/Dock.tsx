@@ -91,18 +91,23 @@ type ChatMsg = {
  *  deterministic, they cost nothing, and a suggested question that turns out to
  *  be unanswerable is worse than none. */
 function suggestionsFor(context: DockContext): string[] {
+  // Every question here was asked of the deployed desk on 2026-09-02 and
+  // answered with figures on the table (docs/spikes/V20_COVERAGE.md and the
+  // R20 battery). A question that leans on a withheld measure (VaR, stress)
+  // or on a shape the model still gets wrong (ranking run rows) is not here.
   if (context.kind === "issuer") {
     const t = context.ticker;
     return [
-      `What is ${t}'s total debt?`,
+      `Add up ${t}'s debt — long-term, current portion, short-term — then net the cash off so I have net debt.`,
       `How has ${t}'s revenue grown over the last four quarters?`,
-      `What does ${t}'s management say about tariffs?`,
+      `Search the web for the latest news on ${t} from the past week and tell me what happened.`,
     ];
   }
   return [
     "What is my largest exposure right now?",
     "Why did the book move on the last run?",
-    "Is anything close to a breach tier?",
+    "Which limits am I closest to breaching, and how much room is left on each?",
+    "Put MSFT, AAPL and GOOGL 2025 full-year net income side by side in a table.",
   ];
 }
 

@@ -35,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.analytics import resources
 from exposure_workbench.analytics import units
 from exposure_workbench.db.models import (
@@ -133,6 +134,7 @@ _RUN_CHILDREN = tuple(
     (r.model,
      tuple(c.name for c in r.columns if c.unit == MONEY),
      tuple(c.name for c in r.columns if c.unit == RATIO),
+     tuple(c.name for c in r.columns if c.unit == COUNT),   # V20: counts are a third kind
      r.label_column,
      r.qualifier_column)
     for r in resources.RUN_CHILDREN
@@ -326,13 +328,21 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
     """exposure_runs has no numeric columns — every number lives on a child."""
     out: list[Quantity] = []
     by_model: dict[type, list] = {}
-    for model, abs_cols, ratio_cols, name_col, qual_col in _RUN_CHILDREN:
+    for model, abs_cols, ratio_cols, count_cols, name_col, qual_col in _RUN_CHILDREN:
         rows = (await db.execute(select(model).where(model.run_id == rid))).scalars().all()
+        # V20. An alert or a check a withheld check raised (on a run before the
+        # check stopped running) is not on the table either — the twelfth
+        # reader, found by a live "which limits am I closest to" turn that
+        # ranked a stress alert first.
+        if model is RiskAlert:
+            rows = wh.published_alerts(rows)
+        elif model.__tablename__ == "limit_checks":
+            rows = wh.published_checks(rows)
         by_model[model] = list(rows)
         table = model.__tablename__
         for row in rows:
             who = _row_label(row, name_col, qual_col)
-            for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO)):
+            for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO), (count_cols, COUNT)):
                 for col in cols:
                     v = getattr(row, col, None)
                     if v is not None:

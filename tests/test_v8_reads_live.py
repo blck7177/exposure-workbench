@@ -109,9 +109,14 @@ async def test_the_row_counts_are_the_row_counts():
             values, _ = await nv.resolve_cited_values(db, [run_id])
             counts = {v.label: v.value for v in values if v.label.startswith("count.")}
 
+            # V20: the table counts PUBLISHED checks — rows of a withheld
+            # check (analytics/withheld.py) written before the check stopped
+            # running are not on it, so the row count is taken the same way.
+            from exposure_workbench.analytics import withheld as wh
             fired = (await db.execute(text(
                 "SELECT count(*) FILTER (WHERE fired), count(*) FROM limit_checks "
-                "WHERE run_id = :r"), {"r": run_id})).one()
+                "WHERE run_id = :r AND split_part(limit_type, ':', 1) <> ALL(:withheld)"),
+                {"r": run_id, "withheld": list(wh.WITHHELD_CHECKS)})).one()
             assert counts["count.limit_checks"] == fired[1]
             assert counts["count.limit_checks.fired=true"] == fired[0]
             assert counts["count.limit_checks.fired=false"] == fired[1] - fired[0]

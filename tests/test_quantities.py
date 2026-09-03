@@ -100,9 +100,10 @@ async def test_every_label_of_a_real_run_is_unique_and_every_quantity_has_a_unit
     labels = [q.label for q in r.quantities]
     dupes = sorted({l for l in labels if labels.count(l) > 1})
     assert dupes == [], f"one name for two figures: {dupes}"
-    # 235 before V20; 217 with the six withheld metrics and the stress table
-    # (twelve losses) off the published resources (analytics/withheld.py).
-    assert len(labels) == 217, len(labels)
+    # 235 before V20; 193 with the six withheld metrics, the stress table
+    # (twelve losses) and the seven stress_loss limit-check rows (three
+    # columns each, plus a count) off the table (analytics/withheld.py).
+    assert len(labels) == 193, len(labels)
     assert {q.unit_class for q in r.quantities} <= {qn.MONEY, qn.RATIO, qn.COUNT}
     assert all(q.table in qn.RUN_TABLES for q in r.quantities), (
         sorted({q.table for q in r.quantities} - set(qn.RUN_TABLES)))
@@ -143,6 +144,6 @@ async def test_the_whole_run_fits_on_the_table_without_narrowing():
         "the declaration came back narrowed")
     assert "truncated" not in declared[0]
     shown = payload["quantities"][RUN]
-    assert len(shown) == 217 - 32, "every quantity but the 32 collinear coefficients is shown"
+    assert len(shown) == 193 - 32, "every quantity but the 32 collinear coefficients is shown"
     assert "factor_attributions.sum_of_contributions" in shown
     assert not any(name.startswith("factor_attributions.market.") for name in shown)

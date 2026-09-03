@@ -88,6 +88,8 @@ def test_every_reader_that_used_to_serve_a_withheld_measure_now_asks_withheld_py
         assert "withheld" in inspect.getsource(mod), mod.__name__
     # Alerts and checks raised by a withheld check before V20 still exist as
     # rows; every reader of them goes through the two filters.
+    assert "published_alerts" in inspect.getsource(qn._from_run) and "published_checks" in inspect.getsource(qn._from_run), \
+        "the table itself is a reader: a run's alert and check rows"
     for mod, fn in ((portfolio_service, "published_alerts"), (run_reads_service, "published_alerts"),
                     (run_reads_service, "published_checks"), (integration_service, "published_checks"),
                     (exposure_runs, "published_checks"), (exposure_runs, "is_withheld_check"),
@@ -164,3 +166,14 @@ def test_portfolio_rolling_volatility_matches_the_hand_computation():
     # And the drawdown, from the running maximum of the compounded path.
     cum = (1 + r).cumprod()
     assert out.max_drawdown == pytest.approx(float(abs((cum / cum.cummax() - 1).min())), rel=1e-12)
+
+
+def test_a_count_of_observations_is_a_count_not_a_ratio():
+    """"75000.0% observations over a 75000.0%-day window" — the default
+    question's answer on the V20 stack. Declared COUNT now, and a COUNT column
+    reaches the table like the other two kinds."""
+    from exposure_workbench.analytics import display_conventions as dc
+    assert R.column_unit("exposure_metrics", "observations") == R.COUNT
+    assert R.column_unit("exposure_metrics", "regression_window_days") == R.COUNT
+    assert any(cols for _m, _a, _r, cols, _l, _q in qn._RUN_CHILDREN), "count columns reach the table"
+    assert dc.display(750.0, "COUNT") == "750"

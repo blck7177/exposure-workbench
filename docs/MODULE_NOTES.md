@@ -924,4 +924,4 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 
 ### 守卫
 
-`test_v20_withheld`:声明与发布的差集恰为 withheld;清单组无 withheld 名;`RUN_TABLES` 无 stress_results;无工具 scope 指向 withheld 表;API 模型无 withheld 字段且带 methods/withheld;九个读取点源码含 withheld;方法句引用代码常量且不描述任何 withheld 度量;sections.tsx 无 `basis="`;组合波动率/回撤手算钉住。旧测试反转:`test_limit_checks`(var/ES/stress 三检查不跑)、`test_limit_completeness`(looked_up = 必需集 − withheld)、`test_resources`(遍历 `_DECLARED`)、`test_v8_run_children`(stress 算而不发)。
+`test_v20_withheld`:声明与发布的差集恰为 withheld;桌面本身(`quantities._from_run`)也过滤 withheld 告警/检查行(第十二个读取点,live 抓到);清单组无 withheld 名;`RUN_TABLES` 无 stress_results;无工具 scope 指向 withheld 表;API 模型无 withheld 字段且带 methods/withheld;九个读取点源码含 withheld;方法句引用代码常量且不描述任何 withheld 度量;sections.tsx 无 `basis="`;组合波动率/回撤手算钉住。旧测试反转:`test_limit_checks`(var/ES/stress 三检查不跑)、`test_limit_completeness`(looked_up = 必需集 − withheld)、`test_resources`(遍历 `_DECLARED`)、`test_v8_run_children`(stress 算而不发)。

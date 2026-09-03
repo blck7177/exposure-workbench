@@ -82,13 +82,15 @@ def test_the_numeric_metadata_is_citable_under_the_run():
     written COUNT meet a stored RATIO, so "58 observations" verifies while
     "58%" correctly does not.
     """
-    ratio_cols = next(
-        ratio for model, _money, ratio, _label, _qual in qn._RUN_CHILDREN
+    # V20: a count of observations is a COUNT column now (it rendered as
+    # 75000.0% under RATIO); either kind is resolvable under run_.
+    ratio_cols, count_cols = next(
+        (ratio, count) for model, _money, ratio, count, _label, _qual in qn._RUN_CHILDREN
         if model is ExposureMetrics
     )
     for column, numeric in NEW_COLUMNS:
         if numeric:
-            assert column in ratio_cols, f"{column} is not resolvable under run_"
+            assert column in ratio_cols or column in count_cols, f"{column} is not resolvable under run_"
 
 
 def test_the_result_object_carries_the_window_it_was_fitted_over():

@@ -86,6 +86,10 @@ def _ratio(*names: tuple[str, str]) -> tuple[Column, ...]:
     return tuple(Column(n, RATIO, d) for n, d in names)
 
 
+def _count(*names: tuple[str, str]) -> tuple[Column, ...]:
+    return tuple(Column(n, COUNT, d) for n, d in names)
+
+
 def _published(resources: tuple["Resource", ...]) -> tuple["Resource", ...]:
     """The declaration minus what analytics/withheld.py withholds (V20).
 
@@ -132,9 +136,11 @@ _DECLARED: tuple[Resource, ...] = (
                  ("stress_loss_market", "stress loss, market"),
                  ("attribution_portfolio_return", "attribution return"), ("alpha", "alpha"),
                  ("residual", "residual"), ("model_r_squared", "model R²"),
-                 ("observations", "observations"),
-                 ("regression_window_days", "regression window, days"),
-                 ("max_vif", "max VIF")),
+                 ("max_vif", "max VIF"))
+        # V20. A count of observations is a COUNT: declared RATIO since V8-P1 it
+        # rendered as 75000.0% in a default question's answer.
+        + _count(("observations", "observations"),
+                 ("regression_window_days", "regression window, days")),
     ),
     Resource(
         IssuerExposure, "ticker",

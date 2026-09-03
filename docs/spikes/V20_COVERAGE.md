@@ -72,9 +72,29 @@ market drop cost us?" — four turns, each after a rebuild:
 | 3 | VaR "withheld pending validation"; then quoted **7.40%** "as the published proxy" and a 6.00% stress limit | `snapshot_all` still served `stress_loss_market`, and alerts/checks raised by withheld checks on runs before V20 reached every reader |
 | 4 | "VaR … withheld pending validation. For a ten percent market drop, the desk does not publish a cost estimate on this run" | `published_alerts` / `published_checks` filters on all eight alert/check readers; the sentence on the snapshot, the manifest and the capability statement |
 
+A fifth turn, after the commit: "Which limits am I closest to breaching" ranked
+`stress loss:market downside 92.5%` first — the table itself
+(`quantities._from_run`) read every alert and check row of the run, so an
+alert a withheld check raised on an older run was still citable. Twelfth
+reader; filtered at the table now, and pinned.
+
+The suggested questions in the chat dock were re-verified on the final stack
+and replaced: the book gets the largest exposure, why the book moved, the
+limits and their room, and a three-issuer net-income table; an issuer page
+gets net debt, four-quarter revenue growth, and a web search for the week's
+news. "Rank the positions" and "share count shrink" were tried and are not
+suggested: the first fails when the rank tool is asked for run rows, the
+second wrote `{ref}` into its text.
+
+"Why did the book move on the last run?" — one of the new default questions —
+answered with "75000.0% observations over a 75000.0%-day window": the two
+counts had been declared RATIO since V8-P1 (a written COUNT was allowed to
+meet a stored RATIO, so they verified; they just displayed as percentages).
+Declared COUNT now, and the table reads COUNT columns as a third kind.
+
 The lesson is the same as V19's: a decision made in one module is only as
 complete as the list of readers, and the list was found by asking the model,
 not by grepping — the grep found nine, the model found the tenth and the
 eleventh.
 
-Live suite: **262 passed** (1:50) against the final stack. Four live tests turned around: `test_quantities` repins the real run at 217 quantities (235 minus the withheld 18) and 185 shown; the faithfulness replay gained a `withheld` class — 17 of the 27 refusals that appeared were pre-V20 answers quoting VaR, a stress loss, or a count over alerts/checks that the withheld rows no longer contribute to, and the ceiling of 9 classified refusals holds.
+Live suite: **262 passed** (1:50) against the final stack. Four live tests turned around: `test_quantities` repins the real run at 193 quantities (235 minus the withheld metrics, the stress table and the stress checks) and 161 shown; the faithfulness replay gained a `withheld` class — 17 of the 27 refusals that appeared were pre-V20 answers quoting VaR, a stress loss, or a count over alerts/checks that the withheld rows no longer contribute to, and the ceiling of 9 classified refusals holds.
