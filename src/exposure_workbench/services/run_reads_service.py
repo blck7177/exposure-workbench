@@ -31,6 +31,8 @@ field on each beta.
 
 from __future__ import annotations
 
+from exposure_workbench.analytics import withheld as wh
+
 from datetime import date
 
 from sqlalchemy import func, select
@@ -160,12 +162,15 @@ _TAIL = {
     "var_95_1d": {"measure": "value_at_risk", "confidence": 0.95, "horizon_days": 1},
     "expected_shortfall_95": {"measure": "expected_shortfall", "confidence": 0.95, "horizon_days": 1},
 }
-_PLAIN_METRICS = (
+_PLAIN_METRICS = tuple(k for k in (
     "portfolio_market_value", "daily_pnl", "daily_return", "gross_exposure", "net_exposure",
     "gross_exposure_pct", "net_exposure_pct", "rolling_vol_30d", "rolling_vol_60d",
     "max_drawdown", "stress_loss_tech", "stress_loss_rates", "stress_loss_credit",
     "stress_loss_market",
-)
+) if not wh.is_withheld_metric(k))
+# V20: the tail measures are withheld (analytics/withheld.py); the packing
+# stays so that the day they are released they arrive with their qualifiers.
+_TAIL = {k: v for k, v in _TAIL.items() if not wh.is_withheld_metric(k)}
 
 
 async def get_risk_state(db: AsyncSession, run_id: str) -> dict:
@@ -190,6 +195,11 @@ async def get_risk_state(db: AsyncSession, run_id: str) -> dict:
     checks = list((await db.execute(
         select(LimitCheck).where(LimitCheck.run_id == run_id)
         .order_by(LimitCheck.limit_type))).scalars().all())
+
+    if "stress_results" in wh.WITHHELD_TABLES:
+        scenarios = []
+    alerts = wh.published_alerts(alerts)
+    checks = wh.published_checks(checks)
 
     metrics = None
     if m is not None:
@@ -227,6 +237,9 @@ async def get_risk_state(db: AsyncSession, run_id: str) -> dict:
         },
         "alerts": [_alert_row(a) for a in alerts],
         "not_a_forecast": True,
+        # V20. Said, not omitted: a payload that simply lacked VaR would read as
+        # a book with no tail measure. The sentence names the withheld state.
+        "withheld": wh.withheld_note(),
         "cite": run_id,
     }
 
@@ -288,6 +301,8 @@ async def list_run_alerts(db: AsyncSession, run_id: str) -> dict:
         .order_by(RiskAlert.severity, RiskAlert.alert_type))).scalars().all())
     checks = list((await db.execute(
         select(LimitCheck).where(LimitCheck.run_id == run_id))).scalars().all())
+    alerts = wh.published_alerts(alerts)
+    checks = wh.published_checks(checks)
     return {
         "run_id": run_id, "as_of": run.as_of_date.isoformat(),
         "alerts": [_alert_row(a) for a in alerts],
@@ -308,6 +323,9 @@ async def list_risk_limits(db: AsyncSession, portfolio_id: str) -> dict:
     rows = list((await db.execute(
         select(RiskLimit).where(RiskLimit.portfolio_id == portfolio_id)
         .order_by(RiskLimit.limit_type, RiskLimit.entity_id))).scalars().all())
+    # V20. A limit on a withheld measure is policy nothing evaluates; showing
+    # it as "in force" is the V2-H4 failure in a new coat.
+    rows = [r for r in rows if r.limit_type not in wh.WITHHELD_CHECKS]
     if not rows:
         return {"error": "no_limits", "portfolio_id": portfolio_id,
                 "detail": "this portfolio has no limit rows; it may not be yours or may not exist"}

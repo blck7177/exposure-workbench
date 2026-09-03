@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.analytics.exposure import ExposureResult
-from exposure_workbench.analytics.limits import AlertResult, LimitBook, check_limits
+from exposure_workbench.analytics.limits import AlertResult, LimitBook, _check_one, check_limits
 from exposure_workbench.analytics.pnl import PnlResult
 from exposure_workbench.analytics.risk_metrics import RiskResult
 from exposure_workbench.analytics.stress import ScenarioResult, StressResult
@@ -142,23 +142,17 @@ def test_a_profitable_day_is_not_a_loss():
     assert _alerts(pnl=pnl(0.05)) == []
 
 
-def test_var_95_breach():
-    a = only(_alerts(risk=risk(var_95_1d=0.04)))
-    assert a.alert_type == "var_95"
-    assert a.severity == "breach"
-    assert (a.entity_type, a.entity_id) == ("portfolio", "portfolio")
-    assert a.limit_value == pytest.approx(0.035)
-    assert a.utilization == pytest.approx(0.04 / 0.035)
-    assert a.message == "1-day 95% VaR: 4.0% vs limit 3.5% [BREACH]"
-
-
-def test_expected_shortfall_warning():
-    a = only(_alerts(risk=risk(es_95=0.04)))
-    assert a.alert_type == "expected_shortfall_95"
-    assert a.severity == "warning"
-    assert a.limit_value == pytest.approx(0.035)
-    assert a.utilization == pytest.approx(0.04 / 0.05)
-    assert a.message == "Expected Shortfall (95%): 4.0% vs limit 3.5% [WARNING]"
+def test_var_95_and_expected_shortfall_are_withheld_and_do_not_run():
+    """V20. The inputs are computed; the checks are not evaluated while
+    analytics/withheld.py withholds them — no alert, and no record either, so
+    the run's `evaluated` list cannot claim a check that did not run."""
+    from exposure_workbench.analytics import withheld as wh
+    assert {"var_95", "expected_shortfall_95"} <= set(wh.WITHHELD_CHECKS)
+    assert _alerts(risk=risk(var_95_1d=0.04, es_95=0.04)) == []
+    lb = book(THRESHOLDS)
+    _, _, records = check_limits(risk(var_95_1d=0.04, es_95=0.04), None, None, None, lb)
+    assert records == []
+    assert not any(lt in ("var_95", "expected_shortfall_95") for lt, _ in lb.looked_up)
 
 
 def test_rolling_volatility_breach():
@@ -202,15 +196,16 @@ def test_issuer_concentration_breach():
     assert a.message == "Issuer AAPL: 25.0% vs limit 20.0% [BREACH]"
 
 
-def test_stress_loss_warning_is_keyed_by_scenario_but_scoped_to_the_portfolio():
-    # The one check whose key and whose entity_type disagree: it is looked up by
-    # scenario name, yet the alert is about the whole book.
-    a = only(_alerts(stress=stress(("Rates +100bp", 0.07))))
-    assert a.alert_type == "stress_loss"
-    assert a.severity == "warning"
+def test_stress_loss_is_withheld_and_does_not_run():
+    """V20. The scenario rows are still written by the workflow; the check on
+    them is not evaluated. The key/entity disagreement this test used to pin
+    (looked up by scenario, alerting on the book) lives on in LIMIT_SPECS and
+    _check_one and returns with the check the day the scenarios are sourced."""
+    from exposure_workbench.analytics import withheld as wh
+    assert "stress_loss" in wh.WITHHELD_CHECKS
+    assert _alerts(stress=stress(("Rates +100bp", 0.07))) == []
+    a = _check_one("stress_loss", "Rates +100bp", 0.07, 0.060, 0.080)
     assert (a.entity_type, a.entity_id) == ("portfolio", "Rates +100bp")
-    assert a.limit_value == pytest.approx(0.060)
-    assert a.utilization == pytest.approx(0.07 / 0.08)
     assert a.message == "Stress scenario: Rates +100bp: 7.0% vs limit 6.0% [WARNING]"
 
 
@@ -227,8 +222,9 @@ def test_below_warning_is_silent():
 
 def test_exactly_at_a_level_fires_it():
     # >= on both tiers: the level is the first value that is not allowed.
-    assert only(_alerts(risk=risk(var_95_1d=0.025))).severity == "warning"
-    assert only(_alerts(risk=risk(var_95_1d=0.035))).severity == "breach"
+    # (On the volatility check since V20; VaR's is withheld.)
+    assert only(_alerts(risk=risk(vol_30d=THRESHOLDS["rolling_volatility_30d"][0]))).severity == "warning"
+    assert only(_alerts(risk=risk(vol_30d=THRESHOLDS["rolling_volatility_30d"][1]))).severity == "breach"
 
 
 def test_a_non_positive_reading_never_alerts():

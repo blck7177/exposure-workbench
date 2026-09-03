@@ -105,9 +105,6 @@ export function WhatThisRunFound({ run, metrics, alerts, sectors, checks }: {
       {checks != null && chip("ck",
         <><b>{checks}</b> <span className="text-slate-500">checks evaluated</span></>, undefined,
         "Every limit this run measured, whether or not it fired")}
-      {metrics?.var_95_1d != null && chip("var",
-        <>VaR 95% <b>{fmtPct(metrics.var_95_1d, 2)}</b></>, undefined,
-        "Historical, one day, from the run's own return window")}
       {moved && chip("sec",
         <>{titleFromKey(moved.sector)} <b>{fmtPct(moved.weight ?? 0, 1)}</b>{" "}
           <span className="text-slate-500">
@@ -141,41 +138,33 @@ function Tile({ label, value, sub, tone, chart, basis }: {
   );
 }
 
-export function Tiles({ metrics, history, checks }: {
+export function Tiles({ metrics, history, checks, methods }: {
   metrics: ExposureMetrics | null;
   history: History | null;
   checks: { evaluated: number; fired: number } | null;
+  /** V20: the ⓘ text under each tile, from the server (analytics/methods.py). */
+  methods?: Record<string, string>;
 }) {
   if (!metrics) return null;
-  const returns = (history?.points ?? [])
-    .map((p) => p.return)
-    .filter((v): v is number => v != null);
   const vols = (history?.points ?? []).slice(-260).map((p) => p.vol_30d);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
       <Tile label="Portfolio value" value={fmtMoney(metrics.portfolio_market_value)}
-        basis="Sum of the holdings at the run's own closing prices"
+        basis={methods?.market_value}
         sub={<>{fmtPct(metrics.gross_exposure_pct ?? 0, 0)} gross · {fmtPct(metrics.net_exposure_pct ?? 0, 0)} net</>} />
       <Tile label="Day P&L" value={fmtMoney(metrics.daily_pnl)}
         tone={metrics.daily_pnl != null && metrics.daily_pnl < 0 ? "down" : "up"}
-        basis="Against the previous session's close, all holdings priced"
+        basis={methods?.day_pnl}
         sub={fmtSignedPct(metrics.daily_return, 2)} />
-      <Tile label="VaR 95% · 1 day" value={fmtPct(metrics.var_95_1d, 2)}
-        basis="Historical, from the return window this run fitted over"
-        sub={<>ES 95% {fmtPct(metrics.expected_shortfall_95, 2)}</>}
-        chart={metrics.var_95_1d != null && returns.length >= 20
-          ? <ReturnHistogram returns={returns} quantile={metrics.var_95_1d}
-              label="Daily returns, with the fifth percentile marked" />
-          : undefined} />
       <Tile label="30-day volatility" value={fmtPct(metrics.rolling_vol_30d, 2)}
-        basis="Rolling 30 sessions, annualised"
+        basis={methods?.volatility}
         sub={<>60-day {fmtPct(metrics.rolling_vol_60d, 2)}</>}
         chart={vols.filter((v) => v != null).length > 2
           ? <Sparkline points={vols} label="30-day volatility over the last year" colour={C.s1} />
           : undefined} />
       <Tile label="Max drawdown" value={fmtPct(metrics.max_drawdown, 2)}
-        basis="Worst peak-to-trough over the window this run measured"
+        basis={methods?.drawdown}
         sub={history?.episodes[0]
           ? <>deepest {fmtPct(-history.episodes[0].depth, 1)} over {history.episodes[0].trough_days} sessions</>
           : undefined} />

@@ -67,3 +67,22 @@
 - "net_income is a filed metric, not a formula: read it with
   get_flow(metric='net_income', months=…) for a flow over a window, or
   get_balance_sheet for a balance at a date"
+
+---
+
+# V20 措辞（同一清单续）
+
+## 12. 页面 ⓘ 方法说明（analytics/methods.py，英文，逐句由代码常量写成）
+- market_value / day_pnl / value_path / drawdown / volatility / attribution /
+  factor_correlation / concentration 八句，原文见文件。
+## 13. `withheld` 一句话（随 get_risk_state、run 端点下发）
+- "Some measures this run computed are withheld pending validation and are not
+  published anywhere on this desk: expected_shortfall_95, stress_loss_credit, …,
+  stress_results. Say so if asked; do not estimate them from other figures."
+## 14. 三个工具描述删去 stress 承诺
+- `get_risk_state`："…exposure, volatility and drawdown metrics, and how many limit
+  checks ran versus fired. Measures the desk computes but withholds pending
+  validation are named in `withheld`, not given as numbers…"
+- `get_portfolio_analysis`：删 "every stress scenario ranked by the size of the loss,"
+- `describe_run`：分组列表删 "stress"
+## 15. UI：VaR 95% tile 与顶部 chip、"If the market broke" 面板、共线时的 "Factor betas" 面板不再出现；ⓘ 按钮 aria-label "How this is computed"

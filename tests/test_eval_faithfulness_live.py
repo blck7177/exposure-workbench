@@ -109,8 +109,12 @@ async def test_chat_answers_verify_almost_completely():
     )
     # The classification is part of the ceiling: a ninth refusal of a different
     # kind must not hide under a count that eight of one kind filled up.
-    kinds = {p["reason"] for p in r["refusals"] if p.get("reason") != "id_written_as_text"}
+    # V20: `withheld` is its own class — an answer that quoted a VaR or a stress
+    # loss before the desk withheld them was right then and is not measured
+    # against the published table now. Counted, not hidden: chat.withheld.
+    kinds = {p["reason"] for p in r["refusals"] if p.get("reason") not in ("id_written_as_text", "withheld")}
     assert kinds <= {"not_in_cited_evidence", "not_quotable_individually"}, kinds
+    assert r["chat"]["withheld"] >= 1, "the pre-V20 answers that quoted VaR or stress are on record"
 
 
 async def test_ids_written_into_text_are_a_closed_class_of_old_answers():
@@ -157,7 +161,7 @@ async def test_a_block_answer_is_measured_as_blocks_not_as_prose():
     assert chat["block_slots"] > 0
     slot_problems = [x for x in r["refusals"]
                      if x["reason"] in ("slot_no_longer_held", "slot_ref_holds_nothing",
-                                        "figure_written_as_text")]
+                                        "figure_written_as_text")]   # `withheld` is its own class (V20)
     assert slot_problems == [], (
         f"{len(slot_problems)} block-answer problems: a slot whose row no longer holds "
         f"its value, or a figure written into text. {slot_problems[:3]}"

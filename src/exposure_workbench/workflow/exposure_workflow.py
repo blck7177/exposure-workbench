@@ -16,6 +16,7 @@ import pandas as pd
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.analytics.exposure import calc_exposure, ExposureResult
 from exposure_workbench.analytics.pnl import calc_pnl, PnlResult
 from exposure_workbench.analytics.factor_model import calc_factor_attribution, FactorAttributionResult
@@ -940,7 +941,8 @@ class ExposureWorkflow:
                 for p in pnl.top_detractors
             ],
             sector_exposures={s: d["weight"] for s, d in exposure.sector_map.items()},
-            var_95_1d=risk.var_95_1d,
+            # V20: a withheld measure does not reach the report writer either.
+            var_95_1d=None if wh.is_withheld_metric("var_95_1d") else risk.var_95_1d,
             vol_30d=risk.vol_30d,
             max_drawdown=risk.max_drawdown,
             factors_collinear=factor_result.collinear,
@@ -954,7 +956,7 @@ class ExposureWorkflow:
                 }
                 for fr in factor_result.factors[:5]
             ],
-            stress_scenarios=[
+            stress_scenarios=[] if "stress_results" in wh.WITHHELD_TABLES else [
                 {
                     "name": s.name,
                     "description": s.description,

@@ -150,8 +150,37 @@ export type TableSpec = { columns: string[]; rows: (string | number)[][] };
  * are the honest half of every panel here and they are given a place rather
  * than left to whoever remembers.
  */
+/**
+ * The ⓘ beside a measure (V20). Its text is the server's method statement
+ * (analytics/methods.py) and never a string written here: a method described
+ * in a component drifts from the code the moment either changes.
+ */
+export function MethodInfo({ text }: { text?: string | null }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        aria-label="How this is computed"
+        aria-expanded={open}
+        title={text}
+        onClick={() => setOpen((v) => !v)}
+        className="h-4 w-4 rounded-full border border-[#30363d] text-[10px] leading-none text-slate-400 hover:text-slate-200 hover:border-slate-500">
+        i
+      </button>
+      {open && (
+        <span role="note"
+          className="absolute left-0 top-5 z-20 w-72 rounded border border-[#30363d] bg-[#0d1117] p-2 text-[11px] leading-snug text-slate-300 shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function ChartCard({
-  title, aside, note, table, controls, children,
+  title, aside, note, table, controls, children, info,
 }: {
   title: string;
   aside?: React.ReactNode;
@@ -159,12 +188,14 @@ export function ChartCard({
   table?: TableSpec;
   controls?: React.ReactNode;
   children: React.ReactNode;
+  /** V20: the method statement shown behind an ⓘ next to the title. */
+  info?: string | null;
 }) {
   const [showTable, setShowTable] = useState(false);
   return (
     <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
       <header className="flex items-center gap-3 px-4 py-2.5 border-b border-[#21262d]">
-        <h3 className="text-sm font-medium text-slate-200">{title}</h3>
+        <h3 className="text-sm font-medium text-slate-200 flex items-center gap-1.5">{title}<MethodInfo text={info} /></h3>
         {aside && <span className="text-[11px] text-slate-500 truncate">{aside}</span>}
         <div className="ml-auto flex items-center gap-2">
           {controls}

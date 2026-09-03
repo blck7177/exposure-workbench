@@ -425,6 +425,15 @@ pointers intact, and each guard refusing without writing.
 
 ### Known limits
 
+- **Four measures are computed and withheld (V20).** VaR 95%, expected
+  shortfall, the stress scenarios and their four losses are still written by
+  every run and served nowhere: not on the page, not in the agent's manifest,
+  not in the daily report, and their limit checks do not run. The one
+  declaration is `analytics/withheld.py`; each entry states the condition
+  for release (a value test and a backtest for the tail measures; sourced
+  shocks and determinate betas for stress). Individual factor betas are
+  withheld under the same collinearity flag the table already uses.
+
 V3 added five, and they are limits of the verification layer rather than of the
 service — worth knowing precisely because the layer above them is now strong
 enough that people will trust it.

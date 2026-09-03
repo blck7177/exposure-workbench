@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field, computed_field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
+from exposure_workbench.analytics import withheld as wh
+from exposure_workbench.analytics.methods import METHODS
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.session import get_db, get_session_factory
@@ -251,7 +253,10 @@ async def get_risk_limits(
     portfolio_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    return await portfolio_service.get_risk_limits(db, portfolio_id)
+    rows = await portfolio_service.get_risk_limits(db, portfolio_id)
+    # V20. A limit on a withheld measure is policy nothing evaluates; it is not
+    # shown as in force (analytics/withheld.py).
+    return [r for r in rows if r.limit_type not in wh.WITHHELD_CHECKS]
 
 
 # ─── Dashboard endpoint ───────────────────────────────────────────────────────
@@ -434,6 +439,7 @@ async def get_portfolio_history(
              "recovery_days": e.recovery_days, "recovered": e.recovery_date is not None}
             for e in episodes
         ],
+        "methods": dict(METHODS),   # V20: the ⓘ text beside each measure, from the code
         "valuation_assumption": (
             "quantities are held fixed at today's holdings for the whole span — "
             "the book has one position snapshot and no holding history to replay"
@@ -483,12 +489,9 @@ async def get_portfolio_dashboard(
                     "gross_exposure_pct": m.gross_exposure_pct,
                     "net_exposure_pct": m.net_exposure_pct,
                     "rolling_vol_30d": m.rolling_vol_30d,
-                    "var_95_1d": m.var_95_1d,
-                    "expected_shortfall_95": m.expected_shortfall_95,
                     "max_drawdown": m.max_drawdown,
-                    "stress_loss_tech": m.stress_loss_tech,
-                    "stress_loss_rates": m.stress_loss_rates,
-                    "stress_loss_market": m.stress_loss_market,
+                    # V20: VaR, ES and the stress losses are withheld
+                    # (analytics/withheld.py) and not served here either.
                 }
 
             sector_exposures = [
@@ -513,7 +516,7 @@ async def get_portfolio_dashboard(
                  "entity_type": ra.entity_type, "entity_id": ra.entity_id,
                  "current_value": ra.current_value, "limit_value": ra.limit_value,
                  "utilization": ra.utilization, "message": ra.message}
-                for ra in (full_run.risk_alerts or [])
+                for ra in wh.published_alerts(full_run.risk_alerts or [])
             ]
             if full_run.daily_report:
                 rpt = full_run.daily_report

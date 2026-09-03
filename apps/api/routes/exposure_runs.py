@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
 from apps.api.schemas import WorkflowEventOut
+from exposure_workbench.analytics import withheld as wh
+from exposure_workbench.analytics.methods import METHODS
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import LimitCheck, StressResult
 from exposure_workbench.db.session import get_db
@@ -36,13 +38,10 @@ class ExposureMetricsOut(BaseModel):
     net_exposure_pct: float | None
     rolling_vol_30d: float | None
     rolling_vol_60d: float | None
-    var_95_1d: float | None
-    expected_shortfall_95: float | None
     max_drawdown: float | None
-    stress_loss_tech: float | None
-    stress_loss_rates: float | None
-    stress_loss_credit: float | None
-    stress_loss_market: float | None
+    # V20. VaR, expected shortfall and the four stress losses are computed,
+    # stored, and not served: analytics/withheld.py says why, and
+    # test_v20_withheld pins that no withheld column has a field here.
 
     model_config = {"from_attributes": True}
 
@@ -144,6 +143,10 @@ class ExposureRunOut(BaseModel):
     factor_attributions: list[FactorAttributionOut] = []
     risk_alerts: list[RiskAlertOut] = []
     daily_report: DailyReportOut | None = None
+    # V20. What each published measure IS (analytics/methods.py), for the ⓘ
+    # beside it; and the sentence naming what this run computed and withholds.
+    methods: dict[str, str] = {}
+    withheld: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -276,9 +279,9 @@ async def run_limit_book(run_id: str, db: AsyncSession = Depends(get_db)):
     if run is None:
         raise HTTPException(404, {"error": "unknown_run", "run_id": run_id})
 
-    rows = (await db.execute(
+    rows = wh.published_checks((await db.execute(
         select(LimitCheck).where(LimitCheck.run_id == run_id).order_by(LimitCheck.limit_type)
-    )).scalars().all()
+    )).scalars().all())
 
     out = []
     for r in rows:
@@ -334,6 +337,11 @@ async def run_stress(run_id: str, db: AsyncSession = Depends(get_db)):
     run = await exposure_run_service.get_run(db, run_id)
     if run is None:
         raise HTTPException(404, {"error": "unknown_run", "run_id": run_id})
+    if "stress_results" in wh.WITHHELD_TABLES:
+        # V20. The rows exist; the page does not get them. The reason travels
+        # so that a reader who knows the URL is told the state, not shown a hole.
+        return {"run_id": run_id, "scenarios": [],
+                "withheld": wh.WITHHELD_TABLES["stress_results"]}
     rows = (await db.execute(
         select(StressResult).where(StressResult.run_id == run_id)
         .order_by(StressResult.loss_pct.desc().nullslast())
@@ -431,4 +439,15 @@ async def get_exposure_run(run_id: str, db: AsyncSession = Depends(get_db)):
     run = await exposure_run_service.get_run(db, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
-    return run
+    out = ExposureRunOut.model_validate(run)
+    # V20. Under collinearity no single beta is determinate (factor_model.py):
+    # the table already projects them off the model's view (V11-F), and the
+    # page gets the same answer from the same flag — the contributions stay,
+    # the coefficients go. Decided here, once, not in a component.
+    if run.metrics is not None and bool(run.metrics.collinear):
+        for f in out.factor_attributions:
+            f.beta = None
+    out.risk_alerts = [a for a in out.risk_alerts if not wh.is_withheld_check(a.alert_type)]
+    out.methods = dict(METHODS)
+    out.withheld = wh.withheld_note()
+    return out

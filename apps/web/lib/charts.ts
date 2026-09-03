@@ -45,6 +45,8 @@ export type History = {
   episodes: Episode[];
   /** Stated, not hidden: today's holdings at historical prices. */
   valuation_assumption?: string;
+  /** V20: method statements from the server, keyed like ExposureRun.methods. */
+  methods?: Record<string, string>;
   detail?: string;
 };
 

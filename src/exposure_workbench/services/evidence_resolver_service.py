@@ -334,7 +334,6 @@ async def _run(db: AsyncSession, rid: str) -> dict | None:
             "status": row.status,
             "market_value": _num(m.portfolio_market_value) if m else None,
             "daily_return": _num(m.daily_return) if m else None,
-            "var_95_1d": _num(m.var_95_1d) if m else None,
             "rolling_vol_30d": _num(m.rolling_vol_30d) if m else None,
             "max_drawdown": _num(m.max_drawdown) if m else None,
         },

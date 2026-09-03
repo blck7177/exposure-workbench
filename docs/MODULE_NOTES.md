@@ -904,3 +904,24 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 ### 守卫
 
 `test_v19_labels`:schema 拒字符串格与 `columns`(指名字段)、三种真实形状的派生(排序表/run 子表/回撤表)、单行表、派生键模型不可自带、resolver→渲染的序列交接、方向算出且句子不判、两面同一注册、能力声明改口、搜索工具走 admit、fact 卡带 URL、run 卡经 `positions_for_run`、workflow 不再有第二份两步判定。
+
+## M22 — 算而不发:量化度量的发布是一处声明(V20,2026-09-02)
+
+**一句话**:审计按三问(方法是否业界具名、数值是否有测试钉住、输入有无已知缺陷)过一遍 book 页,四个度量至少失一问却在页面、agent 清单、日报、限额引擎里各自直读列——于是"不发"写成 `analytics/withheld.py` 一处,九个读取点全部派生;workflow 照算照存,放行=改这一个文件。
+
+### 形状
+
+- **`withheld.py`**:`WITHHELD_METRICS`(var_95_1d/expected_shortfall_95/四个 stress_loss_*)、`WITHHELD_TABLES`(stress_results)、`WITHHELD_CHECKS`(var_95/expected_shortfall_95/stress_loss)、`WITHHELD_GROUPS`(stress);每条的理由就是放行条件(尾部:数值测试+分位约定写明+一次 Kupiec 回测;压力:有来源的冲击+单个 β 可判定)。
+- **派生**:`resources._DECLARED` 是 run 写的全部,`RUN_CHILDREN = _published(_DECLARED)`;`RUN_GROUPS` 同样过滤 → 桌面上没有这些名字、`describe_run` 不列、门解析不到;`check_limits` 对 withheld 检查不 emit(无告警、无记录、不进 evaluated),限额行照留;`get_risk_state`/`list_risk_limits`/`get_portfolio_analysis`/日报输入/run 证据卡/三个 API 面读同一模块;撤掉的载荷带 `withheld` 一句话——缺席被说出来,不是被省略。
+- **ⓘ 文案在服务端**:`analytics/methods.py` 每个保留度量一句英文,引用代码自己的常量(ddof=1、√252、VIF 5),随 run/history 端点作 `methods` 下发,页面 `MethodInfo` 渲染;组件里不再写 `basis="…"`(测试钉住)。
+- **单个 β**:`GET /exposure-runs/{id}` 在 `metrics.collinear` 下把每个 `beta` 置 None(与桌面 V11-F 投影同一面旗),页面只在存在 β 时画那块;贡献、总和、相关矩阵照留。`^VIX` 退出 `factor_config.yaml`(指数水平不是收益;八因子 VIF 17.9)。
+
+### 有意不做
+
+- 不删列、不删表、不删情景配置:数据继续积累,放行时不用重跑历史。
+- 不在 UI 放开关:前端只是没有字段可显示。
+- 不修 VaR:修法在放行条件里,是下一批的活。
+
+### 守卫
+
+`test_v20_withheld`:声明与发布的差集恰为 withheld;清单组无 withheld 名;`RUN_TABLES` 无 stress_results;无工具 scope 指向 withheld 表;API 模型无 withheld 字段且带 methods/withheld;九个读取点源码含 withheld;方法句引用代码常量且不描述任何 withheld 度量;sections.tsx 无 `basis="`;组合波动率/回撤手算钉住。旧测试反转:`test_limit_checks`(var/ES/stress 三检查不跑)、`test_limit_completeness`(looked_up = 必需集 − withheld)、`test_resources`(遍历 `_DECLARED`)、`test_v8_run_children`(stress 算而不发)。

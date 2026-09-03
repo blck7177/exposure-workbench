@@ -65,6 +65,7 @@ export function ValueAndDrawdown({ history }: { history: History }) {
   return (
     <ChartCard
       title="Value and drawdown"
+      info={[history.methods?.value_path, history.methods?.drawdown].filter(Boolean).join(" ")}
       aside={history.window
         ? `${history.window.sessions} sessions to ${fmtDate(history.window.to)} · ${history.benchmark} indexed to the same start`
         : undefined}
@@ -125,7 +126,8 @@ export function ValueAndDrawdown({ history }: { history: History }) {
 
 // ── where the day went ───────────────────────────────────────────────────────
 
-export function WhereTheDayWent({ factors, issuers, dailyReturn, dailyPnl, names }: {
+export function WhereTheDayWent({ factors, issuers, dailyReturn, dailyPnl, names, info }: {
+  info?: string | null;
   factors: FactorAttribution[];
   issuers: IssuerExposure[];
   dailyReturn: number | null;
@@ -165,6 +167,7 @@ export function WhereTheDayWent({ factors, issuers, dailyReturn, dailyPnl, names
   return (
     <ChartCard
       title="Where the day went"
+      info={info}
       controls={
         <div className="flex rounded border border-[#30363d] overflow-hidden text-[11px]">
           {(["factors", "holdings"] as const).map((m) => (
@@ -310,7 +313,7 @@ export function FactorBetas({ factors, collinear, maxVif, names }: {
   );
 }
 
-export function FactorCorrelations({ corr }: { corr: FactorCorrelation }) {
+export function FactorCorrelations({ corr, info }: { corr: FactorCorrelation; info?: string | null }) {
   if (!corr.matrix || corr.labels.length === 0) {
     return (
       <ChartCard title="Factor correlations" note={corr.detail}>
@@ -322,6 +325,7 @@ export function FactorCorrelations({ corr }: { corr: FactorCorrelation }) {
   return (
     <ChartCard
       title="Factor correlations"
+      info={info}
       aside={corr.window ? `${corr.window.observations} sessions` : undefined}
       table={{
         columns: ["", ...corr.labels],

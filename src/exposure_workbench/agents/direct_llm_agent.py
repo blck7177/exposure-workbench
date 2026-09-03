@@ -50,7 +50,8 @@ def _build_user_message(inp: ReportInput) -> str:
         lines.append(f"- {sector}: {pct(weight)}")
 
     lines.append("\n### Risk Metrics")
-    lines.append(f"- 1-day 95% VaR: {pct(inp.var_95_1d)}")
+    if inp.var_95_1d is not None:   # V20: withheld measures are not handed to the writer
+        lines.append(f"- 1-day 95% VaR: {pct(inp.var_95_1d)}")
     lines.append(f"- 30d Annualised Vol: {pct(inp.vol_30d)}")
     lines.append(f"- Max Drawdown: {pct(inp.max_drawdown)}")
 

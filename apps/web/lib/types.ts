@@ -76,13 +76,9 @@ export interface ExposureMetrics {
   net_exposure_pct: number | null;
   rolling_vol_30d: number | null;
   rolling_vol_60d: number | null;
-  var_95_1d: number | null;
-  expected_shortfall_95: number | null;
   max_drawdown: number | null;
-  stress_loss_tech: number | null;
-  stress_loss_rates: number | null;
-  stress_loss_credit: number | null;
-  stress_loss_market: number | null;
+  // V20: VaR, expected shortfall and the stress losses are withheld server-side
+  // (analytics/withheld.py) and are not on the wire.
 }
 
 export interface SectorExposure {
@@ -143,6 +139,10 @@ export interface DailyReport {
 }
 
 export interface ExposureRun {
+  /** V20: what each published measure IS, from analytics/methods.py — the ⓘ text. */
+  methods?: Record<string, string>;
+  /** V20: the sentence naming what this run computed and withholds. */
+  withheld?: string | null;
   id: string;
   portfolio_id: string;
   status: "pending" | "running" | "completed" | "failed";

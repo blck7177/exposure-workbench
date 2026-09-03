@@ -69,7 +69,10 @@ def test_a_run_looks_up_every_required_limit_and_at_the_right_scope():
         book,
     )
 
-    assert {lt for lt, _ in book.looked_up} == set(REQUIRED_LIMIT_TYPES)
+    # V20: a withheld check (analytics/withheld.py) is not looked up, because
+    # it is not evaluated; every other required type still is.
+    from exposure_workbench.analytics import withheld as wh
+    assert {lt for lt, _ in book.looked_up} == set(REQUIRED_LIMIT_TYPES) - set(wh.WITHHELD_CHECKS)
 
     for limit_type, entity_id in book.looked_up:
         scope = LIMIT_SPECS[limit_type].scope

@@ -10,6 +10,8 @@ uses the desk's policy" and "a run quietly uses a number from the source tree".
 
 from __future__ import annotations
 
+from exposure_workbench.analytics import withheld as wh
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -326,11 +328,15 @@ def check_limits(
         emit("daily_loss", "portfolio", -pnl_result.daily_return,
              limits.get_portfolio("daily_loss"))
 
+    # V20. A check whose input is withheld (analytics/withheld.py) does not run:
+    # no alert, no record, no "evaluated" key — the same shape as a check whose
+    # input is None, because to every reader it is the same fact. The limit
+    # rows stay; policy is the portfolio's own.
     if risk_metrics_result is not None:
-        if risk_metrics_result.var_95_1d is not None:
+        if risk_metrics_result.var_95_1d is not None and "var_95" not in wh.WITHHELD_CHECKS:
             emit("var_95", "portfolio", risk_metrics_result.var_95_1d,
                  limits.get_portfolio("var_95"))
-        if risk_metrics_result.es_95 is not None:
+        if risk_metrics_result.es_95 is not None and "expected_shortfall_95" not in wh.WITHHELD_CHECKS:
             emit("expected_shortfall_95", "portfolio", risk_metrics_result.es_95,
                  limits.get_portfolio("expected_shortfall_95"))
         if risk_metrics_result.vol_30d is not None:
@@ -359,7 +365,7 @@ def check_limits(
             emit("issuer_concentration", ticker, data["weight"],
                  limits.get_entity("issuer_concentration", ticker))
 
-    if stress_result is not None:
+    if stress_result is not None and "stress_loss" not in wh.WITHHELD_CHECKS:
         for scenario in stress_result.scenarios:
             emit("stress_loss", scenario.name, scenario.estimated_loss_pct,
                  limits.get_entity("stress_loss", scenario.name))

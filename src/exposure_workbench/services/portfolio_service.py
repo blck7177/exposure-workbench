@@ -12,6 +12,8 @@ passes the citation gate, so a portfolio-level claim is cited like an issuer one
 
 from __future__ import annotations
 
+from exposure_workbench.analytics import withheld as wh
+
 import asyncio
 import logging
 from datetime import date
@@ -139,8 +141,7 @@ def _metrics(m) -> dict | None:
         "gross_exposure_pct": _f(m.gross_exposure_pct),
         "net_exposure_pct": _f(m.net_exposure_pct),
         "rolling_vol_30d": _f(m.rolling_vol_30d),
-        "var_95_1d": _f(m.var_95_1d),
-        "max_drawdown": _f(m.max_drawdown),
+        "max_drawdown": _f(m.max_drawdown),   # V20: var_95_1d is withheld (analytics/withheld.py)
     }
 
 
@@ -180,7 +181,7 @@ async def _snapshot_one(db: AsyncSession, p: Portfolio) -> dict:
         "alerts": [
             {"id": a.id, "alert_type": a.alert_type, "severity": a.severity,
              "entity_id": a.entity_id, "message": a.message, "utilization": _f(a.utilization)}
-            for a in run.risk_alerts
+            for a in wh.published_alerts(run.risk_alerts)
         ],
     }
 

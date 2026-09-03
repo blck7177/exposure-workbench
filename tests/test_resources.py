@@ -64,7 +64,10 @@ def test_every_numeric_column_of_a_run_child_is_declared_or_deliberately_not():
         "stress_results.rank",
     }
     undeclared = []
-    for r in R.RUN_CHILDREN:
+    # Over the WHOLE declaration (V20): a withheld column is still a decision
+    # somebody made, and it is made in analytics/withheld.py, which the
+    # published RUN_CHILDREN is derived from.
+    for r in R._DECLARED:
         declared = {c.name for c in r.columns}
         for col in r.model.__table__.columns:
             if not isinstance(col.type, (Numeric, Float, Integer)):

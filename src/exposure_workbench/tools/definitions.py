@@ -17,6 +17,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import withheld as _wh
 from exposure_workbench.db.models import Company, RiskAlert
 from exposure_workbench.services import brief_service
 from exposure_workbench.services import (
@@ -246,7 +247,12 @@ async def _get_fundamental_panel(db: AsyncSession, ticker: str,
 # ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
 
 async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
-    return {"portfolios": await portfolio_service.snapshot_all(db)}
+    # V20. The entry point every portfolio question starts at carries the
+    # withheld sentence: the first live turn after withholding asked for VaR
+    # and a 10% market drop, never reached get_risk_state, and estimated the
+    # drop as a tenth of market value — the one thing the sentence forbids.
+    return {"portfolios": await portfolio_service.snapshot_all(db),
+            "withheld": _wh.withheld_note()}
 
 
 # ── financial data / calculations ───────────────────────────────────────────────
@@ -356,6 +362,8 @@ _FACE_CAPABILITIES = {
     ],
     "cannot": [
         "produce a figure no tool returned: a quantity not on the table cannot be written",
+        "give a measure the desk withholds pending validation (VaR, expected shortfall, the "
+        "stress scenarios): say it is withheld; never estimate it from other figures",
     ],
 }
 
@@ -443,9 +451,11 @@ async def _describe_run(db: AsyncSession, run_id: str) -> dict:
         **({"other": _factored(rest)} if rest else {}),
         "units": {r.table: {c.name: c.unit for c in r.columns} for r in _rs.RUN_CHILDREN},
         "not_available": {
-            "stress_unevaluated": analysis.get("stress_unevaluated") if isinstance(analysis, dict) else None,
             "headroom_not_recorded": analysis.get("headroom_not_recorded") if isinstance(analysis, dict) else None,
             "withheld_collinear": _factored(withheld) if withheld else None,
+            # V20: named here as well as at the snapshot, because this is the
+            # manifest a book question reads before choosing the next call.
+            "withheld_pending_validation": _wh.withheld_note(),
         },
         "collinear_note": ("these factors are collinear: no single beta is on the table; "
                            "factor_attributions.sum_of_contributions and the net betas are"
@@ -523,7 +533,7 @@ async def _list_alerts(db: AsyncSession, ticker: str) -> dict:
     return {"ticker": tk, "alerts": [
         {"id": a.id, "type": a.alert_type, "severity": a.severity,
          "message": a.message, "utilization": float(a.utilization) if a.utilization is not None else None}
-        for a in rows
+        for a in _wh.published_alerts(rows)
     ]}
 
 
@@ -815,17 +825,16 @@ def build_read_registry() -> ToolRegistry:
         name="get_risk_state",
         display="Reading the run's risk measures",
         description=(
-            "One run's measured risk state: exposure and volatility metrics, the tail "
-            "measures with their confidence and horizon attached, every stress scenario "
-            "(including the ones that were refused and why), and how many limit checks ran "
-            "versus fired. Describes the book on that date under those shocks; it is not a "
-            "forecast. Cite the run_id."
+            "One run's measured risk state: exposure, volatility and drawdown metrics, and "
+            "how many limit checks ran versus fired. Measures the desk computes but withholds "
+            "pending validation are named in `withheld`, not given as numbers. Describes the "
+            "book on that date; it is not a forecast. Cite the run_id."
         ),
         json_schema={"type": "object", "properties": {
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_risk_state, tool_class=READ,
-        evidence=Evidence(scope=("exposure_metrics", "stress_results", "risk_alerts", "limit_checks", "count")),
+        evidence=Evidence(scope=("exposure_metrics", "risk_alerts", "limit_checks", "count")),
     ))
     reg.register(Tool(
         name="list_run_alerts",
@@ -893,9 +902,9 @@ def build_read_registry() -> ToolRegistry:
         name="get_portfolio_analysis",
         display="Ordering the exposures and measuring the room left",
         description=(
-            "One run's exposures, already ordered and netted: every stress scenario ranked "
-            "by the size of the loss, the book's NET exposure to rates, credit and equity "
-            "with the legs that make it up, the distance from each limit check to its own "
+            "One run's exposures, already ordered and netted: the book's NET exposure to "
+            "rates, credit and equity with the legs that make it up, the distance from each "
+            "limit check to its own "
             "warning and breach levels, and every holding with its weight and its "
             "contribution to the day. Use this for 'what is this book exposed to', 'which "
             "risk is biggest', 'how much room is left' and 'what should I watch' — it "
@@ -908,7 +917,7 @@ def build_read_registry() -> ToolRegistry:
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_portfolio_analysis, tool_class=READ,
-        evidence=Evidence(scope=("stress_results", "limit_checks", "factor_attributions", "issuer_exposures", "exposure_metrics", "count")),
+        evidence=Evidence(scope=("limit_checks", "factor_attributions", "issuer_exposures", "exposure_metrics", "count")),
     ))
     reg.register(Tool(
         name="describe_run",
@@ -917,7 +926,7 @@ def build_read_registry() -> ToolRegistry:
             "Start here for any question about THIS BOOK: everything one completed run "
             "holds, named exactly as a slot takes it, grouped by the question each group "
             "answers — book size, concentration, mandate (each check against its tiers and "
-            "the room left), stress, factor exposure, attribution, risk, counts. The values "
+            "the room left), factor exposure, attribution, risk, counts. The values "
             "come back on the table beside the names. Also says what this face can and "
             "cannot do. Read it before reaching for the per-table tools."
         ),

@@ -52,7 +52,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 load_dotenv(ROOT / ".env", override=True)
 
-from exposure_workbench.db.models import AgentMessage, IssuerBrief  # noqa: E402
+from exposure_workbench.analytics import withheld as wh  # noqa: E402
+from exposure_workbench.db.models import AgentMessage, ExposureMetrics, IssuerBrief, StressResult  # noqa: E402
 from exposure_workbench.services import answer_blocks as ab  # noqa: E402
 from exposure_workbench.services import numeric_verification as nv  # noqa: E402
 from exposure_workbench.services import quantities as qn  # noqa: E402
@@ -137,10 +138,51 @@ async def _check_blocks(db, blocks) -> tuple[int, list[dict], list[dict]]:
         holds = by_ref.get(ref, [])
         atol = 0.5 * (10 ** -_decimals_of(float(want)))
         if not any(abs(v.value - float(want)) <= atol for v in holds):
+            # V20. A slot on a measure the desk has since withheld was right
+            # when written and is not on the table now: its own class, so the
+            # replay says "withheld", not "no longer held".
+            label = s.get("label")
             problems.append({
-                "reason": "slot_no_longer_held" if holds else "slot_ref_holds_nothing",
-                "ref": ref, "label": s.get("label"), "number": want})
+                "reason": ("withheld" if isinstance(label, str) and wh.is_withheld_name(label)
+                           else "slot_no_longer_held" if holds else "slot_ref_holds_nothing"),
+                "ref": ref, "label": label, "number": want})
     return len(slots), problems, ids_in_text
+
+
+async def _withheld_values(db, refs: list[str]) -> list[float]:
+    """The numbers a withheld measure held for the cited runs — read from the
+    stored rows, which withholding did not touch — so a prose answer written
+    before V20 that quoted a VaR or a stress loss is classified as `withheld`
+    rather than as unverified (V20)."""
+    runs = [r for r in refs if r.startswith("run_")]
+    if not runs:
+        return []
+    out: list[float] = []
+    for m in (await db.execute(select(ExposureMetrics).where(ExposureMetrics.run_id.in_(runs)))).scalars():
+        for col in wh.WITHHELD_METRICS:
+            v = getattr(m, col, None)
+            if v is not None:
+                out.append(float(v))
+    if "stress_results" in wh.WITHHELD_TABLES:
+        rows = list((await db.execute(select(StressResult).where(StressResult.run_id.in_(runs)))).scalars())
+        for r in rows:
+            for v in (r.loss_pct, r.loss_usd):
+                if v is not None:
+                    out.append(float(v))
+        by_run: dict[str, int] = {}
+        for r in rows:
+            by_run[r.run_id] = by_run.get(r.run_id, 0) + 1
+        out.extend(float(n) for n in by_run.values())
+    # The counts an old answer stated over ALL alerts or checks of a run: the
+    # published count is smaller now by the withheld checks' rows.
+    from exposure_workbench.db.models import LimitCheck, RiskAlert
+    for model in (RiskAlert, LimitCheck):
+        rows = list((await db.execute(select(model).where(model.run_id.in_(runs)))).scalars())
+        by_run = {}
+        for r in rows:
+            by_run[r.run_id] = by_run.get(r.run_id, 0) + 1
+        out.extend(float(n) for n in by_run.values())
+    return out
 
 
 def _decimals_of(x: float) -> int:
@@ -171,6 +213,7 @@ async def evaluate() -> dict:
                 select(AgentMessage).where(AgentMessage.role == "assistant")
             )).scalars().all()
             numbers = bad = cited = dangling_total = uncited_with_numbers = 0
+            withheld_total = 0
             v2_messages = v2_slots = 0
             id_text_runs, id_text_messages = 0, set()
             for m in msgs:
@@ -180,7 +223,10 @@ async def evaluate() -> dict:
                     n_slots, problems, ids_in_text = await _check_blocks(db, blocks)
                     v2_slots += n_slots
                     numbers += n_slots
-                    bad += len(problems)
+                    # V20: a withheld slot is its own class, not an unverified one.
+                    withheld_here = sum(1 for p in problems if p.get("reason") == "withheld")
+                    withheld_total += withheld_here
+                    bad += len(problems) - withheld_here
                     for p in problems:
                         out["refusals"].append({"where": m.id, **p})
                     for p in ids_in_text:
@@ -207,10 +253,24 @@ async def evaluate() -> dict:
                 values, quoted = await nv.resolve_cited_values(db, ids)
                 problems = nv.verify(stated, values, quoted)
                 numbers += len(stated)
-                bad += len(problems)
+                # V20. A refused number that equals a withheld measure of a
+                # cited run is `withheld`, counted apart from `unverified`.
+                held_back = await _withheld_values(db, ids)
+                by_surface = {n.surface: n for n in stated}
                 for p in problems:
-                    out["refusals"].append({"where": m.id, "reason": "unverified_number", **p})
+                    n = by_surface.get(p.get("number"))
+                    # `reason` after **p: the verifier's own reason is kept as
+                    # `verifier_reason`, and the replay's class is the one read.
+                    if n is not None and any(abs(v - n.value) <= n.atol for v in held_back):
+                        withheld_total += 1
+                        out["refusals"].append({"where": m.id, **p, "verifier_reason": p.get("reason"),
+                                                "reason": "withheld"})
+                    else:
+                        bad += 1
+                        # As before V20: the verifier's own reason is the class read.
+                        out["refusals"].append({"where": m.id, "reason": "unverified_number", **p})
             out["chat"] = {"messages": len(msgs), "numbers": numbers, "unverified": bad,
+                           "withheld": withheld_total,
                            "citations": cited, "dangling_citations": dangling_total,
                            "number_bearing_uncited": uncited_with_numbers,
                            "block_messages": v2_messages, "block_slots": v2_slots,

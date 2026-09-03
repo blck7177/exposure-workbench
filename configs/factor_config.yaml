@@ -37,10 +37,12 @@ factors:
     description: "Oil / energy commodity proxy"
     group: "commodity"
 
-  volatility:
-    ticker: "^VIX"
-    description: "CBOE VIX — equity volatility / fear gauge"
-    group: "macro"
+  # `volatility: ^VIX` was removed in V20. The VIX is an index level, not a
+  # tradable return; regressing the book's return on its day-over-day
+  # percentage change is a choice with academic precedent and no desk
+  # convention behind it, and it sat in an eight-factor set already collinear
+  # enough (max VIF 17.9) that no single beta was quotable. The stored
+  # factor_prices rows for ^VIX are kept; nothing reads them.
 
 # Every key below is read by analytics/factor_model.py. `method: ewm` and
 # `ewm_halflife_days` used to sit here advertising a capability the code did not

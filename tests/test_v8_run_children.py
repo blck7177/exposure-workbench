@@ -76,12 +76,17 @@ def test_the_scenario_carries_the_shocks_it_applied():
     assert "shocks" in ScenarioResult.__dataclass_fields__
 
 
-def test_a_scenarios_loss_is_citable_under_the_run():
-    entry = next((m, money, ratio, label) for m, money, ratio, label, _qual in qn._RUN_CHILDREN
-                 if m is StressResultRow)
-    _model, money, ratio, label = entry
-    assert "loss_usd" in money and "loss_pct" in ratio
-    assert label == "scenario", "the label has to name the scenario or ten losses look alike"
+def test_a_scenarios_loss_is_computed_stored_and_withheld():
+    """V20. The row is written and the loss is real; it is not on the table —
+    analytics/withheld.py says why, and the published resources are derived
+    from that decision. This test used to pin the opposite and turns around
+    with it: the day stress is released, `stress_results` reappears in
+    RUN_CHILDREN and this assertion flips back."""
+    from exposure_workbench.analytics import resources as R
+    from exposure_workbench.analytics import withheld as wh
+    assert "stress_results" in wh.WITHHELD_TABLES
+    assert all(r.table != "stress_results" for r in R.RUN_CHILDREN)
+    assert any(r.table == "stress_results" for r in R._DECLARED)
 
 
 # ── P3: limit checks ──────────────────────────────────────────────────────────

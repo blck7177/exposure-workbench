@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.db.models import (
     ExposureMetrics, FactorAttribution, IssuerExposure, LimitCheck, RiskAlert,
     SectorExposure, StressResult,
@@ -85,11 +86,35 @@ def _ratio(*names: tuple[str, str]) -> tuple[Column, ...]:
     return tuple(Column(n, RATIO, d) for n, d in names)
 
 
+def _published(resources: tuple["Resource", ...]) -> tuple["Resource", ...]:
+    """The declaration minus what analytics/withheld.py withholds (V20).
+
+    Written as a filter over the full declaration rather than by deleting
+    lines: the columns and the table are still real, still written by the
+    workflow, and the day they are validated they come back by editing
+    withheld.py alone. A column withheld is a column the table never shows
+    the model, the manifest never lists and the gate never resolves — one
+    decision, read here once.
+    """
+    out = []
+    for r in resources:
+        if r.table in wh.WITHHELD_TABLES:
+            continue
+        if r.model is ExposureMetrics:
+            r = Resource(r.model, r.label_column,
+                         tuple(c for c in r.columns if not wh.is_withheld_metric(c.name)),
+                         r.count_label, r.count_split, r.qualifier_column)
+        out.append(r)
+    return tuple(out)
+
+
 # ── a run's children ─────────────────────────────────────────────────────────
 #
 # Order is table order and stays stable: it decides which label a figure held by
 # two rows of one id resolves to (answer_blocks takes the first).
-RUN_CHILDREN: tuple[Resource, ...] = (
+# _DECLARED is the whole of what a run writes; RUN_CHILDREN is what it
+# publishes (V20: the two differ by analytics/withheld.py and nothing else).
+_DECLARED: tuple[Resource, ...] = (
     Resource(
         ExposureMetrics, None,
         _money(("portfolio_market_value", "market value"), ("daily_pnl", "day P&L"),
@@ -154,6 +179,7 @@ RUN_CHILDREN: tuple[Resource, ...] = (
         count_label="limit_checks", count_split="fired",
     ),
 )
+RUN_CHILDREN: tuple[Resource, ...] = _published(_DECLARED)
 
 
 # ── the ledger ───────────────────────────────────────────────────────────────
@@ -212,7 +238,7 @@ def countable() -> tuple[tuple[type, str, str | None], ...]:
 # from tools/definitions.py: describe_run reads it to build its manifest, and
 # services/quantities.py reads it to stamp each quantity with its group, so it
 # is a fact about the resources, not about one tool.
-RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+_DECLARED_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("book", "size, day P&L and net/gross exposure of the whole book",
      ("exposure_metrics.portfolio_market_value", "exposure_metrics.daily_pnl", "exposure_metrics.daily_return",
       "exposure_metrics.gross_exposure", "exposure_metrics.net_exposure",
@@ -238,8 +264,14 @@ RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("exposure_metrics.rolling_vol_30d", "exposure_metrics.rolling_vol_60d", "exposure_metrics.var_95_1d",
       "exposure_metrics.expected_shortfall_95", "exposure_metrics.max_drawdown",
       "exposure_metrics.model_r_squared", "exposure_metrics.observations", "exposure_metrics.max_vif")),
-    ("counts", "how many positions, factors, scenarios, alerts and checks the run holds",
+    ("counts", "how many positions, factors, alerts and checks the run holds",
      ("count.*",)),
+)
+# What the manifest shows (V20): a withheld group is gone whole, and a withheld
+# name is gone from the group it sat in. Same filter, same single decision.
+RUN_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = tuple(
+    (key, question, tuple(n for n in names if not wh.is_withheld_name(n)))
+    for key, question, names in _DECLARED_GROUPS if key not in wh.WITHHELD_GROUPS
 )
 
 

@@ -16,6 +16,8 @@ consequences, and every input keeps its own id.
 
 from __future__ import annotations
 
+from exposure_workbench.analytics import withheld as wh
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,15 +69,17 @@ async def get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
     scenarios = list((await db.execute(
         select(StressResult).where(StressResult.run_id == run_id)
         .order_by(StressResult.scenario))).scalars().all())
+    if "stress_results" in wh.WITHHELD_TABLES:
+        scenarios = []   # V20: nothing to rank; the payload says why below
     factors = list((await db.execute(
         select(FactorAttribution).where(FactorAttribution.run_id == run_id)
         .order_by(FactorAttribution.factor_name))).scalars().all())
     positions = list((await db.execute(
         select(IssuerExposure).where(IssuerExposure.run_id == run_id)
         .order_by(IssuerExposure.ticker))).scalars().all())
-    checks = list((await db.execute(
+    checks = wh.published_checks(list((await db.execute(
         select(LimitCheck).where(LimitCheck.run_id == run_id)
-        .order_by(LimitCheck.limit_type))).scalars().all())
+        .order_by(LimitCheck.limit_type))).scalars().all()))
 
     collinear = (None if metrics is None or metrics.collinear is None
                  else bool(metrics.collinear))
@@ -145,6 +149,9 @@ async def get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
             for i, r in enumerate(ranked)
         ],
         "stress_unevaluated": unevaluated,
+        # V20. Empty because withheld, not because nothing was computed — the
+        # sentence says which (analytics/withheld.py).
+        "stress_withheld": wh.WITHHELD_TABLES.get("stress_results"),
         "net_exposures": nets,
         "headroom": [
             {"check": h.check, "current": h.current, "status": h.status,

@@ -293,7 +293,7 @@ export default function BookPage() {
             <>
               <WhatThisRunFound run={run} metrics={metrics} alerts={alerts}
                 sectors={run.sector_exposures ?? []} checks={facts.evaluated} />
-              <Tiles metrics={metrics} history={history}
+              <Tiles metrics={metrics} history={history} methods={run.methods}
                 checks={facts.evaluated == null ? null
                   : { evaluated: facts.evaluated, fired: alerts.length }} />
             </>
@@ -314,16 +314,23 @@ export default function BookPage() {
                 factors={run.factor_attributions}
                 issuers={run.issuer_exposures ?? []}
                 dailyReturn={metrics?.daily_return ?? null}
-                dailyPnl={metrics?.daily_pnl ?? null} names={factorNames} />
+                dailyPnl={metrics?.daily_pnl ?? null} names={factorNames}
+                info={run.methods?.attribution} />
               {limitBook && <MandateBook book={limitBook} inert={facts.inertOverrides} />}
             </div>
           )}
 
+          {/* V20: the server nulls every beta when the run is collinear (no single
+              coefficient is determinate), so the betas panel exists only when
+              there is a beta to draw. The correlations are the evidence for
+              that decision and stay. */}
           {run && (run.factor_attributions?.length ?? 0) > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <FactorBetas factors={run.factor_attributions} names={factorNames}
-                collinear={!!correlation?.collinear} maxVif={correlation?.max_vif ?? null} />
-              {correlation && <FactorCorrelations corr={correlation} />}
+              {run.factor_attributions.some((f) => f.beta != null) && (
+                <FactorBetas factors={run.factor_attributions} names={factorNames}
+                  collinear={!!correlation?.collinear} maxVif={correlation?.max_vif ?? null} />
+              )}
+              {correlation && <FactorCorrelations corr={correlation} info={run.methods?.factor_correlation} />}
             </div>
           )}
 
