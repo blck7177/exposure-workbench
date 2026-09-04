@@ -16,11 +16,11 @@ History is persisted as agent_messages so a session survives across turns.
 
 from __future__ import annotations
 
-import json
 import logging
 
 from sqlalchemy import update
 
+from exposure_workbench.agents import batch
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.auth.context import current_user_id
@@ -190,6 +190,7 @@ async def handle_message(
         user_id=current_user_id(), message_id=message_id,
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
         tools = tools_session.tools
+        held_recorder = batch.trace_recorder(db_factory, session_id, message_id)
 
         for turn in range(max_turns):
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
@@ -215,17 +216,17 @@ async def handle_message(
                 messages.append({"role": "user", "content": "Call respond to reply to the user."})
                 continue
 
-            for tc in tool_calls:
+            # V21-S1. The message's calls go out in order and stop at the first
+            # refusal per tool (agents/batch.py): the held ones come back as
+            # not_attempted, so the model reads the refusal in this turn
+            # rather than after nine repeats of it.
+            dispatched = await batch.dispatch(
+                tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
+            for tc, args, result in dispatched:
                 name = tc["function"]["name"]
-                try:
-                    args = json.loads(tc["function"]["arguments"] or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                result = await tools_session.call(name, args)
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
                                  "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
-                if result.get("error") == "budget_exceeded" and \
-                        result.get("kind") in ("turn_tool", "tool"):
+                if batch.is_pool_empty(result):
                     # The budget bounds EVIDENCE (registry.invoke), and it is
                     # spent: no further call on this face can return anything
                     # the gate will accept. Narrow what is OFFERED on the next

@@ -24,6 +24,11 @@ class PriceBar:
     high: float | None = None
     low: float | None = None
     volume: int | None = None
+    # V21. New shares per old share when this bar is a split's ex-date, else
+    # None. Carried on the bar because the provider learns it from the same
+    # history call, and a second request per ticker per sync for a column
+    # that call already returned would be a cost with no information in it.
+    split_ratio: float | None = None
 
 
 class MarketDataProvider(Protocol):

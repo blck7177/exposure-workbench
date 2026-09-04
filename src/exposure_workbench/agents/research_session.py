@@ -12,10 +12,10 @@ to the model until submit_brief is accepted or the budget runs out.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Sequence
 
+from exposure_workbench.agents import batch
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.agents.tool_session import tool_session
@@ -23,6 +23,11 @@ from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
+
+# The research face's pause and exit: never held, never holding (agents/batch.py).
+# The registry decides this by class; this side of the mount spells it by name,
+# as the meta loop does, and test_v21_batch pins the two together.
+_BUDGET_FREE_TOOLS = ("think", "submit_brief")
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +107,7 @@ async def run_research_session(
         user_id=current_user_id(), deny=deny,
     ) as tools_session, llm_session(db_factory, session_id) as llm:
         tools = tools_session.tools
+        held_recorder = batch.trace_recorder(db_factory, session_id)
 
         for turn in range(max_turns):
             # No message_id: a research run has no message to hang a cost on. The
@@ -124,13 +130,12 @@ async def run_research_session(
                                  "content": "Continue with tools, then call submit_brief."})
                 continue
 
-            for tc in tool_calls:
+            # V21-S1. Same dispatcher as the meta loop, same rule: the batch
+            # stops at the first call-shaped refusal per tool.
+            dispatched = await batch.dispatch(
+                tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
+            for tc, args, result in dispatched:
                 name = tc["function"]["name"]
-                try:
-                    args = json.loads(tc["function"]["arguments"] or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                result = await tools_session.call(name, args)
                 # The same cap the meta-agent reads under: the table slice rides
                 # inside the result (registry.invoke attaches result["table"]),
                 # and a whole run's names at 8000 characters were cut before the

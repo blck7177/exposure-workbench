@@ -39,6 +39,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import drawdown as dd
 from exposure_workbench.analytics import units as u
 from exposure_workbench.analytics.units import POINT_PERIOD_KEY
 from exposure_workbench.db.models import CalcLedger, FactorPrice, MarketPrice
@@ -83,6 +84,10 @@ MOMENTUM_MIN_OBS = 200
 # the omitted month carries bid-ask bounce and short-term reversal, which
 # contaminate the signal with the opposite sign). 21 sessions ≈ 1 month.
 MOMENTUM_SKIP_DAYS = 21
+# V21-S2. A drawdown over a named window is a statement about that window; on
+# fewer sessions than a month it is a different quantity under the name. One
+# month, the same floor as volatility's shortest window.
+DRAWDOWN_MIN_OBS = 20
 # Nominal formation depth: ~12 months of sessions.
 _MOMENTUM_FORMATION_DAYS = 252
 _52W_WINDOW_DAYS = 252
@@ -100,6 +105,8 @@ OP_REGRESS = "price.regress"           # rows are OP_REGRESS + ".beta" / ".alpha
 OP_MOMENTUM = "price.momentum_12_1"
 OP_52W = "price.distance_from_52w_high"
 OP_ADV = "price.adv"                   # rows are OP_ADV + ".shares" / ".dollars"
+# V21-S2. Rows are OP_DRAWDOWN + ".peak" / ".trough" / ".fall" / ".depth".
+OP_DRAWDOWN = "price.drawdown"
 
 
 @dataclass(frozen=True)
@@ -723,6 +730,92 @@ async def adv(db: AsyncSession, ticker: str, window_days: int = 20,
 # each wraps. `evidence: {}` means a plain Evidence() — the calc_ids and
 # absence_ids in results go on the table by the default rule.
 
+# ── 6d. the deepest fall in a window — four quantities ───────────────────────
+
+async def drawdown(db: AsyncSession, ticker: str, window: str = _DEFAULT_WINDOW,
+                   invoked_by: str = "agent") -> dict:
+    """The deepest peak-to-trough fall of one name's adjusted close over a
+    named window: the peak and the trough (each a dated level), the FALL
+    between them in the level's unit and the DEPTH as a ratio of the peak.
+
+    Four rows, because the question is asked four ways and each answer must
+    be a quantity the exit can slot. Before this the model read the peak and
+    the trough off `get_price_series` and slotted one of them under a label
+    saying "decline" (V19 §1; the label is derived now and the subtraction
+    was still the model's initiative — V19 §3). The subtraction is done here,
+    where every other estimate is: with its inputs recorded, its unit stated,
+    and a calc_id the reader can follow.
+
+    Adjusted closes throughout, like the 52-week distance: on as-traded prices
+    every split is a fall. The depth is positive, as the book's own drawdown
+    depth is (analytics/drawdown.py): a distance below a running maximum.
+    """
+    ticker = ticker.upper()
+    if window not in _WINDOWS:
+        return {"error": "unknown_window", "window": window, "known": sorted(_WINDOWS)}
+    stem = f"{ticker}.drawdown"
+    bars = await _bars(db, ticker)
+    if not bars:
+        return await _no_history(
+            db, ticker=ticker, quantity=f"{stem}.depth",
+            detail=f"this desk holds no price history for {ticker}.",
+            invoked_by=invoked_by, window=window)
+    start = bars[-1].date - timedelta(days=_WINDOWS[window])
+    priced = [b for b in bars if b.date >= start and b.adj_close is not None]
+    n = len(priced)
+    if n < DRAWDOWN_MIN_OBS:
+        return await _too_few(
+            db, ticker=ticker, quantity=f"{stem}.depth", parameter="DRAWDOWN_MIN_OBS",
+            needs=DRAWDOWN_MIN_OBS, have=n,
+            window_desc=f"{n} adjusted daily closes for {ticker} over the last {window}",
+            invoked_by=invoked_by, window=window)
+    interval = [priced[0].date.isoformat(), priced[-1].date.isoformat()]
+    episode = dd.deepest_from_levels([(b.date, b.adj_close) for b in priced])
+    if episode is None:
+        # Monotone non-decreasing over the whole window: there is no fall to
+        # measure. A statement, not a zero — a zero-depth fall dated to the
+        # last bar would be a quantity nobody computed.
+        return await ab.refuse(
+            db, "no_drawdown", kind="no_drawdown", ticker=ticker,
+            statement=(f"{stem} was not computed: {ticker}'s adjusted close never sat below "
+                       f"its running maximum over the last {window} ({interval[0]} to "
+                       f"{interval[1]}, {n} sessions). There is no peak-to-trough fall in "
+                       f"this window."),
+            tried={"quantity": f"{stem}.depth", "window": window},
+            invoked_by=invoked_by, window=window, interval=interval, n=n)
+
+    peak_d, trough_d = episode.peak_date.isoformat(), episode.trough_date.isoformat()
+    span = {"interval": [peak_d, trough_d]}
+    refs = [f"price:{ticker}:{interval[0]}:{interval[1]}"]
+    flags: dict = {"n": n, "window": window}
+    rows = (
+        ("peak", episode.peak, u.MONEY_PER_SHARE, {"instant": peak_d}),
+        ("trough", episode.trough, u.MONEY_PER_SHARE, {"instant": trough_d}),
+        ("fall", episode.fall, u.MONEY_PER_SHARE, span),
+        ("depth", episode.depth, u.RATIO, span),
+    )
+    out: dict = {"ticker": ticker, "window": window, "interval": interval, "n": n,
+                 "peak_date": peak_d, "trough_date": trough_d,
+                 "recovery_date": episode.recovery_date.isoformat() if episode.recovery_date else None,
+                 "basis": (f"adj_close over the last {window} ({interval[0]} to {interval[1]}); the "
+                           f"deepest fall below the running maximum: peak {peak_d}, trough "
+                           f"{trough_d}; fall = peak − trough, depth = fall ÷ peak"
+                           + ("" if episode.recovery_date else "; the peak has not been regained"))}
+    for column, value, unit, basis in rows:
+        quantity = f"{stem}.{column}"
+        calc_id = await cs._record(
+            db, ticker, f"{OP_DRAWDOWN}.{column}",
+            {"ticker": ticker, "window": window, "peak_date": peak_d, "trough_date": trough_d,
+             "result_type": {"unit_class": unit, "kind": "scalar", "quantity": quantity,
+                             "basis": basis}},
+            {"value": float(value)}, refs, flags, invoked_by,
+            unit_class=unit.upper(),
+        )
+        out[column] = {"value": float(value), "calc_id": calc_id, "quantity": quantity,
+                       "unit_class": unit}
+    return out
+
+
 _TICKER_ARG = {"type": "string", "description": "ticker symbol"}
 _WINDOW_ARG = {"type": ["string", "null"], "enum": [*sorted(_WINDOWS), None],
                "description": "named span (default 1y)"}
@@ -848,6 +941,23 @@ _TOOL_SPECS: list[dict] = [
             "ticker": _TICKER_ARG,
             "window_days": {"type": ["integer", "null"], "enum": [20, 30, 60, None],
                             "description": "sessions in the window (default 20)"},
+        }, "required": ["ticker"], "additionalProperties": False},
+        "evidence": {},
+    },
+    {
+        "name": "get_drawdown",
+        "service_fn": "drawdown",
+        "display": "Measuring {ticker}'s deepest fall",
+        "description": (
+            "How far one name fell from its high and when, over a named window: the "
+            "deepest peak-to-trough episode of the adjusted close, as FOUR quantities "
+            "with four calc_ids — peak and trough (dated levels), fall (peak − trough, "
+            "per share) and depth (fall ÷ peak, a ratio) — plus the recovery date if the "
+            "peak was regained. Use this for 'how much did it drop', 'peak-to-trough', "
+            "'decline from its high': the subtraction is done here, not by you, and each "
+            "of the four is a name you can slot."),
+        "json_schema": {"type": "object", "properties": {
+            "ticker": _TICKER_ARG, "window": _WINDOW_ARG,
         }, "required": ["ticker"], "additionalProperties": False},
         "evidence": {},
     },

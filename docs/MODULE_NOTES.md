@@ -925,3 +925,25 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 ### 守卫
 
 `test_v20_withheld`:声明与发布的差集恰为 withheld;桌面本身(`quantities._from_run`)也过滤 withheld 告警/检查行(第十二个读取点,live 抓到);清单组无 withheld 名;`RUN_TABLES` 无 stress_results;无工具 scope 指向 withheld 表;API 模型无 withheld 字段且带 methods/withheld;九个读取点源码含 withheld;方法句引用代码常量且不描述任何 withheld 度量;sections.tsx 无 `basis="`;组合波动率/回撤手算钉住。旧测试反转:`test_limit_checks`(var/ES/stress 三检查不跑)、`test_limit_completeness`(looked_up = 必需集 − withheld)、`test_resources`(遍历 `_DECLARED`)、`test_v8_run_children`(stress 算而不发)。
+
+## M23 — 残余逐条关：批次止于首拒、减法进工具、股数按拆股结转、历史一套因子、critic 在门外（V21，2026-09-04）
+
+**一句话**：V19/V20 登记的五条残余各对应一个功能面，修法各不相同但没有一条是 prompt 规则或 fallback——四条是让错误类在结构上写不出来，一条是把门内放不下的判断放到门外做测量。
+
+### 形状
+
+- **S1 批次分发**（`agents/batch.py`，两个循环共用）：一条 assistant 消息的调用按序发；结果有 `error` 且无 `table` = 调用本身被拒 → 同名其余调用不发，回 `not_attempted`（带被拒的 code 与 detail），不计预算、不走 MCP；带 absence 行（有 table）的拒绝是发现，不截；`budget_exceeded`（turn/session 池）之后其余全部不发，`think`/`respond`/`submit_brief` 永不被截、也不截别人。被截调用由循环写 `agent_steps`（`rejected`，摘要写明 held behind 谁）。meta 循环的 V3 收窄改用同一个谓词。
+- **S2 `get_drawdown`**：`price_analytics_service.drawdown` 四行（`{T}.drawdown.peak/trough/fall/depth`，前三 money_per_share、depth RATIO），`analytics/drawdown.deepest_from_levels` 在水平序列上找最深回撤（第一根 bar 可为峰，`find_episodes` 做不到）；`DRAWDOWN_MIN_OBS=20` 生产者参数；窗口内从未下跌=`no_drawdown` 陈述而非零。从 `_TOOL_SPECS` 注册，两面都有。
+- **S3 拆股结转**：`analytics/splits.carry_quantity`（区间 (stated, valued]，正向乘、反向除）；`PriceBar.split_ratio` 来自同一次 yfinance history（`actions=True`），`ingest_market_prices` 顺手 upsert `stock_splits`；workflow `_load_inputs` 结转一次，`quantity` 是 run 日基准，`stated_quantity/stated_as_of/split_factor` 并列；`load_inputs` 事件 payload `splits_applied`；methods ⓘ 两句改口。下游（exposure/pnl/value path）只读 `quantity`（测试钉住不读 stated）。
+- **S4 重拟合**：`scripts/reattribute_runs.py` 用 workflow 自己的输入与 `calc_factor_attribution` 重算历史 run，替换 `factor_attributions`、更新 `exposure_metrics` 的拟合记录、写 `workflow_events.reattribute`（before/after）；从未有过拟合的 run 不碰。
+- **S5 门外 critic**：`services/prose_critic.py` 只读段落块，槽变 `⟦k⟧(值)` 标记，给第二个模型桌名+单位+命名语法，三种 verdict；`chat` 由调用方传入，模块不 import 模型客户端；`scripts/critic.py` 离线席位（traces 或 session）。
+
+### 有意不做
+
+- 不把 critic 接进门或每 turn 内联（成本/延迟是产品决定）；不给 critic 打分（只有三种 verdict）。
+- 不按 code 列表判"哪些拒绝截批次"——判据是"桌上无物"。
+- 不给种子 run 补第一次拟合；不改旧日报文本。
+
+### 守卫
+
+`test_v21_batch`（同名截住/absence 不截/异名照发/顺序保持/池空截读不截 exit/search 池只截自己/exit 不截不被截/被截有记录/记录失败不伤 turn/两循环同一模块/free 名与 registry 类一致）、`test_v21_drawdown`（水平序列首 bar 可为峰、与 returns 版一致、四行四 id、窗口如实、floor 拒绝、无回撤是陈述、面上有）、`test_v21_splits`（区间开闭、复合与反拆、provider 同一次调用、split 行、`_load_inputs` 结转一次且只问区间内、下游不读 stated、ⓘ 改口）、`test_v21_critic`（只读段落、问句带桌名、JSON 或 unclear、一段一次、无出口 import、不 import 模型）。

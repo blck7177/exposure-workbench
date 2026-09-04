@@ -114,6 +114,24 @@ class MarketPrice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# ─── Stock Splits (V21) ────────────────────────────────────────────────────────
+
+class StockSplit(Base):
+    """A split a held name went through: new shares per old share on ex_date.
+    Read by the workflow to carry a stated share count to the run date
+    (analytics/splits.py); written by the price sync from the same provider
+    call that writes market_prices."""
+    __tablename__ = "stock_splits"
+    __table_args__ = (UniqueConstraint("ticker", "ex_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    ex_date: Mapped[date] = mapped_column(Date, nullable=False)
+    ratio: Mapped[float] = mapped_column(Numeric(14, 6), nullable=False)
+    source: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ─── Factor Prices ────────────────────────────────────────────────────────────
 
 class FactorPrice(Base):

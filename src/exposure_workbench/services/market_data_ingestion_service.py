@@ -16,7 +16,7 @@ from datetime import date
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import FactorPrice, MarketPrice
+from exposure_workbench.db.models import FactorPrice, MarketPrice, StockSplit
 from exposure_workbench.providers.market_data_provider import MarketDataProvider, PriceBar
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,14 @@ def build_market_rows(bars: list[PriceBar], source: str) -> list[dict]:
             "source": source,
         }
         for b in bars
+    ]
+
+
+def build_split_rows(bars: list[PriceBar], source: str) -> list[dict]:
+    """V21. The splits among these bars, one row per ex-date."""
+    return [
+        {"ticker": b.ticker, "ex_date": b.price_date, "ratio": b.split_ratio, "source": source}
+        for b in bars if b.split_ratio
     ]
 
 
@@ -115,8 +123,19 @@ async def ingest_market_prices(
             },
         )
         await db.execute(stmt)
+        # V21. The splits the same bars carry, so a stated share count can be
+        # carried to the run date (analytics/splits.py). Upsert on
+        # (ticker, ex_date): a provider revising a ratio revises the row.
+        split_rows = build_split_rows(bars, provider.name)
+        if split_rows:
+            sstmt = pg_insert(StockSplit).values(split_rows)
+            sstmt = sstmt.on_conflict_do_update(
+                index_elements=["ticker", "ex_date"],
+                set_={"ratio": sstmt.excluded.ratio, "source": sstmt.excluded.source},
+            )
+            await db.execute(sstmt)
         counts[ticker] = len(rows)
-        logger.info("ingested %d market rows for %s", len(rows), ticker)
+        logger.info("ingested %d market rows (%d splits) for %s", len(rows), len(split_rows), ticker)
     if commit:
         await db.commit()
     return counts

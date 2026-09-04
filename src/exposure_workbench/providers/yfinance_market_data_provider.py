@@ -43,7 +43,9 @@ class YFinanceMarketDataProvider:
             start=start.isoformat(),
             end=(end + timedelta(days=1)).isoformat(),
             auto_adjust=False,
-            actions=False,
+            # V21: the same frame carries "Stock Splits" (new per old on the
+            # ex-date, 0 elsewhere) and "Dividends"; splits ride on the bar.
+            actions=True,
         )
         if hist is None or hist.empty:
             logger.warning("yfinance returned no rows for %s [%s..%s]", ticker, start, end)
@@ -58,6 +60,7 @@ class YFinanceMarketDataProvider:
             adj = _f(row.get("Adj Close")) if has_adj else None
             pd_date = idx.date() if hasattr(idx, "date") else idx
             vol = _f(row.get("Volume"))
+            split = _f(row.get("Stock Splits"))
             bars.append(
                 PriceBar(
                     ticker=ticker,
@@ -68,6 +71,7 @@ class YFinanceMarketDataProvider:
                     high=_f(row.get("High")),
                     low=_f(row.get("Low")),
                     volume=int(vol) if vol is not None else None,
+                    split_ratio=split if split else None,
                 )
             )
         return bars

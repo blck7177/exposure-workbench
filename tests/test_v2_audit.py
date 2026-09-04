@@ -41,6 +41,8 @@ TENANT_TABLES = {
 SHARED_TABLES = {
     "companies", "filings", "filing_documents", "filing_sections", "filing_chunks",
     "financial_facts", "research_sources", "calc_ledger", "market_prices",
+    # V21: splits are market data, shared like the prices they arrive with.
+    "stock_splits",
     "factor_prices", "security_master", "tasks", "usage_daily",
 }
 

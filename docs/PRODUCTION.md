@@ -360,6 +360,15 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 python scripts/remap_concepts.py --dry-run
 python scripts/remap_concepts.py --apply
 
+
+# v21_stock_splits.sql adds the stock_splits table and does not backfill: the
+# next run of each portfolio syncs its holdings' prices, and the same provider
+# call now writes the splits they carry. A run computed before that reads an
+# empty table and carries no share count through any split — which is what it
+# did before the table existed, stated rather than guessed.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v21_stock_splits.sql
+
 docker compose up -d
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.

@@ -22,7 +22,9 @@ _ANNUALISE = f"√{_rm._TRADING_DAYS_PER_YEAR}"
 METHODS: dict[str, str] = {
     "market_value": (
         "Sum of quantity × last close on or before the run date, for every holding; "
-        "a holding with no recent price fails the run rather than being valued at zero."
+        "a holding with no recent price fails the run rather than being valued at zero. "
+        "A share count stated before a stock split is carried through the split to the "
+        "run date, so count and close are on the same basis."
     ),
     "day_pnl": (
         "Each holding's adjusted (total-return) daily return applied to its previous-session "
@@ -30,9 +32,10 @@ METHODS: dict[str, str] = {
         "The book's day return is that P&L over the previous session's value."
     ),
     "value_path": (
-        "Today's holdings, at fixed quantities, revalued at each session's adjusted close "
-        "over the window; the benchmark is indexed to the same starting value. This is what "
-        "this book would have been worth, not what it was — there is no holding history."
+        "Today's holdings, at fixed split-adjusted quantities, revalued at each session's "
+        "adjusted close over the window; the benchmark is indexed to the same starting value. "
+        "This is what this book would have been worth, not what it was — there is no holding "
+        "history."
     ),
     "drawdown": (
         "Distance of the value path below its running maximum; an episode is a peak, the "

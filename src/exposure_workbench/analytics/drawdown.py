@@ -124,3 +124,67 @@ def deepest(returns: pd.Series) -> Episode | None:
     """
     found = find_episodes(returns, min_depth=0.0)
     return found[0] if found else None
+
+
+# ── V21-S2: the same episode, read off a LEVEL series ─────────────────────────
+
+@dataclass(frozen=True)
+class LevelEpisode:
+    """The deepest peak-to-trough fall in a series of levels (adjusted closes).
+
+    Carries the two levels as well as the two dates, because for a single
+    name the question is asked in dollars as often as in percent: "how far did
+    NVDA fall from its high" wants `fall` (peak − trough, in the level's unit)
+    beside `depth` (fall ÷ peak). Both are computed here; neither is read off
+    by eye or left for the model to subtract (V19 §3, the missing subtraction).
+    """
+
+    peak_date: date
+    peak: float
+    trough_date: date
+    trough: float
+    recovery_date: date | None
+
+    @property
+    def fall(self) -> float:
+        return self.peak - self.trough
+
+    @property
+    def depth(self) -> float:
+        return self.fall / self.peak if self.peak else 0.0
+
+
+def deepest_from_levels(levels: list[tuple[date, float]]) -> LevelEpisode | None:
+    """The deepest fall below a running maximum in `levels`, by depth.
+
+    On levels, not returns: `find_episodes` starts its cumulative series one
+    step in and cannot make the FIRST observation a peak, which for a price
+    series is exactly the bar a "fell from its high" question may be about.
+    Every bar can be the peak here, the first included.
+
+    None when the series never sits below its running maximum (fewer than two
+    bars, or monotone non-decreasing) — there is no episode, and the caller
+    says so rather than reporting a zero-depth fall from the last bar.
+    """
+    if len(levels) < 2:
+        return None
+    best: tuple[float, int, int] | None = None   # (depth, peak_idx, trough_idx)
+    peak_idx = 0
+    for i in range(1, len(levels)):
+        if levels[i][1] > levels[peak_idx][1]:
+            peak_idx = i
+            continue
+        peak_value = levels[peak_idx][1]
+        if peak_value <= 0:
+            continue
+        depth = (peak_value - levels[i][1]) / peak_value
+        if depth > 0 and (best is None or depth > best[0]):
+            best = (depth, peak_idx, i)
+    if best is None:
+        return None
+    _, p, t = best
+    peak_value = levels[p][1]
+    recovery = next((levels[j][0] for j in range(t + 1, len(levels)) if levels[j][1] >= peak_value), None)
+    return LevelEpisode(peak_date=levels[p][0], peak=peak_value,
+                        trough_date=levels[t][0], trough=levels[t][1],
+                        recovery_date=recovery)

@@ -84,7 +84,7 @@
 
 **运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
 
-## 6. 工具面(`tools/`,41 + 24)
+## 6. 工具面(`tools/`,43 + 25)
 
 面是声明式数据(`faces.py`),缺一个工具即构建错误。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
 
@@ -93,6 +93,7 @@
 | **定位** | `describe_issuer` | 唯一定位工具(V10 三合一)。**V12 起携带知识**:`period_semantics`(财年历、财季是否对齐日历)、每条指标的 `kind`/`windows_filed`/`do_not_add_to`/`superseded_by`/`do_not_combine_with`/`for_a_total_call`/`note`、每个公式的 `family`/`computable`/`missing_inputs` |
 | **取数** | `get_flow`(窗口或序列)· `get_balance_sheet`(单时点)· `get_balance_series` | 区间代数直出;不可导出即拒绝,带 `absence_id` |
 | **算** | `calculate`(类型化四则,标量或序列)· `rank`(**V17**:类型化排序)· `series_stat` · `evaluate_formula` · `get_fundamental_panel` | 每一步落账本 |
+| **价格(V16/V21)** | `get_price` · `get_price_series` · `get_rolling_volatility` · `get_beta` · `regress_series` · `get_momentum_12_1` · `get_distance_from_52w_high` · `get_adv` · `get_drawdown`(**V21**) | 由 `price_analytics_service._TOOL_SPECS` 数据注册;每个估计携 n,最低观测数是生产者参数;`get_drawdown` 把峰、谷、跌幅（峰−谷）、深度（跌幅÷峰）算成四条可 slot 的行——减法在工具里做,不由模型 |
 | **文本** | `search_filing_passages` · `get_filing_section` | 语义检索 / 整节原文,带引用锚 |
 | **book 清单(V15)** | `describe_run` · `read_quantities` | book 侧的 `describe_issuer` / `evaluate_formula(name)`:一个 run 持有的全部量按"回答什么"分组(book/concentration/mandate/stress/factor_exposure/attribution/risk/counts,pattern × labels),缺什么、共线撤下了什么、这个面能做什么不能做什么;`read_quantities(run_id, names)` 按名一次取 |
 | **组合** | `get_portfolio_snapshot`(入口)· `get_portfolio_positions` · `get_attribution` · `get_risk_state` · `list_run_alerts` · `list_risk_limits` · `get_run_freshness` · `reconcile_move` · `get_drawdown_episodes` · `explain_episode` · `list_alerts` · `get_market_stats` | 全集返回、**禁 top_k**;共线时 `quotable_individually: false` |
@@ -102,7 +103,7 @@
 
 预算:每 turn 15 次工具调用(REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
 
-研究面 = READ_CORE 22 + `search_external_research` + `submit_brief`。V19 前 `search_external_research` 只在研究面,chat 里"帮我搜一下"没有工具可走,而"本面不能联网"那句能力声明只随 `describe_run` 返回、发行人问题从未读到。
+研究面 = READ_CORE 23 + `search_external_research` + `submit_brief`。V19 前 `search_external_research` 只在研究面,chat 里"帮我搜一下"没有工具可走,而"本面不能联网"那句能力声明只随 `describe_run` 返回、发行人问题从未读到。
 
 ## 7. 门(`respond` / `submit_brief` 的解析链,V15)——可追溯是怎么被执行的
 
@@ -124,7 +125,7 @@
 
 **拓扑 1 + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ research 子会话(worker 内,产 brief)。
 
-**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 41 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
+**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 43 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。**V21 起一条 assistant 消息里的多个调用按序分发、每个工具止于第一次"调用本身被拒"**(`agents/batch.py`:有 `error` 且桌上无物=调用被拒,同名其余调用不发、回 `not_attempted`、不计预算;带 absence 行的拒绝是发现,不截;预算池空则其余全部不发,pause/exit 除外),两个循环共用。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`(被截住的调用由循环记为 `rejected`)。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
 
 **research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief`(六节 × 同一块文法,同一解析器;五节各须指向证据)→ `issuer_briefs`(文本列 + `blocks` JSONB)。
 
@@ -161,7 +162,9 @@
 - **LLY capex 未映射**(`test_v11_tag_drift_live` 唯一的 `unmapped_candidate`),补映射前须先验证语料
 - **系统提示未变短**(V12 判据 6 未达标:4918→5071 字符),示例换了更便宜的位置而非变小
 - **四个量化度量算而不发（V20）**：VaR/ES（无数值测试、分位约定未写明、无回测）、压力情景与四个 stress loss（冲击幅度无来源、三个情景依赖各自共线的单个 β、未冲击因子按 0）——run 照算照存，`analytics/withheld.py` 一处声明，桌面/清单/门/限额/日报/API/证据卡全部由它派生；单个因子 β 在 `collinear` 下由 API 置空。每条附放行条件
-- **段落里的错标仍不被判**——V19 把表格与 trend 的标签变成派生的(模型无处写),段落散文里"market cap at $919.77"(槽是 `LLY.close`)这一类仍在,只能由门外的非阻塞 critic 读(下一批)
+- **段落里的错标由门外 critic 读,不进门(V21)**——`services/prose_critic.py` 读渲染后的块,给第二个模型每个槽的桌名,判 agrees/disagrees/unclear;今天只在离线席位(`scripts/critic.py`,电池或会话),是否每 turn 内联为非阻塞批注是产品决定,未做
+- **拆股结转只覆盖陈述日→run 日(V21)**:`stock_splits` 随价格同步写入,同步前的旧 run 未结转;陈述日之前的持仓历史本来就没有
+- **去掉 ^VIX 后仍然共线**:`scripts/reattribute_runs.py`(V21)对生产库 dry-run 显示 28 个历史 run 可重拟合到七因子、max VIF 17.9→16.8,来源是 SPY/QQQ/IWM;`--apply` 改写生产行,待 boss 放行后执行;单个 β 仍在 `collinear` 下置空
 - **比较级散文仍不被判**——门保证出处,不保证句子。V17 把「谁最高」变成一次 `rank` 计算(有操作数、有拒绝、落账本、每个名次是桌上的一个名字),消灭的是"顺序从未被算过"这一类;直接写进散文的最高级仍是散文
 - **历史行的读法靠迁移改正,不靠回算**:`v17_multiple_unit.sql` 只改 326 行的 `unit_class`(值、操作数、基准、输入引用一概不动)
 - 单价格源、无基准成分股、单币种:IPV / Brinson / 货币归因**明确不做**(MODULE_NOTES 插节)
@@ -169,4 +172,4 @@
 
 ## 12. 版本弧(每批一句)
 
-V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集。
+V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集 → **V21 五条残余逐条关**:批次止于首次拒绝(十次同名错调用只花一次)、`get_drawdown` 四行(减法进工具)、股数按拆股结转到 run 日(`stock_splits`)、历史 run 重拟合到七因子的脚本(dry-run 28 个,apply 待放行)、门外 critic 离线席位(段落标签的判断在门外)。

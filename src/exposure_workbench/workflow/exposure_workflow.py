@@ -16,6 +16,7 @@ import pandas as pd
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import splits as sp
 from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.analytics.exposure import calc_exposure, ExposureResult
 from exposure_workbench.analytics.pnl import calc_pnl, PnlResult
@@ -171,6 +172,22 @@ class ExposureWorkflow:
                 positions_df, prices_df, factor_prices_df, limit_book = await self._load_inputs(
                     db, portfolio_id, as_of_date, positions=positions
                 )
+                # V21-S3. Which holdings were carried through a split between
+                # their stated date and this run, and by how much — on the
+                # run's timeline, where a reader asking why a weight moved
+                # between two runs can see it.
+                carried_rows = [
+                    {"ticker": str(r.ticker), "stated": float(r.stated_quantity),
+                     "stated_as_of": r.stated_as_of.isoformat(),
+                     "valued": float(r.quantity), "factor": float(r.split_factor)}
+                    for r in positions_df.itertuples()
+                    if "split_factor" in positions_df.columns and float(r.split_factor) != 1.0
+                ]
+                if carried_rows:
+                    ctx.payload = {"splits_applied": carried_rows}
+                    ctx.message = (f"Loaded inputs; {len(carried_rows)} holding(s) carried through a "
+                                   f"split since their stated date: "
+                                   + ", ".join(f"{c['ticker']} ×{c['factor']:g}" for c in carried_rows))
                 await ctx.__aexit__(None, None, None)
                 steps_completed.append("load_inputs")
             except Exception as e:
@@ -503,10 +520,30 @@ class ExposureWorkflow:
         if positions is None:
             positions = await self._positions_for(db, portfolio_id, as_of_date)
 
+        # V21-S3. `quantity` is the count ON THE RUN DATE: the stated count
+        # carried through the splits in (as_of_date, run date]
+        # (analytics/splits.py). Every consumer downstream — market value,
+        # weights, P&L, the value path — reads this column, so the carry is
+        # made once, here. `stated_quantity` / `stated_as_of` keep what the
+        # holder said, and `split_factor` says by how much the two differ.
+        tickers = sorted({p.ticker for p in positions}) if positions else []
+        stated_from = min((p.as_of_date for p in positions), default=as_of_date)
+        splits_by = await market_data_service.get_splits(
+            db, tickers, min(stated_from, as_of_date), max(stated_from, as_of_date),
+        ) if tickers else {}
+        carried = {
+            p.id: sp.carry(p.ticker, float(p.quantity), p.as_of_date, as_of_date,
+                           splits_by.get(p.ticker, []))
+            for p in positions
+        } if positions else {}
+
         positions_df = pd.DataFrame([
             {
                 "ticker": p.ticker,
-                "quantity": float(p.quantity),
+                "quantity": carried[p.id].valued,
+                "stated_quantity": float(p.quantity),
+                "stated_as_of": p.as_of_date,
+                "split_factor": carried[p.id].factor,
                 "sector": p.sector or "Unknown",
                 "asset_class": p.asset_class or "equity",
                 "cost_basis": float(p.cost_basis) if p.cost_basis else None,
@@ -516,7 +553,6 @@ class ExposureWorkflow:
             for p in positions
         ]) if positions else pd.DataFrame(columns=["ticker", "quantity", "sector", "asset_class"])
 
-        tickers = positions_df["ticker"].tolist() if not positions_df.empty else []
         start_date = as_of_date - timedelta(days=_LOOKBACK_DAYS)
 
         prices_df = await market_data_service.get_prices_df(

@@ -53,6 +53,9 @@ READ_CORE = [
     "get_momentum_12_1",
     "get_distance_from_52w_high",
     "get_adv",
+    # V21-S2. The deepest fall in a window, subtracted where every other
+    # estimate is made — the model used to slot the peak for "decline".
+    "get_drawdown",
     "search_filing_passages",
     "get_filing_section",
     "list_alerts",

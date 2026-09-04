@@ -77,6 +77,19 @@ CREATE TABLE IF NOT EXISTS market_prices (
     UNIQUE (ticker, price_date)
 );
 
+-- ─── Stock Splits (V21) ──────────────────────────────────────────────────────
+-- new shares per old share on ex_date; read to carry a stated share count to
+-- the run date (analytics/splits.py). See infra/migrations/v21_stock_splits.sql.
+CREATE TABLE IF NOT EXISTS stock_splits (
+    id              SERIAL PRIMARY KEY,
+    ticker          VARCHAR(16) NOT NULL,
+    ex_date         DATE NOT NULL,
+    ratio           NUMERIC(14, 6) NOT NULL,
+    source          VARCHAR(32),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (ticker, ex_date)
+);
+
 -- ─── Factor Prices ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS factor_prices (
     id              SERIAL PRIMARY KEY,

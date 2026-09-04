@@ -8,7 +8,8 @@ import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import MarketPrice, FactorPrice
+from exposure_workbench.db.models import MarketPrice, FactorPrice, StockSplit
+from exposure_workbench.analytics.splits import Split
 
 
 async def latest_session_date(db: AsyncSession) -> date | None:
@@ -70,6 +71,29 @@ async def get_prices_df(
         }
         for r in rows
     ])
+
+
+async def get_splits(
+    db: AsyncSession,
+    tickers: list[str],
+    start_date: date,
+    end_date: date,
+) -> dict[str, list[Split]]:
+    """V21. Every split held for these tickers with an ex-date in
+    [start_date, end_date], by ticker. Empty lists for names with none."""
+    out: dict[str, list[Split]] = {t: [] for t in tickers}
+    if not tickers:
+        return out
+    rows = (await db.execute(
+        select(StockSplit)
+        .where(StockSplit.ticker.in_(tickers),
+               StockSplit.ex_date >= start_date,
+               StockSplit.ex_date <= end_date)
+        .order_by(StockSplit.ex_date)
+    )).scalars().all()
+    for r in rows:
+        out.setdefault(r.ticker, []).append(Split(ticker=r.ticker, ex_date=r.ex_date, ratio=float(r.ratio)))
+    return out
 
 
 async def get_factor_prices_df(
