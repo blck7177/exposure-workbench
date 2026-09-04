@@ -947,3 +947,31 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 ### 守卫
 
 `test_v21_batch`（同名截住/absence 不截/异名照发/顺序保持/池空截读不截 exit/search 池只截自己/exit 不截不被截/被截有记录/记录失败不伤 turn/两循环同一模块/free 名与 registry 类一致）、`test_v21_drawdown`（水平序列首 bar 可为峰、与 returns 版一致、四行四 id、窗口如实、floor 拒绝、无回撤是陈述、面上有）、`test_v21_splits`（区间开闭、复合与反拆、provider 同一次调用、split 行、`_load_inputs` 结转一次且只问区间内、下游不读 stated、ⓘ 改口）、`test_v21_critic`（只读段落、问句带桌名、JSON 或 unclear、一段一次、无出口 import、不 import 模型）。
+
+
+## M24 — 组合量进类型化代数、面板在代数之上、一次卖出是原语(V22,2026-09-04)
+
+**一句话**:对话电池(V21_CONVERSATIONS §2/§5)量出桌上有两个"值的世界"却只有一个代数——发行人的量有算子、有方法登记、缺失会进 trace;组合的量(权重、市值、限额线、净 β)只可读可引,不可作操作数。boss 拍板:不给裸计算器,把组合量接进现有 typed 代数,`get_portfolio_analysis` 改成代数之上的面板并用 parity 钉住,加一个情景原语。
+
+### 形状
+
+- **具名操作数**(`typed_calculator._resolve_named`):`ref:name`——第一个冒号是边界(名字含点、标签含冒号:`limit_checks.issuer_concentration:MSFT.current_value`)。值与单位来自唯一拼名者 `quantities.of_ref`(桌面、门、计算器读的是同一份);新增的是 **as-of**(run 日期)与 `Typed` 的一根新轴 **base**(这个量是哪本 book 的:run id、情景行 id;分析行的 base 是它分析的 run)。行标签进 `issuers` 作 entity,`rank` 靠它标行、双计规则靠它分辨同一 run 的两行。共线的单个 β(`not_alone`)拒作操作数,与桌面投影一致。
+- **base 加的规则**(`_book_rule`,`_check` 第一站):两本 book 的量相加/相乘 → `different_books`;book 的量与申报量相加/相减 → `mixed_worlds`;book 的份额 × 非本 book 的钱 → `mixed_worlds`;两本 book 相减 = 变化(base 为空)、相除 = 比率;份额 × 发行人比率(加权利润率)放行且仍属本 book;两边都无 base → 一字不改。结果行记 `result_type.base` 并读回;`scale`/`rank` 同样带 base;带 base 的行在图例分组为 `book_derived`(`GROUP_QUESTIONS` 新键)。
+- **面板自述类型**(`integration_service._record`):params 加 `as_of` 与 `result_type{unit_class: ratio, base: run_id, basis.instant}`,识别键两键不变(`find_recorded` 按包含匹配);`calc_…:portfolio.integration.room_to_breach.<check>` 于是按行自身定型而不再靠操作名规则(`LEGACY_RATIO_OPS` 只为旧行留着)。面板仍是一次调用一行(它存在是为了省调用),**parity 测试**证明 headroom = `subtract`、net beta = `scale`(方向是数据 `_RISK_SENSE`)再 `add`;活库 20/20 检查逐位相等。
+- **情景原语** `hypothetical_book(run_id, sales[{ticker, fraction}])`(`analytics/scenario.without` 纯函数 + `scenario_service`,仅 meta 面):卖出全部或一部分,**收益离开 book**(不发明现金行),余下权重 = 各自市值 / 余下总市值,行业权重随之;用 workflow 同一个 `check_limits` 重跑限额(risk/stress/pnl 输入为空 → 集中度与敞口检查跑、`checks_not_run` 点名两项);因子敞口**不结转**,陈述为 unmeasured。拒绝:未持有、fraction ∉ (0,1]、同名两次、卖空整本、无市值持仓。结果是**一条** `book.scenario` 账本行,result 镜像 run 的四张子表;`quantities._from_scenario` 用 run 的名字与 run 的单位发布(列名从 `resources.RUN_CHILDREN` 读,写者只能写声明里有的列,测试钉住)。于是 run 上能用的槽在情景上原样能用;`calc_…:issuer_exposures.MSFT.weight` 以情景行为 base:情景权重 − run 权重 = 卖出造成的变化,相加 → `different_books`。
+
+### 有意不做
+
+- 不给裸计算器:无类型的操作数照旧拒绝。
+- 面板不按量逐行落账(一次 `describe_run` 就是五十行);一行自述类型 + parity。
+- 情景不带现金、不重拟合 β、不跨日期;它是"run 日的这本 book,少了一些东西"。
+- `_SYSTEM` 不动:"最高最低先 rank"这句现在对 book 也为真(V21 前 rank 吃不了 run 引用)。`so_what` 仍是 boss 的产品决定。
+
+### 实证(2026-09-04,活库,重建前)
+
+`run_b791e7985dcd`:MSFT 超预警 0.01251671 × 市值 $10,986,070 = **$137,509.45** 应卖;十只按权重排序 MSFT 1…NVDA 10;两个 run 的 MSFT 权重相加拒、相减 +0.0024;headroom parity 20/20;net β parity 在这个 run 上因共线不可经操作数达成(单 β 被投影,面板的净值是共线下唯一可引路径,V11-F 的既定不对称)。**卖出 NVDA**:余 $10,529,170,九只,MSFT 16.96%、AAPL 15.59%、JPM 15.47%——集中度告警从 2 个变 **4 个**(AAPL、JPM 被顶过 15%),电池 C01#t3 那句"anything get tight"的答案是:更紧。卖 MSFT 的 9.06% 恰落在 15.0000060%,仍 `warning`(检查是 ≥,引擎规则如实)。
+
+### 守卫
+
+`test_v22_book_algebra`(43):分隔符与名字文法、run 量的类型/base/日期/entity、未知名/共线/未知行拒绝、七条 base 规则、减到限额两步、卖出后权重两步、跨 run 相加拒相减允、按权重排序带名次、权重与市值非一种度量、parity 两条、分析行自述类型、分析距离作操作数、卖出算术(重归一化/行业/部分卖出/恰好落线)与五种拒绝、情景行的名字单位分组、写者 ⊆ 声明、情景权重作操作数且 base 是情景、工具在 meta 面/schema 边界/描述含文法、`book_derived` 组、排序行带 base。`test_symmetry` 学会新组键,并抓出 `_from_scenario` 初稿自己拼列名。
+

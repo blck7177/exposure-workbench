@@ -33,6 +33,25 @@ from a right one stops being reachable.
 An operand whose type cannot be established is refused rather than assumed
 compatible: a guard whose blind spot is silent is worse than no guard, because
 it is trusted.
+
+THE BOOK'S QUANTITIES (V22). Until V22 the operands were fact_ and calc_ ids
+only, and a run's own figures — a weight, a market value, a limit level, a net
+beta — were terminal: readable, citable, never combinable. The conversation
+battery (docs/spikes/V21_CONVERSATIONS.md §2) measured what that costs: "how
+much must I sell to get back under the limit" is (weight − limit) × market
+value, two operations over four figures the run already holds, and no tool
+could perform either. So an operand may now be a NAMED FIGURE ON A ROW —
+`run_…:issuer_exposures.MSFT.weight`, `calc_…:portfolio.integration.
+room_to_breach.issuer_concentration:MSFT` — typed the way a fact is, with one
+more axis: its BASE, the book it is a share of. The rules that axis adds are
+the ways a bare calculator gets a book wrong:
+
+    two books' figures summed or multiplied           different_books
+    a book's figure summed with a filed figure        mixed_worlds
+    a share of the book times money not the book's    mixed_worlds
+
+A weight subtracted from another book's weight is the change between them and
+goes through, as R2 lets a balance's two readings be differenced.
 """
 
 from __future__ import annotations
@@ -72,6 +91,14 @@ class Typed:
     # before quantities carried an issuer — and unknown is treated as shared, so
     # the double-count rules stay ON for legacy rows rather than off.
     issuers: tuple[str, ...] = ()
+    # V22. The book this quantity is a figure OF — a run id, or a scenario
+    # row's id — for a run child's column or a quantity derived from one. A
+    # weight is a share of ITS book's market value and of nothing else; the
+    # base is what lets the rules say so. None for a filed quantity and for
+    # anything derived only from filed quantities. For a run child the entity
+    # (the ticker, the sector, the check) rides in `issuers`, so rank can label
+    # it and the double-count rules can tell two rows of one run apart.
+    base: str | None = None
 
     def basis(self) -> dict:
         if self.instant:
@@ -83,15 +110,156 @@ class Typed:
     def as_dict(self) -> dict:
         return {"unit_class": self.unit_class, "basis": self.basis(),
                 "quantity": self.quantity, "source_id": self.source_id,
-                "issuers": list(self.issuers)}
+                "issuers": list(self.issuers),
+                **({"base": self.base} if self.base else {})}
 
 
 def _err(code: str, detail: str) -> dict:
     return {"error": code, "detail": detail}
 
 
+# The gate's unit names (services/quantities.py) to the algebra's. The inverse
+# of quantities._UNIT_CLASS_OF, written here so this module does not import
+# the namer at load time (the namer imports RANK_OP from here).
+_ALGEBRA_UNIT = {"MONEY": MONEY, "RATIO": RATIO, "COUNT": COUNT,
+                 "MONEY_PER_SHARE": MONEY_PER_SHARE, "MULTIPLE": MULTIPLE}
+
+# The separator between a row and a figure on it: `run_x:issuer_exposures.
+# MSFT.weight`. A colon, because a name may hold dots (every run name does)
+# and the run's own labels hold colons only INSIDE a label
+# (`issuer_concentration:MSFT`), never before the table name — so the first
+# colon is always the boundary.
+NAMED_SEP = ":"
+
+
+def split_named(ref: str) -> tuple[str, str] | None:
+    """(row id, name) for a named operand, or None for a bare id."""
+    if NAMED_SEP not in ref:
+        return None
+    rid, _, name = ref.partition(NAMED_SEP)
+    if not rid.startswith(("run_", "calc_")) or not name:
+        return None
+    return rid, name
+
+
+def _parse_book_name(name: str) -> tuple[str, str | None]:
+    """(what the figure is a quantity of, the entity it belongs to).
+
+    A run child's name is `<table>.<row label>.<column>` (quantities.py); the
+    quantity is the column on its table and the entity is the row label. A
+    whole-book column (`exposure_metrics.portfolio_market_value`), a count, or
+    the regression's sum has no entity. An analysis row's name is `portfolio.
+    integration.<key>.<label>`; the entity is the label.
+    """
+    parts = name.split(".")
+    if name.startswith("portfolio.integration.") and len(parts) == 4:
+        return ".".join(parts[:3]), parts[3]
+    if len(parts) == 3:
+        return f"{parts[0]}.{parts[2]}", parts[1]
+    return name, None
+
+
+async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typed | dict:
+    """One figure on a row that holds many, typed (V22).
+
+    The VALUE and the UNIT come from the one namer every other reader uses
+    (services/quantities.py), so the figure the calculator combines is the
+    figure the table shows and the gate resolves — there is no second walk.
+    What this adds is the BASE and the AS-OF: a run's figures are readings at
+    the run's date of that run's book; an analysis row's, of the run it
+    analysed; a scenario row's, of the hypothetical book the row itself is.
+    """
+    resolved = await _named_quantities(db, rid)
+    if resolved.kind is None:
+        return _err("unknown_operand", f"{rid} is not a row this desk holds")
+    held = {q.label: q for q in resolved.quantities}
+    if (rid.startswith("calc_") and name in held and resolved.kind == "scalar"
+            and not name.startswith("portfolio.") and _is_single_valued(resolved)):
+        # A named figure on a row that holds ONE figure is the row: the table
+        # shows a scalar under its quantity's name, the model writes ref:name
+        # as it does for a run, and the row's own type (its leaves, its base)
+        # is fuller than anything re-derived from the name. Measured live on
+        # the first V22 turn: `calc_…:issuer_concentration:MSFT.excess_weight`
+        # was refused undated when the bare id carried the date.
+        return await _resolve(db, rid)
+    q = held.get(name)
+    if q is None:
+        return _err("unknown_name",
+                    f"{rid} holds no figure named {name!r}. A run's names are listed by "
+                    f"describe_run; an analysis or scenario row's names are on its table.")
+    if q.not_alone is not None:
+        return _err("not_alone", f"{name} may not be used on its own: {q.not_alone}")
+    unit = _ALGEBRA_UNIT.get(q.unit_class)
+    if unit is None:
+        return _err("unknown_unit", f"{name} on {rid} is {q.unit_class}, which this desk "
+                                    f"cannot do algebra on")
+    ctx = await _named_context(db, rid)
+    if isinstance(ctx, dict):
+        return ctx
+    base, as_of = ctx
+    quantity, entity = _parse_book_name(name)
+    return Typed(value=float(q.value), unit_class=unit, instant=as_of, quantity=quantity,
+                 source_id=ref, issuers=(entity,) if entity else (), base=base)
+
+
+def _is_single_valued(resolved) -> bool:
+    """One figure on the row, not counting the quality flags it carries. Only a
+    calculator row qualifies (kind scalar, a name that is not a run family's):
+    an analysis row with a single distance is still a row ABOUT a run, and its
+    figure is typed from the row's params, not from the row as a whole."""
+    figures = [q for q in resolved.quantities if not q.label.startswith("quality_flags")]
+    return len(figures) == 1
+
+
+async def _named_quantities(db: AsyncSession, rid: str):
+    """The figures a row holds, by the one namer (services/quantities.py)."""
+    from exposure_workbench.services import quantities as qn  # lazy: qn imports RANK_OP
+    return await qn.of_ref(db, rid)
+
+
+async def _named_context(db: AsyncSession, rid: str) -> tuple[str, date] | dict:
+    """(base, as_of) for a row's figures. A run: itself, at its date. A ledger
+    row about a run — an analysis (portfolio.integration) or a scenario
+    (book.scenario) — says so in its params; a scenario's base is the row
+    itself, because the hypothetical book IS that row."""
+    from exposure_workbench.db.models import ExposureRun
+    if rid.startswith("run_"):
+        run = (await db.execute(select(ExposureRun).where(ExposureRun.id == rid))).scalar_one_or_none()
+        if run is None:
+            return _err("unknown_operand", f"{rid} is not a run this desk holds")
+        return rid, run.as_of_date
+    row = (await db.execute(select(CalcLedger).where(CalcLedger.id == rid))).scalar_one_or_none()
+    params = (row.params or {}) if row is not None else {}
+    rt = params.get("result_type") or {}
+    if row is not None and row.operation == SCENARIO_OP:
+        base = rid                                   # the hypothetical book IS this row
+    else:
+        base = params.get("run_id") or rt.get("base") or rid
+    as_of = None
+    if params.get("as_of"):
+        as_of = date.fromisoformat(params["as_of"])
+    elif params.get("run_id"):
+        run = (await db.execute(select(ExposureRun).where(ExposureRun.id == params["run_id"]))).scalar_one_or_none()
+        as_of = run.as_of_date if run is not None else None
+    elif (rt.get("basis") or {}).get("instant"):
+        as_of = date.fromisoformat(rt["basis"]["instant"])   # a calculator row of the book
+    if as_of is None:
+        return _err("undated_operand", f"{rid} carries no as-of date, so its figures cannot "
+                                       f"be placed in time and cannot be combined")
+    return base, as_of
+
+
+# The operation a scenario row is recorded under (services/scenario_service.py
+# writes it; named here because _resolve_named reads it and the namer reads
+# both). One string, one owner.
+SCENARIO_OP = "book.scenario"
+
+
 async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
-    """A fact or a calc, as a typed quantity."""
+    """A fact, a calc, or a named figure on a run or a ledger row, as a typed quantity."""
+    named = split_named(ref)
+    if named is not None:
+        return await _resolve_named(db, named[0], named[1], ref)
     if ref.startswith("fact_"):
         row = (await db.execute(
             select(FinancialFact).where(FinancialFact.id == ref)
@@ -169,7 +337,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             interval=(date.fromisoformat(basis["interval"][0]),
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
             quantity=t.get("quantity"), source_id=ref, recorded_basis=basis or None,
-            issuers=owned,
+            issuers=owned, base=t.get("base") or None,
         )
     if ref.startswith(("chunk_", "src_")):
         # V11-A. Asked what share of Lilly's revenue its top products make up,
@@ -185,7 +353,9 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
                     f"there is no basis, no unit and no metric to check a combination "
                     f"against. If the filing states the figure you want, quote it; if it "
                     f"only states the parts, this desk cannot combine them.")
-    return _err("unknown_operand", f"{ref} is not a fact_ or calc_ id")
+    return _err("unknown_operand",
+                f"{ref} is not a fact_ or calc_ id, nor a named figure on a row "
+                f"(run_…:<name>, calc_…:<name>)")
 
 
 def _row_issuers(result_type: dict | None, company_id: str | None) -> tuple[str, ...]:
@@ -273,7 +443,49 @@ def _shared_issuer(a: Typed, b: Typed) -> bool:
     return not a.issuers or not b.issuers or bool(set(a.issuers) & set(b.issuers))
 
 
+def _book_rule(op: str, a: Typed, b: Typed) -> dict | None:
+    """The rules a base adds (V22). None when neither operand has one.
+
+    A weight is a share of ITS book's market value. Summed with another
+    book's weight it is a share of nothing; multiplied by another book's
+    market value it is a position that does not exist. Differenced it is the
+    change between the two books, and divided it is a ratio that says which
+    two — R2's shape, one axis over. A book figure summed with a filed figure
+    (a position's market value plus the issuer's cash) is two worlds in one
+    number; a share of the book times money that is not the book's is the
+    same mistake as a product. A share times an issuer's RATIO (weight × net
+    margin, the weighted margin) is an analyst's arithmetic and goes through.
+    """
+    if a.base is None and b.base is None:
+        return None
+    if a.base and b.base and a.base != b.base and op in ("add", "multiply"):
+        return _err("different_books",
+                    f"{a.source_id} is a figure of {a.base} and {b.source_id} of {b.base}: "
+                    f"a share is a share of its own book's market value, so two books' "
+                    f"figures cannot be summed or multiplied. Subtract them for the change "
+                    f"between the two books, or divide for the ratio.")
+    if (a.base is None) != (b.base is None):
+        filed = b if a.base else a
+        if op in ("add", "subtract"):
+            return _err("mixed_worlds",
+                        f"{filed.source_id} is a filed figure and the other operand is a "
+                        f"figure of the book: a position and an issuer's own accounts are "
+                        f"not parts of one whole and cannot be summed or differenced. "
+                        f"Multiply a share of the book by an issuer's ratio, or divide, "
+                        f"if that is the measure meant.")
+        if op == "multiply" and filed.unit_class == MONEY:
+            return _err("mixed_worlds",
+                        f"{filed.source_id} is money that is not this book's: a share of "
+                        f"the book multiplied by it is a position that does not exist. "
+                        f"Multiply the share by the book's own market value "
+                        f"(exposure_metrics.portfolio_market_value).")
+    return None
+
+
 def _check(op: str, a: Typed, b: Typed) -> dict | None:
+    refusal = _book_rule(op, a, b)
+    if refusal:
+        return refusal
     # Multiply and divide are exempt from the period and basis rules below —
     # a ratio may cross bases; it says which — but not from the unit algebra:
     # whether a product means anything is a lookup in units.PRODUCTS/QUOTIENTS,
@@ -447,7 +659,23 @@ def _mixed_basis(op: str, a: Typed, b: Typed) -> dict:
     return out
 
 
+def _result_base(op: str, a: Typed, b: Typed) -> str | None:
+    """Which book the result is a figure of. One book: that book. A share
+    times a filed ratio: still the book. Two books differenced or divided:
+    neither — the result is ABOUT two books and a figure of none."""
+    if a.base == b.base:
+        return a.base
+    if op == "multiply" and (a.base is None) != (b.base is None):
+        return a.base or b.base
+    return None
+
+
 def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
+    t = _result_type_inner(op, a, b, value)
+    return replace(t, base=_result_base(op, a, b))
+
+
+def _result_type_inner(op: str, a: Typed, b: Typed, value: float) -> Typed:
     issuers = tuple(sorted(set(a.issuers) | set(b.issuers)))
     if op in ("multiply", "divide"):
         # The unit is the table's answer, never the operand order's: before V16
@@ -580,6 +808,8 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     rt = {"unit_class": result.unit_class, "basis": basis,
           "quantity": as_quantity or result.quantity or _derived_name(op, left, right),
           "issuers": list(result.issuers)}
+    if result.base:
+        rt["base"] = result.base
     if named_by and as_quantity:
         # Who chose the name — "session" when the model named its own
         # composition (Tier 2). Recorded so a misnamed row is attributable,
@@ -624,7 +854,8 @@ async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
     value = left.value * factor
     rt = {"unit_class": unit_class, "basis": left.basis(),
           "quantity": quantity or f"{left.quantity or ref}.scale",
-          "issuers": list(left.issuers)}
+          "issuers": list(left.issuers),
+          **({"base": left.base} if left.base else {})}
     calc_id = await cs._record(
         db, None, "calc.scalar.scale",
         {"op": "scale", "operands": [ref], "factor": factor,
@@ -853,6 +1084,9 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
     flags = {"tied_places": ties} if ties else {}
     rt = {"unit_class": unit, "kind": "ranking", "quantity": name,
           "issuers": sorted({lb for lb in labels if lb})}
+    bases = {t.base for t in typed}
+    if len(bases) == 1 and None not in bases:
+        rt["base"] = bases.pop()     # an ordering of one book's figures is a figure of it
     calc_id = await cs._record(
         db, None, RANK_OP,
         {"op": "rank", "operands": refs, "direction": direction,

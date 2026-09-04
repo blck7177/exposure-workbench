@@ -73,8 +73,9 @@ KIND_ABSENCE = "absence"
 
 _SERIES_OPS = ("series", "flow.series", "balance.series", "change.")
 _ABSENCE_PREFIX = "absence."
-# The ordering row's operation, named once in the calculator that writes it.
-from exposure_workbench.services.typed_calculator import RANK_OP  # noqa: E402
+# The ordering row's operation, named once in the calculator that writes it;
+# the scenario row's likewise (V22).
+from exposure_workbench.services.typed_calculator import RANK_OP, SCENARIO_OP  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -209,6 +210,8 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     head = quantity if isinstance(quantity, str) and quantity else row.operation
     if row.operation == RANK_OP:
         return _from_ranking(row, head, unit, cid)
+    if row.operation == SCENARIO_OP:
+        return _from_scenario(row, cid)
     if "points" in result:
         for p in result.get("points") or []:
             v = (p or {}).get("value")
@@ -234,6 +237,7 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
     # decides — a measure the formula registry defines is `derived`, everything
     # else is a filed figure or a read over filed figures.
     fallback = ("price" if (row.operation or "").startswith("price.")
+                else "book_derived" if _of_the_book(row)
                 else "derived" if head in fm.FORMULAS else "fundamentals")
     values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
     # The ledger's company_id column holds the TICKER the row is about (a plain
@@ -269,9 +273,73 @@ def _from_ranking(row: CalcLedger, head: str, unit: str, cid: str) -> Resolved:
     if isinstance(spread, (int, float)) and not isinstance(spread, bool):
         values.append(Quantity(float(spread), unit, f"{head}.spread", cid))
     values.append(Quantity(float(len(entries)), COUNT, f"{head}.ranked", cid))
-    fallback = "derived" if head in fm.FORMULAS else "fundamentals"
+    fallback = ("book_derived" if _of_the_book(row)
+                else "derived" if head in fm.FORMULAS else "fundamentals")
     values = [replace(q, group=resources.group_of(q.label) or fallback) for q in values]
     return Resolved(tuple(values), frozenset(), calc_kind(row))
+
+
+def _of_the_book(row) -> bool:
+    """Whether a ledger row is a figure OF a book: its result_type names the
+    base the calculator carried (V22). Read from the row, never inferred from
+    the operation name — the rule LEGACY_RATIO_OPS exists to retire."""
+    return bool(((getattr(row, "params", None) or {}).get("result_type") or {}).get("base"))
+
+
+# Which of a run's tables a scenario row holds. The COLUMNS are not spelled
+# here: they are read from the one declaration (analytics/resources.py), so a
+# scenario publishes a column under exactly the name and unit the run does,
+# and a column the scenario writer records that the declaration does not know
+# is a number nothing can cite — the intended direction (resources.py's own
+# words on CALC_RESULTS). A scenario is a hypothetical RUN, and a reader who
+# knows `issuer_exposures.MSFT.weight` on a run knows it here.
+SCENARIO_TABLES: tuple[str, ...] = (
+    "issuer_exposures", "sector_exposures", "exposure_metrics", "limit_checks",
+)
+
+
+def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
+    """The names a hypothetical book puts on the table (V22).
+
+    A run child's name is `<table>.<row label>.<column>`; a scenario row holds
+    the same tables as lists of {label, <column>...} and publishes the same
+    names with the same units, so a slot that works on a run works on the
+    book-after-the-sale unchanged. Counts follow V8-P4's vocabulary.
+    """
+    result = row.result or {}
+    values: list[Quantity] = []
+    for res in resources.RUN_CHILDREN:
+        if res.table not in SCENARIO_TABLES:
+            continue
+        held = result.get(res.table)
+        rows = held if isinstance(held, list) else ([held] if isinstance(held, dict) else [])
+        for r in rows:
+            who = f".{r['label']}" if res.label_column and isinstance(r.get("label"), str) else ""
+            for c in res.columns:
+                v = r.get(c.name)
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    values.append(Quantity(float(v), c.unit, f"{res.table}{who}.{c.name}", cid))
+    positions = result.get("issuer_exposures") or []
+    checks = result.get("limit_checks") or []
+    alerts = result.get("alerts") or []
+    values.append(Quantity(float(len(positions)), COUNT, "count.positions", cid))
+    values.append(Quantity(float(len(alerts)), COUNT, "count.alerts", cid))
+    values.append(Quantity(float(len(checks)), COUNT, "count.limit_checks", cid))
+    fired = sum(1 for c in checks if c.get("fired"))
+    values.append(Quantity(float(fired), COUNT, "count.limit_checks.fired=true", cid))
+    values.append(Quantity(float(len(checks) - fired), COUNT, "count.limit_checks.fired=false", cid))
+    values = [replace(q, group=resources.group_of(q.label) or "other") for q in values]
+    # The SUBJECT: which book this is. A scenario's names are a run's names on
+    # purpose, so a before/after table's two columns would derive the same
+    # header ("issuer exposures weight | issuer exposures weight") and a reader
+    # could not tell which was which — the first live V22 turn showed exactly
+    # that. The renderer prefixes a ref's subject into a derived name when the
+    # name does not carry it (answer_blocks._derivation_name), so the
+    # scenario's column reads "after sale of NVDA issuer exposures weight".
+    sales = (row.params or {}).get("sales") or []
+    sold = [s.get("ticker") for s in sales if isinstance(s, dict) and s.get("ticker")]
+    subject = ("after_sale_of_" + "_".join(sold)) if sold else "after_sale"
+    return Resolved(tuple(values), frozenset(), calc_kind(row), subject=subject)
 
 
 async def _from_fact(db: AsyncSession, fid: str) -> Resolved:

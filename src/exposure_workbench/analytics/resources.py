@@ -307,6 +307,11 @@ GROUP_QUESTIONS: dict[str, str] = {
     **{key: question for key, question, _patterns in RUN_GROUPS},
     "fundamentals": "figures as the issuer filed them, and series or windows read over them",
     "derived": "measures this desk computed from filed figures by a named formula",
+    # V22. A figure the calculator made from the book's own figures — a weight
+    # less its limit, times the book's market value; an ordering of the
+    # holdings. Not `derived` (that is filed figures by formula) and not a run
+    # family (no run wrote it): its own question, so the legend can state it.
+    "book_derived": "figures this desk computed from the book's own figures (a run's, an analysis's or a scenario's)",
     "price": "per-share figures — a share price or per-share earnings",
     "other": "quantities not otherwise grouped",
 }

@@ -98,6 +98,10 @@ META_ONLY_READS = [
     # V8-D. When the book fell and what the window between two dates held. Both
     # are about a portfolio, so both are meta-only.
     "get_drawdown_episodes", "explain_episode",
+    # V22. The book after a sale, as a row every other tool can read and the
+    # calculator can take operands from. A hypothetical book is still THIS
+    # desk's book.
+    "hypothetical_book",
 ]
 
 # V19: search_external_research is on BOTH faces. Until then the chat had no

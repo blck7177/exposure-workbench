@@ -122,7 +122,7 @@ def test_the_group_vocabulary_is_closed_and_every_key_answers_a_question():
     per-share — price, a formula's measure is derived, the rest other) — and
     nothing else, so the payload legend can state every key it prints."""
     run_keys = {key for key, _q, _p in resources.RUN_GROUPS}
-    assert set(resources.GROUP_QUESTIONS) == run_keys | {"fundamentals", "derived", "price", "other"}
+    assert set(resources.GROUP_QUESTIONS) == run_keys | {"fundamentals", "derived", "book_derived", "price", "other"}
     assert all(q.strip() for q in resources.GROUP_QUESTIONS.values())
 
 

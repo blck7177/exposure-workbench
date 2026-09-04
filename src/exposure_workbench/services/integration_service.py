@@ -209,9 +209,17 @@ async def _record(db: AsyncSession, run_id: str, out: dict) -> str:
                            for h in out["headroom"]],
     }
 
+    # V22. The row says what its figures ARE — a ratio, a reading at the
+    # run's date, a figure of THIS run's book — so the calculator can take
+    # `calc_…:portfolio.integration.room_to_breach.<check>` as an operand and
+    # type it without a second rule about this operation's name. The
+    # identifying params stay exactly the two-key set find_recorded matches on
+    # (containment; tests/test_reconcile_reuse holds that shape).
     return await cs._record(
         db, None, OP_INTEGRATION,
-        identifying_params(run_id),
+        {**identifying_params(run_id), "as_of": out["as_of"],
+         "result_type": {"unit_class": "ratio", "base": run_id,
+                         "basis": {"instant": out["as_of"]}}},
         recorded,
         [run_id],
         {"scenarios_ranked": len(out["stress_ranked"]),

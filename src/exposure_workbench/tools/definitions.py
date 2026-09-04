@@ -33,6 +33,7 @@ from exposure_workbench.services import drawdown_service
 from exposure_workbench.services import integration_service
 from exposure_workbench.services import reconcile_service
 from exposure_workbench.services import run_reads_service
+from exposure_workbench.services import scenario_service
 from exposure_workbench.services import security_master_service
 from exposure_workbench.services import series_service
 from exposure_workbench.services import trace_service
@@ -335,6 +336,10 @@ async def _get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
     return await integration_service.get_portfolio_analysis(db, run_id)
 
 
+async def _hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) -> dict:
+    return await scenario_service.hypothetical_book(db, run_id, sales)
+
+
 async def _get_drawdown_episodes(db: AsyncSession, portfolio_id: str, span: str = "1y") -> dict:
     return await drawdown_service.get_drawdown_episodes(db, portfolio_id, span)
 
@@ -354,7 +359,12 @@ _FACE_CAPABILITIES = {
     "can": [
         "read this book's runs by name (describe_run → read_quantities) and every issuer's "
         "filed figures, filing passages and named measures",
-        "compute with calculate / series_stat / evaluate_formula, each minting a citable id",
+        "compute with calculate / series_stat / evaluate_formula, each minting a citable id — "
+        "and over the book's own figures by name (run_id:issuer_exposures.MSFT.weight, "
+        "calc_id:portfolio.integration.room_to_breach.<check>): a weight less a limit, "
+        "times the book's market value, is the dollars to sell",
+        "rebuild the book after a sale (hypothetical_book): weights, sectors and limit "
+        "checks of the book without the names sold, on a row read like a run",
         "search the web (search_external_research) for what the filings cannot hold — news, "
         "guidance, events after the last report — each result a src_ id a sentence can cite",
         "start background work: a readiness pass, an exposure run, an issuer research run "
@@ -445,7 +455,9 @@ async def _describe_run(db: AsyncSession, run_id: str) -> dict:
         "how_to_read": ("every name here is a figure on this run's table, with its value beside it "
                         "under `table`. Write it in a slot {ref, name}: ref is the run_id, except "
                         "portfolio.integration.* names, whose ref is analysis_calc_id. A pattern "
-                        "with <label> is one name per label"),
+                        "with <label> is one name per label. Every name is also an OPERAND for "
+                        "calculate and rank, written ref:name — run_id:issuer_exposures.MSFT.weight, "
+                        "analysis_calc_id:portfolio.integration.room_to_breach.<check>"),
         "analysis_calc_id": analysis_id,
         "groups": groups,
         **({"other": _factored(rest)} if rest else {}),
@@ -465,16 +477,32 @@ async def _describe_run(db: AsyncSession, run_id: str) -> dict:
 
 
 async def _read_quantities(db: AsyncSession, run_id: str, names: list[str]) -> dict:
-    """The exact quantities a question needs, by name, in one call."""
-    run = await run_reads_service._run_or_error(db, run_id)
-    if isinstance(run, dict):
-        return run
+    """The exact quantities a question needs, by name, in one call.
+
+    V22: a scenario row (`calc_…` from hypothetical_book) is a run-shaped row
+    and reads the same way — the first live turn called this on one and was
+    told `unknown_run`, then wrote the whole id as a name.
+    """
+    if run_id.startswith("calc_"):
+        row = (await db.execute(select(cs.CalcLedger).where(cs.CalcLedger.id == run_id))).scalar_one_or_none()
+        if row is None:
+            return {"error": "unknown_run", "run_id": run_id, "message": f"no run or scenario row {run_id}"}
+        if row.operation != typed_calculator.SCENARIO_OP:
+            return {"error": "not_a_book", "run_id": run_id,
+                    "detail": "read_quantities reads a run or a hypothetical_book row; this ledger "
+                              "row's figures are on its own table under their names"}
+        as_of = (row.params or {}).get("as_of")
+    else:
+        run = await run_reads_service._run_or_error(db, run_id)
+        if isinstance(run, dict):
+            return run
+        as_of = run.as_of_date.isoformat()
     resolved = await qn.of_ref(db, run_id)
     held = {q.label: q for q in resolved.quantities if q.not_alone is None}
     wanted = [str(n) for n in names]
     found = [n for n in wanted if n in held]
     unknown = [n for n in wanted if n not in held]
-    return {"run_id": run_id, "as_of": run.as_of_date.isoformat(), "names": found,
+    return {"run_id": run_id, "as_of": as_of, "names": found,
             "units": {n: held[n].unit_class for n in found},
             **({"unknown": unknown, "detail": "not names this run holds; describe_run lists them"}
                if unknown else {})}
@@ -673,19 +701,25 @@ def build_read_registry() -> ToolRegistry:
         display="Computing {op} of two figures",
         description=(
             "Add, subtract, multiply or divide two quantities you already have, by their "
-            "ids (fact_… or calc_…). Compose anything: EBIT, leverage, coverage, margins, "
-            "turnover — none of these needs to be a built-in. The result gets its own "
-            "calc_id and is citable. Combinations that would silently double-count are "
-            "refused with the reason: two balances from different dates added together, "
-            "two flows over overlapping periods added together, or a total added to "
-            "something it already contains. A balance divided by a flow is fine — that is "
-            "what leverage is — and a balance subtracted from a later reading of it is the "
-            "change over the days between."
+            "ids (fact_… or calc_…) or by NAME on a run or an analysis row "
+            "(run_…:issuer_exposures.MSFT.weight, run_…:exposure_metrics.portfolio_market_value, "
+            "calc_…:portfolio.integration.room_to_breach.<check>). Compose anything: EBIT, "
+            "leverage, coverage, margins, turnover — and the book's own arithmetic: a weight "
+            "less its limit is the excess, times the book's market value is the dollars to "
+            "sell. None of these needs to be a built-in. The result gets its own calc_id and "
+            "is citable. Combinations that would silently double-count are refused with the "
+            "reason: two balances from different dates added together, two flows over "
+            "overlapping periods added together, a total added to something it already "
+            "contains, two books' figures summed or multiplied, or a book's figure summed "
+            "with a filed one. A balance divided by a flow is fine — that is what leverage "
+            "is — a balance subtracted from a later reading of it is the change over the "
+            "days between, and one book's weight less another's is the change between the "
+            "two books."
         ),
         json_schema={"type": "object", "properties": {
             "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]},
-            "a": {"type": "string", "description": "fact_… or calc_… id"},
-            "b": {"type": "string", "description": "fact_… or calc_… id"},
+            "a": {"type": "string", "description": "fact_… or calc_… id, or ref:name for a figure on a run or analysis row"},
+            "b": {"type": "string", "description": "fact_… or calc_… id, or ref:name for a figure on a run or analysis row"},
             "as_quantity": {"type": ["string", "null"],
                             "description": "name the result IS — 'market_cap', 'fcf_yield' — "
                                            "so the table calls it that and your answer can "
@@ -702,14 +736,17 @@ def build_read_registry() -> ToolRegistry:
             "Put two or more quantities in order, and record the order. Use it whenever "
             "an answer would say which is highest, lowest, largest or worst — the ranking "
             "is computed here rather than read off by eye, and its result puts a PLACE on "
-            "the table for each name (`accruals_ratio.rank.JPM`) beside each value, so the "
-            "claim can be slotted like any other figure. Every entry must be the same "
-            "measure, in the same unit, and belong to a different issuer; anything else is "
-            "refused with the reason. Each entry keeps its own period, and they are stated."
+            "the table for each name (`accruals_ratio.rank.JPM`, "
+            "`issuer_exposures.weight.rank.MSFT`) beside each value, so the claim can be "
+            "slotted like any other figure. The book's own figures rank by name "
+            "(run_…:issuer_exposures.MSFT.weight, one per holding). Every entry must be the "
+            "same measure, in the same unit, and belong to a different issuer or row; "
+            "anything else is refused with the reason. Each entry keeps its own period, and "
+            "they are stated."
         ),
         json_schema={"type": "object", "properties": {
             "refs": {"type": "array", "minItems": 2, "items": {"type": "string"},
-                     "description": "fact_… or calc_… ids, one per name being ranked"},
+                     "description": "fact_… or calc_… ids, or ref:name figures on a run, one per name being ranked"},
             "direction": {"type": "string", "enum": list(typed_calculator.DIRECTIONS),
                           "description": "which end takes place 1"},
             "as_quantity": {"type": ["string", "null"],
@@ -911,13 +948,45 @@ def build_read_registry() -> ToolRegistry:
             "answers in one call what otherwise takes five, and the ordering and the "
             "netting are done here rather than by you. A risk no factor measures is "
             "reported as unmeasured, not as zero. Cite the run_id, or the calc_id for the "
-            "netted betas and the distances."
+            "netted betas and the distances. Every distance is an operand for calculate "
+            "by name (calc_id:portfolio.integration.room_to_breach.<check>): times the "
+            "book's market value it is the dollars of room, or of excess."
         ),
         json_schema={"type": "object", "properties": {
             "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
         }, "required": ["run_id"], "additionalProperties": False},
         fn=_get_portfolio_analysis, tool_class=READ,
         evidence=Evidence(scope=("limit_checks", "factor_attributions", "issuer_exposures", "exposure_metrics", "count")),
+    ))
+    reg.register(Tool(
+        name="hypothetical_book",
+        display="Rebuilding the book after the sale",
+        description=(
+            "The book as it would stand after selling some of what it holds — all of a "
+            "name, or a fraction of it — with the weights renormalised over what remains, "
+            "the sector weights, the market value, and every concentration and exposure "
+            "limit check re-run against the portfolio's own thresholds. Use it for 'if I "
+            "sell X, where does concentration land', 'what gets tight, what gets better', "
+            "and 'would trimming Y clear the warning'. The proceeds leave the book (no cash "
+            "line is added). The result is a row whose names are a run's names "
+            "(issuer_exposures.MSFT.weight, limit_checks.issuer_concentration:MSFT.current_value, "
+            "count.alerts), so slot them with ref = the calc_id; and each is an operand for "
+            "calculate — calc_id:issuer_exposures.MSFT.weight less run_id:issuer_exposures.MSFT.weight "
+            "is the change the sale makes. Factor exposures are not re-fitted and are "
+            "reported as unmeasured, never carried over."
+        ),
+        json_schema={"type": "object", "properties": {
+            "run_id": {"type": "string", "description": "the completed exposure run (run_...) to start from"},
+            "sales": {"type": "array", "minItems": 1, "maxItems": 20,
+                      "items": {"type": "object", "properties": {
+                          "ticker": {"type": "string"},
+                          "fraction": {"type": "number", "exclusiveMinimum": 0, "maximum": 1,
+                                       "description": "share of the position sold; omitted means all of it"},
+                      }, "required": ["ticker"], "additionalProperties": False},
+                      "description": "what is sold, one entry per name"},
+        }, "required": ["run_id", "sales"], "additionalProperties": False},
+        fn=_hypothetical_book, tool_class=READ,
+        evidence=Evidence(),
     ))
     reg.register(Tool(
         name="describe_run",
@@ -943,10 +1012,11 @@ def build_read_registry() -> ToolRegistry:
             "The exact figures a question needs, by name, in one call — names from "
             "describe_run (or any table you have seen), e.g. issuer_exposures.MSFT.weight, "
             "limit_checks.sector_concentration:Technology.breach_level. Unknown names are "
-            "returned as unknown, not guessed."
+            "returned as unknown, not guessed. Reads a run (run_…) or a hypothetical_book "
+            "row (calc_…) alike."
         ),
         json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string"},
+            "run_id": {"type": "string", "description": "a run id (run_…) or a hypothetical_book row id (calc_…)"},
             "names": {"type": "array", "minItems": 1, "maxItems": 120, "items": {"type": "string"}},
         }, "required": ["run_id", "names"], "additionalProperties": False},
         fn=_read_quantities, tool_class=READ,
