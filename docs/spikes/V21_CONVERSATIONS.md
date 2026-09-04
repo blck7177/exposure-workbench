@@ -216,15 +216,38 @@ Mounjaro", "how is Azure growing", "where does Exxon earn it" are answerable
 only from filing prose, whose figures cannot be slotted (§3 cause 3), which is
 why C09 had to drop every number it had read.
 
-**`rank` cannot order anything about the book.** `typed_calculator._resolve`
-accepts `fact_` and `calc_` refs only; a run's own quantities
-(`issuer_exposures.MSFT.weight`, `limit_checks.*.current_value`) are neither.
-Meanwhile the system prompt says a highest/lowest claim is "a rank call FIRST".
-So every natural portfolio ordering — biggest position, closest to breaching,
-who hurt most — has no primitive, and the model either avoids ordering
-(`ranking` 3/10) or asserts one it is not allowed to make.
-`get_portfolio_analysis` precomputes two orderings server-side (`stress_ranked`,
-`headroom`); there is no general one.
+**`rank` cannot mint a PLACE over the book — but the orderings already ship,
+and the prompt does not know it.** This was written the other way round in the
+first pass and the verification stage corrected it, which is worth recording
+because the correction changes the recommendation.
+
+What is true: `typed_calculator._resolve` accepts `fact_` and `calc_` refs
+only, so a run quantity (`issuer_exposures.MSFT.weight`) cannot become a
+citable rank place (`weight.rank.MSFT`).
+
+What is also true, and matters more: `analytics/integration.py` already returns
+the orderings a portfolio question asks for, computed server-side and citable
+against the run —
+
+    :238  positions      sorted by (-weight, ticker)
+    :193  headroom       sorted by to_breach
+    :66   exposure legs  sorted by (-|value|, name)
+
+and **the gate has no rule requiring a rank place for a superlative**. The five
+closed checks are shape, source, name, quotes and assertion-row-type; none of
+them reads a comparative. Only the SYSTEM PROMPT demands one: "A claim that one
+name is the highest or the lowest is a rank call FIRST".
+
+So the desk asks the model for a call that `rank` cannot serve on run
+quantities, to satisfy a rule the gate does not enforce, when the ordering is
+already in `get_portfolio_analysis`'s payload. The model's way out is to stop
+making superlatives, which is `ranking` 3/10. The fix is therefore NOT to teach
+`rank` to eat run refs — that would put every run column into the unit algebra
+— but to make the prompt say what is true: an ordering over the book comes from
+`get_portfolio_analysis`, and a rank call is for quantities that carry
+`fact_`/`calc_` ids. If a citable PLACE is genuinely wanted, the cheap version
+is a labelled `weight_rank` family emitted by `integration_service` beside the
+sort it already performs, declared as COUNT in `resources.py`.
 
 **`unknown_formula` does not suggest a near name.** It returns all 32 known
 names, and for a filed metric it points at `get_flow` (V19). `return_on_capital`
@@ -302,8 +325,10 @@ all but a prompt.
 2. **Fix `derive_table`** for heterogeneous rows: fall back to per-cell captions
    (`explicit` True) whenever the rows do not share a name family, and pin it.
    A wrong label reached a user in this batch.
-3. **Let `rank` take run quantities** — or precompute the orderings a book
-   question asks for. `ranking` 3/10 is downstream of this.
+3. **Tell the prompt the truth about orderings** (§5): the book's orderings
+   already ship from `get_portfolio_analysis`, and the gate never asked for a
+   rank place. One clause, and `ranking` 3/10 is downstream of it. Do NOT
+   teach `rank` to accept run refs.
 4. **Decide the `so_what` question** (§6). One clause, and the largest single
    move in measured analytical quality.
 5. **Refine the batch hold** to argument scope (§7).
@@ -347,14 +372,16 @@ kind:
 
 | kind | confirmed | what it means |
 |---|---|---|
-| **model_behaviour** | **23** | the tool and the data were there and were not used |
-| missing_skill | 6 | all book-level or scenario-level (§2) |
+| **model_behaviour** | **27** | the tool and the data were there and were not used |
+| missing_skill | 8 | all book-level or scenario-level (§2) |
 | missing_tool | 3 | run history, portfolio vol series, post-trade weights |
 | missing_data | 3 | product-line revenue, customer concentration, purchase obligations |
 | gate_blocked | 2 | §4 |
 | unit/label defects | 3 | §4b |
 
-Twenty-three of forty. The instances are specific and each names a tool that
+All thirteen verified: 46 CONFIRMED, 31 MISDIAGNOSED, 7 ALREADY_EXISTS — a
+third of what the readers proposed did not survive contact with the code, which
+is the point of the second stage. Twenty-seven of forty-six. The instances are specific and each names a tool that
 existed:
 
 - "The one tool built to answer *how much room is left* was never called"
