@@ -50,8 +50,23 @@ unambiguous:
       return_on_capital                   — an alias for roic, which exists
 
 **Zero genuinely missing formulas in 31 turns of real analysis.** Every named
-measure the analysis reached for was already in the registry. Adding methods is
-not the lever.
+measure the analysis reached for was already in the registry.
+
+That is the whole answer only for ISSUER-level methods. The deep read (§10)
+found methods that are genuinely absent and that never appear as
+`unknown_formula` because they are not formula-shaped and the model never
+tried: they are BOOK-level quantities, and the registry has none.
+
+| absent | what it answers | where it goes |
+|---|---|---|
+| post-trade weights | "if I sell NVDA, where does concentration land" | a service beside `integration_service`: drop the ticker, renormalise `w_i/(1-w_sold)` |
+| trim-to-limit sizing | "how much MSFT must I sell to get back under 15%" | the money leg beside `analytics/integration.headroom()`'s existing ratio legs |
+| capital-allocation ratios | "is capex or the buyback the bigger use of cash" | three divide entries in `formulas.py`, family "cash uses" |
+
+The first two are what C01#t3 died for and what C12#t2 could only answer in
+ratios. Note the shape: these are not new fundamentals, they are the book's own
+arithmetic, and the registry was built for issuers. Adding ISSUER formulas is
+not the lever; adding a small BOOK vocabulary is.
 
 ## §3 What actually costs the turns: the answer grammar, not the evidence
 
@@ -129,7 +144,48 @@ to the user as raw JSON.
 All three are closed lexical checks — the kind the gate already is — not
 judgements.
 
+## §4b Two wrong figures that reached the user, both from unit and name gaps
+
+**(d) `max VIF 1672.7%`.** Published in C03#t3. `exposure_metrics.max_vif` is
+declared RATIO in `analytics/resources.py`, so a variance inflation factor of
+16.727 is printed by the percent rule. This is the same class as V17's
+"debt/EBITDA 2.30 → 230.0%" and V20's "750 observations → 75000.0%", on the
+same table, for the third time. VIF is a MULTIPLE — the unit class V17 added
+for exactly this. `model_r_squared` shares the row and reads 80.7%, which is
+defensible and worth a decision rather than an assumption.
+
+**(e) "The deepest drawdown episode ran from 12.0% with a trough on 12.0%".**
+Same answer. The model wanted the peak DATE and the trough DATE;
+`portfolio.drawdown_episodes` names only `deepest_depth` and `episode_depths`
+(resources.py:198), so a sentence about WHEN has no figure to point at, and the
+model slotted the depth twice — once under "ran from", once under "with a
+trough on". `get_drawdown_episodes` returns those dates; the table holds no
+name for them. This is the V16 residual ("an as-of date that cannot be slotted
+sends the model to a price slot") reappearing with a new instance, and it is a
+one-line fix in the resource declaration, not a new capability.
+
 ## §5 What the desk genuinely cannot do
+
+**A figure inside a quotation the gate itself verifies may not be written.**
+This is the cheapest and largest of the three, and it was found by asking why
+C09 dropped every number it had read. The resolver's fifth check (V5, `quotes`)
+already proves that any quoted span of four words or more appears VERBATIM in
+the passages the block cites, and refuses the answer as `unverified_quote`
+otherwise. But `validate_shape` runs first, and refuses the digits before that
+proof is ever attempted:
+
+    "…collectively accounted for 82 percent of our total revenues in 2025"
+      -> digits_in_text: ['82']
+
+So the desk can quote the issuer and cannot quote the issuer's number, even
+though the machinery that would prove the number is the issuer's own words is
+already there and already runs. Every figure that lives only in filing prose —
+product and segment revenue, customer concentration, backlog, headcount, the
+effect size management states — is unstateable for this reason.
+
+The fix is a closed lookup, not a judgement: exempt digits that fall inside a
+quoted span of four words or more, and let the existing quote check prove the
+span. Nothing opens up — an unverified quote still refuses the whole answer.
 
 **Segment, product and geography figures do not exist.** The fact store holds
 **0 dimensional facts out of 73,861**: `financial_facts.dimensions` is `{}` on
@@ -184,17 +240,37 @@ Refinement, not a retraction: when a refusal names the offending argument
 that argument's VALUE; hold by tool only when the refusal is about the call
 itself. `agents/batch.py`, one predicate.
 
-## §8 The critic on this batch
+## §8 The critic on this batch — and what it missed
 
 `prose_critic` over the 31 answers: 90 slots in prose, **82 agrees, 2
-disagrees, 6 unclear** — and both disagreements are false positives
+disagrees, 6 unclear**, and both disagreements are false positives
 (`risk_alerts.issuer_concentration:MSFT.current_value` *is* the current weight;
-`.limit_value` *is* the limit). The grammar in `_NAME_GRAMMAR` does not
-describe the alert columns. Zero true mislabels in prose this batch — while
-§4(a) shows the mislabels moved into the tables, where the critic does not look.
+`.limit_value` *is* the limit — `_NAME_GRAMMAR` does not describe the alert
+columns).
+
+The mislabels of §4(a) are in TABLES, where the critic does not look. It also
+**missed the one true mislabel in prose**. Shown the sentence
+"The deepest drawdown episode ran from ⟦1⟧(12.0%) with a trough on ⟦2⟧(12.0%)"
+with the desk name `portfolio.drawdown_episodes.deepest_depth` beside both, it
+answered `agrees` twice, reading "ran from" as "deepest drawdown depth" and
+"with a trough on" as "trough depth". A human reads those prepositions as
+dates. The critic rationalises: asked what the sentence CLAIMS the figure is,
+it finds the most charitable reading that fits the desk name rather than the
+one the English supports.
+
+So on this batch the instrument scored 0 true positives and 2 false positives,
+against at least one true mislabel present. **That settles the question V21 left
+open** (IMPLEMENTATION_PLAN_V21 S5, "whether to pay for it per turn"): not yet.
+Before it is worth inlining it needs the prepositional test — does the
+quantity's KIND fit the slot the sentence opens ("on <date>", "from <date>",
+"at <price>") — and a grammar that covers the alert and integration columns.
 
 ## §9 What to do, in the order the evidence supports
 
+0. **Let a verified quote carry its figure** (§5). One condition in
+   `answer_blocks._text_problems`, against a check that already runs. It closes
+   the third and largest cause of `digits_in_text` and is the only item here
+   that adds analytical capability rather than removing friction.
 1. **Teach the refusals** (`answer_blocks`, `arg_validation`): name the block
    type a malformed block was trying to be; separate "you wrote a number" from
    "your slot is a string"; refuse `{ref` in text; say when an identical answer
@@ -210,8 +286,25 @@ describe the alert columns. Zero true mislabels in prose this batch — while
 5. **Refine the batch hold** to argument scope (§7).
 6. **Dimensional facts** (§5) — the biggest capability gap, and the most
    expensive: it means reading each filing's XBRL instance rather than
-   companyfacts. Nothing else on this list unlocks segment analysis.
-7. **A near-name suggestion in `unknown_formula`** — `difflib` over the 32
+   companyfacts. Nothing else on this list unlocks segment analysis AS A
+   COMPUTED QUANTITY; item 0 below unlocks stating it as the issuer's own
+   sentence, which is most of the value for a fraction of the work.
+7. **Type `max_vif` as MULTIPLE and name the drawdown dates** (§4b) — two
+   declarations in `analytics/resources.py`, both already shown wrong to a user.
+8. **A near-name suggestion in `unknown_formula`** — `difflib` over the 32
    known names, a closed lookup.
 
 Adding formulas is not on this list, and §2 is why.
+
+
+## §10 A note on the deep read, and on believing readers
+
+Thirteen sub-agents read one conversation each and said what a competent
+analyst would have delivered. Their reading is suggestive and not
+authoritative, and one case shows why: the reader of C03 called MSFT at 16.0%
+against a 15.0% line "already a breach, not a warning". The desk's own answer
+said warning, and the desk was right — `risk_limits` holds warning 15.0% and
+breach 20.0% for MSFT (12.0% / 18.0% for LLY). Every claim taken from a reader
+into this document was checked against the database or the code first; that is
+why the workflow pairs each reader with a verifier that must open the file
+before a gap is believed.
