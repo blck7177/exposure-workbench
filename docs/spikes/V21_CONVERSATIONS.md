@@ -117,7 +117,7 @@ That was the answer to *"rates back up 100bp — walk me through what that does
 to this book, name by name"*. **Gate pressure degrades content**: refused often
 enough, the model ships whatever passes.
 
-## §4 Three holes found in the gate and its labels
+## §4 Four holes found in the gate and its labels
 
 **(a) `derive_table` mislabels a heterogeneous table — the V19 error class,
 reintroduced by the machinery built to prevent it.** C10#t1 showed the reader:
@@ -141,7 +141,27 @@ digits. C01#t3 was caught only because a run id looks like a figure; the same
 mistake with `{ref": "calc_x", "name": "gross_margin"}` would have been shown
 to the user as raw JSON.
 
-All three are closed lexical checks — the kind the gate already is — not
+**(a2) The same derivation fails the other way, and shipped a table that
+contradicts its own prose.** C11#t3 published:
+
+    Operating margin and ROIC for the book's megacaps
+     | operating margin | roic
+     | 46.8% | 84.0%
+     | 32.6% | 84.0%
+     | 33.1% | 17.6%
+
+No row labels at all, the SAME `calc_58c920070b22` ROIC slotted on two
+different rows, and prose above it saying "ROIC is unavailable for Microsoft
+and Nvidia" while 46.8% is Microsoft's margin. Root cause, and it is one line:
+`typed_calculator` records every `calculate` result as
+`cs._record(db, None, …)` — the company is hard-coded None — although it has
+just resolved both operands' `issuers` and refuses to combine across issuers.
+So a Tier-2 composition has no subject; V19's derivation needs the subject to
+build a label; the labels come out empty. `evaluate_formula` rows carry their
+company and do not have this problem, which is why the defect only appears
+when the model composes its own measure.
+
+All of these are closed checks — the kind the gate already is — not
 judgements.
 
 ## §4b Two wrong figures that reached the user, both from unit and name gaps
@@ -267,6 +287,9 @@ quantity's KIND fit the slot the sentence opens ("on <date>", "from <date>",
 
 ## §9 What to do, in the order the evidence supports
 
+The order below is by evidence, and §11 is why the first item is not a fix at
+all but a prompt.
+
 0. **Let a verified quote carry its figure** (§5). One condition in
    `answer_blocks._text_problems`, against a check that already runs. It closes
    the third and largest cause of `digits_in_text` and is the only item here
@@ -294,7 +317,14 @@ quantity's KIND fit the slot the sentence opens ("on <date>", "from <date>",
 8. **A near-name suggestion in `unknown_formula`** — `difflib` over the 32
    known names, a closed lookup.
 
-Adding formulas is not on this list, and §2 is why.
+9. **Stamp the issuer on a `calculate` row** (§4a2) — one argument, and it is
+   what makes a self-composed measure nameable in a table.
+10. **The behaviour list** (§11): the prompt and the tool descriptions are where
+   23 of the 40 confirmed gaps live. Worth its own pass, with the battery
+   re-run against it — that is the one lever this document cannot size from
+   the outside.
+
+Adding ISSUER formulas is not on this list, and §2 is why.
 
 
 ## §10 A note on the deep read, and on believing readers
@@ -308,3 +338,39 @@ breach 20.0% for MSFT (12.0% / 18.0% for LLY). Every claim taken from a reader
 into this document was checked against the database or the code first; that is
 why the workflow pairs each reader with a verifier that must open the file
 before a gap is believed.
+
+
+## §11 Where the shortfall actually lives
+
+The deep read proposed 40 gaps that survived a verifier opening the file. By
+kind:
+
+| kind | confirmed | what it means |
+|---|---|---|
+| **model_behaviour** | **23** | the tool and the data were there and were not used |
+| missing_skill | 6 | all book-level or scenario-level (§2) |
+| missing_tool | 3 | run history, portfolio vol series, post-trade weights |
+| missing_data | 3 | product-line revenue, customer concentration, purchase obligations |
+| gate_blocked | 2 | §4 |
+| unit/label defects | 3 | §4b |
+
+Twenty-three of forty. The instances are specific and each names a tool that
+existed:
+
+- "The one tool built to answer *how much room is left* was never called"
+  (`get_portfolio_analysis.headroom`, C08).
+- "Not one holding's volatility measured, though the per-ticker tool was there"
+  (C07).
+- "Never searched filing text for the issuer's own disclosed +100bp
+  sensitivity" (C04) — the issuers publish it; the desk can read it.
+- "Daily prices never consulted — no check on whether the news is already in
+  the price" (C10).
+- "Abandoned leverage after one failed formula instead of substituting an
+  available one" (C06).
+
+So the honest answer to *is the analysis good enough, and do we need more
+skills* is: the analysis is limited first by how the desk USES what it has,
+second by the grammar friction that eats the turns in which it would be
+analysing (§3), and only third by anything absent. The levers in that order are
+the system prompt and the tool descriptions, the refusal letters, and then a
+short list of book-level methods — not more issuer formulas.
