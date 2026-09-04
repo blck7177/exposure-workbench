@@ -89,6 +89,15 @@ SEMANTIC = {
         "the system has never ingested — generic sector prose with no filed figure, no "
         "quoted passage, and no named period behind it."
     ),
+    # V21. A conversation's second turn is not a question on its own: "and the
+    # other two?" has no subject, and "is that a one-off" has no referent. The
+    # unit the other criteria score is one answer; this one scores the JOIN.
+    "follows_on": (
+        "The turn resolves what the user's words point at — the entities, the measure or "
+        "the finding carried over from the exchange before it — and answers THAT. FALSE if "
+        "it asks the user to restate what was already said, silently changes the subject, "
+        "the measure or the period, or re-answers the previous turn instead of this one."
+    ),
     "precision": (
         "Figures are written at a precision a reader uses. FALSE if ledger-raw precision "
         "is reproduced in prose (33.878625%, 0.5556454228194568) where two or three "
@@ -136,9 +145,33 @@ def _tools_called(steps: list[dict]) -> list[str]:
             if s.get("tool_name") and s["step_type"] == "tool_call"]
 
 
+def _question_tag(rec: dict) -> str:
+    """Which question this record answers. A record that states it is believed;
+    otherwise the --repeat suffix is stripped. Conversation turns state it,
+    because `C01-trim-one#t2` ends in a digit and is not a repeat of `C01`."""
+    if rec.get("question_tag"):
+        return rec["question_tag"]
+    return rec["tag"].rsplit("-", 1)[0] if rec["tag"][-1].isdigit() else rec["tag"]
+
+
+def flatten_conversations(convos: list[dict]) -> list[dict]:
+    """A conversation file (scripts/conversation_battery.py) as one record per
+    TURN, each carrying the exchange before it as `context`."""
+    out: list[dict] = []
+    for c in convos:
+        history: list[str] = []
+        for t in c.get("turns", []):
+            tag = f"{c['tag']}#t{t.get('turn', len(history) + 1)}"
+            out.append({"tag": tag, "question_tag": tag, "session_id": c.get("session_id"),
+                        "question": t.get("q"), "answer": t.get("answer"), "error": t.get("error"),
+                        "steps": t.get("steps", []), "context": "\n\n".join(history)})
+            history.append(f"USER: {t.get('q')}\nDESK: {(t.get('answer') or '')[:1500]}")
+    return out
+
+
 def _score_structural(rec: dict, holdings: int) -> dict:
     tools = _tools_called(rec.get("steps", []))
-    tag = rec["tag"].rsplit("-", 1)[0] if rec["tag"][-1].isdigit() else rec["tag"]
+    tag = _question_tag(rec)
     out = {}
 
     required = REQUIRED.get(tag, set())
@@ -159,9 +192,16 @@ def _score_structural(rec: dict, holdings: int) -> dict:
     return out
 
 
-async def _judge_one(name: str, question: str, answer: str, model: str | None) -> dict:
+async def _judge_one(name: str, question: str, answer: str, model: str | None,
+                     context: str = "") -> dict:
     prompt = _JUDGE_PROMPT.format(name=name, definition=SEMANTIC[name],
                                   question=question, answer=answer)
+    if context:
+        # Only for a turn that has one. A criterion about the JOIN cannot be
+        # scored without the thing joined to, and every other criterion is
+        # scored on this turn alone — so the context is appended, never mixed
+        # into the answer under judgement.
+        prompt += f"\n\nWHAT WAS SAID BEFORE THIS TURN (context, not under judgement):\n{context}\n"
     content, _model, _p, _c = await chat_complete(
         [{"role": "user", "content": prompt}], model=model, max_tokens=120)
     head, _, rest = (content or "").strip().partition("\n")
@@ -178,7 +218,7 @@ async def _judge_one(name: str, question: str, answer: str, model: str | None) -
 def _estimate(records: list[dict], questions: dict) -> None:
     calls = chars = 0
     for rec in records:
-        tag = rec["tag"].rsplit("-", 1)[0] if rec["tag"][-1].isdigit() else rec["tag"]
+        tag = _question_tag(rec)
         q = questions.get(tag)
         if not q or not rec.get("answer"):
             continue
@@ -186,7 +226,9 @@ def _estimate(records: list[dict], questions: dict) -> None:
             if name in SEMANTIC:
                 calls += 1
                 chars += len(_JUDGE_PROMPT.format(name=name, definition=SEMANTIC[name],
-                                                  question=q["q"], answer=rec["answer"]))
+                                                  question=rec.get("question") or q["q"],
+                                                  answer=rec["answer"]))
+                chars += len(rec.get("context", "")) if name == "follows_on" else 0
     print(f"semantic pass: {calls} judge calls, ~{chars // 4:,} prompt tokens "
           f"(+{calls * 120:,} completion cap)")
 
@@ -202,7 +244,8 @@ async def main(argv: list[str]) -> int:
     ap.add_argument("--holdings", type=int, default=10, help="positions in the book under test")
     args = ap.parse_args(argv)
 
-    records = json.load(open(args.traces))
+    raw = json.load(open(args.traces))
+    records = flatten_conversations(raw) if raw and "turns" in raw[0] else raw
     questions = {q["tag"]: q for q in json.load(open(args.questions))}
 
     if args.estimate:
@@ -211,7 +254,7 @@ async def main(argv: list[str]) -> int:
 
     scored = []
     for rec in records:
-        tag = rec["tag"].rsplit("-", 1)[0] if rec["tag"][-1].isdigit() else rec["tag"]
+        tag = _question_tag(rec)
         q = questions.get(tag)
         if q is None:
             print(f"[{rec['tag']}] no such question in {args.questions}", file=sys.stderr)
@@ -228,7 +271,8 @@ async def main(argv: list[str]) -> int:
             for name in q["criteria"]:
                 if name in SEMANTIC:
                     criteria[name] = await _judge_one(
-                        name, q["q"], rec["answer"], args.judge_model)
+                        name, rec.get("question") or q["q"], rec["answer"], args.judge_model,
+                        context=rec.get("context", "") if name == "follows_on" else "")
         elif not answered:
             for name in q["criteria"]:
                 if name in SEMANTIC:

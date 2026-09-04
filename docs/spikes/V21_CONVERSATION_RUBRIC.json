@@ -1,0 +1,715 @@
+{
+ "scored": [
+  {
+   "tag": "C01-trim-one#t1",
+   "question_tag": "C01-trim-one#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "ranking": {
+     "met": false,
+     "why": "It names a smallest holding, not the largest driver, and gives no ordered ranking by magnitude."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating the data: \u201cthe smallest holding in the run is NVDA,\u201d with no actionable implication for reducing the book to nine."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It says \u201cthe smallest holding in the run is NVDA\u201d but gives no filed figure, quoted passage, or named period."
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t2",
+   "question_tag": "C01-trim-one#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 11,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It gives a \u201cFundamental comparison\u201d table but never says whether the expensive name is worse business or just expensive."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cgross margin | 68.3% | 46.8% | 39.3% | 22.9%\u201d and \u201cnet margin | 35.0% | 35.0%...\u201d are specific filed figures, not generic prose."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating metrics, with no actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t3",
+   "question_tag": "C01-trim-one#t3",
+   "answered": true,
+   "gate_refusals": 8,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI could not produce an answer... Ask again,\u201d so it doesn\u2019t resolve the carried-over concentration question."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by offering to do more work: \"Ask again, or narrow the question,\" with no actionable portfolio implication."
+    },
+    "trigger": {
+     "met": false,
+     "why": "It says \u201cdid not get there\u201d and gives no quantified monitoring threshold like a level, move, or spread."
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t1",
+   "question_tag": "C02-nvda-bear#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cIt says \u2018the filing\u2019 and cites specific risks like \u2018export controls,\u2019 \u2018inventory write-downs,\u2019 and geography such as \u2018China, Hong Kong, Israel, Korea, and Taiwan.\u2019"
+    },
+    "ranking": {
+     "met": false,
+     "why": "The risks are listed in a flat narrative, not ranked, and no single \u201clargest\u201d driver is identified as the largest."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It lists risks but ends with \u201ccould harm business, financial condition...,\u201d not a portfolio-manager action or implication for the book."
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t2",
+   "question_tag": "C02-nvda-bear#t2",
+   "answered": true,
+   "gate_refusals": 7,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "\u201cIt could not produce an answer\u201d; it did not identify which item would show up first or what to watch for."
+    },
+    "trigger": {
+     "met": false,
+     "why": "The answer gives no quantified monitoring threshold; it only says it \u201cdid not get there\u201d and asks to \u201cnarrow the question.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by saying \u201cAsk again\u201d and gives no actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t1",
+   "question_tag": "C03-smoke#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe largest weights are 16.0% and 12.8%\u201d and \u201cTechnology is the largest sector by a wide margin\u201d show the drivers are ordered with the largest named largest."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe book is concentrated in a small set of names, with 10 positions,\u201d \u201cThe recent risk readings are not quiet: 12.8% and 17.7%.\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"So the smoke... is concentration in a few large growth names... I would... look at whether the largest names are all telling the same macro story.\""
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t2",
+   "question_tag": "C03-smoke#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It gives the concentration figures behind the \u201csmoke\u201d: \u201cMSFT weight | 16.0%,\u201d \u201cLLY weight | 12.8%,\u201d and \u201csector exposures Technology weight | 35.1%.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-level precision like \u201c16.0%,\u201d \u201c$1.74M,\u201d and \u201c12.8%,\u201d not ledger-raw excessive precision."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer gives actual figures like \u201cMSFT weight | 16.0%\u201d and \u201cLLY market value: $1.39M\u201d with the named exposure period data."
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t3",
+   "question_tag": "C03-smoke#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe concentration issue is not a one-off\u201d directly answers whether it has been \u201cbuilding for a while.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201c2 issuer concentration alerts,\u201d \u201cover their warning lines,\u201d and specific figures like \u201c16.0% versus 15.0% for MSFT\u201d ground the claim in evidence."
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t1",
+   "question_tag": "C04-rates-100bp#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "ranking": {
+     "met": false,
+     "why": "It only states \u201c10 positions, 7 factor exposures, 2 alerts, and 20 limit checks,\u201d with no ordered driver ranking or \u201clargest\u201d named."
+    },
+    "netting": {
+     "met": false,
+     "why": "It only says \u201c10 positions, 7 factor exposures\u201d and gives no netted directional exposure or offsetting legs."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating data: \u201cIt holds 10 positions, 7 factor exposures, 2 alerts, and 20 limit checks.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives only generic snapshot metadata\u2014\u201c10 positions, 7 factor exposures, 2 alerts, and 20 limit checks\u201d\u2014with no names, filed figures, or period-specific claim."
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t2",
+   "question_tag": "C04-rates-100bp#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201chow much of that is just us owning TLT\u201d and distinguishes TLT from \u201cequities being long duration in disguise.\u201d"
+    },
+    "netting": {
+     "met": true,
+     "why": "\u201cthe rates-up shock is measured as a 0.67% net exposure, with the opposite-signed rates leg inside it\u201d states the net and its direction."
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t1",
+   "question_tag": "C05-amzn-capital#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "ranking": {
+     "met": false,
+     "why": "The answer lists capex, buybacks, and debt in a narrative mix without ranking them by magnitude or naming the largest driver as largest."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201clatest trailing year,\u201d \u201cAMZN 2026-03-31,\u201d and \u201cthe filing set here\u201d tie the claims to specific ingested evidence, not generic prose."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201cnet debt: $20.97B\u201d and \u201cAmazon\u2019s cash generation \u2026 left $-2.47B\u201d use ledger-raw precision rather than reader-level figures."
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t2",
+   "question_tag": "C05-amzn-capital#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 12,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201ccapex.divide.revenue: 19.2% (2025-06-30) \u2192 24.4% (2026-03-31), up\u201d directly answers whether capex is growing faster than revenue."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201ccapex.divide.revenue: 19.2% (2025-06-30) \u2192 24.4% (2026-03-31), up\u201d names a period and filed figures from the system."
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t3",
+   "question_tag": "C05-amzn-capital#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "0 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It compares Amazon\u2019s capex intensity with Microsoft\u2019s on the same front: \u201cCapex intensity versus revenue: Amazon and Microsoft.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites named periods and specific filed figures for Amazon and Microsoft: \u201c2025-06-30 \u2026 2026-03-31\u201d with capex/revenue percentages."
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t1",
+   "question_tag": "C06-new-name-ko#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cmarked {ref}investigable{ref} in the issuer registry\u201d is system-specific, but it gives no filing, period, or quoted evidence for a business claim."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It offers \u201cIf you want, I can pull...\u201d but does not close with an actionable implication for the book."
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t2",
+   "question_tag": "C06-new-name-ko#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts to \u201cKO's 3.10\u00d7\u201d and \u201cdebt_to_ebitda is unavailable\u201d instead of comparing leverage with \u201cthe average name in here.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cKO's 3.10\u00d7\u201d and \u201clatest balance date\u201d ground the claim in a named company and period rather than generic prose."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer gives no ordered ranking of drivers; it only says \u201ccoverage is mixed\u201d and provides no largest driver."
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t3",
+   "question_tag": "C06-new-name-ko#t3",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over KO addition question with mandate impact: \u201ca fresh run would be needed\u201d and cites current issuer concentration alerts."
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201cLLY current value | 12.8% | risk alerts issuer concentration:LLY limit value: 12.0%\u201d gives a quantified threshold that would change the assessment."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with mandate data only: \u201ccount alerts | 2\u201d and issuer concentrations, with no actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t1",
+   "question_tag": "C07-vol-rising#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\"Portfolio volatility snapshot\" with specific figures \"trailing volatility at 12.8%\" and \"SPY\u2019s most recent 21-session volatility is 7.21%\" grounds the claim in named period evidence."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-appropriate precision like \u201c12.8%,\u201d \u201c13.1%,\u201d and \u201c7.21%,\u201d not ledger-raw excessive decimals."
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t2",
+   "question_tag": "C07-vol-rising#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe book\u2019s latest run shows trailing 12.8% and 13.1%\u201d and \u201cposition-specific movement\u201d directly answer whether it\u2019s broad market jumpiness or something specific."
+    },
+    "ranking": {
+     "met": true,
+     "why": "It names \u201cMSFT had the largest negative contribution\u201d and separately \u201cNVDA had the largest positive contribution,\u201d with the largest explicitly identified."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with \u201cidiosyncratic effects rather than just common market factors,\u201d which implies the manager should focus on specific holdings."
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t1",
+   "question_tag": "C08-wrong-premise#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cNVDA\u2019s weight is 4.13%\u201d and \u201cThe largest position is 16.0%\u201d are specific period/book figures, not generic prose."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c16.0%,\u201d \u201c4.13%,\u201d and \u201c15.0%\u201d use reader-appropriate precision, not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t2",
+   "question_tag": "C08-wrong-premise#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It directly answers \u201cwhich one is actually the biggest\u201d with \u201cMSFT, 16.0%\u201d and \u201chow much room is left\u201d via \u201c15.0% limit\u201d and \u201c80.1% of that limit.\u201d"
+    },
+    "trigger": {
+     "met": true,
+     "why": "\"It sits against a limit of 15.0%,\" which quantifies the threshold that would change the assessment."
+    },
+    "ranking": {
+     "met": true,
+     "why": "It explicitly names \"The largest position is 16.0% in MSFT,\" satisfying the largest-driver ordering criterion."
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t1",
+   "question_tag": "C09-lly-concentration#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cLilly\u2019s own filing says\u2026 in 2025\u201d with specific named products and revenue shares, so it rests on cited filing evidence rather than generic prose."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cThe evidence \u2026 is that revenue is highly concentrated \u2026 especially the incretin / cardiometabolic franchise\u201d is an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t2",
+   "question_tag": "C09-lly-concentration#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"The filing text itself says the six biggest products together accounted for more than half of total revenues in 2025\" answers \"how much of the top line are we talking about.\""
+    },
+    "precision": {
+     "met": true,
+     "why": "It uses rounded prose like \u201cmore than half\u201d instead of ledger-raw precision."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites a named period and filing-specific 2025 figures: \u201cthe six biggest products together accounted for more than half of total revenues in 2025.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "C10-news-to-position#t1",
+   "question_tag": "C10-news-to-position#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cThe last week brought a few things\u201d and \u201cthe recent items were mostly broker commentary\u201d are generic; no filed figure, quoted passage, or named period-specific evidence."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It mentions several items but does not rank drivers by magnitude or name the largest as the largest."
+    }
+   }
+  },
+  {
+   "tag": "C10-news-to-position#t2",
+   "question_tag": "C10-news-to-position#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"The touches from that list that we own are 16.0% in $1.74M, 4.13% in $449K, 12.4% in $1.35M, and 14.8% in $1.60M. LLY is also owned...\""
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating holdings and sizes; there\u2019s no actionable implication for a portfolio manager."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-appropriate rounded figures like \u201c16.0%,\u201d \u201c4.13%,\u201d and \u201c$1.74M,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t1",
+   "question_tag": "C11-ellipsis#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific trailing 12-month figures: \u201cMicrosoft\u2019s operating margin is 46.8%\u2026 versus Apple\u2019s 32.6%.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "It uses reader-appropriate precision: \u201c46.8%\u201d and \u201c32.6%,\u201d not raw ledger precision."
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t2",
+   "question_tag": "C11-ellipsis#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\"the other two megacaps in the book\" is answered by naming GOOGL and NVDA with their exposures."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific ingested holdings and figures: \u201cGOOGL | 12.4% | $1.35M\u201d and \u201cNVDA | 4.13% | $449K.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t3",
+   "question_tag": "C11-ellipsis#t3",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts to \u201cROIC\u201d and cites \u201cunavailable for Microsoft and Nvidia,\u201d instead of resolving which business is best by the prior operating-margin measure."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It lists values, but no ranking \u201cordered by magnitude\u201d or named largest driver; Microsoft and Nvidia are excluded instead of ranked."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating ROIC data and unavailability, not with an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t1",
+   "question_tag": "C12-trigger-levels#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific issuer and sector exposures with figures: \u201cMSFT | 16.0% \u2026 LLY | 12.8% \u2026 Technology | 35.1%,\u201d grounding the claim in system evidence."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with raw exposure data only: \u201cissuer exposures MSFT... LLY... sector exposures Technology...\u201d, with no actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t2",
+   "question_tag": "C12-trigger-levels#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It directly answers \u201cwhat would have to happen for that answer to flip\u201d with the thresholds: \u201cMSFT | 16.0% | 15.0%\u201d and \u201cLLY | 12.8% | 12.0%.\u201d"
+    },
+    "trigger": {
+     "met": true,
+     "why": "It gives quantified flip levels: \u201cissuer concentration:MSFT | 16.0% | 15.0%\u201d and \u201cissuer concentration:LLY | 12.8% | 12.0%.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t1",
+   "question_tag": "C13-xom-still-oil#t1",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 11,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives no Exxon evidence, figures, period, or cited passage\u2014only \u201cI need a visible run or table id,\u201d so the claim is unsupported."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201ccannot be cited,\u201d giving no portfolio implication for Exxon and no actionable conclusion."
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t2",
+   "question_tag": "C13-xom-still-oil#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 32,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It resolves \u201cExxon\u2026 still basically an oil bet\u201d with cited numbers: \u201ccapex intensity,\u201d \u201casset turnover,\u201d and \u201ccash generation,\u201d not just narrative."
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201c0.72\u00d7 says the asset base is turning sales at a limited pace\u201d and \u201c8.66% is a modest share of $334B\u201d give quantified thresholds."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives numbers, but they\u2019re generic and unlabeled as system evidence beyond \u201clatest twelve-month window\u201d and \u201c2026-03-31.\u201d"
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "no_linear_locating": [
+   4,
+   4
+  ],
+  "ranking": [
+   3,
+   10
+  ],
+  "so_what": [
+   3,
+   15
+  ],
+  "grounded_claims": [
+   16,
+   22
+  ],
+  "follows_on": [
+   13,
+   18
+  ],
+  "trigger": [
+   4,
+   6
+  ],
+  "precision": [
+   6,
+   7
+  ],
+  "netting": [
+   1,
+   2
+  ]
+ }
+}
