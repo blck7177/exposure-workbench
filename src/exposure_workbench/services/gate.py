@@ -6,8 +6,10 @@ nothing to check. It checks whether the model POINTED right:
 
     G1  every id in the answer is on this session's ledger          not_on_ledger
     G2  the layout admits the fact's kind: a cell is a standalone
-        scalar, a chart is a series, a cite is a passage, an inline
-        fact stands alone                                             kind_does_not_fit / not_standalone
+        scalar, a chart is a series, an inline fact stands alone; a
+        cite is any fact the block rests on (the first live round
+        listed the scalars it used there, 8 refusals in 11 — a habit
+        that costs the reader nothing, so it is not refused)          kind_does_not_fit / not_standalone
     G3  the prose carries nothing the ledger cannot account for:
         every digit token resolves — to a fact it equals (exactly, at
         the written precision, under a money scale), to a fact's
@@ -95,14 +97,26 @@ _FIX = ("a figure in prose is either a fact on the ledger — point at it as {fa
 _NAME_MARKS = (".", ":", "@")
 
 
+def _core(token: str) -> str:
+    """A number stripped of sign, currency, separators and percent — what two
+    spellings of one figure share ("+100bp" and "100bp"; "5%" and "5")."""
+    return re.sub(r"[+\-−$,%\s]", "", token or "").lower()
+
+
 def _compound(measures: set[str]) -> list[str]:
     return sorted(m for m in measures if isinstance(m, str) and any(c in m for c in _NAME_MARKS))
 
 
 # ── the pass ──────────────────────────────────────────────────────────────────
 
-def check(blocks, ledger: Ledger) -> Verdict:
+def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
+    """`question` is the user's message this turn answers: a number the user
+    wrote ("100bp", "5%", "half") is the question's, and a sentence that repeats
+    it rests on the question — a lookup over its tokens, not an exemption class.
+    The first live round refused "+100bp" as unsourced in the answer to "rates
+    back up 100bp"."""
     v = Verdict()
+    asked = {_core(t["token"]) for t in A.tokens_in(question or "")}
     shape = A.validate_shape(blocks)
     if shape:
         v.error, v.problems = "malformed_answer", shape
@@ -131,9 +145,6 @@ def check(blocks, ledger: Ledger) -> Verdict:
         elif role == A.CHART and kind != F.SERIES:
             v.problems.append({"at": at, "id": fid, "reason": "kind_does_not_fit", "kind": kind,
                                "detail": "a chart draws a series fact"})
-        elif role == A.CITE and kind != F.PASSAGE:
-            v.problems.append({"at": at, "id": fid, "reason": "kind_does_not_fit", "kind": kind,
-                               "detail": "cites are passage facts (filing text, web sources); a figure is pointed at inline"})
         elif role in (A.CELL, A.INLINE) and not ledger.standalone(fid):
             rec = ledger.by_id[fid]
             v.problems.append({"at": at, "id": fid, "reason": "not_standalone",
@@ -148,6 +159,17 @@ def check(blocks, ledger: Ledger) -> Verdict:
     names = _compound(ledger.measures)
     for i, prose, cites in A.prose_by_block(blocks):
         at = f"blocks[{i}]"
+        # A pointer SERIALISED into the string — "{fact:f_…}", "{\"fact\": \"f_…\"}" —
+        # is the V23-R slot-as-string shape reborn: the first live V24 round wrote
+        # eleven of them in one answer and the id inside each would have linked.
+        # Named as what it is, and reported instead of the id inside it.
+        serialised = A.SERIALISED_REF.findall(prose)
+        if serialised:
+            v.problems.append({"at": at, "reason": "pointer_written_as_text", "pointers": serialised,
+                               "detail": ("a fact ref is an OBJECT element of `runs` — [\"text\", {\"fact\": \"f_…\"}, "
+                                          "\"text\"] — never a string containing one. Send it as an object; the "
+                                          "reader is shown the fact's value where it sits")})
+            prose = A.SERIALISED_REF.sub(" ", prose)
         written = sorted({n for n in names if n in prose})
         if written:
             v.problems.append({"at": at, "reason": "name_in_prose", "names": written,
@@ -174,16 +196,21 @@ def check(blocks, ledger: Ledger) -> Verdict:
             if pids:
                 v.links[(i, t["start"])] = {"to": "passage", "ids": pids, "as_written": tok}
                 continue
+            if _core(tok) in asked:
+                v.links[(i, t["start"])] = {"to": "question", "ids": [], "as_written": tok}
+                continue
             v.problems.append({"at": at, "reason": "unsourced_figure", "figure": tok, "detail": _FIX})
         passages = [ledger.passages[c] for c in cites if c in ledger.passages]
         for p in verify_quotes(prose, passages):
             v.problems.append({"at": at, **p, "reason": "unverified_quote"})
     if v.problems:
         reasons = {p["reason"] for p in v.problems}
-        v.error = ("unsourced_figure" if "unsourced_figure" in reasons else
+        v.error = ("pointer_written_as_text" if "pointer_written_as_text" in reasons else
+                   "unsourced_figure" if "unsourced_figure" in reasons else
                    "id_in_prose" if "id_in_prose" in reasons else
                    "name_in_prose" if "name_in_prose" in reasons else "unverified_quote")
-        v.detail = {"unsourced_figure": _FIX,
+        v.detail = {"pointer_written_as_text": "a fact ref is an object element of runs, never text inside a string",
+                    "unsourced_figure": _FIX,
                     "id_in_prose": "ids belong in {fact: id} or in cites, never in a sentence",
                     "name_in_prose": "a name the ledger holds is written as {fact: id}, not as words",
                     "unverified_quote": ("quotation marks say these words appear verbatim in a passage this "
@@ -202,12 +229,16 @@ def accepted(blocks, verdict: Verdict, ledger: Ledger) -> dict:
     facts_used = list(dict.fromkeys([*verdict.refs, *linked]))
     figures = [ledger.by_id[f] for f in facts_used if ledger.kind(f) in (F.SCALAR, F.SERIES)]
     passages = [f for f in facts_used if ledger.kind(f) == F.PASSAGE]
+    # a figure is counted once per place it stands — a pointer, or a written
+    # number — not once per fact that shares the written value
+    pointed = [f for _, f, role in A.refs_in(blocks) if role in (A.INLINE, A.CELL, A.CHART) and ledger.kind(f) in (F.SCALAR, F.SERIES)]
+    written = [l for l in verdict.links.values() if l["to"] == "fact"]
     return {
         "blocks": filled,
         "text": A.prose_of(filled),
         "citations": facts_used,
         "verified": {
-            "figures": len(figures), "sources": len(passages),
+            "figures": len(pointed) + len(written), "sources": len(passages),
             "matches": [{"label": r.get("measure"), "value": r.get("value"), "unit_class": r.get("unit"),
                          "source_id": r["id"], "subject": r.get("subject"), "as_of": r.get("as_of")}
                         for r in figures],

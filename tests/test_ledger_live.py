@@ -64,3 +64,44 @@ async def test_step_and_table_agree_and_the_drawer_resolves():
             await db.execute(delete(AgentSession).where(AgentSession.id == sid))
             await db.commit()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_a_fact_id_is_an_operand_with_the_facts_identity():
+    """V24 live round 1: the model wrote multiply(f_…, f_…). A shown scalar Fact
+    resolves to a typed operand — unit, as-of, subject, base — and the result
+    row names the fact ids as its inputs."""
+    from exposure_workbench.services import compute_service
+    engine = create_async_engine(URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    reg = build_meta_registry()
+    async with mk() as db:
+        s = await sess.create_session(db, kind="meta")
+        await db.commit()
+        sid = s.id
+    try:
+        async with mk() as db:
+            R._session_ctx.set(sid)
+            res = await R.invoke(reg, db, sid, "read_book", {"ref": "run_b791e7985dcd",
+                                 "names": ["issuer_exposures.MSFT.weight", "exposure_metrics.portfolio_market_value"]})
+            await db.commit()
+        rows = res["facts"]["rows"]
+        by = {r[3]: r[0] for r in rows}
+        w, mv = by["issuer_exposures.weight"], by["exposure_metrics.portfolio_market_value"]
+        async with mk() as db:
+            R._session_ctx.set(sid)
+            out = await compute_service.compute(db, op="multiply", operands=[w, mv], as_quantity="msft_market_value")
+            await db.rollback()
+        assert not out.get("error"), out
+        assert out["type"]["unit_class"] == "money" and out["operands"] == [w, mv]
+        assert out["type"]["issuers"] == ["MSFT"] and out["type"].get("base") == "run_b791e7985dcd"
+        async with mk() as db:
+            bad = await compute_service.compute(db, op="add", operands=["f_000000000000", w])
+        assert bad["error"] == "unknown_operand"
+    finally:
+        async with mk() as db:
+            await db.execute(delete(FactRecord).where(FactRecord.session_id == sid))
+            await db.execute(delete(AgentStep).where(AgentStep.session_id == sid))
+            await db.execute(delete(AgentSession).where(AgentSession.id == sid))
+            await db.commit()
+        await engine.dispose()

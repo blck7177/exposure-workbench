@@ -84,6 +84,13 @@ MEASURE_ALIAS = {"n": "observations"}
 # locates a passage in a file. Neither is something an answer states.
 DROP_KEYS = frozenset({"score", "char_span"})
 
+# Structures that are not the tool's figures at all — a refusal's schema for the
+# params it wanted, its list of problems, the names it knows — kept in the note
+# verbatim. The first live V24 round hit `minItems` inside `params_schema` and
+# the refusal the model needed became an adapter error.
+PASSTHROUGH_KEYS = frozenset({"params_schema", "problems", "known", "nearest", "available", "held_on",
+                              "expected", "supported", "allowed"})
+
 # Numbers that are identity, not figures: kept in the note as they are (they
 # are parameters the model may write, and G3 resolves them from the Fact's
 # window/params), and copied onto the Facts they qualify.
@@ -323,6 +330,9 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
         for k, v in node.items():
             if k in DROP_KEYS:
                 continue
+            if k in PASSTHROUGH_KEYS:
+                out[k] = v
+                continue
             if k in MEASURE_TABLE and isinstance(v, (list, dict)):
                 out[k] = _harvest(v, k, f"{path}.{k}" if path else k, sub.child(table=MEASURE_TABLE[k]), facts)
             else:
@@ -353,6 +363,9 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
     out: dict = {}
     for k, v in row.items():
         if k in DROP_KEYS:
+            continue
+        if k in PASSTHROUGH_KEYS:
+            out[k] = v
             continue
         if _is_num(v) and k not in PARAM_KEYS:
             table = ctx.table or MEASURE_TABLE.get(key) or key
@@ -634,10 +647,14 @@ def _blank_ids(node: Any, ids: set[str]) -> Any:
 
 
 def numeric_leaves(node: Any, path: str = "") -> list[tuple[str, float]]:
-    """Every number in a note — I1 says there are none. A test helper, exported."""
+    """Every number in a note that is a figure — I1 says there are none. A
+    passthrough structure (a schema, a list of problems) is not walked: its
+    numbers describe an argument, not the world. A test helper, exported."""
     out: list[tuple[str, float]] = []
     if isinstance(node, dict):
         for k, v in node.items():
+            if k in PASSTHROUGH_KEYS:
+                continue
             out += numeric_leaves(v, f"{path}.{k}" if path else k)
     elif isinstance(node, list):
         for i, v in enumerate(node):

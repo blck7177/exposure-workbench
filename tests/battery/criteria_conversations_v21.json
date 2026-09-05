@@ -97,7 +97,8 @@
   "asks": "TLT versus equity duration",
   "criteria": [
    "follows_on",
-   "netting"
+   "netting",
+   "honest_absence"
   ]
  },
  {
@@ -212,7 +213,8 @@
   "criteria": [
    "follows_on",
    "precision",
-   "grounded_claims"
+   "grounded_claims",
+   "honest_absence"
   ]
  },
  {
@@ -297,7 +299,8 @@
   "criteria": [
    "follows_on",
    "trigger",
-   "grounded_claims"
+   "grounded_claims",
+   "honest_absence"
   ]
  }
 ]

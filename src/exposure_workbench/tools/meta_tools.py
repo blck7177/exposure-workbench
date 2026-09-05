@@ -172,10 +172,19 @@ async def _respond_blocks(db: AsyncSession, blocks: list) -> dict:
     the reason (services/gate.py). The ledger is read as recorded
     (services/ledger.py); nothing here rebuilds anything."""
     led = await ledger.load(db, current_session_id())
-    verdict = gate.check(blocks, led)
+    verdict = gate.check(blocks, led, question=await _question(db, current_session_id()))
     if not verdict.ok:
         return verdict.as_refusal()
     return {"responded": True, "format": "blocks", **gate.accepted(blocks, verdict, led)}
+
+
+async def _question(db: AsyncSession, session_id: str) -> str | None:
+    """The user's message this turn answers — the latest user row of the session."""
+    from exposure_workbench.db.models import AgentMessage
+    row = (await db.execute(
+        select(AgentMessage.content).where(AgentMessage.session_id == session_id, AgentMessage.role == "user")
+        .order_by(AgentMessage.created_at.desc()).limit(1))).first()
+    return row[0] if row else None
 
 
 # The exit's grammar, as schema (Law B): services/answer.py owns the block
@@ -228,8 +237,9 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "Reply to the user. An answer is a list of BLOCKS; a figure is a pointer {fact: id} "
             "at a fact a tool result showed (its `facts` block), and the reader is shown the "
             "fact's own value with what it is and as of when — you never write a number. Blocks: "
-            "`paragraph` (runs: strings and {fact: id} in reading order; `cites`: the passage "
-            "facts its prose rests on), `table` (rows of fact ids, one row per thing compared "
+            "`paragraph` (runs: an ARRAY whose elements are strings and {fact: id} OBJECTS in reading "
+            "order — a ref is never written inside a string; `cites`: the facts its prose rests on), "
+            "`table` (rows of fact ids, one row per thing compared "
             "and one column per measure; header and row labels come from the facts), `chart` "
             "(kind + a series fact). A claim that something rose or fell points at the series; "
             "that something is not held, at the absence fact; work you started, at its task fact. "

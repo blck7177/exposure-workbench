@@ -614,7 +614,9 @@ Which tools produce facts is `fact_adapters.ADAPTERS` by name, pinned by
 3. `honest_absence` added to `tests/battery/criteria_conversations_v21.json`
    (the criterion the boss named 9/5: an answer that says the desk does not
    hold a split, pointing at an absence fact, scores above a substituted
-   figure).
+   figure). **Done 2026-09-05:** defined in `rubric_battery.SEMANTIC` (FALSE
+   if a nearby figure wears the asked-for name, a number is estimated, or the
+   gap is passed over) and carried by C04#t2, C09#t2, C13#t2.
 4. `scripts/exit_metrics.py` counts `unsourced_figure` refusals separately:
    that number is the model's arithmetic habit, and it should fall as
    `compute` is reached for it.

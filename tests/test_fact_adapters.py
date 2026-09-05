@@ -219,3 +219,15 @@ def test_cap_holds_back_whole_facts():
 def test_unknown_numeric_key_is_an_error_not_a_guess():
     with pytest.raises(fa.UnknownUnit):
         fa.harvest({"as_of": "2026-01-01", "frobnication": 3.2}, fa.Ctx("t", subject="X"))
+
+
+def test_a_refusals_schema_and_problems_pass_through_untouched():
+    """Live round 1: compute(book.sell) with the wrong params shape refused with
+    its params_schema, and `minItems` inside it became an adapter error that
+    masked the refusal the model needed."""
+    refusal = {"error": "invalid_params", "detail": "book.sell: params do not fit the method's schema",
+               "problems": [{"field": "sales", "message": "required", "minimum": 1}],
+               "params_schema": {"type": "object", "properties": {"sales": {"type": "array", "minItems": 1}}}}
+    facts, note, held = fa.adapt("compute", {"method": "book.sell"}, refusal)
+    assert facts == [] and note["params_schema"] == refusal["params_schema"] and note["problems"] == refusal["problems"]
+    assert fa.numeric_leaves(note) == []

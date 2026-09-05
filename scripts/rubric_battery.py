@@ -89,6 +89,19 @@ SEMANTIC = {
         "the system has never ingested — generic sector prose with no filed figure, no "
         "quoted passage, and no named period behind it."
     ),
+    # V24 (the boss, 2026-09-05). The V23 battery scored an honest "the desk
+    # does not hold this split" (C04#t2) BELOW V21's substituted wrong figure,
+    # because no criterion rewarded correct abstention. This one does: the
+    # answer that says what is not held, points at the record of its absence
+    # and offers the nearest thing the desk does hold beats one that fills the
+    # gap with a neighbouring figure wearing the asked-for name.
+    "honest_absence": (
+        "Where the question asks for a figure or a split the desk does not hold, the "
+        "answer says so plainly, names why (not filed; not held as a figure; no method), "
+        "and offers the nearest thing the desk DOES hold as what it is. FALSE if a "
+        "nearby figure is presented under the asked-for name, if a number is estimated, "
+        "or if the gap is passed over in silence."
+    ),
     # V21. A conversation's second turn is not a question on its own: "and the
     # other two?" has no subject, and "is that a one-off" has no referent. The
     # unit the other criteria score is one answer; this one scores the JOIN.

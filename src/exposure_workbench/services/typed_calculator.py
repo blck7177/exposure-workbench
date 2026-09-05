@@ -159,6 +159,52 @@ def _parse_book_name(name: str) -> tuple[str, str | None]:
     return name, None
 
 
+async def _resolve_fact_ref(db: AsyncSession, fid: str) -> Typed | dict:
+    """V24. A Fact by its id as an operand — the id the model was shown, so the
+    figure it computes with is the figure it read, with the identity the Fact
+    carries: unit, as-of or window, subject, and the row it rests on as base.
+    The first live V24 round wrote `multiply(f_…, f_…)` unprompted and was
+    refused; a scalar Fact is the most completely typed operand on the desk.
+    """
+    from exposure_workbench.services import ledger as ledger_svc
+    rec = await ledger_svc.record(db, fid)
+    if rec is None:
+        return _err("unknown_operand", f"{fid} is not a fact this desk has shown")
+    kind = rec.get("kind")
+    if kind == "series":
+        src = next((s for s in rec.get("sources") or [] if isinstance(s, str) and s.startswith("calc_")), None)
+        if src:
+            return await _resolve(db, src)
+        return _err("not_a_quantity", f"{fid} is a series with no ledger row behind it; a series statistic "
+                                      f"(compute op yoy/qoq/…) takes the series' calc id")
+    if kind != "scalar" or rec.get("value") is None:
+        return _err("not_a_quantity", f"{fid} is {kind or 'not a figure'} — it can be pointed at, not combined")
+    if rec.get("standalone") is False:
+        return _err("not_alone", f"{fid} ({rec.get('measure')}) is not determined on its own; combine the figure that is")
+    unit = _ALGEBRA_UNIT.get(str(rec.get("unit") or "").upper())
+    if unit is None:
+        return _err("unknown_unit", f"{fid} is {rec.get('unit')!r}, which this desk cannot do algebra on")
+    instant = interval = None
+    w = rec.get("window") or {}
+    try:
+        if isinstance(w, dict) and w.get("start") and w.get("end"):
+            interval = (date.fromisoformat(str(w["start"])[:10]), date.fromisoformat(str(w["end"])[:10]))
+        elif rec.get("as_of") and str(rec["as_of"])[:4].isdigit():
+            instant = date.fromisoformat(str(rec["as_of"])[:10])
+    except ValueError:
+        instant = interval = None
+    subject = rec.get("subject")
+    issuer = (subject,) if isinstance(subject, str) and subject and not subject.startswith(("run_", "port_", "calc_")) else ()
+    base = next((s for s in rec.get("sources") or [] if isinstance(s, str) and s.startswith(("run_", "calc_"))), None)
+    if not issuer and isinstance(subject, str) and subject.startswith("run_"):
+        base = base or subject
+    return Typed(value=float(rec["value"]), unit_class=unit, instant=instant, interval=interval,
+                 quantity=rec.get("measure"), source_id=fid, issuers=issuer,
+                 base=base if (rec.get("measure") or "").startswith(("issuer_exposures", "sector_exposures", "limit_checks",
+                                                                        "exposure_metrics", "factor_attributions", "risk_alerts",
+                                                                        "portfolio.", "trade.")) else None)
+
+
 async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typed | dict:
     """One figure on a row that holds many, typed (V22).
 
@@ -293,6 +339,8 @@ SCENARIO_OP = "book.scenario"
 
 async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
     """A fact, a calc, or a named figure on a run or a ledger row, as a typed quantity."""
+    if ref.startswith("f_"):
+        return await _resolve_fact_ref(db, ref)
     named = split_named(ref)
     if named is not None:
         return await _resolve_named(db, named[0], named[1], ref)

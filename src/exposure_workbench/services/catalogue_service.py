@@ -81,7 +81,10 @@ def _err(code: str, detail: str, **more) -> dict:
 # What a model writes when it means "no subject": the schema says null, and
 # the first live V23 turn wrote the string "null" (and "port_" for a portfolio
 # it had not looked up). The desk is the desk under any of these spellings.
-_DESK_ALIASES = ("", "null", "none", "desk", "book", "portfolio", "portfolios")
+# The schema's own placeholders, typed literally, mean the desk too: the model
+# wrote describe("port_") on the first call of two live V24 turns.
+_DESK_ALIASES = ("", "null", "none", "desk", "book", "portfolio", "portfolios",
+                 "port_", "run_", "calc_", "port_…", "run_…", "port_...", "run_...")
 
 
 def kind_of(subject: str | None) -> str:

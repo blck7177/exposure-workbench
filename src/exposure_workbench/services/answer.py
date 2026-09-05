@@ -205,6 +205,10 @@ _NUM = (r"(?P<num>(?<![\w.])[+\-−]?\$?\d[\d,]*(?:\.\d+)?%?"
         r"(?:\s?(?:bn|mn|K|M|B|million|billion|thousand|percent|per\s?cent)\b)?)")
 TOKEN = re.compile("|".join((_ID, _DATE, _FORM, _NUM)))
 
+# A fact ref serialised into a string: `{fact:f_3a…}`, `{"fact": "f_3a…"}`,
+# `{fact: 'f_3a…'}` — braces around the word fact and an id. Closed shape.
+SERIALISED_REF = re.compile(r"\{\s*[\"']?fact[\"']?\s*:\s*[\"']?f_[A-Za-z0-9]{4,}[\"']?\s*\}")
+
 
 def tokens_in(text: str) -> list[dict]:
     """[{token, kind, start, end}] for every id, date, form name and number."""
@@ -324,6 +328,8 @@ def _split_runs(i: int, runs: list, records: dict[str, dict], links: dict) -> li
                         key=lambda x: x[0])
         pos = 0
         for start, link in pieces:
+            if link["to"] == "question":
+                continue                          # the user's own number stays in its sentence, unmarked
             local = start - offset
             if local < pos:
                 continue

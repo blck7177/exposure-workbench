@@ -66,7 +66,7 @@ def test_G2_a_cell_is_a_scalar_a_chart_a_series_a_cite_a_passage(world):
     absence = next(r for r in led.by_id.values() if r["kind"] == F.ABSENCE)
     assert G.check([{"type": "table", "rows": [[series["id"]]]}], led).error == "kind_does_not_fit"
     assert G.check([{"type": "chart", "kind": "line", "fact": var.id}], led).error == "kind_does_not_fit"
-    assert G.check([_para("x", cites=[var.id])], led).error == "kind_does_not_fit"
+    assert G.check([_para("x", cites=[var.id])], led).ok, "a cite may be any fact the block rests on (live round 1)"
     assert G.check([{"type": "chart", "kind": "line", "fact": series["id"]}], led).ok
     assert G.check([_para("Segment revenue is ", {"fact": absence["id"]}, ".")], led).ok, "an absence stands inline"
     assert G.check([_para("The filing says so.", cites=[passage.id])], led).ok
@@ -172,7 +172,7 @@ def test_the_gate_refuses_for_one_of_seven_reasons_and_nothing_else():
     found = {m for m in reasons if f'"{m}"' in src}
     assert found == reasons
     # the only patterns in the gate are whitespace and quotation marks; no digit class, no exemption
-    assert "_NOT_A_FIGURE" not in src and "_DIGIT_RUN" not in src and "exempt" not in src.lower().replace("no list of digit classes exempt", "")
+    assert "_NOT_A_FIGURE" not in src and "_DIGIT_RUN" not in src, "no digit class list in the gate"
 
 
 # ── accepted ──────────────────────────────────────────────────────────────────
@@ -203,3 +203,47 @@ def test_an_answer_that_states_nothing_factual_verifies_nothing_and_says_so(worl
     v = G.check(blocks, led)
     out = G.accepted(blocks, v, led)
     assert out["verified"] == {"figures": 0, "sources": 0, "matches": []} and out["citations"] == []
+
+
+# ── from the first live round (2026-09-05) ────────────────────────────────────
+
+def test_a_cite_may_be_any_fact_the_block_rests_on(world):
+    """Eight of eleven live refusals were the model listing the scalars it had
+    used under `cites`. Nothing is lost by accepting it: the quote check reads
+    the passage cites, and the rest render as footnotes to the facts."""
+    led, by, var, passage = world
+    w = by[("MSFT", "issuer_exposures.weight")]
+    v = G.check([_para("MSFT weighs ", {"fact": w["id"]}, ".", cites=[w["id"], passage.id])], led)
+    assert v.ok, v.problems
+
+
+def test_a_pointer_written_inside_a_string_is_named_as_that_not_linked(world):
+    led, by, *_ = world
+    w = by[("MSFT", "issuer_exposures.weight")]
+    for shape in ("{fact:%s}", '{"fact": "%s"}', "{fact: '%s'}"):
+        v = G.check([_para("MSFT weighs " + shape % w["id"] + " of the book.")], led)
+        assert v.error == "pointer_written_as_text", shape
+        assert v.problems[0]["pointers"] == [shape % w["id"]]
+        assert not any(p["reason"] == "id_in_prose" for p in v.problems), "the id inside is not reported twice"
+
+
+def test_verified_counts_a_written_value_once_however_many_facts_share_it(world):
+    led, by, *_ = world
+    thr = next(r for r in led.by_id.values() if r["measure"] == "limit_checks.warning_level" and (r["subject"] or "").startswith("issuer_concentration"))
+    blocks = [_para(f"against a {thr['value'] * 100:.1f}% warning limit.")]
+    v = G.check(blocks, led)
+    out = G.accepted(blocks, v, led)
+    assert out["verified"]["figures"] == 1 and len(out["citations"]) > 1
+
+
+def test_a_number_the_user_wrote_rests_on_the_question(world):
+    led, *_ = world
+    q = "rates back up 100bp from here — and if I sell half our NVDA and put 5% into KO?"
+    v = G.check([_para("On a +100bp move the book loses; a 5% KO position would sit under its limit.")], led, question=q)
+    assert v.ok, v.problems
+    by_written = {l["as_written"]: l["to"] for l in v.links.values()}
+    assert by_written["+100"] == "question"
+    assert by_written["5%"] in ("question", "fact"), "5% is the user's figure, and also a scenario input on the ledger"
+    out = G.accepted([_para("On a +100bp move the book loses.")], G.check([_para("On a +100bp move the book loses.")], led, question=q), led)
+    assert out["blocks"][0]["runs"] == ["On a +100bp move the book loses."], "the question's number renders as plain text"
+    assert G.check([_para("On a +100bp move the book loses.")], led).error == "unsourced_figure"
