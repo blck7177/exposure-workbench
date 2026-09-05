@@ -1,10 +1,9 @@
-"""M10 registry — declaration onto the table, schema generation, redaction (offline).
+"""M10 registry — the wrapper's side of the facts (V24), schema generation, redaction (offline).
 
-V15-S2a. Evidence is DECLARED by a tool's registration, not harvested by a walker
-that guesses whether a result was a retrieval. These tests pin the wrapper's side
-of that: what `invoke` hands `table.build` for each class of tool and result,
-and what it records as the step's evidence — with `table.build` stubbed, because
-building a slice needs rows and the question here is what was declared.
+What `invoke` hands the model and records on the step for each class of tool
+and result: a read's figures as facts, a gate's verdict as nothing, a refusal's
+absence as a fact, an adapter that cannot name a unit as the tool's own error.
+The trace and the budget are stubbed; the adapters are real.
 """
 
 from __future__ import annotations
@@ -69,29 +68,32 @@ def test_delegated_work_is_declared_as_a_task_row():
 # ── the wrapper: what it hands build(), what it records ───────────────────────
 
 class _Db:
+    def __init__(self):
+        self.added = []
+
     async def rollback(self):
         pass
 
+    def add(self, row):
+        self.added.append(row)
 
-def _wire(monkeypatch, *, built=None):
-    """Stub the three things invoke() reaches for besides the tool itself.
+    async def flush(self):
+        pass
 
-    Returns the log: `built` is every declaration handed to table.build,
-    `recorded` every evidence_refs list handed to the trace.
-    """
-    log = {"built": [], "recorded": []}
 
-    async def _build(db, declared, limit=tbl.TABLE_CHAR_LIMIT):
-        log["built"].append(declared)
-        return built if built is not None else (declared, {"quantities": {"stub": {}}})
+def _wire(monkeypatch):
+    """Stub what invoke() reaches for besides the tool itself: the trace and the
+    budget. Returns the log: `recorded` is every evidence_refs list handed to
+    the trace (V24: a step's facts as `{facts: [...]}`), `step_ids` the ids."""
+    log = {"recorded": []}
 
     async def _record(db, session_id, **kw):
         log["recorded"].append(kw["evidence_refs"])
+        return "step_stub"
 
     async def _reserve(db, session_id, is_external_search=False, message_id=None):
         pass
 
-    monkeypatch.setattr(R.tbl, "build", _build)
     monkeypatch.setattr(R.trace_service, "record_step", _record)
     monkeypatch.setattr(R.sess, "reserve", _reserve)
     return log
@@ -109,156 +111,138 @@ def _returning(payload):
     return fn
 
 
-async def test_a_read_tool_registered_with_evidence_puts_its_ids_on_the_table(monkeypatch):
+def _facts_recorded(log):
+    from exposure_workbench.services import ledger as L
+    return [L.facts_in(refs) for refs in log["recorded"]]
+
+
+async def test_a_read_tools_figures_reach_the_model_as_facts_and_the_step_records_them(monkeypatch):
+    """V24. The payload's figures become Facts; the model reads `facts` + `note`
+    (the payload with each figure replaced by its fact id); the step records the
+    same facts; the facts table gets one row each."""
     log = _wire(monkeypatch)
-    tool = Tool(name="get_flow", description="", json_schema={"type": "object"},
-                fn=_returning({"calc_id": "calc_abc", "points": [{"fact_ids": ["fact_a"]}]}),
-                tool_class=READ, evidence=Evidence())
-    out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_flow", {})
+    payload = {"calc_id": "calc_abc", "ticker": "MSFT", "metric": "revenue", "value": 2.8e11, "unit_class": "MONEY",
+               "period": {"start": "2025-04-01", "end": "2026-03-31"}, "terms": [{"fact_id": "fact_a", "sign": 1}],
+               "derivation": "sum of quarters", "basis": "2025-04-01..2026-03-31"}
+    tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
+                fn=_returning(payload), tool_class=READ, evidence=Evidence())
+    db = _Db()
+    out = await R.invoke(_registry(tool), db, "sess_1", "read_fundamentals", {"ticker": "MSFT", "metric": "revenue"})
 
-    assert log["built"] == [[{"type": "calc", "id": "calc_abc"}, {"type": "fact", "id": "fact_a"}]]
-    assert log["recorded"] == [[{"type": "calc", "id": "calc_abc"}, {"type": "fact", "id": "fact_a"}]]
-    assert out["table"] == {"quantities": {"stub": {}}}, "the slice the model reads rides on the result"
+    assert "table" not in out and "value" not in out, "the figure is not in the payload twice"
+    rows = out["facts"]["rows"]
+    assert len(rows) == 1 and rows[0][3] == "revenue" and rows[0][4] == "MONEY" and rows[0][6] == "2026-03-31"
+    fid = rows[0][0]
+    assert out["fact"] == fid, "the note points at the fact where the value stood"
+    assert out["derivation"] == "sum of quarters"
+    [(recorded,)] = _facts_recorded(log)
+    assert recorded["id"] == fid and recorded["sources"] == ["calc_abc", "fact_a"]
+    assert [r.id for r in db.added] == [fid] and db.added[0].step_id == "step_stub"
 
 
-async def test_a_tool_registered_without_a_declaration_puts_nothing_on_the_table(monkeypatch):
-    """get_task_status reads state, list_risk_limits reads policy: their results
-    hold ids and are not evidence. Nothing is built and nothing is recorded."""
+async def test_a_tool_with_no_adapter_passes_its_payload_through_and_records_nothing(monkeypatch):
     log = _wire(monkeypatch)
     tool = Tool(name="get_task_status", description="", json_schema={"type": "object"},
                 fn=_returning({"job_id": "run_real", "state": "completed"}),
                 tool_class=READ, evidence=None)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_task_status", {})
-
-    assert log["built"] == []
+    assert out == {"job_id": "run_real", "state": "completed"}
     assert log["recorded"] == [[]]
-    assert "table" not in out
 
 
-async def test_a_gates_refusal_echoing_ids_puts_nothing_on_the_table(monkeypatch):
-    """The fabricated-id loop, closed by construction. respond's refusal echoes
-    the ids it just refused under problems[].id, and the call itself COMPLETES —
-    a walker over that payload wrote them into the trail, and on the retry they
-    passed. A gate declares nothing, so there is nothing for the retry to find."""
+async def test_a_gates_refusal_echoing_ids_records_nothing(monkeypatch):
+    """The fabricated-id loop, closed by construction: a gate's verdict is not a
+    tool result with facts in it, so the ids a refusal echoes are never on the
+    ledger for the retry to point at."""
     log = _wire(monkeypatch)
-    refusal = {"error": "not_on_table",
-               "problems": [{"id": "calc_fabricated", "reason": "not_on_table"},
-                            {"id": "fact_nope", "reason": "not_on_table"}]}
-    assert {e["id"] for e in tbl.declare(dict(refusal))["evidence"]} == {"calc_fabricated", "fact_nope"}, (
-        "the ids are there to be found — which is why the decision is made above declare()")
+    refusal = {"error": "not_on_ledger",
+               "problems": [{"id": "f_fabricated", "reason": "not_on_ledger"}]}
     gate = Tool(name="respond", description="", json_schema={"type": "object"},
                 fn=_returning(refusal), tool_class=GATE, evidence=R.NOT_EVIDENCE)
     out = await R.invoke(_registry(gate), _Db(), "sess_1", "respond", {})
-
-    assert out["error"] == "not_on_table"
-    assert log["built"] == []
+    assert out["error"] == "not_on_ledger" and out["problems"][0]["id"] == "f_fabricated"
     assert log["recorded"] == [[]]
 
 
-async def test_a_reflection_echoing_an_id_declares_nothing(monkeypatch):
-    """V3-R2: think hands the thought straight back, so a one-token thought that
-    IS an id would have been harvested. A reflection is the model talking to
-    itself and is registered without a declaration."""
+async def test_a_reflection_echoing_an_id_records_nothing(monkeypatch):
     from exposure_workbench.tools.definitions import _think
-
     log = _wire(monkeypatch)
-    echoed = await _think(None, thought="calc_deadbeefcafe")
-    assert tbl.declare(dict(echoed))["evidence"], "the walker still finds it — hence the registration"
-    assert build_read_registry().get("think").evidence is None
-
     think = Tool(name="think", description="", json_schema={"type": "object"},
                  fn=_think, tool_class=REFLECTION, evidence=R.NOT_EVIDENCE)
-    await R.invoke(_registry(think), _Db(), "sess_1", "think", {"thought": "calc_deadbeefcafe"})
-    assert log["built"] == [] and log["recorded"] == [[]]
+    out = await R.invoke(_registry(think), _Db(), "sess_1", "think", {"thought": "calc_deadbeefcafe"})
+    assert out["noted"] is True and log["recorded"] == [[]]
 
 
-async def test_a_refused_read_still_declares_the_absence_it_minted(monkeypatch):
-    """The first red test of V15-S2a. get_flow refuses a series it cannot derive
-    and mints an absence row for the refusal; the old harvester skipped any
-    payload with an `error` key, so the one id an `absence` block needs was the
-    one id that never reached the trail. A result with an error key AND an
-    absence_id declares it like any other id the tool returned."""
+async def test_a_refused_read_still_records_the_absence_it_minted(monkeypatch):
+    """A refusal that minted an absence row is a FACT of kind absence — the one
+    thing an honest sentence about a missing figure can point at."""
     log = _wire(monkeypatch)
-    tool = Tool(name="get_flow", description="", json_schema={"type": "object"},
-                fn=_returning({"error": "series_not_derivable", "absence_id": "calc_absent1"}),
+    tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
+                fn=_returning({"error": "window_not_derivable", "absence_id": "calc_absent1", "ticker": "MSFT",
+                               "metric": "revenue", "statement": "No 12-month window of MSFT's revenue can be derived."}),
                 tool_class=READ, evidence=Evidence())
-    out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_flow", {})
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_fundamentals", {"ticker": "MSFT", "metric": "revenue"})
+    assert out["error"] == "window_not_derivable"
+    rows = out["facts"]["rows"]
+    assert len(rows) == 1 and rows[0][1] == "absence" and rows[0][3] == "revenue"
+    assert out["fact"] == rows[0][0] and "statement" not in out
+    [(rec,)] = _facts_recorded(log)
+    assert rec["kind"] == "absence" and rec["sources"] == ["calc_absent1"]
 
-    assert out["error"] == "series_not_derivable"
-    assert log["built"] == [[{"type": "calc", "id": "calc_absent1"}]]
-    assert log["recorded"] == [[{"type": "calc", "id": "calc_absent1"}]]
 
-
-async def test_a_tool_that_raised_declares_nothing(monkeypatch):
-    """An exception is not a retrieval: the wrapper's structured tool_error
-    carries no ids and builds no table, whatever the tool's registration says."""
+async def test_a_tool_that_raised_records_nothing(monkeypatch):
     log = _wire(monkeypatch)
 
     async def _boom(db, **args):
         raise RuntimeError("calc_should_not_matter")
 
-    tool = Tool(name="get_flow", description="", json_schema={"type": "object"},
+    tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
                 fn=_boom, tool_class=READ, evidence=Evidence())
-    out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_flow", {})
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_fundamentals", {"ticker": "MSFT"})
+    assert out["error"] == "tool_error" and "facts" not in out
+    assert log["recorded"] == [[]]
 
-    assert out["error"] == "tool_error"
-    assert log["built"] == [] and log["recorded"] == [[]]
 
-
-async def test_a_delegation_declares_the_work_it_started_as_a_task(monkeypatch):
+async def test_a_delegation_records_the_work_it_started_as_a_task_fact(monkeypatch):
     log = _wire(monkeypatch)
-    tool = Tool(name="start_issuer_research", description="", json_schema={"type": "object"},
-                fn=_returning({"enqueued": True, "run_id": "rrun_2", "ticker": "NVDA"}),
+    tool = Tool(name="start", description="", json_schema={"type": "object"},
+                fn=_returning({"enqueued": True, "run_id": "rrun_2", "kind": "issuer_research", "ticker": "NVDA"}),
                 tool_class=DELEGATION, evidence=Evidence(tasks_from=("run_id",)))
-    await R.invoke(_registry(tool), _Db(), "sess_1", "start_issuer_research", {})
-    assert log["built"] == [[{"type": "task", "id": "rrun_2", "kind": tbl.KIND_TASK}]]
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "start", {"kind": "research", "subject": "NVDA"})
+    rows = out["facts"]["rows"]
+    assert len(rows) == 1 and rows[0][1] == "task" and rows[0][2] == "rrun_2"
+    [(rec,)] = _facts_recorded(log)
+    assert rec["kind"] == "task" and rec["text"] == "enqueued"
 
 
-async def test_a_run_read_declares_its_scope_and_a_read_by_name_declares_its_names(monkeypatch):
+async def test_an_adapter_that_cannot_name_a_unit_is_the_tools_own_structured_failure(monkeypatch):
+    """I3, at run time: a numeric key with no declared unit is never shown as a
+    bare number. The tool answers with a structured error naming the key, and
+    nothing is recorded — loud, not a guess."""
     log = _wire(monkeypatch)
-    scoped = Tool(name="get_risk_state", description="", json_schema={"type": "object"},
-                  fn=_returning({"run_id": "run_1", "metrics": {}}), tool_class=READ,
-                  evidence=Evidence(scope=("exposure_metrics", "count")))
-    named = Tool(name="read_quantities", description="", json_schema={"type": "object"},
-                 fn=_returning({"run_id": "run_1",
-                                "names": {"run_1": {"issuer_exposures.MSFT.weight": 0.1}}}),
-                 tool_class=READ, evidence=Evidence(names_from="names"))
-    reg = ToolRegistry()
-    reg.register(scoped)
-    reg.register(named)
-    await R.invoke(reg, _Db(), "sess_1", "get_risk_state", {})
-    await R.invoke(reg, _Db(), "sess_1", "read_quantities", {})
-    assert log["built"] == [
-        [{"type": "run", "id": "run_1", "scope": ["exposure_metrics", "count"]}],
-        [{"type": "run", "id": "run_1", "names": ["issuer_exposures.MSFT.weight"]}],
-    ]
+    tool = Tool(name="read_prices", description="", json_schema={"type": "object"},
+                fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2}),
+                tool_class=READ, evidence=Evidence())
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_prices", {"ticker": "MSFT"})
+    assert out["error"] == "fact_adapter_error" and "frobnication" in out["detail"]
+    assert log["recorded"] == [[]]
 
 
-async def test_what_is_recorded_is_what_build_narrowed_to(monkeypatch):
-    """Three outlets, one set: the declaration stored is the one build() returned
-    after fitting the slice, not the one the tool declared — so the record and
-    the payload cannot say different things about a run whose tail was cut."""
-    narrowed = [{"type": "run", "id": "run_1", "scope": ["exposure_metrics"],
-                 "truncated": ["count"]}]
-    log = _wire(monkeypatch, built=(narrowed, {"quantities": {"run_1": {}}}))
-    tool = Tool(name="get_risk_state", description="", json_schema={"type": "object"},
-                fn=_returning({"run_id": "run_1"}), tool_class=READ,
-                evidence=Evidence(scope=("exposure_metrics", "count")))
-    await R.invoke(_registry(tool), _Db(), "sess_1", "get_risk_state", {})
-    assert log["recorded"] == [narrowed]
-
-
-async def test_a_table_that_cannot_be_built_is_a_result_with_nothing_citable(monkeypatch):
+async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(monkeypatch):
+    from exposure_workbench.services import facts as F
     log = _wire(monkeypatch)
-
-    async def _broken(db, declared, limit=tbl.TABLE_CHAR_LIMIT):
-        raise RuntimeError("db gone")
-
-    monkeypatch.setattr(R.tbl, "build", _broken)
-    tool = Tool(name="get_flow", description="", json_schema={"type": "object"},
-                fn=_returning({"calc_id": "calc_abc"}), tool_class=READ, evidence=Evidence())
-    out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_flow", {})
-    assert "table" not in out and log["recorded"] == [[]]
+    payload = {"run_id": "run_1", "as_of": "2026-09-03",
+               "figures": {f"issuer_exposures.T{i:03d}.weight": {"value": i / 1000, "unit_class": "RATIO"} for i in range(F.FACTS_PER_RESULT + 40)}}
+    tool = Tool(name="read_book", description="", json_schema={"type": "object"},
+                fn=_returning(payload), tool_class=READ, evidence=Evidence())
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_book", {"ref": "run_1", "names": ["x"]})
+    shown = len(out["facts"]["rows"])
+    total = F.FACTS_PER_RESULT + 40
+    assert 0 < shown <= F.FACTS_PER_RESULT < total, "whole facts came off the tail until the result fit"
+    assert out["held_back"]["count"] == total - shown and "read_book(" in out["held_back"]["how"]
+    assert sum(1 for v in out["figures"].values() if v == "held_back") == total - shown
+    [(recorded)] = _facts_recorded(log)
+    assert len(recorded) == shown, "what is recorded is what was shown"
 
 
 def test_every_read_tool_that_returns_evidence_says_so():

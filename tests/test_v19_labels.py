@@ -37,12 +37,13 @@ S = {"ref": "calc_1", "name": "NVDA.adj_close@2026-06-05"}
 
 # ── S1: the grammar has no cell for words ─────────────────────────────────────
 
-def test_a_string_cell_is_refused_by_the_schema_at_the_cell():
-    assert _fields([{"type": "metric_table", "rows": [["Peak-to-trough decline", S]]}]) == ["blocks.0.rows.0.0"]
+def test_a_slot_cell_is_refused_by_the_schema_at_the_cell():
+    """V24: a cell is a fact id; a slot object has no place."""
+    assert _fields([{"type": "table", "rows": [[S, "f_a"]]}]) == ["blocks.0.rows.0.0"]
 
 
 def test_columns_are_refused_by_the_schema_at_the_key():
-    assert _fields([{"type": "metric_table", "columns": ["Measure", "Value"], "rows": [[S]]}]) == ["blocks.0.columns"]
+    assert _fields([{"type": "table", "columns": ["Measure", "Value"], "rows": [["f_a"]]}]) == ["blocks.0.columns"]
 
 
 def test_validate_shape_names_the_cell_and_carries_the_rule():
@@ -55,9 +56,10 @@ def test_validate_shape_names_the_cell_and_carries_the_rule():
 
 def test_the_schema_description_and_the_refusal_say_the_same_rule():
     """One sentence, read twice — the schema before the gate, the refusal after."""
+    from exposure_workbench.services import answer as A
     branch = next(b for b in RESPOND_SCHEMA["properties"]["blocks"]["items"]["oneOf"]
-                  if b["properties"]["type"]["enum"] == ["metric_table"])
-    assert branch["properties"]["rows"]["description"] == ab.TABLE_RULE
+                  if b["properties"]["type"]["enum"] == ["table"])
+    assert branch["properties"]["rows"]["description"] == A.TABLE_RULE
     assert "columns" not in branch["properties"]
 
 
@@ -128,7 +130,7 @@ def test_the_model_cannot_supply_the_derived_keys_itself():
     """`header`, `labels`, `explicit` are the renderer's; a block carrying them
     is refused like any unknown key, so the derivation is the only writer."""
     for key in ("header", "labels", "explicit"):
-        assert _fields([{"type": "metric_table", "rows": [[S]], key: ["x"]}]) == [f"blocks.0.{key}"]
+        assert _fields([{"type": "table", "rows": [["f_a"]], key: ["x"]}]) == [f"blocks.0.{key}"]
 
 
 # ── S1: a trend's series states its own direction ─────────────────────────────

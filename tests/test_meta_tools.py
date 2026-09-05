@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from exposure_workbench.services import answer_blocks as ab
+from exposure_workbench.services import answer as A
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.registries import build_meta_registry
 from exposure_workbench.tools.registry import DELEGATION, GATE
@@ -43,7 +43,8 @@ def test_respond_requires_only_blocks():
     branches = schema["properties"]["blocks"]["items"]["oneOf"]
     kinds = [b["properties"]["type"]["enum"] for b in branches]
     assert all(len(k) == 1 for k in kinds), "each branch is one claim type"
-    assert {k[0] for k in kinds} == set(ab.BLOCK_TYPES)
+    from exposure_workbench.services import answer as A
+    assert {k[0] for k in kinds} == set(A.BLOCK_TYPES)
 
 
 def test_respond_description_states_the_rule_the_gate_enforces():

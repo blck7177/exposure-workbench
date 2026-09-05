@@ -6,16 +6,15 @@ The wrapper does four things automatically around every LLM-driven call:
   1. validate the arguments against the tool's own schema — before any spend
   2. reserve budget (agent_session_service) — before the tool runs
   3. run the fn, catching failures as structured results (never crashes the loop)
-  4. put what the tool DECLARED on the table (services/table.py) — the slice the
-     model reads is attached as result["table"], and the declaration is the
-     step's evidence_refs. The gate loads the same declarations.
+  4. turn the result into FACTS (services/fact_adapters.py, V24): the model
+     reads the facts block and the note (the payload with each figure replaced
+     by its fact id); the step records the facts; the facts table indexes
+     them. The gate loads the same records (services/ledger.py).
 
-Evidence is declared, not harvested (V15-S2a). A tool's registration says what
-its results put on the table (`Tool.evidence`): the ids it returns, the run
-child tables it read, the delegated work it started. A tool registered without
-a declaration puts nothing on the table — visible in the first live test that
-tries to cite it, which is the intended direction. Nothing walks a result
-looking for id-shaped strings and guessing whether it was a retrieval.
+A figure carries its identity from the adapter on: no second program names it
+from storage, and what the model was shown is what the gate holds, because it
+is the same record. `Tool.evidence` is the V23 declaration and is no longer
+read; it goes with phase E.
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -34,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import fact_adapters as fa
 from exposure_workbench.services import ledger as ledger_svc
-from exposure_workbench.services import table as tbl
+from exposure_workbench.services import facts as fct
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.arg_validation import validate_args
 
@@ -279,46 +278,29 @@ async def invoke(
         except Exception:  # noqa: BLE001 — nothing left to salvage either way
             logger.exception("could not roll back after %s failed", tool_name)
 
-    # 4) the table. The tool's registration says what its result puts on it;
-    # build() names those quantities (services/quantities.py), attaches the
-    # slice the model reads, and returns the declaration as stored — narrowed
-    # to what fit, so the record and the payload agree. A gate's verdict, a
-    # reflection and any tool registered without a declaration put nothing on
-    # the table, which is what stops a refusal's echoed ids from becoming
-    # evidence on the next attempt.
+    # 4) the facts (V24). The tool's adapter turns the payload into Facts and a
+    # note (the payload with each figure replaced by its fact id); the model
+    # reads `facts` + `note`, the step records the facts, the facts table
+    # indexes them. A tool with no adapter (a gate, a reflection) returns its
+    # payload as it is. An adapter that cannot name a unit is the tool's own
+    # failure — loud, structured, never a number shown without an identity.
     refs: list[dict] = []
-    if status == "completed" and tool.evidence is not None and isinstance(result, dict):
-        declared = tbl.declare(
-            result, scope=tool.evidence.scope or None,
-            names=_names_from(result, tool.evidence.names_from),
-            tasks=[v for k in tool.evidence.tasks_from
-                   for v in [result.get(k)] if isinstance(v, str)],
-        ).pop("evidence", [])
-        try:
-            refs, slice_ = await tbl.build(db, declared)
-        except Exception:  # noqa: BLE001 — a table that cannot be built is a result with nothing citable
-            logger.exception("could not build the table for %s (session %s)", tool_name, session_id)
-            refs, slice_ = [], {}
-        if slice_:
-            result["table"] = slice_
-    # 4b) V24 phase B: the same result as FACTS, recorded on the step and in the
-    # facts table beside the V23 declaration. The model is not yet shown them
-    # (phase C switches what it sees and what the gate checks in one commit);
-    # what this phase establishes is that every call's facts exist, agree
-    # between step and table, and resolve in the drawer. An adapter that cannot
-    # name a unit is logged loudly and records nothing — in phase C it becomes
-    # the tool's own structured error.
     shown: list = []
     if status == "completed" and isinstance(result, dict) and tool.name in fa.ADAPTERS:
         try:
-            # without the V23 slice attached above: its name->[value, group] map
-            # is not the tool's payload, and phase C removes it
-            shown, _note, _held = fa.adapt(tool.name, args, {k: v for k, v in result.items() if k != "table"})
-        except Exception:  # noqa: BLE001 — phase B: the old path is still the live one
+            shown, note, held = fa.adapt(tool.name, args, result)
+        except Exception as exc:  # noqa: BLE001 — see docstring: fail loud, not silent
             logger.exception("fact adapter failed for %s (session %s)", tool_name, session_id)
-            shown = []
-        if shown:
-            refs = [*refs, ledger_svc.step_entry(shown)]
+            status = "error"
+            result = {"error": "fact_adapter_error", "tool": tool_name, "detail": str(exc)[:500]}
+        else:
+            if shown:
+                result = {**note, "facts": fct.block_for_model(shown)}
+                if held:
+                    result["held_back"] = held
+                refs = [ledger_svc.step_entry(shown)]
+            else:
+                result = note
     try:
         step_id = await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
@@ -335,18 +317,6 @@ async def invoke(
         # see the structured result it was given.
         logger.exception("could not record trace step for %s (session %s)", tool_name, session_id)
     return result
-
-
-def _names_from(result: dict, key: str | None) -> list[str] | None:
-    """The exact quantity names a read-by-name tool returned, for its declaration."""
-    if key is None:
-        return None
-    got = result.get(key)
-    if isinstance(got, dict):
-        return [n for names in got.values() if isinstance(names, dict) for n in names]
-    if isinstance(got, list):
-        return [n for n in got if isinstance(n, str)]
-    return None
 
 
 def _step_type(tool: Tool) -> str:

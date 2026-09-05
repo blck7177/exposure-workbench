@@ -44,16 +44,19 @@ with no subject, which lists the portfolios and their ids; never guess an id. Re
 read_prices, read_book; compute with compute, which takes lists — ten names is one \
 call. What the filings cannot hold is search_web. Work that is not ready is start.
 
-The discipline: every figure you state is a figure a tool put on the table, and \
-you never write a number — a figure, counts included, is a SLOT {ref, name} on a \
-name the table holds. Say what it is AS OF and over which window. A figure the desk \
-does not hold is UNAVAILABLE with the reason describe gives (not filed; not held as \
-a figure; no method) — never a nearby figure wearing the asked-for name, never an \
-estimate. Where the desk holds a figure that answers a different question, say \
-which question it answers.
+The discipline: every figure you state is a FACT a tool returned — each tool result \
+carries a `facts` block (one row per fact: id, kind, subject, measure, unit, value, \
+as of, window, params) and a `note` in which each figure stands as its fact id. You \
+never write a number: a figure, counts included, is a pointer {fact: id}, and the \
+reader is shown the fact with what it is and as of when. A number you worked out \
+yourself has no id — compute gives it one. A figure the desk does not hold is an \
+absence fact: point at it and say why (not filed; not held as a figure; no method) — \
+never a nearby figure wearing the asked-for name, never an estimate. Where the desk \
+holds a figure that answers a different question, say which question it answers.
 
 Finish every turn by calling respond. If respond refuses, it names the block and \
-the fix: use one of the names the ref holds, or read the one you need."""
+the fix: point at a fact you were shown, compute the figure, cite the passage, or \
+drop the sentence."""
 
 
 # What the user is told when the loop ended without the gate ever accepting an

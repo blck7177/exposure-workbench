@@ -1,9 +1,9 @@
-"""V15-S5 submit_brief gate — six sections of blocks, one table, one resolver.
+"""V15-S5 / V24 submit_brief gate — six sections of blocks, one ledger, one gate.
 
 Offline: the schema is the exit's grammar (BLOCK_SCHEMAS, shared by identity
 with `respond`), a section that points at nothing is refused structurally, and a
-slot the table cannot name is refused with the section named. Live: a clean
-submission persists the prose, the filled blocks and the per-section ids.
+pointer the ledger does not hold is refused with the section named. Live: a
+clean submission persists the prose, the filled blocks and the per-section ids.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from types import SimpleNamespace
 import pytest
 from dotenv import load_dotenv
 
-from exposure_workbench.services import quantities as qn
-from exposure_workbench.services import table as tbl
+from exposure_workbench.services import facts as F
+from exposure_workbench.services import ledger as L
+from exposure_workbench.services.answer import BLOCK_SCHEMAS
 from exposure_workbench.tools import research_tools as rt
-from exposure_workbench.tools.meta_tools import BLOCK_SCHEMAS
 
 load_dotenv(".env", override=True)
 
@@ -25,16 +25,15 @@ URL = os.getenv("DATABASE_URL_LOCAL",
                 "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
 
 CALC, CHUNK = "calc_hand_built", "chunk_hand_built"
+FIG = F.Fact(id="f_hand_figure", kind=F.SCALAR, measure="revenue", subject="NVDA", unit=F.__dict__.get("MONEY", "MONEY"),
+             value=13_237_000_000.0, as_of="2026-01-25", sources=(CALC,))
+PAS = F.Fact(id="f_hand_passage", kind=F.PASSAGE, measure="10-Q Item 2", subject="NVDA", as_of="2026-02-26",
+             text="Demand for our data center products remained strong through the quarter.", sources=(CHUNK,))
 
 
-def _table() -> tbl.Table:
-    """A table built by hand: one figure under one calc id, one passage."""
-    t = tbl.Table()
-    t.quantities[CALC] = {"stat.latest": qn.Quantity(13_237_000_000.0, qn.MONEY, "stat.latest", CALC)}
-    t.passages[CHUNK] = "Demand for our data center products remained strong through the quarter."
-    t.rows.update({CALC: qn.KIND_SCALAR, CHUNK: "passage"})
-    t.refs.update({CALC, CHUNK})
-    return t
+def _ledger() -> L.Ledger:
+    """A ledger built by hand: one figure, one passage."""
+    return L.Ledger.of_facts([FIG, PAS])
 
 
 def _para(*runs, cites=None) -> dict:
@@ -45,10 +44,10 @@ def _para(*runs, cites=None) -> dict:
 
 
 def _sections(**overrides) -> dict:
-    """Six clean sections against `_table()`; override any one to break it."""
-    cited = {"blocks": [_para("Management described demand as firm.", cites=[CHUNK])]}
+    """Six clean sections against `_ledger()`; override any one to break it."""
+    cited = {"blocks": [_para("Management described demand as firm.", cites=[PAS.id])]}
     base = {
-        "financial_summary": {"blocks": [_para("Revenue reached ", {"ref": CALC, "name": "stat.latest"}, ".")]},
+        "financial_summary": {"blocks": [_para("Revenue reached ", {"fact": FIG.id}, ".")]},
         "key_changes": cited,
         "management_explanation": cited,
         "market_context": cited,
@@ -60,16 +59,16 @@ def _sections(**overrides) -> dict:
 
 @pytest.fixture
 def offline_gate(monkeypatch):
-    """A run exists for the session and the table is the hand-built one; the
+    """A run exists for the session and the ledger is the hand-built one; the
     gate never touches a database before it decides."""
     async def run(db, session_id):
         return SimpleNamespace(id="rrun_test", company_id="co_test", owner_id=None)
 
     async def load(db, session_id):
-        return _table()
+        return _ledger()
 
     monkeypatch.setattr(rt, "_run_for_session", run)
-    monkeypatch.setattr(tbl, "load", load)
+    monkeypatch.setattr(rt.ledger, "load", load)
 
 
 # ── offline ───────────────────────────────────────────────────────────────────
@@ -115,22 +114,27 @@ async def test_open_questions_needs_no_ids(offline_gate, monkeypatch):
     assert set(written[0].block_citations) == set(rt.CITED_SECTIONS)
 
 
-async def test_a_slot_with_an_unknown_name_names_the_section(offline_gate):
+async def test_a_pointer_the_ledger_does_not_hold_names_the_section(offline_gate):
     """The refusal is the verdict `respond` would give, plus which section it
     was in — the model fixes that block, not the brief."""
     out = await rt._submit_brief(None, **_sections(
-        key_changes={"blocks": [_para("Gross margin was ", {"ref": CALC, "name": "gross_margin"}, ".",
-                                      cites=[CHUNK])]}))
-    assert out["error"] == "unknown_name"
+        key_changes={"blocks": [_para("Gross margin was ", {"fact": "f_never_shown"}, ".", cites=[PAS.id])]}))
+    assert out["error"] == "not_on_ledger"
     assert out["section"] == "key_changes"
     (problem,) = out["problems"]
-    assert problem["at"] == "blocks[0].runs[1]" and problem["available"] == ["stat.latest"]
+    assert problem["at"] == "blocks[0].runs[1]" and problem["id"] == "f_never_shown"
 
 
-async def test_an_id_off_the_table_names_the_section(offline_gate):
+async def test_a_slot_is_not_a_pointer(offline_gate):
+    out = await rt._submit_brief(None, **_sections(
+        key_changes={"blocks": [_para("Gross margin was ", {"ref": CALC, "name": "gross_margin"}, ".", cites=[PAS.id])]}))
+    assert out["error"] == "malformed_answer" and out["section"] == "key_changes"
+
+
+async def test_an_id_off_the_ledger_names_the_section(offline_gate):
     out = await rt._submit_brief(None, **_sections(
         portfolio_implications={"blocks": [_para("Held across two books.", cites=["chunk_fabricated"])]}))
-    assert out["error"] == "not_on_table"
+    assert out["error"] == "not_on_ledger"
     assert out["section"] == "portfolio_implications"
     assert [p["id"] for p in out["problems"]] == ["chunk_fabricated"]
 
@@ -179,16 +183,18 @@ async def test_a_clean_submission_persists_text_blocks_and_per_section_ids():
             db.add(ResearchRun(id=new_research_run_id(), company_id=company_id, status="running",
                                agent_session_id=s.id, triggered_by="test"))
             await db.flush()
+            fig = F.fact(F.SCALAR, "stat.latest", subject="NVDA", unit="MONEY", value=float(value),
+                         as_of="2026-01-25", sources=(calc_id,))
+            pas = F.fact(F.PASSAGE, "10-K Item 7", subject="NVDA", as_of="2026-02-26",
+                         text="Management described demand as firm through the period.", sources=(chunk,))
             await trace_service.record_step(
-                db, s.id, step_type="tool_call", tool_name="get_stat", args={}, result_summary="",
-                evidence_refs=[{"type": "calc", "id": calc_id}, {"type": "chunk", "id": chunk}],
-                status="completed")
+                db, s.id, step_type="tool_call", tool_name="read_fundamentals", args={}, result_summary="",
+                evidence_refs=[L.step_entry([fig, pas])], status="completed")
             registry._session_ctx.set(s.id)
 
-            cited = {"blocks": [_para("Management described demand as firm.", cites=[chunk])]}
+            cited = {"blocks": [_para("Management described demand as firm.", cites=[pas.id])]}
             out = await rt._submit_brief(db, **{
-                "financial_summary": {"blocks": [_para("The latest reading was ",
-                                                        {"ref": calc_id, "name": "stat.latest"}, ".")]},
+                "financial_summary": {"blocks": [_para("The latest reading was ", {"fact": fig.id}, ".")]},
                 "key_changes": cited, "management_explanation": cited,
                 "market_context": cited, "portfolio_implications": cited,
                 "open_questions": {"blocks": [_para("Will it hold next quarter?")]},
@@ -200,14 +206,14 @@ async def test_a_clean_submission_persists_text_blocks_and_per_section_ids():
                 "SELECT financial_summary, blocks, block_citations, citations "
                 "FROM issuer_briefs WHERE id = :id"), {"id": out["brief_id"]})).one()
             prose, blocks, per_section, citations = row
-            assert prose == f"The latest reading was {dc.display(value, qn.MONEY)}."
-            slot = blocks["financial_summary"][0]["runs"][1]["slot"]
-            assert slot["ref"] == calc_id and slot["label"] == "stat.latest"
-            assert slot["value"] == pytest.approx(value)
+            assert prose == f"The latest reading was {dc.display(value, 'MONEY')}."
+            filled = blocks["financial_summary"][0]["runs"][1]["fact"]
+            assert filled["id"] == fig.id and filled["measure"] == "stat.latest" and filled["sources"] == [calc_id]
+            assert filled["value"] == pytest.approx(value)
             assert set(per_section) == set(rt.CITED_SECTIONS)
-            assert per_section["financial_summary"] == [calc_id]
-            assert per_section["key_changes"] == [chunk]
-            assert citations == sorted({calc_id, chunk})
+            assert per_section["financial_summary"] == [fig.id]
+            assert per_section["key_changes"] == [pas.id]
+            assert citations == sorted({fig.id, pas.id})
 
             # The read side hands the blocks back under each section.
             seen = await brief_service.latest_visible(db, company_id)

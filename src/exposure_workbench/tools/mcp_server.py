@@ -42,10 +42,11 @@ INSTRUCTIONS = """Tools for a portfolio risk and issuer-intelligence desk: finan
 calculations, filing search and full-text read, market stats, portfolio
 holdings and alerts, and delegation of long work to background runs.
 
-State no number you did not get from a tool, and cite the evidence ids
-(fact_/chunk_/calc_/src_/run_/alert_/pos_) behind any factual claim — a figure
-the desk cannot trace back to a filing, a calculation or a run is not usable,
-and the gate will refuse an answer that cites what was never retrieved.
+Every tool result carries a `facts` block — one row per figure, with its id
+(f_…), what it is, whose, its unit, value, as-of and window — and a `note` in
+which each figure stands as its fact id. State no number you did not get as a
+fact; point at facts by id. The gate refuses an answer that points at what was
+never shown, or writes a number the facts cannot account for.
 
 Calculations belong to the tools: a number you worked out yourself has no id to
 cite. Delegation tools return immediately with a run id; they do not block."""

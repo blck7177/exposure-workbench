@@ -527,6 +527,25 @@ questions from V23 §3 run with zero `not_on_ledger` caused by a shown id;
 the §7 replay of the 200 refused responds under G3 gives the table §7
 predicts (every row resolves except head arithmetic).
 
+**Phase C built, 2026-09-05 (offline green; live rounds are phase F, after
+the containers are rebuilt).** `services/answer.py` (three blocks, the token
+finder, the renderer whose table header and labels come from the facts),
+`services/gate.py` (G1/G2/G3 as lookups on the ledger; eight named refusals
+and no digit class), `respond` and `submit_brief` on the gate, the wrapper
+returning `facts` + `note` and recording only facts, `_SYSTEM` and the MCP
+instructions restated, the research pack reading the ledger. Tests:
+`test_answer_grammar.py`, `test_gate.py` (one case per refusal and per §7
+class, the Chinese "95% 1日 VaR" included), `test_tool_registry.py` rewritten
+around facts, `test_submit_gate.py` on a hand-built ledger; the old grammar
+tests removed. **Scope note found while cutting over:** `services/quantities.py`
+is not only the gate's namer — it is the operand grammar of `compute`
+(`run_…:issuer_exposures.MSFT.weight`) and the source of `read_book` by name
+and `describe(run)`'s name list. It stays as the run-children namer (driven
+by `resources.py`); what phase E removes is its gate-facing role (`table.py`,
+`resolver.py`, `answer_blocks.py`, `prose_critic.py`). Letting `compute` take
+fact ids as operands (`f_…`, resolved through the facts table) is the way to
+retire the `ref:name` grammar later; registered as a phase-F residual.
+
 ### Phase D — the renderer
 
 `apps/web/app/components/analyst/AnswerBlocks.tsx`:

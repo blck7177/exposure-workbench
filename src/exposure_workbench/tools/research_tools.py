@@ -2,12 +2,12 @@
 
 Registered onto the base read registry to form FACE_RESEARCH. submit_brief is
 the session's exit, and since V15-S5 it is the SAME exit `respond` is: six
-sections, each a list of blocks in the grammar of tools/meta_tools.BLOCK_SCHEMAS,
-every pointer resolved against the session's table by services/resolver.py. The
+sections, each a list of blocks in the grammar of services/answer.py, every
+pointer checked against the session's ledger by services/gate.py (V24). The
 brief used to have its own gate — prose with figures in it, a number extractor,
 a per-block value search — and that gate was the second implementation of a
-rule the desk wanted to hold once. Now there is one grammar, one table and one
-resolver, and this module only shapes the verdict per section and persists what
+rule the desk wanted to hold once. Now there is one grammar, one ledger and one
+gate, and this module only shapes the verdict per section and persists what
 was accepted. A rejected submission names the section and the block; nothing
 partial is ever written.
 """
@@ -20,11 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import IssuerBrief, ResearchRun
-from exposure_workbench.services import answer_blocks as ab
+from exposure_workbench.services import answer as A
+from exposure_workbench.services import gate, ledger
 from exposure_workbench.services import research_search_service as rss
-from exposure_workbench.services import resolver
-from exposure_workbench.services import table as tbl
-from exposure_workbench.tools.meta_tools import BLOCK_SCHEMAS
+from exposure_workbench.services.answer import BLOCK_SCHEMAS
 from exposure_workbench.tools.registry import (
     DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
 )
@@ -105,21 +104,21 @@ async def _submit_brief(db: AsyncSession, **sections) -> dict:
     if run is None:
         return {"error": "no_research_run", "detail": "submit_brief called outside a research run"}
 
-    missing = [name for name in CITED_SECTIONS if not ab.refs_in(sections[name]["blocks"])]
+    missing = [name for name in CITED_SECTIONS if not A.ids_in(sections[name]["blocks"])]
     if missing:
         return {"error": "missing_citations", "sections": missing,
-                "detail": "every section except open_questions must point at evidence — a slot "
-                          "{ref, name}, a `cites` list, or a series/absence ref — from a tool "
-                          "result this session"}
+                "detail": "every section except open_questions must point at evidence — a "
+                          "{fact: id}, a table of fact ids, or a `cites` list of passage facts — "
+                          "from a tool result this session"}
 
-    table = await tbl.load(db, session_id)
+    led = await ledger.load(db, session_id)
     accepted: dict[str, dict] = {}
     for name in SECTIONS:
         blocks = sections[name]["blocks"]
-        verdict = resolver.resolve_against(blocks, table)
+        verdict = gate.check(blocks, led)
         if not verdict.ok:
             return {**verdict.as_refusal(), "section": name}
-        accepted[name] = resolver.accepted(blocks, verdict)
+        accepted[name] = gate.accepted(blocks, verdict, led)
 
     # The flat list is the union over all six: an id open_questions pointed at
     # was resolved like any other and belongs on the record, even though the
@@ -198,15 +197,13 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
         description=(
             "Submit the Issuer Risk Brief: six sections (financial_summary, key_changes, "
             "management_explanation, market_context, portfolio_implications, open_questions), "
-            "each a list of BLOCKS. A figure is a SLOT {ref, name} using a name from the `table` "
-            "a tool result carried — the reader is shown the table's own value; you never write "
-            "a number. Blocks: `paragraph` (runs of strings and slots; `cites`: the chunk_/src_ "
-            "ids its prose rests on), `metric_table` (rows of slots only — the header and each "
-            "row's label are derived from the slots' names), `chart` "
-            "(kind + series_ref), `trend` (text + series_ref), `absence` (text + absence_ref), "
-            "`action` (text + task_ref). Text carries no digits except dates. Every section but "
-            "open_questions must point at evidence from this session. A refusal names the "
-            "section and the block; fix that block and resubmit."
+            "each a list of BLOCKS. A figure is a pointer {fact: id} at a fact a tool result "
+            "showed — the reader is shown the fact's own value; you never write a number. Blocks: "
+            "`paragraph` (runs of strings and {fact: id}; `cites`: the passage facts its prose "
+            "rests on), `table` (rows of fact ids only — header and row labels come from the "
+            "facts), `chart` (kind + a series fact). A number written in prose must be one the "
+            "ledger accounts for. Every section but open_questions must point at evidence from "
+            "this session. A refusal names the section and the block; fix that block and resubmit."
         ),
         json_schema=SUBMIT_BRIEF_SCHEMA,
         fn=_submit_brief, tool_class=GATE,

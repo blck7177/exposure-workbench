@@ -10,12 +10,18 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.services import table as tb
+from exposure_workbench.services import ledger as ledger_svc
 
 
 async def collect_ids(db: AsyncSession, session_id: str) -> set[str]:
     """Every id on the session's table."""
-    return set((await tb.load(db, session_id)).refs)
+    # V24: the facts the session was shown, and the rows they rest on — the
+    # pack keeps both, so a brief's chip and its drill-through both resolve.
+    led = await ledger_svc.load(db, session_id)
+    refs = set(led.by_id)
+    for rec in led.by_id.values():
+        refs.update(s for s in (rec.get("sources") or []) if isinstance(s, str))
+    return refs
 
 
 async def materialize_pack(db: AsyncSession, session_id: str) -> list[dict]:

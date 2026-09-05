@@ -29,9 +29,12 @@ def _names(rel: str) -> set[str]:
 
 
 def test_both_exits_resolve_through_the_one_resolver():
+    """V24: the one resolver is services/gate.check; both exits call it and
+    both hand its verdict to gate.accepted."""
     for rel in ("tools/meta_tools.py", "tools/research_tools.py"):
         src = _src(rel)
-        assert "resolver.resolve" in src, f"{rel} does not call the resolver"
+        assert "gate.check(" in src and "gate.accepted(" in src, f"{rel} does not go through the gate"
+        assert "resolver." not in src, f"{rel} still reaches the V15 resolver"
         assert "numeric_verification" not in src, f"{rel} still reads figures out of prose"
         assert "validate_citations" not in src, f"{rel} still checks citations against the old trail"
         assert "evidence_trail_service" not in src, rel
@@ -64,4 +67,6 @@ def test_the_registry_no_longer_harvests_evidence():
     src = _src("tools/registry.py")
     assert "extract_evidence_refs" not in src
     assert "_harvestable" not in src
-    assert "tbl.declare(" in src and "tbl.build(" in src, "the wrapper builds the table from the declaration"
+    # V24: nothing is built from a declaration; the adapter's facts are recorded as they are
+    assert "tbl.declare(" not in src and "tbl.build(" not in src
+    assert "fa.adapt(" in src and "ledger_svc.step_entry(" in src

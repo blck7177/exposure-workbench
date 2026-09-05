@@ -148,19 +148,20 @@ def test_the_respond_gate_returns_what_the_resolver_accepted():
     """
     import inspect
 
-    from exposure_workbench.services import resolver
+    from exposure_workbench.services import gate, ledger
     from exposure_workbench.tools import meta_tools
 
     body = inspect.getsource(meta_tools._respond_blocks)
-    assert "resolver.resolve(" in body
-    assert "return {\"responded\": True, \"format\": \"blocks\", **resolver.accepted(blocks, verdict)}" in body
+    assert "gate.check(" in body
+    assert "return {\"responded\": True, \"format\": \"blocks\", **gate.accepted(blocks, verdict, led)}" in body
     assert "verify_with_matches" not in inspect.getsource(meta_tools), (
         "the exit must not run the prose checker: a second judgement beside the "
-        "resolver's is free to disagree with it"
+        "gate's is free to disagree with it"
     )
-    # The shape the UI reads, pinned on the resolver rather than on the tool.
-    accepted = resolver.accepted([{"type": "paragraph", "runs": ["Nothing changed."]}],
-                                 resolver.Verdict())
+    # The shape the UI reads, pinned on the gate rather than on the tool.
+    led = ledger.Ledger()
+    blocks = [{"type": "paragraph", "runs": ["Nothing changed."]}]
+    accepted = gate.accepted(blocks, gate.check(blocks, led), led)
     assert accepted["verified"] == {"figures": 0, "sources": 0, "matches": []}
     assert accepted["citations"] == []
 

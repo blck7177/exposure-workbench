@@ -3,9 +3,9 @@
 Delegation tools only ENQUEUE (non-blocking): they return a run/task id
 immediately, never wait for completion, so the meta-agent stays responsive and
 the heavy work runs on the worker. respond is the meta-agent's exit: an answer
-is blocks (services/answer_blocks.py), and every pointer in it is resolved
-against the session's table by the one resolver (services/resolver.py) —
-submit_brief resolves through the same function.
+is blocks (services/answer.py), and every pointer in it is checked against the
+session's ledger by the one gate (services/gate.py) — submit_brief goes
+through the same function.
 """
 
 from __future__ import annotations
@@ -18,8 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
-from exposure_workbench.services import answer_blocks as ab
-from exposure_workbench.services import resolver
+from exposure_workbench.services import answer, gate, ledger
 from exposure_workbench.tools.registry import (
     DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
 )
@@ -165,76 +164,24 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
     return {"enqueued": True, "run_id": run.id, "kind": "exposure_update", "reason": reason}
 
 
-# ── respond gate ────────────────────────────────────────────────────────────────
+# ── respond gate (V24) ──────────────────────────────────────────────────────────
 
 async def _respond_blocks(db: AsyncSession, blocks: list) -> dict:
-    """V15-S3/S4. The exit: every pointer in the answer lands on the table, or the
-    answer comes back with the block and the reason.
-
-    Nothing here reads a figure out of a sentence — a sentence may not contain
-    one — and nothing here guesses which figure a value meant, because a slot
-    carries a name. The resolver is shared with submit_brief; this function only
-    shapes its verdict into the exit's reply.
-    """
-    verdict = await resolver.resolve(db, current_session_id(), blocks)
+    """The exit: every pointer lands on the session's ledger and every digit in
+    the prose is accounted for, or the answer comes back with the block and
+    the reason (services/gate.py). The ledger is read as recorded
+    (services/ledger.py); nothing here rebuilds anything."""
+    led = await ledger.load(db, current_session_id())
+    verdict = gate.check(blocks, led)
     if not verdict.ok:
         return verdict.as_refusal()
-    return {"responded": True, "format": "blocks", **resolver.accepted(blocks, verdict)}
+    return {"responded": True, "format": "blocks", **gate.accepted(blocks, verdict, led)}
 
 
-# ── the exit's grammar, as schema (Law B) ──────────────────────────────────────
-# Every claim type has one shape; a block outside these six is refused by the
-# argument validator before the gate runs, with every problem named.
-
-_SLOT = {"type": "object",
-         "description": "one figure: the id and the NAME the table gave it, e.g. "
-                        "{ref: 'run_…', name: 'issuer_exposures.MSFT.weight'}",
-         "properties": {"ref": {"type": "string"}, "name": {"type": "string"}},
-         "required": ["ref", "name"], "additionalProperties": False}
-_RUN = {"anyOf": [{"type": "string"}, _SLOT]}
-_CITES = {"type": "array", "items": {"type": "string"},
-          "description": "chunk_/src_ ids the prose of this block rests on"}
-_TEXT = {"type": "string", "minLength": 1, "description": "the claim, with no figures in it"}
-
-
-def _block(kind: str, props: dict, required: list[str]) -> dict:
-    return {"type": "object",
-            "properties": {"type": {"type": "string", "enum": [kind]}, **props},
-            "required": ["type", *required], "additionalProperties": False}
-
-
-BLOCK_SCHEMAS = [
-    _block("paragraph", {"runs": {"type": "array", "minItems": 1, "items": _RUN,
-                                  "description": "strings and slots, in reading order"},
-                         "cites": _CITES}, ["runs"]),
-    # V19: cells are slots only, and there is no `columns` — the header and
-    # the row labels are derived from the slots' names when the answer is
-    # rendered (services/answer_blocks.derive_table). A label the model wrote
-    # beside a figure was the one thing about a figure the gate could not see.
-    _block("metric_table", {"title": {"type": "string"},
-                            "rows": {"type": "array", "minItems": 1,
-                                     "description": ab.TABLE_RULE,
-                                     "items": {"type": "array", "minItems": 1, "items": _SLOT}},
-                            "cites": _CITES}, ["rows"]),
-    _block("chart", {"kind": {"type": "string", "enum": list(ab.CHART_KINDS)},
-                     "title": {"type": "string"},
-                     "series_ref": {"type": "string", "description": "the calc id of a series you read"}},
-           ["kind", "series_ref"]),
-    _block("trend", {"text": _TEXT,
-                     "series_ref": {"type": "string", "description": "the calc id of the series the claim was read from"}},
-           ["text", "series_ref"]),
-    _block("absence", {"text": _TEXT,
-                       "absence_ref": {"type": "string", "description": "the calc id of the recorded refusal"}},
-           ["text", "absence_ref"]),
-    _block("action", {"text": _TEXT,
-                      "task_ref": {"type": "string", "description": "the task/run id a delegation tool returned this turn"}},
-           ["text", "task_ref"]),
-]
-
-RESPOND_SCHEMA = {"type": "object", "properties": {
-    "blocks": {"type": "array", "minItems": 1, "description": "the answer, in reading order",
-               "items": {"oneOf": BLOCK_SCHEMAS}},
-}, "required": ["blocks"], "additionalProperties": False}
+# The exit's grammar, as schema (Law B): services/answer.py owns the block
+# shapes; the brief's sections reuse the same list.
+BLOCK_SCHEMAS = answer.BLOCK_SCHEMAS
+RESPOND_SCHEMA = answer.ANSWER_SCHEMA
 
 
 # ── registration ────────────────────────────────────────────────────────────────
@@ -279,19 +226,17 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         name="respond",
         display="Resolving every figure against the table, then answering",
         description=(
-            "Reply to the user. An answer is a list of BLOCKS; every figure is a SLOT "
-            "{ref, name} using a name from the `table` a tool result carried, and the "
-            "reader is shown the table's own value — you never write a number. Blocks: "
-            "`paragraph` (runs: strings and slots in reading order; `cites`: the chunk_/src_ "
-            "ids its prose rests on), `metric_table` (rows of slots, one row per thing compared "
-            "and one column per measure — the header and each row's label are derived from "
-            "the slots' names, so a cell is never text; use it whenever you compare or "
-            "rank), `chart` (kind + series_ref), `trend` (text + "
-            "series_ref: a claim that something rose or fell rests on the series it was read "
-            "from), `absence` (text + absence_ref: a claim that something was not reported "
-            "rests on the row the refused read minted), `action` (text + task_ref: work you "
-            "started this turn, by its id). Text carries no digits except dates. A reply "
-            "that states nothing factual needs no slots and no cites."
+            "Reply to the user. An answer is a list of BLOCKS; a figure is a pointer {fact: id} "
+            "at a fact a tool result showed (its `facts` block), and the reader is shown the "
+            "fact's own value with what it is and as of when — you never write a number. Blocks: "
+            "`paragraph` (runs: strings and {fact: id} in reading order; `cites`: the passage "
+            "facts its prose rests on), `table` (rows of fact ids, one row per thing compared "
+            "and one column per measure; header and row labels come from the facts), `chart` "
+            "(kind + a series fact). A claim that something rose or fell points at the series; "
+            "that something is not held, at the absence fact; work you started, at its task fact. "
+            "A number written in prose must be one the ledger accounts for — a fact's value, its "
+            "date, its window or parameter, or a figure a cited passage states — else the reply "
+            "is refused: compute it, cite it, or drop it."
         ),
         json_schema=RESPOND_SCHEMA,
         fn=_respond_blocks, tool_class=GATE,
