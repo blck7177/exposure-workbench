@@ -100,7 +100,7 @@ async def test_a_session_cannot_talk_an_id_onto_its_own_table():
         reg = build_read_registry()
         from exposure_workbench.tools.meta_tools import register_meta_tools
         register_meta_tools(reg)
-        from exposure_workbench.services import table as tb
+        from exposure_workbench.services import ledger as L
 
         async with mk() as db:
             run_id = (await db.execute(text(
@@ -119,7 +119,7 @@ async def test_a_session_cannot_talk_an_id_onto_its_own_table():
             await db.commit()
 
         async with mk() as db:
-            assert not (await tb.load(db, sid)).holds(run_id), (
+            assert not (await L.load(db, sid)).holds(run_id), (
                 "an echo is not a retrieval; nothing this session called declared that id")
             refused = await R.invoke(reg, db, sid, "respond", {"blocks": [
                 {"type": "paragraph", "runs": [
@@ -134,7 +134,7 @@ async def test_a_session_cannot_talk_an_id_onto_its_own_table():
             # The refusal echoed the id under problems[].id and the call
             # completed. The old harvester wrote that echo into the trail and
             # the retry passed; a gate declares nothing, so it is still off.
-            assert not (await tb.load(db, sid)).holds(run_id), (
+            assert not (await L.load(db, sid)).holds(run_id), (
                 "a gate's refusal put the id it refused on the table")
     finally:
         await engine.dispose()

@@ -54,7 +54,7 @@ load_dotenv(ROOT / ".env", override=True)
 
 from exposure_workbench.analytics import withheld as wh  # noqa: E402
 from exposure_workbench.db.models import AgentMessage, ExposureMetrics, IssuerBrief, StressResult  # noqa: E402
-from exposure_workbench.services import answer_blocks as ab  # noqa: E402
+from exposure_workbench.services import answer as A  # noqa: E402
 from exposure_workbench.services import numeric_verification as nv  # noqa: E402
 from exposure_workbench.services import quantities as qn  # noqa: E402
 
@@ -80,7 +80,7 @@ _ID_TOKEN = re.compile(r"\b(?:fact|chunk|calc|src|co|rrun|run|filing|alert|brief
 def _only_ids(text: str) -> bool:
     """Every flagged digit run sits inside an id token: with the tokens taken
     out, the exit's own rule finds nothing."""
-    return bool(_ID_TOKEN.search(text)) and not ab.figures_in_text(_ID_TOKEN.sub(" ", text))
+    return bool(_ID_TOKEN.search(text)) and not [t for t in A.tokens_in(_ID_TOKEN.sub(" ", text)) if t["kind"] == "num"]
 
 
 async def _check_blocks(db, blocks) -> tuple[int, list[dict], list[dict]]:
@@ -114,7 +114,7 @@ async def _check_blocks(db, blocks) -> tuple[int, list[dict], list[dict]]:
             if isinstance(r, dict) and isinstance(r.get("slot"), dict):
                 slots.append(r["slot"])
             elif isinstance(r, str):
-                figures = ab.figures_in_text(r)
+                figures = [t["token"] for t in A.tokens_in(r) if t["kind"] == "num"]
                 if figures and _only_ids(r):
                     ids_in_text.append({
                         "reason": "id_written_as_text", "at": f"blocks[{i}].runs[{j}]",

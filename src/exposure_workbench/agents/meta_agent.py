@@ -89,19 +89,12 @@ _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 # How much of one tool result reaches the model. Entries come off the tail of the
 # largest container and are named in a `truncated` field, so a payload that does
-# not fit says so — see utils.json.dumps_capped. The `table` slice is never cut
-# here: it is capped where it is built (services/table.py, 16k characters) so
-# that what the model sees is exactly what the gate holds.
-#
-# Derived rather than picked. The binding constraint is context_soft_limit_tokens
-# (80k); a turn may make turn_tool_budget (15) calls. A result now carries its
-# own payload plus the table slice — a whole run's quantities at reader
-# precision plus its derived row are ~15k characters, and describe_run's manifest
-# beside them ~9k — so 28k characters (~7k tokens) is the ceiling that lets the
-# book's one manifest call arrive whole. Fifteen such calls would not fit the
-# soft limit, and no turn makes them: the manifest is read once, then
-# read_quantities brings named figures at a few hundred characters a call
-# (measured peak before V15: 22k prompt tokens a turn).
+# not fit says so — see utils.json.dumps_capped. V24: a result is a `facts`
+# block (capped where it is built, services/facts.FACTS_CHAR_LIMIT, whole facts
+# only) beside a `note` in which each figure stands as its fact id; the note is
+# what this cap bounds. The ceiling stays where V15 derived it: the context soft
+# limit is 80k tokens over at most fifteen calls a turn, and no turn makes
+# fifteen calls this large.
 TOOL_RESULT_LIMIT = 28_000
 
 

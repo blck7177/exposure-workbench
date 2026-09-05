@@ -324,8 +324,7 @@ def test_every_citable_prefix_has_a_value_source():
     the table that holds nothing and says nothing. run_ and chunk_/src_ were
     both missing from the first design."""
     from exposure_workbench.services import quantities as qn
-    from exposure_workbench.services import table as tb
-    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(qn.CITABLE_PREFIXES)
+    assert set(qn.SOURCES) == set(qn.CITABLE_PREFIXES)
 
 
 def test_a_short_digit_string_cannot_be_verified_by_prose_alone():

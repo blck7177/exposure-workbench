@@ -24,7 +24,6 @@ load_dotenv(".env", override=True)
 
 from exposure_workbench.analytics import resources, units
 from exposure_workbench.services import quantities as qn
-from exposure_workbench.services import table as tb
 
 URL = os.getenv("DATABASE_URL_LOCAL", "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
 RUN = "run_1d6e9e05bee6"
@@ -128,22 +127,3 @@ async def test_two_issuer_concentration_alerts_get_distinct_names_by_qualifier()
     assert len(conc) == len(set(conc))
 
 
-@pytest.mark.live
-async def test_the_whole_run_fits_on_the_table_without_narrowing():
-    """The size cap is derived so one run arrives whole; if this fails, the cap
-    and the run have drifted apart and scope starts silently dropping tables."""
-    engine, mk = await _mk()
-    try:
-        async with mk() as db:
-            declared, payload = await tb.build(db, [{"type": "run", "id": RUN, "scope": list(qn.RUN_TABLES)}])
-            await db.rollback()
-    finally:
-        await engine.dispose()
-    assert len(json.dumps(payload)) <= tb.TABLE_CHAR_LIMIT
-    assert declared == [{"type": "run", "id": RUN, "scope": list(qn.RUN_TABLES)}], (
-        "the declaration came back narrowed")
-    assert "truncated" not in declared[0]
-    shown = payload["quantities"][RUN]
-    assert len(shown) == 193 - 32, "every quantity but the 32 collinear coefficients is shown"
-    assert "factor_attributions.sum_of_contributions" in shown
-    assert not any(name.startswith("factor_attributions.market.") for name in shown)

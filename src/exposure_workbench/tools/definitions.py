@@ -16,7 +16,7 @@ The agent's tools are organised by DATA DOMAIN × VERB, not by question
     + start, respond (tools/meta_tools), search_web, submit_brief (tools/research_tools)
 
 Every fn is a THIN wrapper over a service; what a result puts on the table is
-declared at registration (`evidence=`). Descriptions are one or two lines:
+made Facts by its adapter (services/fact_adapters, by tool name). Descriptions are one or two lines:
 WHEN to use a tool is the agent's judgement, informed by describe and by the
 skill registry, not a sentence in a description — that is the whole point of
 the collapse from 44 tools to ten.
@@ -42,7 +42,7 @@ from exposure_workbench.services import security_master_service
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services.typed_calculator import SCENARIO_OP
 from exposure_workbench.tools.registry import (
-    NOT_EVIDENCE, READ, REFLECTION, Evidence, Tool, ToolRegistry, current_session_id,
+    READ, REFLECTION, Tool, ToolRegistry, current_session_id,
 )
 
 
@@ -369,7 +369,6 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "expand": {"type": ["string", "null"], "enum": [*catalogue_service.EXPANDS, None]},
         }, "additionalProperties": False},
         fn=_describe, tool_class=READ,
-        evidence=Evidence(scope=_RUN_TABLES, names_from="table_names"),
     ))
     reg.register(Tool(
         name="read_fundamentals",
@@ -389,7 +388,7 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40, "description": "a series of the last N quarters (flow) or readings (balance)"},
             "at": {"type": ["string", "null"], "description": "YYYY-MM-DD instant for a balance; null = latest"},
         }, "required": ["ticker"], "additionalProperties": False},
-        fn=_read_fundamentals, tool_class=READ, evidence=Evidence(),
+        fn=_read_fundamentals, tool_class=READ,
     ))
     reg.register(Tool(
         name="read_filings",
@@ -406,7 +405,7 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             "form_type": _FORM_TYPE,
         }, "required": ["ticker"], "additionalProperties": False},
-        fn=_read_filings, tool_class=READ, evidence=Evidence(),
+        fn=_read_filings, tool_class=READ,
     ))
     reg.register(Tool(
         name="read_prices",
@@ -421,7 +420,7 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "window": {"type": ["string", "null"], "enum": ["1m", "3m", "6m", "1y", "3y", None]},
             "as_of": {"type": ["string", "null"], "description": "YYYY-MM-DD for a single session; null = latest"},
         }, "required": ["ticker"], "additionalProperties": False},
-        fn=_read_prices, tool_class=READ, evidence=Evidence(),
+        fn=_read_prices, tool_class=READ,
     ))
     reg.register(Tool(
         name="compute",
@@ -448,7 +447,6 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "as_quantity": {"type": ["string", "null"], "description": "what to call an op's result, e.g. 'dollars_to_sell'"},
         }, "additionalProperties": False},
         fn=_compute_for(kinds), tool_class=READ,
-        evidence=Evidence(scope=_RUN_TABLES),
     ))
     reg.register(Tool(
         name="think",
@@ -457,7 +455,6 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
         json_schema={"type": "object", "properties": {"thought": {"type": "string"}},
                      "required": ["thought"], "additionalProperties": False},
         fn=_think, tool_class=REFLECTION,
-        evidence=NOT_EVIDENCE,
     ))
     register_book_tool(reg)
     return reg
@@ -481,6 +478,5 @@ def register_book_tool(reg: ToolRegistry) -> ToolRegistry:
             "names": {"type": "array", "minItems": 1, "maxItems": 120, "items": {"type": "string"}},
         }, "required": ["ref", "names"], "additionalProperties": False},
         fn=_read_book, tool_class=READ,
-        evidence=Evidence(scope=_RUN_TABLES, names_from="names"),
     ))
     return reg

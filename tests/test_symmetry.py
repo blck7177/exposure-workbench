@@ -25,7 +25,6 @@ load_dotenv(".env", override=True)
 
 from exposure_workbench.analytics import resources
 from exposure_workbench.services import quantities as qn
-from exposure_workbench.services import table as tb
 from exposure_workbench.tools import definitions, faces
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
@@ -35,46 +34,10 @@ RUN = "run_1d6e9e05bee6"
 # Tools whose results are not evidence, by decision: state, policy, a reflection,
 # the two exits. Adding to this list is adding a tool the model can call and
 # never cite, so it is spelled out here rather than derived.
-NOT_EVIDENCE = {"get_task_status", "list_risk_limits", "get_run_freshness", "think", "respond", "submit_brief"}
 
 
 def _faces():
     return ((build_meta_registry(), faces.FACE_META_AGENT), (build_research_registry(), faces.FACE_RESEARCH))
-
-
-def test_every_tool_on_both_faces_declares_evidence_or_is_explicitly_not_evidence():
-    for reg, face in _faces():
-        for name in faces.resolve(reg, face):
-            tool = reg.get(name)
-            if name in NOT_EVIDENCE:
-                assert tool.evidence is None, f"{name} is listed as not evidence but declares some"
-            else:
-                assert tool.evidence is not None, (
-                    f"{name} returns results that put nothing on the table; declare Evidence() "
-                    f"or add it to NOT_EVIDENCE with a reason")
-
-
-def test_every_declared_scope_names_a_table_a_run_has():
-    for reg, face in _faces():
-        for name in faces.resolve(reg, face):
-            ev = reg.get(name).evidence
-            if ev is None:
-                continue
-            unknown = [t for t in ev.scope if t not in qn.RUN_TABLES]
-            assert unknown == [], f"{name} scopes {unknown}, not in quantities.RUN_TABLES"
-
-
-def test_the_prefixes_a_result_may_declare_are_the_prefixes_quantities_can_resolve():
-    """A prefix table.py recognises that quantities.py cannot read is an id on
-    the table with nothing behind it; the reverse is a value source no tool
-    can ever declare. They are one set."""
-    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(qn.CITABLE_PREFIXES)
-    # What the resolver leans on: passages for `cites`, and every kind an
-    # assertion block points at that comes from a row (tasks are placed by
-    # table.py itself, not read from a row).
-    assert {"chunk_", "src_"} <= set(qn.SOURCES)
-    assert "calc_" in qn.SOURCES, "series and absence rows are calc rows"
-    assert all(p.endswith("_") for p in qn.SOURCES)
 
 
 async def test_an_id_of_no_known_prefix_resolves_to_nothing_without_touching_the_db():
@@ -127,21 +90,6 @@ def test_the_group_vocabulary_is_closed_and_every_key_answers_a_question():
     run_keys = {key for key, _q, _p in resources.RUN_GROUPS}
     assert set(resources.GROUP_QUESTIONS) == run_keys | {"fundamentals", "derived", "book_derived", "price", "other"}
     assert all(q.strip() for q in resources.GROUP_QUESTIONS.values())
-
-
-def test_the_id_prefixes_refused_in_text_are_built_from_their_owners():
-    """answer_blocks refuses an id written into prose, by prefix. That list was
-    a third hand-written copy; now it is the union of the two owners — citable
-    prefixes from quantities.SOURCES, task prefixes from table._TASK_PREFIXES —
-    plus a short reject-only tail of ids the desk mints but nothing resolves."""
-    from exposure_workbench.services import answer_blocks as ab
-    assert set(ab._ID_PREFIXES) == (
-        set(qn.CITABLE_PREFIXES) | set(tb._TASK_PREFIXES) | set(ab._REJECT_ONLY_PREFIXES))
-    assert set(ab._REJECT_ONLY_PREFIXES).isdisjoint(
-        set(qn.CITABLE_PREFIXES) | set(tb._TASK_PREFIXES)), (
-        "a prefix something resolves belongs to its owner, not the reject-only tail")
-    for p in ab._ID_PREFIXES:
-        assert ab._ID_TOKEN.fullmatch(p + "abcd1234"), p
 
 
 def test_an_alerts_citable_columns_are_the_resource_declaration():

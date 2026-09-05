@@ -40,14 +40,13 @@ def test_both_exits_resolve_through_the_one_resolver():
         assert "evidence_trail_service" not in src, rel
 
 
-def test_not_alone_is_a_projection_decided_in_the_table_builder_only():
-    """quantities.py SETS it (the row said so); the daily report's v1 path reads
-    it in numeric_verification; the block exit decides it once, in table.py.
-    The resolver, the exits and the grammar never mention it in code."""
-    assert "not_alone" in _names("services/table.py")
-    for rel in ("services/resolver.py", "tools/meta_tools.py", "tools/research_tools.py",
-                "services/answer_blocks.py"):
-        assert "not_alone" not in _names(rel), f"{rel} decides collinearity a second time"
+def test_standalone_is_decided_by_the_adapter_and_read_by_the_gate_only():
+    """V24: the row says it (quotable_individually / not_alone); the adapter
+    carries it onto the Fact as `standalone`; the gate reads the field. The
+    exits and the grammar never mention it in code."""
+    assert "standalone" in _names("services/fact_adapters.py") and "standalone" in _names("services/gate.py")
+    for rel in ("tools/meta_tools.py", "tools/research_tools.py", "services/answer.py"):
+        assert "not_alone" not in _names(rel) and "quotable_individually" not in _names(rel), rel
 
 
 def test_only_quantities_py_builds_a_quantity_name():

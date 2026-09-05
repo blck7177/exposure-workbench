@@ -591,6 +591,17 @@ Done when: `grep -rn "quantities\|answer_blocks\|resolver\." src apps tests`
 returns only the report path and this document's history; the offline
 count is recorded in §12.
 
+**Phase E done, 2026-09-05.** Removed: `table.py`, `resolver.py`,
+`answer_blocks.py`, `prose_critic.py`, `scripts/critic.py`, `Tool.evidence` /
+`Evidence` / `NOT_EVIDENCE` and every `evidence=` registration, and their
+tests (`test_table`, `test_table_meaning`, `test_v21_critic`,
+`test_v15_table_live`, the declaration tests in `test_tool_registry`,
+`test_symmetry`, `test_portfolio_snapshot`). `numeric_verification` (the
+daily report's V3 gate) now imports the quotation check from `gate.py`.
+`quantities.py` stays as the run-children namer (see phase C's scope note).
+Which tools produce facts is `fact_adapters.ADAPTERS` by name, pinned by
+`test_every_tool_on_a_face_has_a_fact_adapter`. Offline: 1,994 passed.
+
 ### Phase F — live rounds and the battery
 
 1. The V23 §3 twelve questions, three rounds, each round fixing the
@@ -739,18 +750,18 @@ accepted      runs filled with the facts' model form + display; a prose digit
 
 ## §12 What is measured, before and after
 
-| | V23-R (now) | V24 |
+| | V23-R (now) | V24 (built, before the live rounds) |
 |---|---|---|
-| lines on the gate path | ~2,600 | (count) |
-| lexical rules in the gate | 5 regexes, 9 exempt classes | 1 token finder, 0 exempt classes |
+| lines on the gate path | ~2,600 (answer_blocks, resolver, table, quantities, resources, display_names, display_conventions, arg_validation, batch) | 1,585 (facts 175, fact_adapters 620, ledger 250, gate 240, answer 300) — `quantities.py` no longer on it |
+| lexical rules in the gate | 5 regexes, 9 exempt classes | 1 token finder (in answer.py), 0 exempt classes; the gate compiles whitespace and quote marks only |
 | kind vocabularies | 3 | 1 (`Fact.kind`) |
 | block types | 6 | 3 |
-| places a new kind of truth is taught | 6 | 2 (adapter, renderer case) |
+| places a new kind of truth is taught | 6 | 2 (an adapter branch, a renderer case) |
 | encodings of one figure to the model | 2 | 1 |
-| offline tests | 1,832 | (count) |
+| offline tests | 1,832 | 1,994 |
 | battery: verified figures / refusals / turns lost / so_what | 325 / 14 / 2 / 10 | (measured, F.2) |
 | `unsourced_figure` per 31 turns | — | (measured, F.4) |
-| §7 replay: refused responds that would now resolve | — | (measured, C) |
+| §7 replay: refused responds that would now resolve | — | (measured, F) |
 
 ## §13 Risks named
 

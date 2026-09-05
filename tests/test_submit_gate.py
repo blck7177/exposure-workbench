@@ -144,8 +144,9 @@ def test_submit_brief_is_the_only_gate_and_declares_no_evidence():
     not become citable on the next attempt."""
     from exposure_workbench.tools.registries import build_research_registry
     from exposure_workbench.tools.registry import GATE
+    from exposure_workbench.services import fact_adapters as fa
     tool = build_research_registry().get("submit_brief")
-    assert tool.tool_class == GATE and tool.evidence is None
+    assert tool.tool_class == GATE and fa.ADAPTERS["submit_brief"] is fa.no_facts
 
 
 # ── live ──────────────────────────────────────────────────────────────────────

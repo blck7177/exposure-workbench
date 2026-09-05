@@ -13,8 +13,8 @@ The wrapper does four things automatically around every LLM-driven call:
 
 A figure carries its identity from the adapter on: no second program names it
 from storage, and what the model was shown is what the gate holds, because it
-is the same record. `Tool.evidence` is the V23 declaration and is no longer
-read; it goes with phase E.
+is the same record. Which tools have adapters is `fact_adapters.ADAPTERS`, by
+name; test_symmetry pins that every read and delegation tool on a face has one.
 
 The SAME registry is consumed by function-calling (schemas()), by the MCP server
 (thin @mcp.tool wrappers), and by the recipe (direct fn call, no budget/trace).
@@ -82,32 +82,6 @@ BUDGET_FREE_CLASSES = (REFLECTION, GATE)
 
 
 @dataclass(frozen=True)
-class Evidence:
-    """What a tool's results put on the table (V15-S2a).
-
-    Every id-shaped string in a result is declared. A run id is declared with
-    `scope` — the run child tables this tool read — or, when `names_from` names
-    a result key, with the exact quantity names under it; a run id with neither
-    is not on the table. `tasks_from` names result keys holding ids of delegated
-    work, which go on the table as rows of kind `task`.
-    """
-    scope: tuple[str, ...] = ()
-    names_from: str | None = None
-    tasks_from: tuple[str, ...] = ()
-
-
-# The explicit "this tool's results are not evidence" marker. None is the value
-# invoke() reads; the NAME exists so a registration says the decision out loud.
-# What no longer exists is a silent DEFAULT: register() refuses a tool that
-# never stated either — the default was how search_external_research's src_ ids
-# vanished from the table for a whole battery (V15) with nothing going red.
-NOT_EVIDENCE: None = None
-
-# Registration-time sentinel: "the author never said". Never a valid value.
-_UNDECLARED = Evidence(scope=("<undeclared>",))
-
-
-@dataclass(frozen=True)
 class Tool:
     name: str
     description: str
@@ -131,12 +105,6 @@ class Tool:
     # registered tool without one — and defaulted here only so the dataclass
     # stays constructible in the argument order every registration already uses.
     display: str = ""
-    # What this tool's results put on the table. Required: Evidence(...) for a
-    # tool whose results are citable, NOT_EVIDENCE for a gate, a reflection and
-    # any tool whose results are not evidence (get_task_status reads state,
-    # list_risk_limits reads policy). There is no default — register() refuses
-    # a tool that says neither.
-    evidence: Evidence | None = _UNDECLARED
 
 
 @dataclass
@@ -146,11 +114,6 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         if tool.name in self.tools:
             raise ValueError(f"duplicate tool {tool.name!r}")
-        if tool.evidence is _UNDECLARED:
-            raise ValueError(
-                f"tool {tool.name!r} does not say what its results put on the table: "
-                "pass evidence=Evidence(...) or evidence=NOT_EVIDENCE"
-            )
         self.tools[tool.name] = tool
 
     def get(self, name: str) -> Tool:

@@ -463,7 +463,7 @@ def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
 # ── quoted text (V11-Q) ───────────────────────────────────────────────────────
 # The block exit checks quotations in services/resolver.py against the block's
 # own cites. This copy serves the v1 eval over stored prose answers.
-from exposure_workbench.services.resolver import quoted_spans, verify_quotes  # noqa: E402,F401
+from exposure_workbench.services.gate import quoted_spans, verify_quotes  # noqa: E402,F401  (V24: the quote check lives in the gate)
 
 
 def verify(

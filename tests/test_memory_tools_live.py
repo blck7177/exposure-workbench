@@ -24,7 +24,6 @@ from exposure_workbench.services import portfolio_service
 from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools import definitions as D
-from exposure_workbench.services import table as tbl
 
 pytestmark = pytest.mark.live
 
@@ -59,30 +58,6 @@ async def test_a_brief_can_be_read_back_with_the_evidence_under_each_block():
             # for them.
             assert out["is_own"] is False, "no authenticated user here"
             assert out["research_run_id"].startswith("rrun_")
-    finally:
-        await engine.dispose()
-
-
-async def test_reading_a_brief_never_makes_the_brief_itself_citable():
-    """brief_ is not a prefix the table places, on purpose: a brief is a
-    conclusion drawn from evidence, so citing it is a loop. What the tool
-    DECLARES (V15-S2a, the registration's Evidence()) is the evidence under the
-    blocks, and that must reach the table."""
-    engine, mk = await _session()
-    try:
-        async with mk() as db:
-            ticker = (await db.execute(text(
-                "SELECT c.ticker FROM issuer_briefs b JOIN companies c ON c.id = b.company_id LIMIT 1"
-            ))).scalar_one_or_none()
-            if ticker is None:
-                pytest.skip("no brief in this database")
-
-            out = await D._read_issuer_brief(db, ticker)
-            assert D.build_read_registry().get("read_issuer_brief").evidence is not None
-            declared = {e["id"] for e in tbl.declare(dict(out))["evidence"]}
-            assert out["brief_id"] not in declared
-            # the underlying evidence, however, must be declared — that is the point
-            assert declared, "the block citations must reach the table"
     finally:
         await engine.dispose()
 

@@ -17,8 +17,6 @@ from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.registry import READ
 from exposure_workbench.services import evidence_resolver_service as resolver
 from exposure_workbench.services import quantities as qn
-from exposure_workbench.services import table as tb
-from exposure_workbench.services import table as tbl
 from exposure_workbench.utils import ids
 
 
@@ -55,80 +53,7 @@ def _snapshot_result() -> dict:
     }]}
 
 
-def _declared() -> list[dict]:
-    """The snapshot's declaration, as the wrapper builds it from the registration."""
-    scope = build_read_registry().get("describe").evidence.scope
-    return tbl.declare(_snapshot_result(), scope=scope)["evidence"]
-
-
-def test_the_snapshot_declares_its_run_with_the_tables_it_read():
-    """V15-S2a: a run is on the table with a scope — the child tables this tool
-    read — not as a bare id, so the 235 quantities of a run do not all become
-    citable because one tool touched it."""
-    run = [e for e in _declared() if e["type"] == "run"]
-    assert len(run) == 1 and run[0]["id"] == "run_abc123"
-    assert set(run[0]["scope"]) >= {"exposure_metrics", "issuer_exposures", "sector_exposures", "risk_alerts"}
-
-
-def test_alert_declared_cleanly_not_typed_by_category():
-    kinds = {(e["type"], e["id"]) for e in _declared()}
-    assert ("alert", "alert_c0nc") in kinds
-    # the alert_type value ("concentration") must NOT become a ref type: the
-    # snapshot uses key "alert_type", not "type", precisely to avoid that.
-    assert not any(e["type"] == "concentration" for e in _declared())
-
-
-def test_run_prefix_does_not_collide_with_research_run():
-    """run_ is declared; rrun_ is not, and the longer prefix must not be read as
-    the shorter one wearing an extra letter. rrun_ reaches the table only as a
-    task row, through a delegation's `tasks_from`."""
-    refs = tbl.declare({"a": "run_1", "b": "rrun_2"}, scope=("count",))["evidence"]
-    kinds = {(e["type"], e["id"]) for e in refs}
-    assert ("run", "run_1") in kinds
-    assert not any(e["id"] == "rrun_2" for e in refs)
-    assert not any(e["id"] == "run_2" for e in refs)      # not silently re-prefixed
-
-
 # ── table <-> namer <-> resolver prefix parity ────────────────────────────────
-
-def test_the_table_places_run_and_alert_prefixes():
-    # without these, a portfolio-level citation is refused as not_on_table
-    assert "run_" in tb._PREFIX_TYPE
-    assert "alert_" in tb._PREFIX_TYPE
-
-
-def test_every_table_prefix_is_resolvable():
-    """A citable id (on the table) must also resolve for the drawer."""
-    for prefix in tb._PREFIX_TYPE:
-        assert prefix in resolver._RESOLVERS, prefix
-
-
-def test_table_namer_and_resolver_agree_on_exactly_one_prefix_set():
-    """Three lists that must be one list. The table wider than the namer gives
-    the model ids that hold nothing; the table wider than the resolver gives the
-    user a citation whose drawer is empty. Asserted together so the next prefix
-    is added in three places or in none."""
-    # V24 phase B: the resolver also answers for a Fact (f_), which the V23
-    # table and namer never mint; phase E removes both and the three sets
-    # become one again.
-    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(resolver._RESOLVERS) - {"f_"}
-
-
-def test_a_holding_is_citable_evidence():
-    """V3-R4. C3 gave the agent a tool that reads back every holding, and the
-    first question anyone asks it — "how many shares of AAPL do I hold" — could
-    not be answered: the quantity is real, it is on a positions row, and that
-    row had no evidence identity, so the number had nothing to cite and A1
-    refused it by construction. The acceptance query for the memory component
-    failed on the memory component's own output.
-
-    Asserted in all three places at once because that is the invariant: table,
-    namer and resolver are one list, and pos_ arriving in two of them would be
-    a hole with a test signing it off."""
-    assert "pos_" in tb._PREFIX_TYPE
-    assert "pos_" in qn.SOURCES
-    assert "pos_" in resolver._RESOLVERS
-
 
 def test_id_helpers_match_evidence_prefixes():
     """The bug real data caught: alerts were minted as new_id("alert") -> "alert<hex>",

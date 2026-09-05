@@ -10,60 +10,16 @@ from __future__ import annotations
 
 import pytest
 
-from exposure_workbench.services import table as tbl
 from exposure_workbench.tools import faces
 from exposure_workbench.tools import registry as R
 from exposure_workbench.tools.definitions import build_read_registry
 from exposure_workbench.tools.registry import (
-    DELEGATION, GATE, READ, REFLECTION, Evidence, Tool, ToolRegistry,
+    DELEGATION, GATE, READ, REFLECTION, Tool, ToolRegistry,
 )
 from exposure_workbench.services.trace_service import redact_args
 
 
 # ── the pure declaration ──────────────────────────────────────────────────────
-
-def test_every_id_shaped_string_in_a_result_is_declared():
-    out = tbl.declare({"calc_id": "calc_abc123", "value": 0.75,
-                       "points": [{"fact_ids": ["fact_a", "fact_b"]}],
-                       "passages": [{"chunk_id": "chunk_x"}],
-                       "source": "src_99", "alert": "alert_c0nc"})
-    kinds = {(e["type"], e["id"]) for e in out["evidence"]}
-    assert kinds == {("calc", "calc_abc123"), ("fact", "fact_a"), ("fact", "fact_b"),
-                     ("chunk", "chunk_x"), ("source", "src_99"), ("alert", "alert_c0nc")}
-
-
-def test_a_key_named_like_an_id_does_not_make_its_value_one():
-    out = tbl.declare({"calc_id": "not-an-id", "fact_id": "fact_abc123"})
-    assert [e["id"] for e in out["evidence"]] == ["fact_abc123"]
-
-
-def test_a_prefix_the_table_cannot_place_is_not_declared():
-    """co_/rrun_/filing_ are minted and never citable; declaring them would hand
-    the model an id it can retrieve, quote, and be refused for quoting."""
-    out = tbl.declare({"company": "co_nvda", "run": "rrun_2", "filing": "filing_x"})
-    assert out["evidence"] == []
-
-
-def test_declaration_dedupes():
-    out = tbl.declare({"a": {"calc_id": "calc_1"}, "b": {"calc_id": "calc_1"}})
-    assert [e["id"] for e in out["evidence"]] == ["calc_1"]
-
-
-def test_a_run_is_on_the_table_only_with_a_scope_or_names():
-    """A run is not evidence for anything until a child of it has been read, so
-    a bare run id — get_task_status echoing one, say — declares nothing."""
-    assert tbl.declare({"run_id": "run_1"})["evidence"] == []
-    scoped = tbl.declare({"run_id": "run_1"}, scope=("exposure_metrics", "count"))["evidence"]
-    assert scoped == [{"type": "run", "id": "run_1", "scope": ["exposure_metrics", "count"]}]
-    named = tbl.declare({"run_id": "run_1"}, scope=("exposure_metrics",),
-                        names=["issuer_exposures.MSFT.weight"])["evidence"]
-    assert named == [{"type": "run", "id": "run_1", "names": ["issuer_exposures.MSFT.weight"]}]
-
-
-def test_delegated_work_is_declared_as_a_task_row():
-    out = tbl.declare({"enqueued": True, "run_id": "rrun_2"}, tasks=["rrun_2"])
-    assert out["evidence"] == [{"type": "task", "id": "rrun_2", "kind": tbl.KIND_TASK}]
-
 
 # ── the wrapper: what it hands build(), what it records ───────────────────────
 
@@ -125,7 +81,7 @@ async def test_a_read_tools_figures_reach_the_model_as_facts_and_the_step_record
                "period": {"start": "2025-04-01", "end": "2026-03-31"}, "terms": [{"fact_id": "fact_a", "sign": 1}],
                "derivation": "sum of quarters", "basis": "2025-04-01..2026-03-31"}
     tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
-                fn=_returning(payload), tool_class=READ, evidence=Evidence())
+                fn=_returning(payload), tool_class=READ)
     db = _Db()
     out = await R.invoke(_registry(tool), db, "sess_1", "read_fundamentals", {"ticker": "MSFT", "metric": "revenue"})
 
@@ -144,7 +100,7 @@ async def test_a_tool_with_no_adapter_passes_its_payload_through_and_records_not
     log = _wire(monkeypatch)
     tool = Tool(name="get_task_status", description="", json_schema={"type": "object"},
                 fn=_returning({"job_id": "run_real", "state": "completed"}),
-                tool_class=READ, evidence=None)
+                tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "get_task_status", {})
     assert out == {"job_id": "run_real", "state": "completed"}
     assert log["recorded"] == [[]]
@@ -158,7 +114,7 @@ async def test_a_gates_refusal_echoing_ids_records_nothing(monkeypatch):
     refusal = {"error": "not_on_ledger",
                "problems": [{"id": "f_fabricated", "reason": "not_on_ledger"}]}
     gate = Tool(name="respond", description="", json_schema={"type": "object"},
-                fn=_returning(refusal), tool_class=GATE, evidence=R.NOT_EVIDENCE)
+                fn=_returning(refusal), tool_class=GATE)
     out = await R.invoke(_registry(gate), _Db(), "sess_1", "respond", {})
     assert out["error"] == "not_on_ledger" and out["problems"][0]["id"] == "f_fabricated"
     assert log["recorded"] == [[]]
@@ -168,7 +124,7 @@ async def test_a_reflection_echoing_an_id_records_nothing(monkeypatch):
     from exposure_workbench.tools.definitions import _think
     log = _wire(monkeypatch)
     think = Tool(name="think", description="", json_schema={"type": "object"},
-                 fn=_think, tool_class=REFLECTION, evidence=R.NOT_EVIDENCE)
+                 fn=_think, tool_class=REFLECTION)
     out = await R.invoke(_registry(think), _Db(), "sess_1", "think", {"thought": "calc_deadbeefcafe"})
     assert out["noted"] is True and log["recorded"] == [[]]
 
@@ -180,7 +136,7 @@ async def test_a_refused_read_still_records_the_absence_it_minted(monkeypatch):
     tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
                 fn=_returning({"error": "window_not_derivable", "absence_id": "calc_absent1", "ticker": "MSFT",
                                "metric": "revenue", "statement": "No 12-month window of MSFT's revenue can be derived."}),
-                tool_class=READ, evidence=Evidence())
+                tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_fundamentals", {"ticker": "MSFT", "metric": "revenue"})
     assert out["error"] == "window_not_derivable"
     rows = out["facts"]["rows"]
@@ -197,7 +153,7 @@ async def test_a_tool_that_raised_records_nothing(monkeypatch):
         raise RuntimeError("calc_should_not_matter")
 
     tool = Tool(name="read_fundamentals", description="", json_schema={"type": "object"},
-                fn=_boom, tool_class=READ, evidence=Evidence())
+                fn=_boom, tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_fundamentals", {"ticker": "MSFT"})
     assert out["error"] == "tool_error" and "facts" not in out
     assert log["recorded"] == [[]]
@@ -207,7 +163,7 @@ async def test_a_delegation_records_the_work_it_started_as_a_task_fact(monkeypat
     log = _wire(monkeypatch)
     tool = Tool(name="start", description="", json_schema={"type": "object"},
                 fn=_returning({"enqueued": True, "run_id": "rrun_2", "kind": "issuer_research", "ticker": "NVDA"}),
-                tool_class=DELEGATION, evidence=Evidence(tasks_from=("run_id",)))
+                tool_class=DELEGATION)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "start", {"kind": "research", "subject": "NVDA"})
     rows = out["facts"]["rows"]
     assert len(rows) == 1 and rows[0][1] == "task" and rows[0][2] == "rrun_2"
@@ -222,7 +178,7 @@ async def test_an_adapter_that_cannot_name_a_unit_is_the_tools_own_structured_fa
     log = _wire(monkeypatch)
     tool = Tool(name="read_prices", description="", json_schema={"type": "object"},
                 fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2}),
-                tool_class=READ, evidence=Evidence())
+                tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_prices", {"ticker": "MSFT"})
     assert out["error"] == "fact_adapter_error" and "frobnication" in out["detail"]
     assert log["recorded"] == [[]]
@@ -234,7 +190,7 @@ async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(
     payload = {"run_id": "run_1", "as_of": "2026-09-03",
                "figures": {f"issuer_exposures.T{i:03d}.weight": {"value": i / 1000, "unit_class": "RATIO"} for i in range(F.FACTS_PER_RESULT + 40)}}
     tool = Tool(name="read_book", description="", json_schema={"type": "object"},
-                fn=_returning(payload), tool_class=READ, evidence=Evidence())
+                fn=_returning(payload), tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_book", {"ref": "run_1", "names": ["x"]})
     shown = len(out["facts"]["rows"])
     total = F.FACTS_PER_RESULT + 40
@@ -245,16 +201,17 @@ async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(
     assert len(recorded) == shown, "what is recorded is what was shown"
 
 
-def test_every_read_tool_that_returns_evidence_says_so():
-    """The registration is the only place a tool's results become citable, so
-    the ones whose results ARE evidence must carry a declaration. The tools
-    listed here are the deliberate exceptions: state and policy readers, and
-    the reflection."""
-    reg = build_read_registry()
-    NOT_EVIDENCE = {"get_task_status", "list_risk_limits", "get_run_freshness", "think"}
-    undeclared = sorted(n for n, t in reg.tools.items()
-                        if t.evidence is None and n not in NOT_EVIDENCE)
-    assert undeclared == [], f"read tools with no declaration: {undeclared}"
+def test_every_tool_on_a_face_has_a_fact_adapter():
+    """V24: a tool's figures reach the model only through its adapter, so a
+    read or delegation tool with none would show bare numbers. Pinned on the
+    real faces; the reflection and the two gates are the deliberate no-fact
+    adapters."""
+    from exposure_workbench.services import fact_adapters as fa
+    from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
+    for reg in (build_meta_registry(), build_research_registry()):
+        missing = sorted(n for n in reg.tools if n not in fa.ADAPTERS)
+        assert missing == [], f"tools with no fact adapter: {missing}"
+    assert fa.ADAPTERS["think"] is fa.no_facts and fa.ADAPTERS["respond"] is fa.no_facts
 
 
 # ── schemas, faces, redaction ─────────────────────────────────────────────────

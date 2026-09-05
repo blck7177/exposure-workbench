@@ -58,13 +58,14 @@ def test_run_tables_the_gate_can_resolve_exclude_the_withheld_table():
     assert "exposure_metrics" in qn.RUN_TABLES
 
 
-def test_no_tool_declares_a_scope_over_a_withheld_table():
-    reg = build_meta_registry()
-    for name, tool in reg.tools.items():
-        ev = tool.evidence
-        if ev is None:
-            continue
-        assert not (set(ev.scope) & set(wh.WITHHELD_TABLES)), name
+def test_no_adapter_names_a_withheld_table_as_a_measure():
+    """V24: a figure's measure is `<run table>.<column>`; the tables the adapters
+    map sections onto are published run children, never a withheld one."""
+    from exposure_workbench.analytics import resources as rs
+    from exposure_workbench.services import fact_adapters as fa
+    published = {r.table for r in rs.RUN_CHILDREN}
+    assert set(fa.MEASURE_TABLE.values()) <= published
+    assert not (set(fa.MEASURE_TABLE.values()) & set(wh.WITHHELD_TABLES))
 
 
 def test_the_api_models_carry_no_withheld_field():

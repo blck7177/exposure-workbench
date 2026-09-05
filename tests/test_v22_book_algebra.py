@@ -621,23 +621,6 @@ def test_read_quantities_reads_a_scenario_row_and_refuses_other_ledger_rows():
     assert "calc_" in rq.description
 
 
-def test_a_scenario_row_names_which_book_it_is_so_a_before_after_table_can_say_so():
-    """Live turn 1's table read `issuer exposures weight | issuer exposures
-    weight`: the scenario's names are the run's on purpose, so the SUBJECT has
-    to tell them apart, and the renderer prefixes it into the derived name."""
-    from exposure_workbench.services import answer_blocks as ab
-    _, row = _scenario_row()
-    row.params["sales"] = [{"ticker": "NVDA", "fraction": 1.0}]
-    r = qn._from_scenario(row, "calc_scn")
-    assert r.subject == "after_sale_of_NVDA"
-    before = ["issuer_exposures.MSFT.weight", "issuer_exposures.AAPL.weight"]
-    after = [ab._derivation_name(n, r.subject) for n in before]
-    t = ab.derive_table([[b, a] for b, a in zip(before, after)])
-    assert t["header"] == ["issuer exposures weight", "after sale of NVDA issuer exposures weight"]
-    assert t["labels"] == ["MSFT", "AAPL"]
-    assert t["explicit"] == [False, False]
-
-
 # ── what a book-derived row is called on the legend ────────────────────────
 
 def test_a_figure_made_from_the_books_figures_is_grouped_as_such():

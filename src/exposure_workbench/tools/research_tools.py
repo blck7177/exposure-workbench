@@ -25,7 +25,7 @@ from exposure_workbench.services import gate, ledger
 from exposure_workbench.services import research_search_service as rss
 from exposure_workbench.services.answer import BLOCK_SCHEMAS
 from exposure_workbench.tools.registry import (
-    DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
+    DELEGATION, GATE, Tool, ToolRegistry, current_session_id,
 )
 from exposure_workbench.utils.ids import new_brief_id
 
@@ -183,8 +183,7 @@ def register_search_tool(reg: ToolRegistry) -> ToolRegistry:
                      "omit for no time restriction"},
         }, "required": ["ticker", "query", "reason"], "additionalProperties": False},
         fn=_search_external_research, tool_class=DELEGATION, budget_key="external_search",
-        # Its sources are the answer's evidence: src_ ids go on the table.
-        evidence=Evidence(),
+        # Its sources are the answer's evidence: src_ ids go on the table.,
     ))
     return reg
 
@@ -207,6 +206,5 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
         ),
         json_schema=SUBMIT_BRIEF_SCHEMA,
         fn=_submit_brief, tool_class=GATE,
-        evidence=NOT_EVIDENCE,  # the filing verdict — same reason respond declares none
     ))
     return reg

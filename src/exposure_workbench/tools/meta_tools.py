@@ -20,7 +20,7 @@ from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
 from exposure_workbench.services import answer, gate, ledger
 from exposure_workbench.tools.registry import (
-    DELEGATION, GATE, NOT_EVIDENCE, Evidence, Tool, ToolRegistry, current_session_id,
+    DELEGATION, GATE, Tool, ToolRegistry, current_session_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -220,7 +220,6 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "as_of_date": {"type": ["string", "null"], "description": "YYYY-MM-DD; exposure_run only; omit unless asked"},
         }, "required": ["kind", "subject", "reason"], "additionalProperties": False},
         fn=_start, tool_class=DELEGATION,
-        evidence=Evidence(tasks_from=("task_id", "run_id")),
     ))
     reg.register(Tool(
         name="respond",
@@ -240,6 +239,5 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         ),
         json_schema=RESPOND_SCHEMA,
         fn=_respond_blocks, tool_class=GATE,
-        evidence=NOT_EVIDENCE,  # a verdict is not evidence — a refusal's echoed ids must not become citable
     ))
     return reg
