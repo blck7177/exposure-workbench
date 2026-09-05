@@ -3,6 +3,7 @@
 import React from "react";
 
 import type { Evidence } from "@/lib/issuer";
+import { display as displayValue } from "@/lib/display";
 import { AuditOnly } from "../audit";
 
 /**
@@ -38,11 +39,12 @@ function Kind({ kind }: { kind: string }) {
     exposure_run: "text-teal-300 bg-teal-950/40",
     alert: "text-red-300 bg-red-950/40",
     position: "text-slate-300 bg-slate-800/50",
+    fact_record: "text-teal-200 bg-teal-950/50",
   };
   const name: Record<string, string> = {
     fact: "Fact · reported", calc: "Calculation", chunk: "Passage · filing",
     source: "Source · web", exposure_run: "Exposure run", alert: "Warning",
-    position: "Holding",
+    position: "Holding", fact_record: "Fact · shown to the analyst",
   };
   return (
     <span className={`inline-block font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${style[kind] ?? "text-slate-300 bg-slate-800/50"}`}>
@@ -104,6 +106,55 @@ export function EvidenceCard({ evidence, onOpen }: {
       <h3 className="text-[15px] font-semibold leading-snug text-slate-100">
         {evidence.label ?? type}
       </h3>
+
+      {type === "fact_record" && (
+        <>
+          {/* V24. What a tool put in front of the model, with the identity it
+              carried; the rows it rests on are one click down. */}
+          {b.kind === "scalar" && typeof b.value === "number" && (
+            <div className="font-mono text-2xl text-slate-100">
+              {typeof b.unit === "string" ? displayValue(b.value, b.unit) : fmtValue(b.value)}
+            </div>
+          )}
+          {b.kind === "series" && Array.isArray(b.points) && (
+            <div className="font-mono text-sm text-slate-200">
+              {(b.points as [string, number][]).length} points
+              {(b.points as [string, number][]).length > 0 && (
+                <> · {String((b.points as [string, number][])[0][0])} → {String((b.points as [string, number][]).slice(-1)[0][0])}</>
+              )}
+            </div>
+          )}
+          {(b.kind === "passage" || b.kind === "absence" || b.kind === "task") && typeof b.text === "string" && (
+            <blockquote className="m-0 pl-3 border-l-2 border-[#30363d] text-[13px] leading-relaxed text-slate-300 whitespace-pre-wrap">
+              {b.text}
+            </blockquote>
+          )}
+          <dl className="m-0">
+            <Field label="What">{String(b.measure ?? "—").replace(/[._]/g, " ")}</Field>
+            {b.subject != null && <Field label="Whose">{String(b.subject)}</Field>}
+            {b.as_of != null && <Field label="As of">{String(b.as_of)}</Field>}
+            {b.window != null && typeof b.window === "object" && (
+              <Field label="Window">
+                {Object.entries(b.window as Record<string, unknown>).map(([k, v]) => `${k} ${String(v)}`).join(" · ")}
+              </Field>
+            )}
+            {typeof b.unit === "string" && <Field label="Unit">{b.unit}</Field>}
+            {b.standalone === false && <Field label="Note">not determined on its own — see the figure that is</Field>}
+            {upstream.length > 0 && (
+              <Field label="Rests on">
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {upstream.map((u) => (
+                    <button key={u.id} onClick={() => onOpen(u.id)}
+                      className="text-[11px] px-2 py-0.5 rounded border border-[#30363d] text-slate-300 hover:border-slate-500">
+                      {u.type} →
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
+          </dl>
+        </>
+      )}
 
       {type === "fact" && (
         <>
@@ -247,7 +298,7 @@ export function EvidenceCard({ evidence, onOpen }: {
         <div className="font-mono text-[10.5px] text-slate-600 break-all">{evidence.id}</div>
       </AuditOnly>
       <Technical rows={[["id", evidence.id], ...Object.entries(p),
-                        ...(type === "calc" ? [["params", b.params] as [string, unknown]] : [])]} />
+                        ...(type === "calc" || type === "fact_record" ? [["params", b.params] as [string, unknown]] : [])]} />
     </div>
   );
 }

@@ -56,7 +56,10 @@ export function FiguredText({ text, matches, labels }: {
   // walk linear. A match whose span no longer lines up (a text edited after the
   // fact — which cannot happen here, since the record is written with the
   // answer) is skipped rather than mis-highlighted.
-  const ordered = [...matches].sort((a, b) => a.span[0] - b.span[0]);
+  // V24 matches carry no span (the figure was a pointer, not a substring); a
+  // v1 answer's matches do, and those are the only ones this walk can place.
+  const ordered = matches.filter((m): m is VerifiedMatch & { span: [number, number] } => Array.isArray(m.span))
+    .sort((a, b) => a.span[0] - b.span[0]);
   const out: React.ReactNode[] = [];
   let cursor = 0;
 

@@ -38,7 +38,34 @@ export type Slot = {
   caption?: string;
 };
 
-export type Run = string | { slot: Slot };
+/**
+ * V24. A fact as the gate filled it: the record the tool showed the model,
+ * plus its display string and, for a series, its own summary. The chip shows
+ * `display`; hover says what the figure IS (measure · subject · as of · unit);
+ * click opens the drawer on the fact, which drills to the rows it rests on.
+ */
+export type FactFill = {
+  id: string;
+  kind: "scalar" | "series" | "passage" | "absence" | "task";
+  measure: string;
+  subject?: string | null;
+  unit?: string | null;
+  value?: number | null;
+  as_of?: string | null;
+  window?: Record<string, unknown> | null;
+  params?: Record<string, unknown> | null;
+  standalone?: boolean;
+  sources?: string[];
+  display?: string;
+  text?: string | null;
+  series?: TrendSeries | null;
+};
+
+/** V24. A number the model wrote in prose that the gate resolved: the written
+ *  text, linked to the fact(s) it equals or the passage that states it. */
+export type Link = { to: "fact" | "passage"; ids: string[]; as_written: string };
+
+export type Run = string | { slot: Slot } | { fact: FactFill } | { link: Link };
 
 /** A trend's series, stating its own first and last point (V19). */
 export type TrendSeries = {
@@ -52,13 +79,14 @@ export type TrendSeries = {
 
 export type Block =
   | { type: "paragraph"; runs: Run[]; cites?: string[] }
-  // V19: `header`, `labels` and `explicit` are derived server-side from the
-  // slots' names (services/answer_blocks.derive_table) and the cells are slots
-  // only. `columns` and string cells are what answers stored before V19 carry,
-  // and they render as they did — the grammar changed, the record did not.
+  // V24: rows are facts; header, labels and explicit are derived server-side
+  // from the facts' measures and subjects (services/answer.derive_table).
+  | { type: "table"; title?: string; rows: { fact: FactFill }[][]; cites?: string[];
+      header?: string[]; labels?: string[]; explicit?: boolean[] }
+  | { type: "chart"; kind: string; title?: string; fact?: FactFill; series_ref?: string }
+  // ── pre-V24 blocks: stored answers are records and render as they were ──
   | { type: "metric_table"; title?: string; columns?: string[]; rows: Run[][]; cites?: string[];
       header?: string[]; labels?: string[]; explicit?: boolean[] }
-  | { type: "chart"; kind: string; title?: string; series_ref: string }
   | { type: "trend"; text: string; series_ref: string; series?: TrendSeries }
   | { type: "absence"; text: string; absence_ref: string }
   | { type: "action"; text: string; task_ref: string };
@@ -79,6 +107,14 @@ function stringRuns(b: Block): string[] {
   }
 }
 
+function refOf(r: Run): string[] {
+  if (typeof r === "string") return [];
+  if ("slot" in r) return [r.slot.ref];
+  if ("fact" in r) return [r.fact.id];
+  if ("link" in r) return r.link.ids;
+  return [];
+}
+
 /**
  * Every id the answer's prose cites, in reading order: a block's `cites`, then
  * any bare id written inside its text. This is the numbering — computed once
@@ -88,7 +124,7 @@ function stringRuns(b: Block): string[] {
 export function citedIds(blocks: Block[]): string[] {
   const out: string[] = [];
   for (const b of blocks) {
-    const cites = b.type === "paragraph" || b.type === "metric_table" ? b.cites ?? [] : [];
+    const cites = b.type === "paragraph" || b.type === "metric_table" || b.type === "table" ? b.cites ?? [] : [];
     for (const id of idsIn(stringRuns(b).join("\n"), cites)) {
       if (!out.includes(id)) out.push(id);
     }
@@ -106,12 +142,18 @@ export function idsInBlocks(blocks: Block[]): string[] {
   for (const b of blocks) {
     switch (b.type) {
       case "paragraph":
-        for (const r of b.runs) if (typeof r !== "string") add(r.slot.ref);
+        for (const r of b.runs) for (const id of refOf(r)) add(id);
         break;
       case "metric_table":
-        for (const r of b.rows.flat()) if (typeof r !== "string") add(r.slot.ref);
+        for (const r of b.rows.flat()) for (const id of refOf(r)) add(id);
+        break;
+      case "table":
+        for (const c of b.rows.flat()) add(c.fact.id);
         break;
       case "chart":
+        if (b.fact) add(b.fact.id);
+        else if (b.series_ref) add(b.series_ref);
+        break;
       case "trend":
         add(b.series_ref);
         break;
@@ -154,6 +196,91 @@ function Figure({ slot, onOpen }: { slot: Slot; onOpen: (id: string) => void }) 
   );
 }
 
+/** What a fact IS, in one line: measure · subject · as of / window · unit. */
+export function identityOf(f: FactFill): string {
+  const when = f.as_of
+    ?? (f.window && typeof f.window === "object"
+      ? [f.window.start, f.window.end].filter(Boolean).join(" – ") || String(f.window.name ?? f.window.months ?? f.window.days ?? "")
+      : "");
+  return [f.measure.replace(/[._]/g, " ").replace(/:/g, " "), f.subject, when ? `as of ${when}` : null, f.unit]
+    .filter(Boolean).join(" · ");
+}
+
+/**
+ * V24. A fact, shown as what it is. A scalar is its display value; a series is
+ * its last point with the V19 series line under it; an absence, a task and a
+ * passage are their label. Hover states the identity; click opens the drawer.
+ */
+function FactChip({ fact, onOpen }: { fact: FactFill; onOpen: (id: string) => void }) {
+  const { audit } = useAudit();
+  const label = fact.kind === "absence" ? "not held" : fact.kind === "task" ? "started" : fact.kind === "passage" ? "passage" : null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onOpen(fact.id)}
+        title={identityOf(fact)}
+        style={{
+          background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer",
+          borderBottom: "1px solid var(--line-strong, #b9c2bb)", fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {label ? (
+          <span style={{ opacity: 0.75, fontSize: "0.85em", fontVariant: "small-caps" }}>{label}</span>
+        ) : (
+          fact.display ?? String(fact.value ?? "")
+        )}
+        {audit ? <span style={{ opacity: 0.6, fontSize: "0.85em" }}> ({identityOf(fact)})</span> : null}
+      </button>
+      {fact.kind === "absence" && fact.text ? <span style={{ opacity: 0.8 }}> — {fact.text}</span> : null}
+      {fact.kind === "series" && fact.series ? <SeriesLine series={fact.series} onOpen={() => onOpen(fact.id)} /> : null}
+    </>
+  );
+}
+
+/**
+ * V24. A number the model wrote in prose, as the gate resolved it: the text as
+ * written, underlined, opening the fact it equals — or, when several facts
+ * share the value, a chooser naming each one's identity, so the reader picks
+ * and the page never guesses.
+ */
+function LinkText({ link, labels, onOpen }: { link: Link; labels?: Labels; onOpen: (id: string) => void }) {
+  if (link.ids.length === 1) {
+    const id = link.ids[0];
+    return (
+      <button type="button" onClick={() => onOpen(id)}
+        title={link.to === "passage" ? "Stated in a cited passage — open it" : labels?.[id]?.label ?? id}
+        style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer",
+                 borderBottom: "1px dotted var(--line-strong, #b9c2bb)", fontVariantNumeric: "tabular-nums" }}>
+        {link.as_written}
+      </button>
+    );
+  }
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <details style={{ display: "inline" }}>
+        <summary style={{ display: "inline", cursor: "pointer", listStyle: "none",
+                          borderBottom: "1px dotted var(--line-strong, #b9c2bb)", fontVariantNumeric: "tabular-nums" }}
+          title={`${link.ids.length} facts share this value — choose one`}>
+          {link.as_written}
+        </summary>
+        <span style={{ position: "absolute", left: 0, top: "1.4em", zIndex: 10, minWidth: "16rem",
+                       background: "var(--panel, #171d26)", border: "1px solid var(--line, #30363d)",
+                       borderRadius: 6, padding: "0.35rem 0.5rem", fontSize: "0.85em", display: "flex",
+                       flexDirection: "column", gap: "0.25rem" }}>
+          {link.ids.map((id) => (
+            <button key={id} type="button" onClick={() => onOpen(id)}
+              style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit",
+                       cursor: "pointer", textAlign: "left" }}>
+              {labels?.[id]?.label ?? id} →
+            </button>
+          ))}
+        </span>
+      </details>
+    </span>
+  );
+}
+
 /**
  * A text run goes through the prose renderer's annotation walk rather than
  * straight to the page, because a brief's historical text — and a model that
@@ -191,6 +318,10 @@ function Runs({
       {runs.map((r, i) =>
         typeof r === "string" ? (
           <Text key={i} text={r} order={order} labels={labels} onOpen={onOpen} />
+        ) : "fact" in r ? (
+          <FactChip key={i} fact={r.fact} onOpen={onOpen} />
+        ) : "link" in r ? (
+          <LinkText key={i} link={r.link} labels={labels} onOpen={onOpen} />
         ) : (
           <Figure key={i} slot={r.slot} onOpen={onOpen} />
         ),
@@ -334,6 +465,51 @@ export function AnswerBlocks({
               </p>
             );
 
+          case "table":
+            return (
+              <div key={i} style={{ margin: "0.75rem 0", overflowX: "auto" }}>
+                {b.title ? <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{b.title}</div> : null}
+                <table style={{ borderCollapse: "collapse", fontSize: "0.95em", width: "100%" }}>
+                  <thead>
+                    <tr>
+                      {["", ...(b.header ?? [])].map((c, j) => (
+                        <th key={j} style={{ textAlign: j === 0 ? "left" : "right", padding: "0.3rem 0.6rem",
+                                             borderBottom: "1px solid var(--line, #dfe3db)", fontWeight: 500,
+                                             opacity: 0.7, whiteSpace: "nowrap" }}>
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.rows.map((row, j) => (
+                      <tr key={j}>
+                        <td style={{ textAlign: "left", padding: "0.3rem 0.6rem",
+                                     borderBottom: "1px solid var(--line-faint, #eef1ea)" }}>
+                          {b.labels?.[j] ?? ""}
+                        </td>
+                        {row.map((cell, k) => (
+                          <td key={k} style={{ textAlign: "right", padding: "0.3rem 0.6rem",
+                                               borderBottom: "1px solid var(--line-faint, #eef1ea)",
+                                               fontVariantNumeric: "tabular-nums" }}>
+                            <FactChip fact={cell.fact} onOpen={onOpen} />
+                            {b.explicit?.[k] ? (
+                              <div style={{ opacity: 0.6, fontSize: "0.8em" }}>{identityOf(cell.fact)}</div>
+                            ) : null}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {b.cites && b.cites.length > 0 ? (
+                  <div style={{ marginTop: "0.25rem" }}>
+                    <Cites ids={b.cites} order={order} labels={labels} onOpen={onOpen} />
+                  </div>
+                ) : null}
+              </div>
+            );
+
           case "metric_table":
             return (
               <div key={i} style={{ margin: "0.75rem 0", overflowX: "auto" }}>
@@ -386,7 +562,7 @@ export function AnswerBlocks({
                           >
                             {typeof cell === "string" ? (
                               <Text text={cell} order={order} labels={labels} onOpen={onOpen} />
-                            ) : (
+                            ) : "slot" in cell ? (
                               <>
                                 <Figure slot={cell.slot} onOpen={onOpen} />
                                 {b.explicit?.[k] && k > 0 ? (
@@ -395,6 +571,10 @@ export function AnswerBlocks({
                                   </div>
                                 ) : null}
                               </>
+                            ) : "fact" in cell ? (
+                              <FactChip fact={cell.fact} onOpen={onOpen} />
+                            ) : (
+                              <LinkText link={cell.link} labels={labels} onOpen={onOpen} />
                             )}
                           </td>
                         ))}
@@ -412,16 +592,17 @@ export function AnswerBlocks({
 
           case "chart":
             // The series itself lives in the ledger, and the drawer already
-            // knows how to show a calc row. Until the inline drawing lands, the
+            // knows how to show a series. Until the inline drawing lands, the
             // honest thing is to name what would be drawn and let the reader
             // open it — not to render an empty frame that looks like a chart
-            // with no data.
+            // with no data. V24: the series is a fact and states its own line.
             return (
               <p key={i} style={{ margin: "0.5rem 0" }}>
                 {b.title ? <strong>{b.title} </strong> : null}
+                {b.fact?.series ? <SeriesLine series={b.fact.series} onOpen={() => onOpen(b.fact!.id)} /> : null}
                 <button
                   type="button"
-                  onClick={() => onOpen(b.series_ref)}
+                  onClick={() => onOpen(b.fact?.id ?? b.series_ref ?? "")}
                   style={{
                     background: "none",
                     border: "none",

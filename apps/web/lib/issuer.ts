@@ -86,9 +86,12 @@ export type AgentStep = { seq: number; step_type: string; tool_name: string | nu
  * is none, and the passage is the support.
  */
 export type VerifiedMatch = {
-  span: [number, number];
-  surface: string;
-  how: "value" | "quoted";
+  // v1 answers: where in the prose the figure sat. V24 matches are pointers and carry none.
+  span?: [number, number];
+  surface?: string;
+  how?: "value" | "quoted";
+  subject?: string | null;
+  as_of?: string | null;
   label?: string;
   source_id?: string;
   value?: number;

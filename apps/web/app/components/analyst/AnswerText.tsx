@@ -56,6 +56,8 @@ export function planAnnotations(text: string, matches?: VerifiedMatch[]): Annota
     spans.push({ start, end: start + m[0].length, kind: "cites", ids: [m[2]] });
   }
   for (const match of matches ?? []) {
+    // V24 matches are pointers and carry no span; only a v1 answer's can be placed.
+    if (!match.span) continue;
     const [start, end] = match.span;
     if (end > text.length || text.slice(start, end) !== match.surface) continue;
     // A figure inside a citation group cannot happen, but a guard here costs
