@@ -6,17 +6,19 @@ nothing to check. It checks whether the model POINTED right:
 
     G1  every id in the answer is on this session's ledger          not_on_ledger
     G2  the layout admits the fact's kind: a cell is a standalone
-        scalar, a chart is a series, an inline fact stands alone; a
-        cite is any fact the block rests on (the first live round
-        listed the scalars it used there, 8 refusals in 11 — a habit
-        that costs the reader nothing, so it is not refused)          kind_does_not_fit / not_standalone
+        scalar, a chart is a series, an inline fact stands alone, and
+        `f_…@period` addresses a point the series actually holds; a
+        cite is any fact the block rests on                           kind_does_not_fit / not_standalone /
+                                                                      unknown_point
+        (a pointer the model wrapped in the old object decoration is
+        NORMALISED to the pointer, not refused: services/answer.WRAPPED)
     G3  the prose carries nothing the ledger cannot account for:
         every digit token resolves — to a fact it equals (exactly, at
         the written precision, under a money scale), to a fact's
         identity field (an as-of, a period, a window, a parameter),
         or to a passage the block cites; a name the ledger holds is
-        not written as words; a quotation is verbatim in a cited
-        passage                                                       unsourced_figure / id_in_prose /
+        not written as words; a pointer has a space before it; a
+        quotation is verbatim in a cited passage                                                       unsourced_figure / id_in_prose /
                                                                       name_in_prose / unverified_quote
 
 Every check is a dictionary lookup on the ledger (services/ledger.py). The
@@ -125,10 +127,10 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
         return v
 
     refs = A.refs_in(blocks)
-    v.refs = list(dict.fromkeys(fid for _, fid, _ in refs))
+    v.refs = list(dict.fromkeys(A.split_point(t)[0] for _, t, _ in refs))
 
     # G1 — on the ledger
-    off = [(at, fid) for at, fid, _ in refs if not ledger.holds(fid)]
+    off = [(at, A.split_point(t)[0]) for at, t, _ in refs if not ledger.holds(A.split_point(t)[0])]
     if off:
         v.error = "not_on_ledger"
         v.problems = [{"at": at, "id": fid, "reason": "not_on_ledger"} for at, fid in off]
@@ -139,8 +141,23 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
         return v
 
     # G2 — the layout admits the kind
-    for at, fid, role in refs:
+    for at, token, role in refs:
+        fid, period = A.split_point(token)
         kind = ledger.kind(fid)
+        if period is not None:
+            # An address into a series: the point has to be one the series holds.
+            if kind != F.SERIES:
+                v.problems.append({"at": at, "id": token, "reason": "kind_does_not_fit", "kind": kind,
+                                   "detail": "f_…@period addresses one point of a SERIES; this fact is not one"})
+            else:
+                held = [str(p[0]) for p in (ledger.by_id[fid].get("points") or [])]
+                if period not in held:
+                    near = [p for p in held if p[:4] == period[:4]] or held
+                    v.problems.append({"at": at, "id": token, "reason": "unknown_point", "period": period,
+                                       "available": near[:12], "truncated": len(near) > 12,
+                                       "detail": "this series holds no point at that period; `available` lists "
+                                                 "the periods it does hold"})
+            continue
         if role == A.CELL and kind != F.SCALAR:
             v.problems.append({"at": at, "id": fid, "reason": "kind_does_not_fit", "kind": kind,
                                "detail": "a table cell is a scalar fact; a series, a passage, an absence or a task goes in a paragraph"})
@@ -153,7 +170,8 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
                                "detail": (rec.get("params") or {}).get("reason")
                                or "this figure is not determined on its own (the row says so); point at the figure that is"})
     if v.problems:
-        v.error = "kind_does_not_fit" if any(p["reason"] == "kind_does_not_fit" for p in v.problems) else "not_standalone"
+        reasons = [p["reason"] for p in v.problems]
+        v.error = next(r for r in ("kind_does_not_fit", "unknown_point", "not_standalone") if r in reasons)
         v.detail = "a pointer's place in the answer must fit what the fact is"
         return v
 
@@ -161,17 +179,10 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
     names = _compound(ledger.measures)
     for i, prose, cites in A.prose_by_block(blocks):
         at = f"blocks[{i}]"
-        # A pointer SERIALISED into the string — "{fact:f_…}", "{\"fact\": \"f_…\"}" —
-        # is the V23-R slot-as-string shape reborn: the first live V24 round wrote
-        # eleven of them in one answer and the id inside each would have linked.
-        # Named as what it is, and reported instead of the id inside it.
-        serialised = A.SERIALISED_REF.findall(prose)
-        if serialised:
-            v.problems.append({"at": at, "reason": "pointer_written_as_text", "pointers": serialised,
-                               "detail": ("a fact ref is an OBJECT element of `runs` — [\"text\", {\"fact\": \"f_…\"}, "
-                                          "\"text\"] — never a string containing one. Send it as an object; the "
-                                          "reader is shown the fact's value where it sits")})
-            prose = A.SERIALISED_REF.sub(" ", prose)
+        for m in A.GLUED.finditer(prose):
+            v.problems.append({"at": at, "reason": "pointer_not_separated", "id": m.group(0),
+                               "detail": "a fact id is read as a pointer only when a space (or a mark) "
+                                         "comes before it; this one is glued to the word in front of it"})
         written = sorted({n for n in names if n in prose})
         if written:
             v.problems.append({"at": at, "reason": "name_in_prose", "names": written,
@@ -207,13 +218,14 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
             v.problems.append({"at": at, **p, "reason": "unverified_quote"})
     if v.problems:
         reasons = {p["reason"] for p in v.problems}
-        v.error = ("pointer_written_as_text" if "pointer_written_as_text" in reasons else
+        v.error = ("pointer_not_separated" if "pointer_not_separated" in reasons else
                    "unsourced_figure" if "unsourced_figure" in reasons else
                    "id_in_prose" if "id_in_prose" in reasons else
                    "name_in_prose" if "name_in_prose" in reasons else "unverified_quote")
-        v.detail = {"pointer_written_as_text": "a fact ref is an object element of runs, never text inside a string",
+        v.detail = {"pointer_not_separated": "put a space before the fact id so it reads as a pointer",
                     "unsourced_figure": _FIX,
-                    "id_in_prose": "ids belong in {fact: id} or in cites, never in a sentence",
+                    "id_in_prose": "a fact's id (f_…) is written into the sentence and becomes the figure; "
+                                   "any other id belongs in `cites`, never in a sentence",
                     "name_in_prose": "a name the ledger holds is written as {fact: id}, not as words",
                     "unverified_quote": ("quotation marks say these words appear verbatim in a passage this "
                                          "block cites. Reproduce the source wording and cite the passage, or "

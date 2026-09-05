@@ -25,9 +25,9 @@ URL = os.getenv("DATABASE_URL_LOCAL",
                 "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench")
 
 CALC, CHUNK = "calc_hand_built", "chunk_hand_built"
-FIG = F.Fact(id="f_hand_figure", kind=F.SCALAR, measure="revenue", subject="NVDA", unit=F.__dict__.get("MONEY", "MONEY"),
+FIG = F.Fact(id="f_a1b2c3d4e5f6", kind=F.SCALAR, measure="revenue", subject="NVDA", unit=F.__dict__.get("MONEY", "MONEY"),
              value=13_237_000_000.0, as_of="2026-01-25", sources=(CALC,))
-PAS = F.Fact(id="f_hand_passage", kind=F.PASSAGE, measure="10-Q Item 2", subject="NVDA", as_of="2026-02-26",
+PAS = F.Fact(id="f_0f1e2d3c4b5a", kind=F.PASSAGE, measure="10-Q Item 2", subject="NVDA", as_of="2026-02-26",
              text="Demand for our data center products remained strong through the quarter.", sources=(CHUNK,))
 
 
@@ -36,8 +36,9 @@ def _ledger() -> L.Ledger:
     return L.Ledger.of_facts([FIG, PAS])
 
 
-def _para(*runs, cites=None) -> dict:
-    block = {"type": "paragraph", "runs": list(runs)}
+def _para(*parts, cites=None) -> dict:
+    """The V24 grammar: a paragraph is a sentence with fact ids written in it."""
+    block = {"type": "paragraph", "text": "".join(p if isinstance(p, str) else p["fact"] for p in parts)}
     if cites:
         block["cites"] = list(cites)
     return block
@@ -118,17 +119,22 @@ async def test_a_pointer_the_ledger_does_not_hold_names_the_section(offline_gate
     """The refusal is the verdict `respond` would give, plus which section it
     was in — the model fixes that block, not the brief."""
     out = await rt._submit_brief(None, **_sections(
-        key_changes={"blocks": [_para("Gross margin was ", {"fact": "f_never_shown"}, ".", cites=[PAS.id])]}))
+        key_changes={"blocks": [_para("Gross margin was ", {"fact": "f_000000000000"}, ".", cites=[PAS.id])]}))
     assert out["error"] == "not_on_ledger"
     assert out["section"] == "key_changes"
     (problem,) = out["problems"]
-    assert problem["at"] == "blocks[0].runs[1]" and problem["id"] == "f_never_shown"
+    assert problem["at"].startswith("blocks[0].text[") and problem["id"] == "f_000000000000"
 
 
-async def test_a_slot_is_not_a_pointer(offline_gate):
+async def test_the_old_runs_shape_is_not_the_grammar(offline_gate):
+    """A section written the old way points at nothing, because a pointer is an
+    id in the sentence now; the structural rule catches it before the gate."""
     out = await rt._submit_brief(None, **_sections(
-        key_changes={"blocks": [_para("Gross margin was ", {"ref": CALC, "name": "gross_margin"}, ".", cites=[PAS.id])]}))
-    assert out["error"] == "malformed_answer" and out["section"] == "key_changes"
+        key_changes={"blocks": [{"type": "paragraph", "runs": ["Gross margin was ", {"fact": FIG.id}]}]}))
+    assert out["error"] == "missing_citations" and out["sections"] == ["key_changes"]
+    out2 = await rt._submit_brief(None, **_sections(
+        key_changes={"blocks": [{"type": "paragraph", "runs": ["x"], "cites": [PAS.id]}]}))
+    assert out2["error"] == "malformed_answer" and out2["section"] == "key_changes"
 
 
 async def test_an_id_off_the_ledger_names_the_section(offline_gate):

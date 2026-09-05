@@ -8,9 +8,23 @@ storage. The kind of a claim was declared twice, once by the block and once by
 the row, and each new kind was six edits. Here the kind lives on the FACT
 (services/facts.Fact.kind) and the grammar has two layouts and a chart:
 
-    paragraph  {runs: [str | {fact: id}], cites?: [passage fact ids]}
+    paragraph  {text: "… f_3a1b … f_9c2d@2025-12-31 …", cites?: [fact ids]}
     table      {title?, rows: [[fact id, …], …], cites?}
     chart      {kind: bar|line|waterfall, title?, fact: series fact id}
+
+A paragraph is a SENTENCE, and a fact's id written in it IS the pointer
+(V24, measured): the array-of-strings-and-objects shape it replaces was
+legal and the model wrote it wrong 28 times in 94 answers, always the same
+way — the object serialised into one of the strings. Replaying every stored
+answer under this shape turned 22 of those into clean acceptances with no
+change in what the reader sees. `cites` stays a FIELD, because the same
+replay showed that folding it into the sentence loses a distinction the desk
+needs: a fact a paragraph RESTS ON is not a fact it STATES, and a figure
+that may not stand alone may still be cited.
+
+`f_…@period` addresses one point of a series. A series is one fact with its
+points inline, so without an address the only way to say "it rose from X to
+Y" was to invent ids for the points, which is what the model did.
 
 A trend is a paragraph pointing at a series fact; an absence is a paragraph
 pointing at an absence fact; work started is a paragraph pointing at a task
@@ -36,14 +50,13 @@ CHART_KINDS = ("bar", "line", "waterfall")
 
 # ── schema (Law B: the grammar is the tool's argument schema) ─────────────────
 
-_FACT_REF = {"type": "object",
-             "description": "one fact, by the id a tool result's `facts` gave it, e.g. {fact: 'f_3a1b…'}; "
-                            "the reader is shown the fact's own value with what it is and as of when",
-             "properties": {"fact": {"type": "string"}},
-             "required": ["fact"], "additionalProperties": False}
-_RUN = {"anyOf": [{"type": "string"}, _FACT_REF]}
+_TEXT = {"type": "string", "minLength": 1,
+         "description": "the sentence. A figure is the FACT'S ID written in it (f_3a1b…) — the reader is "
+                        "shown the fact's value with what it is and as of when; one point of a series is "
+                        "f_3a1b…@2025-12-31"}
 _CITES = {"type": "array", "items": {"type": "string"},
-          "description": "passage fact ids (f_…) the prose of this block rests on"}
+          "description": "fact ids (f_…) the prose of this block rests on but does not state — the "
+                         "passages it quotes, the figures it reasons from"}
 
 TABLE_RULE = ("a table cell is a fact id and nothing else; the header comes from the facts' "
               "measures and each row's label from their subject or date — neither is written "
@@ -58,9 +71,7 @@ def _block(kind: str, props: dict, required: list[str]) -> dict:
 
 
 BLOCK_SCHEMAS = [
-    _block("paragraph", {"runs": {"type": "array", "minItems": 1, "items": _RUN,
-                                  "description": "strings and fact refs, in reading order"},
-                         "cites": _CITES}, ["runs"]),
+    _block("paragraph", {"text": _TEXT, "cites": _CITES}, ["text"]),
     _block("table", {"title": {"type": "string"},
                      "rows": {"type": "array", "minItems": 1, "description": TABLE_RULE,
                               "items": {"type": "array", "minItems": 1, "items": {"type": "string"}}},
@@ -78,10 +89,6 @@ ANSWER_SCHEMA = {"type": "object", "properties": {
 
 
 # ── structure (for callers that bypass the schema) ────────────────────────────
-
-def _is_ref(x: Any) -> bool:
-    return isinstance(x, dict) and isinstance(x.get("fact"), str) and bool(x.get("fact"))
-
 
 def validate_shape(blocks) -> list[dict]:
     """Structural problems only, all at once. The text and pointer rules are the
@@ -102,18 +109,9 @@ def validate_shape(blocks) -> list[dict]:
         if cites is not None and not (isinstance(cites, list) and all(isinstance(c, str) for c in cites)):
             problems.append({"at": f"{at}.cites", "reason": "cites_not_a_list_of_ids"})
         if kind == "paragraph":
-            runs = b.get("runs")
-            if not isinstance(runs, list) or not runs:
-                problems.append({"at": at, "reason": "paragraph_without_runs"})
-                continue
-            for j, r in enumerate(runs):
-                if isinstance(r, str) or _is_ref(r):
-                    continue
-                if isinstance(r, dict):
-                    problems.append({"at": f"{at}.runs[{j}]", "reason": "ref_without_fact",
-                                     "detail": "a figure in prose is {fact: id}; a name or a value is not a pointer"})
-                else:
-                    problems.append({"at": f"{at}.runs[{j}]", "reason": "run_not_text_or_fact"})
+            if not isinstance(b.get("text"), str) or not b["text"].strip():
+                problems.append({"at": at, "reason": "paragraph_without_text",
+                                 "detail": "a paragraph is a sentence; a figure is a fact's id written in it"})
         elif kind == "table":
             rows = b.get("rows")
             if not isinstance(rows, list) or not rows:
@@ -148,9 +146,8 @@ def refs_in(blocks) -> list[tuple[str, str, str]]:
         if not isinstance(b, dict):
             continue
         at = f"blocks[{i}]"
-        for j, r in enumerate(b.get("runs") or []):
-            if _is_ref(r):
-                out.append((f"{at}.runs[{j}]", r["fact"], INLINE))
+        for tok, s, _e in pointers_in(normalise(b.get("text") or "")):
+            out.append((f"{at}.text[{s}]", tok, INLINE))
         for j, row in enumerate(b.get("rows") or []):
             for k, cell in enumerate(row if isinstance(row, list) else []):
                 if isinstance(cell, str):
@@ -166,18 +163,15 @@ def refs_in(blocks) -> list[tuple[str, str, str]]:
 def ids_in(blocks) -> list[str]:
     seen: dict[str, None] = {}
     for _, fid, _ in refs_in(blocks):
-        seen.setdefault(fid, None)
+        seen.setdefault(split_point(fid)[0], None)
     return list(seen)
-
-
-# The separator between a paragraph's string runs when they are read as one
-# text: a fact stood between them, so two strings must not fuse into one token.
-_GAP = " ⁣ "     # invisible separator, whitespace on both sides
 
 
 def prose_by_block(blocks) -> list[tuple[int, str, list[str]]]:
     """(block index, prose, cites) per block — the gate reads each block's prose
-    against its own cites. A table's title is its prose."""
+    against its own cites. The prose is normalised with its pointers BLANKED to
+    spaces of the same length, so a link's offset holds in the rendered text
+    too; a table's title is its prose."""
     out: list[tuple[int, str, list[str]]] = []
     for i, b in enumerate(blocks if isinstance(blocks, list) else []):
         if not isinstance(b, dict):
@@ -185,8 +179,8 @@ def prose_by_block(blocks) -> list[tuple[int, str, list[str]]]:
         parts: list[str] = []
         if isinstance(b.get("title"), str):
             parts.append(b["title"])
-        if b.get("runs"):
-            parts.append(_GAP.join(r for r in b["runs"] if isinstance(r, str)))
+        if isinstance(b.get("text"), str):
+            parts.append(_blank(normalise(b["text"])))
         cites = [c for c in (b.get("cites") or []) if isinstance(c, str)]
         out.append((i, "\n".join(parts), cites))
     return out
@@ -201,13 +195,56 @@ ID_PREFIXES = ("f_", "fact_", "calc_", "chunk_", "src_", "run_", "alert_", "pos_
 _ID = r"(?P<id>\b(?:" + "|".join(p[:-1] for p in ID_PREFIXES) + r")_[A-Za-z0-9]{4,}\b)"
 _DATE = r"(?P<date>\b\d{4}-\d{2}-\d{2}\b)"
 _FORM = r"(?P<form>\b\d{1,2}-[KQF](?:/A)?\b|\b[SF]-[13]\b|\bDEF\s?14A\b)"
-_NUM = (r"(?P<num>(?<![\w.])[+\-−]?\$?\d[\d,]*(?:\.\d+)?%?"
+# `\d(?:[\d,]*\d)?` and not `\d[\d,]*`: the second swallows the comma that ends
+# a clause, so "in 2024, revenue rose" offered the gate the token "2024," —
+# which no lookup can resolve, and four of the seven unsourced_figure refusals
+# in the whole stored corpus were exactly that (measured 2026-09-05).
+_NUM = (r"(?P<num>(?<![\w.])[+\-−]?\$?\d(?:[\d,]*\d)?(?:\.\d+)?%?"
         r"(?:\s?(?:bn|mn|K|M|B|million|billion|thousand|percent|per\s?cent)\b)?)")
 TOKEN = re.compile("|".join((_ID, _DATE, _FORM, _NUM)))
 
-# A fact ref serialised into a string: `{fact:f_3a…}`, `{"fact": "f_3a…"}`,
-# `{fact: 'f_3a…'}` — braces around the word fact and an id. Closed shape.
-SERIALISED_REF = re.compile(r"\{\s*[\"']?fact[\"']?\s*:\s*[\"']?f_[A-Za-z0-9]{4,}[\"']?\s*\}")
+# A pointer written in the prose: the fact's id, optionally addressing one
+# point of a series. Permissive on the body so a mistyped id is refused as
+# `not_on_ledger` (which says what to do about it) rather than read as a word.
+POINTER = re.compile(r"\bf_[0-9A-Za-z]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?\b")
+
+# The object decoration the old grammar required, if the model still writes it:
+# `{fact:f_3a…}`, `{"fact": "f_3a…"}`. A closed shape carrying a pointer, so it
+# is NORMALISED to the pointer rather than refused — 22 of 94 stored answers.
+WRAPPED = re.compile(r"\{\s*[\"']?fact[\"']?\s*:\s*[\"']?(f_[0-9A-Za-z]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?)[\"']?\s*\}")
+
+
+def normalise(text: str) -> str:
+    """The prose as everything downstream reads it. Every reader of a paragraph
+    (the walkers, the gate, the renderer) calls it, so their offsets agree."""
+    return WRAPPED.sub(lambda m: m.group(1), text or "")
+
+
+def split_point(token: str) -> tuple[str, str | None]:
+    """`f_3a1b@2025-12-31` -> ('f_3a1b', '2025-12-31'); a plain id -> (id, None)."""
+    base, sep, period = (token or "").partition("@")
+    return base, (period if sep and period else None)
+
+
+def pointers_in(text: str) -> list[tuple[str, int, int]]:
+    """(token, start, end) for every pointer in an already-normalised string."""
+    return [(m.group(0), m.start(), m.end()) for m in POINTER.finditer(text or "")]
+
+
+# A pointer with no space before it — "…the book aref_1aa5…". The pointer regex
+# needs a word boundary, so this one is found by NEITHER the pointer walk nor
+# the id rule, and the id would reach the reader as literal prose. Found by
+# replaying the stored corpus; refused rather than guessed at, because a silent
+# id in a sentence is the one failure this desk must not have.
+GLUED = re.compile(r"(?<=[0-9A-Za-z])f_[0-9A-Za-z]{4,}")
+
+
+def _blank(text: str) -> str:
+    """The prose with its pointers blanked, same length — what the text rules read."""
+    out = text
+    for _tok, s, e in pointers_in(text):
+        out = out[:s] + " " * (e - s) + out[e:]
+    return out
 
 
 def tokens_in(text: str) -> list[dict]:
@@ -257,6 +294,18 @@ def fill(rec: dict) -> dict:
     return out
 
 
+def fill_point(rec: dict, period: str) -> dict:
+    """One point of a series, as the reader's form of a figure: the point's value
+    as of its own date. The id stays the SERIES' id, so the chip opens the series
+    in the drawer — the point is an address into it, not a row of its own."""
+    value = next((float(p[1]) for p in (rec.get("points") or []) if str(p[0]) == period), None)
+    unit = rec.get("unit") or ""
+    out = {k: rec.get(k) for k in ("id", "measure", "subject", "unit", "params", "standalone", "sources", "group")}
+    out |= {"kind": F.SCALAR, "value": value, "as_of": period, "window": None,
+            "display": dc.display(value, unit) if (value is not None and unit) else str(value)}
+    return out
+
+
 def derive_table(cells: list[list[dict]]) -> dict:
     """header / labels / explicit from the facts in a grid.
 
@@ -300,7 +349,11 @@ def rendered(blocks, records: dict[str, dict], links: dict[tuple[int, int], dict
     for i, b in enumerate(blocks):
         nb = dict(b)
         if b.get("type") == "paragraph":
-            nb["runs"] = _split_runs(i, b.get("runs") or [], records, links)
+            # The INPUT grammar changed; the OUTPUT shape did not. A rendered
+            # paragraph is still `runs` of strings, {fact: …} and {link: …},
+            # which is what the page and every stored answer already read.
+            nb.pop("text", None)
+            nb["runs"] = _paragraph_runs(i, normalise(b.get("text") or ""), records, links)
         elif b.get("type") == "table":
             grid = [[fill(records[c]) for c in row] for row in b["rows"]]
             nb["rows"] = [[{"fact": f} for f in row] for row in grid]
@@ -313,34 +366,36 @@ def rendered(blocks, records: dict[str, dict], links: dict[tuple[int, int], dict
     return out
 
 
-def _split_runs(i: int, runs: list, records: dict[str, dict], links: dict) -> list:
-    """String runs split at their resolved tokens; fact refs filled."""
+def _paragraph_runs(i: int, text: str, records: dict[str, dict], links: dict) -> list:
+    """The sentence, cut at its pointers and at the tokens the gate resolved.
+
+    Both are addressed by offset into the same normalised string — the gate
+    read it with the pointers blanked to spaces of equal length, so the two
+    sets of offsets live in one coordinate system and cannot overlap."""
+    marks: list[tuple[int, int, str, object]] = []
+    for tok, s, e in pointers_in(text):
+        base, period = split_point(tok)
+        marks.append((s, e, "fact", (base, period)))
+    for (bi, s), link in links.items():
+        if bi == i and link["to"] != "question":     # the user's own number stays unmarked
+            marks.append((s, s + len(link["as_written"]), "link", link))
+    marks.sort(key=lambda m: m[0])
     out: list = []
-    # offsets into the block's prose as prose_by_block built it (title first)
-    offset = 0
-    for r in runs:
-        if _is_ref(r):
-            out.append({"fact": fill(records[r["fact"]])})
+    pos = 0
+    for s, e, kind, payload in marks:
+        if s < pos:
             continue
-        if not isinstance(r, str):
-            continue
-        pieces = sorted(((s, l) for (bi, s), l in links.items() if bi == i and offset <= s < offset + len(r)),
-                        key=lambda x: x[0])
-        pos = 0
-        for start, link in pieces:
-            if link["to"] == "question":
-                continue                          # the user's own number stays in its sentence, unmarked
-            local = start - offset
-            if local < pos:
-                continue
-            if local > pos:
-                out.append(r[pos:local])
-            end = local + len(link["as_written"])
-            out.append({"link": {"to": link["to"], "ids": link["ids"], "as_written": r[local:end]}})
-            pos = end
-        if pos < len(r):
-            out.append(r[pos:])
-        offset += len(r) + len(_GAP)
+        if s > pos:
+            out.append(text[pos:s])
+        if kind == "fact":
+            base, period = payload
+            rec = records.get(base)
+            out.append({"fact": (fill_point(rec, period) if period else fill(rec)) if rec else {"id": base}})
+        else:
+            out.append({"link": {"to": payload["to"], "ids": payload["ids"], "as_written": text[s:e]}})
+        pos = e
+    if pos < len(text):
+        out.append(text[pos:])
     return out
 
 

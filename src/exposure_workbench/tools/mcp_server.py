@@ -45,7 +45,7 @@ holdings and alerts, and delegation of long work to background runs.
 Every tool result carries a `facts` block — one row per figure, with its id
 (f_…), what it is, whose, its unit, value, as-of and window — and a `note` in
 which each figure stands as its fact id. State no number you did not get as a
-fact; point at facts by id. The gate refuses an answer that points at what was
+fact; write the fact's id into the sentence where the figure goes. The gate refuses an answer that points at what was
 never shown, or writes a number the facts cannot account for.
 
 Calculations belong to the tools: a number you worked out yourself has no id to

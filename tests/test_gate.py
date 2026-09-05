@@ -41,8 +41,10 @@ def world():
     return led, by, var, passage
 
 
-def _para(*runs, cites=None):
-    b = {"type": "paragraph", "runs": list(runs)}
+def _para(*parts, cites=None):
+    """The new grammar: a paragraph is a sentence with fact ids written in it.
+    Called with strings and {"fact": id} so the cases read as they always did."""
+    b = {"type": "paragraph", "text": "".join(p if isinstance(p, str) else p["fact"] for p in parts)}
     if cites:
         b["cites"] = cites
     return b
@@ -146,8 +148,10 @@ def test_G3_an_id_in_prose_is_a_pointer_in_the_wrong_place(world):
     w = by[("MSFT", "issuer_exposures.weight")]
     v = G.check([_para("See run_b791e7985dcd for the weight.")], led)
     assert v.error == "id_in_prose"
-    v2 = G.check([_para(f"See {w['id']} for the weight.")], led)
-    assert v2.ok and next(iter(v2.links.values()))["ids"] == [w["id"]], "a fact id in prose is linked to its fact"
+    blocks = [_para(f"See {w['id']} for the weight.")]
+    v2 = G.check(blocks, led)
+    assert v2.ok and v2.refs == [w["id"]], "a fact id in prose IS the pointer"
+    assert G.accepted(blocks, v2, led)["blocks"][0]["runs"][1]["fact"]["id"] == w["id"]
 
 
 def test_G3_a_measures_name_written_as_words_is_refused_and_a_plain_word_is_not(world):
@@ -164,11 +168,22 @@ def test_G3_a_quotation_is_verbatim_in_a_cited_passage_or_refused(world):
     assert v.error == "unverified_quote"
 
 
-def test_the_gate_refuses_for_one_of_seven_reasons_and_nothing_else():
+def test_a_pointer_glued_to_the_word_before_it_is_refused_not_left_in_the_prose(world):
+    """The pointer walk needs a word boundary, so an id with no space before it
+    would reach the reader as literal prose. Found replaying the stored corpus."""
+    led, by, *_ = world
+    w = by[("MSFT", "issuer_exposures.weight")]
+    v = G.check([_para(f"the two megacaps are{w['id']} for GOOGL.")], led)
+    assert v.error == "pointer_not_separated" and v.problems[0]["id"] == w["id"]
+    assert G.check([_para(f"the two megacaps are {w['id']} for GOOGL.")], led).ok
+
+
+def test_the_gate_refuses_for_one_of_ten_reasons_and_nothing_else():
     import inspect
     src = inspect.getsource(G)
     reasons = {"malformed_answer", "not_on_ledger", "kind_does_not_fit", "not_standalone",
-               "unsourced_figure", "id_in_prose", "name_in_prose", "unverified_quote"}
+               "unknown_point", "unsourced_figure", "id_in_prose", "name_in_prose", "unverified_quote",
+               "pointer_not_separated"}
     found = {m for m in reasons if f'"{m}"' in src}
     assert found == reasons
     # the only patterns in the gate are whitespace and quotation marks; no digit class, no exemption
@@ -217,14 +232,36 @@ def test_a_cite_may_be_any_fact_the_block_rests_on(world):
     assert v.ok, v.problems
 
 
-def test_a_pointer_written_inside_a_string_is_named_as_that_not_linked(world):
+def test_a_pointer_the_model_wrapped_in_the_old_decoration_is_normalised_not_refused(world):
+    """Measured over 94 stored answers: the object decoration the old grammar
+    required is a closed shape carrying a pointer, and 22 refusals were nothing
+    but that. It is read as the pointer and the reader sees no trace of it."""
     led, by, *_ = world
     w = by[("MSFT", "issuer_exposures.weight")]
     for shape in ("{fact:%s}", '{"fact": "%s"}', "{fact: '%s'}"):
-        v = G.check([_para("MSFT weighs " + shape % w["id"] + " of the book.")], led)
-        assert v.error == "pointer_written_as_text", shape
-        assert v.problems[0]["pointers"] == [shape % w["id"]]
-        assert not any(p["reason"] == "id_in_prose" for p in v.problems), "the id inside is not reported twice"
+        blocks = [_para("MSFT weighs " + shape % w["id"] + " of the book.")]
+        v = G.check(blocks, led)
+        assert v.ok, (shape, v.problems)
+        out = G.accepted(blocks, v, led)
+        assert "{fact" not in out["text"] and out["blocks"][0]["runs"][1]["fact"]["id"] == w["id"]
+
+
+def test_a_point_of_a_series_is_addressed_and_a_period_it_does_not_hold_is_refused(world):
+    led, *_ = world
+    s = next(r for r in led.by_id.values() if r["kind"] == F.SERIES and len(r.get("points") or []) > 1)
+    first, last = str(s["points"][0][0]), str(s["points"][-1][0])
+    blocks = [_para(f"It ran from {s['id']}@{first} to {s['id']}@{last}.")]
+    v = G.check(blocks, led)
+    assert v.ok, v.problems
+    runs = G.accepted(blocks, v, led)["blocks"][0]["runs"]
+    chips = [r["fact"] for r in runs if isinstance(r, dict) and "fact" in r]
+    assert [c["as_of"] for c in chips] == [first, last]
+    assert [c["value"] for c in chips] == [float(s["points"][0][1]), float(s["points"][-1][1])]
+    assert all(c["id"] == s["id"] for c in chips), "the chip opens the series it addresses"
+    bad = G.check([_para(f"It stood at {s['id']}@1999-01-01.")], led)
+    assert bad.error == "unknown_point" and bad.problems[0]["available"]
+    scalar = next(r for r in led.by_id.values() if r["kind"] == F.SCALAR)
+    assert G.check([_para(f"x {scalar['id']}@2026-01-01.")], led).error == "kind_does_not_fit"
 
 
 def test_verified_counts_a_written_value_once_however_many_facts_share_it(world):

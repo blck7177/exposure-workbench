@@ -1,6 +1,12 @@
-"""V24 phase C: the answer grammar (services/answer.py) — three blocks, the
-token finder that decides nothing, the renderer that shows each fact as what it
-is, and the table whose header and labels come from the facts."""
+"""V24 phase C/§4: the answer grammar (services/answer.py).
+
+A paragraph is a SENTENCE and a fact's id written in it is the pointer; the
+array-of-strings-and-objects shape it replaces was legal and the model wrote
+it wrong 28 times in 94 stored answers, always the same way. `cites` stays a
+field: a fact a paragraph rests on is not a fact it states. `f_…@period`
+addresses one point of a series. The rendered OUTPUT is unchanged — runs of
+strings, {fact: …} and {link: …} — so the page reads new and old alike.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +17,9 @@ from exposure_workbench.services import facts as F
 from exposure_workbench.services import ledger as L
 from exposure_workbench.tools.arg_validation import validate_args
 
+WEIGHT, MV, NV_W, NV_MV = "f_aaaa11112222", "f_bbbb11112222", "f_cccc11112222", "f_dddd11112222"
+SERIES, PASSAGE = "f_ssss11112222", "f_pppp11112222"
+
 
 def _fields(blocks) -> list[str]:
     return sorted(p["field"] for p in validate_args(A.ANSWER_SCHEMA, {"blocks": blocks}))
@@ -19,55 +28,66 @@ def _fields(blocks) -> list[str]:
 # ── the schema ────────────────────────────────────────────────────────────────
 
 def test_the_grammar_has_three_block_types_and_each_is_accepted():
-    ok = [{"type": "paragraph", "runs": ["MSFT weighs ", {"fact": "f_a"}, "."], "cites": ["f_p"]},
-          {"type": "table", "title": "Weights", "rows": [["f_a", "f_b"], ["f_c", "f_d"]]},
-          {"type": "chart", "kind": "line", "fact": "f_s"}]
+    ok = [{"type": "paragraph", "text": f"MSFT weighs {WEIGHT} of the book.", "cites": [PASSAGE]},
+          {"type": "table", "title": "Weights", "rows": [[WEIGHT, MV], [NV_W, NV_MV]]},
+          {"type": "chart", "kind": "line", "fact": SERIES}]
     assert _fields(ok) == []
     assert A.BLOCK_TYPES == ("paragraph", "table", "chart")
 
 
-def test_a_slot_a_value_a_name_or_a_string_cell_has_no_place():
-    assert _fields([{"type": "paragraph", "runs": [{"ref": "run_x", "name": "weight"}]}])
-    assert _fields([{"type": "paragraph", "runs": [{"fact": "f_a", "value": 0.16}]}])
-    assert _fields([{"type": "table", "rows": [["Peak-to-trough decline", "f_a"]]}]) == [] or True  # a string cell is a fact id to the schema…
-    problems = A.validate_shape([{"type": "table", "rows": [["", "f_a"]]}])
-    assert problems and problems[0]["reason"] == "cell_not_a_fact_id"      # …and the gate refuses an empty one
-
-
-def test_the_old_block_types_are_unknown():
+def test_the_shapes_the_grammar_no_longer_has():
+    # the old runs array, a slot, a value beside a ref, the old block types
+    assert _fields([{"type": "paragraph", "runs": ["x", {"fact": WEIGHT}]}])
+    assert _fields([{"type": "paragraph", "text": "x", "runs": ["y"]}]) == ["blocks.0.runs"]
     for t in ("metric_table", "trend", "absence", "action"):
-        assert _fields([{"type": t, "text": "x", "series_ref": "calc_s", "absence_ref": "calc_a", "task_ref": "task_t", "rows": [["f"]]}])
         assert A.validate_shape([{"type": t}])[0]["reason"] == "unknown_block_type"
+    assert A.validate_shape([{"type": "paragraph", "text": "  "}])[0]["reason"] == "paragraph_without_text"
 
 
 def test_the_model_cannot_supply_the_derived_keys():
     for key in ("header", "labels", "explicit", "columns"):
-        assert _fields([{"type": "table", "rows": [["f_a"]], key: ["x"]}])
+        assert _fields([{"type": "table", "rows": [[WEIGHT]], key: ["x"]}]) == [f"blocks.0.{key}"]
 
 
 def test_validate_shape_reports_every_problem_not_the_first():
-    problems = A.validate_shape([{"type": "paragraph", "runs": []}, {"type": "table", "rows": [["f_a"], ["f_b", "f_c"]]},
+    problems = A.validate_shape([{"type": "paragraph", "text": ""},
+                                 {"type": "table", "rows": [[WEIGHT], [MV, NV_W]]},
                                  {"type": "chart", "kind": "pie", "fact": ""}])
     reasons = {p["reason"] for p in problems}
-    assert {"paragraph_without_runs", "row_width_mismatch", "unknown_chart_kind", "chart_without_fact"} <= reasons
+    assert {"paragraph_without_text", "row_width_mismatch", "unknown_chart_kind", "chart_without_fact"} <= reasons
 
 
-# ── walking ───────────────────────────────────────────────────────────────────
+# ── pointers ──────────────────────────────────────────────────────────────────
 
-def test_refs_in_gathers_every_pointer_with_its_role_in_order():
-    blocks = [{"type": "paragraph", "runs": ["a ", {"fact": "f_1"}, " b"], "cites": ["f_p"]},
-              {"type": "table", "rows": [["f_2", "f_3"]]},
-              {"type": "chart", "kind": "bar", "fact": "f_s"}]
-    assert [(fid, role) for _, fid, role in A.refs_in(blocks)] == [
-        ("f_1", A.INLINE), ("f_p", A.CITE), ("f_2", A.CELL), ("f_3", A.CELL), ("f_s", A.CHART)]
-    assert A.ids_in(blocks + blocks) == ["f_1", "f_p", "f_2", "f_3", "f_s"]
+def test_the_old_object_decoration_is_normalised_to_the_pointer_it_carries():
+    for shape in ("{fact:%s}", '{"fact": "%s"}', "{fact: '%s'}", '{ "fact" : %s }'):
+        assert A.normalise("a " + shape % WEIGHT + " b") == f"a {WEIGHT} b"
+    assert A.normalise(f"plain {WEIGHT} stays") == f"plain {WEIGHT} stays"
 
 
-def test_prose_by_block_reads_strings_only_and_keeps_runs_apart():
-    blocks = [{"type": "paragraph", "runs": ["VaR (", {"fact": "f_1"}, ") at 95%"], "cites": ["f_p"]},
-              {"type": "table", "title": "Two names", "rows": [["f_2"]]}]
+def test_split_point_and_pointers_in():
+    assert A.split_point(WEIGHT) == (WEIGHT, None)
+    assert A.split_point(f"{SERIES}@2025-12-31") == (SERIES, "2025-12-31")
+    text = f"from {SERIES}@2024-12-31 to {SERIES}@2025-12-31, and {WEIGHT}."
+    assert [t for t, _s, _e in A.pointers_in(text)] == [f"{SERIES}@2024-12-31", f"{SERIES}@2025-12-31", WEIGHT]
+
+
+def test_refs_in_gathers_pointers_and_cites_with_their_roles():
+    blocks = [{"type": "paragraph", "text": f"a {WEIGHT} b {SERIES}@2025-12-31", "cites": [PASSAGE]},
+              {"type": "table", "rows": [[MV, NV_W]]},
+              {"type": "chart", "kind": "bar", "fact": SERIES}]
+    assert [(t, role) for _at, t, role in A.refs_in(blocks)] == [
+        (WEIGHT, A.INLINE), (f"{SERIES}@2025-12-31", A.INLINE), (PASSAGE, A.CITE),
+        (MV, A.CELL), (NV_W, A.CELL), (SERIES, A.CHART)]
+    assert A.ids_in(blocks) == [WEIGHT, SERIES, PASSAGE, MV, NV_W]
+
+
+def test_prose_by_block_blanks_the_pointers_and_keeps_the_length():
+    blocks = [{"type": "paragraph", "text": f"VaR ({WEIGHT}) at 95%", "cites": [PASSAGE]},
+              {"type": "table", "title": "Two names", "rows": [[MV]]}]
     (i0, p0, c0), (i1, p1, c1) = A.prose_by_block(blocks)
-    assert i0 == 0 and c0 == ["f_p"] and "VaR (" in p0 and ") at 95%" in p0 and "f_1" not in p0
+    assert i0 == 0 and c0 == [PASSAGE] and len(p0) == len(blocks[0]["text"])
+    assert WEIGHT not in p0 and p0.startswith("VaR (") and p0.endswith(") at 95%")
     assert i1 == 1 and p1 == "Two names" and c1 == []
 
 
@@ -79,75 +99,84 @@ def test_prose_by_block_reads_strings_only_and_keeps_runs_apart():
     ("weighs 16.3% of the book at $1,785,420", [("16.3%", "num"), ("$1,785,420", "num")]),
     ("net debt of $38.1bn and 2.4739 billion", [("$38.1bn", "num"), ("2.4739 billion", "num")]),
     ("accounted for 82 percent of revenue", [("82%", "num")]),
-    ("see run_1d6e9e05bee6 and f_3a1b2c3d4e5f", [("run_1d6e9e05bee6", "id"), ("f_3a1b2c3d4e5f", "id")]),
     ("95% 1日 VaR 为", [("95%", "num"), ("1", "num")]),
-    ("the H200 ramp", []),           # a designator, not a number: no digit run stands alone
-    ("no figures here", []),
+    ("the H200 ramp", []),
+    # a clause mark is not part of the figure: "2024," could resolve against no
+    # lookup, and four of the seven unsourced_figure refusals in the whole
+    # stored corpus were exactly this (measured 2026-09-05)
+    ("in 2024, revenue rose", [("2024", "num")]),
+    ("of $1,785,420, which is", [("$1,785,420", "num")]),
+    ("16.3%, and then", [("16.3%", "num")]),
 ])
-def test_tokens_in_finds_ids_dates_forms_and_numbers_whole(text, expected):
+def test_tokens_in_finds_whole_tokens_and_stops_at_the_clause(text, expected):
     assert [(t["token"], t["kind"]) for t in A.tokens_in(text)] == expected
 
 
 # ── rendering ─────────────────────────────────────────────────────────────────
 
 def _facts():
-    a = F.fact(F.SCALAR, "issuer_exposures.weight", subject="MSFT", unit="RATIO", value=0.16251671, as_of="2026-09-03", sources=("run_x",))
-    b = F.fact(F.SCALAR, "issuer_exposures.market_value", subject="MSFT", unit="MONEY", value=1785420.0, as_of="2026-09-03", sources=("run_x",))
-    c = F.fact(F.SCALAR, "issuer_exposures.weight", subject="NVDA", unit="RATIO", value=0.1493, as_of="2026-09-03", sources=("run_x",))
-    d = F.fact(F.SCALAR, "issuer_exposures.market_value", subject="NVDA", unit="MONEY", value=1640000.0, as_of="2026-09-03", sources=("run_x",))
-    s = F.fact(F.SERIES, "operating_cash_flow", subject="MSFT", unit="MONEY",
-               points=(("2022-12-31", 7.59e9), ("2023-12-31", 9.1e9), ("2025-12-31", 16.81e9)),
-               window={"start": "2022-12-31", "end": "2025-12-31"}, as_of="2025-12-31", sources=("calc_s",))
-    p = F.fact(F.PASSAGE, "10-K Item 7", subject="LLY", text="Six products accounted for 82 percent of total revenues in 2025.",
-               as_of="2026-02-20", params={"form_type": "10-K"}, sources=("chunk_1",))
-    ab = F.fact(F.ABSENCE, "segment_revenue", subject="MSFT", text="not held as figures; stated in the segment note", as_of="2026-09-05", sources=("calc_abs",))
-    return a, b, c, d, s, p, ab
+    def f(fid, **kw):
+        return F.Fact(id=fid, **kw)
+    a = f(WEIGHT, kind=F.SCALAR, measure="issuer_exposures.weight", subject="MSFT", unit="RATIO",
+          value=0.16251671, as_of="2026-09-03", sources=("run_x",))
+    b = f(MV, kind=F.SCALAR, measure="issuer_exposures.market_value", subject="MSFT", unit="MONEY",
+          value=1785420.0, as_of="2026-09-03", sources=("run_x",))
+    c = f(NV_W, kind=F.SCALAR, measure="issuer_exposures.weight", subject="NVDA", unit="RATIO",
+          value=0.1493, as_of="2026-09-03", sources=("run_x",))
+    d = f(NV_MV, kind=F.SCALAR, measure="issuer_exposures.market_value", subject="NVDA", unit="MONEY",
+          value=1640000.0, as_of="2026-09-03", sources=("run_x",))
+    s = f(SERIES, kind=F.SERIES, measure="operating_cash_flow", subject="MSFT", unit="MONEY",
+          points=(("2022-12-31", 7.59e9), ("2023-12-31", 9.1e9), ("2025-12-31", 16.81e9)),
+          window={"start": "2022-12-31", "end": "2025-12-31"}, as_of="2025-12-31", sources=("calc_s",))
+    p = f(PASSAGE, kind=F.PASSAGE, measure="10-K Item 7", subject="LLY", as_of="2026-02-20",
+          text="Six products accounted for 82 percent of total revenues in 2025.", sources=("chunk_1",))
+    return a, b, c, d, s, p
 
 
-def test_rendered_fills_each_pointer_with_its_fact_and_a_table_derives_its_labels():
-    a, b, c, d, s, p, ab = _facts()
-    led = L.Ledger.of_facts([a, b, c, d, s, p, ab])
-    blocks = [{"type": "paragraph", "runs": ["MSFT weighs ", {"fact": a.id}, " of the book."]},
+def test_rendered_fills_each_pointer_and_a_table_derives_its_labels():
+    a, b, c, d, s, p = _facts()
+    led = L.Ledger.of_facts([a, b, c, d, s, p])
+    blocks = [{"type": "paragraph", "text": f"MSFT weighs {a.id} of the book."},
               {"type": "table", "rows": [[a.id, b.id], [c.id, d.id]]},
-              {"type": "paragraph", "runs": ["Cash generation climbed ", {"fact": s.id}, "; segment revenue is ", {"fact": ab.id}, "."]}]
+              {"type": "paragraph", "text": f"Cash generation climbed: {s.id}."}]
     out = A.rendered(blocks, led.by_id)
+    assert "text" not in out[0], "the rendered form is runs, as the page has always read"
+    assert out[0]["runs"][0] == "MSFT weighs " and out[0]["runs"][2] == " of the book."
     assert out[0]["runs"][1]["fact"]["display"] == "16.3%" and out[0]["runs"][1]["fact"]["as_of"] == "2026-09-03"
     assert out[1]["header"] == ["issuer exposures weight", "issuer exposures market value"]
     assert out[1]["labels"] == ["MSFT", "NVDA"] and out[1]["explicit"] == [False, False]
     series = out[2]["runs"][1]["fact"]["series"]
-    assert series["from"]["period"] == "2022-12-31" and series["to"]["value"] == 16.81e9 and series["direction"] == "up"
-    assert out[2]["runs"][3]["fact"]["kind"] == F.ABSENCE and out[2]["runs"][3]["fact"]["text"].startswith("not held")
+    assert series["from"]["period"] == "2022-12-31" and series["direction"] == "up"
     text = A.prose_of(out)
     assert "MSFT weighs 16.3% of the book." in text
     assert " | issuer exposures weight | issuer exposures market value\nMSFT | 16.3% | $1.79M\nNVDA | 14.9% | $1.64M" in text
 
 
-def test_a_column_whose_measures_differ_is_explicit_and_a_single_row_is_labelled_by_its_subject():
-    a, b, c, d, *_ = _facts()
-    grid = [[A.fill(F.for_record(a)), A.fill(F.for_record(d))]]
-    dd = A.derive_table(grid)
-    assert dd["labels"] == ["MSFT"] and dd["explicit"] == [False, False]
-    grid2 = [[A.fill(F.for_record(a)), A.fill(F.for_record(b))], [A.fill(F.for_record(c)), A.fill(F.for_record(a))]]
-    assert A.derive_table(grid2)["explicit"] == [False, True]
-
-
-def test_resolved_prose_tokens_become_links_at_their_written_text():
-    a, b, *_ = _facts()
-    led = L.Ledger.of_facts([a, b])
-    blocks = [{"type": "paragraph", "runs": ["MSFT is 16.3% of the book, worth $1.79M as of 2026-09-03."]}]
-    links = {(0, 8): {"to": "fact", "ids": [a.id], "as_written": "16.3%"},
-             (0, 33): {"to": "fact", "ids": [b.id], "as_written": "$1.79M"},
-             (0, 46): {"to": "fact", "ids": [a.id, b.id], "as_written": "2026-09-03"}}
-    out = A.rendered(blocks, led.by_id, links)
-    runs = out[0]["runs"]
-    assert runs[0] == "MSFT is " and runs[1] == {"link": {"to": "fact", "ids": [a.id], "as_written": "16.3%"}}
-    assert runs[2] == " of the book, worth " and runs[3]["link"]["as_written"] == "$1.79M"
-    assert runs[5]["link"]["ids"] == [a.id, b.id] and runs[6] == "."
-    assert A.prose_of(out) == "MSFT is 16.3% of the book, worth $1.79M as of 2026-09-03."
+def test_a_point_of_a_series_renders_as_that_points_value_on_its_own_date():
+    *_, s, _p = _facts()
+    led = L.Ledger.of_facts([s])
+    out = A.rendered([{"type": "paragraph", "text": f"It ran {s.id}@2022-12-31 to {s.id}@2025-12-31."}], led.by_id)
+    first, last = out[0]["runs"][1]["fact"], out[0]["runs"][3]["fact"]
+    assert (first["value"], first["as_of"], first["display"]) == (7.59e9, "2022-12-31", "$7.59B")
+    assert (last["value"], last["as_of"], last["display"]) == (16.81e9, "2025-12-31", "$16.81B")
+    assert first["id"] == s.id == last["id"], "the chip opens the series it addresses"
+    assert A.prose_of(out) == "It ran $7.59B to $16.81B."
 
 
 def test_a_passage_pointed_at_inline_reads_as_a_mark_not_its_text():
-    a, b, c, d, s, p, ab = _facts()
+    *_, p = _facts()
     led = L.Ledger.of_facts([p])
-    out = A.rendered([{"type": "paragraph", "runs": ["Lilly says so: ", {"fact": p.id}, "."]}], led.by_id)
+    out = A.rendered([{"type": "paragraph", "text": f"Lilly says so: {p.id}."}], led.by_id)
     assert A.prose_of(out) == "Lilly says so: [10-K Item 7]."
+
+
+def test_resolved_prose_tokens_become_links_beside_the_pointers():
+    a, b, *_ = _facts()
+    led = L.Ledger.of_facts([a, b])
+    text = f"MSFT is 16.3% of the book, worth {b.id} as of 2026-09-03."
+    links = {(0, text.index("16.3%")): {"to": "fact", "ids": [a.id], "as_written": "16.3%"},
+             (0, text.index("2026-09-03")): {"to": "fact", "ids": [a.id, b.id], "as_written": "2026-09-03"}}
+    runs = A.rendered([{"type": "paragraph", "text": text}], led.by_id, links)[0]["runs"]
+    assert runs[0] == "MSFT is " and runs[1]["link"]["as_written"] == "16.3%"
+    assert runs[3]["fact"]["id"] == b.id and runs[5]["link"]["ids"] == [a.id, b.id]
+    assert A.prose_of([{"type": "paragraph", "runs": runs}]) == f"MSFT is 16.3% of the book, worth $1.79M as of 2026-09-03."

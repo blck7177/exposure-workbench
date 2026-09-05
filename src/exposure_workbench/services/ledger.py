@@ -190,7 +190,10 @@ class Ledger:
         if sign in ("-", "−"):
             v = -v
         decimals = len(core.split(".")[1]) if "." in core else 0
-        tol = 0.5 * 10 ** (-decimals)
+        # Half a unit of the last digit written, and a hair more: a figure that
+        # sits EXACTLY on the boundary (0.1625 written as 16.3%) misses by one
+        # float ulp otherwise, and the reader is looking at the same number.
+        tol = 0.5 * 10 ** (-decimals) * (1 + 1e-9) + 1e-12
         scale = {"k": 1e3, "thousand": 1e3, "m": 1e6, "mn": 1e6, "million": 1e6,
                  "b": 1e9, "bn": 1e9, "billion": 1e9}.get((suffix or "").lower(), None)
         hits: list[str] = []
