@@ -112,6 +112,9 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
         out = await _scenario(db, subject, expand)
     if out.get("error"):
         return out
+    # V24: the catalogue's own date. Its counts and latest values are facts and
+    # a fact says as of when; a map of the desk is as of the moment it is drawn.
+    out["catalogue_as_of"] = date.today().isoformat()
     out["how_to_read"] = _HOW_TO_READ
     out["withheld"] = wh.withheld_note()
     return out

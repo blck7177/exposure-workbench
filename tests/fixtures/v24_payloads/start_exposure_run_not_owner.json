@@ -1,0 +1,5 @@
+{
+ "error": "not_your_portfolio",
+ "portfolio_id": "port_001",
+ "detail": "you can only run a portfolio you own; clone the demo to run it"
+}

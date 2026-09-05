@@ -1,0 +1,33 @@
+{
+ "method": "price.beta",
+ "subject": "MSFT",
+ "n": 253,
+ "unmatched_points": 0,
+ "window": "1y",
+ "basis": "OLS of calc_61f2024414ce on calc_2cd9cde82fb6 over 253 observations aligned by period key; 0 unmatched points dropped and counted",
+ "beta": {
+  "value": 0.954760631813798,
+  "calc_id": "calc_589edcbf0c19",
+  "quantity": "MSFT.beta.SPY",
+  "unit_class": "multiple"
+ },
+ "alpha": {
+  "value": -0.0005092450809486505,
+  "calc_id": "calc_a3643a2f9231",
+  "quantity": "MSFT.alpha.SPY",
+  "unit_class": "ratio"
+ },
+ "r2": {
+  "value": 0.1421986549895084,
+  "calc_id": "calc_cb1f873b5657",
+  "quantity": "MSFT.r2.SPY",
+  "unit_class": "ratio"
+ },
+ "ticker": "MSFT",
+ "benchmark": "SPY",
+ "returns_series": {
+  "MSFT": "calc_61f2024414ce",
+  "SPY": "calc_2cd9cde82fb6"
+ },
+ "convention": "simple daily adj_close total returns on both sides; alpha is per trading day"
+}

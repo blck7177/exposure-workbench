@@ -1,0 +1,27 @@
+{
+ "n": 254,
+ "unmatched_points": 0,
+ "window": {
+  "from": "2025-09-02",
+  "to": "2026-09-03"
+ },
+ "basis": "OLS of calc_10dbf09a186d on calc_7503990cd61b over 254 observations aligned by period key; 0 unmatched points dropped and counted",
+ "beta": {
+  "value": -0.2733366073275485,
+  "calc_id": "calc_2092730462a6",
+  "quantity": "regress(calc_10dbf09a186d~calc_7503990cd61b).beta",
+  "unit_class": "multiple"
+ },
+ "alpha": {
+  "value": 637.4369298558266,
+  "calc_id": "calc_f5fb065f45b2",
+  "quantity": "regress(calc_10dbf09a186d~calc_7503990cd61b).alpha",
+  "unit_class": "ratio"
+ },
+ "r2": {
+  "value": 0.04531526715747501,
+  "calc_id": "calc_c3a2e4ee42c6",
+  "quantity": "regress(calc_10dbf09a186d~calc_7503990cd61b).r2",
+  "unit_class": "ratio"
+ }
+}

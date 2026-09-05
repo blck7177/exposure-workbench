@@ -1,0 +1,309 @@
+{
+ "method": "book.sell",
+ "subject": "run_b791e7985dcd",
+ "calc_id": "calc_fab299253d82",
+ "from_run": "run_b791e7985dcd",
+ "as_of": "2026-09-03",
+ "sales": [
+  {
+   "ticker": "NVDA",
+   "fraction": 0.5
+  }
+ ],
+ "sold": [
+  {
+   "ticker": "NVDA",
+   "fraction": 0.5,
+   "market_value_sold": 228450.0,
+   "exited": false
+  }
+ ],
+ "proceeds": 228450.0,
+ "market_value": 10757620.0,
+ "positions": [
+  {
+   "label": "MSFT",
+   "sector": "Technology",
+   "market_value": 1785420.0,
+   "weight": 0.16596793714594865
+  },
+  {
+   "label": "AAPL",
+   "sector": "Technology",
+   "market_value": 1641050.0,
+   "weight": 0.15254768247995373
+  },
+  {
+   "label": "JPM",
+   "sector": "Financials",
+   "market_value": 1629270.0,
+   "weight": 0.15145264472996817
+  },
+  {
+   "label": "LLY",
+   "sector": "Healthcare",
+   "market_value": 1391520.0,
+   "weight": 0.12935203139727933
+  },
+  {
+   "label": "GOOGL",
+   "sector": "Communication_Services",
+   "market_value": 1369920.0,
+   "weight": 0.1273441523310918
+  },
+  {
+   "label": "HYG",
+   "sector": "Fixed_Income",
+   "market_value": 792100.0,
+   "weight": 0.07363152816329263
+  },
+  {
+   "label": "AMZN",
+   "sector": "Consumer_Discretionary",
+   "market_value": 776700.0,
+   "weight": 0.07219998475499227
+  },
+  {
+   "label": "TLT",
+   "sector": "Fixed_Income",
+   "market_value": 656560.0,
+   "weight": 0.061032087022966044
+  },
+  {
+   "label": "XOM",
+   "sector": "Energy",
+   "market_value": 486630.0,
+   "weight": 0.04523584212864928
+  },
+  {
+   "label": "NVDA",
+   "sector": "Technology",
+   "market_value": 228450.0,
+   "weight": 0.0212361098458581
+  }
+ ],
+ "sectors": [
+  {
+   "label": "Technology",
+   "market_value": 3654920.0,
+   "weight": 0.33975172947176047
+  },
+  {
+   "label": "Financials",
+   "market_value": 1629270.0,
+   "weight": 0.15145264472996817
+  },
+  {
+   "label": "Fixed_Income",
+   "market_value": 1448660.0,
+   "weight": 0.13466361518625866
+  },
+  {
+   "label": "Healthcare",
+   "market_value": 1391520.0,
+   "weight": 0.12935203139727933
+  },
+  {
+   "label": "Communication_Services",
+   "market_value": 1369920.0,
+   "weight": 0.1273441523310918
+  },
+  {
+   "label": "Consumer_Discretionary",
+   "market_value": 776700.0,
+   "weight": 0.07219998475499227
+  },
+  {
+   "label": "Energy",
+   "market_value": 486630.0,
+   "weight": 0.04523584212864928
+  }
+ ],
+ "limit_checks": [
+  {
+   "label": "gross_exposure",
+   "current_value": 1.0,
+   "warning_level": 1.1,
+   "breach_level": 1.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:AAPL",
+   "current_value": 0.15254768247995373,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "warning",
+   "fired": true
+  },
+  {
+   "label": "issuer_concentration:AMZN",
+   "current_value": 0.07219998475499227,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:GOOGL",
+   "current_value": 0.1273441523310918,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:HYG",
+   "current_value": 0.07363152816329263,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:JPM",
+   "current_value": 0.15145264472996817,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "warning",
+   "fired": true
+  },
+  {
+   "label": "issuer_concentration:LLY",
+   "current_value": 0.12935203139727933,
+   "warning_level": 0.12,
+   "breach_level": 0.18,
+   "status": "warning",
+   "fired": true
+  },
+  {
+   "label": "issuer_concentration:MSFT",
+   "current_value": 0.16596793714594865,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "warning",
+   "fired": true
+  },
+  {
+   "label": "issuer_concentration:NVDA",
+   "current_value": 0.0212361098458581,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:TLT",
+   "current_value": 0.061032087022966044,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "issuer_concentration:XOM",
+   "current_value": 0.04523584212864928,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Communication_Services",
+   "current_value": 0.1273441523310918,
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Consumer_Discretionary",
+   "current_value": 0.07219998475499227,
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Energy",
+   "current_value": 0.04523584212864928,
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Financials",
+   "current_value": 0.15145264472996817,
+   "warning_level": 0.2,
+   "breach_level": 0.3,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Fixed_Income",
+   "current_value": 0.13466361518625866,
+   "warning_level": 0.2,
+   "breach_level": 0.3,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Healthcare",
+   "current_value": 0.12935203139727933,
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "status": "ok",
+   "fired": false
+  },
+  {
+   "label": "sector_concentration:Technology",
+   "current_value": 0.33975172947176047,
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "status": "ok",
+   "fired": false
+  }
+ ],
+ "alerts": [
+  {
+   "alert_type": "issuer_concentration",
+   "entity_id": "AAPL",
+   "severity": "warning",
+   "current_value": 0.15254768247995373,
+   "limit_value": 0.15
+  },
+  {
+   "alert_type": "issuer_concentration",
+   "entity_id": "JPM",
+   "severity": "warning",
+   "current_value": 0.15145264472996817,
+   "limit_value": 0.15
+  },
+  {
+   "alert_type": "issuer_concentration",
+   "entity_id": "LLY",
+   "severity": "warning",
+   "current_value": 0.12935203139727933,
+   "limit_value": 0.12
+  },
+  {
+   "alert_type": "issuer_concentration",
+   "entity_id": "MSFT",
+   "severity": "warning",
+   "current_value": 0.16596793714594865,
+   "limit_value": 0.15
+  }
+ ],
+ "checks_not_run": [
+  "daily_loss",
+  "rolling_volatility_30d"
+ ],
+ "factor_exposure": {
+  "measured": false,
+  "reason": "betas are a regression over the book's return history; the book after the sale has none, so none is carried"
+ },
+ "reads_as": "The book as it would stand after the trade, as of the run's date: each weight is its market value over the book's; sale proceeds leave the book and purchase money comes from outside it. Every name here is on the table under the calc_id, and the same names on run_b791e7985dcd are the book before \u2014 subtract for the change.",
+ "not_a_forecast": true,
+ "cite": "calc_fab299253d82"
+}

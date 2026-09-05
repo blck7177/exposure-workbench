@@ -1,0 +1,85 @@
+{
+ "calc_id": "calc_34f3d764ce86",
+ "ticker": "MSFT",
+ "metric": "revenue",
+ "months": 12,
+ "unit_class": "MONEY",
+ "points": [
+  {
+   "start": "2020-07-01",
+   "period_end": "2021-06-30",
+   "value": 168088000000.0,
+   "fact_ids": [
+    "fact_b9f2c418ae4d"
+   ],
+   "terms": [
+    {
+     "fact_id": "fact_b9f2c418ae4d",
+     "sign": 1
+    }
+   ],
+   "derivation": "2020-07-01..2021-06-30"
+  },
+  {
+   "start": "2021-07-01",
+   "period_end": "2022-06-30",
+   "value": 198270000000.0,
+   "fact_ids": [
+    "fact_e937c565a1b1"
+   ],
+   "terms": [
+    {
+     "fact_id": "fact_e937c565a1b1",
+     "sign": 1
+    }
+   ],
+   "derivation": "2021-07-01..2022-06-30"
+  },
+  {
+   "start": "2022-07-01",
+   "period_end": "2023-06-30",
+   "value": 211915000000.0,
+   "fact_ids": [
+    "fact_7d45a96a289c"
+   ],
+   "terms": [
+    {
+     "fact_id": "fact_7d45a96a289c",
+     "sign": 1
+    }
+   ],
+   "derivation": "2022-07-01..2023-06-30"
+  },
+  {
+   "start": "2023-07-01",
+   "period_end": "2024-06-30",
+   "value": 245122000000.0,
+   "fact_ids": [
+    "fact_7255f526122a"
+   ],
+   "terms": [
+    {
+     "fact_id": "fact_7255f526122a",
+     "sign": 1
+    }
+   ],
+   "derivation": "2023-07-01..2024-06-30"
+  },
+  {
+   "start": "2024-07-01",
+   "period_end": "2025-06-30",
+   "value": 281724000000.0,
+   "fact_ids": [
+    "fact_2a08c00f1a50"
+   ],
+   "terms": [
+    {
+     "fact_id": "fact_2a08c00f1a50",
+     "sign": 1
+    }
+   ],
+   "derivation": "2024-07-01..2025-06-30"
+  }
+ ],
+ "basis": "5 consecutive 12-month windows on MSFT's own reporting grid, 2020-07-01..2025-06-30"
+}

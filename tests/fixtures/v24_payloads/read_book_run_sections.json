@@ -1,0 +1,289 @@
+{
+ "run_id": "run_b791e7985dcd",
+ "section": {
+  "alerts": {
+   "run_id": "run_b791e7985dcd",
+   "as_of": "2026-09-03",
+   "alerts": [
+    {
+     "id": "alert_1c5fe7c8db0b",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "LLY",
+     "current_value": 0.12666222,
+     "limit_value": 0.12,
+     "utilization": 0.70367899,
+     "message": "Issuer LLY: 12.7% vs limit 12.0% [WARNING]",
+     "reads_as": "LLY: 0.1267 against the warning level of 0.12 \u2014 utilisation 70.4% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.12. 70.4% is a share of a limit, never a level in itself."
+    },
+    {
+     "id": "alert_455cad508de7",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "MSFT",
+     "current_value": 0.16251671,
+     "limit_value": 0.15,
+     "utilization": 0.81258357,
+     "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+     "reads_as": "MSFT: 0.1625 against the warning level of 0.15 \u2014 utilisation 81.3% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.15. 81.3% is a share of a limit, never a level in itself."
+    }
+   ],
+   "checks_run": 20,
+   "checks_clear": 18,
+   "cite": "run_b791e7985dcd"
+  },
+  "attribution": {
+   "run_id": "run_b791e7985dcd",
+   "portfolio_id": "port_001",
+   "as_of": "2026-09-03",
+   "attribution_portfolio_return": 0.01159506,
+   "daily_return": 0.01159506,
+   "daily_pnl": 125924.0,
+   "factors": [
+    {
+     "factor_name": "credit",
+     "factor_ticker": "HYG",
+     "beta": 0.24588183,
+     "factor_return": 0.00126406,
+     "contribution": 0.00031081,
+     "r_squared": 0.45327454,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "gold",
+     "factor_ticker": "GLD",
+     "beta": -0.00531121,
+     "factor_return": 0.01847162,
+     "contribution": -9.811e-05,
+     "r_squared": 0.01639276,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "growth",
+     "factor_ticker": "QQQ",
+     "beta": -0.19477851,
+     "factor_return": 0.01188596,
+     "contribution": -0.00231513,
+     "r_squared": 0.6694179,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "market",
+     "factor_ticker": "SPY",
+     "beta": 1.24495791,
+     "factor_return": 0.0104684,
+     "contribution": 0.01303272,
+     "r_squared": 0.78022797,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "oil",
+     "factor_ticker": "USO",
+     "beta": -0.0079188,
+     "factor_return": 0.00665958,
+     "contribution": -5.274e-05,
+     "r_squared": 0.00109054,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "rates",
+     "factor_ticker": "TLT",
+     "beta": -0.00733297,
+     "factor_return": 0.00146431,
+     "contribution": -1.074e-05,
+     "r_squared": 0.0213674,
+     "quotable_individually": false
+    },
+    {
+     "factor_name": "small_cap",
+     "factor_ticker": "IWM",
+     "beta": -0.19453553,
+     "factor_return": 0.00401347,
+     "contribution": -0.00078076,
+     "r_squared": 0.41020801,
+     "quotable_individually": false
+    }
+   ],
+   "factor_note": "These factors are collinear (max VIF above 5). Their SUM is well determined; no single beta is. Quote the total factor contribution, not one coefficient.",
+   "positions": [
+    {
+     "ticker": "AAPL",
+     "sector": "Technology",
+     "weight": 0.14937553,
+     "daily_return": 0.01000123,
+     "contribution": 0.0014963,
+     "market_value": 1641050.0,
+     "daily_pnl": 16250.0
+    },
+    {
+     "ticker": "AMZN",
+     "sector": "Consumer_Discretionary",
+     "weight": 0.07069862,
+     "daily_return": 0.01537375,
+     "contribution": 0.00108286,
+     "market_value": 776700.0,
+     "daily_pnl": 11760.0
+    },
+    {
+     "ticker": "GOOGL",
+     "sector": "Communication_Services",
+     "weight": 0.12469609,
+     "daily_return": 0.01589938,
+     "contribution": 0.00197419,
+     "market_value": 1369920.0,
+     "daily_pnl": 21440.0
+    },
+    {
+     "ticker": "HYG",
+     "sector": "Fixed_Income",
+     "weight": 0.0721004,
+     "daily_return": 0.00126406,
+     "contribution": 9.208e-05,
+     "market_value": 792100.0,
+     "daily_pnl": 1000.0
+    },
+    {
+     "ticker": "JPM",
+     "sector": "Financials",
+     "weight": 0.14830326,
+     "daily_return": 0.01639436,
+     "contribution": 0.00241986,
+     "market_value": 1629270.0,
+     "daily_pnl": 26280.0
+    },
+    {
+     "ticker": "LLY",
+     "sector": "Healthcare",
+     "weight": 0.12666222,
+     "daily_return": -0.00041376,
+     "contribution": -5.304e-05,
+     "market_value": 1391520.0,
+     "daily_pnl": -576.0
+    },
+    {
+     "ticker": "MSFT",
+     "sector": "Technology",
+     "weight": 0.16251671,
+     "daily_return": 0.02677026,
+     "contribution": 0.00428631,
+     "market_value": 1785420.0,
+     "daily_pnl": 46550.0
+    },
+    {
+     "ticker": "NVDA",
+     "sector": "Technology",
+     "weight": 0.04158903,
+     "daily_return": 0.01800276,
+     "contribution": 0.000744,
+     "market_value": 456900.0,
+     "daily_pnl": 8080.0
+    },
+    {
+     "ticker": "TLT",
+     "sector": "Fixed_Income",
+     "weight": 0.05976295,
+     "daily_return": 0.00146431,
+     "contribution": 8.84e-05,
+     "market_value": 656560.0,
+     "daily_pnl": 960.0
+    },
+    {
+     "ticker": "XOM",
+     "sector": "Energy",
+     "weight": 0.04429518,
+     "daily_return": -0.01181846,
+     "contribution": -0.0005359,
+     "market_value": 486630.0,
+     "daily_pnl": -5820.0
+    }
+   ],
+   "metadata": {
+    "alpha": 0.00010462,
+    "residual": 0.00140438,
+    "model_r_squared": 0.80740492,
+    "observations": 750,
+    "regression_window_days": 750,
+    "max_vif": 16.702893,
+    "collinear": true,
+    "attribution_date": "2026-09-03"
+   },
+   "metadata_note": null,
+   "cite": "run_b791e7985dcd"
+  },
+  "risk_state": {
+   "run_id": "run_b791e7985dcd",
+   "portfolio_id": "port_001",
+   "as_of": "2026-09-03",
+   "status": "completed",
+   "metrics": {
+    "portfolio_market_value": 10986070.0,
+    "daily_pnl": 125924.0,
+    "daily_return": 0.01159506,
+    "gross_exposure": 10986070.0,
+    "net_exposure": 10986070.0,
+    "gross_exposure_pct": 1.0,
+    "net_exposure_pct": 1.0,
+    "rolling_vol_30d": 0.12156975,
+    "rolling_vol_60d": 0.13174456,
+    "max_drawdown": 0.17668075
+   },
+   "scenarios": [],
+   "limit_checks": {
+    "evaluated": 20,
+    "fired": 2,
+    "clear": 18,
+    "types_clear": [
+     "daily_loss",
+     "gross_exposure",
+     "issuer_concentration:AAPL",
+     "issuer_concentration:AMZN",
+     "issuer_concentration:GOOGL",
+     "issuer_concentration:HYG",
+     "issuer_concentration:JPM",
+     "issuer_concentration:NVDA",
+     "issuer_concentration:TLT",
+     "issuer_concentration:XOM",
+     "rolling_volatility_30d",
+     "sector_concentration:Communication_Services",
+     "sector_concentration:Consumer_Discretionary",
+     "sector_concentration:Energy",
+     "sector_concentration:Financials",
+     "sector_concentration:Fixed_Income",
+     "sector_concentration:Healthcare",
+     "sector_concentration:Technology"
+    ]
+   },
+   "alerts": [
+    {
+     "id": "alert_1c5fe7c8db0b",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "LLY",
+     "current_value": 0.12666222,
+     "limit_value": 0.12,
+     "utilization": 0.70367899,
+     "message": "Issuer LLY: 12.7% vs limit 12.0% [WARNING]",
+     "reads_as": "LLY: 0.1267 against the warning level of 0.12 \u2014 utilisation 70.4% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.12. 70.4% is a share of a limit, never a level in itself."
+    },
+    {
+     "id": "alert_455cad508de7",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "MSFT",
+     "current_value": 0.16251671,
+     "limit_value": 0.15,
+     "utilization": 0.81258357,
+     "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+     "reads_as": "MSFT: 0.1625 against the warning level of 0.15 \u2014 utilisation 81.3% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.15. 81.3% is a share of a limit, never a level in itself."
+    }
+   ],
+   "not_a_forecast": true,
+   "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures.",
+   "cite": "run_b791e7985dcd"
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "error": "unknown_window",
+ "window": "7y",
+ "known": [
+  "1m",
+  "1y",
+  "3m",
+  "3y",
+  "6m"
+ ]
+}

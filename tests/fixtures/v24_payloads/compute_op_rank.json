@@ -1,0 +1,53 @@
+{
+ "calc_id": "calc_4951d4fb15b7",
+ "op": "rank",
+ "quantity": "issuer_exposures.weight",
+ "direction": "highest",
+ "as_of": "2026-09-03",
+ "leader": "MSFT",
+ "ordering": [
+  {
+   "label": "MSFT",
+   "ref": "run_b791e7985dcd:issuer_exposures.MSFT.weight",
+   "value": 0.16251671,
+   "basis": "2026-09-03",
+   "as_of": "2026-09-03",
+   "rank": 1
+  },
+  {
+   "label": "AAPL",
+   "ref": "run_b791e7985dcd:issuer_exposures.AAPL.weight",
+   "value": 0.14937553,
+   "basis": "2026-09-03",
+   "as_of": "2026-09-03",
+   "rank": 2
+  },
+  {
+   "label": "NVDA",
+   "ref": "run_b791e7985dcd:issuer_exposures.NVDA.weight",
+   "value": 0.04158903,
+   "basis": "2026-09-03",
+   "as_of": "2026-09-03",
+   "rank": 3
+  }
+ ],
+ "spread": 0.12092768000000001,
+ "type": {
+  "unit_class": "ratio",
+  "kind": "ranking",
+  "quantity": "issuer_exposures.weight",
+  "issuers": [
+   "AAPL",
+   "MSFT",
+   "NVDA"
+  ],
+  "base": "run_b791e7985dcd"
+ },
+ "operands": [
+  "run_b791e7985dcd:issuer_exposures.MSFT.weight",
+  "run_b791e7985dcd:issuer_exposures.NVDA.weight",
+  "run_b791e7985dcd:issuer_exposures.AAPL.weight"
+ ],
+ "quality_flags": {},
+ "basis": "3 quantities named issuer_exposures.weight, ordered highest first; each entry keeps its own period"
+}

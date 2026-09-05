@@ -1,0 +1,238 @@
+{
+ "subject": null,
+ "kind": "desk",
+ "portfolios": [
+  {
+   "portfolio_id": "port_9507452aa4f4",
+   "name": "My Portfolio (demo copy)",
+   "is_own": false,
+   "run_id": "run_2345b2fba361",
+   "as_of": "2026-07-27",
+   "positions": 10,
+   "alerts": 2,
+   "market_value_name": "exposure_metrics.portfolio_market_value on run_2345b2fba361",
+   "scenario": "compute(method='book.sell' | 'book.buy', subject='run_2345b2fba361', params=\u2026) rebuilds the book after a trade as a row read like a run"
+  },
+  {
+   "portfolio_id": "port_0659b64c29d4",
+   "name": "My Portfolio (demo copy)",
+   "is_own": false,
+   "run_id": "run_0b2d88d81dc0",
+   "as_of": "2026-07-27",
+   "positions": 10,
+   "alerts": 2,
+   "market_value_name": "exposure_metrics.portfolio_market_value on run_0b2d88d81dc0",
+   "scenario": "compute(method='book.sell' | 'book.buy', subject='run_0b2d88d81dc0', params=\u2026) rebuilds the book after a trade as a row read like a run"
+  },
+  {
+   "portfolio_id": "port_6f96444c5076",
+   "name": "probe-uncharged-1",
+   "is_own": false,
+   "run_id": "run_af4ed8a3641d",
+   "as_of": "2026-07-28",
+   "positions": 5,
+   "alerts": 7,
+   "market_value_name": "exposure_metrics.portfolio_market_value on run_af4ed8a3641d",
+   "scenario": "compute(method='book.sell' | 'book.buy', subject='run_af4ed8a3641d', params=\u2026) rebuilds the book after a trade as a row read like a run"
+  },
+  {
+   "portfolio_id": "port_ac98bf27d6f1",
+   "name": "probe-uncharged-2",
+   "is_own": false,
+   "run_id": null,
+   "as_of": null,
+   "positions": null,
+   "alerts": 0,
+   "market_value_name": null,
+   "scenario": null
+  },
+  {
+   "portfolio_id": "port_1493b151e184",
+   "name": "probe-uncharged-3",
+   "is_own": false,
+   "run_id": null,
+   "as_of": null,
+   "positions": null,
+   "alerts": 0,
+   "market_value_name": null,
+   "scenario": null
+  },
+  {
+   "portfolio_id": "port_rvprobe",
+   "name": "rv-probe-badticker",
+   "is_own": false,
+   "run_id": null,
+   "as_of": null,
+   "positions": null,
+   "alerts": 0,
+   "market_value_name": null,
+   "scenario": null
+  },
+  {
+   "portfolio_id": "port_001",
+   "name": "US Growth & Income Portfolio",
+   "is_own": false,
+   "run_id": "run_b791e7985dcd",
+   "as_of": "2026-09-03",
+   "positions": 10,
+   "alerts": 2,
+   "market_value_name": "exposure_metrics.portfolio_market_value on run_b791e7985dcd",
+   "scenario": "compute(method='book.sell' | 'book.buy', subject='run_b791e7985dcd', params=\u2026) rebuilds the book after a trade as a row read like a run"
+  }
+ ],
+ "issuers_prepared": [
+  "AAPL",
+  "AMZN",
+  "GOOGL",
+  "JPM",
+  "KO",
+  "LLY",
+  "MSFT",
+  "NVDA",
+  "XOM"
+ ],
+ "domains": [
+  "fundamentals (filed figures)",
+  "filings (text)",
+  "prices",
+  "book (runs, positions, limits)",
+  "web (search_web)"
+ ],
+ "methods": {
+  "issuer": [
+   "ebit",
+   "ebitda",
+   "free_cash_flow",
+   "total_debt",
+   "net_debt",
+   "ebit_interest_coverage",
+   "debt_to_ebitda",
+   "debt_to_operating_cash_flow",
+   "fcf_to_debt",
+   "current_ratio",
+   "gross_margin",
+   "operating_margin",
+   "net_margin",
+   "days_sales_outstanding",
+   "days_inventory",
+   "days_payable",
+   "roe",
+   "roa",
+   "tax_burden",
+   "nopat",
+   "invested_capital",
+   "roic",
+   "asset_turnover",
+   "equity_multiplier",
+   "quick_assets",
+   "quick_ratio",
+   "fcf_margin",
+   "capex_intensity",
+   "net_debt_to_ebitda",
+   "cash_conversion_cycle",
+   "accruals",
+   "accruals_ratio",
+   "issuer.panel"
+  ],
+  "price": [
+   "price.volatility",
+   "price.beta",
+   "price.momentum_12_1",
+   "price.distance_from_52w_high",
+   "price.adv",
+   "price.drawdown",
+   "price.window_return"
+  ],
+  "run": [
+   "book.analysis",
+   "book.reconcile",
+   "book.sell",
+   "book.buy"
+  ],
+  "portfolio": [
+   "book.drawdown_episodes",
+   "book.explain_episode"
+  ]
+ },
+ "procedures": [
+  {
+   "name": "cut_one_name",
+   "question": "which holding to cut, and what the book looks like after",
+   "subject": "portfolio"
+  },
+  {
+   "name": "bear_case_from_filings",
+   "question": "the bear case in the issuer's own words, ordered by which risk is live",
+   "subject": "issuer"
+  },
+  {
+   "name": "diligence_sweep",
+   "question": "an open-ended review of one issuer: what stands out",
+   "subject": "issuer"
+  },
+  {
+   "name": "rates_scenario",
+   "question": "what a move in rates does to this book, name by name",
+   "subject": "portfolio"
+  },
+  {
+   "name": "capital_allocation",
+   "question": "where the issuer's cash is going",
+   "subject": "issuer"
+  },
+  {
+   "name": "name_outside_the_book",
+   "question": "can a name be analysed, and how does it compare with what is held",
+   "subject": "issuer"
+  },
+  {
+   "name": "wrong_premise",
+   "question": "the user asserts a figure that is not what the desk holds",
+   "subject": "portfolio"
+  },
+  {
+   "name": "revenue_concentration",
+   "question": "how concentrated the issuer's revenue is",
+   "subject": "issuer"
+  },
+  {
+   "name": "news_to_position",
+   "question": "what happened recently and whether it touches something held",
+   "subject": "portfolio"
+  },
+  {
+   "name": "trigger_levels",
+   "question": "what would have to happen for the mandate's answer to flip",
+   "subject": "portfolio"
+  },
+  {
+   "name": "thesis_check",
+   "question": "is what is held still the business it was bought as",
+   "subject": "issuer"
+  },
+  {
+   "name": "volatility_attribution",
+   "question": "has the book got jumpier, and is it the market or something held",
+   "subject": "portfolio"
+  },
+  {
+   "name": "peer_comparison",
+   "question": "how one issuer compares with another on one front",
+   "subject": "issuer"
+  }
+ ],
+ "not_held": {
+  "segment_revenue": "not held as figures (companyfacts carries no dimensions); stated in the 10-K's segment note and Item 7 \u2014 read_filings",
+  "product_revenue": "not held as figures; stated in Item 7 and the product table \u2014 read_filings",
+  "geographic_revenue": "not held as figures; stated in the segment note \u2014 read_filings",
+  "customer_concentration": "not held as figures; stated in Item 1 / the concentration note \u2014 read_filings",
+  "backlog": "not held as figures; stated in Item 7 where the issuer discloses it \u2014 read_filings"
+ },
+ "cannot": {
+  "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name",
+  "scenario_refit": "a scenario (book.sell / book.buy) re-runs the limit checks and does not re-fit betas, volatility or P&L: stated unmeasured"
+ },
+ "catalogue_as_of": "2026-09-05",
+ "how_to_read": "Every name under `table` is a figure you can slot {ref, name} or use as an operand (ref:name) in compute. `methods` are what compute can produce for this subject; `procedures` are how an analyst approaches a kind of question about it; `not_held` and `cannot` are figures this desk does not have and why \u2014 say so, do not substitute. expand=<domain> opens one domain's detail.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures."
+}

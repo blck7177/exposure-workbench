@@ -1,0 +1,106 @@
+{
+ "ticker": "MSFT",
+ "query": "cloud revenue growth",
+ "passages": [
+  {
+   "chunk_id": "chunk_c5adb8772e75",
+   "text": "$\n\n     69,773\n\n     $\n\n     59,661\n\n     17%\n\n     Intelligent Cloud\n\n     Revenue\n\n     $\n\n     106,265\n\n     $\n\n     87,464\n\n     21%\n\n     Cost of revenue\n\n     40,171\n\n     29,611\n\n     36%\n\n     Operating expenses\n\n     21,505\n\n     20,040\n\n     7%\n\n     Operating Income\n\n     $\n\n     44,589\n\n     $\n\n     37,813\n\n     18%\n\n     More Personal Computing\n\n     Revenue\n\n     $\n\n     54,649\n\n     $\n\n     50,838\n\n     7%\n\n     Cost of revenue\n\n     25,238\n\n     24,892\n\n     1%\n\n     Operating expenses\n\n     15,245\n\n     13,987\n\n     9%\n\n     Operating Income\n\n     $\n\n     14,166\n\n     $\n\n     11,959\n\n     18%\n\n     Total\n\n     Revenue\n\n     $\n\n     281,724\n\n     $\n\n     245,122\n\n     15%\n\n     Cost of revenue\n\n     87,831\n\n     74,114\n\n     19%\n\n     Operating expenses\n\n     65,365\n\n     61,575\n\n     6%\n\n     Operating Income\n\n     $\n\n     128,528\n\n     $\n\n     109,433\n\n     17%\n\nReportable Segments\n\nFiscal Year 2025 Compared with Fiscal Year 2024 \n\nProductivity and Business Processes \n\nRevenue increased $14.0 billion or 13%.\n\n\u2022Microsoft 365 Commercial products and cloud services revenue increased $10.8 billion or 14%. Microsoft 365 Commercial cloud revenue grew 15% with Microsoft 365 Commercial seat growth of 6% driven by small and medium businesses and frontline worker offerings, as well as growth in revenue per user. Microsoft 365 Commercial products revenue grew 7% driven by the Windows Commercial on-premises components of Microsoft 365 suite sales and an increase in Office transactional purchasing with the launch of Office 2024.\n\n\u2022Microsoft 365 Consumer products and cloud services revenue increased $756 million or 11%. Microsoft 365 Consumer cloud revenue grew 11% driven by Microsoft 365 Consumer subscriber growth of 8% to 89.0 million, as well as growth in revenue per user from the price increase announced in January 2025.",
+   "score": 0.5688,
+   "item": "Item 7",
+   "section_title": "MANAGEMENT\u2019S DISCUSSION AND ANALYSIS OF FINANCIAL CONDITION AND RESULTS OF OPERATIONS",
+   "citation": {
+    "type": "chunk",
+    "id": "chunk_c5adb8772e75",
+    "accession": "0000950170-25-100235",
+    "form_type": "10-K",
+    "filing_date": "2025-07-30",
+    "item": "Item 7",
+    "char_span": [
+     15048,
+     16913
+    ],
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm"
+   }
+  },
+  {
+   "chunk_id": "chunk_195f6f3aeb48",
+   "text": "$\n\n         281,724\n\n         $\n\n         245,122\n\n         $\n\n         211,915\n\n         Cost of revenue\n\n         87,831\n\n         74,114\n\n         65,863\n\n         Operating expenses\n\n         65,365\n\n         61,575\n\n         57,529\n\n         Operating Income\n\n         $\n\n         128,528\n\n         $\n\n         109,433\n\n         $\n\n         88,523\n\nNo sales to an individual customer or country other than the United States accounted for more than 10% of revenue for fiscal years 2025, 2024, or 2023. Revenue, classified by the major geographic areas in which our customers were located, was as follows:\n\n         (In millions)\n\n         Year Ended June 30,\n\n         2025\n\n         2024\n\n         2023\n\n         United States (a)\n\n         $\n\n         144,546\n\n         $\n\n         124,704\n\n         $\n\n         106,744\n\n         Other countries\n\n         137,178\n\n         120,418\n\n         105,171\n\n         Total\n\n         $\n\n         281,724\n\n         $\n\n         245,122\n\n         $\n\n         211,915\n\n(a)Includes billings to OEMs and certain multinational organizations because of the nature of these businesses and the impracticability of determining the geographic source of the revenue. \n\n  Revenue, classified by significant product and service offerings, was as follows: \n\n         (In millions)\n\n         Year Ended June 30,\n\n         2025\n\n         2024\n\n         2023\n\n         Server products and cloud services\n\n         $\n\n         98,435\n\n         $\n\n         79,828\n\n         $\n\n         65,007\n\n         Microsoft 365 Commercial products and cloud services\n\n         87,767\n\n         76,969",
+   "score": 0.5559,
+   "item": "Item 8",
+   "section_title": "FINANCIAL STATEMENTS AND SUPPLEMENTARY DATA",
+   "citation": {
+    "type": "chunk",
+    "id": "chunk_195f6f3aeb48",
+    "accession": "0000950170-25-100235",
+    "form_type": "10-K",
+    "filing_date": "2025-07-30",
+    "item": "Item 8",
+    "char_span": [
+     115410,
+     117035
+    ],
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm"
+   }
+  },
+  {
+   "chunk_id": "chunk_d73ec2ac8b3b",
+   "text": "crosoft 365 Consumer subscriber growth of 8% to 89.0 million, as well as growth in revenue per user from the price increase announced in January 2025.\n\n\u2022LinkedIn revenue increased $1.4 billion or 9% with growth across all lines of business.\n\n\u2022Dynamics products and cloud services revenue increased $996 million or 15% driven by growth in Dynamics 365, offset in part by a decline in Dynamics on-premises products. Dynamics 365 revenue grew 19% with growth across all workloads.\n\nOperating income increased $10.1 billion or 17%.\n\n\u2022Cost of revenue increased $2.8 billion or 14% driven by growth in Microsoft 365 Commercial cloud. \n\n\u2022Gross margin increased $11.2 billion or 13% driven by growth in Microsoft 365 Commercial cloud. Gross margin percentage decreased slightly primarily driven by the impact of scaling our AI infrastructure, offset in part by efficiency gains in Microsoft 365 Commercial cloud.\n\n\u2022Operating expenses increased $1.1 billion or 4% driven by investments in cloud and AI engineering and commercial sales.\n\n  Intelligent Cloud \n\nRevenue increased $18.8 billion or 21%.\n\n\u2022Server products and cloud services revenue increased $18.6 billion or 23% driven by Azure and other cloud services. Azure and other cloud services revenue grew 34% driven by demand for our portfolio of services. Server products revenue decreased 3% driven by a decrease in transactional purchasing with continued customer shift to cloud offerings.\n\n\u2022Enterprise and partner services revenue increased $166 million or 2% driven by growth in Enterprise Support Services, offset in part by a decline in Industry Solutions.",
+   "score": 0.5556,
+   "item": "Item 7",
+   "section_title": "MANAGEMENT\u2019S DISCUSSION AND ANALYSIS OF FINANCIAL CONDITION AND RESULTS OF OPERATIONS",
+   "citation": {
+    "type": "chunk",
+    "id": "chunk_d73ec2ac8b3b",
+    "accession": "0000950170-25-100235",
+    "form_type": "10-K",
+    "filing_date": "2025-07-30",
+    "item": "Item 7",
+    "char_span": [
+     16763,
+     18373
+    ],
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm"
+   }
+  },
+  {
+   "chunk_id": "chunk_575075b05b89",
+   "text": "fic acquisition costs increased 12% driven by higher search volume and revenue per search, as well as continued benefit from third-party partnerships.\n\nOperating income increased $146 million or 4%.\n\n\u2022Cost of revenue decreased $584 million or 10% primarily driven by lower hardware sales.\n\n\u2022Gross margin increased $405 million or 6% driven by growth in Search advertising and Gaming. Gross margin percentage increased driven by sales mix shift to higher margin businesses.\n\n\u2022Operating expenses increased $259 million or 7% driven by impairment and other related expenses in our Gaming business and continued investments in research and development compute capacity, AI talent, and data to support product development that benefits the entire portfolio.\n\nRevenue, gross margin, and operating income included a favorable foreign currency impact of 2%, 2%, and 3%, respectively.\n\nNine Months Ended March 31, 2026 Compared with Nine Months Ended March 31, 2025\n\nProductivity and Business Processes\n\nRevenue increased $14.5 billion or 16%.\n\n\u2022Microsoft 365 Commercial products and cloud services revenue increased $10.6 billion or 17%. Microsoft 365 Commercial cloud revenue grew 18% with growth in revenue per user driven by Microsoft 365 E5 and Microsoft 365 Copilot, and continued Microsoft 365 Commercial seat growth. Microsoft 365 Commercial products revenue grew 10% driven by an increase in Office 2024 transactional purchasing, as well as growth in the Windows Commercial on-premises components of Microsoft 365 suite sales.",
+   "score": 0.5495,
+   "item": "Part I, Item 2",
+   "section_title": "MANAGEMENT\u2019S DISCUSSION AND ANALYSIS OF FINANCIAL CONDITION AND RESULTS OF OPERATIONS",
+   "citation": {
+    "type": "chunk",
+    "id": "chunk_575075b05b89",
+    "accession": "0001193125-26-191507",
+    "form_type": "10-Q",
+    "filing_date": "2026-04-29",
+    "item": "Part I, Item 2",
+    "char_span": [
+     24768,
+     26294
+    ],
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526191507/msft-20260331.htm"
+   }
+  },
+  {
+   "chunk_id": "chunk_fee4db869a87",
+   "text": "ightly driven by efficiency gains in Microsoft 365 Commercial cloud even with continued investments in AI infrastructure and growing AI product usage.\n\n\u2022Operating expenses increased $795 million or 11% driven by continued investments in research and development compute capacity, AI talent, and data to support product development that benefits the entire portfolio, as well as higher Copilot advertising expenses.\n\nRevenue, gross margin, and operating income included a favorable foreign currency impact of 4%, 5%, and 7%, respectively. Operating expenses included an unfavorable foreign currency impact of 2%.\n\nIntelligent Cloud\n\nRevenue increased $7.9 billion or 30%.\n\n\u2022Server products and cloud services revenue increased $7.8 billion or 32% driven by Azure and other cloud services. Azure and other cloud services revenue grew 40% driven by demand for services across the platform with continued growth across all workloads. Server products revenue increased slightly, primarily driven by higher purchases of licenses running in multi-cloud environments, offset in part by renewals with lower in-period revenue recognition from the mix of contracts and continued customer shift to cloud.\n\n\u2022Enterprise and partner services revenue increased $141 million or 7% driven by growth in Enterprise Support Services.\n\nOperating income increased $2.7 billion or 24%.\n\n\u2022Cost of revenue increased $4.8 billion or 47% driven by investments in AI infrastructure to support growing customer demand and increased GitHub Copilot usage.",
+   "score": 0.5341,
+   "item": "Part I, Item 2",
+   "section_title": "MANAGEMENT\u2019S DISCUSSION AND ANALYSIS OF FINANCIAL CONDITION AND RESULTS OF OPERATIONS",
+   "citation": {
+    "type": "chunk",
+    "id": "chunk_fee4db869a87",
+    "accession": "0001193125-26-191507",
+    "form_type": "10-Q",
+    "filing_date": "2026-04-29",
+    "item": "Part I, Item 2",
+    "char_span": [
+     21888,
+     23411
+    ],
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526191507/msft-20260331.htm"
+   }
+  }
+ ]
+}

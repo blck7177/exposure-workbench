@@ -1,0 +1,298 @@
+{
+ "portfolio_id": "port_001",
+ "section": {
+  "positions": {
+   "portfolio_id": "port_001",
+   "name": "US Growth & Income Portfolio",
+   "run_id": "run_b791e7985dcd",
+   "valued_as_of": "2026-09-03",
+   "positions_as_of": "2026-07-23",
+   "holdings": [
+    {
+     "pos_id": "pos_bb75f719df7a",
+     "ticker": "AAPL",
+     "quantity": 5000.0,
+     "sector": "Technology",
+     "asset_class": "equity",
+     "market_value": 1641050.0,
+     "weight": 0.14937553
+    },
+    {
+     "pos_id": "pos_1b526f0605c8",
+     "ticker": "JPM",
+     "quantity": 4500.0,
+     "sector": "Financials",
+     "asset_class": "equity",
+     "market_value": 1629270.0,
+     "weight": 0.14830326
+    },
+    {
+     "pos_id": "pos_0d809fa2cf4a",
+     "ticker": "LLY",
+     "quantity": 1200.0,
+     "sector": "Healthcare",
+     "asset_class": "equity",
+     "market_value": 1391520.0,
+     "weight": 0.12666222
+    },
+    {
+     "pos_id": "pos_6b782215b37e",
+     "ticker": "MSFT",
+     "quantity": 3500.0,
+     "sector": "Technology",
+     "asset_class": "equity",
+     "market_value": 1785420.0,
+     "weight": 0.16251671
+    },
+    {
+     "pos_id": "pos_410b16712204",
+     "ticker": "GOOGL",
+     "quantity": 4000.0,
+     "sector": "Communication_Services",
+     "asset_class": "equity",
+     "market_value": 1369920.0,
+     "weight": 0.12469609
+    },
+    {
+     "pos_id": "pos_279fcf0330b1",
+     "ticker": "HYG",
+     "quantity": 10000.0,
+     "sector": "Fixed_Income",
+     "asset_class": "etf",
+     "market_value": 792100.0,
+     "weight": 0.0721004
+    },
+    {
+     "pos_id": "pos_cc1bf0163c5b",
+     "ticker": "AMZN",
+     "quantity": 3000.0,
+     "sector": "Consumer_Discretionary",
+     "asset_class": "equity",
+     "market_value": 776700.0,
+     "weight": 0.07069862
+    },
+    {
+     "pos_id": "pos_a71f84f56513",
+     "ticker": "TLT",
+     "quantity": 8000.0,
+     "sector": "Fixed_Income",
+     "asset_class": "etf",
+     "market_value": 656560.0,
+     "weight": 0.05976295
+    },
+    {
+     "pos_id": "pos_211c096b1ae4",
+     "ticker": "XOM",
+     "quantity": 3000.0,
+     "sector": "Energy",
+     "asset_class": "equity",
+     "market_value": 486630.0,
+     "weight": 0.04429518
+    },
+    {
+     "pos_id": "pos_aa8f2cedb298",
+     "ticker": "NVDA",
+     "quantity": 2000.0,
+     "sector": "Technology",
+     "asset_class": "equity",
+     "market_value": 456900.0,
+     "weight": 0.04158903
+    }
+   ],
+   "count": 10,
+   "total_holdings": 10
+  },
+  "limits": {
+   "portfolio_id": "port_001",
+   "limits": [
+    {
+     "limit_type": "daily_loss",
+     "entity_type": "portfolio",
+     "entity_id": null,
+     "warning_level": 0.02,
+     "breach_level": 0.03,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "gross_exposure",
+     "entity_type": "portfolio",
+     "entity_id": null,
+     "warning_level": 1.1,
+     "breach_level": 1.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "issuer_concentration",
+     "entity_type": "issuer",
+     "entity_id": "AAPL",
+     "warning_level": 0.15,
+     "breach_level": 0.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "issuer_concentration",
+     "entity_type": "issuer",
+     "entity_id": "LLY",
+     "warning_level": 0.12,
+     "breach_level": 0.18,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "issuer_concentration",
+     "entity_type": "issuer",
+     "entity_id": "MSFT",
+     "warning_level": 0.15,
+     "breach_level": 0.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "issuer_concentration",
+     "entity_type": "issuer",
+     "entity_id": "NVDA",
+     "warning_level": 0.15,
+     "breach_level": 0.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "issuer_concentration",
+     "entity_type": "issuer",
+     "entity_id": null,
+     "warning_level": 0.15,
+     "breach_level": 0.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "rolling_volatility_30d",
+     "entity_type": "portfolio",
+     "entity_id": null,
+     "warning_level": 0.18,
+     "breach_level": 0.25,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "sector_concentration",
+     "entity_type": "sector",
+     "entity_id": "Consumer_Discretionary",
+     "warning_level": 0.15,
+     "breach_level": 0.2,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "sector_concentration",
+     "entity_type": "sector",
+     "entity_id": "Financials",
+     "warning_level": 0.2,
+     "breach_level": 0.3,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "sector_concentration",
+     "entity_type": "sector",
+     "entity_id": "Fixed_Income",
+     "warning_level": 0.2,
+     "breach_level": 0.3,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "sector_concentration",
+     "entity_type": "sector",
+     "entity_id": "Technology",
+     "warning_level": 0.4,
+     "breach_level": 0.5,
+     "unit": "fraction",
+     "is_active": true
+    },
+    {
+     "limit_type": "sector_concentration",
+     "entity_type": "sector",
+     "entity_id": null,
+     "warning_level": 0.4,
+     "breach_level": 0.5,
+     "unit": "fraction",
+     "is_active": true
+    }
+   ],
+   "note": "policy this desk set, not a measurement \u2014 these are not citable evidence"
+  },
+  "freshness": {
+   "portfolio_id": "port_001",
+   "latest_completed_run": "run_b791e7985dcd",
+   "run_as_of": "2026-09-03",
+   "latest_market_session": "2026-09-03",
+   "sessions_behind": 0,
+   "runs_in_flight": 0,
+   "detail": null
+  },
+  "runs": [
+   {
+    "run_id": "run_b791e7985dcd",
+    "as_of": "2026-09-03",
+    "status": "completed"
+   },
+   {
+    "run_id": "run_89c6f026d650",
+    "as_of": "2026-09-02",
+    "status": "completed"
+   },
+   {
+    "run_id": "run_3c94a47d6547",
+    "as_of": "2026-09-02",
+    "status": "completed"
+   },
+   {
+    "run_id": "run_690a3a2db838",
+    "as_of": "2026-09-01",
+    "status": "completed"
+   },
+   {
+    "run_id": "run_d91de5678b19",
+    "as_of": "2026-08-31",
+    "status": "completed"
+   }
+  ],
+  "alerts": {
+   "run_id": "run_b791e7985dcd",
+   "as_of": "2026-09-03",
+   "alerts": [
+    {
+     "id": "alert_1c5fe7c8db0b",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "LLY",
+     "current_value": 0.12666222,
+     "limit_value": 0.12,
+     "utilization": 0.70367899,
+     "message": "Issuer LLY: 12.7% vs limit 12.0% [WARNING]",
+     "reads_as": "LLY: 0.1267 against the warning level of 0.12 \u2014 utilisation 70.4% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.12. 70.4% is a share of a limit, never a level in itself."
+    },
+    {
+     "id": "alert_455cad508de7",
+     "alert_type": "issuer_concentration",
+     "severity": "warning",
+     "entity_type": "issuer",
+     "entity_id": "MSFT",
+     "current_value": 0.16251671,
+     "limit_value": 0.15,
+     "utilization": 0.81258357,
+     "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+     "reads_as": "MSFT: 0.1625 against the warning level of 0.15 \u2014 utilisation 81.3% is measured against the higher BREACH level, which this alert does not carry, NOT against 0.15. 81.3% is a share of a limit, never a level in itself."
+    }
+   ],
+   "checks_run": 20,
+   "checks_clear": 18,
+   "cite": "run_b791e7985dcd"
+  }
+ }
+}

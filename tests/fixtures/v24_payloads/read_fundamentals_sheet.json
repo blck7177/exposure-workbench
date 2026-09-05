@@ -1,0 +1,111 @@
+{
+ "ticker": "MSFT",
+ "as_of": "2026-03-31",
+ "balances": {
+  "accounts_payable": {
+   "value": 37513000000.0,
+   "fact_id": "fact_1d3255175f2a",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "accounts_receivable": {
+   "value": 60041000000.0,
+   "fact_id": "fact_5fd9f455f6af",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "cash_and_equivalents": {
+   "value": 32105000000.0,
+   "fact_id": "fact_b854e88bfe92",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "cash_and_restricted_cash": {
+   "value": 32105000000.0,
+   "fact_id": "fact_88979e9e74a5",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "current_assets": {
+   "value": 175329000000.0,
+   "fact_id": "fact_f37bd6c7ffe6",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "current_liabilities": {
+   "value": 136661000000.0,
+   "fact_id": "fact_df03dc26f94d",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "current_portion_long_term_debt": {
+   "value": 8839000000.0,
+   "fact_id": "fact_b32b7c775c2d",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "inventory": {
+   "value": 1219000000.0,
+   "fact_id": "fact_0e2914c9eae9",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "long_term_debt_noncurrent": {
+   "value": 31423000000.0,
+   "fact_id": "fact_49a5ca612fad",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "long_term_debt_total": {
+   "value": 40262000000.0,
+   "fact_id": "fact_1f6cbb3811f2",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "operating_lease_liability_noncurrent": {
+   "value": 16703000000.0,
+   "fact_id": "fact_59e8979d852a",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "operating_lease_liability_total": {
+   "value": 22238000000.0,
+   "fact_id": "fact_751e8dd4c9b8",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "shares_outstanding": {
+   "value": 7429000000.0,
+   "fact_id": "fact_ad2484120464",
+   "as_of": "2026-03-31",
+   "unit_class": "COUNT"
+  },
+  "stockholders_equity": {
+   "value": 414367000000.0,
+   "fact_id": "fact_139ce5fb1427",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "total_assets": {
+   "value": 694228000000.0,
+   "fact_id": "fact_d710c63953f3",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  },
+  "total_liabilities": {
+   "value": 279861000000.0,
+   "fact_id": "fact_c2bd385f0d1c",
+   "as_of": "2026-03-31",
+   "unit_class": "MONEY"
+  }
+ },
+ "not_reported_at_this_date": {
+  "commercial_paper": {
+   "last_reported": "2025-06-30",
+   "value_then": 0.0,
+   "unit_class": "MONEY",
+   "note": "reported at another date; ask for that date rather than combining it with these"
+  }
+ },
+ "basis": "balance sheet as of 2026-03-31; one instant, no substitution"
+}

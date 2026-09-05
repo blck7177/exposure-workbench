@@ -1,0 +1,27 @@
+{
+ "run_id": "run_b791e7985dcd",
+ "as_of": "2026-09-03",
+ "names": [
+  "issuer_exposures.MSFT.weight",
+  "count.alerts"
+ ],
+ "units": {
+  "issuer_exposures.MSFT.weight": "RATIO",
+  "count.alerts": "COUNT"
+ },
+ "figures": {
+  "issuer_exposures.MSFT.weight": {
+   "value": 0.16251671,
+   "unit_class": "RATIO"
+  },
+  "count.alerts": {
+   "value": 2.0,
+   "unit_class": "COUNT"
+  }
+ },
+ "unknown": [
+  "exposure_metrics.var_95_1d",
+  "nonsense.name"
+ ],
+ "detail": "not names run_b791e7985dcd holds; describe('run_b791e7985dcd') lists them"
+}

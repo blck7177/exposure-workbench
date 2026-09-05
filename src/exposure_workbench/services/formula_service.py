@@ -235,7 +235,7 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
             if step.get("error"):
                 return step
             running_id, running_value = step["calc_id"], step["value"]
-    return {"id": running_id, "value": running_value,
+    return {"id": running_id, "value": running_value, "as_of": bs["as_of"],
             "basis": f"as of {bs['as_of']}", "formula": cover.formula,
             "missing_at_this_date": list(cover.missing_at_this_date),
             "no_facts_for_issuer": list(cover.no_facts_for_issuer),
@@ -388,7 +388,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         f = fm.FORMULAS["total_debt"]
         out = {"formula": name, "ticker": ticker, "value": got["value"],
                "calc_id": got["id"], "definition": got.get("formula", f.expression),
-               "basis": got["basis"], "authority": fm.authority(f), "note": f.note,
+               "basis": got["basis"], "as_of": got.get("as_of"),
+               "authority": fm.authority(f), "note": f.note,
                "unit_class": f.unit_class}
         # Only when there is something to say. An empty list beside every total
         # invites a sentence about what was left out when nothing was.
@@ -444,7 +445,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                       as_quantity=name if final else None)
             if step.get("error"):
                 return _not_combinable(step)
-            acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
+            acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"], "periods": step.get("periods") or (step.get("type") or {}).get("basis")}
     elif f.op == "difference":
         # signs[0] is +1 by import-time validation: the fold STARTS from the
         # first operand, so its sign is structural, never read.
@@ -456,13 +457,13 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                       as_quantity=name if final else None)
             if step.get("error"):
                 return _not_combinable(step)
-            acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
+            acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"], "periods": step.get("periods") or (step.get("type") or {}).get("basis")}
     elif f.op == "product":
         step = await tc.calculate(db, "multiply", operands[0]["id"], operands[1]["id"],
                                   invoked_by=invoked_by, as_quantity=name)
         if step.get("error"):
             return _not_combinable(step)
-        acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
+        acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"], "periods": step.get("periods") or (step.get("type") or {}).get("basis")}
     elif f.op == "divide":
         if f.denominator_must_be_positive and operands[1]["value"] <= 0:
             # A failure condition the REGISTRY declares: ROE over negative
@@ -499,7 +500,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                                   as_unit_class=None if scaled_to_days else f.unit_class)
         if step.get("error"):
             return _not_combinable(step)
-        acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"]}
+        acc = {"id": step["calc_id"], "value": step["value"], "basis": step["basis"],
+               "periods": step.get("periods") or (step.get("type") or {}).get("basis")}
         if scaled_to_days:
             # The x365 gets its own ledger row. Doing it here in Python was the
             # first version, and it published a number no evidence could support:
@@ -510,7 +512,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             if scaled.get("error"):
                 return _not_combinable(scaled)
             acc = {"id": scaled["calc_id"], "value": scaled["value"],
-                   "basis": acc["basis"]}
+                   "basis": acc["basis"], "periods": acc.get("periods")}
     else:
         # Unreachable while fm.validate runs at import; loud rather than a
         # fallthrough if the two files ever disagree. The old else-branch here
@@ -526,6 +528,11 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
     out = {"formula": name, "ticker": ticker, "value": acc["value"],
            "calc_id": acc["id"], "definition": definition, "basis": acc["basis"],
            "authority": fm.authority(f), "note": f.note, "unit_class": f.unit_class}
+    # V24: the period as data beside the basis sentence — the Fact's window and
+    # as_of are read from here, never parsed out of the sentence.
+    periods = acc.get("periods")
+    if periods:
+        out["periods"] = periods
     if used_instead:
         out["substituted_inputs"] = used_instead
     return out

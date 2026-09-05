@@ -1,0 +1,1283 @@
+{
+ "calc_id": "calc_8e0bc70cd96c",
+ "ticker": "MSFT",
+ "window": "1y",
+ "n": 254,
+ "points": [
+  {
+   "period_end": "2025-09-02",
+   "value": 500.998,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-03",
+   "value": 501.2261,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-04",
+   "value": 503.8247,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-05",
+   "value": 490.9606,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-08",
+   "value": 494.1344,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-09",
+   "value": 494.3427,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-10",
+   "value": 496.2867,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-11",
+   "value": 496.9215,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-12",
+   "value": 505.7389,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-15",
+   "value": 511.1544,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-16",
+   "value": 504.886,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-17",
+   "value": 505.8579,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-18",
+   "value": 504.3008,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-19",
+   "value": 513.7034,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-22",
+   "value": 510.2519,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-23",
+   "value": 505.0744,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-24",
+   "value": 505.9869,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-25",
+   "value": 502.8924,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-26",
+   "value": 507.2862,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-29",
+   "value": 510.4005,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-09-30",
+   "value": 513.7233,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-01",
+   "value": 515.4689,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-02",
+   "value": 511.5313,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-03",
+   "value": 513.1281,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-06",
+   "value": 524.2566,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-07",
+   "value": 519.704,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-08",
+   "value": 520.5669,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-09",
+   "value": 518.137,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-10",
+   "value": 506.7903,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-13",
+   "value": 509.8551,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-14",
+   "value": 509.379,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-15",
+   "value": 509.2401,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-16",
+   "value": 507.435,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-17",
+   "value": 509.3889,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-20",
+   "value": 512.5727,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-21",
+   "value": 513.4356,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-22",
+   "value": 516.2921,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-23",
+   "value": 516.3119,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-24",
+   "value": 519.337,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-27",
+   "value": 527.1825,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-28",
+   "value": 537.6464,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-29",
+   "value": 537.1306,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-30",
+   "value": 521.4695,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-10-31",
+   "value": 513.5844,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-03",
+   "value": 512.8108,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-04",
+   "value": 510.1328,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-05",
+   "value": 503.0213,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-06",
+   "value": 493.0434,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-07",
+   "value": 492.7657,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-10",
+   "value": 501.8708,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-11",
+   "value": 504.5289,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-12",
+   "value": 506.9688,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-13",
+   "value": 499.1829,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-14",
+   "value": 506.0166,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-17",
+   "value": 503.3486,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-18",
+   "value": 489.7604,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-19",
+   "value": 483.1448,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-20",
+   "value": 475.4139,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-21",
+   "value": 469.1436,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-24",
+   "value": 471.0118,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-25",
+   "value": 473.9829,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-26",
+   "value": 482.4393,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-11-28",
+   "value": 488.9083,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-01",
+   "value": 483.6715,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-02",
+   "value": 486.9109,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-03",
+   "value": 474.7183,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-04",
+   "value": 477.8087,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-05",
+   "value": 480.1141,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-08",
+   "value": 487.9245,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-09",
+   "value": 488.9182,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-10",
+   "value": 475.5431,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-11",
+   "value": 480.4221,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-12",
+   "value": 475.5132,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-15",
+   "value": 471.8266,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-16",
+   "value": 473.3868,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-17",
+   "value": 473.1184,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-18",
+   "value": 480.9289,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-19",
+   "value": 482.8567,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-22",
+   "value": 481.863,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-23",
+   "value": 483.7808,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-24",
+   "value": 484.9434,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-26",
+   "value": 484.6353,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-29",
+   "value": 484.0292,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-30",
+   "value": 484.4069,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2025-12-31",
+   "value": 480.5712,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-02",
+   "value": 469.9585,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-05",
+   "value": 469.8691,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-06",
+   "value": 475.4934,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-07",
+   "value": 480.4221,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-08",
+   "value": 475.0959,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-09",
+   "value": 476.2585,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-12",
+   "value": 474.1718,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-13",
+   "value": 467.7028,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-14",
+   "value": 456.484,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-15",
+   "value": 453.7811,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-16",
+   "value": 456.9609,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-20",
+   "value": 451.6546,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-21",
+   "value": 441.3102,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-22",
+   "value": 448.2959,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-23",
+   "value": 463.0126,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-26",
+   "value": 467.3153,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-27",
+   "value": 477.5503,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-28",
+   "value": 478.5937,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-29",
+   "value": 430.7671,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-01-30",
+   "value": 427.5774,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-02",
+   "value": 420.701,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-03",
+   "value": 408.6176,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-04",
+   "value": 411.5789,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-05",
+   "value": 391.1882,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-06",
+   "value": 398.6111,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-09",
+   "value": 410.9926,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-10",
+   "value": 410.6647,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-11",
+   "value": 401.8208,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-12",
+   "value": 399.3067,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-13",
+   "value": 398.79,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-17",
+   "value": 394.3581,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-18",
+   "value": 397.0809,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-19",
+   "value": 396.8518,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-20",
+   "value": 395.6267,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-23",
+   "value": 382.9182,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-24",
+   "value": 387.43,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-25",
+   "value": 398.9831,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-26",
+   "value": 400.0986,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-02-27",
+   "value": 391.1548,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-02",
+   "value": 396.9414,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-03",
+   "value": 402.2997,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-04",
+   "value": 403.5646,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-05",
+   "value": 409.0224,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-06",
+   "value": 407.3094,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-09",
+   "value": 407.7576,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-10",
+   "value": 404.1223,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-11",
+   "value": 403.2458,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-12",
+   "value": 400.238,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-13",
+   "value": 393.9535,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-16",
+   "value": 398.3358,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-17",
+   "value": 397.7979,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-18",
+   "value": 390.2087,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-19",
+   "value": 387.4499,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-20",
+   "value": 380.3287,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-23",
+   "value": 381.4542,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-24",
+   "value": 371.2356,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-25",
+   "value": 369.5424,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-26",
+   "value": 364.4929,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-27",
+   "value": 355.33,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-30",
+   "value": 357.5112,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-03-31",
+   "value": 368.676,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-01",
+   "value": 367.8792,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-02",
+   "value": 371.9527,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-06",
+   "value": 371.375,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-07",
+   "value": 370.7874,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-08",
+   "value": 372.8192,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-09",
+   "value": 371.5643,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-10",
+   "value": 369.3731,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-13",
+   "value": 382.8186,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-14",
+   "value": 391.5233,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-15",
+   "value": 409.5603,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-16",
+   "value": 418.5638,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-17",
+   "value": 421.0836,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-20",
+   "value": 416.3826,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-21",
+   "value": 422.4481,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-22",
+   "value": 431.1727,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-23",
+   "value": 414.072,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-24",
+   "value": 422.9062,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-27",
+   "value": 423.1054,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-28",
+   "value": 427.5175,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-29",
+   "value": 422.7468,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-04-30",
+   "value": 406.1342,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-01",
+   "value": 412.7673,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-04",
+   "value": 411.9506,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-05",
+   "value": 409.7196,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-06",
+   "value": 412.2892,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-07",
+   "value": 419.0717,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-08",
+   "value": 413.4445,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-11",
+   "value": 410.9944,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-12",
+   "value": 406.1242,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-13",
+   "value": 403.5745,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-14",
+   "value": 407.7775,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-15",
+   "value": 420.2171,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-18",
+   "value": 421.8306,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-19",
+   "value": 415.7353,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-20",
+   "value": 419.3605,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-21",
+   "value": 418.3025,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-22",
+   "value": 417.7835,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-26",
+   "value": 415.2483,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-27",
+   "value": 411.8946,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-28",
+   "value": 426.1877,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-05-29",
+   "value": 449.394,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-01",
+   "value": 459.6547,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-02",
+   "value": 440.4808,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-03",
+   "value": 426.537,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-04",
+   "value": 427.2457,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-05",
+   "value": 415.8871,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-08",
+   "value": 410.9663,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-09",
+   "value": 402.652,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-10",
+   "value": 396.6133,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-11",
+   "value": 389.6066,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-12",
+   "value": 390.0058,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-15",
+   "value": 399.0089,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-16",
+   "value": 393.09,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-17",
+   "value": 378.198,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-18",
+   "value": 378.6871,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-22",
+   "value": 366.6498,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-23",
+   "value": 373.2374,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-24",
+   "value": 364.7733,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-25",
+   "value": 352.167,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-26",
+   "value": 372.2692,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-29",
+   "value": 367.8775,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-06-30",
+   "value": 372.3191,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-01",
+   "value": 383.558,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-02",
+   "value": 389.7563,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-06",
+   "value": 386.0133,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-07",
+   "value": 388.1094,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-08",
+   "value": 382.6197,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-09",
+   "value": 383.6378,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-10",
+   "value": 384.3764,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-13",
+   "value": 390.2553,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-14",
+   "value": 384.2067,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-15",
+   "value": 394.8866,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-16",
+   "value": 400.3463,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-17",
+   "value": 393.08,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-20",
+   "value": 401.5341,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-21",
+   "value": 397.0026,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-22",
+   "value": 389.6066,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-23",
+   "value": 380.863,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-24",
+   "value": 380.9828,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-27",
+   "value": 388.3689,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-28",
+   "value": 392.6109,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-29",
+   "value": 389.8062,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-30",
+   "value": 450.2524,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-07-31",
+   "value": 463.8468,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-03",
+   "value": 486.7337,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-04",
+   "value": 491.884,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-05",
+   "value": 486.5441,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-06",
+   "value": 498.9207,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-07",
+   "value": 499.0505,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-10",
+   "value": 505.1091,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-11",
+   "value": 502.8633,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-12",
+   "value": 491.5047,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-13",
+   "value": 495.9464,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-14",
+   "value": 494.4691,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-17",
+   "value": 479.4474,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-18",
+   "value": 480.725,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-19",
+   "value": 483.4,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-20",
+   "value": 481.15,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-21",
+   "value": 483.24,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-24",
+   "value": 487.31,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-25",
+   "value": 491.71,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-26",
+   "value": 496.37,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-27",
+   "value": 505.06,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-28",
+   "value": 513.53,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-08-31",
+   "value": 507.29,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-09-01",
+   "value": 501.02,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-09-02",
+   "value": 496.82,
+   "fact_ids": []
+  },
+  {
+   "period_end": "2026-09-03",
+   "value": 510.12,
+   "fact_ids": []
+  }
+ ],
+ "from": "2025-09-02",
+ "to": "2026-09-03",
+ "quantity": "MSFT.adj_close",
+ "unit_class": "money_per_share",
+ "basis": "adjusted daily closes, 2025-09-02..2026-09-03"
+}

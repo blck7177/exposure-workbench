@@ -1,0 +1,51 @@
+{
+ "calc_id": "calc_c3df79c9754c",
+ "ticker": "MSFT",
+ "metric": "total_assets",
+ "unit_class": "MONEY",
+ "points": [
+  {
+   "period_end": "2024-12-31",
+   "value": 533898000000.0,
+   "fact_ids": [
+    "fact_40da92d8a42d"
+   ]
+  },
+  {
+   "period_end": "2025-03-31",
+   "value": 562624000000.0,
+   "fact_ids": [
+    "fact_b72f0d1c610f"
+   ]
+  },
+  {
+   "period_end": "2025-06-30",
+   "value": 619003000000.0,
+   "fact_ids": [
+    "fact_d755777b710b"
+   ]
+  },
+  {
+   "period_end": "2025-09-30",
+   "value": 636351000000.0,
+   "fact_ids": [
+    "fact_af77ca74af0a"
+   ]
+  },
+  {
+   "period_end": "2025-12-31",
+   "value": 665302000000.0,
+   "fact_ids": [
+    "fact_440228c30b9b"
+   ]
+  },
+  {
+   "period_end": "2026-03-31",
+   "value": 694228000000.0,
+   "fact_ids": [
+    "fact_d710c63953f3"
+   ]
+  }
+ ],
+ "basis": "total_assets as reported at each of 6 instants, 2024-12-31..2026-03-31; no value is carried across dates"
+}

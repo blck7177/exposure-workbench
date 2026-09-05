@@ -1,0 +1,857 @@
+{
+ "subject": "MSFT",
+ "kind": "issuer",
+ "identity": {
+  "ticker": "MSFT",
+  "name": "Microsoft Corporation",
+  "cik": "789019",
+  "sector": null,
+  "industry": null,
+  "investigable": true
+ },
+ "fundamentals": {
+  "metrics": 37,
+  "latest_period_end": "2026-03-31",
+  "kinds": {
+   "instant": 17,
+   "flow": 20
+  },
+  "names": [
+   "accounts_payable",
+   "accounts_receivable",
+   "amortization_of_intangibles",
+   "buybacks",
+   "capex",
+   "cash_and_equivalents",
+   "cash_and_restricted_cash",
+   "commercial_paper",
+   "cost_of_revenue",
+   "current_assets",
+   "current_liabilities",
+   "current_portion_long_term_debt",
+   "depreciation",
+   "dividends_paid",
+   "eps_basic",
+   "eps_diluted",
+   "gross_profit",
+   "income_tax_expense",
+   "interest_expense",
+   "interest_expense_nonoperating",
+   "inventory",
+   "long_term_debt_noncurrent",
+   "long_term_debt_total",
+   "net_income",
+   "operating_cash_flow",
+   "operating_income",
+   "operating_lease_liability_noncurrent",
+   "operating_lease_liability_total",
+   "pretax_income",
+   "revenue",
+   "sbc",
+   "shares_basic_weighted",
+   "shares_diluted_weighted",
+   "shares_outstanding",
+   "stockholders_equity",
+   "total_assets",
+   "total_liabilities"
+  ],
+  "fiscal": {
+   "latest_period_end": "2026-03-31",
+   "how_to_ask": "A flow is measured over an interval and a balance is read at an instant; they are different kinds of number and may not be added. Ask read_fundamentals for the window you want \u2014 months=3 for a quarter, months=12 for a year \u2014 and it derives exactly that window from the periods this issuer filed, or refuses. It never returns a shorter period than the one you asked for.",
+   "fiscal_year_ends": "Jun 30",
+   "fiscal_quarters_align_with_calendar": true
+  },
+  "methods_computable": 29,
+  "methods_not_computable": {
+   "ebitda": "missing depreciation_amortization",
+   "debt_to_ebitda": "missing depreciation_amortization",
+   "net_debt_to_ebitda": "missing depreciation_amortization"
+  }
+ },
+ "filings": {
+  "filings": {
+   "10-K": {
+    "count": 1,
+    "latest": "2025-07-30"
+   },
+   "10-Q": {
+    "count": 1,
+    "latest": "2026-04-29"
+   }
+  },
+  "items_indexed": [
+   "Item 1",
+   "Item 10",
+   "Item 11",
+   "Item 12",
+   "Item 13",
+   "Item 14",
+   "Item 15",
+   "Item 16",
+   "Item 1A",
+   "Item 1B",
+   "Item 1C",
+   "Item 2",
+   "Item 3",
+   "Item 4",
+   "Item 5",
+   "Item 6",
+   "Item 7",
+   "Item 7A",
+   "Item 8",
+   "Item 9",
+   "Item 9A",
+   "Item 9B",
+   "Item 9C",
+   "Part I, Item 1",
+   "Part I, Item 2",
+   "Part I, Item 3",
+   "Part I, Item 4",
+   "Part II, Item 1",
+   "Part II, Item 1A",
+   "Part II, Item 2",
+   "Part II, Item 5",
+   "Part II, Item 6"
+  ],
+  "passages": 348,
+  "read_with": "read_filings(ticker, query=\u2026) for passages; read_filings(ticker, item='1A') for a section"
+ },
+ "prices": {
+  "sessions": 897,
+  "from": "1998-10-05",
+  "to": "2026-09-03",
+  "read_with": "read_prices(ticker, window)"
+ },
+ "book": {
+  "held_in": [
+   {
+    "portfolio_id": "port_001",
+    "run_id": "run_b791e7985dcd",
+    "as_of": "2026-09-03",
+    "names": [
+     "issuer_exposures.MSFT.weight",
+     "issuer_exposures.MSFT.market_value",
+     "issuer_exposures.MSFT.contribution",
+     "exposure_metrics.portfolio_market_value",
+     "limit_checks.issuer_concentration:MSFT.current_value",
+     "limit_checks.issuer_concentration:MSFT.warning_level",
+     "limit_checks.issuer_concentration:MSFT.breach_level",
+     "risk_alerts.issuer_concentration:MSFT.current_value",
+     "risk_alerts.issuer_concentration:MSFT.limit_value",
+     "risk_alerts.issuer_concentration:MSFT.utilization"
+    ],
+    "checks": [
+     {
+      "name": "limit_checks.issuer_concentration:MSFT.current_value",
+      "status": "warning"
+     }
+    ],
+    "alerts": [
+     "warning"
+    ],
+    "methods_on_this_run": [
+     "book.analysis",
+     "book.reconcile",
+     "book.sell",
+     "book.buy"
+    ],
+    "procedures": [
+     "cut_one_name",
+     "rates_scenario",
+     "wrong_premise",
+     "news_to_position",
+     "trigger_levels",
+     "volatility_attribution"
+    ],
+    "everything_else": "describe('run_b791e7985dcd')"
+   },
+   {
+    "portfolio_id": "port_0659b64c29d4",
+    "run_id": "run_0b2d88d81dc0",
+    "as_of": "2026-07-27",
+    "names": [
+     "issuer_exposures.MSFT.weight",
+     "issuer_exposures.MSFT.market_value",
+     "issuer_exposures.MSFT.contribution",
+     "exposure_metrics.portfolio_market_value"
+    ],
+    "checks": [],
+    "alerts": [],
+    "methods_on_this_run": [
+     "book.analysis",
+     "book.reconcile",
+     "book.sell",
+     "book.buy"
+    ],
+    "procedures": [
+     "cut_one_name",
+     "rates_scenario",
+     "wrong_premise",
+     "news_to_position",
+     "trigger_levels",
+     "volatility_attribution"
+    ],
+    "everything_else": "describe('run_0b2d88d81dc0')"
+   },
+   {
+    "portfolio_id": "port_9507452aa4f4",
+    "run_id": "run_2345b2fba361",
+    "as_of": "2026-07-27",
+    "names": [
+     "issuer_exposures.MSFT.weight",
+     "issuer_exposures.MSFT.market_value",
+     "issuer_exposures.MSFT.contribution",
+     "exposure_metrics.portfolio_market_value"
+    ],
+    "checks": [],
+    "alerts": [],
+    "methods_on_this_run": [
+     "book.analysis",
+     "book.reconcile",
+     "book.sell",
+     "book.buy"
+    ],
+    "procedures": [
+     "cut_one_name",
+     "rates_scenario",
+     "wrong_premise",
+     "news_to_position",
+     "trigger_levels",
+     "volatility_attribution"
+    ],
+    "everything_else": "describe('run_2345b2fba361')"
+   }
+  ]
+ },
+ "desk": {
+  "brief": {
+   "id": "brief_20660dfc0271",
+   "created_at": "2026-07-24T06:04:07.795985+00:00"
+  },
+  "read_with": "read_book('MSFT', names=['brief'])"
+ },
+ "not_held": {
+  "segment_revenue": "not held as figures (companyfacts carries no dimensions); stated in the 10-K's segment note and Item 7 \u2014 read_filings",
+  "product_revenue": "not held as figures; stated in Item 7 and the product table \u2014 read_filings",
+  "geographic_revenue": "not held as figures; stated in the segment note \u2014 read_filings",
+  "customer_concentration": "not held as figures; stated in Item 1 / the concentration note \u2014 read_filings",
+  "backlog": "not held as figures; stated in Item 7 where the issuer discloses it \u2014 read_filings"
+ },
+ "cannot": {
+  "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name"
+ },
+ "methods": {
+  "issuer": [
+   {
+    "name": "ebit",
+    "describes": "net income + interest expense + income tax expense",
+    "authority": "SEC C&DI 103.01, 103.02",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "ebit"
+    ]
+   },
+   {
+    "name": "ebitda",
+    "describes": "EBIT + depreciation and amortisation",
+    "authority": "SEC C&DI 103.01, 103.02",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "ebitda"
+    ]
+   },
+   {
+    "name": "free_cash_flow",
+    "describes": "operating cash flow \u2212 capital expenditures",
+    "authority": "SEC C&DI 102.07",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "free_cash_flow"
+    ]
+   },
+   {
+    "name": "total_debt",
+    "describes": "the widest non-overlapping set of reported debt components",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "total_debt"
+    ]
+   },
+   {
+    "name": "net_debt",
+    "describes": "total debt \u2212 cash and equivalents",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "net_debt"
+    ]
+   },
+   {
+    "name": "ebit_interest_coverage",
+    "describes": "EBIT \u00f7 interest expense, over the same window",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "ebit_interest_coverage"
+    ]
+   },
+   {
+    "name": "debt_to_ebitda",
+    "describes": "total debt \u00f7 EBITDA",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "debt_to_ebitda"
+    ]
+   },
+   {
+    "name": "debt_to_operating_cash_flow",
+    "describes": "total debt \u00f7 operating cash flow",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "debt_to_operating_cash_flow"
+    ]
+   },
+   {
+    "name": "fcf_to_debt",
+    "describes": "free cash flow \u00f7 total debt",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "fcf_to_debt"
+    ]
+   },
+   {
+    "name": "current_ratio",
+    "describes": "current assets \u00f7 current liabilities",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "current_ratio"
+    ]
+   },
+   {
+    "name": "gross_margin",
+    "describes": "gross profit \u00f7 revenue",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "gross_margin"
+    ]
+   },
+   {
+    "name": "operating_margin",
+    "describes": "operating income \u00f7 revenue",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "operating_margin"
+    ]
+   },
+   {
+    "name": "net_margin",
+    "describes": "net income \u00f7 revenue",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "net_margin"
+    ]
+   },
+   {
+    "name": "days_sales_outstanding",
+    "describes": "accounts receivable \u00f7 revenue \u00d7 365",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "days_sales_outstanding"
+    ]
+   },
+   {
+    "name": "days_inventory",
+    "describes": "inventory \u00f7 cost of revenue \u00d7 365",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "days_inventory"
+    ]
+   },
+   {
+    "name": "days_payable",
+    "describes": "accounts payable \u00f7 cost of revenue \u00d7 365",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "days_payable"
+    ]
+   },
+   {
+    "name": "roe",
+    "describes": "net income \u00f7 stockholders' equity",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; stockholders' equity at or below zero makes ROE meaningless: a loss divided by negative equity prints as a positive return, so the ratio is refused rather than displayed",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "roe"
+    ]
+   },
+   {
+    "name": "roa",
+    "describes": "net income \u00f7 total assets",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "roa"
+    ]
+   },
+   {
+    "name": "tax_burden",
+    "describes": "net income \u00f7 pretax income",
+    "authority": "CFA Institute, Financial Analysis Techniques (DuPont five-step)",
+    "fails_when": "an input the issuer did not file at the window or instant asked",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "tax_burden"
+    ]
+   },
+   {
+    "name": "nopat",
+    "describes": "operating income \u00d7 tax burden",
+    "authority": "Damodaran, Return Measures (NYU Stern working paper)",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: for a financial issuer debt is not financing to be netted against operations \u2014 deposits and borrowings are the raw material of the business \u2014 so an invested capital assembled as debt plus equity minus cash describes nothing",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "nopat"
+    ]
+   },
+   {
+    "name": "invested_capital",
+    "describes": "total debt + stockholders' equity \u2212 cash and equivalents",
+    "authority": "Damodaran, Return Measures (NYU Stern working paper)",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: for a financial issuer debt is not financing to be netted against operations \u2014 deposits and borrowings are the raw material of the business \u2014 so an invested capital assembled as debt plus equity minus cash describes nothing",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "invested_capital"
+    ]
+   },
+   {
+    "name": "roic",
+    "describes": "NOPAT \u00f7 invested capital",
+    "authority": "Damodaran, Return Measures (NYU Stern working paper)",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: for a financial issuer debt is not financing to be netted against operations \u2014 deposits and borrowings are the raw material of the business \u2014 so an invested capital assembled as debt plus equity minus cash describes nothing",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "roic"
+    ]
+   },
+   {
+    "name": "asset_turnover",
+    "describes": "revenue \u00f7 total assets",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "asset_turnover"
+    ]
+   },
+   {
+    "name": "equity_multiplier",
+    "describes": "total assets \u00f7 stockholders' equity",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; stockholders' equity at or below zero makes the equity multiplier meaningless: assets over negative equity prints as a negative multiple of leverage, so the ratio is refused rather than displayed",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "equity_multiplier"
+    ]
+   },
+   {
+    "name": "quick_assets",
+    "describes": "current assets \u2212 inventory",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: a financial issuer does not present a classified balance sheet",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "quick_assets"
+    ]
+   },
+   {
+    "name": "quick_ratio",
+    "describes": "(current assets \u2212 inventory) \u00f7 current liabilities",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: a financial issuer does not present a classified balance sheet",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "quick_ratio"
+    ]
+   },
+   {
+    "name": "fcf_margin",
+    "describes": "free cash flow \u00f7 revenue",
+    "authority": "SEC C&DI 102.07",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: operating cash flow less capital expenditure does not describe a bank, whose cash generation and reinvestment run through the loan book and deposits rather than property and equipment",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "fcf_margin"
+    ]
+   },
+   {
+    "name": "capex_intensity",
+    "describes": "capital expenditures \u00f7 revenue",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: operating cash flow less capital expenditure does not describe a bank, whose cash generation and reinvestment run through the loan book and deposits rather than property and equipment",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "capex_intensity"
+    ]
+   },
+   {
+    "name": "net_debt_to_ebitda",
+    "describes": "net debt \u00f7 EBITDA",
+    "authority": "SEC non-GAAP C&DIs",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "net_debt_to_ebitda"
+    ]
+   },
+   {
+    "name": "cash_conversion_cycle",
+    "describes": "days sales outstanding + days inventory \u2212 days payable",
+    "authority": "CFA Institute, Financial Analysis Techniques",
+    "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: a financial issuer holds no inventory and its receivables and payables are not trade credit, so a working-capital cycle measured in days describes nothing",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "cash_conversion_cycle"
+    ]
+   },
+   {
+    "name": "accruals",
+    "describes": "net income \u2212 operating cash flow",
+    "authority": "Sloan (1996), The Accounting Review 71(3); Hribar & Collins (2002)",
+    "fails_when": "an input the issuer did not file at the window or instant asked",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "accruals"
+    ]
+   },
+   {
+    "name": "accruals_ratio",
+    "describes": "(net income \u2212 operating cash flow) \u00f7 total assets",
+    "authority": "Sloan (1996), The Accounting Review 71(3)",
+    "fails_when": "an input the issuer did not file at the window or instant asked",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "accruals_ratio"
+    ]
+   },
+   {
+    "name": "issuer.panel",
+    "describes": "every named issuer measure this desk knows, evaluated once, with each one's own refusal where an input is missing",
+    "authority": "the registry's own entries, each with its citation",
+    "fails_when": "never as a whole; each measure fails on its own terms",
+    "params": [
+     "months",
+     "at"
+    ],
+    "yields": [
+     "ebit",
+     "ebitda",
+     "free_cash_flow",
+     "total_debt",
+     "net_debt",
+     "ebit_interest_coverage",
+     "debt_to_ebitda",
+     "debt_to_operating_cash_flow",
+     "fcf_to_debt",
+     "current_ratio",
+     "gross_margin",
+     "operating_margin",
+     "net_margin",
+     "days_sales_outstanding",
+     "days_inventory",
+     "days_payable",
+     "roe",
+     "roa",
+     "tax_burden",
+     "nopat",
+     "invested_capital",
+     "roic",
+     "asset_turnover",
+     "equity_multiplier",
+     "quick_assets",
+     "quick_ratio",
+     "fcf_margin",
+     "capex_intensity",
+     "net_debt_to_ebitda",
+     "cash_conversion_cycle",
+     "accruals",
+     "accruals_ratio"
+    ]
+   }
+  ],
+  "price": [
+   {
+    "name": "price.volatility",
+    "describes": "annualised volatility of the last N daily returns",
+    "authority": "CFA Program, Quantitative Methods (return volatility); \u221a252 annualisation is the industry convention",
+    "fails_when": "fewer than 20 sessions in the window (VOL_MIN_OBS): refused with the counts, never shortened",
+    "params": [
+     "window_days"
+    ],
+    "yields": [
+     "{ticker}.vol.{n}d"
+    ]
+   },
+   {
+    "name": "price.beta",
+    "describes": "OLS beta, alpha and R\u00b2 of a name's daily returns on a benchmark's (default SPY)",
+    "authority": "Sharpe (1964) market model; CFA Program, Portfolio Management (beta estimation)",
+    "fails_when": "fewer than 60 aligned observations (BETA_MIN_OBS); a benchmark with no price history",
+    "params": [
+     "benchmark",
+     "window"
+    ],
+    "yields": [
+     "{ticker}.beta",
+     "{ticker}.alpha",
+     "{ticker}.r_squared"
+    ]
+   },
+   {
+    "name": "price.momentum_12_1",
+    "describes": "cumulative adjusted return from ~12 months back through 21 sessions back, the last month skipped",
+    "authority": "Jegadeesh & Titman (1993), Returns to Buying Winners and Selling Losers",
+    "fails_when": "fewer than 200 sessions of history (MOMENTUM_MIN_OBS); a formation window under 252 sessions is flagged",
+    "params": [],
+    "yields": [
+     "{ticker}.momentum_12_1"
+    ]
+   },
+   {
+    "name": "price.distance_from_52w_high",
+    "describes": "how far the adjusted close sits below its trailing-year high, with the date the high was set",
+    "authority": "George & Hwang (2004), The 52-Week High and Momentum Investing",
+    "fails_when": "fewer than 200 sessions of history (MOMENTUM_MIN_OBS)",
+    "params": [],
+    "yields": [
+     "{ticker}.distance_from_52w_high"
+    ]
+   },
+   {
+    "name": "price.adv",
+    "describes": "average daily volume over the last N sessions, in shares and in dollars",
+    "authority": "desk convention for days-to-liquidate arithmetic (20/30/60-session windows)",
+    "fails_when": "fewer than 20 sessions (ADV_MIN_OBS) or no recorded volume",
+    "params": [
+     "window_days"
+    ],
+    "yields": [
+     "{ticker}.adv.shares",
+     "{ticker}.adv.dollars"
+    ]
+   },
+   {
+    "name": "price.drawdown",
+    "describes": "the deepest peak-to-trough fall of the adjusted close over a window: peak, trough, fall and depth, dated, with the recovery date if regained",
+    "authority": "the standard drawdown definition (Magdon-Ismail, Atiya, Pratap & Abu-Mostafa, 2004)",
+    "fails_when": "fewer than 20 sessions (DRAWDOWN_MIN_OBS); a window that never fell is stated, not zero",
+    "params": [
+     "window"
+    ],
+    "yields": [
+     "{ticker}.drawdown.peak",
+     "{ticker}.drawdown.trough",
+     "{ticker}.drawdown.fall",
+     "{ticker}.drawdown.depth"
+    ]
+   },
+   {
+    "name": "price.window_return",
+    "describes": "total return over a named window, and relative to a benchmark when one is given",
+    "authority": "total-return convention on split- and dividend-adjusted closes",
+    "fails_when": "no price on or before either end of the window",
+    "params": [
+     "window",
+     "benchmark"
+    ],
+    "yields": [
+     "{ticker}.window_return",
+     "{ticker}.window_return.relative"
+    ]
+   }
+  ]
+ },
+ "procedures": [
+  {
+   "name": "bear_case_from_filings",
+   "question": "the bear case in the issuer's own words, ordered by which risk is live"
+  },
+  {
+   "name": "diligence_sweep",
+   "question": "an open-ended review of one issuer: what stands out"
+  },
+  {
+   "name": "capital_allocation",
+   "question": "where the issuer's cash is going"
+  },
+  {
+   "name": "name_outside_the_book",
+   "question": "can a name be analysed, and how does it compare with what is held"
+  },
+  {
+   "name": "revenue_concentration",
+   "question": "how concentrated the issuer's revenue is"
+  },
+  {
+   "name": "thesis_check",
+   "question": "is what is held still the business it was bought as"
+  },
+  {
+   "name": "peer_comparison",
+   "question": "how one issuer compares with another on one front"
+  }
+ ],
+ "catalogue_as_of": "2026-09-05",
+ "how_to_read": "Every name under `table` is a figure you can slot {ref, name} or use as an operand (ref:name) in compute. `methods` are what compute can produce for this subject; `procedures` are how an analyst approaches a kind of question about it; `not_held` and `cannot` are figures this desk does not have and why \u2014 say so, do not substitute. expand=<domain> opens one domain's detail.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures.",
+ "table_names": {
+  "run_b791e7985dcd": [
+   "issuer_exposures.MSFT.weight",
+   "issuer_exposures.MSFT.market_value",
+   "issuer_exposures.MSFT.contribution",
+   "exposure_metrics.portfolio_market_value",
+   "limit_checks.issuer_concentration:MSFT.current_value",
+   "limit_checks.issuer_concentration:MSFT.warning_level",
+   "limit_checks.issuer_concentration:MSFT.breach_level",
+   "risk_alerts.issuer_concentration:MSFT.current_value",
+   "risk_alerts.issuer_concentration:MSFT.limit_value",
+   "risk_alerts.issuer_concentration:MSFT.utilization"
+  ],
+  "run_0b2d88d81dc0": [
+   "issuer_exposures.MSFT.weight",
+   "issuer_exposures.MSFT.market_value",
+   "issuer_exposures.MSFT.contribution",
+   "exposure_metrics.portfolio_market_value"
+  ],
+  "run_2345b2fba361": [
+   "issuer_exposures.MSFT.weight",
+   "issuer_exposures.MSFT.market_value",
+   "issuer_exposures.MSFT.contribution",
+   "exposure_metrics.portfolio_market_value"
+  ]
+ }
+}

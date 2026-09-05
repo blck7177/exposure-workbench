@@ -1,0 +1,480 @@
+{
+ "subject": "run_b791e7985dcd",
+ "kind": "run",
+ "portfolio_id": "port_001",
+ "as_of": "2026-09-03",
+ "names": 161,
+ "groups": [
+  {
+   "group": "book",
+   "answers": "size, day P&L and net/gross exposure of the whole book",
+   "names": [
+    "exposure_metrics.daily_pnl",
+    "exposure_metrics.daily_return",
+    "exposure_metrics.gross_exposure",
+    "exposure_metrics.gross_exposure_pct",
+    "exposure_metrics.net_exposure",
+    "exposure_metrics.net_exposure_pct",
+    "exposure_metrics.portfolio_market_value"
+   ]
+  },
+  {
+   "group": "concentration",
+   "answers": "which issuers and sectors the book is concentrated in",
+   "patterns": [
+    {
+     "patterns": [
+      "issuer_exposures.<label>.market_value",
+      "issuer_exposures.<label>.weight"
+     ],
+     "labels": [
+      "AAPL",
+      "AMZN",
+      "GOOGL",
+      "HYG",
+      "JPM",
+      "LLY",
+      "MSFT",
+      "NVDA",
+      "TLT",
+      "XOM"
+     ]
+    },
+    {
+     "patterns": [
+      "sector_exposures.<label>.weight"
+     ],
+     "labels": [
+      "Communication_Services",
+      "Consumer_Discretionary",
+      "Energy",
+      "Financials",
+      "Fixed_Income",
+      "Healthcare",
+      "Technology"
+     ]
+    }
+   ]
+  },
+  {
+   "group": "mandate",
+   "answers": "how each limit check stands against its warning and breach tiers, and the room left",
+   "names": [
+    "risk_alerts.issuer_concentration:LLY.current_value",
+    "risk_alerts.issuer_concentration:LLY.limit_value",
+    "risk_alerts.issuer_concentration:LLY.utilization",
+    "risk_alerts.issuer_concentration:MSFT.current_value",
+    "risk_alerts.issuer_concentration:MSFT.limit_value",
+    "risk_alerts.issuer_concentration:MSFT.utilization"
+   ],
+   "patterns": [
+    {
+     "patterns": [
+      "limit_checks.<label>.current_value",
+      "limit_checks.<label>.warning_level",
+      "limit_checks.<label>.breach_level"
+     ],
+     "labels": [
+      "daily_loss",
+      "gross_exposure",
+      "issuer_concentration:AAPL",
+      "issuer_concentration:AMZN",
+      "issuer_concentration:GOOGL",
+      "issuer_concentration:HYG",
+      "issuer_concentration:JPM",
+      "issuer_concentration:LLY",
+      "issuer_concentration:MSFT",
+      "issuer_concentration:NVDA",
+      "issuer_concentration:TLT",
+      "issuer_concentration:XOM",
+      "rolling_volatility_30d",
+      "sector_concentration:Communication_Services",
+      "sector_concentration:Consumer_Discretionary",
+      "sector_concentration:Energy",
+      "sector_concentration:Financials",
+      "sector_concentration:Fixed_Income",
+      "sector_concentration:Healthcare",
+      "sector_concentration:Technology"
+     ]
+    }
+   ]
+  },
+  {
+   "group": "factor_exposure",
+   "answers": "which way the book moves with each risk \u2014 net betas with their legs",
+   "names": [
+    "factor_attributions.sum_of_contributions"
+   ]
+  },
+  {
+   "group": "attribution",
+   "answers": "what moved the book on the run's date, by position and by factor",
+   "names": [
+    "exposure_metrics.alpha",
+    "exposure_metrics.attribution_portfolio_return",
+    "exposure_metrics.residual"
+   ],
+   "patterns": [
+    {
+     "patterns": [
+      "issuer_exposures.<label>.daily_return",
+      "issuer_exposures.<label>.contribution"
+     ],
+     "labels": [
+      "AAPL",
+      "AMZN",
+      "GOOGL",
+      "HYG",
+      "JPM",
+      "LLY",
+      "MSFT",
+      "NVDA",
+      "TLT",
+      "XOM"
+     ]
+    }
+   ]
+  },
+  {
+   "group": "risk",
+   "answers": "volatility, tail measures and drawdown as the run measured them",
+   "names": [
+    "exposure_metrics.max_drawdown",
+    "exposure_metrics.max_vif",
+    "exposure_metrics.model_r_squared",
+    "exposure_metrics.observations",
+    "exposure_metrics.rolling_vol_30d",
+    "exposure_metrics.rolling_vol_60d"
+   ]
+  },
+  {
+   "group": "counts",
+   "answers": "how many positions, factors, alerts and checks the run holds",
+   "names": [
+    "count.alerts",
+    "count.factors",
+    "count.limit_checks",
+    "count.limit_checks.fired=false",
+    "count.limit_checks.fired=true",
+    "count.positions"
+   ]
+  }
+ ],
+ "other": {
+  "names": [
+   "exposure_metrics.regression_window_days"
+  ],
+  "patterns": [
+   {
+    "patterns": [
+     "issuer_exposures.<label>.daily_pnl"
+    ],
+    "labels": [
+     "AAPL",
+     "AMZN",
+     "GOOGL",
+     "HYG",
+     "JPM",
+     "LLY",
+     "MSFT",
+     "NVDA",
+     "TLT",
+     "XOM"
+    ]
+   },
+   {
+    "patterns": [
+     "sector_exposures.<label>.market_value",
+     "sector_exposures.<label>.weight_change"
+    ],
+    "labels": [
+     "Communication_Services",
+     "Consumer_Discretionary",
+     "Energy",
+     "Financials",
+     "Fixed_Income",
+     "Healthcare",
+     "Technology"
+    ]
+   }
+  ]
+ },
+ "withheld_collinear": {
+  "patterns": [
+   {
+    "patterns": [
+     "factor_attributions.<label>.beta",
+     "factor_attributions.<label>.contribution",
+     "factor_attributions.<label>.factor_return",
+     "factor_attributions.<label>.r_squared"
+    ],
+    "labels": [
+     "credit",
+     "gold",
+     "growth",
+     "market",
+     "oil",
+     "rates",
+     "small_cap"
+    ]
+   }
+  ]
+ },
+ "units": {
+  "exposure_metrics": {
+   "portfolio_market_value": "MONEY",
+   "daily_pnl": "MONEY",
+   "gross_exposure": "MONEY",
+   "net_exposure": "MONEY",
+   "daily_return": "RATIO",
+   "gross_exposure_pct": "RATIO",
+   "net_exposure_pct": "RATIO",
+   "rolling_vol_30d": "RATIO",
+   "rolling_vol_60d": "RATIO",
+   "max_drawdown": "RATIO",
+   "attribution_portfolio_return": "RATIO",
+   "alpha": "RATIO",
+   "residual": "RATIO",
+   "model_r_squared": "RATIO",
+   "max_vif": "RATIO",
+   "observations": "COUNT",
+   "regression_window_days": "COUNT"
+  },
+  "issuer_exposures": {
+   "market_value": "MONEY",
+   "daily_pnl": "MONEY",
+   "weight": "RATIO",
+   "weight_change": "RATIO",
+   "daily_return": "RATIO",
+   "contribution": "RATIO"
+  },
+  "sector_exposures": {
+   "market_value": "MONEY",
+   "weight": "RATIO",
+   "weight_change": "RATIO"
+  },
+  "factor_attributions": {
+   "beta": "RATIO",
+   "factor_return": "RATIO",
+   "contribution": "RATIO",
+   "r_squared": "RATIO"
+  },
+  "risk_alerts": {
+   "current_value": "RATIO",
+   "limit_value": "RATIO",
+   "utilization": "RATIO"
+  },
+  "limit_checks": {
+   "current_value": "RATIO",
+   "warning_level": "RATIO",
+   "breach_level": "RATIO"
+  }
+ },
+ "read_with": "read_book('run_b791e7985dcd', names=[\u2026])",
+ "methods": {
+  "run": [
+   "book.analysis",
+   "book.reconcile",
+   "book.sell",
+   "book.buy"
+  ]
+ },
+ "procedures": [
+  {
+   "name": "cut_one_name",
+   "question": "which holding to cut, and what the book looks like after"
+  },
+  {
+   "name": "rates_scenario",
+   "question": "what a move in rates does to this book, name by name"
+  },
+  {
+   "name": "wrong_premise",
+   "question": "the user asserts a figure that is not what the desk holds"
+  },
+  {
+   "name": "news_to_position",
+   "question": "what happened recently and whether it touches something held"
+  },
+  {
+   "name": "trigger_levels",
+   "question": "what would have to happen for the mandate's answer to flip"
+  },
+  {
+   "name": "volatility_attribution",
+   "question": "has the book got jumpier, and is it the market or something held"
+  }
+ ],
+ "cannot": {
+  "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name",
+  "scenario_refit": "a scenario (book.sell / book.buy) re-runs the limit checks and does not re-fit betas, volatility or P&L: stated unmeasured"
+ },
+ "catalogue_as_of": "2026-09-05",
+ "how_to_read": "Every name under `table` is a figure you can slot {ref, name} or use as an operand (ref:name) in compute. `methods` are what compute can produce for this subject; `procedures` are how an analyst approaches a kind of question about it; `not_held` and `cannot` are figures this desk does not have and why \u2014 say so, do not substitute. expand=<domain> opens one domain's detail.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures.",
+ "table_names": {
+  "run_b791e7985dcd": [
+   "exposure_metrics.portfolio_market_value",
+   "exposure_metrics.daily_pnl",
+   "exposure_metrics.gross_exposure",
+   "exposure_metrics.net_exposure",
+   "exposure_metrics.daily_return",
+   "exposure_metrics.gross_exposure_pct",
+   "exposure_metrics.net_exposure_pct",
+   "exposure_metrics.rolling_vol_30d",
+   "exposure_metrics.rolling_vol_60d",
+   "exposure_metrics.max_drawdown",
+   "exposure_metrics.attribution_portfolio_return",
+   "exposure_metrics.alpha",
+   "exposure_metrics.residual",
+   "exposure_metrics.model_r_squared",
+   "exposure_metrics.max_vif",
+   "exposure_metrics.observations",
+   "exposure_metrics.regression_window_days",
+   "issuer_exposures.AAPL.market_value",
+   "issuer_exposures.AAPL.daily_pnl",
+   "issuer_exposures.AAPL.weight",
+   "issuer_exposures.AAPL.daily_return",
+   "issuer_exposures.AAPL.contribution",
+   "issuer_exposures.AMZN.market_value",
+   "issuer_exposures.AMZN.daily_pnl",
+   "issuer_exposures.AMZN.weight",
+   "issuer_exposures.AMZN.daily_return",
+   "issuer_exposures.AMZN.contribution",
+   "issuer_exposures.GOOGL.market_value",
+   "issuer_exposures.GOOGL.daily_pnl",
+   "issuer_exposures.GOOGL.weight",
+   "issuer_exposures.GOOGL.daily_return",
+   "issuer_exposures.GOOGL.contribution",
+   "issuer_exposures.HYG.market_value",
+   "issuer_exposures.HYG.daily_pnl",
+   "issuer_exposures.HYG.weight",
+   "issuer_exposures.HYG.daily_return",
+   "issuer_exposures.HYG.contribution",
+   "issuer_exposures.JPM.market_value",
+   "issuer_exposures.JPM.daily_pnl",
+   "issuer_exposures.JPM.weight",
+   "issuer_exposures.JPM.daily_return",
+   "issuer_exposures.JPM.contribution",
+   "issuer_exposures.LLY.market_value",
+   "issuer_exposures.LLY.daily_pnl",
+   "issuer_exposures.LLY.weight",
+   "issuer_exposures.LLY.daily_return",
+   "issuer_exposures.LLY.contribution",
+   "issuer_exposures.MSFT.market_value",
+   "issuer_exposures.MSFT.daily_pnl",
+   "issuer_exposures.MSFT.weight",
+   "issuer_exposures.MSFT.daily_return",
+   "issuer_exposures.MSFT.contribution",
+   "issuer_exposures.NVDA.market_value",
+   "issuer_exposures.NVDA.daily_pnl",
+   "issuer_exposures.NVDA.weight",
+   "issuer_exposures.NVDA.daily_return",
+   "issuer_exposures.NVDA.contribution",
+   "issuer_exposures.TLT.market_value",
+   "issuer_exposures.TLT.daily_pnl",
+   "issuer_exposures.TLT.weight",
+   "issuer_exposures.TLT.daily_return",
+   "issuer_exposures.TLT.contribution",
+   "issuer_exposures.XOM.market_value",
+   "issuer_exposures.XOM.daily_pnl",
+   "issuer_exposures.XOM.weight",
+   "issuer_exposures.XOM.daily_return",
+   "issuer_exposures.XOM.contribution",
+   "sector_exposures.Technology.market_value",
+   "sector_exposures.Technology.weight",
+   "sector_exposures.Technology.weight_change",
+   "sector_exposures.Financials.market_value",
+   "sector_exposures.Financials.weight",
+   "sector_exposures.Financials.weight_change",
+   "sector_exposures.Healthcare.market_value",
+   "sector_exposures.Healthcare.weight",
+   "sector_exposures.Healthcare.weight_change",
+   "sector_exposures.Communication_Services.market_value",
+   "sector_exposures.Communication_Services.weight",
+   "sector_exposures.Communication_Services.weight_change",
+   "sector_exposures.Fixed_Income.market_value",
+   "sector_exposures.Fixed_Income.weight",
+   "sector_exposures.Fixed_Income.weight_change",
+   "sector_exposures.Consumer_Discretionary.market_value",
+   "sector_exposures.Consumer_Discretionary.weight",
+   "sector_exposures.Consumer_Discretionary.weight_change",
+   "sector_exposures.Energy.market_value",
+   "sector_exposures.Energy.weight",
+   "sector_exposures.Energy.weight_change",
+   "risk_alerts.issuer_concentration:LLY.current_value",
+   "risk_alerts.issuer_concentration:LLY.limit_value",
+   "risk_alerts.issuer_concentration:LLY.utilization",
+   "risk_alerts.issuer_concentration:MSFT.current_value",
+   "risk_alerts.issuer_concentration:MSFT.limit_value",
+   "risk_alerts.issuer_concentration:MSFT.utilization",
+   "limit_checks.daily_loss.current_value",
+   "limit_checks.daily_loss.warning_level",
+   "limit_checks.daily_loss.breach_level",
+   "limit_checks.gross_exposure.current_value",
+   "limit_checks.gross_exposure.warning_level",
+   "limit_checks.gross_exposure.breach_level",
+   "limit_checks.issuer_concentration:AAPL.current_value",
+   "limit_checks.issuer_concentration:AAPL.warning_level",
+   "limit_checks.issuer_concentration:AAPL.breach_level",
+   "limit_checks.issuer_concentration:AMZN.current_value",
+   "limit_checks.issuer_concentration:AMZN.warning_level",
+   "limit_checks.issuer_concentration:AMZN.breach_level",
+   "limit_checks.issuer_concentration:GOOGL.current_value",
+   "limit_checks.issuer_concentration:GOOGL.warning_level",
+   "limit_checks.issuer_concentration:GOOGL.breach_level",
+   "limit_checks.issuer_concentration:HYG.current_value",
+   "limit_checks.issuer_concentration:HYG.warning_level",
+   "limit_checks.issuer_concentration:HYG.breach_level",
+   "limit_checks.issuer_concentration:JPM.current_value",
+   "limit_checks.issuer_concentration:JPM.warning_level",
+   "limit_checks.issuer_concentration:JPM.breach_level",
+   "limit_checks.issuer_concentration:LLY.current_value",
+   "limit_checks.issuer_concentration:LLY.warning_level",
+   "limit_checks.issuer_concentration:LLY.breach_level",
+   "limit_checks.issuer_concentration:MSFT.current_value",
+   "limit_checks.issuer_concentration:MSFT.warning_level",
+   "limit_checks.issuer_concentration:MSFT.breach_level",
+   "limit_checks.issuer_concentration:NVDA.current_value",
+   "limit_checks.issuer_concentration:NVDA.warning_level",
+   "limit_checks.issuer_concentration:NVDA.breach_level",
+   "limit_checks.issuer_concentration:TLT.current_value",
+   "limit_checks.issuer_concentration:TLT.warning_level",
+   "limit_checks.issuer_concentration:TLT.breach_level",
+   "limit_checks.issuer_concentration:XOM.current_value",
+   "limit_checks.issuer_concentration:XOM.warning_level",
+   "limit_checks.issuer_concentration:XOM.breach_level",
+   "limit_checks.rolling_volatility_30d.current_value",
+   "limit_checks.rolling_volatility_30d.warning_level",
+   "limit_checks.rolling_volatility_30d.breach_level",
+   "limit_checks.sector_concentration:Communication_Services.current_value",
+   "limit_checks.sector_concentration:Communication_Services.warning_level",
+   "limit_checks.sector_concentration:Communication_Services.breach_level",
+   "limit_checks.sector_concentration:Consumer_Discretionary.current_value",
+   "limit_checks.sector_concentration:Consumer_Discretionary.warning_level",
+   "limit_checks.sector_concentration:Consumer_Discretionary.breach_level",
+   "limit_checks.sector_concentration:Energy.current_value",
+   "limit_checks.sector_concentration:Energy.warning_level",
+   "limit_checks.sector_concentration:Energy.breach_level",
+   "limit_checks.sector_concentration:Financials.current_value",
+   "limit_checks.sector_concentration:Financials.warning_level",
+   "limit_checks.sector_concentration:Financials.breach_level",
+   "limit_checks.sector_concentration:Fixed_Income.current_value",
+   "limit_checks.sector_concentration:Fixed_Income.warning_level",
+   "limit_checks.sector_concentration:Fixed_Income.breach_level",
+   "limit_checks.sector_concentration:Healthcare.current_value",
+   "limit_checks.sector_concentration:Healthcare.warning_level",
+   "limit_checks.sector_concentration:Healthcare.breach_level",
+   "limit_checks.sector_concentration:Technology.current_value",
+   "limit_checks.sector_concentration:Technology.warning_level",
+   "limit_checks.sector_concentration:Technology.breach_level",
+   "factor_attributions.sum_of_contributions",
+   "count.positions",
+   "count.factors",
+   "count.alerts",
+   "count.limit_checks",
+   "count.limit_checks.fired=false",
+   "count.limit_checks.fired=true"
+  ]
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "method": "price.distance_from_52w_high",
+ "subject": "MSFT",
+ "calc_id": "calc_50e768360bce",
+ "ticker": "MSFT",
+ "value": -0.05119796208065375,
+ "n": 252,
+ "quantity": "MSFT.distance_from_52w_high",
+ "unit_class": "ratio",
+ "high_date": "2025-10-28",
+ "as_of": "2026-09-03",
+ "basis": "adj_close at 2026-09-03 against its high of the trailing 252 sessions, set 2025-10-28"
+}

@@ -1,0 +1,16 @@
+{
+ "method": "price.window_return",
+ "subject": "MSFT",
+ "calc_id": "calc_ebc0ab53d669",
+ "operation": "window_return.relative",
+ "ticker": "MSFT",
+ "value": -0.1966233129873256,
+ "unit_class": "RATIO",
+ "window": {
+  "start": "2025-09-03",
+  "end": "2026-09-03"
+ },
+ "as_of": "2026-09-03",
+ "benchmark": "SPY",
+ "quality_flags": {}
+}

@@ -1,0 +1,23 @@
+{
+ "calc_id": "calc_e13c08d23f6d",
+ "op": "scale",
+ "value": 47740950000.0,
+ "type": {
+  "unit_class": "money",
+  "basis": {
+   "interval": [
+    "2025-04-01",
+    "2026-03-31"
+   ]
+  },
+  "quantity": "revenue.scale",
+  "issuers": [
+   "MSFT"
+  ]
+ },
+ "operands": [
+  "calc_699932f2b3a4"
+ ],
+ "factor": 0.15,
+ "basis": "2025-04-01..2026-03-31 scaled by 0.15"
+}

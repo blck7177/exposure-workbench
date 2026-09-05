@@ -1,0 +1,5 @@
+{
+ "error": "company_not_found",
+ "detail": "ZZZZ is not a company this desk knows",
+ "ticker": "ZZZZ"
+}

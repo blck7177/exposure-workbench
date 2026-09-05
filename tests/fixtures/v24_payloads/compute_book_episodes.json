@@ -1,0 +1,40 @@
+{
+ "method": "book.drawdown_episodes",
+ "subject": "port_001",
+ "calc_id": "calc_b8e4d85cc14a",
+ "portfolio_id": "port_001",
+ "span": "1y",
+ "window": {
+  "from": "2025-09-03",
+  "to": "2026-09-03"
+ },
+ "sessions": 253,
+ "episodes": [
+  {
+   "peak_date": "2026-01-07",
+   "trough_date": "2026-03-27",
+   "depth": 0.11957069822749936,
+   "recovery_date": "2026-05-01",
+   "trough_days": 55,
+   "recovery_days": 24,
+   "recovered": true
+  },
+  {
+   "peak_date": "2026-05-29",
+   "trough_date": "2026-06-25",
+   "depth": 0.062397139234276706,
+   "recovery_date": "2026-07-15",
+   "trough_days": 18,
+   "recovery_days": 13,
+   "recovered": true
+  }
+ ],
+ "deepest": {
+  "peak_date": "2026-01-07",
+  "trough_date": "2026-03-27",
+  "depth": 0.11957069822749936,
+  "recovered": true
+ },
+ "reported_floor": 0.05,
+ "valuation_assumption": "quantities are held fixed at today's holdings for the whole span \u2014 the book has one position snapshot and no holding history to replay"
+}

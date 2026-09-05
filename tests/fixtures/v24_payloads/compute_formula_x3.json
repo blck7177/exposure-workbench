@@ -1,0 +1,83 @@
+{
+ "results": [
+  {
+   "method": "net_margin",
+   "subject": "MSFT",
+   "formula": "net_margin",
+   "ticker": "MSFT",
+   "value": 0.39342325613545603,
+   "calc_id": "calc_95203c3ac701",
+   "definition": "net income \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "authority": {
+    "cite_as": "SEC non-GAAP C&DIs",
+    "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"
+   },
+   "note": "The revenue line used is named in the result.",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  {
+   "method": "net_margin",
+   "subject": "AAPL",
+   "formula": "net_margin",
+   "ticker": "AAPL",
+   "value": 0.2715188219084622,
+   "calc_id": "calc_03ee374004b6",
+   "definition": "net income \u00f7 revenue",
+   "basis": "2025-03-30..2026-03-28 divide 2025-03-30..2026-03-28",
+   "authority": {
+    "cite_as": "SEC non-GAAP C&DIs",
+    "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"
+   },
+   "note": "The revenue line used is named in the result.",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-03-30",
+      "2026-03-28"
+     ]
+    ]
+   }
+  },
+  {
+   "method": "net_margin",
+   "subject": "NVDA",
+   "formula": "net_margin",
+   "ticker": "NVDA",
+   "value": 0.6366294901458565,
+   "calc_id": "calc_c6af35e24ebb",
+   "definition": "net income \u00f7 revenue [total revenues used for revenue]",
+   "basis": "2025-07-28..2026-07-26 divide 2025-07-28..2026-07-26",
+   "authority": {
+    "cite_as": "SEC non-GAAP C&DIs",
+    "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"
+   },
+   "note": "The revenue line used is named in the result.",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-07-28",
+      "2026-07-26"
+     ]
+    ]
+   },
+   "substituted_inputs": {
+    "revenue": "total_revenues"
+   }
+  }
+ ],
+ "count": 3
+}

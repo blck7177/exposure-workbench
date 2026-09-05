@@ -206,7 +206,7 @@ async def get_flow(
         {"value": window.value}, [t["fact_id"] for t in terms], {}, invoked_by,
     )
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric,
-            "value": window.value, "period": period, "terms": terms,
+            "value": window.value, "unit_class": unit.upper(), "period": period, "terms": terms,
             "derivation": window.formula,
             "basis": f"{period['start']}..{period['end']}, derived as: {window.formula}"}
 
@@ -231,7 +231,7 @@ async def get_balance_sheet(
     rows = (await db.execute(
         select(FinancialFact.normalized_metric, FinancialFact.period_end,
                FinancialFact.value, FinancialFact.id,
-               FinancialFact.source_accession, Filing.filing_date)
+               FinancialFact.source_accession, Filing.filing_date, FinancialFact.unit)
         .outerjoin(Filing, Filing.id == FinancialFact.filing_id)
         .where(FinancialFact.company_id == company_id,
                FinancialFact.normalized_metric.is_not(None),
@@ -243,25 +243,31 @@ async def get_balance_sheet(
         return {"error": "no_balance_sheet_data", "ticker": ticker}
 
     best: dict[tuple[str, date], tuple] = {}
-    for metric, pe, value, fid, acc, fd in rows:
+    for metric, pe, value, fid, acc, fd, raw_unit in rows:
         key = (metric, pe)
         prev = best.get(key)
         if prev is None or ia.restatement_key(fd, acc) > ia.restatement_key(prev[4], prev[3]):
-            best[key] = (float(value), fid, pe, acc, fd)
+            best[key] = (float(value), fid, pe, acc, fd, raw_unit)
 
     as_of = date.fromisoformat(at) if at else max(pe for _m, pe in best)
     balances, absent = {}, {}
     for metric in sorted({m for m, _pe in best}):
         here = best.get((metric, as_of))
         if here is not None:
+            # V24: the balance says its unit — judged by the algebra's own
+            # fact_unit, never binned; a unit it cannot judge is stated as such.
+            judged = units.fact_unit(here[5])
             balances[metric] = {"value": here[0], "fact_id": here[1],
-                                "as_of": as_of.isoformat()}
+                                "as_of": as_of.isoformat(),
+                                "unit_class": judged.upper() if judged else "UNKNOWN"}
         else:
             seen = [pe for m, pe in best if m == metric]
             last = max((pe for pe in seen if pe < as_of), default=None) or max(seen)
+            judged_then = units.fact_unit(best[(metric, last)][5])
             absent[metric] = {
                 "last_reported": last.isoformat(),
                 "value_then": best[(metric, last)][0],
+                "unit_class": judged_then.upper() if judged_then else "UNKNOWN",
                 "note": ("reported at another date; ask for that date rather than "
                          "combining it with these"),
             }
@@ -318,7 +324,7 @@ async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) ->
         invoked_by,
     )
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "months": months,
-            "points": points,
+            "unit_class": unit.upper(), "points": points,
             "basis": (f"{len(derived)} consecutive {months}-month windows on {ticker}'s own "
                       f"reporting grid, "
                       f"{points[0]['start']}..{points[-1][units.POINT_PERIOD_KEY]}"
@@ -378,7 +384,8 @@ async def get_balance_series(
          "result_type": {"unit_class": unit, "kind": "instant", "quantity": metric}},
         {"points": points}, [p["fact_ids"][0] for p in points], {}, invoked_by,
     )
-    return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "points": points,
+    return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "unit_class": unit.upper(),
+            "points": points,
             "basis": f"{metric} as reported at each of {len(points)} instants, "
                      f"{points[0][units.POINT_PERIOD_KEY]}.."
                      f"{points[-1][units.POINT_PERIOD_KEY]}; "

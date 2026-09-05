@@ -1,0 +1,17 @@
+{
+ "ticker": "MSFT",
+ "as_of": "2026-09-03",
+ "convention": "close is the as-traded price (market value, display); adj_close is the split- and dividend-adjusted level returns are measured on. They are two quantities; cite the one you use.",
+ "close": {
+  "value": 510.12,
+  "calc_id": "calc_fd35d73131f7",
+  "quantity": "MSFT.close",
+  "unit_class": "money_per_share"
+ },
+ "adj_close": {
+  "value": 510.12,
+  "calc_id": "calc_01bc349ec272",
+  "quantity": "MSFT.adj_close",
+  "unit_class": "money_per_share"
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "method": "ebitda",
+ "subject": "MSFT",
+ "error": "input_unavailable",
+ "absence_id": "calc_2c90b6dc2e86",
+ "statement": "ebitda cannot be produced for MSFT: this desk holds no depreciation_amortization for MSFT at any date. What this desk does hold: net_income through 2026-03-31; interest_expense through 2024-06-30; income_tax_expense through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item.",
+ "ticker": "MSFT",
+ "formula": "ebitda",
+ "missing": "depreciation_amortization",
+ "detail": "MSFT reports no depreciation_amortization with a period; it may report a related line instead \u2014 call describe",
+ "definition": "EBIT + depreciation and amortisation",
+ "authority": {
+  "cite_as": "SEC C&DI 103.01, 103.02",
+  "url": "https://www.sec.gov/corpfin/non-gaap-financial-measures"
+ }
+}

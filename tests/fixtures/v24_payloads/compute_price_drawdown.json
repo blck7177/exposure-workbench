@@ -1,0 +1,39 @@
+{
+ "method": "price.drawdown",
+ "subject": "MSFT",
+ "ticker": "MSFT",
+ "window": "1y",
+ "interval": [
+  "2025-09-02",
+  "2026-09-03"
+ ],
+ "n": 254,
+ "peak_date": "2025-10-28",
+ "trough_date": "2026-06-25",
+ "recovery_date": null,
+ "basis": "adj_close over the last 1y (2025-09-02 to 2026-09-03); the deepest fall below the running maximum: peak 2025-10-28, trough 2026-06-25; fall = peak \u2212 trough, depth = fall \u00f7 peak; the peak has not been regained",
+ "peak": {
+  "value": 537.6464,
+  "calc_id": "calc_d9630cd71bd6",
+  "quantity": "MSFT.drawdown.peak",
+  "unit_class": "money_per_share"
+ },
+ "trough": {
+  "value": 352.167,
+  "calc_id": "calc_e8d88d1ce21d",
+  "quantity": "MSFT.drawdown.trough",
+  "unit_class": "money_per_share"
+ },
+ "fall": {
+  "value": 185.4794,
+  "calc_id": "calc_2c54cfc15667",
+  "quantity": "MSFT.drawdown.fall",
+  "unit_class": "money_per_share"
+ },
+ "depth": {
+  "value": 0.34498398947709874,
+  "calc_id": "calc_50aa161656f2",
+  "quantity": "MSFT.drawdown.depth",
+  "unit_class": "ratio"
+ }
+}

@@ -1,0 +1,172 @@
+{
+ "ticker": "MSFT",
+ "section": {
+  "brief": {
+   "brief_id": "brief_20660dfc0271",
+   "created_at": "2026-07-24T06:04:07.795985+00:00",
+   "is_own": false,
+   "research_run_id": "rrun_0bef53cb5360",
+   "blocks": {
+    "financial_summary": {
+     "text": "Microsoft\u2019s latest reported quarter (ended 2026-03-31) showed revenue of $82.886B, operating income of $38.398B, net income of $31.778B, and capex of $30.876B. Revenue and operating income remain at elevated levels versus recent quarters, while capex continued to rise. Liquidity metrics at 2026-03-31 show cash and equivalents of $32.105B, long-term debt of $31.423B, current assets of $175.329B, and current liabilities of $136.661B. The current ratio was 1.28x at 2026-03-31."
+    },
+    "key_changes": {
+     "text": "Quarterly revenue increased from $76.441B at 2025-06-30 to $82.886B at 2026-03-31; operating income rose from $34.323B to $38.398B over the same span; net income increased from $27.233B to $31.778B, though it was below the prior quarter\u2019s $38.458B at 2025-12-31; and capex increased from $17.079B to $30.876B. Capex also accelerated sequentially, with q/q growth of 54.0% in the 2025-12-31 quarter and 3.3% in the 2026-03-31 quarter."
+    },
+    "management_explanation": {
+     "text": "Management attributed March 2026 quarter performance to growth in Microsoft Cloud and Azure, with revenue up 18% and operating income up 20% for the nine-month period ended 2026-03-31. It said operating expense growth was driven by continued investment in research and development compute capacity, AI talent, and data to support product development, while gross margin was pressured by continued AI infrastructure investment and growing AI product usage, partially offset by efficiency gains across Microsoft Cloud and Azure/Microsoft 365 Commercial cloud. Management also noted favorable foreign-currency impacts on revenue, gross margin, and operating income."
+    },
+    "market_context": {
+     "text": "MSFT underperformed SPY by 13.6% over the last 3 months and by 42.4% over the last 1 year. No portfolio alerts are currently listed for the issuer."
+    },
+    "portfolio_implications": {
+     "text": "The key portfolio issue is execution risk around very heavy AI/cloud capex: management says Microsoft is spending substantial amounts to build and maintain datacenters and infrastructure for cloud-based and AI services, and it explicitly warns that these investments are reducing operating margins. With no current portfolio alerts, the position is being driven more by fundamental and valuation sensitivity to capex intensity, margin pressure, and AI demand conversion than by near-term balance-sheet stress."
+    },
+    "open_questions": {
+     "text": "How quickly can Microsoft convert AI demand into enough incremental cloud revenue to justify the current capex run rate? Will margin pressure from AI infrastructure ease as Azure efficiency gains scale? Is the recent relative share-price weakness primarily valuation, capex skepticism, or broader macro exposure?"
+    }
+   },
+   "citations": [
+    "calc_2d13f77733c8",
+    "calc_358d17eaa2f6",
+    "calc_4bed2c5be826",
+    "calc_dd049cd6ff93",
+    "chunk_01587cbb7325",
+    "chunk_1cb75f927298",
+    "chunk_527f93e3f86b",
+    "chunk_8c7b585c0bbe",
+    "chunk_fc6993ba6318",
+    "chunk_fee4db869a87",
+    "fact_02a614a32e91",
+    "fact_08870d1a8616",
+    "fact_0dbdcb486e42",
+    "fact_1320d5321db0",
+    "fact_2a08c00f1a50",
+    "fact_46435ed6ca81",
+    "fact_49a5ca612fad",
+    "fact_571dd645b9a3",
+    "fact_8501bbbbfe3c",
+    "fact_888aedbd9360",
+    "fact_88979e9e74a5",
+    "fact_8adc3c937f26",
+    "fact_8ba74db0f4cb",
+    "fact_9bd9d73386be",
+    "fact_a53ed1eda8a3",
+    "fact_c7b619e70971",
+    "fact_ce3f223ead87",
+    "fact_ceca6898a8d7",
+    "fact_d974d9b55978",
+    "fact_df03dc26f94d",
+    "fact_e426270a8f8d",
+    "fact_f37bd6c7ffe6"
+   ],
+   "has_block_citations": false
+  },
+  "alerts": [
+   {
+    "id": "alert_455cad508de7",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+    "as_of": "2026-09-04",
+    "utilization": 0.81258357
+   },
+   {
+    "id": "alert_47a5c53f667b",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.0% vs limit 15.0% [WARNING]",
+    "as_of": "2026-09-04",
+    "utilization": 0.80057395
+   },
+   {
+    "id": "alert_37bf78736e1d",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.0% vs limit 15.0% [WARNING]",
+    "as_of": "2026-09-03",
+    "utilization": 0.80057395
+   },
+   {
+    "id": "alert_f60d93b860a1",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.2% vs limit 15.0% [WARNING]",
+    "as_of": "2026-09-02",
+    "utilization": 0.8082588
+   },
+   {
+    "id": "alert_d027596492e3",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+    "as_of": "2026-09-01",
+    "utilization": 0.816756
+   },
+   {
+    "id": "alert_498241e3f709",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-31",
+    "utilization": 0.816756
+   },
+   {
+    "id": "alert_c95d1c05080a",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-31",
+    "utilization": 0.816756
+   },
+   {
+    "id": "alert_dbfcc7a8963b",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.5% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-31",
+    "utilization": 0.82296644
+   },
+   {
+    "id": "alert_77de23c3e65d",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 16.3% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-30",
+    "utilization": 0.81338945
+   },
+   {
+    "id": "alert_46d4a046ef59",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 15.5% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-27",
+    "utilization": 0.77638756
+   },
+   {
+    "id": "alert_d5339c84226a",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 15.5% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-21",
+    "utilization": 0.77638756
+   },
+   {
+    "id": "alert_72355c77cc2a",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 15.5% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-21",
+    "utilization": 0.77638756
+   },
+   {
+    "id": "alert_15d7f8706d0d",
+    "type": "issuer_concentration",
+    "severity": "warning",
+    "message": "Issuer MSFT: 15.5% vs limit 15.0% [WARNING]",
+    "as_of": "2026-08-21",
+    "utilization": 0.77638756
+   }
+  ]
+ }
+}

@@ -184,8 +184,11 @@ async def window_return(
         db, ticker, res.operation, params, {"value": res.value}, refs,
         res.quality_flags, invoked_by,
     )
-    return {"calc_id": calc_id, "operation": res.operation,
-            "value": res.value, "quality_flags": res.quality_flags}
+    return {"calc_id": calc_id, "operation": res.operation, "ticker": ticker,
+            "value": res.value, "unit_class": "RATIO",
+            "window": {"start": start.isoformat(), "end": end.isoformat()},
+            "as_of": end.isoformat(), **({"benchmark": benchmark} if benchmark else {}),
+            "quality_flags": res.quality_flags}
 
 
 async def list_available_metrics(db: AsyncSession, ticker: str) -> dict:

@@ -1,0 +1,97 @@
+{
+ "subject": "port_001",
+ "kind": "portfolio",
+ "identity": {
+  "name": "US Growth & Income Portfolio",
+  "portfolio_id": "port_001"
+ },
+ "positions": {
+  "count": 0,
+  "read_with": "read_book('port_001', names=['positions'])"
+ },
+ "limits": {
+  "count": 13,
+  "read_with": "read_book('port_001', names=['limits'])"
+ },
+ "runs": [
+  {
+   "run_id": "run_b791e7985dcd",
+   "as_of": "2026-09-03",
+   "status": "completed"
+  },
+  {
+   "run_id": "run_89c6f026d650",
+   "as_of": "2026-09-02",
+   "status": "completed"
+  },
+  {
+   "run_id": "run_3c94a47d6547",
+   "as_of": "2026-09-02",
+   "status": "completed"
+  },
+  {
+   "run_id": "run_690a3a2db838",
+   "as_of": "2026-09-01",
+   "status": "completed"
+  },
+  {
+   "run_id": "run_d91de5678b19",
+   "as_of": "2026-08-31",
+   "status": "completed"
+  }
+ ],
+ "freshness": {
+  "portfolio_id": "port_001",
+  "latest_completed_run": "run_b791e7985dcd",
+  "run_as_of": "2026-09-03",
+  "latest_market_session": "2026-09-03",
+  "sessions_behind": 0,
+  "runs_in_flight": 0,
+  "detail": null
+ },
+ "methods": {
+  "portfolio": [
+   "book.drawdown_episodes",
+   "book.explain_episode"
+  ],
+  "run": [
+   "book.analysis",
+   "book.reconcile",
+   "book.sell",
+   "book.buy"
+  ]
+ },
+ "procedures": [
+  {
+   "name": "cut_one_name",
+   "question": "which holding to cut, and what the book looks like after"
+  },
+  {
+   "name": "rates_scenario",
+   "question": "what a move in rates does to this book, name by name"
+  },
+  {
+   "name": "wrong_premise",
+   "question": "the user asserts a figure that is not what the desk holds"
+  },
+  {
+   "name": "news_to_position",
+   "question": "what happened recently and whether it touches something held"
+  },
+  {
+   "name": "trigger_levels",
+   "question": "what would have to happen for the mandate's answer to flip"
+  },
+  {
+   "name": "volatility_attribution",
+   "question": "has the book got jumpier, and is it the market or something held"
+  }
+ ],
+ "cannot": {
+  "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name",
+  "scenario_refit": "a scenario (book.sell / book.buy) re-runs the limit checks and does not re-fit betas, volatility or P&L: stated unmeasured"
+ },
+ "catalogue_as_of": "2026-09-05",
+ "how_to_read": "Every name under `table` is a figure you can slot {ref, name} or use as an operand (ref:name) in compute. `methods` are what compute can produce for this subject; `procedures` are how an analyst approaches a kind of question about it; `not_held` and `cannot` are figures this desk does not have and why \u2014 say so, do not substitute. expand=<domain> opens one domain's detail.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures."
+}

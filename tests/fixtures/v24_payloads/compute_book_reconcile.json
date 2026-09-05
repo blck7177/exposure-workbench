@@ -1,0 +1,53 @@
+{
+ "method": "book.reconcile",
+ "subject": "run_b791e7985dcd",
+ "run_id": "run_b791e7985dcd",
+ "portfolio_id": "port_001",
+ "as_of": "2026-09-03",
+ "reconciles": true,
+ "identity_positions": {
+  "statement": "sum of position contributions == daily_return",
+  "sum_of_contributions": 0.011595059999999999,
+  "daily_return": 0.01159506,
+  "gap": 1.734723475976807e-18,
+  "tolerance": 5.5e-08,
+  "holds": true,
+  "terms": 10
+ },
+ "identity_factors": {
+  "statement": "attribution_portfolio_return - sum of factor contributions == alpha + residual",
+  "attribution_portfolio_return": 0.01159506,
+  "sum_of_factor_contributions": 0.01008605,
+  "alpha_plus_residual": 0.0015090100000000016,
+  "recorded_alpha_plus_residual": 0.001509,
+  "gap": 1.0000000001675335e-08,
+  "tolerance": 4e-08,
+  "holds": true,
+  "terms": 7
+ },
+ "return_conventions": {
+  "daily_return": 0.01159506,
+  "attribution_portfolio_return": 0.01159506,
+  "difference": 0.0,
+  "why": "daily_return applies each holding's adjusted return to yesterday's as-traded market value; attribution_portfolio_return revalues the book at total-return prices on both days, which is what the betas were fitted against. They differ by the holdings' dividend history."
+ },
+ "largest_factor_contribution": {
+  "factor_name": "market",
+  "factor_ticker": "SPY",
+  "contribution": 0.01303272,
+  "quotable_individually": false
+ },
+ "largest_position_contribution": {
+  "ticker": "MSFT",
+  "contribution": 0.00428631,
+  "weight": 0.16251671,
+  "daily_return": 0.02677026
+ },
+ "observations": 750,
+ "regression_window_days": 750,
+ "collinear": true,
+ "factor_note": "These factors are collinear (max VIF above 5). Their SUM is well determined; no single beta is. Quote the total factor contribution, not one coefficient.",
+ "factor_share": 0.8698575082837,
+ "unexplained_share": 0.1301424917163,
+ "calc_id": "calc_f44cef4270cd"
+}

@@ -1102,7 +1102,10 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
                     f"different one: got {[l or '?' for l in labels]}. Rank one measure "
                     f"across issuers.")
 
-    entries = [{"label": lb, "ref": t.source_id, "value": t.value, "basis": _basis_str(t)}
+    # V24: the entry's date as data beside the basis sentence — an instant's
+    # date, or the end of an interval — so the Fact made of it says as of when.
+    entries = [{"label": lb, "ref": t.source_id, "value": t.value, "basis": _basis_str(t),
+                "as_of": (t.instant.isoformat() if t.instant else t.interval[1].isoformat() if t.interval else None)}
                for lb, t in zip(labels, typed)]
     entries.sort(key=lambda e: e["value"], reverse=(direction == "highest"))
     # Competition ranking: equal values share a place, because numbering them
@@ -1137,7 +1140,11 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
          "operand_types": [t.as_dict() for t in typed], "result_type": rt},
         result, refs, flags, invoked_by,
     )
+    # V24: the ordering's date is the latest of its entries' — the spread is a
+    # figure and a figure says as of when; each entry still keeps its own.
+    dated = [e["as_of"] for e in entries if e.get("as_of")]
     return {"calc_id": calc_id, "op": "rank", "quantity": name, "direction": direction,
+            "as_of": max(dated) if dated else None,
             "leader": result["leader"], "ordering": entries, "spread": result["spread"],
             "type": rt, "operands": refs, "quality_flags": flags,
             "basis": (f"{len(entries)} quantities named {quantity}, ordered {direction} "

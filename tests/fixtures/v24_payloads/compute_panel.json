@@ -1,0 +1,503 @@
+{
+ "method": "issuer.panel",
+ "subject": "MSFT",
+ "ticker": "MSFT",
+ "judgement": "none: these are measured values with their definitions and period bases. Thresholds and conclusions are the reader's.",
+ "per_formula_sources": "call compute(method=...) for a formula's source url and its caveats",
+ "lines": {
+  "total_debt": {
+   "error": "incomplete_cover",
+   "absence_id": "calc_6c2d3289c46f",
+   "statement": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "ticker": "MSFT",
+   "metric": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself."
+  },
+  "accruals": {
+   "formula": "accruals",
+   "ticker": "MSFT",
+   "value": -44925000000.0,
+   "calc_id": "calc_3f803f5d8626",
+   "definition": "net income \u2212 operating cash flow",
+   "basis": "2025-04-01..2026-03-31 subtract 2025-04-01..2026-03-31",
+   "unit_class": "money",
+   "periods": {
+    "interval": [
+     "2025-04-01",
+     "2026-03-31"
+    ]
+   }
+  },
+  "accruals_ratio": {
+   "formula": "accruals_ratio",
+   "ticker": "MSFT",
+   "value": -0.06471216948898632,
+   "calc_id": "calc_474589512d93",
+   "definition": "(net income \u2212 operating cash flow) \u00f7 total assets",
+   "basis": "2025-04-01..2026-03-31 divide 2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "asset_turnover": {
+   "formula": "asset_turnover",
+   "ticker": "MSFT",
+   "value": 0.458456011569686,
+   "calc_id": "calc_c3921d9b168e",
+   "definition": "revenue \u00f7 total assets",
+   "basis": "2025-04-01..2026-03-31 divide 2026-03-31",
+   "unit_class": "multiple",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "capex_intensity": {
+   "formula": "capex_intensity",
+   "ticker": "MSFT",
+   "value": 0.305476744807131,
+   "calc_id": "calc_4cb0fcada087",
+   "definition": "capital expenditures \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "days_sales_outstanding": {
+   "formula": "days_sales_outstanding",
+   "ticker": "MSFT",
+   "value": 68.85587216006384,
+   "calc_id": "calc_e19e232d3e03",
+   "definition": "accounts receivable \u00f7 revenue \u00d7 365",
+   "basis": "2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "count",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "days_inventory": {
+   "formula": "days_inventory",
+   "ticker": "MSFT",
+   "value": 4.411280648007693,
+   "calc_id": "calc_bf4b5b28d561",
+   "definition": "inventory \u00f7 cost of revenue \u00d7 365",
+   "basis": "2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "count",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "days_payable": {
+   "formula": "days_payable",
+   "ticker": "MSFT",
+   "value": 135.75091956416128,
+   "calc_id": "calc_1e398c705cf6",
+   "definition": "accounts payable \u00f7 cost of revenue \u00d7 365",
+   "basis": "2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "count",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "cash_conversion_cycle": {
+   "formula": "cash_conversion_cycle",
+   "ticker": "MSFT",
+   "value": -62.48376675608975,
+   "calc_id": "calc_d6391951de00",
+   "definition": "days sales outstanding + days inventory \u2212 days payable",
+   "basis": "((2026-03-31 / 2025-04-01..2026-03-31) + (2026-03-31 / 2025-04-01..2026-03-31)) subtract (2026-03-31 / 2025-04-01..2026-03-31)",
+   "unit_class": "count",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "current_ratio": {
+   "formula": "current_ratio",
+   "ticker": "MSFT",
+   "value": 1.2829483173692569,
+   "calc_id": "calc_f4f5d377442d",
+   "definition": "current assets \u00f7 current liabilities",
+   "basis": "2026-03-31 divide 2026-03-31",
+   "unit_class": "multiple",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": []
+   }
+  },
+  "ebit": {
+   "formula": "ebit",
+   "ticker": "MSFT",
+   "value": 157330000000.0,
+   "calc_id": "calc_68e2b4850c26",
+   "definition": "net income + interest expense + income tax expense [interest expense nonoperating used for interest expense]",
+   "basis": "2025-04-01..2026-03-31 add 2025-04-01..2026-03-31",
+   "unit_class": "money",
+   "periods": {
+    "interval": [
+     "2025-04-01",
+     "2026-03-31"
+    ]
+   },
+   "substituted_inputs": {
+    "interest_expense": "interest_expense_nonoperating"
+   }
+  },
+  "ebitda": {
+   "error": "input_unavailable",
+   "absence_id": "calc_2587254ee7c7",
+   "statement": "ebitda cannot be produced for MSFT: this desk holds no depreciation_amortization for MSFT at any date. What this desk does hold: net_income through 2026-03-31; interest_expense through 2024-06-30; income_tax_expense through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item.",
+   "ticker": "MSFT",
+   "formula": "ebitda",
+   "missing": "depreciation_amortization",
+   "detail": "MSFT reports no depreciation_amortization with a period; it may report a related line instead \u2014 call describe",
+   "definition": "EBIT + depreciation and amortisation"
+  },
+  "debt_to_ebitda": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "statement": "debt_to_ebitda cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: net_income through 2026-03-31; interest_expense through 2024-06-30; income_tax_expense through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item.",
+   "ticker": "MSFT",
+   "formula": "debt_to_ebitda",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "total debt \u00f7 EBITDA"
+  },
+  "debt_to_operating_cash_flow": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "debt_to_operating_cash_flow",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "total debt \u00f7 operating cash flow"
+  },
+  "ebit_interest_coverage": {
+   "formula": "ebit_interest_coverage",
+   "ticker": "MSFT",
+   "value": 55.65263530244075,
+   "calc_id": "calc_9e7b400fc9fa",
+   "definition": "EBIT \u00f7 interest expense, over the same window [interest expense nonoperating used for interest expense]",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "multiple",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   },
+   "substituted_inputs": {
+    "interest_expense": "interest_expense_nonoperating"
+   }
+  },
+  "equity_multiplier": {
+   "formula": "equity_multiplier",
+   "ticker": "MSFT",
+   "value": 1.6753940347566287,
+   "calc_id": "calc_78cd613e8aa2",
+   "definition": "total assets \u00f7 stockholders' equity",
+   "basis": "2026-03-31 divide 2026-03-31",
+   "unit_class": "multiple",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": []
+   }
+  },
+  "free_cash_flow": {
+   "formula": "free_cash_flow",
+   "ticker": "MSFT",
+   "value": 72916000000.0,
+   "calc_id": "calc_35db8b27c35f",
+   "definition": "operating cash flow \u2212 capital expenditures",
+   "basis": "2025-04-01..2026-03-31 subtract 2025-04-01..2026-03-31",
+   "unit_class": "money",
+   "periods": {
+    "interval": [
+     "2025-04-01",
+     "2026-03-31"
+    ]
+   }
+  },
+  "fcf_margin": {
+   "formula": "fcf_margin",
+   "ticker": "MSFT",
+   "value": 0.22909891822429174,
+   "calc_id": "calc_01f001b1a8f2",
+   "definition": "free cash flow \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "fcf_to_debt": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "fcf_to_debt",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "free cash flow \u00f7 total debt"
+  },
+  "gross_margin": {
+   "formula": "gross_margin",
+   "ticker": "MSFT",
+   "value": 0.6830928165442874,
+   "calc_id": "calc_7ddf93b7b4cb",
+   "definition": "gross profit \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "invested_capital": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "invested_capital",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "total debt + stockholders' equity \u2212 cash and equivalents"
+  },
+  "net_debt": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "net_debt",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "total debt \u2212 cash and equivalents"
+  },
+  "net_debt_to_ebitda": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "net_debt_to_ebitda",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "net debt \u00f7 EBITDA"
+  },
+  "net_margin": {
+   "formula": "net_margin",
+   "ticker": "MSFT",
+   "value": 0.39342325613545603,
+   "calc_id": "calc_d184cb2b90fb",
+   "definition": "net income \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "tax_burden": {
+   "formula": "tax_burden",
+   "ticker": "MSFT",
+   "value": 0.8104438101525536,
+   "calc_id": "calc_e353110a2e37",
+   "definition": "net income \u00f7 pretax income",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "nopat": {
+   "formula": "nopat",
+   "ticker": "MSFT",
+   "value": 120721278628.89394,
+   "calc_id": "calc_7c82e8daed4c",
+   "definition": "operating income \u00d7 tax burden",
+   "basis": "2025-04-01..2026-03-31 multiply (2025-04-01..2026-03-31 / 2025-04-01..2026-03-31)",
+   "unit_class": "money",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "operating_margin": {
+   "formula": "operating_margin",
+   "ticker": "MSFT",
+   "value": 0.4680164512855316,
+   "calc_id": "calc_0e8904f6192f",
+   "definition": "operating income \u00f7 revenue",
+   "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "quick_assets": {
+   "formula": "quick_assets",
+   "ticker": "MSFT",
+   "value": 174110000000.0,
+   "calc_id": "calc_5d498a2f2d2d",
+   "definition": "current assets \u2212 inventory",
+   "basis": "2026-03-31 subtract 2026-03-31",
+   "unit_class": "money",
+   "periods": {
+    "instant": "2026-03-31"
+   }
+  },
+  "quick_ratio": {
+   "formula": "quick_ratio",
+   "ticker": "MSFT",
+   "value": 1.2740284353253672,
+   "calc_id": "calc_22c0f838ca0b",
+   "definition": "(current assets \u2212 inventory) \u00f7 current liabilities",
+   "basis": "2026-03-31 divide 2026-03-31",
+   "unit_class": "multiple",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": []
+   }
+  },
+  "roa": {
+   "formula": "roa",
+   "ticker": "MSFT",
+   "value": 0.1803672568666202,
+   "calc_id": "calc_689e23831743",
+   "definition": "net income \u00f7 total assets",
+   "basis": "2025-04-01..2026-03-31 divide 2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "roe": {
+   "formula": "roe",
+   "ticker": "MSFT",
+   "value": 0.30218622621975205,
+   "calc_id": "calc_a36dc8f750c6",
+   "definition": "net income \u00f7 stockholders' equity",
+   "basis": "2025-04-01..2026-03-31 divide 2026-03-31",
+   "unit_class": "ratio",
+   "periods": {
+    "instants": [
+     "2026-03-31"
+    ],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "roic": {
+   "error": "input_unavailable",
+   "absence_id": "calc_4953c60216e2",
+   "ticker": "MSFT",
+   "formula": "roic",
+   "missing": "total_debt",
+   "detail": "total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper \u2014 which MSFT does file \u2014 was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.",
+   "definition": "NOPAT \u00f7 invested capital"
+  }
+ }
+}

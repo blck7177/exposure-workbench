@@ -1,0 +1,44 @@
+{
+ "calc_id": "calc_b9f79723826f",
+ "op": "yoy",
+ "series": "calc_db1eb0299976",
+ "points": [
+  {
+   "period_end": "2022-06-30",
+   "value": 0.17956070629670173,
+   "fact_ids": [
+    "fact_e937c565a1b1",
+    "fact_b9f2c418ae4d"
+   ]
+  },
+  {
+   "period_end": "2023-06-30",
+   "value": 0.06882029555656428,
+   "fact_ids": [
+    "fact_7d45a96a289c",
+    "fact_e937c565a1b1"
+   ]
+  },
+  {
+   "period_end": "2024-06-30",
+   "value": 0.15669962013071279,
+   "fact_ids": [
+    "fact_7255f526122a",
+    "fact_7d45a96a289c"
+   ]
+  },
+  {
+   "period_end": "2025-06-30",
+   "value": 0.1493215623240672,
+   "fact_ids": [
+    "fact_2a08c00f1a50",
+    "fact_7255f526122a"
+   ]
+  }
+ ],
+ "unit_class": "ratio",
+ "quality_flags": {
+  "periods_without_comparable_prior": 1
+ },
+ "basis": "yoy over calc_db1eb0299976; each point is matched to its prior by date, never by position"
+}

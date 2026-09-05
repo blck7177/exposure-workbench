@@ -245,6 +245,7 @@ async def _read_book(db: AsyncSession, ref: str, names: list[str]) -> dict:
                 .order_by(RiskAlert.created_at.desc()).limit(20))).scalars().all()
             out["section"]["alerts"] = [
                 {"id": a.id, "type": a.alert_type, "severity": a.severity, "message": a.message,
+                 "as_of": a.created_at.date().isoformat() if a.created_at else None,
                  "utilization": float(a.utilization) if a.utilization is not None else None}
                 for a in _wh.published_alerts(rows)]
         else:
@@ -259,8 +260,12 @@ async def _quantities_by_name(db: AsyncSession, ref: str, as_of: str | None, wan
     held = {q.label: q for q in resolved.quantities if q.not_alone is None}
     found = [n for n in wanted if n in held]
     unknown = [n for n in wanted if n not in held]
+    # V24: the values travel in the payload, under their names — the adapter
+    # (services/fact_adapters.read_book) makes each a Fact. `names`/`units`
+    # stay for the V23 declaration path until phase C removes it.
     return {"run_id": ref, "as_of": as_of, "names": found,
             "units": {n: held[n].unit_class for n in found},
+            "figures": {n: {"value": held[n].value, "unit_class": held[n].unit_class} for n in found},
             **({"unknown": unknown, "detail": f"not names {ref} holds; describe('{ref}') lists them"}
                if unknown else {})}
 

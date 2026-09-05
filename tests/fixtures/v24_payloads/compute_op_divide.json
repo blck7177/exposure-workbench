@@ -1,0 +1,39 @@
+{
+ "calc_id": "calc_e455a1be9a51",
+ "op": "divide",
+ "value": 0.39342325613545603,
+ "type": {
+  "unit_class": "ratio",
+  "basis": {
+   "mixed": "2025-04-01..2026-03-31 / 2025-04-01..2026-03-31",
+   "leaves": {
+    "instants": [],
+    "intervals": [
+     [
+      "2025-04-01",
+      "2026-03-31"
+     ]
+    ]
+   }
+  },
+  "quantity": "net_margin",
+  "issuers": [
+   "MSFT"
+  ],
+  "named_by": "session"
+ },
+ "operands": [
+  "calc_c2500f1e5894",
+  "calc_699932f2b3a4"
+ ],
+ "basis": "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+ "periods": {
+  "instants": [],
+  "intervals": [
+   [
+    "2025-04-01",
+    "2026-03-31"
+   ]
+  ]
+ }
+}

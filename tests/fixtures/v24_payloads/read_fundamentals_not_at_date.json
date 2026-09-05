@@ -1,0 +1,13 @@
+{
+ "error": "not_reported_at_this_date",
+ "ticker": "MSFT",
+ "metric": "total_assets",
+ "as_of": "2019-01-01",
+ "last_reported": {
+  "last_reported": "2026-03-31",
+  "value_then": 694228000000.0,
+  "unit_class": "MONEY",
+  "note": "reported at another date; ask for that date rather than combining it with these"
+ },
+ "detail": "ask with `at` set to the date it was last reported, or last_n for its history"
+}

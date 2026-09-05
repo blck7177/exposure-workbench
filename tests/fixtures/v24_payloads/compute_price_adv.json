@@ -1,0 +1,23 @@
+{
+ "method": "price.adv",
+ "subject": "MSFT",
+ "ticker": "MSFT",
+ "n": 20,
+ "window": {
+  "from": "2026-08-07",
+  "to": "2026-09-03"
+ },
+ "basis": "mean over the last 20 sessions with recorded volume; dollar ADV is as-traded close \u00d7 as-traded volume",
+ "adv_shares": {
+  "value": 23534260.0,
+  "calc_id": "calc_eb0ef829f668",
+  "quantity": "MSFT.adv_shares.20d",
+  "unit_class": "count"
+ },
+ "adv_dollars": {
+  "value": 11683004074.15,
+  "calc_id": "calc_73f506f41cce",
+  "quantity": "MSFT.adv_dollars.20d",
+  "unit_class": "money"
+ }
+}

@@ -1,0 +1,358 @@
+{
+ "method": "book.analysis",
+ "subject": "run_b791e7985dcd",
+ "run_id": "run_b791e7985dcd",
+ "portfolio_id": "port_001",
+ "as_of": "2026-09-03",
+ "stress_ranked": [],
+ "stress_unevaluated": [],
+ "stress_withheld": "withheld pending validation: scenario shocks are unsourced and propagate through individually collinear betas",
+ "net_exposures": {
+  "rates_up": {
+   "measured": true,
+   "direction": "gains",
+   "net_beta": 0.00733297,
+   "gross_beta": 0.00733297,
+   "quotable_individually": false,
+   "legs": [
+    {
+     "factor_name": "rates",
+     "beta": -0.00733297,
+     "signed_for_this_risk": 0.00733297,
+     "cite": "run_b791e7985dcd"
+    }
+   ]
+  },
+  "credit_spreads_widen": {
+   "measured": true,
+   "direction": "loses",
+   "net_beta": -0.24588183,
+   "gross_beta": 0.24588183,
+   "quotable_individually": false,
+   "legs": [
+    {
+     "factor_name": "credit",
+     "beta": 0.24588183,
+     "signed_for_this_risk": -0.24588183,
+     "cite": "run_b791e7985dcd"
+    }
+   ]
+  },
+  "equity_down": {
+   "measured": true,
+   "direction": "loses",
+   "net_beta": -0.8556438699999999,
+   "gross_beta": 1.6342719499999998,
+   "quotable_individually": false,
+   "legs": [
+    {
+     "factor_name": "growth",
+     "beta": -0.19477851,
+     "signed_for_this_risk": 0.19477851,
+     "cite": "run_b791e7985dcd"
+    },
+    {
+     "factor_name": "market",
+     "beta": 1.24495791,
+     "signed_for_this_risk": -1.24495791,
+     "cite": "run_b791e7985dcd"
+    },
+    {
+     "factor_name": "small_cap",
+     "beta": -0.19453553,
+     "signed_for_this_risk": 0.19453553,
+     "cite": "run_b791e7985dcd"
+    }
+   ]
+  }
+ },
+ "headroom": [
+  {
+   "check": "issuer_concentration:MSFT",
+   "current": 0.16251671,
+   "status": "warning",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": -0.012516710000000014,
+   "room_to_breach": 0.03748329,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "daily_loss",
+   "current": -0.01159506,
+   "status": "clear",
+   "warning_level": 0.02,
+   "breach_level": 0.03,
+   "room_to_warning": 0.03159506,
+   "room_to_breach": 0.04159506,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:AAPL",
+   "current": 0.14937553,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.0006244699999999881,
+   "room_to_breach": 0.050624470000000005,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:JPM",
+   "current": 0.14830326,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.0016967400000000021,
+   "room_to_breach": 0.05169674000000002,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:LLY",
+   "current": 0.12666222,
+   "status": "warning",
+   "warning_level": 0.12,
+   "breach_level": 0.18,
+   "room_to_warning": -0.0066622199999999965,
+   "room_to_breach": 0.05333778,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:GOOGL",
+   "current": 0.12469609,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.02530391,
+   "room_to_breach": 0.07530391000000002,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:HYG",
+   "current": 0.0721004,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.0778996,
+   "room_to_breach": 0.1278996,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "rolling_volatility_30d",
+   "current": 0.12156975,
+   "status": "clear",
+   "warning_level": 0.18,
+   "breach_level": 0.25,
+   "room_to_warning": 0.05843024999999999,
+   "room_to_breach": 0.12843025,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:AMZN",
+   "current": 0.07069862,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.07930137999999999,
+   "room_to_breach": 0.12930138000000002,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Consumer_Discretionary",
+   "current": 0.07069862,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.07930137999999999,
+   "room_to_breach": 0.12930138000000002,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:TLT",
+   "current": 0.05976295,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.09023704999999999,
+   "room_to_breach": 0.14023705,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Technology",
+   "current": 0.35348127,
+   "status": "clear",
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "room_to_warning": 0.04651873000000001,
+   "room_to_breach": 0.14651872999999999,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Financials",
+   "current": 0.14830326,
+   "status": "clear",
+   "warning_level": 0.2,
+   "breach_level": 0.3,
+   "room_to_warning": 0.05169674000000002,
+   "room_to_breach": 0.15169674,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:XOM",
+   "current": 0.04429518,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.10570481999999999,
+   "room_to_breach": 0.15570482000000002,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "issuer_concentration:NVDA",
+   "current": 0.04158903,
+   "status": "clear",
+   "warning_level": 0.15,
+   "breach_level": 0.2,
+   "room_to_warning": 0.10841097,
+   "room_to_breach": 0.15841097,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Fixed_Income",
+   "current": 0.13186335,
+   "status": "clear",
+   "warning_level": 0.2,
+   "breach_level": 0.3,
+   "room_to_warning": 0.06813665000000002,
+   "room_to_breach": 0.16813665,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "gross_exposure",
+   "current": 1.0,
+   "status": "clear",
+   "warning_level": 1.1,
+   "breach_level": 1.2,
+   "room_to_warning": 0.10000000000000009,
+   "room_to_breach": 0.19999999999999996,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Healthcare",
+   "current": 0.12666222,
+   "status": "clear",
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "room_to_warning": 0.27333778000000003,
+   "room_to_breach": 0.37333778,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Communication_Services",
+   "current": 0.12469609,
+   "status": "clear",
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "room_to_warning": 0.27530391000000004,
+   "room_to_breach": 0.37530391,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "check": "sector_concentration:Energy",
+   "current": 0.04429518,
+   "status": "clear",
+   "warning_level": 0.4,
+   "breach_level": 0.5,
+   "room_to_warning": 0.35570482000000003,
+   "room_to_breach": 0.45570482,
+   "cite": "run_b791e7985dcd"
+  }
+ ],
+ "headroom_not_recorded": [],
+ "positions": [
+  {
+   "ticker": "MSFT",
+   "sector": "Technology",
+   "weight": 0.16251671,
+   "contribution": 0.00428631,
+   "market_value": 1785420.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "AAPL",
+   "sector": "Technology",
+   "weight": 0.14937553,
+   "contribution": 0.0014963,
+   "market_value": 1641050.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "JPM",
+   "sector": "Financials",
+   "weight": 0.14830326,
+   "contribution": 0.00241986,
+   "market_value": 1629270.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "LLY",
+   "sector": "Healthcare",
+   "weight": 0.12666222,
+   "contribution": -5.304e-05,
+   "market_value": 1391520.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "GOOGL",
+   "sector": "Communication_Services",
+   "weight": 0.12469609,
+   "contribution": 0.00197419,
+   "market_value": 1369920.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "HYG",
+   "sector": "Fixed_Income",
+   "weight": 0.0721004,
+   "contribution": 9.208e-05,
+   "market_value": 792100.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "AMZN",
+   "sector": "Consumer_Discretionary",
+   "weight": 0.07069862,
+   "contribution": 0.00108286,
+   "market_value": 776700.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "TLT",
+   "sector": "Fixed_Income",
+   "weight": 0.05976295,
+   "contribution": 8.84e-05,
+   "market_value": 656560.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "XOM",
+   "sector": "Energy",
+   "weight": 0.04429518,
+   "contribution": -0.0005359,
+   "market_value": 486630.0,
+   "cite": "run_b791e7985dcd"
+  },
+  {
+   "ticker": "NVDA",
+   "sector": "Technology",
+   "weight": 0.04158903,
+   "contribution": 0.000744,
+   "market_value": 456900.0,
+   "cite": "run_b791e7985dcd"
+  }
+ ],
+ "reads_as": "The scenarios are ordered by the size of the loss; the net exposures say which way the book moves if each risk materialises, with the legs that make up the net; the headroom is the distance from each measured value to its own thresholds.",
+ "not_a_forecast": true,
+ "cite": "run_b791e7985dcd",
+ "calc_id": "calc_38d75e719209"
+}
