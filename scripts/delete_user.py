@@ -93,6 +93,7 @@ DELETION_ORDER: list[tuple[str, str]] = [
     ("risk_limits", "portfolio_id = ANY(%(portfolios)s)"),
     ("positions", "portfolio_id = ANY(%(portfolios)s)"),
     ("portfolios", "owner_id = %(user)s"),
+    ("facts", "session_id = ANY(%(sessions)s)"),          # V24: a session's facts
     ("agent_steps", "session_id = ANY(%(sessions)s)"),
     ("agent_messages", "session_id = ANY(%(sessions)s)"),
     ("agent_sessions", "owner_id = %(user)s"),

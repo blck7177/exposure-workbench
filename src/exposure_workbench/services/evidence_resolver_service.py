@@ -383,7 +383,34 @@ async def _position(db: AsyncSession, pid: str) -> dict | None:
     }
 
 
+async def _fact_record(db: AsyncSession, fid: str) -> dict | None:
+    """V24. A Fact by its id: what a tool put in front of the model, with the
+    identity it carried, and the rows it rests on as upstream — so the drawer
+    keeps drilling from a chip to the calc, the fact, the filing."""
+    from exposure_workbench.services import ledger as ledger_svc
+    rec = await ledger_svc.record(db, fid)
+    if rec is None:
+        return None
+    when = rec.get("as_of") or _window((rec.get("window") or {}).get("start"), (rec.get("window") or {}).get("end"))
+    label = " · ".join(x for x in (
+        (rec.get("measure") or "").replace("_", " ").replace(".", " "),
+        rec.get("subject"), when if isinstance(when, str) else None,
+    ) if x)
+    return {
+        "type": "fact_record", "id": fid, "label": label,
+        "body": {k: rec.get(k) for k in ("kind", "measure", "subject", "unit", "value", "points", "text",
+                                          "as_of", "window", "params", "standalone", "group")},
+        "provenance": {"session_id": rec.get("session_id"), "step_id": rec.get("step_id"),
+                       "message_id": rec.get("message_id"), "created_at": rec.get("created_at")},
+        "upstream": [{"type": ("fact" if r.startswith("fact_") else "calc" if r.startswith("calc_")
+                               else "chunk" if r.startswith("chunk_") else "source" if r.startswith("src_")
+                               else "run" if r.startswith("run_") else "alert" if r.startswith("alert_") else "ref"),
+                      "id": r} for r in (rec.get("sources") or []) if isinstance(r, str)],
+    }
+
+
 _RESOLVERS = {
+    "f_": _fact_record,
     "fact_": _fact,
     "calc_": _calc,
     "chunk_": _chunk,

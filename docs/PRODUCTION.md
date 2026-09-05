@@ -373,6 +373,11 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 # budget is charged per assistant message (V23). Additive, idempotent.
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v23_budget_per_message.sql
+# v24_facts.sql adds the facts table: every Fact a tool put in front of the
+# model, by id, written in the same transaction as its agent_steps row. The
+# evidence drawer resolves f_ ids from it. Additive; tenant rule = the session's.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v24_facts.sql
 
 docker compose up -d
 

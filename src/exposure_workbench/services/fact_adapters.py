@@ -291,7 +291,7 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                        unit=(unit.upper() if isinstance(unit, str) else _unit_for(measure.split(".")[-1], ctx)),
                        points=pts, as_of=pts[-1][0] if pts and pts[-1][0] != "?" else _as_of_of(node, ctx),
                        window=_window_of(node, ctx) or {"start": pts[0][0], "end": pts[-1][0]},
-                       params=_params_of(node, ctx), sources=tuple(srcs), group=ctx.group)
+                       params={**ctx.params, **_params_of(node, ctx)}, sources=tuple(srcs), group=ctx.group)
             facts.append(f)
             note = {k: v for k, v in node.items() if k not in ("points",)}
             note = _harvest(note, key, path, ctx.child(as_of=f.as_of, window=f.window, sources=f.sources), facts)
@@ -303,7 +303,8 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
             f = F.fact(F.SCALAR, measure, subject=node.get("ticker") or ctx.subject,
                        unit=(unit.upper() if isinstance(unit, str) else _unit_for(key if key else measure, ctx, node)),
                        value=float(node["value"]), as_of=_as_of_of(node, ctx), window=_window_of(node, ctx),
-                       params=_params_of(node, ctx), standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
+                       params={**ctx.params, **_params_of(node, ctx)},
+                       standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
                        sources=_sources_of(node, ctx), group=ctx.group)
             facts.append(f)
             note = {k: v for k, v in node.items() if k != "value"}

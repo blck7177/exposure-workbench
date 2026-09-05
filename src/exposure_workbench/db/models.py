@@ -803,6 +803,37 @@ class AgentMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# ─── Runtime: Facts (V24) — what a tool put in front of the model, by id ────────
+
+class FactRecord(Base):
+    """One Fact (services/facts.Fact), as the drawer and later sessions read it.
+
+    The step's evidence_refs is the record of what one call showed; this row
+    is the index. Same transaction as the step; the tenant rule is the
+    session's, as for agent_steps.
+    """
+    __tablename__ = "facts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False)
+    step_id: Mapped[str | None] = mapped_column(String(64))
+    message_id: Mapped[str | None] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(64))
+    measure: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(24))
+    value: Mapped[float | None] = mapped_column(Float)
+    points: Mapped[list[Any] | None] = mapped_column(JSONB)
+    text: Mapped[str | None] = mapped_column(Text)
+    as_of: Mapped[str | None] = mapped_column(String(32))
+    window: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    standalone: Mapped[bool] = mapped_column(Boolean, default=True)
+    sources: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    group: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ─── Runtime: Agent Steps (APPEND-ONLY audit trail) ─────────────────────────────
 
 class AgentStep(Base):

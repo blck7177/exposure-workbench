@@ -30,7 +30,7 @@ export type Annotation =
   | { start: number; end: number; kind: "figure"; match: VerifiedMatch }
   | { start: number; end: number; kind: "cites"; ids: string[] };
 
-const ID_BODY = "(?:fact|calc|chunk|src|alert|run|pos)_[0-9a-f]{6,}";
+const ID_BODY = "(?:fact|calc|chunk|src|alert|run|pos|f)_[0-9a-f]{6,}";
 const BRACKETED = new RegExp(`\\s*\\[\\s*(${ID_BODY}(?:\\s*,\\s*${ID_BODY})*)\\s*\\]`, "g");
 const BARE = new RegExp(`(,\\s*)?(${ID_BODY})`, "g");
 

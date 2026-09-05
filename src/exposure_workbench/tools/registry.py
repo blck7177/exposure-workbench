@@ -32,6 +32,8 @@ from typing import Any, Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.services import agent_session_service as sess
+from exposure_workbench.services import fact_adapters as fa
+from exposure_workbench.services import ledger as ledger_svc
 from exposure_workbench.services import table as tbl
 from exposure_workbench.services import trace_service
 from exposure_workbench.tools.arg_validation import validate_args
@@ -299,12 +301,34 @@ async def invoke(
             refs, slice_ = [], {}
         if slice_:
             result["table"] = slice_
+    # 4b) V24 phase B: the same result as FACTS, recorded on the step and in the
+    # facts table beside the V23 declaration. The model is not yet shown them
+    # (phase C switches what it sees and what the gate checks in one commit);
+    # what this phase establishes is that every call's facts exist, agree
+    # between step and table, and resolve in the drawer. An adapter that cannot
+    # name a unit is logged loudly and records nothing — in phase C it becomes
+    # the tool's own structured error.
+    shown: list = []
+    if status == "completed" and isinstance(result, dict) and tool.name in fa.ADAPTERS:
+        try:
+            # without the V23 slice attached above: its name->[value, group] map
+            # is not the tool's payload, and phase C removes it
+            shown, _note, _held = fa.adapt(tool.name, args, {k: v for k, v in result.items() if k != "table"})
+        except Exception:  # noqa: BLE001 — phase B: the old path is still the live one
+            logger.exception("fact adapter failed for %s (session %s)", tool_name, session_id)
+            shown = []
+        if shown:
+            refs = [*refs, ledger_svc.step_entry(shown)]
     try:
-        await trace_service.record_step(
+        step_id = await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
             result_summary=_summarize(result), evidence_refs=refs, status=status,
             duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
         )
+        if shown:
+            for row in ledger_svc.rows_for(shown, session_id=session_id, step_id=step_id, message_id=message_id):
+                db.add(row)
+            await db.flush()
     except Exception:  # noqa: BLE001
         # A hole in the audit trail is bad; turning one into an unexplained 500
         # that also spends the user's turn is worse. Log loudly and let the agent

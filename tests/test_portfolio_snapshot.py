@@ -108,7 +108,10 @@ def test_table_namer_and_resolver_agree_on_exactly_one_prefix_set():
     the model ids that hold nothing; the table wider than the resolver gives the
     user a citation whose drawer is empty. Asserted together so the next prefix
     is added in three places or in none."""
-    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(resolver._RESOLVERS)
+    # V24 phase B: the resolver also answers for a Fact (f_), which the V23
+    # table and namer never mint; phase E removes both and the three sets
+    # become one again.
+    assert set(tb._PREFIX_TYPE) == set(qn.SOURCES) == set(resolver._RESOLVERS) - {"f_"}
 
 
 def test_a_holding_is_citable_evidence():
