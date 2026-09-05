@@ -1,0 +1,45 @@
+[
+ {"tag": "N01-earnings-quality", "note": "forensic: OCF vs net income, accruals — 'are the profits real'. Sloan's accruals ratio is in the registry and has never been asked for in a conversation.",
+  "turns": ["something has been nagging me about nvidia. the earnings look spectacular but is the cash actually showing up behind them? I want to know whether the profits are real",
+            "and is that getting worse or is it one odd quarter"]},
+
+ {"tag": "N02-working-capital", "note": "forensic: receivables and inventory growing faster than sales — the classic tell before a demand air pocket.",
+  "turns": ["for nvidia, are receivables and inventory growing faster than the top line? that's usually what you see before demand rolls over",
+            "put that in days for me — how long is inventory sitting there now versus a year ago"]},
+
+ {"tag": "N03-liquidity", "note": "price.adv, never asked for. A PM's real question is days-to-exit at a fraction of ADV.",
+  "turns": ["if I had to get out of this book in a hurry, which positions actually hurt me? I mean liquidity, not price",
+            "for the worst one, how many days is that at a quarter of daily volume"]},
+
+ {"tag": "N04-drawdown-anatomy", "note": "book.drawdown_episodes + explain_episode, never asked for. The review question is depth, speed, recovery, and what drove it.",
+  "turns": ["walk me through the worst drawdown this book has had over the last year — how deep, how fast, and did we get it back",
+            "what was actually driving it? market beta or something we owned"]},
+
+ {"tag": "N05-market-or-us", "note": "book.reconcile / attribution alpha+residual — separating broad market exposure from what we chose.",
+  "turns": ["honest question. how much of what this book did is just the market moving, and how much of it is us"]},
+
+ {"tag": "N06-top-five", "note": "concentration from the NAV angle rather than the limit angle; also asks for a comparison across runs.",
+  "turns": ["what share of the book do the top five names carry between them, and is that tighter or looser than the run before this one"]},
+
+ {"tag": "N07-capex-cycle", "note": "capex intensity against depreciation, two names — the over-investment question from the forensic checklist.",
+  "turns": ["microsoft and amazon are both spending enormously on infrastructure. is either of them over-investing relative to what they are depreciating?",
+            "which of the two has more room to keep doing it without straining the balance sheet"]},
+
+ {"tag": "N08-whats-in-the-price", "note": "price.distance_from_52w_high + price.momentum_12_1, neither asked for in a conversation.",
+  "turns": ["where is exxon trading against its own last twelve months — near the high or the low? I'm trying to work out what is already in the price",
+            "and its momentum leaving the last month out, since that is usually noise"]},
+
+ {"tag": "N09-no-forecast", "note": "deliberately outside the desk: a forward estimate. Tests honest abstention and the pivot to what IS held.",
+  "turns": ["what's your estimate for lilly's revenue growth next year?",
+            "fine. then what do their own filings say would move it either way"]},
+
+ {"tag": "N10-margin-debate", "note": "the earnings-call theme: margin direction and whether it is mix or price. The mix/price split is not held as figures — the honest answer says so.",
+  "turns": ["apple against microsoft — whose gross margin is holding up better, and is that mix or pricing?"]},
+
+ {"tag": "N11-one-question", "note": "a synthesis turn: the analyst's own judgement about which line matters most, grounded in what was read.",
+  "turns": ["if you could put one question to xom's management on the next call, what would it be? base it on what their numbers are actually showing, not on the narrative"]},
+
+ {"tag": "N12-sector-drift", "note": "drift/overlap — the book's shape now against the mandate, from the sector side rather than the issuer side.",
+  "turns": ["has the sector shape of this book drifted? I care about whether we are quietly all in one trade",
+            "if I wanted to take that down without selling the biggest position, what are my options"]}
+]

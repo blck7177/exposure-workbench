@@ -105,3 +105,30 @@ def test_G3_passages(led):
 
 def test_pre_v24_declarations_are_not_facts():
     assert L.facts_in([{"type": "run", "id": "run_abc", "scope": ["issuer_exposures"]}, {"type": "calc", "id": "calc_1"}]) == []
+
+
+def test_a_bare_short_integer_cannot_borrow_a_source_from_a_passage(led):
+    """A twelve-thousand-character filing contains nearly every one- and
+    two-digit number. The 2026-09-05 battery linked a forecast the desk had
+    invented ("low-20s percent") to a 10-K passage that happened to contain the
+    digits 20. A figure a passage STATES carries its unit."""
+    pid, text = next(iter(led.passages.items()))
+    assert led.resolve_in_passages("20", [pid]) == []
+    assert led.resolve_in_passages("7", [pid]) == []
+    import re
+    m = re.search(r"(?<![\d.])(\d[\d,]*(?:\.\d+)?)\s?(?:percent|%)", text)
+    if m:
+        assert led.resolve_in_passages(m.group(1) + "%", [pid]) == [pid], "a marked figure still resolves"
+    m4 = re.search(r"(?<![\d.])(\d[\d,]{3,}(?:\.\d+)?)(?![\d])", text)
+    if m4:
+        assert led.resolve_in_passages(m4.group(1), [pid]) == [pid], "a long number needs no marker"
+
+
+def test_the_day_and_month_of_a_date_are_not_identity_tokens():
+    from exposure_workbench.services import facts as F
+    f = F.fact(F.PASSAGE, "10-K Item 7", subject="LLY", text="…", as_of="2026-02-20",
+               params={"form_type": "10-K", "filed": "2026-02-20"})
+    led = L.Ledger.of_facts([f])
+    assert led.resolve_identity("2026-02-20") and led.resolve_identity("2026")
+    assert led.resolve_identity("20") == [] and led.resolve_identity("02") == []
+    assert led.resolve_identity("10-K") and led.resolve_identity("10"), "a form name still gives its digits"

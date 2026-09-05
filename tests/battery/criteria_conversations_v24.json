@@ -1,0 +1,195 @@
+[
+ {
+  "tag": "N01-earnings-quality#t1",
+  "q": "something has been nagging me about nvidia. the earnings look spectacular but is the cash actually showing up behind them? I want to know whether the profits are real",
+  "asks": "are the profits real",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "N01-earnings-quality#t2",
+  "q": "and is that getting worse or is it one odd quarter",
+  "asks": "is it worsening or a one-off",
+  "criteria": [
+   "follows_on",
+   "grounded_claims"
+  ]
+ },
+ {
+  "tag": "N02-working-capital#t1",
+  "q": "for nvidia, are receivables and inventory growing faster than the top line? that's usually what you see before demand rolls over",
+  "asks": "receivables/inventory vs sales",
+  "criteria": [
+   "grounded_claims",
+   "ranking",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "N02-working-capital#t2",
+  "q": "put that in days for me — how long is inventory sitting there now versus a year ago",
+  "asks": "inventory in days, now vs a year ago",
+  "criteria": [
+   "follows_on",
+   "precision"
+  ]
+ },
+ {
+  "tag": "N03-liquidity#t1",
+  "q": "if I had to get out of this book in a hurry, which positions actually hurt me? I mean liquidity, not price",
+  "asks": "which positions are illiquid",
+  "criteria": [
+   "ranking",
+   "so_what",
+   "grounded_claims"
+  ]
+ },
+ {
+  "tag": "N03-liquidity#t2",
+  "q": "for the worst one, how many days is that at a quarter of daily volume",
+  "asks": "days to exit at a quarter of ADV",
+  "criteria": [
+   "follows_on",
+   "precision"
+  ]
+ },
+ {
+  "tag": "N04-drawdown-anatomy#t1",
+  "q": "walk me through the worst drawdown this book has had over the last year — how deep, how fast, and did we get it back",
+  "asks": "depth, speed, recovery",
+  "criteria": [
+   "precision",
+   "grounded_claims",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "N04-drawdown-anatomy#t2",
+  "q": "what was actually driving it? market beta or something we owned",
+  "asks": "market or something held",
+  "criteria": [
+   "follows_on",
+   "ranking",
+   "grounded_claims"
+  ]
+ },
+ {
+  "tag": "N05-market-or-us#t1",
+  "q": "honest question. how much of what this book did is just the market moving, and how much of it is us",
+  "asks": "market versus us",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "netting"
+  ]
+ },
+ {
+  "tag": "N06-top-five#t1",
+  "q": "what share of the book do the top five names carry between them, and is that tighter or looser than the run before this one",
+  "asks": "top five share, tighter or looser",
+  "criteria": [
+   "ranking",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "N07-capex-cycle#t1",
+  "q": "microsoft and amazon are both spending enormously on infrastructure. is either of them over-investing relative to what they are depreciating?",
+  "asks": "over-investing versus depreciation",
+  "criteria": [
+   "ranking",
+   "grounded_claims",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "N07-capex-cycle#t2",
+  "q": "which of the two has more room to keep doing it without straining the balance sheet",
+  "asks": "which has more room",
+  "criteria": [
+   "follows_on",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "N08-whats-in-the-price#t1",
+  "q": "where is exxon trading against its own last twelve months — near the high or the low? I'm trying to work out what is already in the price",
+  "asks": "where against its own year",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "N08-whats-in-the-price#t2",
+  "q": "and its momentum leaving the last month out, since that is usually noise",
+  "asks": "momentum excluding the last month",
+  "criteria": [
+   "follows_on",
+   "precision"
+  ]
+ },
+ {
+  "tag": "N09-no-forecast#t1",
+  "q": "what's your estimate for lilly's revenue growth next year?",
+  "asks": "a forward estimate",
+  "criteria": [
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "N09-no-forecast#t2",
+  "q": "fine. then what do their own filings say would move it either way",
+  "asks": "what the filings say would move it",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "N10-margin-debate#t1",
+  "q": "apple against microsoft — whose gross margin is holding up better, and is that mix or pricing?",
+  "asks": "whose margin holds up, mix or price",
+  "criteria": [
+   "ranking",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "N11-one-question#t1",
+  "q": "if you could put one question to xom's management on the next call, what would it be? base it on what their numbers are actually showing, not on the narrative",
+  "asks": "the one question for management",
+  "criteria": [
+   "so_what",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "N12-sector-drift#t1",
+  "q": "has the sector shape of this book drifted? I care about whether we are quietly all in one trade",
+  "asks": "has the sector shape drifted",
+  "criteria": [
+   "ranking",
+   "grounded_claims",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "N12-sector-drift#t2",
+  "q": "if I wanted to take that down without selling the biggest position, what are my options",
+  "asks": "options short of selling the biggest",
+  "criteria": [
+   "follows_on",
+   "so_what"
+  ]
+ }
+]

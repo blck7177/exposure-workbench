@@ -145,17 +145,19 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
         fid, period = A.split_point(token)
         kind = ledger.kind(fid)
         if period is not None:
-            # An address into a series: the point has to be one the series holds,
-            # and a point is a scalar — legal in a sentence and in a table cell,
-            # but a chart draws the whole series and a cite names a whole fact.
+            # `f_…@period` reads "the value of this fact at this period". For a
+            # series that is one of its points; for a scalar it is the figure
+            # itself, and holds only when the period IS the figure's own date —
+            # the model stamps the as-of onto every id once it has learned the
+            # syntax (10 of 23 refusals in the 2026-09-05 battery), and an
+            # address that restates the date the fact already carries points at
+            # the same figure. A chart takes the whole series; a cite a whole
+            # fact.
             if role in (A.CHART, A.CITE):
                 v.problems.append({"at": at, "id": token, "reason": "kind_does_not_fit", "kind": kind,
                                    "detail": ("a chart draws the whole series and a cite names a whole fact; "
-                                              "@period addresses one point, which belongs in a sentence or a cell")})
-            elif kind != F.SERIES:
-                v.problems.append({"at": at, "id": token, "reason": "kind_does_not_fit", "kind": kind,
-                                   "detail": "f_…@period addresses one point of a SERIES; this fact is not one"})
-            else:
+                                              "@period addresses one figure, which belongs in a sentence or a cell")})
+            elif kind == F.SERIES:
                 held = [str(p[0]) for p in (ledger.by_id[fid].get("points") or [])]
                 if period not in held:
                     near = [p for p in held if p[:4] == period[:4]] or held
@@ -163,6 +165,17 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
                                        "available": near[:12], "truncated": len(near) > 12,
                                        "detail": "this series holds no point at that period; `available` lists "
                                                  "the periods it does hold"})
+            elif kind == F.SCALAR:
+                own = ledger.by_id[fid].get("as_of")
+                if period != own:
+                    v.problems.append({"at": at, "id": token, "reason": "unknown_point", "period": period,
+                                       "available": [own] if own else [],
+                                       "detail": f"this figure is as of {own}; a figure at another date is a "
+                                                 f"different fact, not an address into this one"})
+            else:
+                v.problems.append({"at": at, "id": token, "reason": "kind_does_not_fit", "kind": kind,
+                                   "detail": "@period addresses a figure at a date; a passage, an absence and a "
+                                             "task have no value at a period"})
             continue
         if role == A.CELL and kind != F.SCALAR:
             v.problems.append({"at": at, "id": fid, "reason": "kind_does_not_fit", "kind": kind,

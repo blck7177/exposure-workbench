@@ -301,9 +301,12 @@ def _fill_cell(records: dict[str, dict], cell: str) -> dict:
 
 
 def fill_point(rec: dict, period: str) -> dict:
-    """One point of a series, as the reader's form of a figure: the point's value
-    as of its own date. The id stays the SERIES' id, so the chip opens the series
-    in the drawer — the point is an address into it, not a row of its own."""
+    """`f_…@period` as the reader's form: the figure at that period. For a
+    scalar the address restates the date it already carries, so it IS the
+    figure. For a series it is that point's value on its own date, and the id
+    stays the SERIES' id, so the chip opens the series in the drawer."""
+    if rec.get("kind") == F.SCALAR:
+        return fill(rec)
     value = next((float(p[1]) for p in (rec.get("points") or []) if str(p[0]) == period), None)
     unit = rec.get("unit") or ""
     out = {k: rec.get(k) for k in ("id", "measure", "subject", "unit", "params", "standalone", "sources", "group")}

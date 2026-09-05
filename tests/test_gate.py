@@ -260,8 +260,24 @@ def test_a_point_of_a_series_is_addressed_and_a_period_it_does_not_hold_is_refus
     assert all(c["id"] == s["id"] for c in chips), "the chip opens the series it addresses"
     bad = G.check([_para(f"It stood at {s['id']}@1999-01-01.")], led)
     assert bad.error == "unknown_point" and bad.problems[0]["available"]
-    scalar = next(r for r in led.by_id.values() if r["kind"] == F.SCALAR)
-    assert G.check([_para(f"x {scalar['id']}@2026-01-01.")], led).error == "kind_does_not_fit"
+
+
+def test_an_address_that_restates_a_scalars_own_date_is_the_scalar(world):
+    """`f_…@period` reads "the value of this fact at this period". Once the model
+    has the syntax it stamps the as-of onto every id — ten of the twenty-three
+    refusals in the 2026-09-05 battery — and an address that restates the date
+    the figure already carries points at the same figure."""
+    led, by, *_ = world
+    w = by[("MSFT", "issuer_exposures.weight")]
+    blocks = [_para(f"MSFT weighs {w['id']}@{w['as_of']} of the book.")]
+    v = G.check(blocks, led)
+    assert v.ok, v.problems
+    chip = G.accepted(blocks, v, led)["blocks"][0]["runs"][1]["fact"]
+    assert chip["id"] == w["id"] and chip["value"] == w["value"] and chip["as_of"] == w["as_of"]
+    other = G.check([_para(f"MSFT weighed {w['id']}@1999-01-01.")], led)
+    assert other.error == "unknown_point" and other.problems[0]["available"] == [w["as_of"]]
+    passage = next(r for r in led.by_id.values() if r["kind"] == F.PASSAGE)
+    assert G.check([_para(f"x {passage['id']}@2026-01-01.")], led).error == "kind_does_not_fit"
 
 
 def test_verified_counts_a_written_value_once_however_many_facts_share_it(world):

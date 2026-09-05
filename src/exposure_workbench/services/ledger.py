@@ -101,9 +101,11 @@ def identity_tokens(rec: dict) -> set[str]:
     date(rec.get("as_of"))
     for v in (rec.get("window") or {}).values():
         if isinstance(v, str):
-            date(v)
-            toks.add(v)
-            toks.update(_DIGITS.findall(v))          # "1y" -> "1"; "30d" -> "30"
+            if _DATE.match(v):
+                date(v)                              # a date gives itself and its year, never its day
+            else:
+                toks.add(v)
+                toks.update(_DIGITS.findall(v))      # "1y" -> "1"; "30d" -> "30"
         elif isinstance(v, (int, float)) and not isinstance(v, bool):
             toks.add(f"{v:g}")
     for k, v in (rec.get("params") or {}).items():
@@ -115,9 +117,11 @@ def identity_tokens(rec: dict) -> set[str]:
                 toks.add(f"{v * 100:g}")
                 toks.add(f"{v * 100:g}%")
         elif isinstance(v, str):
-            date(v)
-            toks.add(v)
-            toks.update(_DIGITS.findall(v))
+            if _DATE.match(v):
+                date(v)
+            else:
+                toks.add(v)
+                toks.update(_DIGITS.findall(v))
     for p in rec.get("points") or []:
         if isinstance(p, (list, tuple)) and p:
             date(str(p[0]))
@@ -225,9 +229,21 @@ class Ledger:
         return sorted(self._tokens.get(t, set()) | self._tokens.get(t.rstrip("%"), set()))
 
     # ── G3: a figure from a passage ──
+    # A number a passage STATES carries its unit — "$22,965 million", "82
+    # percent". A bare short integer does not, and a twelve-thousand-character
+    # filing contains nearly every one of them, so a substring match would
+    # MANUFACTURE a source: the 2026-09-05 battery linked a forecast the desk
+    # invented ("low-20s percent") to a 10-K passage that happened to contain
+    # the digits 20.
+    _MARKED = re.compile(r"[$%]|(?:bn|mn|[KMB]|million|billion|thousand)\s*$", re.IGNORECASE)
+    _MIN_BARE_DIGITS = 4
+
     def resolve_in_passages(self, token: str, cited: Sequence[str]) -> list[str]:
-        core = re.sub(r"[$,%\s]", "", token or "")
+        tok = (token or "").strip()
+        core = re.sub(r"[$,%\s]", "", tok)
         if not core:
+            return []
+        if not self._MARKED.search(tok) and len(re.sub(r"\D", "", core)) < self._MIN_BARE_DIGITS:
             return []
         pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?![\d])")
         return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
