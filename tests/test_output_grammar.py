@@ -270,3 +270,82 @@ def test_the_exempt_token_classes_are_frozen_at_nine():
     a design decision taken in review, with its case beside it, not a wider
     tuple."""
     assert len(ab._NOT_A_FIGURE) == 9
+
+
+# ── V23-R: the two shapes the V23 battery lost turns to ──────────────────────
+#
+# The conversation battery of 2026-09-05 (docs/spikes/V23_COVERAGE.md §5) refused
+# 27 answers as `malformed_answer`, and 22 of them were two shapes the gate could
+# have named and did not: a slot the model serialised into a string, and a name
+# the model wrote as prose. Both are closed lookups — no judgement, no model —
+# and both were reported as "text carries no figures", which describes neither.
+# C08#t1 sent the same serialised slot nine times against that sentence and lost
+# the turn; C09#t2 published `risk_alerts.issuer_concentration:LLY.current_value`
+# to the reader as words.
+
+def test_a_slot_serialised_into_a_string_is_named_as_that():
+    """C08#t1, nine identical refusals. The run is the model's own slot, quoted."""
+    [p] = ab.validate_shape([{"type": "paragraph", "runs": [
+        "No — the desk's book table shows ",
+        '{ref":"run_b791e7985dcd","name":"issuer_exposures.NVDA.weight"}',
+        " for NVIDIA."]}])
+    assert p["reason"] == "slot_written_as_string"
+    assert "object" in p["detail"] and "not a string" in p["detail"]
+    assert p["at"] == "blocks[0].runs"
+
+
+def test_the_serialised_slot_is_not_also_reported_as_an_id_in_text():
+    """One problem, not two: the id inside the slot is the slot's, and a refusal
+    naming both sends the model to fix the wrong half (it did — nine times)."""
+    problems = ab.validate_shape([{"type": "paragraph", "runs": [
+        '{"ref": "run_b791e7985dcd", "name": "issuer_exposures.NVDA.weight"}']}])
+    assert [p["reason"] for p in problems] == ["slot_written_as_string"]
+
+
+def test_a_table_name_written_as_prose_is_refused_with_the_name():
+    """C09#t2 shipped this sentence to a reader."""
+    names = frozenset({"risk_alerts.issuer_concentration:LLY.current_value",
+                       "issuer_exposures.LLY.weight"})
+    [p] = ab.validate_shape([{"type": "paragraph", "runs": [
+        "the six products together accounted for "
+        "risk_alerts.issuer_concentration:LLY.current_value of total revenues"]}],
+        names=names)
+    assert p["reason"] == "name_written_as_text"
+    assert p["names"] == ["risk_alerts.issuer_concentration:LLY.current_value"]
+    assert "slot" in p["detail"]
+
+
+def test_a_name_that_is_also_an_english_word_is_left_alone():
+    """`capex`, `proceeds`, `buybacks` are names AND words. Only a name carrying
+    a dot, a colon or an @ is unmistakably the desk's, so only those are looked
+    for: refusing "capex was large" would refuse a sentence."""
+    names = frozenset({"capex", "proceeds", "buybacks", "operating_cash_flow"})
+    assert ab.validate_shape([{"type": "paragraph", "runs": [
+        "capex was large and the proceeds were reinvested"]}], names=names) == []
+
+
+def test_the_name_rule_is_off_when_no_table_is_given():
+    """validate_shape is pure and its callers differ: the brief gate and the
+    tests pass no table. With no names, the rule cannot fire."""
+    assert ab.validate_shape([{"type": "paragraph", "runs": [
+        "issuer_exposures.LLY.weight of the book"]}]) == []
+
+
+def test_the_resolver_hands_the_table_names_to_the_text_rule():
+    """The lookup belongs to the text rule (V1) and the names live on the table,
+    so the one caller that has a table passes them. No sixth invariant."""
+    import inspect
+    from exposure_workbench.services import resolver as rs
+    src = inspect.getsource(rs.resolve_against)
+    assert "validate_shape(blocks, names=" in src
+
+
+def test_a_serialised_slot_reports_one_problem_not_two():
+    """The name inside the serialised slot is that slot's, not prose. Reporting
+    both `slot_written_as_string` and `name_written_as_text` for one run is the
+    two-halves refusal this rule exists to remove."""
+    names = frozenset({"issuer_exposures.MSFT.weight"})
+    problems = ab.validate_shape([{"type": "paragraph", "runs": [
+        'shows ', '{ref":"run_x","name":"issuer_exposures.MSFT.weight"}', ' for MSFT']}],
+        names=names)
+    assert [p["reason"] for p in problems] == ["slot_written_as_string"]

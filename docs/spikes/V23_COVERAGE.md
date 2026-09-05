@@ -80,3 +80,72 @@ for a name the sale pushed over), not in what it looked at.
 - **`tests/battery/questions_round4*.json`** name old tools in their keep-lists; `scripts/ablation_battery.py --arm narrow` would deny every tool until they are rewritten. Left as is: the ablation arm is not part of the current battery.
 - **Ten-name reads still ten calls?** No: `read_fundamentals` is per ticker, but the budget is per message, so ten reads in one message cost one unit. `compute(method, subject=[…])` is one call.
 - **describe(desk) under the owner role lists every portfolio**; under RLS it lists the caller's own plus the public one.
+
+## §5 The conversation battery, three runs (2026-09-05)
+
+Same 13 conversations, 31 turns, three stacks: V21 (44 tools, 9/4), V23 (10
+tools), V23-R (V23 plus the two closed grammar refusals below).
+
+| criterion | V21 | V23 | V23-R | | deterministic | V21 | V23 | V23-R |
+|---|---|---|---|---|---|---|---|---|
+| so_what | 3/15 | 6/15 | **10/15** | | verified figures | 228 | 309 | **325** |
+| ranking | 3/10 | 4/10 | 4/10 | | citations | 90 | 103 | **119** |
+| trigger | 4/6 | 5/6 | 3/6 | | gate refusals | 15 | 17 | **14** |
+| grounded_claims | 16/22 | 13/22 | 13/22 | | slot written as string | 9 | 15 | **1** |
+| precision | 6/7 | 4/7 | 5/7 | | name written as prose | 2 | 7 | 5 |
+| follows_on | 13/18 | 13/18 | 12/18 | | calls held behind a refusal | 22 | 19 | **1** |
+| netting | 1/2 | 0/2 | 0/2 | | turns lost to the gate | 2 | 3 | 2 |
+| no_linear_locating | 4/4 | 4/4 | 4/4 | | tool calls | 228 | 240 | 237 |
+| **total** | 50/84 | 49/84 | **51/84** | | | | | |
+
+**What moved.** The tool path straightened (V21: five entry points rotating —
+evaluate_formula 39, get_flow 21, snapshot 20, describe_issuer 16,
+read_quantities 16; V23: describe 41 → read_fundamentals 47 → compute 38).
+`so_what` 3 → 6 → 10 across two independent judge passes with a causal chain
+(procedures give the close a shape; the grammar fix lets more turns reach
+it). The refusal mix changed from all-grammar (15/15) to part-evidence (V23:
+5 `unsupported_assertion`, 2 `unknown_name`) — the gate began reporting
+capability gaps rather than spelling.
+
+**The two closed grammar refusals (V23-R).** A turn-by-turn diff of V21 vs
+V23 showed 27 malformed answers of which 22 were two shapes the gate could
+name and did not: a slot serialised into a string (C08#t1 sent the identical
+one NINE times and lost the turn) and a table name written as prose (C09#t2
+shipped `risk_alerts.issuer_concentration:LLY.current_value` to the reader).
+Both are lookups: `slot_written_as_string` (an object literal carrying ref
+and name, whatever quoting survived) and `name_written_as_text` (a COMPOUND
+name the session's table holds — only names with a dot, colon or @, so
+`capex` and `proceeds`, which are words, are left alone). The resolver hands
+the table's names to `validate_shape`; no sixth invariant. Result: slot as
+string 15 → 1, held calls 19 → 1.
+
+**The two turns still lost are registered capability gaps, not grammar.**
+C03#t3 ("has it been building?") — no cross-run series exists; the model said
+so correctly, then cited a run id it had recalled from the transcript and was
+refused `not_on_table` six times. C09#t1 — the model read "top six products
+accounted for 82 percent" in the 10-K and could not write it: a figure inside
+a verified quotation is still refused (V21_CONVERSATIONS §9 item 0, the status
+box's item ②).
+
+**Found on the way.** `describe()` at the desk lists 7 portfolios in storage
+order; four are empty development probes and the real book is seventh — a
+catalogue that mirrors storage rather than salience.
+
+**On the scores.** One judge pass each; 14 regressed / 13 improved / total
+50-49-51 is mostly noise. Trusted: the deterministic columns, and `so_what`
+(two runs, same direction, large). Not trusted: `trigger` 5 → 3 with no
+related change between the runs. The rubric also scores an honest "the desk
+does not hold this split" (V23's C04#t2) below V21's substituted wrong figure
+— a criterion for correct abstention is missing from the battery.
+
+**Gaps after this batch, by root cause** (the architecture discussion of
+2026-09-05, recorded in the topic log): the ontology admits one kind of truth
+(a computed quantity) where the desk has four (computed, attested verbatim,
+structural attribute, checked absence); the book world has an algebra (V22)
+and no calendar; the catalogue mirrors storage and the session has no focus;
+knowledge is delivered at discovery (describe) and not at use (the table
+slice carries a path, not an identity). The proposed redraw — the model writes
+pointers and argument, the desk fills facts and shows what each fact IS, the
+gate resolves pointers in session scope and checks their kind — is a
+restructuring, not a batch, and waits on the boss.
+

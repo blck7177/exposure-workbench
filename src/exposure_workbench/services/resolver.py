@@ -105,11 +105,16 @@ def resolve_against(blocks, table: tb.Table) -> Verdict:
     """Pure: the answer against a table already loaded."""
     v = Verdict()
 
-    shape = ab.validate_shape(blocks)
+    # V23-R. The text rule reads the table's own names as well as its figures:
+    # a name written as prose is a slot the model dropped, and saying so is a
+    # lookup over the names already loaded — the same shape as V5's quotes,
+    # not a sixth invariant.
+    held = {n for q in table.quantities.values() for n in q}
+    shape = ab.validate_shape(blocks, names=held)
     if shape:
         v.error, v.problems = "malformed_answer", shape
         v.detail = ("an answer is a list of blocks; a figure is a slot {ref, name}; text carries "
-                    "no digits. Each problem names its block")
+                    "no digits and no name the table holds. Each problem names its block")
         return v
 
     v.refs = ab.refs_in(blocks)

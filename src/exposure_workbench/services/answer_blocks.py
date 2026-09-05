@@ -145,10 +145,74 @@ def _is_slot(x) -> bool:
     return isinstance(x, dict)
 
 
-def _text_problems(text: str, at: str) -> list[dict]:
-    figures = figures_in_text(text)
+# V23-R. A slot the model SERIALISED into a string instead of sending as an
+# object: `"{ref\": \"run_…\", \"name\": \"issuer_exposures.NVDA.weight\"}"`.
+# The old rule caught it only through the run id inside it and answered "an id
+# is never written into text", which describes the symptom; C08#t1 of the V23
+# battery sent the identical answer NINE times against that sentence and lost
+# the turn. The shape is closed — an object literal carrying a ref and a name,
+# whatever quoting survived the round trip — so the refusal can say what it is.
+_SERIALISED_SLOT = re.compile(r"\{[^{}]{0,300}?\bref\b[^{}]{0,300}?\bname\b[^{}]{0,300}?\}")
+
+# The characters that make a quantity's name unmistakably the desk's. `capex`,
+# `buybacks` and `proceeds` are names AND English words, and refusing those
+# would refuse a sentence; `risk_alerts.issuer_concentration:LLY.current_value`
+# is nobody's prose. Only compound names are looked for, which is why this can
+# be a lookup rather than a judgement.
+_NAME_MARKS = (".", ":", "@")
+
+
+def compound_names(names) -> frozenset[str]:
+    """The subset of a table's names the text rule may look for (see above)."""
+    return frozenset(n for n in names if any(c in n for c in _NAME_MARKS))
+
+
+def _spans(text: str, found) -> list[tuple[int, int]]:
+    out = []
+    for f in found:
+        start = text.find(f)
+        while start != -1:
+            out.append((start, start + len(f)))
+            start = text.find(f, start + 1)
+    return out
+
+
+def _text_problems(text: str, at: str, names=frozenset()) -> list[dict]:
+    """The text rule: what belongs in a slot may not be written as words.
+
+    Three ways to break it, each named separately because each has a different
+    fix. A serialised slot and a bare name are reported INSTEAD of the digits
+    and ids inside them — a refusal that names both halves sends the model to
+    fix the wrong one, which is how nine identical retries happen.
+    """
+    problems: list[dict] = []
+    serialised = [m.group(0) for m in _SERIALISED_SLOT.finditer(text or "")]
+    if serialised:
+        problems.append({
+            "at": at, "reason": "slot_written_as_string", "slots": serialised,
+            "detail": ("a slot is an OBJECT in the runs array — {\"ref\": \"…\", \"name\": "
+                       "\"…\"} — not a string containing one. Send it as an object; the reader "
+                       "is shown the table's own value where it sits"),
+        })
+    # The name INSIDE a serialised slot belongs to that slot, not to the prose:
+    # reporting both sends the model to fix the wrong half, which is the whole
+    # failure this rule exists to stop. So the slot's spans are blanked first.
+    rest = text or ""
+    for start, end in sorted(_spans(rest, serialised), reverse=True):
+        rest = rest[:start] + " " * (end - start) + rest[end:]
+    written = sorted({n for n in names if n and n in rest})
+    if written:
+        problems.append({
+            "at": at, "reason": "name_written_as_text", "names": written,
+            "detail": ("a name the table holds is the name OF a figure, not a word: write it as "
+                       "a slot {ref, name} with the id it sits on, and the reader is shown the "
+                       "value. A name in prose shows the reader the name"),
+        })
+    for start, end in sorted(_spans(rest, written), reverse=True):
+        rest = rest[:start] + " " * (end - start) + rest[end:]
+    figures = figures_in_text(rest)
     if not figures:
-        return []
+        return problems
     ids = [f for f in figures if _ID_TOKEN.fullmatch(f)]
     numbers = [f for f in figures if f not in ids]
     detail = []
@@ -159,7 +223,9 @@ def _text_problems(text: str, at: str) -> list[dict]:
         detail.append("an id is never written into text — a figure points at it through a "
                       "slot, a passage through the block's `cites`; a run or alert the prose "
                       "rests on goes in `cites` as well, and the reader follows it from there")
-    return [{"at": at, "reason": "digits_in_text", "figures": figures, "detail": "; ".join(detail)}]
+    problems.append({"at": at, "reason": "digits_in_text", "figures": figures,
+                     "detail": "; ".join(detail)})
+    return problems
 
 
 def _slot_problem(slot: dict, at: str) -> dict | None:
@@ -171,13 +237,20 @@ def _slot_problem(slot: dict, at: str) -> dict | None:
     return None
 
 
-def validate_shape(blocks) -> list[dict]:
+def validate_shape(blocks, names=frozenset()) -> list[dict]:
     """The text rule, plus enough structure to walk without crashing.
 
     The schema on `respond` refuses malformed blocks before this runs; a direct
     caller (a test, the brief gate) gets the same answers here, one list, all
     problems at once.
+
+    `names` is the set of quantity names the session's table holds (V23-R). The
+    text rule has always said that what belongs in a slot may not be written as
+    words; with the table's names it can say so about a NAME as well as about a
+    figure. Empty for a caller with no table, and the rule simply does not fire
+    — it is a lookup over what was passed, never a guess about what a word is.
     """
+    names = compound_names(names)
     problems: list[dict] = []
     if not isinstance(blocks, list) or not blocks:
         return [{"at": "blocks", "reason": "no_blocks", "detail": "an answer is a non-empty list of blocks"}]
@@ -192,9 +265,9 @@ def validate_shape(blocks) -> list[dict]:
                              "allowed": list(BLOCK_TYPES)})
             continue
         if isinstance(b.get("title"), str):
-            problems += _text_problems(b["title"], f"{at}.title")
+            problems += _text_problems(b["title"], f"{at}.title", names)
         if isinstance(b.get("text"), str):
-            problems += _text_problems(b["text"], f"{at}.text")
+            problems += _text_problems(b["text"], f"{at}.text", names)
         if kind == "paragraph":
             runs = b.get("runs")
             if not isinstance(runs, list) or not runs:
@@ -204,7 +277,8 @@ def validate_shape(blocks) -> list[dict]:
             # slots lifted out. Checked run by run, "VaR (" + slot + ") at 95%"
             # shows the rule a bare "95%" with the measure's name in another
             # run, and refuses the confidence level it would have recognised.
-            problems += _text_problems("".join(r for r in runs if isinstance(r, str)), f"{at}.runs")
+            problems += _text_problems("".join(r for r in runs if isinstance(r, str)),
+                                        f"{at}.runs", names)
             for j, r in enumerate(runs):
                 if isinstance(r, str):
                     continue
