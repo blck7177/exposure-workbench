@@ -359,7 +359,12 @@ def prose_of(rendered_blocks) -> str:
                     s.append(r)
                 elif isinstance(r, dict) and "fact" in r:
                     f = r["fact"]
-                    s.append(f["display"] if f.get("kind") in (F.SCALAR, F.SERIES) else (f.get("text") or f.get("display") or ""))
+                    if f.get("kind") in (F.SCALAR, F.SERIES):
+                        s.append(f["display"])
+                    elif f.get("kind") == F.PASSAGE:
+                        s.append(f"[{_words(f.get('measure') or 'passage')}]")     # a mark, never the passage's text
+                    else:
+                        s.append(f.get("text") or f.get("display") or "")
                 elif isinstance(r, dict) and "link" in r:
                     s.append(r["link"]["as_written"])
             parts.append("".join(s))

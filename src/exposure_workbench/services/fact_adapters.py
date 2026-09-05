@@ -417,8 +417,29 @@ def _ticker(args: dict) -> str | None:
 
 def describe(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     subject = result.get("subject") or args.get("subject")
-    facts, note = harvest(result, Ctx("describe", subject=subject, as_of=result.get("as_of") or result.get("catalogue_as_of"),
-                                      group="fundamentals" if result.get("kind") == "issuer" else "book_derived"))
+    as_of = result.get("as_of") or result.get("catalogue_as_of")
+    # The catalogue's three kinds of "missing" are one kind of Fact (plan §3):
+    # `not_reported` already arrives as an absence row; `not_held` and `cannot`
+    # are the catalogue's own sentences — each becomes an absence fact the
+    # honest answer can POINT at. Measured before this: the two honest_absence
+    # misses of the first battery had no absence fact on their ledger at all.
+    facts: list[F.Fact] = []
+    r = copy.deepcopy(result)
+    for reason in ("not_held", "cannot"):
+        entries = r.get(reason)
+        if isinstance(entries, dict) and entries:
+            pointed: dict = {}
+            for key, sentence in entries.items():
+                if not isinstance(sentence, str) or not sentence:
+                    continue
+                f = F.fact(F.ABSENCE, key, subject=subject, text=sentence, as_of=as_of or "n/a",
+                           params={"reason": reason}, group="fundamentals" if result.get("kind") == "issuer" else "book_derived")
+                facts.append(f)
+                pointed[key] = f.id
+            r[reason] = pointed
+    more, note = harvest(r, Ctx("describe", subject=subject, as_of=as_of,
+                                group="fundamentals" if result.get("kind") == "issuer" else "book_derived"))
+    facts += more
     # The catalogue's map — names a run holds, methods, procedures — is the note. Its
     # counts and latest values are facts (I1); nothing else in it is a figure.
     note.pop("table_names", None)

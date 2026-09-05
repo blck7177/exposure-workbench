@@ -231,3 +231,13 @@ def test_a_refusals_schema_and_problems_pass_through_untouched():
     facts, note, held = fa.adapt("compute", {"method": "book.sell"}, refusal)
     assert facts == [] and note["params_schema"] == refusal["params_schema"] and note["problems"] == refusal["problems"]
     assert fa.numeric_leaves(note) == []
+
+
+def test_the_catalogues_not_held_and_cannot_are_absence_facts(adapted):
+    """The honest sentence has something to point at: every not_held and cannot
+    entry of describe is an absence fact with the catalogue's sentence."""
+    facts, note, _h = adapted["describe_issuer"]
+    absent = [f for f in facts if f.kind == F.ABSENCE]
+    assert absent and {f.params["reason"] for f in absent} <= {"not_held", "cannot"}
+    assert any(f.measure == "segment_revenue" and "read_filings" in f.text for f in absent)
+    assert all(F.is_fact_id(v) for v in note["not_held"].values()) and all(f.as_of for f in absent)

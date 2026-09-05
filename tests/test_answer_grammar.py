@@ -144,3 +144,10 @@ def test_resolved_prose_tokens_become_links_at_their_written_text():
     assert runs[2] == " of the book, worth " and runs[3]["link"]["as_written"] == "$1.79M"
     assert runs[5]["link"]["ids"] == [a.id, b.id] and runs[6] == "."
     assert A.prose_of(out) == "MSFT is 16.3% of the book, worth $1.79M as of 2026-09-03."
+
+
+def test_a_passage_pointed_at_inline_reads_as_a_mark_not_its_text():
+    a, b, c, d, s, p, ab = _facts()
+    led = L.Ledger.of_facts([p])
+    out = A.rendered([{"type": "paragraph", "runs": ["Lilly says so: ", {"fact": p.id}, "."]}], led.by_id)
+    assert A.prose_of(out) == "Lilly says so: [10-K Item 7]."

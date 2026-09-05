@@ -133,7 +133,9 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
         v.error = "not_on_ledger"
         v.problems = [{"at": at, "id": fid, "reason": "not_on_ledger"} for at, fid in off]
         v.detail = ("every id an answer points at is a fact a tool result showed this session "
-                    "(an f_… id from a `facts` block). These are not — use one you were shown, or read it")
+                    "(an f_… id from a `facts` block). These are not — use one you were shown, or read it. "
+                    "A figure a passage states is not a fact of its own: write it in the prose and put the "
+                    "passage in `cites`; a point of a series is computed from the series, not pointed at")
         return v
 
     # G2 — the layout admits the kind
