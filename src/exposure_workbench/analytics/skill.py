@@ -258,7 +258,7 @@ _BOOK_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="book.sell", subject_kind="run", family="scenario",
-        describes="the book after selling all or part of some names: weights renormalised over what remains, sector weights, market value, and every concentration and exposure limit check re-run; the proceeds leave the book",
+        describes="the book after selling all or part of some names: weights renormalised over what remains, sector weights, market value, and every concentration and exposure limit check re-run; the proceeds leave the book. The subject is a run (run_…) or another scenario's calc_ row, so trades chain",
         procedure="remove the sold market value; weight_i = mv_i ÷ Σ mv remaining; check_limits over the result with the portfolio's own thresholds",
         authority="arithmetic over the run's positions; thresholds from the portfolio's risk_limits (analytics/limits)",
         fails_when="a name not held, a fraction outside (0, 1], a name sold twice, a sale emptying the book, an unpriced holding; factor exposures are not re-fitted and are stated unmeasured",
@@ -275,7 +275,7 @@ _BOOK_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="book.buy", subject_kind="run", family="scenario",
-        describes="the book after adding names at target weights of the new book: every existing weight scaled down, sector weights, market value, and every concentration and exposure limit check re-run; the money comes from outside the book",
+        describes="the book after adding names at target weights of the new book: every existing weight scaled down, sector weights, market value, and every concentration and exposure limit check re-run; the money comes from outside the book. The subject is a run (run_…) or another scenario's calc_ row (a sale, then this purchase on its result)",
         procedure="mv_added = w × mv_old ÷ (1 − Σ w); weight_i = mv_i ÷ Σ mv; check_limits over the result",
         authority="arithmetic over the run's positions; thresholds from the portfolio's risk_limits; the new name's sector from the desk's company record",
         fails_when="a target weight outside (0, 1), targets summing to 1 or more, a name the desk cannot place in a sector, a name already held (trim or add to it through its weight instead); factor exposures are stated unmeasured",
@@ -442,6 +442,15 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
         close=("name the candidate and the reason it was chosen over the runner-up", "say what gets tighter and what gets better after the sale, from the scenario's checks"),
         absent="a candidate with no run figure is not a candidate; say so",
         authority="the mandate's own limits; concentration review practice",
+    ),
+    Procedure(
+        "trim_to_tier", "how much of one holding to sell to bring it back under a concentration tier", "portfolio",
+        gather=("the run's book market value, the holding's weight and market value, and the tier level (read_book by name: exposure_metrics.portfolio_market_value, issuer_exposures.<T>.market_value, limit_checks.issuer_concentration:<T>.warning_level or .breach_level)",),
+        compute=("the tier in dollars: multiply(book market value, tier level)", "the sale: subtract(the holding's market value, the tier in dollars)", "or book.sell at a fraction, and read the after-book's check"),
+        compare=("the sale against the holding's market value — a sale larger than the position, or negative, means the wrong tier or the wrong base was used",),
+        close=("the dollars to sell and the weight it lands at, with the tier named", "what else in the book the sale touches (the after-book's checks if book.sell was run)"),
+        absent="a holding with no check row for the tier asked has no tier to trim to; say so",
+        authority="the mandate's own limits; the V22 route (a weight is a share of ITS book, so the tier in dollars is book value × tier)",
     ),
     Procedure(
         "bear_case_from_filings", "the bear case in the issuer's own words, ordered by which risk is live", "issuer",

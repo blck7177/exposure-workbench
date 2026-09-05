@@ -147,19 +147,42 @@ async def hypothetical_buy(db: AsyncSession, run_id: str, buys: list[dict]) -> d
                            {"buys": [{"ticker": b.ticker, "weight": b.weight} for b in placed]})
 
 
-async def _scenario(db: AsyncSession, run_id: str, rebuild, identifying: dict) -> dict:
+async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) -> dict:
+    """The book after a trade, from a run's positions — or, V24, from another
+    scenario row's, so a sale and then a purchase are two calls on one book
+    (live round 3: book.buy on the sale's calc row was refused unknown_run and
+    the second leg went unanswered). The chain is recorded: the new row's
+    input is the row it built on, and `from_scenario` names it."""
+    from exposure_workbench.db.models import CalcLedger
+    from_scenario = None
+    if base_id.startswith("calc_"):
+        prior = (await db.execute(select(CalcLedger).where(CalcLedger.id == base_id))).scalar_one_or_none()
+        if prior is None or prior.operation != SCENARIO_OP:
+            return _err("not_a_scenario", f"{base_id} is not a scenario row; a scenario starts from a "
+                                          f"completed run (run_…) or from another scenario's calc_ row", ref=base_id)
+        run_id = (prior.params or {}).get("run_id")
+        from_scenario = base_id
+        prior_holdings = (prior.result or {}).get("issuer_exposures") or []
+    else:
+        run_id = base_id
+        prior_holdings = None
     run = (await db.execute(select(ExposureRun).where(ExposureRun.id == run_id))).scalar_one_or_none()
     if run is None:
         return _err("unknown_run", f"no exposure run {run_id}", run_id=run_id)
     if run.status != "completed":
         return _err("run_not_completed", f"run {run_id} is {run.status}; a scenario starts "
                                           f"from a completed run", run_id=run_id, status=run.status)
-    positions = list((await db.execute(
-        select(IssuerExposure).where(IssuerExposure.run_id == run_id)
-        .order_by(IssuerExposure.ticker))).scalars().all())
-    holdings = [sc.Holding(p.ticker, p.sector,
-                           None if p.market_value is None else float(p.market_value))
-                for p in positions]
+    if prior_holdings is not None:
+        holdings = [sc.Holding(str(h["label"]), h.get("sector"),
+                               None if h.get("market_value") is None else float(h["market_value"]))
+                    for h in prior_holdings if isinstance(h, dict) and h.get("label")]
+    else:
+        positions = list((await db.execute(
+            select(IssuerExposure).where(IssuerExposure.run_id == run_id)
+            .order_by(IssuerExposure.ticker))).scalars().all())
+        holdings = [sc.Holding(p.ticker, p.sector,
+                               None if p.market_value is None else float(p.market_value))
+                    for p in positions]
     book = rebuild(holdings)
     if isinstance(book, dict):
         return {**book, "run_id": run_id}
@@ -188,13 +211,15 @@ async def _scenario(db: AsyncSession, run_id: str, rebuild, identifying: dict) -
     calc_id = await cs._record(
         db, None, SCENARIO_OP,
         {"run_id": run_id, "as_of": as_of, **identifying,
+         **({"from_scenario": from_scenario} if from_scenario else {}),
          "result_type": {"unit_class": "ratio", "basis": {"instant": as_of}}},
-        recorded, [run_id], {"checks_run": len(checks), "alerts": len(alerts)},
+        recorded, [from_scenario or run_id], {"checks_run": len(checks), "alerts": len(alerts)},
         current_session_id(),
     )
     return {
         "calc_id": calc_id,
         "from_run": run_id,
+        **({"from_scenario": from_scenario} if from_scenario else {}),
         "as_of": as_of,
         **identifying,
         "sold": recorded["sold"],

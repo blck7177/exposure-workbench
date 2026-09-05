@@ -371,7 +371,10 @@ def prose_of(rendered_blocks) -> str:
                 cells = [lab]
                 for k, c in enumerate(row):
                     f = c["fact"]
-                    cells.append((f"{_words(f.get('measure') or '')}: " if (b.get("explicit") or [False] * 99)[k] else "") + str(f.get("display") or ""))
+                    words = _words(f.get("measure") or "")
+                    if lab and words.lower().startswith(lab.lower()):
+                        words = words[len(lab):].strip()          # "AAPL beta contrib" under the AAPL row reads "beta contrib"
+                    cells.append((f"{words}: " if (b.get("explicit") or [False] * 99)[k] and words else "") + str(f.get("display") or ""))
                 parts.append(" | ".join(cells))
         elif b.get("type") == "chart":
             f = b.get("fact") or {}

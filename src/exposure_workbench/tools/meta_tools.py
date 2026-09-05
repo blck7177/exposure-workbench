@@ -219,7 +219,9 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         description=(
             "Start background work and return its id at once: readiness (ingest, index and price an "
             "issuer — any listed SEC filer, prepared in a couple of minutes), research (an Issuer Risk "
-            "Brief), exposure_run (a portfolio run, on the last completed session unless as_of_date). "
+            "Brief), exposure_run (a portfolio run on the book AS IT IS, on the last completed session "
+            "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is "
+            "compute(method='book.sell' | 'book.buy', subject=run_…), which answers at once). "
             "Never blocks; tell the user it is being prepared."
         ),
         json_schema={"type": "object", "properties": {

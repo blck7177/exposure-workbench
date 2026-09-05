@@ -549,6 +549,12 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
               as_of=result.get("as_of"), group=group,
               sources=tuple(s for s in (result.get("calc_id"),) if _is_id(s)))
     r = copy.deepcopy(result)
+    # an op over one issuer's figures is that issuer's figure: the typed
+    # calculator records the operands' issuers, and a single one is the subject
+    # (live round 2: ten `weight × beta` results labelled by measure alone)
+    issuers = (r.get("type") or {}).get("issuers") if isinstance(r.get("type"), dict) else None
+    if ctx.subject is None and isinstance(issuers, list) and len(issuers) == 1 and isinstance(issuers[0], str):
+        ctx = ctx.child(subject=issuers[0])
     # a scalar op / formula / price method: the top-level value is the method's own figure
     if _is_num(r.get("value")):
         measure = (r.get("quantity") or r.get("formula") or (r.get("type") or {}).get("quantity")

@@ -607,6 +607,22 @@ Which tools produce facts is `fact_adapters.ADAPTERS` by name, pinned by
 1. The V23 §3 twelve questions, three rounds, each round fixing the
    catalogue or an adapter — never the gate. Residuals to the topic status
    box as V23 did.
+
+   **Three rounds run 2026-09-05** (four questions: trim MSFT; AMZN vs MSFT
+   cash; rates +100bp; sell half NVDA and add KO 5%), through the deployed
+   face after each rebuild:
+
+   | round | what went wrong | fixed where |
+   |---|---|---|
+   | 1 | 8 of 11 refusals: scalars listed under `cites`; a ref serialised into a string (`{fact:f_…}`) eleven times in one answer and resent six times; `+100bp` refused as unsourced; `compute(book.sell)`'s params_schema (`minItems`) became an adapter error and the model fell back to `start`; `multiply(f_…, f_…)` refused unknown_operand | gate: cites take any fact; `pointer_written_as_text` named once; a number the user wrote rests on the question. adapter: refusal schemas pass through. compute: a Fact id is an operand. describe: the placeholders `port_`/`run_` mean the desk |
+   | 2 | trim: `MSFT MV ÷ breach` (8.93M) then a negative "sale" — the wrong route, chosen; rates: ten `weight × beta` results labelled by measure only, the table repeating the label; KO: `start(exposure_run)` again | skill: a `trim_to_tier` procedure (tier dollars = book MV × tier; sale = position MV − that); adapter: a single-issuer op result takes that issuer as subject; transcript: a row label is not repeated in its cell; start's description says a run does not apply a trade |
+   | 3 | trim: asked for `…MSFT.limit_level`, refused bare, read the breach level as the warning; KO: `book.sell` right, then `book.buy` on the sale's calc row refused unknown_run — the honest second leg went unanswered | read_book: an unknown name comes with its five nearest; scenario: a scenario builds on a scenario row (`from_scenario`), so sell-then-buy is two calls on one book |
+
+   Held across all three: zero `not_on_ledger` caused by a shown id; every
+   accepted answer's figures were pointers or resolved links; the two
+   answers that were WRONG (round 2's trim) were wrong in the route the model
+   chose, with every figure's identity on display — the class no gate
+   removes, and the one the rubric and the reader see.
 2. The 13-conversation battery (`scripts/conversation_battery.py`) against
    V23-R, side by side in `docs/spikes/V24_COVERAGE.md`: deterministic
    columns (verified figures now = chips + resolved prose links; refusals by

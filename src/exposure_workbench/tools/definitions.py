@@ -263,17 +263,26 @@ async def _quantities_by_name(db: AsyncSession, ref: str, as_of: str | None, wan
     # V24: the values travel in the payload, under their names — the adapter
     # (services/fact_adapters.read_book) makes each a Fact. `names`/`units`
     # stay for the V23 declaration path until phase C removes it.
+    # A name the row does not hold comes back with the five nearest it does
+    # (live round 3: `limit_checks.issuer_concentration:MSFT.limit_level` was
+    # refused bare, and the model read the breach level as the warning).
+    import difflib
+    nearest = {n: difflib.get_close_matches(n, list(held), n=5, cutoff=0.5) for n in unknown}
     return {"run_id": ref, "as_of": as_of, "names": found,
             "units": {n: held[n].unit_class for n in found},
             "figures": {n: {"value": held[n].value, "unit_class": held[n].unit_class} for n in found},
-            **({"unknown": unknown, "detail": f"not names {ref} holds; describe('{ref}') lists them"}
+            **({"unknown": unknown, "nearest": nearest,
+                "detail": f"not names {ref} holds; `nearest` lists the closest it does; describe('{ref}') lists all"}
                if unknown else {})}
 
 
 async def _portfolio_sections(db: AsyncSession, pid: str, wanted: list[str]) -> dict:
     p = await portfolio_service.get_portfolio(db, pid)
     if p is None:
-        return {"error": "unknown_portfolio", "portfolio_id": pid}
+        snaps = await portfolio_service.snapshot_all(db)
+        return {"error": "unknown_portfolio", "portfolio_id": pid,
+                "portfolios": [{"portfolio_id": s["portfolio_id"], "name": s["name"]} for s in snaps],
+                "detail": "not a portfolio this desk holds; the ones it does are listed"}
     out: dict = {"portfolio_id": pid, "section": {}}
     for n in wanted:
         if n == "positions":

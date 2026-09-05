@@ -338,7 +338,12 @@ async def _desk_about(db: AsyncSession, company_id: str, tk: str) -> dict:
 async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
     p = await portfolio_service.get_portfolio(db, pid)
     if p is None:
-        return _err("unknown_portfolio", f"no portfolio {pid}", portfolio_id=pid)
+        # A teaching refusal (V16): the ids that DO exist ride on it, so a guessed
+        # id ("port_MSFT", live round 2) costs one call, not two.
+        snaps = await portfolio_service.snapshot_all(db)
+        return _err("unknown_portfolio", f"no portfolio {pid}; the desk's portfolios are listed below — "
+                                         f"describe() with no subject shows them with their latest runs",
+                    portfolio_id=pid, portfolios=[{"portfolio_id": s["portfolio_id"], "name": s["name"]} for s in snaps])
     positions = await portfolio_service.positions_with_weights(db, pid)
     limits = await run_reads_service.list_risk_limits(db, pid)
     fresh = await run_reads_service.get_run_freshness(db, pid)

@@ -105,3 +105,34 @@ async def test_a_fact_id_is_an_operand_with_the_facts_identity():
             await db.execute(delete(AgentSession).where(AgentSession.id == sid))
             await db.commit()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_a_scenario_chains_on_a_scenario_row_and_an_unknown_name_names_its_nearest():
+    """Live round 3: book.buy on the sale's calc row was refused unknown_run;
+    a read for `…MSFT.limit_level` was refused with no hint. Both fixed at
+    the source. Rolled back; nothing is left."""
+    from exposure_workbench.services import compute_service
+    from exposure_workbench.tools import definitions as d
+    engine = create_async_engine(URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with mk() as db:
+            sale = await compute_service.compute(db, method="book.sell", subject="run_b791e7985dcd",
+                                                 params={"sales": [{"ticker": "NVDA", "fraction": 0.5}]})
+            assert not sale.get("error"), sale
+            buy = await compute_service.compute(db, method="book.buy", subject=sale["calc_id"],
+                                                params={"buys": [{"ticker": "KO", "weight": 0.05}]})
+            assert not buy.get("error"), buy
+            assert buy["from_scenario"] == sale["calc_id"] and buy["from_run"] == "run_b791e7985dcd"
+            after = {p["label"]: p for p in buy["positions"]}
+            assert "KO" in after and after["NVDA"]["market_value"] < {p["label"]: p for p in sale["positions"]}["NVDA"]["market_value"] * 1.0001
+            bad = await compute_service.compute(db, method="book.buy", subject="calc_000000000000",
+                                                params={"buys": [{"ticker": "KO", "weight": 0.05}]})
+            assert bad["error"] == "not_a_scenario"
+            out = await d._read_book(db, "run_b791e7985dcd", ["limit_checks.issuer_concentration:MSFT.limit_level"])
+            assert out["unknown"] == ["limit_checks.issuer_concentration:MSFT.limit_level"]
+            assert any(n.endswith(("warning_level", "breach_level")) for n in out["nearest"]["limit_checks.issuer_concentration:MSFT.limit_level"])
+            await db.rollback()
+    finally:
+        await engine.dispose()
