@@ -6,6 +6,8 @@ gate enforces by lookup. These are the contract stated in words.
 
 ## `_SYSTEM` (agents/meta_agent.py) — the changed paragraph
 
+*(updated 2026-09-05 for the prose grammar; the paragraph is a sentence and a fact's id in it is the pointer)*
+
 > The discipline: every figure you state is a FACT a tool returned — each tool
 > result carries a `facts` block (one row per fact: id, kind, subject, measure,
 > unit, value, as of, window, params) and a `note` in which each figure stands
@@ -66,7 +68,8 @@ gate enforces by lookup. These are the contract stated in words.
 | `kind_does_not_fit` | a table cell is a scalar fact; a series, a passage, an absence or a task goes in a paragraph / a chart draws a series fact |
 | `not_standalone` | this figure is not determined on its own (the row says so); point at the figure that is |
 | `unsourced_figure` | a figure in prose is either a fact on the ledger — point at it as {fact: id}, or it is linked for you when it equals one — a figure a cited passage states, or a result compute has not produced yet. Compute it, cite the passage that states it, or drop it |
-| `pointer_written_as_text` | a fact ref is an OBJECT element of `runs` — ["text", {"fact": "f_…"}, "text"] — never a string containing one. Send it as an object; the reader is shown the fact's value where it sits |
+| `unknown_point` | this series holds no point at that period; `available` lists the periods it does hold |
+| `pointer_not_separated` | a fact id is read as a pointer only when a space (or a mark) comes before it; this one is glued to the word in front of it |
 | `id_in_prose` | an id is a pointer, not a word: a fact goes in {fact: id}, a passage in cites |
 | `name_in_prose` | a measure's name is the name OF a figure, not a word: point at the fact {fact: id} and the reader is shown its value and what it is |
 | `unverified_quote` | quotation marks say these words appear verbatim in a passage this block cites. Reproduce the source wording and cite the passage, or drop the marks |

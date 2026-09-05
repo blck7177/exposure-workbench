@@ -96,21 +96,69 @@ and `compute` (a Fact id is an operand); round 2 taught the skill registry
 and `start`'s description; round 3 taught `read_book` (nearest names) and
 the scenario service (a scenario builds on a scenario row).
 
-## §4 Decisions left for the boss
+## §4 The grammar, measured and changed (2026-09-05)
 
-1. **`pointer_written_as_text`: refuse or parse.** 13 of 27 refusals. The
-   shape is closed (`{fact:f_…}` with any quoting); parsing it into a real
-   pointer is lossless and removes the class by construction; refusing it
-   keeps the contract literal ("a ref is an object") at one retry a time.
-2. **The table block went unused** in 31 turns (V23-R produced several).
-   Either the description does not invite it or paragraphs with pointers
-   read well enough; a rubric criterion for "compared things are tabulated"
-   would say which.
-3. **Wording** — docs/spikes/V24_WORDING_REVIEW.md lists every model-facing
-   sentence V24 changed, for approval.
-4. **A pointer at a series point** (`{fact, at}`), §2a — a grammar addition.
-5. **`not_on_ledger`'s sentence** should add: a figure a passage states is
-   written in prose with the passage in cites, not pointed at.
-6. **The two honest_absence misses** are procedure text (`rates_scenario`,
-   the LLY concentration angle): say "point at the absence fact and name the
-   nearest held figure" in those words.
+§1 left three questions. Rather than decide them by argument, every respond
+the desk had stored (94: the battery, the three live rounds, the reruns) was
+replayed with its own ledger and its own question, under the grammar as it
+stood and under a candidate.
+
+**What the replay said.** 28 of 48 refusals were one shape, the pointer
+object serialised into one of the strings of the `runs` array. Under a prose
+grammar 22 of them became clean acceptances, and the decoration left in the
+reader's text vanished entirely once the one closed wrapper shape was
+stripped. It also **refused half of what had been proposed**: folding `cites`
+into the sentence turned two accepted answers into refusals, because a fact a
+paragraph RESTS ON is not a fact it STATES, and a figure that may not stand
+alone may still be cited. So `cites` stayed a field.
+
+**What was built.** `paragraph {text, cites}`; the fact's id written where the
+figure goes; `f_…@period` for one point of a series (the model had invented
+ids for points five times because they had no address); the old decoration
+normalised to the pointer it carries rather than refused. The rendered OUTPUT
+is unchanged — runs of strings, `{fact: …}`, `{link: …}` — so the page and
+every stored answer read as before, and the frontend did not change.
+
+**Three defects the replay found, two of them already shipping.**
+
+| defect | how it showed | closed by |
+|---|---|---|
+| the number token swallowed the comma ending a clause | "in 2024, revenue rose" offered the gate `2024,`, which no lookup resolves; **four of the seven `unsourced_figure` refusals in the whole corpus were this** | the digit run must end in a digit |
+| a value exactly on the rounding boundary missed by one float ulp | 0.1625 written as 16.3% did not match | half a unit of the last digit, and a hair |
+| a pointer glued to the word before it is invisible to the pointer walk | the id would reach the reader as literal prose — a silent failure | `pointer_not_separated`, refused by name |
+
+**Verified over the same 94 responds:** accepted 44 → 69; no accepted
+answer's text shows an id or decoration; every remaining refusal is the gate
+working (a fabricated id, a scare quote, the model's own arithmetic).
+
+**The live round after it.** The trim answered in four calls with no refusal.
+The rates turn produced twenty verified figures and named the offset. The
+model tabulated a series' eight instants as `@period` cells, which crashed
+the renderer once and is now a table cell like any other. And the case that
+had been unstateable since V21 — a figure that lives only in filing prose —
+came out right:
+
+> Lilly's filing says Mounjaro and Zepbound accounted for **56%** of total
+> revenues in 2025. It also says the six products … collectively accounted
+> for **82%** of total revenues in 2025
+
+Both figures are written in the sentence and linked to the passage the block
+cites. Nothing was estimated and nothing was pointed at that was not shown.
+
+## §5 Left for the boss
+
+1. **A passage pointer standing where a figure belongs.** The same Lilly
+   question, asked one turn earlier, produced "total revenue of
+   [10-K Item 8]" seven times: the model points at the passage instead of
+   writing the figure the passage states. The gate accepts it (a passage
+   inline is legal and renders as a mark) and the reader gets a mark where a
+   number should be. The turn that got it right did the designed thing —
+   figure in the prose, passage in `cites`. Refusing an inline passage would
+   force that, in one line of G2, at the cost of the footnote-in-a-sentence
+   form. **This is a contract change, not a defect fix, so it waits.**
+2. **The table block is still unused** in ordinary turns.
+3. **Wording** — docs/spikes/V24_WORDING_REVIEW.md, updated for the prose
+   grammar.
+4. **`honest_absence`** was 1/3 on its first reading; the absence facts it
+   needed did not exist then and do now, and the one turn re-run since
+   passed. It should be re-measured on the next full battery.
