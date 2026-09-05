@@ -294,6 +294,12 @@ def fill(rec: dict) -> dict:
     return out
 
 
+def _fill_cell(records: dict[str, dict], cell: str) -> dict:
+    base, period = split_point(cell)
+    rec = records.get(base) or {"id": base}
+    return fill_point(rec, period) if period else fill(rec)
+
+
 def fill_point(rec: dict, period: str) -> dict:
     """One point of a series, as the reader's form of a figure: the point's value
     as of its own date. The id stays the SERIES' id, so the chip opens the series
@@ -355,7 +361,10 @@ def rendered(blocks, records: dict[str, dict], links: dict[tuple[int, int], dict
             nb.pop("text", None)
             nb["runs"] = _paragraph_runs(i, normalise(b.get("text") or ""), records, links)
         elif b.get("type") == "table":
-            grid = [[fill(records[c]) for c in row] for row in b["rows"]]
+            # A cell may address one point of a series (live: the model tabulated
+            # a filed balance's eight instants that way, and the renderer looked
+            # the whole token up as an id).
+            grid = [[_fill_cell(records, c) for c in row] for row in b["rows"]]
             nb["rows"] = [[{"fact": f} for f in row] for row in grid]
             nb.update(derive_table(grid))
         elif b.get("type") == "chart":

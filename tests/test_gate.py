@@ -284,3 +284,20 @@ def test_a_number_the_user_wrote_rests_on_the_question(world):
     out = G.accepted([_para("On a +100bp move the book loses.")], G.check([_para("On a +100bp move the book loses.")], led, question=q), led)
     assert out["blocks"][0]["runs"] == ["On a +100bp move the book loses."], "the question's number renders as plain text"
     assert G.check([_para("On a +100bp move the book loses.")], led).error == "unsourced_figure"
+
+
+def test_a_point_of_a_series_is_a_scalar_so_it_may_stand_in_a_table_cell(world):
+    """Live: the model tabulated a filed balance's eight instants as
+    f_…@period cells; the gate let them through and the renderer looked the
+    whole token up as an id."""
+    led, *_ = world
+    s = next(r for r in led.by_id.values() if r["kind"] == F.SERIES and len(r.get("points") or []) > 1)
+    (p0, v0), (p1, v1) = (str(s["points"][0][0]), float(s["points"][0][1])), (str(s["points"][-1][0]), float(s["points"][-1][1]))
+    blocks = [{"type": "table", "rows": [[f"{s['id']}@{p0}"], [f"{s['id']}@{p1}"]]}]
+    v = G.check(blocks, led)
+    assert v.ok, v.problems
+    out = G.accepted(blocks, v, led)
+    cells = [row[0]["fact"] for row in out["blocks"][0]["rows"]]
+    assert [(c["as_of"], c["value"]) for c in cells] == [(p0, v0), (p1, v1)]
+    assert out["blocks"][0]["labels"] == [p0, p1], "rows of one measure are labelled by their dates"
+    assert G.check([{"type": "chart", "kind": "line", "fact": f"{s['id']}@{p0}"}], led).error == "kind_does_not_fit"
