@@ -777,8 +777,8 @@ accepted      runs filled with the facts' model form + display; a prose digit
 | places a new kind of truth is taught | 6 | 2 (an adapter branch, a renderer case) |
 | encodings of one figure to the model | 2 | 1 |
 | offline tests | 1,832 | 1,994 |
-| battery: verified figures / refusals / turns lost / so_what | 325 / 14 / 2 / 10 | (measured, F.2) |
-| `unsourced_figure` per 31 turns | — | (measured, F.4) |
+| battery: rubric total (84) / turns lost / tool calls / so_what / grounded / follows_on | 51 / 2 / 237 / 10 / 13 / 12 | **63 / 0 / 188 / 10 / 19 / 16** (docs/spikes/V24_COVERAGE.md §1) |
+| `unsourced_figure` per 31 turns | — | 3 (each fixed by a compute call on the retry); `pointer_written_as_text` 13 |
 | §7 replay: refused responds that would now resolve | — | (measured, F) |
 
 ## §13 Risks named

@@ -97,25 +97,25 @@
 | **发起** | `start(kind, subject, reason)` | readiness / research / exposure_run 三合一,立即返回 id |
 | **反思/门** | `think` · `respond` · `submit_brief` | 不变 |
 
+**V24**:每个工具结果 = `{...note, facts: {columns, rows}, held_back?}`——note 是载荷中每个数字被其 fact id 替换后的结构,facts 一行一事实(id、kind、subject、measure、unit、value、as_of、window、params、sources);`respond` 的块只有 paragraph / table / chart,指针是 `{fact: id}`。
+
 预算:每 turn 15 个单位,**V23 起按 assistant 消息计**(同一消息内多次调用一个单位;REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
 
 研究面 = READ_CORE 23 + `search_external_research` + `submit_brief`。V19 前 `search_external_research` 只在研究面,chat 里"帮我搜一下"没有工具可走,而"本面不能联网"那句能力声明只随 `describe_run` 返回、发行人问题从未读到。
 
-## 7. 门(`respond` / `submit_brief` 的解析链,V15)——可追溯是怎么被执行的
+## 7. 门(`respond` / `submit_brief`,V24)——核的是指得对不对,不是数据对不对
 
-**桌面**(`services/table.py`)是唯一的对象:每轮工具声明的并集,同时是上下文载荷、门的全集、审计记录。出口只能写桌面上的名字,门只做查找。
+**账本**(`services/ledger.py`)是唯一的对象:本会话每次工具调用记录在步骤上的 Fact(`agent_steps.evidence_refs` 的 `{facts: [...]}`),同一事务写入 `facts` 表作索引。模型看到的 `facts` 块与门加载的是同一份记录,不重建。一个 Fact 在工具边界由 adapter 造一次(`services/fact_adapters.py`,不变量:note 里无数字、每条有 as_of 或 window、每个数字键有单位),随后原样传递。
 
-按顺序,全部**机械、封闭、无阈值、无按值反推**(`services/resolver.py`):
+出口只能写指针:`paragraph {runs: [str | {fact: id}], cites}` / `table {rows: [[id]]}` / `chart {kind, fact}`(`services/answer.py`)。门(`services/gate.py`)按顺序做三个**查表**:
 
-1. **形状**:`RESPOND_SCHEMA`(oneOf 六种论断:paragraph / metric_table / chart / trend / absence / action)在关口拒绝一切非文法形状;槽只有 `{ref, name}`;文本 `\d` 为空,豁免类封闭且短(日期、年份、表单号、期间标签、法规引证、附着型号、窗口标签),id 写进正文按整个 token 拒。**V19:`metric_table` 的格子只能是槽,没有 `columns`**——表头与行标签在渲染时由槽的名字派生(`answer_blocks.derive_table`:一列的名字逐 token 对齐时,公共 token 是表头、变化 token 是行标签;对不齐则每格写全名),`trend` 块附带序列自己的首末点与**算出来的**方向。门本身零新增(9/1 契约)
-2. **来源**:每个 ref ∈ 本 session 桌面(`not_on_table`)
-3. **名字**:每个槽的 name ∈ 该 ref 持有的量(`unknown_name`,拒绝信列出该 ref 的全部名字)
-4. **引号逐字**:引号内 ≥4 词 ∈ 该块 `cites` 指向的原文
-5. **断言行类型**:trend/chart → 序列行;absence → 缺席行;action → 本轮任务
+1. **G1 在账本上**:每个 id ∈ 本会话账本(`not_on_ledger`)
+2. **G2 排版容得下**:格子=独立标量、图=序列、`standalone:false` 不可单独站(`kind_does_not_fit` / `not_standalone`);`cites` 可为本段依据的任何事实
+3. **G3 正文可对账**:每个数字 token 解析到等值事实(唯一或多条)、事实的身份字段(as_of 与年份、period、window、params 如置信度、measure 里的数字)、所引段落、或用户本轮问题;否则 `unsourced_figure`(算 / 引 / 删)。另:`pointer_written_as_text`、`id_in_prose`、`name_in_prose`、`unverified_quote`(引号 ≥4 词逐字在所引段落)
 
-`not_alone`(共线单系数)不在门里判:它们**不上桌**(`table._place`),模型看不见就写不出。四个出口(`respond`、`submit_brief`)调同一个 `resolver.resolve`;日报门保留 v1 散文路径(`numeric_verification.verify`,证据集由服务端装配)。
+零豁免类;门里唯一的正则找 token(在 answer.py),不判。`accepted()` 把指针填成事实(含 display 与身份)、把解析到的正文数字切成链接片段;`verified` 记门当时所见。日报门保留 v1(`numeric_verification`,引号核验从 gate 导入)。
 
-被整体删除的:按值解析(`_COMPATIBLE`、半 ulp 匹配槽、`held_instead_by`)、`_DERIVATIONS` 出路搜索、20 条豁免正则、26 个运行时形状码、`trajectory_gate`(R1 进 rubric,R2 由 action 谓词取代)、id 形状收割器与 `collect_trail`。
+被整体删除的(V24):`quantities` 的门角色、`table.py`(声明→切片→砍范围)、`resolver.py`、`answer_blocks.py`(六种块、九类数字豁免、槽 `{ref, name}`)、`prose_critic.py`、`Tool.evidence` 声明。留下的 `quantities.py` 只为 run 子表命名(compute 的 `ref:name` 操作数、read_book 按名读);compute 的操作数也接受 `f_` id。
 
 ## 8. Agent 层
 
@@ -169,3 +169,4 @@
 ## 12. 版本弧(每批一句)
 
 V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集 → **V21 五条残余逐条关**:批次止于首次拒绝(十次同名错调用只花一次)、`get_drawdown` 四行(减法进工具)、股数按拆股结转到 run 日(`stock_splits`)、历史 run 重拟合到七因子的脚本(dry-run 28 个,apply 待放行)、门外 critic 离线席位(段落标签的判断在门外)。 → **V22 组合量进代数**:`ref:name` 具名操作数 + `Typed.base` 轴(两本 book 不相加、book 与申报不相加、份额不乘别人的钱),`get_portfolio_analysis` 行自述类型成为代数之上的面板(parity 活库 20/20),一个情景原语 `hypothetical_book`(卖出后的 book 是一条 run 形状的行;电池 C01#t3 那问的答案是"更紧":告警 2→4)。 → **V23 目录、一个 compute、skill 三种条目**:工具按数据域×动词 44→10 一次切;`describe(subject)` 一个跨域目录带三种“缺”;46 条方法进 `analytics/skill.py`(每条 authority + fails_when)由 compute 执行,17 条读法、13 条分析程序作为数据随 describe 到达;提示词缩到契约;预算按消息计。
+- **V24**(2026-09-05):事实自带身份——Fact 在工具边界造一次(adapter),账本 + facts 表双写,三种块、三查表的门(零数字豁免,正文数字按账本对账否则拒),critic 与起名器的门角色删除;前端事实芯片与链接;live 三轮四问后 compute 接受 `f_` 操作数、情景可链式。

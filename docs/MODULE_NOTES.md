@@ -1000,3 +1000,32 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 
 `test_v23_catalogue_and_compute`(面的精确成员与顺序、13 个旧方法工具不在面上且都是登记表方法、描述面上限、research compute 的 kinds、每条方法有 authority/fails_when、公式 ⊆ 方法、executor 对称、构造期拒绝、零阈值扩展到方法与读法、读法与程序的 subject、电池 13 角度各有程序、near-name、compute 的 op/method 互斥与参数校验与 subject 展开、目录的 subject 判定、not_held 对概念图、cannot 对登记表、三种缺一种格式、方法与程序按 kind 列出、pattern×labels 折叠、预算按消息、read_book 的四种 ref 与 sections、instant/flow 由事实判定)。既有测试按新名改口(见 topic 日志)。
 
+
+## M26 — 事实自带身份:Fact、账本、三查表的门(V24,2026-09-05)
+
+**一句话**:boss 定架构为四步——调用 → 返回(结果 + 自带身份的材料)→ 模型只写论证与指针 → 门核"指得对不对"。一个数字的身份在工具边界**造一次**(adapter),随后原样传递:给模型、上步骤、进 facts 表、过门、到读者;任何地方都不再从存储反推。V15–V23 的门路径(`quantities` 起名器 + `table` 切片 + `resolver` + `answer_blocks` 九类数字豁免 + `prose_critic`)被整体移除;`quantities.py` 只剩数据角色(run 子表的命名,供 compute 的 `ref:name` 操作数与 read_book 按名读)。
+
+### 形状
+
+- **Fact**(`services/facts.py`):`{id f_…, kind scalar|series|passage|absence|task, subject, measure, unit, value|points|text, as_of, window, params, standalone, sources, group}`。两种序列化:**记录形**(完整,进 `agent_steps.evidence_refs` 的 `{facts: [...]}` 条目与 `facts` 表)与**模型形**(列声明一次、一行一事实、值按读者精度、序列内联 60 点、段落 12k 字符;全结果同源时 `sources` 提到块上)。上限由 Phase 0 实测定:`FACTS_CHAR_LIMIT` 24k(book.analysis 146 条整份可见)、`FACTS_PER_RESULT` 200,超出整条 `held_back` 并说按名读的调用,从不切半条。
+- **Adapter**(`services/fact_adapters.py`):每工具一个 `(args, result) → (facts, note)`,共用一个 walker 识别五种载荷形状(absence 行、series、typed figure、带标签的行表、裸数字叶),按工具给上下文(subject/as_of/source/group/run 表名)。**note = 载荷中每个数字被其 fact id 替换后的结构**,模型读结构在 note、读值在 facts,各一次。三条不变量由 47 份活库夹具钉死:I1 note 里无数字(拒绝性载荷的 `params_schema`/`problems` 等原样透传,不算数字);I2 每条 Fact 有 as_of 或 window(task 除外);I3 每个数字键有声明单位,否则 `UnknownUnit`——live 时是工具自己的结构化错误 `fact_adapter_error`,不是裸数。第一轮跑夹具时找出 8 处"服务知道却没说"的身份缺口,全部在服务里补(flow/series/资产负债表每项带 unit_class、公式带 periods、window_return 带 window/as_of、rank 逐条带 as_of、目录带 catalogue_as_of、read_book 按名返回值本身)。
+- **账本**(`services/ledger.py`)与 **facts 表**(`v24_facts.sql`,租户策略同 agent_steps):同一事务双写,步骤是"这次调用给模型看了什么"的记录、表是索引(抽屉、brief、跨会话按 `f_` 解析)。`Ledger.load` 只读步骤 JSON——不回库、不起名、不砍范围——并建三个索引:`by_id`(G1/G2)、按值(精确 / 书写精度 / 三档货币缩放 / 显示串)、身份 token(as_of 与年份、序列点 period、window 值、params 值及其百分比形、measure 名里的数字串)、段落文本(千分位归一)。
+- **文法**(`services/answer.py`):三种块 `paragraph {runs: [str | {fact: id}], cites}` / `table {rows: [[id]]}` / `chart {kind, fact}`。trend/absence/action 不再是块,是段落指向对应 kind 的事实;表头与行标签由事实的 measure/subject 派生。唯一的正则是 token finder(id / 日期 / 表单名 / 数字含缩放词),只找不判。渲染时每个指针填入事实(含 display、序列摘要、段落文本),正文里被门解析到的数字切成 `{link: {to, ids, as_written}}` 片段。
+- **门**(`services/gate.py`)三个查表:**G1** 每个 id 在本会话账本;**G2** 排版容得下 kind(格子=独立标量、图=序列、`standalone:false` 不可单独站;`cites` 可为本段依据的任何事实——live 第一轮 11 拒 8 是模型把用的标量列在 cites);**G3** 正文每个数字 token 解析到:等值的事实(唯一或多条都链)、事实的身份字段、所引段落、或**用户本轮问题里的数字**(`+100bp`),否则 `unsourced_figure`,拒绝信给三条路(算 / 引 / 删);另有 `pointer_written_as_text`(`{fact:f_…}` 写进字符串——V23-R 槽序列化的再现,只报这一条不报里面的 id)、`id_in_prose`、`name_in_prose`(复合 measure 名入文)、`unverified_quote`(V5 原样)。八个拒绝名,零豁免类;门里编译的正则只有空白与引号。`accepted()` 返回填好的块、正文、引用(所用全部事实)、`verified`。
+- **模型侧**:工具结果 = `{...note, facts: {columns, rows}, held_back?}`;`_SYSTEM` 说契约(指针、心算无 id → compute、缺席指 absence 事实);`respond`/`submit_brief` 描述同步;MCP `INSTRUCTIONS` 同步。**compute 的操作数接受 `f_` id**(模型 live 第一直觉),按 Fact 的单位/日期/主体/base 变成类型化操作数。
+- **前端**:`FactChip`(悬停显身份、点开抽屉的 `fact_record` 卡,卡上"rests on"钻到来源行)、`LinkText`(单事实直开;多事实 chooser 列各自身份)、表由事实派生;旧块类型保留只读渲染。`ID_BODY` 认 `f_`。
+
+### 有意不做
+
+- 不迁移旧会话的声明:账本忽略非 Fact 条目,跨切换的会话第一轮重读;迁移就是让起名器再跑最后一次。
+- 不给正文数字做任何"豁免类":日期是 as_of、窗口是 window、置信度是 params、表单名在段落——都是字段查表;"95% 1日 VaR"(中文)因此不再漏。
+- 不在门里判断句子说的对不对(critic 删除):身份随事实显示,读者自己看。live 第二轮 trim 的错路线(MV ÷ breach)每个数字身份都在,门不拦。
+- 日报路径(`report_verification` / `numeric_verification`)仍是 V3 老门,只把引号核验改从 gate 导入;记录为范围外。
+
+### 实证(2026-09-05,活库)
+
+Phase 0:229 条已接受块答案 347 个正文数字 token 在 G3 下重放——254 靠身份字段、60 是 id、16 是值、17 未解析且**没有一个需要词法豁免**(8 个日期是相关行未纳入的字段,7 个窗口参数,2 个置信度);200 次被拒 respond 的数字里 ~90% 有源可链,链不上的只有心算。live 三轮四问后的残余与修复见 IMPLEMENTATION_PLAN_V24 §8 F。
+
+### 守卫
+
+`test_fact_adapters`(47 夹具 × I1/I2/单位/id 与 note 对应/模型形往返/上限)、`test_ledger` + `test_ledger_live`(步骤与表一致、抽屉解析、`f_` 操作数、情景链式)、`test_answer_grammar`、`test_gate`(每个拒绝名一例、§7 每类一例、中文置信度、问题数字、cites 任意事实、指针入串)、`test_tool_registry`(wrapper 的事实记录、adapter 错误是结构化错误、超上限 held_back、每个面上的工具都有 adapter)、`test_submit_gate`、`test_one_resolver`(两个出口同一个门;registry 不再建表)。
