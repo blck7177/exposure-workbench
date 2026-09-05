@@ -13,6 +13,8 @@ every name the run actually holds.
 
 from __future__ import annotations
 
+import inspect
+
 import os
 
 import pytest
@@ -93,7 +95,7 @@ def test_every_resource_column_has_a_display_name_and_a_unit():
 def test_describe_run_and_read_quantities_are_meta_only():
     """They answer questions about THIS DESK's book; the research face is
     issuer-scoped by construction (faces.py)."""
-    for name in ("describe_run", "read_quantities"):
+    for name in ("read_book",):
         assert name in faces.FACE_META_AGENT
         assert name not in faces.FACE_RESEARCH
 
@@ -112,8 +114,9 @@ def test_the_groups_live_in_resources_and_definitions_only_reads_them():
     """V16 moved RUN_GROUPS to the data layer: the manifest describe_run builds
     and the group each quantity carries on the table come from the one table,
     so they cannot drift."""
-    assert definitions._RUN_GROUPS is resources.RUN_GROUPS
-    assert definitions._matches is resources.matches
+    from exposure_workbench.services import catalogue_service
+    src = inspect.getsource(catalogue_service._book_names)
+    assert "resources.RUN_GROUPS" in src and "resources.matches" in src
 
 
 def test_the_group_vocabulary_is_closed_and_every_key_answers_a_question():

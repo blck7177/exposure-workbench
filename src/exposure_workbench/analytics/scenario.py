@@ -119,3 +119,65 @@ def without(holdings: list[Holding], sales: list[Sale]) -> ScenarioBook | dict:
         holdings=remaining, weights=weights, sectors=sectors,
         market_value=total, proceeds=proceeds, sold=sold,
     )
+
+
+@dataclass(frozen=True)
+class Buy:
+    ticker: str
+    weight: float                # target share of the book AFTER the purchase, in (0, 1)
+    sector: str | None = None
+
+
+def with_buys(holdings: list[Holding], buys: list[Buy]) -> ScenarioBook | dict:
+    """The book after adding names at target weights of the NEW book (V23).
+
+    Money comes from outside: the added market value is what makes each new
+    name its target share of the enlarged book, mv_added_i = w_i × mv_old ÷
+    (1 − Σ w). Every existing weight scales down by (1 − Σ w). Refused: a
+    weight outside (0, 1), targets summing to one or more, a name already
+    held (its weight is changed by selling or by buying more of it, which is a
+    different arithmetic — say so rather than guess), a name bought twice, an
+    unpriced holding.
+    """
+    held = {h.ticker: h for h in holdings}
+    seen: set[str] = set()
+    total_w = 0.0
+    for b in buys:
+        if b.ticker in seen:
+            return _err("duplicate_buy", f"{b.ticker} is bought twice; state one target weight per name")
+        seen.add(b.ticker)
+        if b.ticker in held:
+            return _err("already_held",
+                        f"{b.ticker} is already a position of this book at its own weight; a "
+                        f"scenario adds names the book does not hold")
+        if not (0.0 < b.weight < 1.0):
+            return _err("bad_weight", f"{b.ticker}: target weight {b.weight!r} is not in (0, 1)")
+        total_w += b.weight
+    if total_w >= 1.0:
+        return _err("bad_weight", f"the target weights sum to {total_w:.4f}; the new names "
+                                  f"cannot be the whole book")
+    if any(h.market_value is None for h in holdings):
+        unpriced = sorted(h.ticker for h in holdings if h.market_value is None)
+        return _err("unpriced_holding",
+                    f"{', '.join(unpriced)} carry no market value on this run, so no weight "
+                    f"after a purchase can be computed")
+    mv_old = sum(float(h.market_value) for h in holdings)
+    if mv_old <= 0.0:
+        return _err("empty_book", "the book has no market value to scale a purchase against")
+    added = [Holding(b.ticker, b.sector, b.weight * mv_old / (1.0 - total_w)) for b in buys]
+    remaining = list(holdings) + added
+    total = sum(float(h.market_value) for h in remaining)
+    weights = {h.ticker: float(h.market_value) / total for h in remaining}
+    sectors: dict[str, dict] = {}
+    for h in remaining:
+        key = h.sector or "Unknown"
+        row = sectors.setdefault(key, {"market_value": 0.0, "weight": 0.0})
+        row["market_value"] += float(h.market_value)
+    for row in sectors.values():
+        row["weight"] = row["market_value"] / total
+    return ScenarioBook(
+        holdings=remaining, weights=weights, sectors=sectors,
+        market_value=total, proceeds=-sum(float(h.market_value) for h in added),
+        sold=[],
+    )
+

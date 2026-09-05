@@ -975,3 +975,28 @@ V15 初稿的三个方案(按值重指 / 按值反推补算 / 规范量归并)�
 
 `test_v22_book_algebra`(43):分隔符与名字文法、run 量的类型/base/日期/entity、未知名/共线/未知行拒绝、七条 base 规则、减到限额两步、卖出后权重两步、跨 run 相加拒相减允、按权重排序带名次、权重与市值非一种度量、parity 两条、分析行自述类型、分析距离作操作数、卖出算术(重归一化/行业/部分卖出/恰好落线)与五种拒绝、情景行的名字单位分组、写者 ⊆ 声明、情景权重作操作数且 base 是情景、工具在 meta 面/schema 边界/描述含文法、`book_derived` 组、排序行带 base。`test_symmetry` 学会新组键,并抓出 `_from_scenario` 初稿自己拼列名。
 
+
+## M25 — 目录、一个 compute、skill 三种条目、工具按数据域(V23,2026-09-05)
+
+**一句话**:boss 定分工——目录先做对,"看什么比什么说什么"交给 agent + skill;工具按**数据域 × 动词**正交,44 → 10 一次切;预算按消息计,现阶段功能优先于预算。
+
+### 形状
+
+- **skill 登记表**(`analytics/skill.py`):三种条目全是数据。**方法** `Method(name, subject_kind, family, describes, procedure, authority, fails_when, executor, params_schema, unit_class, yields)`——32 条公式由 formulas.py 生成(不复制)+ `issuer.panel` + 价格 7 条(volatility/beta/momentum_12_1/distance_from_52w_high/adv/drawdown/window_return,原 `_TOOL_SPECS` 的九个工具,每条补了 authority 与 fails_when)+ book 6 条(analysis/reconcile/drawdown_episodes/explain_episode/sell/**buy**,`_RISK_SENSE` 的方向知识写进 analysis 的 procedure);构造期拒绝无 authority、无 fails_when、未知 executor、未知 subject_kind。**读法** `Reading(method, compare_within, reads, meaningless_when, authority)` 17 条,不带典型区间(决定 1 未答),不进任何计算。**分析程序** `Procedure(name, question, subject_kind, gather, compute, compare, close, absent, authority)` 13 条,按电池的 13 个角度写,agent 可照做可不照做。
+- **compute**(`services/compute_service.py`):唯一算入口、账本唯一写口。`op` 走 typed_calculator / series_service / price regress(操作数可为 `ref:name`);`method` 查登记表、按方法自己的 `params_schema` 校验、按 `executor` 分发到原服务;`method` 与 `subject` 都接受列表(十家一次调用)。只新增两种拒绝:`unknown_method`(带近似名)与 `invalid_params`。R1–R3、单位、base 规则、观测下限、情景五拒全在执行器里原样运行。`executors_dispatched()` 与 `skill.EXECUTORS` 对称测试。research 面的 compute 用 `ISSUER_KINDS` 构造,book 方法回 `not_on_this_face`。
+- **describe(subject)**(`services/catalogue_service.py`):subject = ticker | port_ | run_ | calc_(情景)| 空(桌子),一种格式。默认层=各域的存在性/计数/日期范围 + 三种"缺"(`not_reported` 走 absence 行;`not_held` 五种维度类数字并指向 read_filings,测试钉住概念图无维度轴;`cannot` 派生自登记表的 subject kinds)+ 适用方法与程序的**名字**;`expand=fundamentals|methods|procedures|book|filings|readings` 展开一域。run/情景的名字沿用 V15 的 pattern × labels 折叠。活库实测:MSFT 5.2k、port_001 2.8k、run 7.0k、KO 4.8k,桌子瘦身后见 V23_COVERAGE,上限 8k。
+- **十个工具**(`tools/definitions.py`、`faces.py`):describe / read_fundamentals(无 metric=整张资产负债表;metric 的 instant/flow 由事实的 period_start 判定,不查名单)/ read_filings(query 或 item)/ read_prices(window 或单日)/ read_book(run 与情景按名字;portfolio 的 positions/limits/alerts/freshness/runs;ticker 的 brief/alerts;task 状态)/ compute / think + start(readiness/research/exposure_run 三合一)/ search_web / respond;research 面 = 前六 + search_web + submit_brief。证据声明每工具一条按域派生。描述面 31,003 → 约 11.4k(respond 的块文法与 compute 的 op 清单占大头;计划的 6k 未达,如实登记)。
+- **提示词**缩到契约:`_SYSTEM` 不再列"何时用哪个",只说 describe 先看、每个数字来自工具、缺席要说出原因与种类、finish with respond。
+- **预算按消息**:`agent_sessions.charged_message_id`(init.sql / models / `v23_budget_per_message.sql`,活库已加列);`reserve(message_id=…)` 同一消息内第二次起不计 turn 额度(lifetime `tools_used` 与外搜池照计);无 message_id 的调用(MCP 外部宿主)仍按调用计。
+
+### 有意不做
+
+- 不给裸计算器:compute 的每条路都经类型化拒绝。
+- 读法不带"典型区间"(决定 1 待答);comparison 块不做(决定 4 待答)。
+- `_TOOL_SPECS` 删除而非保留:两份来源就是漂移的开始。
+- 旧工具名不做别名:一次切,电池兜底。
+
+### 守卫
+
+`test_v23_catalogue_and_compute`(面的精确成员与顺序、13 个旧方法工具不在面上且都是登记表方法、描述面上限、research compute 的 kinds、每条方法有 authority/fails_when、公式 ⊆ 方法、executor 对称、构造期拒绝、零阈值扩展到方法与读法、读法与程序的 subject、电池 13 角度各有程序、near-name、compute 的 op/method 互斥与参数校验与 subject 展开、目录的 subject 判定、not_held 对概念图、cannot 对登记表、三种缺一种格式、方法与程序按 kind 列出、pattern×labels 折叠、预算按消息、read_book 的四种 ref 与 sections、instant/flow 由事实判定)。既有测试按新名改口(见 topic 日志)。
+

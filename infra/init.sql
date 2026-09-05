@@ -642,7 +642,10 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     -- research spends 25-32 calls in one session and never claims a turn, so a
     -- per-turn counter would never be zeroed for it.
     turn_tools_used   INTEGER NOT NULL DEFAULT 0,
-    turn_tool_budget  INTEGER
+    turn_tool_budget  INTEGER,
+    -- V23: the turn budget is charged per assistant MESSAGE; the last message
+    -- charged is carried here so calls inside one message cost one unit.
+    charged_message_id VARCHAR(64)
 );
 
 -- ─── Runtime: Agent Messages ─────────────────────────────────────────────────

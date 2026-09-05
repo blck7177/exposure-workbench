@@ -63,7 +63,7 @@ async def _run_or_error(db: AsyncSession, run_id: str) -> ExposureRun | dict:
         # indistinguishable from one that never existed, and saying so plainly
         # is better than a bare miss the model retries.
         return {"error": "unknown_run", "run_id": run_id,
-                "detail": "no run with this id is visible to you; call get_portfolio_snapshot "
+                "detail": "no run with this id is visible to you; call describe() "
                           "for the runs on your own books"}
     return row
 

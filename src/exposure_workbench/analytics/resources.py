@@ -255,7 +255,7 @@ _DECLARED_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("limit_checks.*.current_value", "limit_checks.*.warning_level", "limit_checks.*.breach_level",
       "portfolio.integration.room_to_warning.*", "portfolio.integration.room_to_breach.*",
       "risk_alerts.*.current_value", "risk_alerts.*.limit_value", "risk_alerts.*.utilization")),
-    ("stress", "what each scenario would cost, ranked by get_portfolio_analysis",
+    ("stress", "what each scenario would cost, ranked by compute(method='book.analysis')",
      ("stress_results.*.loss_pct", "stress_results.*.loss_usd",
       "exposure_metrics.stress_loss_market", "exposure_metrics.stress_loss_rates",
       "exposure_metrics.stress_loss_credit", "exposure_metrics.stress_loss_tech")),

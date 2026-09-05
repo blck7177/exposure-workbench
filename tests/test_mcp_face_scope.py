@@ -29,8 +29,8 @@ from exposure_workbench.tools.registries import build_research_registry
 from tests.mcp_mount import RecordingDb, connected, mounted, use_secret
 
 FACE = faces.FACE_NAME_RESEARCH
-SKIPPED = "search_external_research"          # what skip_external_research removes
-META_ONLY = "read_issuer_brief"               # registered, and outside this face
+SKIPPED = "search_web"          # what skip_external_research removes
+META_ONLY = "read_book"               # registered, and outside this face
 
 
 @pytest.fixture(autouse=True)
@@ -110,8 +110,8 @@ async def test_a_deny_naming_a_tool_this_mount_never_offered_is_a_no_op():
 
 @pytest.mark.parametrize("deny", [
     (META_ONLY,),
-    ("get_portfolio_snapshot", "get_task_status"),
-    ("respond", "start_issuer_research"),
+    ("read_book", "respond"),
+    ("respond", "start"),
     ("no_such_tool_anywhere",),
     tuple(faces.FACE_META_AGENT),
 ], ids=["a registered tool outside the face", "two of them", "tools of the other face",

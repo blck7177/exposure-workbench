@@ -90,7 +90,7 @@ async def _facts_unit(db: AsyncSession, fact_ids, ticker: str, metric: str) -> s
 
 def _unknown_metric(metric: str) -> dict:
     return {"error": "unknown_metric", "metric": metric,
-            "detail": f"{metric} is not a normalised metric; describe_issuer lists them"}
+            "detail": f"{metric} is not a normalised metric; describe lists them"}
 
 
 async def _metric_absence(db: AsyncSession, error: str, kind: str, ticker: str, metric: str,
@@ -169,7 +169,7 @@ async def get_flow(
             why=f"This desk holds no {metric} for {ticker} over any period.",
             invoked_by=invoked_by,
             detail=f"{ticker} reports no {metric} with a period; it may report "
-                   f"a related line instead — call describe_issuer")
+                   f"a related line instead — call describe")
 
     if last_n is not None and last_n > 1:
         if start or end:
@@ -359,7 +359,7 @@ async def get_balance_series(
             why=f"This desk holds no {metric} for {ticker} as a balance at any date.",
             invoked_by=invoked_by,
             detail=f"{ticker} reports no {metric} as a balance; it may be a flow — "
-                   f"call get_flow, or describe_issuer to see which it is")
+                   f"call read_fundamentals, or describe to see which it is")
     best: dict[date, tuple] = {}
     for pe, value, fid, acc, fd in rows:
         prev = best.get(pe)

@@ -107,7 +107,7 @@ def test_last_n_has_a_floor():
     """0 asked for none and got all forty; -20 on a twelve-point series returned
     an empty series with a citable id. Inherited from get_fact_series, and kept."""
     reg = build_meta_registry()
-    for name in ("get_flow", "get_balance_series"):
+    for name in ("read_fundamentals",):
         ln = reg.tools[name].json_schema["properties"]["last_n"]
         assert ln["minimum"] == 1 and ln["maximum"] == 40, name
 
@@ -117,28 +117,32 @@ def test_series_stat_is_the_union_of_both_old_operators_and_nothing_else():
     an op that neither old tool had would be new capability, which this batch
     does not add."""
     assert set(ss.OPS) == set(so.CHANGE_MODES) | set(so.STAT_OPS)
+    from exposure_workbench.services import compute_service
+    assert set(compute_service.SERIES_OPS) == set(ss.OPS)
     reg = build_meta_registry()
-    assert set(reg.tools["series_stat"].json_schema["properties"]["op"]["enum"]) == set(ss.OPS)
+    assert set(ss.OPS) <= set(reg.tools["compute"].json_schema["properties"]["op"]["enum"])
 
 
 def test_series_stat_takes_an_id_not_a_fetch_spec():
     """The whole point. compute_change took (ticker, metric, period_type,
     last_n, mode): the fetch and the operator in one breath, re-spelled on
     every operator. series_stat takes what the fetch produced."""
-    props = set(build_meta_registry().tools["series_stat"].json_schema["properties"])
-    assert props == {"series_id", "op"}
+    props = set(build_meta_registry().tools["compute"].json_schema["properties"])
+    assert "operands" in props and "op" in props
+    assert not ({"ticker", "metric", "period_type", "series_id"} & props)
 
 
 def test_the_new_tools_are_on_both_faces():
     meta = set(faces.resolve(build_meta_registry(), faces.FACE_META_AGENT))
     research = set(faces.resolve(build_research_registry(), faces.FACE_RESEARCH))
-    for name in ("get_balance_series", "series_stat", "describe_issuer"):
+    for name in ("read_fundamentals", "compute", "describe"):
         assert name in meta and name in research, name
 
 
 def test_describe_issuer_names_the_missing_input_not_a_hole():
-    src = inspect.getsource(build_meta_registry().tools["describe_issuer"].fn)
-    assert '"computable"' in src and '"missing_inputs"' in src
+    from exposure_workbench.services import catalogue_service
+    src = inspect.getsource(catalogue_service._fundamentals)
+    assert '"methods_computable"' in src and '"methods_not_computable"' in src and "missing" in src
 
 
 # ── the calculator over series ───────────────────────────────────────────────
@@ -164,4 +168,4 @@ def test_alignment_tolerance_is_the_engines_not_a_new_number():
 
 def test_an_untyped_series_is_refused_with_the_tool_that_makes_a_typed_one():
     out = tc._resolve_series("calc_old", "series", {}, [{"end": "2025-01-01", "value": 1.0}])
-    assert out["error"] == "untyped_operand" and "get_flow" in out["detail"]
+    assert out["error"] == "untyped_operand" and "read_fundamentals" in out["detail"]

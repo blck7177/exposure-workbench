@@ -167,14 +167,12 @@ def register_search_tool(reg: ToolRegistry) -> ToolRegistry:
     (V19), so the meta face and the research face carry the same tool with the
     same budget key and the same evidence declaration."""
     reg.register(Tool(
-        name="search_external_research",
+        name="search_web",
         display="Searching the web for “{query}”",
         description=(
-            "Search the web for what the filings cannot hold: news, guidance, an event "
-            "after the last report, industry or regulatory developments — and anything the "
-            "user asks you to look up. Each result is a src_ id on the table; a sentence "
-            "resting on one names it in the block's cites. reason states why the filed "
-            "evidence is insufficient."
+            "Search the web about an issuer for what the filings cannot hold: news, guidance, "
+            "an event after the last report — and anything the user asks you to look up. Each "
+            "result is a src_ id on the table; a sentence resting on one names it in cites."
         ),
         json_schema={"type": "object", "properties": {
             "ticker": {"type": "string"},

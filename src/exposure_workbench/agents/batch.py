@@ -91,6 +91,21 @@ def is_pool_empty(result: Any) -> bool:
             and result.get("kind") in _EVIDENCE_POOLS)
 
 
+def holds(refusal: dict, args: dict) -> bool:
+    """Whether a refusal holds a later call to the same tool.
+
+    V23 (the V21 §7 residual, met on the first live turn): a refusal that
+    names the ARGUMENT it is about — `held_on: {"metric": "capital_expenditures"}`
+    — holds only later calls that repeat that value; a call for another
+    metric is a different question and goes out. A refusal that names no
+    argument is about the call itself and holds by tool, as V21 did.
+    """
+    on = refusal.get("held_on")
+    if not isinstance(on, dict) or not on:
+        return True
+    return all(args.get(k) == v for k, v in on.items())
+
+
 def parse_args(tc: dict) -> dict:
     try:
         return json.loads(tc["function"]["arguments"] or "{}")
@@ -141,24 +156,25 @@ async def dispatch(
     reaches the wrapper, and a turn whose steps were fewer than its calls with
     nothing saying why is the audit gap V7-Q2 was diagnosed through.
     """
-    refused: dict[str, dict] = {}
+    refused: dict[str, list[dict]] = {}
     pool_empty: dict | None = None
     out: list[tuple[dict, dict, dict]] = []
     for tc in tool_calls:
         name = tc["function"]["name"]
         args = parse_args(tc)
+        behind = next((r for r in refused.get(name, ()) if holds(r, args)), None)
         if name in free:
             result = await tools_session.call(name, args)
         elif pool_empty is not None:
             result = _held_behind_budget(name, pool_empty)
-        elif name in refused:
-            result = _held_behind_refusal(name, refused[name])
+        elif behind is not None:
+            result = _held_behind_refusal(name, behind)
         else:
             result = await tools_session.call(name, args)
             if is_pool_empty(result):
                 pool_empty = result
             elif is_call_refusal(result):
-                refused[name] = result
+                refused.setdefault(name, []).append(result)
         if result.get("error") == NOT_ATTEMPTED and record is not None:
             try:
                 await record(name, args, result)

@@ -778,6 +778,12 @@ class AgentSession(Base):
     # never claims a turn, so nothing would ever zero a per-turn counter for it.
     turn_tools_used: Mapped[int] = mapped_column(Integer, default=0)
     turn_tool_budget: Mapped[int | None] = mapped_column(Integer)
+    # V23: the turn budget is charged PER ASSISTANT MESSAGE, not per call. The
+    # last message charged is carried by the row, so a second call inside the
+    # same message costs nothing and a call in the next message costs one.
+    # Boss's decision 2026-09-05: the budget's unit had been shaping the tools
+    # (a method per tool so a call is one unit); the unit is now the message.
+    charged_message_id: Mapped[str | None] = mapped_column(String(64))
 
 
 # ─── Runtime: Agent Messages ────────────────────────────────────────────────────

@@ -239,51 +239,41 @@ RESPOND_SCHEMA = {"type": "object", "properties": {
 
 # ── registration ────────────────────────────────────────────────────────────────
 
+_START_KINDS = ("readiness", "research", "exposure_run")
+
+
+async def _start(db: AsyncSession, kind: str, subject: str, reason: str,
+                 as_of_date: str | None = None) -> dict:
+    """One delegation tool (V23): readiness for an issuer, a research run for an
+    issuer, an exposure run for a portfolio. Each returns an id immediately and
+    the work runs in the background; read_book(id, ['state']) follows it."""
+    if kind == "readiness":
+        return await _ensure_company_ready(db, subject, reason)
+    if kind == "research":
+        return await _start_issuer_research(db, subject, reason)
+    if kind == "exposure_run":
+        return await _start_exposure_run(db, subject, reason, as_of_date)
+    return {"error": "unknown_kind", "kind": kind, "known": list(_START_KINDS)}
+
+
 def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     reg.register(Tool(
-        name="ensure_company_ready",
-        display="Preparing {ticker}'s filings and prices",
+        name="start",
+        display="Starting {kind} for {subject}",
         description=(
-            "Enqueue a data-readiness pass for an issuer (ingest/index/price). Returns "
-            "immediately. Works for ANY listed SEC filer, not only issuers already on "
-            "the desk: a ticker with no filings or facts yet is prepared by this call, "
-            "and becomes readable a couple of minutes later. Refuses a symbol that is "
-            "not listed, an ETF, and a listing with no SEC CIK, each by name."
+            "Start background work and return its id at once: readiness (ingest, index and price an "
+            "issuer — any listed SEC filer, prepared in a couple of minutes), research (an Issuer Risk "
+            "Brief), exposure_run (a portfolio run, on the last completed session unless as_of_date). "
+            "Never blocks; tell the user it is being prepared."
         ),
         json_schema={"type": "object", "properties": {
-            "ticker": {"type": "string"},
-            "reason": {"type": "string", "description": "why readiness is needed now"},
-        }, "required": ["ticker", "reason"], "additionalProperties": False},
-        fn=_ensure_company_ready, tool_class=DELEGATION,
-        evidence=Evidence(tasks_from=("task_id",)),
-    ))
-    reg.register(Tool(
-        name="start_issuer_research",
-        display="Starting a research run on {ticker}",
-        description="Enqueue a full issuer research run (produces an Issuer Risk Brief). Returns a run id immediately.",
-        json_schema={"type": "object", "properties": {
-            "ticker": {"type": "string"},
-            "reason": {"type": "string"},
-        }, "required": ["ticker", "reason"], "additionalProperties": False},
-        fn=_start_issuer_research, tool_class=DELEGATION,
-        evidence=Evidence(tasks_from=("run_id",)),
-    ))
-    reg.register(Tool(
-        name="start_exposure_run",
-        display="Starting an exposure run",
-        description="Enqueue a portfolio exposure run. Returns a run id immediately.",
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-            # Nullable because the description tells the model to omit it, and
-            # a model that has decided not to use an optional argument says so
-            # with null about as often as by leaving it out.
-            "as_of_date": {"type": ["string", "null"], "description":
-                "YYYY-MM-DD. Omit unless the user asked for a specific date — "
-                "the server reports on the last completed session by default."},
-            "reason": {"type": "string"},
-        }, "required": ["portfolio_id", "reason"], "additionalProperties": False},
-        fn=_start_exposure_run, tool_class=DELEGATION,
-        evidence=Evidence(tasks_from=("run_id",)),
+            "kind": {"type": "string", "enum": list(_START_KINDS)},
+            "subject": {"type": "string", "description": "a ticker (readiness, research) or a port_… id (exposure_run)"},
+            "reason": {"type": "string", "description": "why this work is needed now"},
+            "as_of_date": {"type": ["string", "null"], "description": "YYYY-MM-DD; exposure_run only; omit unless asked"},
+        }, "required": ["kind", "subject", "reason"], "additionalProperties": False},
+        fn=_start, tool_class=DELEGATION,
+        evidence=Evidence(tasks_from=("task_id", "run_id")),
     ))
     reg.register(Tool(
         name="respond",

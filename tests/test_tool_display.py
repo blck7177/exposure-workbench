@@ -34,7 +34,7 @@ TOOLS = _all_tools()
 def test_there_are_tools_to_check():
     """The guard's own liveness. A registry that failed to build would make
     every test below pass over an empty dict."""
-    assert len(TOOLS) >= 30, f"only {len(TOOLS)} tools resolved — the registries did not build"
+    assert len(TOOLS) >= 10, f"only {len(TOOLS)} tools resolved — the registries did not build"
 
 
 @pytest.mark.parametrize("name", sorted(TOOLS))
@@ -93,9 +93,9 @@ def test_every_phrase_renders_from_a_call_that_satisfies_its_schema(name):
 
 
 def test_a_real_call_reads_as_a_sentence():
-    tool = TOOLS["evaluate_formula"]
-    assert render(tool.display, {"name": "total_debt", "ticker": "AAPL"},
-                  tool_name="evaluate_formula") == "Evaluating total debt for AAPL"
+    tool = TOOLS["read_fundamentals"]
+    assert render(tool.display, {"ticker": "AAPL", "metric": "total_debt"},
+                  tool_name="read_fundamentals") == "Reading AAPL's filed figures"
 
 
 @pytest.mark.parametrize("name", sorted(TOOLS))

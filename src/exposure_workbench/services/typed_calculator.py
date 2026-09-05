@@ -25,7 +25,7 @@ days between — a working-capital swing is exactly this — and the result is
 typed as a flow over that window, so it meets a filed flow under R1 when and
 only when they describe the same days. R2 is a rule about ADDING across time,
 as the list above says; refusing the subtraction as well sent the one question
-that needs it ("how much has it moved?") to get_balance_sheet, which reads one
+that needs it ("how much has it moved?") to read_fundamentals, which reads one
 instant and cannot produce a change. The point is not to narrow what may be
 analysed; it is that the one region where a wrong answer is indistinguishable
 from a right one stops being reachable.
@@ -173,6 +173,19 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
     if resolved.kind is None:
         return _err("unknown_operand", f"{rid} is not a row this desk holds")
     held = {q.label: q for q in resolved.quantities}
+    if name not in held:
+        import difflib
+        near = difflib.get_close_matches(name, list(held), n=5, cutoff=0.5)
+        return _err("unknown_name",
+                    f"{rid} holds no figure named {name!r}."
+                    + (f" Nearest names it holds: {', '.join(near)}." if near else "")
+                    + f" A run's names are listed by describe(run_id); an analysis or scenario "
+                      f"row's names are on its table.")
+    if resolved.kind == "series" and "@" in name:
+        # A point of a series row — `capex@2025-12-31` — as an operand: its own
+        # period, its row's issuer, no base. Live turn 3 wrote exactly this and
+        # was refused undated; a point is the most dated thing on the desk.
+        return await _resolve_point(db, rid, name, held[name], ref)
     if (rid.startswith("calc_") and name in held and resolved.kind == "scalar"
             and not name.startswith("portfolio.") and _is_single_valued(resolved)):
         # A named figure on a row that holds ONE figure is the row: the table
@@ -182,11 +195,7 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
         # the first V22 turn: `calc_…:issuer_concentration:MSFT.excess_weight`
         # was refused undated when the bare id carried the date.
         return await _resolve(db, rid)
-    q = held.get(name)
-    if q is None:
-        return _err("unknown_name",
-                    f"{rid} holds no figure named {name!r}. A run's names are listed by "
-                    f"describe_run; an analysis or scenario row's names are on its table.")
+    q = held[name]
     if q.not_alone is not None:
         return _err("not_alone", f"{name} may not be used on its own: {q.not_alone}")
     unit = _ALGEBRA_UNIT.get(q.unit_class)
@@ -200,6 +209,33 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
     quantity, entity = _parse_book_name(name)
     return Typed(value=float(q.value), unit_class=unit, instant=as_of, quantity=quantity,
                  source_id=ref, issuers=(entity,) if entity else (), base=base)
+
+
+async def _resolve_point(db: AsyncSession, rid: str, name: str, q, ref: str) -> Typed | dict:
+    """One dated point of a series row, typed from the row's recorded type."""
+    unit = _ALGEBRA_UNIT.get(q.unit_class)
+    if unit is None:
+        return _err("unknown_unit", f"{name} on {rid} is {q.unit_class}, which this desk cannot do algebra on")
+    row = (await db.execute(select(CalcLedger).where(CalcLedger.id == rid))).scalar_one_or_none()
+    params = (row.params or {}) if row is not None else {}
+    rt = params.get("result_type") or {}
+    period = name.rsplit("@", 1)[1]
+    try:
+        end = date.fromisoformat(period)
+    except ValueError:
+        return _err("undated_operand", f"{name}: the period {period!r} is not a date")
+    point = next((pt for pt in ((row.result or {}).get("points") or [])
+                  if str(pt.get(units.POINT_PERIOD_KEY) or pt.get("end") or pt.get("as_of")) == period), None)
+    start = (point or {}).get("start")
+    kind = rt.get("kind")
+    issuers = _row_issuers(rt, getattr(row, "company_id", None))
+    if start or kind == "flow":
+        interval = (date.fromisoformat(start), end) if start else None
+        return Typed(value=float(q.value), unit_class=unit, interval=interval,
+                     instant=None if interval else end, quantity=rt.get("quantity") or name.split("@")[0],
+                     source_id=ref, issuers=issuers)
+    return Typed(value=float(q.value), unit_class=unit, instant=end,
+                 quantity=rt.get("quantity") or name.split("@")[0], source_id=ref, issuers=issuers)
 
 
 def _is_single_valued(resolved) -> bool:
@@ -323,7 +359,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
                 "untyped_operand",
                 f"{ref} was recorded before quantities carried their type, so what it "
                 f"may be combined with cannot be established. Recompute it with "
-                f"get_flow, get_balance_sheet or calculate.")
+                f"read_fundamentals or compute.")
         unit = t.get("unit_class")
         if unit is None:
             # A result_type without a unit is not "probably money": refusing it
@@ -353,9 +389,17 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
                     f"there is no basis, no unit and no metric to check a combination "
                     f"against. If the filing states the figure you want, quote it; if it "
                     f"only states the parts, this desk cannot combine them.")
+    if "." in ref and not ref.startswith(("fact_", "calc_", "run_")):
+        # A run's name written without its run: the first live V23 turn wrote
+        # `issuer_exposures.MSFT.market_value` bare. The name is right; it
+        # needs the row it is on.
+        return _err("unknown_operand",
+                    f"{ref!r} looks like a figure's name without its row: write it as "
+                    f"run_<id>:{ref} (or calc_<id>:{ref} on a scenario row). An operand is an "
+                    f"id or ref:name, never an expression.")
     return _err("unknown_operand",
                 f"{ref} is not a fact_ or calc_ id, nor a named figure on a row "
-                f"(run_…:<name>, calc_…:<name>)")
+                f"(run_…:<name>, calc_…:<name>); an operand is never an expression")
 
 
 def _row_issuers(result_type: dict | None, company_id: str | None) -> tuple[str, ...]:
@@ -397,12 +441,12 @@ def _resolve_series(ref: str, operation: str, params: dict, points: list,
     if not rt:
         return _err("untyped_operand",
                     f"{ref} is a series recorded before series carried their type. "
-                    f"Recompute it with get_flow(last_n=…) or get_balance_series.")
+                    f"Recompute it with read_fundamentals(last_n=…).")
     unit = rt.get("unit_class")
     if unit is None:
         return _err("untyped_operand",
                     f"{ref} is a series whose recorded type has no unit_class; "
-                    f"recompute it with get_flow(last_n=…) or get_balance_series.")
+                    f"recompute it with read_fundamentals(last_n=…).")
     kind = rt.get("kind", "series")
     quantity = rt.get("quantity")
     typed: list[tuple[date, Typed]] = []
@@ -555,14 +599,14 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
     # balance is the change over the days between them, and it is the only way
     # "how much has it moved" can be answered from balances at all; the series
     # axis has always allowed it element-wise. This guard used to fire on
-    # subtract as well, and its way out pointed at get_balance_sheet — which
+    # subtract as well, and its way out pointed at read_fundamentals — which
     # reads one instant and cannot produce a change.
     if op == "add" and a.instant and b.instant and a.instant != b.instant:
         return _err("different_instants",
                     f"{a.source_id} is as of {a.instant.isoformat()} and {b.source_id} is "
                     f"as of {b.instant.isoformat()}. Balances from two dates describe two "
                     f"company-moments and cannot be summed; ask for both at one date with "
-                    f"get_balance_sheet, or subtract them for the change between the two "
+                    f"read_fundamentals, or subtract them for the change between the two "
                     f"readings.")
 
     # R3 — containment, in both directions.
@@ -597,7 +641,7 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
                     f"Components of one period may be added when they cover the SAME "
                     f"window, and consecutive periods may be added when they meet; these "
                     f"do neither, so their sum belongs to no period. Fetch both over one "
-                    f"window with get_flow(start=..., end=...).")
+                    f"window with read_fundamentals(start=..., end=...).")
     return None
 
 

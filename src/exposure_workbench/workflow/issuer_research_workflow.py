@@ -78,7 +78,7 @@ async def run_issuer_research(
     # started with skip_external_research meets a face where the tool is
     # physically absent. Nothing is trimmed on this side as well — two places
     # narrowing one face is the error class the move deletes.
-    deny = ("search_external_research",) if skip_external_research else ()
+    deny = ("search_web",) if skip_external_research else ()
 
     async with db_factory() as db:
         async with step(db, run_id, "agent_session",

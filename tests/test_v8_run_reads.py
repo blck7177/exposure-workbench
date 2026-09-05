@@ -15,8 +15,9 @@ from exposure_workbench.services import run_reads_service as rr
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
-_A_TOOLS = ["get_attribution", "get_risk_state", "list_run_alerts",
-            "list_risk_limits", "get_run_freshness"]
+# V23: the five run reads are sections of read_book (attribution, risk_state,
+# alerts on a run; limits, freshness on a portfolio) — one tool, meta-only.
+_A_TOOLS = ["read_book"]
 
 
 # ── the face ──────────────────────────────────────────────────────────────────
@@ -40,9 +41,9 @@ def test_attribution_has_no_size_argument(forbidden):
     set is small and comes back whole; if it ever stops being small the answer is
     pagination with a stated total, not a cut whose size the model chooses."""
     reg = build_meta_registry()
-    props = reg.tools["get_attribution"].json_schema["properties"]
+    props = reg.tools["read_book"].json_schema["properties"]
     assert forbidden not in props
-    assert set(props) == {"run_id"}
+    assert set(props) == {"ref", "names"}
 
 
 # ── absence 2: no judgement ───────────────────────────────────────────────────

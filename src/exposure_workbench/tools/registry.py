@@ -246,7 +246,8 @@ async def invoke(
     # and any exit written later inherits this without anybody remembering to.
     if tool.tool_class not in BUDGET_FREE_CLASSES:
         try:
-            await sess.reserve(db, session_id, is_external_search=(tool.budget_key == "external_search"))
+            await sess.reserve(db, session_id, is_external_search=(tool.budget_key == "external_search"),
+                               message_id=message_id)
         except sess.BudgetExceeded as e:
             await trace_service.record_step(
                 db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,

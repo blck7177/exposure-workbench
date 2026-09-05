@@ -105,21 +105,21 @@ SEMANTIC = {
     ),
 }
 
-LOCATING_TOOLS = {"describe_issuer", "get_portfolio_snapshot"}
+LOCATING_TOOLS = {"describe"}
 
 # Which tools count as having read the thing each question rests on. Keyed by
 # tag, because "required" is a property of the question, not of the system: a
 # drawdown question that never measures an episode has not read its inputs, and
 # a rate question that never looks at the factor loadings has not either.
 REQUIRED: dict[str, set[str]] = {
-    "V1-macro-breakdown": {"get_risk_state", "get_attribution"},
-    "V2-fundamental-lens": {"search_filing_passages", "get_filing_section"},
-    "V3-rate-exposure": {"get_attribution"},
-    "V4-what-to-watch": {"get_risk_state", "list_risk_limits", "list_run_alerts"},
-    "V5-drawdown-forensics": {"get_drawdown_episodes"},
-    "V6-concentration-mandate": {"list_risk_limits"},
-    "V7-single-name-integration": {"get_attribution", "get_portfolio_positions"},
-    "V8-cross-issuer": {"evaluate_formula"},
+    "V1-macro-breakdown": {"read_book", "read_book"},
+    "V2-fundamental-lens": {"read_filings", "read_filings"},
+    "V3-rate-exposure": {"read_book"},
+    "V4-what-to-watch": {"read_book", "read_book", "read_book"},
+    "V5-drawdown-forensics": {"compute"},
+    "V6-concentration-mandate": {"read_book"},
+    "V7-single-name-integration": {"read_book", "read_book"},
+    "V8-cross-issuer": {"compute"},
 }
 
 _JUDGE_PROMPT = """You are scoring one answer from a financial analysis assistant against \

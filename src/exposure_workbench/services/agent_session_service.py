@@ -158,11 +158,19 @@ async def release_turn(session_id: str, claimed_at=None) -> None:
         pass
 
 
-async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool) -> BudgetStatus:
-    """Atomically reserve one tool call (and one external search if applicable).
+async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool,
+                  message_id: str | None = None) -> BudgetStatus:
+    """Atomically reserve one unit of budget (and one external search if applicable).
 
     Uses a conditional UPDATE so concurrent calls can't both slip past the last
     unit of budget. Raises BudgetExceeded without mutating state when over limit.
+
+    V23: under a per-turn budget the UNIT IS THE ASSISTANT MESSAGE. The first
+    evidence call of a message charges one unit and stamps the message on the
+    row; later calls of the same message cost nothing against the turn (they
+    still count in the lifetime `tools_used`, the audit number, and an
+    external search still spends its own pool). A call with no message id —
+    an MCP host outside the loop — is charged as before, per call.
     """
     settings = get_settings()
     session = await get_session(db, session_id)
@@ -170,6 +178,23 @@ async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool
         raise ValueError(f"unknown session {session_id!r}")
 
     ext_limit = settings.external_search_budget
+    same_message = (session.turn_tool_budget is not None and message_id is not None
+                    and session.charged_message_id == message_id)
+    if same_message:
+        if is_external_search and session.external_searches >= ext_limit:
+            raise BudgetExceeded("external_search", session.external_searches, ext_limit)
+        result = await db.execute(
+            update(AgentSession)
+            .where(AgentSession.id == session_id,
+                   *( [AgentSession.external_searches < ext_limit] if is_external_search else [] ))
+            .values(tools_used=AgentSession.tools_used + 1,
+                    external_searches=AgentSession.external_searches + (1 if is_external_search else 0))
+            .returning(AgentSession.tools_used, AgentSession.external_searches, AgentSession.turn_tools_used)
+        )
+        row = result.first()
+        if row is None:
+            raise BudgetExceeded("external_search", ext_limit, ext_limit)
+        return BudgetStatus(row[0], session.turn_tool_budget, row[1], ext_limit, row[2])
 
     # Which counter is enforced comes off the ROW, not off the session's kind:
     # a per-turn budget if the row carries one, the lifetime budget otherwise
@@ -197,6 +222,8 @@ async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool
     if is_external_search:
         conditions.append(AgentSession.external_searches < ext_limit)
 
+    stamp = ({"charged_message_id": message_id}
+             if (session.turn_tool_budget is not None and message_id is not None) else {})
     result = await db.execute(
         update(AgentSession)
         .where(*conditions)
@@ -204,6 +231,7 @@ async def reserve(db: AsyncSession, session_id: str, *, is_external_search: bool
             tools_used=AgentSession.tools_used + 1,
             turn_tools_used=AgentSession.turn_tools_used + 1,
             external_searches=AgentSession.external_searches + ext_inc,
+            **stamp,
         )
         .returning(AgentSession.tools_used, AgentSession.external_searches,
                    AgentSession.turn_tools_used)

@@ -166,8 +166,9 @@ async def test_an_unknown_window_is_named_with_the_known_set(monkeypatch):
 # ── on the face, by the spec ──────────────────────────────────────────────────
 
 def test_get_drawdown_is_on_both_faces_from_the_service_spec():
-    spec = next(s for s in pas._TOOL_SPECS if s["name"] == "get_drawdown")
-    assert spec["service_fn"] == "drawdown"
-    assert "get_drawdown" in faces.READ_CORE
-    assert "get_drawdown" in faces.FACE_META_AGENT and "get_drawdown" in faces.FACE_RESEARCH
-    assert "peak − trough" in spec["description"], "the description says the subtraction is the tool's"
+    from exposure_workbench.analytics import skill
+    m = skill.METHODS["price.drawdown"]
+    assert m.executor == "price.drawdown" and m.subject_kind == "price"
+    assert "compute" in faces.READ_CORE
+    assert "compute" in faces.FACE_META_AGENT and "compute" in faces.FACE_RESEARCH
+    assert "peak − trough" in m.procedure, "the method says the subtraction is the desk's"

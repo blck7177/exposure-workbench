@@ -368,8 +368,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
         if name in SUPPORTED_METRICS:
             out["detail"] = (f"{name} is a filed metric, not a formula: read it with "
-                             f"get_flow(metric={name!r}, months=…) for a flow over a window, or "
-                             f"get_balance_sheet for a balance at a date")
+                             f"read_fundamentals(metric={name!r}, months=…) for a flow over a window, or "
+                             f"read_fundamentals(at=…) for a balance at a date")
         return out
     cache = _cache if _cache is not None else {}
     # Per-formula, per-reason: ROE applies to a bank (not_for_financials=None)
@@ -572,7 +572,7 @@ async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
         "ticker": ticker,
         "judgement": ("none: these are measured values with their definitions and period "
                       "bases. Thresholds and conclusions are the reader's."),
-        "per_formula_sources": ("call evaluate_formula(name=...) for a formula's source url "
+        "per_formula_sources": ("call compute(method=...) for a formula's source url "
                                 "and its caveats"),
         "lines": lines,
     }

@@ -20,7 +20,7 @@ load_dotenv(".env", override=True)
 
 from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.auth.context import current_user_ctx
-from exposure_workbench.tools.definitions import _describe_issuer
+from exposure_workbench.services.catalogue_service import describe as _describe_issuer
 from exposure_workbench.utils.json import dumps_capped
 
 pytestmark = pytest.mark.live

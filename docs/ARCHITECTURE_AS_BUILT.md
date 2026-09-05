@@ -85,24 +85,19 @@
 
 **运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
 
-## 6. 工具面(`tools/`,43 + 25)
+## 6. 工具面(`tools/`,V23 起 **10 + 8**)
 
-面是声明式数据(`faces.py`),缺一个工具即构建错误。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
+面是声明式数据(`faces.py`),缺一个工具即构建错误。**V23**:工具按**数据域 × 动词**正交——describe / read_fundamentals / read_filings / read_prices / read_book / compute / think / start / search_web / respond,meta 面 10 个,research 面 8 个(去 read_book 与 start,加 submit_brief)。原 13 个“方法工具”成为 `analytics/skill.py` 登记表里的方法,由 compute 执行;原三个定位工具合成 describe;原七条读 run 的路合成 read_book。下表按 V23 重写。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
 
-| 组 | 工具 | 说明 |
+| 动词 \\ 域 | 工具 | 说明 |
 |---|---|---|
-| **定位** | `describe_issuer` | 唯一定位工具(V10 三合一)。**V12 起携带知识**:`period_semantics`(财年历、财季是否对齐日历)、每条指标的 `kind`/`windows_filed`/`do_not_add_to`/`superseded_by`/`do_not_combine_with`/`for_a_total_call`/`note`、每个公式的 `family`/`computable`/`missing_inputs` |
-| **取数** | `get_flow`(窗口或序列)· `get_balance_sheet`(单时点)· `get_balance_series` | 区间代数直出;不可导出即拒绝,带 `absence_id` |
-| **算** | `calculate`(类型化四则,标量或序列)· `rank`(**V17**:类型化排序)· `series_stat` · `evaluate_formula` · `get_fundamental_panel` | 每一步落账本;**V22** `calculate`/`rank` 的操作数可写 `run_…:issuer_exposures.MSFT.weight`、`calc_…:portfolio.integration.room_to_breach.<check>`——(权重−限额)×市值=应卖美元、十只按权重排序,都是 book 自己的量在代数里算出来的 |
-| **价格(V16/V21)** | `get_price` · `get_price_series` · `get_rolling_volatility` · `get_beta` · `regress_series` · `get_momentum_12_1` · `get_distance_from_52w_high` · `get_adv` · `get_drawdown`(**V21**) | 由 `price_analytics_service._TOOL_SPECS` 数据注册;每个估计携 n,最低观测数是生产者参数;`get_drawdown` 把峰、谷、跌幅（峰−谷）、深度（跌幅÷峰）算成四条可 slot 的行——减法在工具里做,不由模型 |
-| **文本** | `search_filing_passages` · `get_filing_section` | 语义检索 / 整节原文,带引用锚 |
-| **book 清单(V15)** | `describe_run` · `read_quantities` | book 侧的 `describe_issuer` / `evaluate_formula(name)`:一个 run 持有的全部量按"回答什么"分组(book/concentration/mandate/stress/factor_exposure/attribution/risk/counts,pattern × labels),缺什么、共线撤下了什么、这个面能做什么不能做什么;`read_quantities(run_id, names)` 按名一次取 |
-| **组合** | `get_portfolio_snapshot`(入口)· `get_portfolio_positions` · `get_attribution` · `get_risk_state` · `list_run_alerts` · `list_risk_limits` · `get_run_freshness` · `reconcile_move` · `get_drawdown_episodes` · `explain_episode` · `list_alerts` · `get_market_stats` · `get_portfolio_analysis` · `hypothetical_book`(**V22**) | 全集返回、**禁 top_k**;共线时 `quotable_individually: false`;`hypothetical_book(run_id, sales)` 铸一条 run 形状的情景行(卖出后权重/行业/限额检查,收益离开 book,β 不结转),名字与单位与 run 相同,可 slot 可作操作数 |
-| **委派** | `ensure_company_ready` · `start_issuer_research` · `start_exposure_run` · `get_task_status` · `read_issuer_brief` | 立即返回 id,不阻塞;预算计入 |
-| **联网(V19)** | `search_external_research` | 两个面共用同一处注册;每 session 5 次子预算;结果为 `src_` 行上桌,句子在 `cites` 指它;不在 `companies` 的上市发行人先经 `company_service.admit` 自举,ETF/无 CIK 具名拒绝 |
-| **反思/门** | `think`(免预算)· `respond`(**唯一出口**,GATE 类,免预算) | |
+| **描述** | `describe(subject, expand)` | 一个跨域目录:ticker / port_ / run_ / calc_ / 空;各域存在性、计数、范围;三种“缺”(not_reported / not_held / cannot);适用方法与分析程序;默认层 ≤ 8k,expand 展开一域 |
+| **读** | `read_fundamentals` · `read_filings` · `read_prices` · `read_book` · `search_web` | 发行人数字(窗口/时点/序列,instant 与 flow 由事实判定)· 申报文本(query 或 item)· 价格(序列或单日)· 桌子自己的产物(run/情景按名字、portfolio 的五个 section、brief、任务状态;仅 meta 面)· 网络(两面共用) |
+| **算** | `compute(op \\| method, operands \\| subject, params)` | 唯一算入口与账本唯一写口:四则/rank/regress/序列统计走类型化计算器;46 条登记表方法(32 公式 + panel + 价格 7 + book 6)按 executor 分发;method 与 subject 接受列表;research 面的 compute 拒 book 方法 |
+| **发起** | `start(kind, subject, reason)` | readiness / research / exposure_run 三合一,立即返回 id |
+| **反思/门** | `think` · `respond` · `submit_brief` | 不变 |
 
-预算:每 turn 15 次工具调用(REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
+预算:每 turn 15 个单位,**V23 起按 assistant 消息计**(同一消息内多次调用一个单位;REFLECTION/GATE 免计);`describe_issuer` 载荷 ≤ 12KB(live 断言,八家全过)。
 
 研究面 = READ_CORE 23 + `search_external_research` + `submit_brief`。V19 前 `search_external_research` 只在研究面,chat 里"帮我搜一下"没有工具可走,而"本面不能联网"那句能力声明只随 `describe_run` 返回、发行人问题从未读到。
 
@@ -173,4 +168,4 @@
 
 ## 12. 版本弧(每批一句)
 
-V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集 → **V21 五条残余逐条关**:批次止于首次拒绝(十次同名错调用只花一次)、`get_drawdown` 四行(减法进工具)、股数按拆股结转到 run 日(`stock_splits`)、历史 run 重拟合到七因子的脚本(dry-run 28 个,apply 待放行)、门外 critic 离线席位(段落标签的判断在门外)。 → **V22 组合量进代数**:`ref:name` 具名操作数 + `Typed.base` 轴(两本 book 不相加、book 与申报不相加、份额不乘别人的钱),`get_portfolio_analysis` 行自述类型成为代数之上的面板(parity 活库 20/20),一个情景原语 `hypothetical_book`(卖出后的 book 是一条 run 形状的行;电池 C01#t3 那问的答案是"更紧":告警 2→4)。
+V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集 → **V21 五条残余逐条关**:批次止于首次拒绝(十次同名错调用只花一次)、`get_drawdown` 四行(减法进工具)、股数按拆股结转到 run 日(`stock_splits`)、历史 run 重拟合到七因子的脚本(dry-run 28 个,apply 待放行)、门外 critic 离线席位(段落标签的判断在门外)。 → **V22 组合量进代数**:`ref:name` 具名操作数 + `Typed.base` 轴(两本 book 不相加、book 与申报不相加、份额不乘别人的钱),`get_portfolio_analysis` 行自述类型成为代数之上的面板(parity 活库 20/20),一个情景原语 `hypothetical_book`(卖出后的 book 是一条 run 形状的行;电池 C01#t3 那问的答案是"更紧":告警 2→4)。 → **V23 目录、一个 compute、skill 三种条目**:工具按数据域×动词 44→10 一次切;`describe(subject)` 一个跨域目录带三种“缺”;46 条方法进 `analytics/skill.py`(每条 authority + fails_when)由 compute 执行,17 条读法、13 条分析程序作为数据随 describe 到达;提示词缩到契约;预算按消息计。

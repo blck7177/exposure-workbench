@@ -172,7 +172,7 @@ async def test_the_book_market_value_is_money_of_the_book_with_no_entity(monkeyp
 async def test_an_unknown_name_is_refused_and_points_at_the_manifest(monkeypatch):
     _desk(monkeypatch)
     r = await tc._resolve(None, f"{RUN}:issuer_exposures.MSFT.rank")
-    assert r["error"] == "unknown_name" and "describe_run" in r["detail"]
+    assert r["error"] == "unknown_name" and "describe(" in r["detail"]
 
 
 async def test_a_collinear_coefficient_may_not_be_an_operand(monkeypatch):
@@ -615,11 +615,10 @@ def test_read_quantities_reads_a_scenario_row_and_refuses_other_ledger_rows():
     """Live turn 1 called read_quantities on the scenario's calc_id and got
     `unknown_run`, then wrote the whole id as a slot name. A scenario is a
     run-shaped row and reads like one; a calculator row is not."""
-    src = inspect.getsource(definitions._read_quantities)
+    src = inspect.getsource(definitions._read_book)
     assert "SCENARIO_OP" in src and '"not_a_book"' in src
-    rq = build_meta_registry().get("read_quantities")
-    assert "hypothetical_book" in rq.description
-    assert "calc_" in rq.json_schema["properties"]["run_id"]["description"]
+    rq = build_meta_registry().get("read_book")
+    assert "calc_" in rq.description
 
 
 def test_a_scenario_row_names_which_book_it_is_so_a_before_after_table_can_say_so():
@@ -664,31 +663,34 @@ async def test_an_ordering_of_one_books_figures_carries_that_base(monkeypatch):
 
 # ── the tool, its face, and what the model is told ──────────────────────────
 
-def test_the_scenario_tool_is_meta_only_and_registered():
-    assert "hypothetical_book" in faces.FACE_META_AGENT
-    assert "hypothetical_book" not in faces.FACE_RESEARCH
-    assert build_meta_registry().get("hypothetical_book").name == "hypothetical_book"
+async def test_the_scenario_method_is_on_the_meta_faces_compute_only():
+    """V23: hypothetical_book is the method book.sell, run by compute. The
+    research face's compute refuses book methods by subject kind."""
+    from exposure_workbench.analytics import skill
+    from exposure_workbench.tools.registries import build_research_registry
+    assert skill.METHODS["book.sell"].subject_kind == "run"
+    assert "compute" in faces.FACE_META_AGENT and "compute" in faces.FACE_RESEARCH
+    out = await build_research_registry().get("compute").fn(
+        None, method="book.sell", subject="run_x", params={"sales": [{"ticker": "NVDA"}]})
+    assert out["error"] == "not_on_this_face"
 
 
 def test_the_operators_say_the_grammar_where_the_model_reads_it():
     """The battery's C01#t1 handed rank ten run refs and was refused; the
     description is where the model learns a figure may be named."""
-    meta = build_meta_registry()
-    calc, rank, analysis, scn = (meta.get(n) for n in
-                                 ("calculate", "rank", "get_portfolio_analysis", "hypothetical_book"))
-    for tool in (calc, rank):
-        assert "run_…:issuer_exposures" in tool.description, tool.name
-    assert "ref:name" in calc.json_schema["properties"]["a"]["description"]
-    assert "ref:name" in rank.json_schema["properties"]["refs"]["description"]
-    assert "calc_id:portfolio.integration.room_to_breach" in analysis.description
-    assert "unmeasured" in scn.description and "proceeds leave" in scn.description
-    assert any("hypothetical_book" in line for line in definitions._FACE_CAPABILITIES["can"])
-    assert any("run_id:issuer_exposures" in line for line in definitions._FACE_CAPABILITIES["can"])
+    from exposure_workbench.analytics import skill
+    compute = build_meta_registry().get("compute")
+    assert "run_…:issuer_exposures" in compute.description
+    assert "rank" in compute.json_schema["properties"]["op"]["enum"]
+    sell = skill.METHODS["book.sell"]
+    assert "unmeasured" in sell.fails_when and "proceeds leave" in sell.describes
+    analysis = skill.METHODS["book.analysis"]
+    assert "room" in analysis.procedure
 
 
 def test_the_scenario_schema_bounds_the_fraction_and_requires_a_ticker():
-    scn = build_meta_registry().get("hypothetical_book")
-    item = scn.json_schema["properties"]["sales"]["items"]
+    from exposure_workbench.analytics import skill
+    item = skill.METHODS["book.sell"].params_schema["properties"]["sales"]["items"]
     assert item["required"] == ["ticker"] and item["additionalProperties"] is False
     assert item["properties"]["fraction"]["exclusiveMinimum"] == 0
     assert item["properties"]["fraction"]["maximum"] == 1

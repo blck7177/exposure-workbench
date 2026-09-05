@@ -48,7 +48,7 @@ _QUARTER_END_FROM_DAY = 25
 
 _HOW_TO_ASK = (
     "A flow is measured over an interval and a balance is read at an instant; "
-    "they are different kinds of number and may not be added. Ask get_flow for "
+    "they are different kinds of number and may not be added. Ask read_fundamentals for "
     "the window you want — months=3 for a quarter, months=12 for a year — and it "
     "derives exactly that window from the periods this issuer filed, or refuses. "
     "It never returns a shorter period than the one you asked for."

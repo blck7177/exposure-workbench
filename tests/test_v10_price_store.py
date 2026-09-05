@@ -37,6 +37,7 @@ def test_market_stats_reports_on_the_last_completed_session_not_the_clock():
     """V5 fixed the recipe and this tool kept date.today(): the same ticker's
     one-month return was a different number on consecutive days with nothing
     in the ledger row to say the window had moved."""
-    src = inspect.getsource(d._get_market_stats)
+    from exposure_workbench.services import compute_service
+    src = inspect.getsource(compute_service._window_return)
     assert "date.today()" not in src
     assert "latest_session_date" in src

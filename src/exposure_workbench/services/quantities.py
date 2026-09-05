@@ -328,6 +328,19 @@ def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
     fired = sum(1 for c in checks if c.get("fired"))
     values.append(Quantity(float(fired), COUNT, "count.limit_checks.fired=true", cid))
     values.append(Quantity(float(len(checks) - fired), COUNT, "count.limit_checks.fired=false", cid))
+    # The trade itself, as money: what left the book (or came in), and each
+    # leg. The second live V23 turn sized a trim with book.sell and could not
+    # slot the proceeds — the row held them and published no name for them.
+    proceeds = result.get("proceeds")
+    if isinstance(proceeds, (int, float)) and not isinstance(proceeds, bool):
+        values.append(Quantity(float(proceeds), MONEY, "trade.proceeds", cid))
+    for leg in result.get("sold") or []:
+        mv = leg.get("market_value_sold") if isinstance(leg, dict) else None
+        if isinstance(mv, (int, float)) and not isinstance(mv, bool) and isinstance(leg.get("ticker"), str):
+            values.append(Quantity(float(mv), MONEY, f"trade.sold.{leg['ticker']}.market_value", cid))
+            fr = leg.get("fraction")
+            if isinstance(fr, (int, float)) and not isinstance(fr, bool):
+                values.append(Quantity(float(fr), RATIO, f"trade.sold.{leg['ticker']}.fraction", cid))
     values = [replace(q, group=resources.group_of(q.label) or "other") for q in values]
     # The SUBJECT: which book this is. A scenario's names are a run's names on
     # purpose, so a before/after table's two columns would derive the same
@@ -336,9 +349,11 @@ def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
     # that. The renderer prefixes a ref's subject into a derived name when the
     # name does not carry it (answer_blocks._derivation_name), so the
     # scenario's column reads "after sale of NVDA issuer exposures weight".
-    sales = (row.params or {}).get("sales") or []
-    sold = [s.get("ticker") for s in sales if isinstance(s, dict) and s.get("ticker")]
-    subject = ("after_sale_of_" + "_".join(sold)) if sold else "after_sale"
+    params = row.params or {}
+    sold = [s.get("ticker") for s in (params.get("sales") or []) if isinstance(s, dict) and s.get("ticker")]
+    bought = [b.get("ticker") for b in (params.get("buys") or []) if isinstance(b, dict) and b.get("ticker")]
+    subject = (("after_sale_of_" + "_".join(sold)) if sold
+               else ("after_buying_" + "_".join(bought)) if bought else "after_trade")
     return Resolved(tuple(values), frozenset(), calc_kind(row), subject=subject)
 
 

@@ -77,8 +77,10 @@ def test_an_entry_without_a_number_contributes_nothing():
 def test_the_tool_is_on_the_meta_face_and_not_the_research_face():
     """It answers a question about THIS DESK's book, which is the whole of the
     reason the meta-only block exists."""
-    assert "get_portfolio_analysis" in faces.FACE_META_AGENT
-    assert "get_portfolio_analysis" not in faces.FACE_RESEARCH
+    from exposure_workbench.analytics import skill
+    from exposure_workbench.tools.definitions import ISSUER_KINDS
+    assert skill.METHODS["book.analysis"].subject_kind == "run"
+    assert "run" not in ISSUER_KINDS
 
 
 def test_the_meta_face_resolves_with_the_new_tool_on_it():
@@ -87,10 +89,8 @@ def test_the_meta_face_resolves_with_the_new_tool_on_it():
     resolved because both are built from the same read registry: the narrowing
     is the face's job, and a tool added to the wrong list would still resolve
     while answering the wrong agent (which the test above holds)."""
-    assert "get_portfolio_analysis" in faces.resolve(build_meta_registry(),
-                                                     faces.FACE_META_AGENT)
-    assert "get_portfolio_analysis" not in faces.resolve(build_research_registry(),
-                                                         faces.FACE_RESEARCH)
+    assert "compute" in faces.resolve(build_meta_registry(), faces.FACE_META_AGENT)
+    assert "read_book" not in faces.resolve(build_research_registry(), faces.FACE_RESEARCH)
 
 
 def test_there_is_no_top_k():

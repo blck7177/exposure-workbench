@@ -137,7 +137,7 @@ def test_the_forms_a_filing_can_actually_have_are_selectable():
     them. So a passage's own citation could name a form the next call was then
     refused for passing back."""
     registry = build_read_registry()
-    for tool_name in ("search_filing_passages", "get_filing_section"):
+    for tool_name in ("read_filings",):
         enum = registry.get(tool_name).json_schema["properties"]["form_type"]["enum"]
         assert {"10-K", "10-Q", "10-K/A", "10-Q/A"} <= set(enum), tool_name
 
@@ -201,7 +201,7 @@ def test_nested_objects_forbid_unknown_arguments_too(name, tool):
 
 
 _WINDOWED = {
-    "get_flow": "last_n", "get_balance_series": "last_n", "search_filing_passages": "k",
+    "read_fundamentals": "last_n", "read_filings": "k",
 }
 
 

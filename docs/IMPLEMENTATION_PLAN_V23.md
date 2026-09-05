@@ -1,6 +1,6 @@
 # V23 — the catalogue, one compute, and the skill that says how to read
 
-Status: **proposed** (2026-09-04), not built. Written from the code as it
+Status: **phases A–D built** (2026-09-05); E (the comparison block) not built, pending decision 4; F measured in docs/spikes/V23_COVERAGE.md. Written from the code as it
 stands after V22 (commit `5422fa4`); every count below was measured, not
 recalled, and the plan is a basis, not an authority — the code is.
 
@@ -225,6 +225,10 @@ its predicate. The session pool and the external-search pool stay as the
 two money-shaped limits they are.
 
 ## §6 Decisions for the boss
+
+Decided 2026-09-05: **2 — per assistant message** ("the priority now is
+function, not budget"); **3 — one cut**. Open: 1 (readings carry no typical
+range until decided; the first batch is qualitative) and 4.
 
 1. **Readings may carry a typical range** (with authority and date) — or
    readings stay qualitative (compare-within, meaningless-when, conventions)

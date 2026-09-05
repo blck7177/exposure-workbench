@@ -57,12 +57,12 @@ async def load_series(db: AsyncSession, series_id: str) -> tuple[list[so.SeriesP
     if not isinstance(points, list):
         return {"error": "not_a_series", "series_id": series_id,
                 "detail": f"{series_id} ({row.operation}) holds one value, not a series; "
-                          f"use calculate for scalars"}
+                          f"use compute(op=…) for scalars"}
     rtype = (row.params or {}).get("result_type")
     if not rtype:
         return {"error": "untyped_series", "series_id": series_id,
                 "detail": f"{series_id} was recorded before series carried their type. "
-                          f"Recompute it with get_flow(last_n=…) or get_balance_series."}
+                          f"Recompute it with read_fundamentals(last_n=…)."}
     out = []
     for p in points:
         # Writers use POINT_PERIOD_KEY and only that since V16; the other two
@@ -95,7 +95,7 @@ async def series_stat(db: AsyncSession, series_id: str, op: str,
     if inherited is None:
         return {"error": "untyped_series", "series_id": series_id,
                 "detail": f"{series_id} recorded a result_type without a unit_class. "
-                          f"Recompute it with get_flow(last_n=…) or get_balance_series."}
+                          f"Recompute it with read_fundamentals(last_n=…)."}
 
     if op in CHANGE_OPS:
         res = so.compute_change(points, op)

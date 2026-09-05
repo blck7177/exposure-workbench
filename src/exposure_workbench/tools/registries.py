@@ -32,7 +32,7 @@ fails on either.
 
 from __future__ import annotations
 
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.definitions import ISSUER_KINDS, build_read_registry
 from exposure_workbench.tools.meta_tools import register_meta_tools
 from exposure_workbench.tools.registry import ToolRegistry
 from exposure_workbench.tools.research_tools import register_research_tools, register_search_tool
@@ -45,4 +45,5 @@ def build_meta_registry() -> ToolRegistry:
 
 
 def build_research_registry() -> ToolRegistry:
-    return register_research_tools(build_read_registry())
+    # V23: the research face's compute runs issuer and price methods only.
+    return register_research_tools(build_read_registry(ISSUER_KINDS))

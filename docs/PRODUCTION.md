@@ -369,6 +369,11 @@ python scripts/remap_concepts.py --apply
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v21_stock_splits.sql
 
+# v23_budget_per_message.sql adds agent_sessions.charged_message_id: the turn
+# budget is charged per assistant message (V23). Additive, idempotent.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v23_budget_per_message.sql
+
 docker compose up -d
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.

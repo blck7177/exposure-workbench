@@ -24,21 +24,20 @@ from exposure_workbench.utils import ids
 
 # ── the tool itself ───────────────────────────────────────────────────────────
 
-def test_get_portfolio_snapshot_registered_no_arg_read():
+def test_describe_is_the_no_arg_entry_point():
+    """V23: describe() with no subject is the desk — how a portfolio-level
+    question starts; no ticker, no required args."""
     reg = build_read_registry()
-    tool = reg.get("get_portfolio_snapshot")
+    tool = reg.get("describe")
     assert tool.tool_class == READ
-    # no ticker, no required args — this is how a portfolio-level question starts
     assert tool.json_schema.get("required", []) == []
-    assert tool.json_schema["properties"] == {}
+    assert set(tool.json_schema["properties"]) == {"subject", "expand"}
 
 
-def test_snapshot_is_meta_only_not_research():
-    assert "get_portfolio_snapshot" in faces.FACE_META_AGENT
-    assert "get_portfolio_snapshot" not in faces.FACE_RESEARCH
-    # and it is actually registered, so the read registry resolves it
-    reg = build_read_registry()
-    assert "get_portfolio_snapshot" in faces.resolve(reg, faces.META_ONLY_READS)
+def test_the_book_read_is_meta_only_not_research():
+    assert "read_book" in faces.FACE_META_AGENT
+    assert "read_book" not in faces.FACE_RESEARCH
+    assert "describe" in faces.FACE_RESEARCH, "the catalogue is on both faces"
 
 
 # ── what the snapshot declares onto the table ─────────────────────────────────
@@ -58,7 +57,7 @@ def _snapshot_result() -> dict:
 
 def _declared() -> list[dict]:
     """The snapshot's declaration, as the wrapper builds it from the registration."""
-    scope = build_read_registry().get("get_portfolio_snapshot").evidence.scope
+    scope = build_read_registry().get("describe").evidence.scope
     return tbl.declare(_snapshot_result(), scope=scope)["evidence"]
 
 

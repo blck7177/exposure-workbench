@@ -87,6 +87,6 @@ def test_identity_b_closes_against_the_total_return_revaluation():
 
 
 def test_the_tool_is_registered_and_carries_no_size_argument():
-    reg = build_meta_registry()
-    tool = reg.tools["reconcile_move"]
-    assert set(tool.json_schema["properties"]) == {"run_id"}
+    from exposure_workbench.analytics import skill
+    m = skill.METHODS["book.reconcile"]
+    assert m.subject_kind == "run" and set(m.params_schema["properties"]) == set()

@@ -104,23 +104,63 @@ def recorded_shape(book: sc.ScenarioBook, checks: list, alerts: list) -> dict:
 async def hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) -> dict:
     """The book after `sales`, from `run_id`'s positions, checked against the
     portfolio's limits and recorded as one row."""
+    parsed = _sales(sales)
+    if isinstance(parsed, dict):
+        return parsed
+    return await _scenario(db, run_id, lambda holdings: sc.without(holdings, parsed),
+                           {"sales": [{"ticker": s.ticker, "fraction": s.fraction} for s in parsed]})
+
+
+def _buys(raw: list[dict]) -> list[sc.Buy] | dict:
+    out = []
+    for i, b in enumerate(raw or []):
+        if not isinstance(b, dict) or not isinstance(b.get("ticker"), str) or not b["ticker"]:
+            return _err("bad_buy", f"buys[{i}] must name a ticker")
+        try:
+            w = float(b.get("weight"))
+        except (TypeError, ValueError):
+            return _err("bad_buy", f"buys[{i}].weight {b.get('weight')!r} is not a number")
+        out.append(sc.Buy(b["ticker"].upper(), w))
+    if not out:
+        return _err("bad_buy", "at least one purchase is needed")
+    return out
+
+
+async def hypothetical_buy(db: AsyncSession, run_id: str, buys: list[dict]) -> dict:
+    """The book after adding names at target weights (V23, the half V22 did
+    not build): the new name's sector comes from the desk's company record,
+    and a name the desk cannot place in a sector is refused rather than
+    filed under Unknown — a sector check on it would be a check on nothing."""
+    from exposure_workbench.db.models import Company
+    parsed = _buys(buys)
+    if isinstance(parsed, dict):
+        return parsed
+    placed: list[sc.Buy] = []
+    for b in parsed:
+        sector = (await db.execute(select(Company.sector).where(Company.ticker == b.ticker))).scalar_one_or_none()
+        if not sector:
+            return _err("no_sector", f"{b.ticker} has no sector on this desk (not prepared, or "
+                                     f"not an SEC filer), so a sector-concentration check on the "
+                                     f"book with it cannot run; prepare the name first", run_id=run_id)
+        placed.append(sc.Buy(b.ticker, b.weight, sector))
+    return await _scenario(db, run_id, lambda holdings: sc.with_buys(holdings, placed),
+                           {"buys": [{"ticker": b.ticker, "weight": b.weight} for b in placed]})
+
+
+async def _scenario(db: AsyncSession, run_id: str, rebuild, identifying: dict) -> dict:
     run = (await db.execute(select(ExposureRun).where(ExposureRun.id == run_id))).scalar_one_or_none()
     if run is None:
         return _err("unknown_run", f"no exposure run {run_id}", run_id=run_id)
     if run.status != "completed":
         return _err("run_not_completed", f"run {run_id} is {run.status}; a scenario starts "
                                           f"from a completed run", run_id=run_id, status=run.status)
-    parsed = _sales(sales)
-    if isinstance(parsed, dict):
-        return parsed
-
     positions = list((await db.execute(
         select(IssuerExposure).where(IssuerExposure.run_id == run_id)
         .order_by(IssuerExposure.ticker))).scalars().all())
     holdings = [sc.Holding(p.ticker, p.sector,
                            None if p.market_value is None else float(p.market_value))
                 for p in positions]
-    book = sc.without(holdings, parsed)
+    book = rebuild(holdings)
     if isinstance(book, dict):
         return {**book, "run_id": run_id}
 
@@ -147,8 +187,7 @@ async def hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) ->
     recorded = recorded_shape(book, checks, alerts)
     calc_id = await cs._record(
         db, None, SCENARIO_OP,
-        {"run_id": run_id, "as_of": as_of,
-         "sales": [{"ticker": s.ticker, "fraction": s.fraction} for s in parsed],
+        {"run_id": run_id, "as_of": as_of, **identifying,
          "result_type": {"unit_class": "ratio", "basis": {"instant": as_of}}},
         recorded, [run_id], {"checks_run": len(checks), "alerts": len(alerts)},
         current_session_id(),
@@ -157,6 +196,7 @@ async def hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) ->
         "calc_id": calc_id,
         "from_run": run_id,
         "as_of": as_of,
+        **identifying,
         "sold": recorded["sold"],
         "proceeds": book.proceeds,
         "market_value": book.market_value,
@@ -169,10 +209,10 @@ async def hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) ->
                             "reason": "betas are a regression over the book's return history; "
                                       "the book after the sale has none, so none is carried"},
         "reads_as": (
-            "The book as it would stand after the sale, as of the run's date: each remaining "
-            "weight is its market value over the remaining book's; the proceeds leave the book. "
-            "Every name here is on the table under the calc_id, and the same names on "
-            f"{run_id} are the book before — subtract for the change."
+            "The book as it would stand after the trade, as of the run's date: each weight is "
+            "its market value over the book's; sale proceeds leave the book and purchase money "
+            "comes from outside it. Every name here is on the table under the calc_id, and the "
+            f"same names on {run_id} are the book before — subtract for the change."
         ),
         "not_a_forecast": True,
         "cite": calc_id,

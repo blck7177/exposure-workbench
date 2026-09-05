@@ -182,18 +182,19 @@ def test_the_direction_is_the_series_word_not_the_models():
 def test_search_external_research_is_on_both_faces_from_one_registration():
     from exposure_workbench.tools import research_tools
     meta, research = build_meta_registry(), build_research_registry()
-    assert "search_external_research" in faces.resolve(meta, faces.FACE_META_AGENT)
-    assert "search_external_research" in faces.resolve(research, faces.FACE_RESEARCH)
-    assert meta.get("search_external_research").budget_key == "external_search"
-    assert meta.get("search_external_research").evidence is not None
+    assert "search_web" in faces.resolve(meta, faces.FACE_META_AGENT)
+    assert "search_web" in faces.resolve(research, faces.FACE_RESEARCH)
+    assert meta.get("search_web").budget_key == "external_search"
+    assert meta.get("search_web").evidence is not None
     src = inspect.getsource(research_tools)
-    assert src.count('name="search_external_research"') == 1
+    assert src.count('name="search_web"') == 1
 
 
 def test_the_capability_statement_says_the_web_is_here():
-    caps = definitions._FACE_CAPABILITIES
-    assert any("search_external_research" in c for c in caps["can"])
-    assert not any("web" in c for c in caps["cannot"])
+    from exposure_workbench.services import catalogue_service
+    src = inspect.getsource(catalogue_service._desk)
+    assert "search_web" in src
+    assert not any("web" in c for c in catalogue_service.CANNOT.values())
 
 
 def test_the_search_tool_admits_a_listed_issuer_rather_than_refusing_it():
@@ -238,7 +239,7 @@ def test_the_search_query_carries_the_issuer_the_model_named():
 
 def test_a_day_window_is_a_request_parameter_not_a_phrase():
     from exposure_workbench.tools import research_tools
-    schema = build_meta_registry().get("search_external_research").json_schema
+    schema = build_meta_registry().get("search_web").json_schema
     assert schema["properties"]["days"]["type"] == ["integer", "null"]
     assert "days" not in schema["required"]
     src = inspect.getsource(research_tools._search_external_research)
@@ -251,7 +252,7 @@ async def test_evaluate_formula_names_the_tool_that_holds_a_filed_metric():
     from exposure_workbench.services import formula_service as fsvc
     out = await fsvc.evaluate_formula(None, "NVDA", "net_income", invoked_by="test")
     assert out["error"] == "unknown_formula"
-    assert "get_flow(metric='net_income'" in out["detail"]
+    assert "read_fundamentals(metric='net_income'" in out["detail"]
     out = await fsvc.evaluate_formula(None, "NVDA", "not_a_thing", invoked_by="test")
     assert out["error"] == "unknown_formula" and "detail" not in out
 

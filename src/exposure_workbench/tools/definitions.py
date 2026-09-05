@@ -1,280 +1,297 @@
-"""Tool definitions (M10) — read + reflection tools.
+"""Tool definitions — the desk's data domains, one tool each (V23).
 
-Every fn is a THIN wrapper over a service: it validates/normalizes args and
-returns a JSON-able dict. What of that result goes on the table is DECLARED at
-registration (`evidence=`): the ids it returns, and for a run the child tables
-it read (services/table.py). No business logic lives here (that stays in
-services/analytics), and no tool touches the network directly.
+The agent's tools are organised by DATA DOMAIN × VERB, not by question
+(IMPLEMENTATION_PLAN_V23 §2). Every tool sits in exactly one cell:
 
-Delegation and gate tools (ensure_company_ready, start_*, respond, submit_brief)
-are registered in P6/P7 where their targets exist.
+    describe(subject)        what the desk holds about a subject, across every domain,
+                             what it means, what is missing, which methods apply
+    read_fundamentals        an issuer's filed figures (a window, an instant, a series)
+    read_filings             an issuer's filing text (a search, or one Item verbatim)
+    read_prices              a name's daily closes (a series, or one session's price)
+    read_book                a run's or scenario's figures by name; a portfolio's
+                             positions, limits, alerts; a brief; a task's state
+    compute                  the ONE place a figure is computed: an op over operands,
+                             or a registry method over a subject   (compute_service)
+    think                    a pause, free
+    + start, respond (tools/meta_tools), search_web, submit_brief (tools/research_tools)
+
+Every fn is a THIN wrapper over a service; what a result puts on the table is
+declared at registration (`evidence=`). Descriptions are one or two lines:
+WHEN to use a tool is the agent's judgement, informed by describe and by the
+skill registry, not a sentence in a description — that is the whole point of
+the collapse from 44 tools to ten.
 """
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import skill
 from exposure_workbench.analytics import withheld as _wh
-from exposure_workbench.db.models import Company, RiskAlert
-from exposure_workbench.services import brief_service
-from exposure_workbench.services import (
-    formula_service, fundamentals_service, typed_calculator,
-)
-from exposure_workbench.services import calc_service as cs
+from exposure_workbench.db.models import CalcLedger, Company, FinancialFact, RiskAlert
+from exposure_workbench.services import brief_service, catalogue_service, compute_service
+from exposure_workbench.services import fundamentals_service
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
 from exposure_workbench.services import portfolio_service
-from exposure_workbench.services import price_analytics_service
-from exposure_workbench.services import drawdown_service
-from exposure_workbench.services import integration_service
-from exposure_workbench.services import reconcile_service
+from exposure_workbench.services import price_analytics_service as pas
 from exposure_workbench.services import run_reads_service
-from exposure_workbench.services import scenario_service
 from exposure_workbench.services import security_master_service
-from exposure_workbench.services import series_service
-from exposure_workbench.services import trace_service
 from exposure_workbench.services import quantities as qn
+from exposure_workbench.services.typed_calculator import SCENARIO_OP
 from exposure_workbench.tools.registry import (
     NOT_EVIDENCE, READ, REFLECTION, Evidence, Tool, ToolRegistry, current_session_id,
 )
 
-_PERIOD_TYPES = ["quarterly", "annual", "instant"]
 
-
-
-# ── company / snapshot ──────────────────────────────────────────────────────────
+# ── shared ──────────────────────────────────────────────────────────────────────
 
 async def _resolve_company(db: AsyncSession, ticker: str) -> dict:
+    """Identity, or a typed refusal that says what to do about it."""
     tk = ticker.upper()
     try:
         c = await company_service.get_by_ticker(db, tk)
     except company_service.CompanyNotFound:
-        # A read tool does not admit an issuer — that costs a queue slot and a
-        # quota unit, and both belong to a decision the model makes explicitly.
-        # What it does do is distinguish the two silences (V17): a name nobody
-        # has prepared yet is one call away from being readable, and saying so
-        # here is the difference between "come back with a ticker I know" and
-        # the reader's own holding being analysable.
         if await security_master_service.is_in_universe(db, tk):
             return {"error": "not_prepared", "ticker": tk,
                     "detail": f"{tk} is a listed security this desk has not prepared yet, so "
-                              f"it holds no filings or facts for it. ensure_company_ready "
+                              f"it holds no filings or facts for it. start(kind='readiness') "
                               f"puts it on the desk; the work runs in the background."}
         return {"error": "company_not_found", "ticker": tk}
-    return {
-        "id": c.id, "ticker": c.ticker, "name": c.name, "cik": c.cik,
-        "exchange": c.exchange, "sector": c.sector, "industry": c.industry,
-        "is_investigable": c.is_investigable,
-    }
+    return {"id": c.id, "ticker": c.ticker, "name": c.name, "cik": c.cik,
+            "exchange": c.exchange, "sector": c.sector, "industry": c.industry,
+            "is_investigable": c.is_investigable}
 
 
-# ── V9-A2/A3: a flow over any window, and one instant's balance sheet ─────────
+# ── describe ────────────────────────────────────────────────────────────────────
 
-async def _describe_issuer(db: AsyncSession, ticker: str) -> dict:
-    """Identity, what the filings hold, and which named measures that supports.
-
-    V10-S2: the one locating tool. It replaces get_issuer_snapshot (identity +
-    metrics), list_available_data (metrics alone — the same list) and
-    list_formulas (the registry with no ticker), because "what can I ask about
-    this company" is one question and three tools made the model ask it three
-    times. The formula list is the same sixteen for every issuer; what differs
-    per issuer is which of them its filings can feed, and that is stated here
-    rather than discovered by a refused evaluate_formula.
-    """
-    from exposure_workbench.analytics import containment as _ct
-    from exposure_workbench.analytics import formulas as _fm
-    from exposure_workbench.analytics import semantics as _sem
-    from exposure_workbench.services import absence_service as _ab
-    from exposure_workbench.services import period_semantics as _ps
-
-    company = await _resolve_company(db, ticker)
-    if company.get("error"):
-        return company
-    metrics = await cs.list_available_metrics(db, ticker.upper())
-    have = {m["metric"] for m in metrics["metrics"]}
-
-    # V12-K1. What each metric MEANS, at the moment of choosing one. Every field
-    # below already existed — in the containment edges, in the registry's named
-    # alternatives, in concept_mapping's comments — and none of it reached the
-    # model, which saw a name, a count and a date and chose between strings.
-    for row in metrics["metrics"]:
-        name = row["metric"]
-        # The RULE, not the graph. Shipping `contains` and `contained_by` beside
-        # this said the same thing three ways: which one is the wider line is
-        # what `for_a_total_call` answers, and the only thing a caller has to
-        # act on is that these two may not be summed. A rule the model has to
-        # compose out of two facts is the class DABstep measured agents missing,
-        # so the conclusion travels and the graph stays in containment.py.
-        nested = sorted({c for c in have if _ct.contains(name, c)} |
-                        {p for p in have if _ct.contains(p, name)})
-        if nested:
-            row["do_not_add_to"] = nested
-        superseded = [a for a in _ab.superseded_by(name) if a in have]
-        if superseded:
-            row["superseded_by"] = superseded
-        sem = _sem.for_metric(name)
-        if sem is None:
-            continue
-        confusable = [o for o in sem.do_not_combine_with if o in have]
-        if confusable:
-            row["do_not_combine_with"] = confusable
-        if sem.for_a_total_call:
-            row["for_a_total_call"] = sem.for_a_total_call
-        # Every note in the table warns about a RELATIONSHIP — this line is
-        # inside that one, this tag was superseded by that one, this is a
-        # component and not the total. Shipped where the other side of the
-        # relationship is absent, it is a caveat about a choice this issuer does
-        # not offer, and LinkedIn measured irrelevant domain knowledge lowering
-        # answer quality rather than raising it. So the note travels with the
-        # relationship that makes it true.
-        if sem.note and any(k in row for k in
-                            ("contains", "contained_by", "superseded_by",
-                             "do_not_combine_with", "for_a_total_call")):
-            row["note"] = sem.note
-
-    def leaves(name: str, seen: set[str]) -> set[str]:
-        f = _fm.FORMULAS.get(name)
-        if f is None:
-            return {name}
-        out: set[str] = set()
-        for inp in f.inputs:
-            if inp in seen:
-                continue
-            out |= leaves(inp, seen | {inp})
+async def _describe(db: AsyncSession, subject: str | None = None, expand: str | None = None) -> dict:
+    out = await catalogue_service.describe(db, subject, expand)
+    if out.get("error"):
         return out
-
-    # V16: which measures describe THIS issuer. A bank's catalogue used to say
-    # quick_ratio was "computable" — inputs present, measure meaningless — and
-    # computable answered a different question than the reader asked. The check
-    # is the same one evaluate_formula applies; the refusal's full sentence
-    # stays there (registry prose travels where it is load-bearing).
-    sector = await formula_service._sector(db, ticker.upper())
-    is_financial = sector in formula_service.FINANCIAL_SECTORS
-
-    formulas = []
-    _order = {fam: i for i, fam in enumerate(_fm.FAMILY_ORDER)}
-    # Reading order, not alphabetical (V16-S3): families in the order an
-    # analyst reads a company — cash first — then by name within a family.
-    for name, f in sorted(_fm.FORMULAS.items(),
-                          key=lambda kv: (_order.get(kv[1].family, len(_order)), kv[0])):
-        needed = leaves(name, {name})
-        missing = sorted(needed - have)
-        # No `authority` and no `note` here. Both are registry prose — the same
-        # bytes for every issuer, and `authority` is the SAME OBJECT sixteen
-        # times over in one catalogue. They travel where they are load-bearing:
-        # beside the number, in evaluate_formula, which has always shipped them.
-        # This is the V11-T lesson applied to the other listing tool; measured,
-        # the two cost 3.8kB of an 18.7kB payload against a 12kB cap.
-        row = {"name": name, "definition": f.expression, "basis": f.basis,
-               "family": f.family, "unit_class": f.unit_class,
-               "computable": not missing,
-               **({"missing_inputs": missing} if missing else {})}
-        if is_financial and f.not_for_financials is not None:
-            row["computable"] = False
-            row["not_for_this_issuer"] = True
-        formulas.append(row)
-
-    out = {"company": company, "available_metrics": metrics["metrics"],
-           "formulas": formulas}
-    periods = await _ps.describe_periods(db, ticker.upper())
-    if periods:
-        out["period_semantics"] = periods
+    # What this call puts on the table, by exact name (Evidence names_from):
+    # a run's or scenario's every name; an issuer's place in each book it is
+    # held in. Nothing else — a catalogue is a map, not the territory.
+    kind = out.get("kind")
+    if kind in ("run", "scenario"):
+        resolved = await qn.of_ref(db, subject)
+        out["table_names"] = {subject: [q.label for q in resolved.quantities if q.not_alone is None]}
+    elif kind == "issuer":
+        out["table_names"] = {h["run_id"]: h["names"] for h in (out.get("book") or {}).get("held_in", [])}
     return out
 
 
-async def _get_balance_series(db: AsyncSession, ticker: str, metric: str, last_n: int = 12) -> dict:
-    return await fundamentals_service.get_balance_series(
-        db, ticker, metric, last_n=int(last_n), invoked_by=current_session_id())
+# ── read_fundamentals ───────────────────────────────────────────────────────────
+
+async def _metric_is_instant(db: AsyncSession, company_id: str, metric: str) -> bool | None:
+    """Whether a metric is filed as balances (instants) — decided from the facts,
+    not from a list: a row with no period_start is an instant."""
+    row = (await db.execute(
+        select(FinancialFact.period_start).where(
+            FinancialFact.company_id == company_id, FinancialFact.normalized_metric == metric)
+        .limit(1))).first()
+    if row is None:
+        return None
+    return row[0] is None
 
 
-async def _series_stat(db: AsyncSession, series_id: str, op: str) -> dict:
-    return await series_service.series_stat(db, series_id, op, invoked_by=current_session_id())
-
-
-async def _get_flow(db: AsyncSession, ticker: str, metric: str,
-                    months: int | None = None,
-                    start: str | None = None, end: str | None = None,
-                    last_n: int | None = None) -> dict:
-    # int(), because draft 2020-12 counts 12.0
-    # as an integer, so the schema cannot refuse the float a model writes when
-    # it means twelve, and it would reach a slice.
+async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None = None,
+                             months: int | None = None, start: str | None = None,
+                             end: str | None = None, last_n: int | None = None,
+                             at: str | None = None) -> dict:
+    """One issuer's filed figures. No metric: every balance at one instant.
+    A metric: a flow over a window (months, or start..end), a series of the
+    last N windows or readings (last_n), or a balance at an instant (at)."""
+    company = await _resolve_company(db, ticker)
+    if company.get("error"):
+        return company
+    tk = company["ticker"]
+    invoked_by = current_session_id()
+    if metric is None:
+        return await fundamentals_service.get_balance_sheet(db, tk, at=at, invoked_by=invoked_by)
+    instant = await _metric_is_instant(db, company["id"], metric)
+    if instant is None:
+        from exposure_workbench.services import calc_service as cs
+        from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
+        have = sorted(m["metric"] for m in (await cs.list_available_metrics(db, tk))["metrics"])
+        return {"error": "metric_not_filed", "ticker": tk, "metric": metric,
+                # The refusal is about THIS argument's value: a batch of reads
+                # for other metrics is not held behind it (agents/batch.py).
+                "held_on": {"metric": metric},
+                "available": have,
+                "detail": (f"{tk} has no filed facts under {metric!r}"
+                           + ("" if metric in SUPPORTED_METRICS else
+                              f"; {metric!r} is not a metric this desk maps")
+                           + "; the names it does hold are in `available`")}
+    if instant:
+        if last_n is not None:
+            return await fundamentals_service.get_balance_series(db, tk, metric, last_n=int(last_n),
+                                                                 invoked_by=invoked_by)
+        sheet = await fundamentals_service.get_balance_sheet(db, tk, at=at, invoked_by=invoked_by)
+        if sheet.get("error"):
+            return sheet
+        balances = sheet.get("balances") or {}
+        if metric in balances:
+            return {**sheet, "balances": {metric: balances[metric]},
+                    "detail": f"{metric} is a balance (an instant); the whole sheet at this date "
+                              f"is read with metric omitted"}
+        return {"error": "not_reported_at_this_date", "ticker": tk, "metric": metric,
+                "as_of": sheet.get("as_of"),
+                "last_reported": (sheet.get("not_reported_at_this_date") or {}).get(metric),
+                "detail": "ask with `at` set to the date it was last reported, or last_n for its history"}
     return await fundamentals_service.get_flow(
-        db, ticker, metric, months=months, start=start, end=end,
-        last_n=None if last_n is None else int(last_n),
-        invoked_by=current_session_id())
+        db, tk, metric, months=(int(months) if months is not None else None), start=start, end=end,
+        last_n=(int(last_n) if last_n is not None else None), invoked_by=invoked_by)
 
 
-async def _get_balance_sheet(db: AsyncSession, ticker: str, at: str | None = None) -> dict:
-    return await fundamentals_service.get_balance_sheet(
-        db, ticker, at=at, invoked_by=current_session_id())
+# ── read_filings ────────────────────────────────────────────────────────────────
+
+async def _read_filings(db: AsyncSession, ticker: str, query: str | None = None, item: str | None = None,
+                        k: int = 5, form_type: str | None = None) -> dict:
+    company = await _resolve_company(db, ticker)
+    if company.get("error"):
+        return company
+    tk = company["ticker"]
+    if (query is None) == (item is None):
+        return {"error": "query_or_item", "detail": "give exactly one of `query` (search the "
+                                                    "passages) or `item` (one Item verbatim, e.g. '1A', '7')"}
+    if item is not None:
+        code = item if item.lower().startswith("item") else f"Item {item}"
+        section = await frs.get_section(db, company["id"], code, form_type=form_type)
+        if section is None:
+            return {"error": "section_not_found", "ticker": tk, "item": code}
+        return {"ticker": tk, "item_code": section.item_code, "title": section.title, "text": section.text,
+                "citation": {"type": "chunk", "accession": section.accession_number,
+                             "form_type": section.form_type, "item": section.item_code,
+                             "source_url": section.source_url}}
+    try:
+        passages = await frs.search_passages(db, company["id"], query, k=int(k), form_type=form_type)
+    except frs.NotIndexed:
+        return {"error": "not_indexed", "ticker": tk,
+                "hint": "start(kind='readiness') indexes this company's filings first"}
+    return {"ticker": tk, "query": query,
+            "passages": [{"chunk_id": p.chunk_id, "text": p.text, "score": round(p.score, 4),
+                          "item": p.item_code, "section_title": p.section_title,
+                          "citation": p.citation()} for p in passages]}
 
 
-async def _calculate(db: AsyncSession, op: str, a: str, b: str,
-                     as_quantity: str | None = None) -> dict:
-    # Tier 2 (V16): the session names its own composition. The name rides into
-    # result_type.quantity like a formula's would; named_by records that a
-    # session, not the registry, chose it — visible, never authoritative.
-    return await typed_calculator.calculate(
-        db, op, a, b, invoked_by=current_session_id(),
-        as_quantity=as_quantity, named_by="session" if as_quantity else None)
+# ── read_prices ─────────────────────────────────────────────────────────────────
+
+async def _read_prices(db: AsyncSession, ticker: str, window: str | None = None,
+                       as_of: str | None = None) -> dict:
+    """A series over a named window, or — with no window — one session's price."""
+    invoked_by = current_session_id()
+    if window is not None:
+        return await pas.get_price_series(db, ticker.upper(), window=window, invoked_by=invoked_by)
+    return await pas.get_price(db, ticker.upper(), as_of=as_of, invoked_by=invoked_by)
 
 
-async def _rank(db: AsyncSession, refs: list[str], direction: str,
-                as_quantity: str | None = None) -> dict:
-    # direction has no default here on purpose: which end takes place 1 is the
-    # caller's claim, and a tool that guesses it would answer "which is worst?"
-    # with the best. The service keeps a default for its own callers.
-    return await typed_calculator.rank(
-        db, refs, direction=direction, as_quantity=as_quantity,
-        invoked_by=current_session_id())
+# ── read_book ───────────────────────────────────────────────────────────────────
+
+_PORTFOLIO_SECTIONS = ("positions", "limits", "alerts", "freshness", "runs")
+_RUN_SECTIONS = ("alerts", "attribution", "risk_state")
 
 
-async def _evaluate_formula(db: AsyncSession, ticker: str, name: str,
-                            months: int | None = None, at: str | None = None) -> dict:
-    return await formula_service.evaluate_formula(
-        db, ticker, name, months=months or 12, at=at, invoked_by=current_session_id())
+async def _read_book(db: AsyncSession, ref: str, names: list[str]) -> dict:
+    """Figures by name from a run or a scenario row; a portfolio's sections; a
+    brief; a task's state. One tool for everything the desk holds about its
+    own work, so the model learns one spelling: read_book(ref, names)."""
+    wanted = [str(n) for n in names]
+    if ref.startswith(("task_", "rrun_")):
+        return await _task_status(db, ref)
+    if ref.startswith("port_"):
+        return await _portfolio_sections(db, ref, wanted)
+    if ref.startswith("run_"):
+        run = await run_reads_service._run_or_error(db, ref)
+        if isinstance(run, dict):
+            return run
+        sections = [n for n in wanted if n in _RUN_SECTIONS]
+        if sections:
+            out: dict = {"run_id": ref, "section": {}}
+            for s in sections:
+                fn = {"alerts": run_reads_service.list_run_alerts,
+                      "attribution": run_reads_service.get_attribution,
+                      "risk_state": run_reads_service.get_risk_state}[s]
+                out["section"][s] = await fn(db, ref)
+            rest = [n for n in wanted if n not in _RUN_SECTIONS]
+            if rest:
+                out["by_name"] = await _quantities_by_name(db, ref, run.as_of_date.isoformat(), rest)
+            return out
+        return await _quantities_by_name(db, ref, run.as_of_date.isoformat(), wanted)
+    if ref.startswith("calc_"):
+        row = (await db.execute(select(CalcLedger).where(CalcLedger.id == ref))).scalar_one_or_none()
+        if row is None:
+            return {"error": "unknown_row", "ref": ref}
+        if row.operation != SCENARIO_OP:
+            return {"error": "not_a_book", "ref": ref,
+                    "detail": "read_book reads a run or a scenario row; a calculator row's figures "
+                              "are on its own table under their names"}
+        return await _quantities_by_name(db, ref, (row.params or {}).get("as_of"), wanted)
+    # a ticker: the desk's products about an issuer
+    company = await _resolve_company(db, ref)
+    if company.get("error"):
+        return company
+    out = {"ticker": company["ticker"], "section": {}}
+    for n in wanted:
+        if n == "brief":
+            brief = await brief_service.latest_visible(db, company["id"])
+            out["section"]["brief"] = brief or {"error": "no_brief",
+                                                 "hint": "start(kind='research') produces one"}
+        elif n == "alerts":
+            rows = (await db.execute(
+                select(RiskAlert).where(RiskAlert.entity_id == company["ticker"])
+                .order_by(RiskAlert.created_at.desc()).limit(20))).scalars().all()
+            out["section"]["alerts"] = [
+                {"id": a.id, "type": a.alert_type, "severity": a.severity, "message": a.message,
+                 "utilization": float(a.utilization) if a.utilization is not None else None}
+                for a in _wh.published_alerts(rows)]
+        else:
+            out.setdefault("unknown", []).append(n)
+    if out.get("unknown"):
+        out["detail"] = "for an issuer, names are 'brief' and 'alerts'; its figures are read_fundamentals"
+    return out
 
 
-async def _get_fundamental_panel(db: AsyncSession, ticker: str,
-                                 months: int | None = None, at: str | None = None) -> dict:
-    return await formula_service.build_panel(
-        db, ticker, months=months or 12, at=at, invoked_by=current_session_id())
+async def _quantities_by_name(db: AsyncSession, ref: str, as_of: str | None, wanted: list[str]) -> dict:
+    resolved = await qn.of_ref(db, ref)
+    held = {q.label: q for q in resolved.quantities if q.not_alone is None}
+    found = [n for n in wanted if n in held]
+    unknown = [n for n in wanted if n not in held]
+    return {"run_id": ref, "as_of": as_of, "names": found,
+            "units": {n: held[n].unit_class for n in found},
+            **({"unknown": unknown, "detail": f"not names {ref} holds; describe('{ref}') lists them"}
+               if unknown else {})}
 
 
-# ── portfolio (the entry point for "my portfolio" questions) ──────────────────────
-
-async def _get_portfolio_snapshot(db: AsyncSession) -> dict:
-    # V20. The entry point every portfolio question starts at carries the
-    # withheld sentence: the first live turn after withholding asked for VaR
-    # and a 10% market drop, never reached get_risk_state, and estimated the
-    # drop as a tenth of market value — the one thing the sentence forbids.
-    return {"portfolios": await portfolio_service.snapshot_all(db),
-            "withheld": _wh.withheld_note()}
-
-
-# ── financial data / calculations ───────────────────────────────────────────────
-
-async def _get_market_stats(db: AsyncSession, ticker: str, window: str = "1y", benchmark: str | None = "SPY") -> dict:
-    # The reporting date is a server fact. Reading the clock here made the same
-    # ticker's 1m return a different number on consecutive days with nothing in
-    # the ledger row to say the window had moved — V5 fixed that for the recipe
-    # and this tool kept the clock. `latest_session_date` is the last completed
-    # session, which is also what start_exposure_run reports on.
-    from exposure_workbench.services import market_data_service
-    days = {"1m": 30, "3m": 91, "6m": 182, "1y": 365}.get(window, 365)
-    end = await market_data_service.latest_session_date(db)
-    if end is None:
-        return {"error": "no_price_data", "detail": "no market prices are loaded yet"}
-    start = end - timedelta(days=days)
-    return await cs.window_return(db, ticker.upper(), start, end, benchmark=benchmark,
-                                  invoked_by=current_session_id())
+async def _portfolio_sections(db: AsyncSession, pid: str, wanted: list[str]) -> dict:
+    p = await portfolio_service.get_portfolio(db, pid)
+    if p is None:
+        return {"error": "unknown_portfolio", "portfolio_id": pid}
+    out: dict = {"portfolio_id": pid, "section": {}}
+    for n in wanted:
+        if n == "positions":
+            out["section"]["positions"] = await portfolio_service.positions_with_weights(db, pid)
+        elif n == "limits":
+            out["section"]["limits"] = await run_reads_service.list_risk_limits(db, pid)
+        elif n == "freshness":
+            out["section"]["freshness"] = await run_reads_service.get_run_freshness(db, pid)
+        elif n == "runs":
+            out["section"]["runs"] = (await catalogue_service.describe(db, pid)).get("runs")
+        elif n == "alerts":
+            fresh = await run_reads_service.get_run_freshness(db, pid)
+            rid = fresh.get("latest_completed_run")
+            out["section"]["alerts"] = (await run_reads_service.list_run_alerts(db, rid) if rid
+                                        else {"error": "no_completed_run"})
+        else:
+            out.setdefault("unknown", []).append(n)
+    if out.get("unknown"):
+        out["detail"] = f"a portfolio's sections are {', '.join(_PORTFOLIO_SECTIONS)}"
+    return out
 
 
-async def _get_task_status(db: AsyncSession, job_id: str) -> dict:
+async def _task_status(db: AsyncSession, job_id: str) -> dict:
     try:
         row = await job_status_service.status_of(db, job_id)
     except job_status_service.NoOwner:
@@ -284,864 +301,181 @@ async def _get_task_status(db: AsyncSession, job_id: str) -> dict:
     return row
 
 
-async def _get_portfolio_positions(db: AsyncSession, portfolio_id: str) -> dict:
-    out = await portfolio_service.positions_with_weights(db, portfolio_id)
-    if out is None:
-        return {"error": "unknown_portfolio", "portfolio_id": portfolio_id}
-    return out
+# ── compute ─────────────────────────────────────────────────────────────────────
+
+# Which subject kinds a face's compute may run a method over. The research
+# face is issuer-scoped by construction (faces.py): its compute runs issuer
+# and price methods and refuses book methods by name, so a brief-writing agent
+# cannot reach the holder's book through the one shared tool.
+ISSUER_KINDS = ("issuer", "price", "series")
+ALL_KINDS = tuple(skill.SUBJECT_KINDS)
 
 
-async def _read_issuer_brief(db: AsyncSession, ticker: str) -> dict:
-    company = await _resolve_company(db, ticker)
-    if company.get("error"):
-        return company
-    brief = await brief_service.latest_visible(db, company["id"])
-    if brief is None:
-        return {"error": "no_brief", "ticker": ticker.upper(),
-                "hint": "start_issuer_research produces one"}
-    return {"ticker": ticker.upper(), **brief}
+def _compute_for(kinds: tuple[str, ...]):
+    async def _compute(db: AsyncSession, op: str | None = None, method=None,
+                       operands: list[str] | None = None, subject=None, params: dict | None = None,
+                       as_quantity: str | None = None, direction: str | None = None) -> dict:
+        names = [method] if isinstance(method, str) else list(method or [])
+        outside = [m for m in names if m in skill.METHODS and skill.METHODS[m].subject_kind not in kinds]
+        if outside:
+            return {"error": "not_on_this_face", "methods": outside,
+                    "detail": "this face is issuer-scoped; book methods are the meta face's"}
+        return await compute_service.compute(db, op=op, method=method, operands=operands, subject=subject,
+                                             params=params, as_quantity=as_quantity, direction=direction)
+    return _compute
 
 
-# ── the run's own findings (V8-A) ───────────────────────────────────────────────
-# Thin, like every fn here. The reason these are four tools rather than one is
-# that they answer four different questions and a single "get_run" would make
-# every one of them cost the whole payload — which for a ten-position book is
-# fine and stops being fine at the first real one.
-
-async def _get_attribution(db: AsyncSession, run_id: str) -> dict:
-    return await run_reads_service.get_attribution(db, run_id)
-
-
-async def _get_risk_state(db: AsyncSession, run_id: str) -> dict:
-    return await run_reads_service.get_risk_state(db, run_id)
-
-
-async def _list_run_alerts(db: AsyncSession, run_id: str) -> dict:
-    return await run_reads_service.list_run_alerts(db, run_id)
-
-
-async def _list_risk_limits(db: AsyncSession, portfolio_id: str) -> dict:
-    return await run_reads_service.list_risk_limits(db, portfolio_id)
-
-
-async def _get_run_freshness(db: AsyncSession, portfolio_id: str) -> dict:
-    return await run_reads_service.get_run_freshness(db, portfolio_id)
-
-
-async def _reconcile_move(db: AsyncSession, run_id: str) -> dict:
-    return await reconcile_service.reconcile_move(db, run_id)
-
-
-async def _get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
-    return await integration_service.get_portfolio_analysis(db, run_id)
-
-
-async def _hypothetical_book(db: AsyncSession, run_id: str, sales: list[dict]) -> dict:
-    return await scenario_service.hypothetical_book(db, run_id, sales)
-
-
-async def _get_drawdown_episodes(db: AsyncSession, portfolio_id: str, span: str = "1y") -> dict:
-    return await drawdown_service.get_drawdown_episodes(db, portfolio_id, span)
-
-
-async def _explain_episode(db: AsyncSession, portfolio_id: str, peak: str, trough: str) -> dict:
-    return await drawdown_service.explain_episode(db, portfolio_id, peak, trough)
-
-
-
-# ── the book's own manifest (V15-S2b) ───────────────────────────────────────────
-
-# What this face can and cannot do, said where the model reads it. R4 measured
-# the failure: with no capability statement, the model called "no operator for
-# this" "not enough data" and, asked for a web search, silently searched
-# filings instead. V19 put the web on this face; the statement says so.
-_FACE_CAPABILITIES = {
-    "can": [
-        "read this book's runs by name (describe_run → read_quantities) and every issuer's "
-        "filed figures, filing passages and named measures",
-        "compute with calculate / series_stat / evaluate_formula, each minting a citable id — "
-        "and over the book's own figures by name (run_id:issuer_exposures.MSFT.weight, "
-        "calc_id:portfolio.integration.room_to_breach.<check>): a weight less a limit, "
-        "times the book's market value, is the dollars to sell",
-        "rebuild the book after a sale (hypothetical_book): weights, sectors and limit "
-        "checks of the book without the names sold, on a row read like a run",
-        "search the web (search_external_research) for what the filings cannot hold — news, "
-        "guidance, events after the last report — each result a src_ id a sentence can cite",
-        "start background work: a readiness pass, an exposure run, an issuer research run "
-        "(whose brief is read with read_issuer_brief)",
-    ],
-    "cannot": [
-        "produce a figure no tool returned: a quantity not on the table cannot be written",
-        "give a measure the desk withholds pending validation (VaR, expected shortfall, the "
-        "stress scenarios): say it is withheld; never estimate it from other figures",
-    ],
-}
-
-# The question each family of a run's quantities answers — now declared with
-# the resources it describes (analytics/resources.py, V16): quantities.py stamps
-# every quantity with its group from the same table this manifest is built
-# from, so the group the model reads beside a value and the group describe_run
-# files the name under cannot drift. The old names stay as aliases because this
-# module is where the manifest is assembled.
-from exposure_workbench.analytics.resources import RUN_GROUPS as _RUN_GROUPS  # noqa: E402
-from exposure_workbench.analytics.resources import matches as _matches  # noqa: E402
-
-
-def _factored(names: list[str]) -> dict:
-    """Names, stated as patterns over their row labels where that is shorter.
-
-    A run's mandate group is 27 checks × 3 columns + 54 distances: 144 names
-    that are five patterns over 27 labels. The model composes a name from a
-    pattern and a label exactly as it would copy one, and the payload stays
-    readable — measured: the flat listing was 18k characters, over the cap.
-    Names that do not share a shape with three others are listed whole.
-    """
-    by_shape: dict[tuple[str, str], list[str]] = {}
-    plain: list[str] = []
-    for n in names:
-        parts = n.split(".")
-        if len(parts) == 3:
-            by_shape.setdefault((parts[0], parts[2]), []).append(parts[1])
-        elif len(parts) == 4 and parts[0] == "portfolio":
-            # portfolio.integration.<key>.<label>
-            by_shape.setdefault((".".join(parts[:3]), ""), []).append(parts[3])
-        else:
-            plain.append(n)
-    # Patterns that range over the same labels share one label list: the
-    # mandate group's five patterns over 27 checks are one list of 27, not five.
-    by_labels: dict[tuple[str, ...], list[str]] = {}
-    for (head, tail), labels in by_shape.items():
-        if len(labels) <= 3:
-            plain.extend(f"{head}.{lb}.{tail}" if tail else f"{head}.{lb}" for lb in labels)
-            continue
-        by_labels.setdefault(tuple(sorted(labels)), []).append(
-            f"{head}.<label>.{tail}" if tail else f"{head}.<label>")
-    out: dict = {}
-    if plain:
-        out["names"] = sorted(plain)
-    if by_labels:
-        out["patterns"] = [{"patterns": pats, "labels": list(labels)} for labels, pats in by_labels.items()]
-    return out
-
-
-async def _describe_run(db: AsyncSession, run_id: str) -> dict:
-    """Everything one run holds, named the way the exit takes it, grouped by the
-    question each group answers. The values arrive on the table beside this."""
-    from exposure_workbench.analytics import resources as _rs
-    run = await run_reads_service._run_or_error(db, run_id)
-    if isinstance(run, dict):
-        return run
-    if run.status != "completed":
-        return {"error": "run_not_completed", "run_id": run_id, "status": run.status}
-    resolved = await qn.of_ref(db, run_id)
-    names = [q.label for q in resolved.quantities if q.not_alone is None]
-    withheld = sorted({q.label for q in resolved.quantities if q.not_alone is not None})
-    # The derived quantities — net betas, room to each tier — live on the row
-    # get_portfolio_analysis mints; minting it here puts them on the table with
-    # the rest, which is what "the whole book on one page" means.
-    analysis = await integration_service.get_portfolio_analysis(db, run_id)
-    analysis_id = analysis.get("calc_id") if isinstance(analysis, dict) else None
-    derived = [q.label for q in (await qn.of_ref(db, analysis_id)).quantities] if analysis_id else []
-    everything = names + derived
-    groups, grouped = [], set()
-    for key, question, patterns in _RUN_GROUPS:
-        members = [n for n in everything if n not in grouped and any(_matches(p, n) for p in patterns)]
-        if members:
-            grouped.update(members)
-            groups.append({"group": key, "answers": question, **_factored(members)})
-    rest = [n for n in everything if n not in grouped]
-    return {
-        "run_id": run_id, "portfolio_id": run.portfolio_id, "as_of": run.as_of_date.isoformat(),
-        "how_to_read": ("every name here is a figure on this run's table, with its value beside it "
-                        "under `table`. Write it in a slot {ref, name}: ref is the run_id, except "
-                        "portfolio.integration.* names, whose ref is analysis_calc_id. A pattern "
-                        "with <label> is one name per label. Every name is also an OPERAND for "
-                        "calculate and rank, written ref:name — run_id:issuer_exposures.MSFT.weight, "
-                        "analysis_calc_id:portfolio.integration.room_to_breach.<check>"),
-        "analysis_calc_id": analysis_id,
-        "groups": groups,
-        **({"other": _factored(rest)} if rest else {}),
-        "units": {r.table: {c.name: c.unit for c in r.columns} for r in _rs.RUN_CHILDREN},
-        "not_available": {
-            "headroom_not_recorded": analysis.get("headroom_not_recorded") if isinstance(analysis, dict) else None,
-            "withheld_collinear": _factored(withheld) if withheld else None,
-            # V20: named here as well as at the snapshot, because this is the
-            # manifest a book question reads before choosing the next call.
-            "withheld_pending_validation": _wh.withheld_note(),
-        },
-        "collinear_note": ("these factors are collinear: no single beta is on the table; "
-                           "factor_attributions.sum_of_contributions and the net betas are"
-                           if withheld else None),
-        "capabilities": _FACE_CAPABILITIES,
-    }
-
-
-async def _read_quantities(db: AsyncSession, run_id: str, names: list[str]) -> dict:
-    """The exact quantities a question needs, by name, in one call.
-
-    V22: a scenario row (`calc_…` from hypothetical_book) is a run-shaped row
-    and reads the same way — the first live turn called this on one and was
-    told `unknown_run`, then wrote the whole id as a name.
-    """
-    if run_id.startswith("calc_"):
-        row = (await db.execute(select(cs.CalcLedger).where(cs.CalcLedger.id == run_id))).scalar_one_or_none()
-        if row is None:
-            return {"error": "unknown_run", "run_id": run_id, "message": f"no run or scenario row {run_id}"}
-        if row.operation != typed_calculator.SCENARIO_OP:
-            return {"error": "not_a_book", "run_id": run_id,
-                    "detail": "read_quantities reads a run or a hypothetical_book row; this ledger "
-                              "row's figures are on its own table under their names"}
-        as_of = (row.params or {}).get("as_of")
-    else:
-        run = await run_reads_service._run_or_error(db, run_id)
-        if isinstance(run, dict):
-            return run
-        as_of = run.as_of_date.isoformat()
-    resolved = await qn.of_ref(db, run_id)
-    held = {q.label: q for q in resolved.quantities if q.not_alone is None}
-    wanted = [str(n) for n in names]
-    found = [n for n in wanted if n in held]
-    unknown = [n for n in wanted if n not in held]
-    return {"run_id": run_id, "as_of": as_of, "names": found,
-            "units": {n: held[n].unit_class for n in found},
-            **({"unknown": unknown, "detail": "not names this run holds; describe_run lists them"}
-               if unknown else {})}
-
-# ── filing retrieval ────────────────────────────────────────────────────────────
-
-async def _search_filing_passages(db: AsyncSession, ticker: str, query: str, k: int = 5,
-                                  form_type: str | None = None, item_code: str | None = None) -> dict:
-    company = await _resolve_company(db, ticker)
-    if company.get("error"):
-        return company
-    try:
-        # int(k) here as well as in the retrieval service: the coercion belongs
-        # where the model's value enters the tool layer, so the rule reads the
-        # same for every window size (see _spec on why the schema cannot say it).
-        passages = await frs.search_passages(db, company["id"], query, k=int(k),
-                                             form_type=form_type, item_code=item_code)
-    except frs.NotIndexed:
-        return {"error": "not_indexed", "ticker": ticker.upper(),
-                "hint": "run a readiness pass for this company first"}
-    return {
-        "ticker": ticker.upper(), "query": query,
-        "passages": [
-            {"chunk_id": p.chunk_id, "text": p.text, "score": round(p.score, 4),
-             "item": p.item_code, "section_title": p.section_title,
-             "citation": p.citation()}
-            for p in passages
-        ],
-    }
-
-
-async def _get_filing_section(db: AsyncSession, ticker: str, item_code: str, form_type: str | None = None) -> dict:
-    company = await _resolve_company(db, ticker)
-    if company.get("error"):
-        return company
-    section = await frs.get_section(db, company["id"], item_code, form_type=form_type)
-    if section is None:
-        return {"error": "section_not_found", "ticker": ticker.upper(), "item_code": item_code}
-    return {
-        "ticker": ticker.upper(), "item_code": section.item_code, "title": section.title,
-        "text": section.text, "citation": {
-            "type": "chunk", "accession": section.accession_number,
-            "form_type": section.form_type, "item": section.item_code,
-            "source_url": section.source_url,
-        },
-    }
-
-
-# ── risk alerts (portfolio context) ─────────────────────────────────────────────
-
-async def _list_alerts(db: AsyncSession, ticker: str) -> dict:
-    tk = ticker.upper()
-    rows = (await db.execute(
-        select(RiskAlert).where(RiskAlert.entity_id == tk).order_by(RiskAlert.created_at.desc()).limit(20)
-    )).scalars().all()
-    return {"ticker": tk, "alerts": [
-        {"id": a.id, "type": a.alert_type, "severity": a.severity,
-         "message": a.message, "utilization": float(a.utilization) if a.utilization is not None else None}
-        for a in _wh.published_alerts(rows)
-    ]}
+_compute = _compute_for(ALL_KINDS)
 
 
 # ── reflection ──────────────────────────────────────────────────────────────────
 
 async def _think(db: AsyncSession, thought: str) -> dict:
-    """Low-friction pause: no side effect, no budget, only a trace line.
-
-    session_id comes from the tool context, never from the model — the trace row
-    for the think step is written by the registry wrapper itself.
-    """
+    """Low-friction pause: no side effect, no budget, only a trace line."""
     return {"noted": True, "thought": thought[:400]}
 
 
 # ── registration ────────────────────────────────────────────────────────────────
 
-_TICKER = {"type": "string", "description": "Issuer ticker, e.g. NVDA"}
-
-# The forms a filing can actually HAVE, which is not the two anyone would list.
-# edgartools' get_filings defaults amendments=True and expands a requested form
-# to {form, form + '/A'}; ingest_filings_metadata records is_amendment and never
-# skips on it. So '10-K/A' reaches filing_chunks, a passage's own citation names
-# it — and with the old enum the model was refused for passing back the form the
-# previous call had just handed it. null is the "any form" the fn already means
-# by None.
-_FORM_TYPE = {
-    "type": ["string", "null"],
-    "enum": ["10-K", "10-Q", "10-K/A", "10-Q/A", None],
-    "description": "narrow to one form; omit for any",
-}
+_TICKER = {"type": "string", "description": "ticker, e.g. NVDA"}
+_FORM_TYPE = {"type": ["string", "null"], "enum": ["10-K", "10-Q", "10-K/A", "10-Q/A", None],
+              "description": "narrow to one form; omit for any"}
+_RUN_TABLES = tuple(qn.RUN_TABLES)
 
 
-def build_read_registry() -> ToolRegistry:
+def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
+    """The read core. `kinds` bounds what this registry's compute may run a
+    method over: the research face passes ISSUER_KINDS."""
     reg = ToolRegistry()
 
     reg.register(Tool(
-        name="get_flow",
-        display="Reading {ticker}'s {metric} over the periods it reports",
+        name="describe",
+        display="Looking at what the desk holds",
         description=(
-            "A flow metric (revenue, net income, interest expense, operating cash flow, "
-            "capex …) over a window YOU choose. Give `months` for the most recent window "
-            "of that length, or an explicit start/end. Issuers file flows over whatever "
-            "periods they file — quarters, half-years, year-to-date, full years — and this "
-            "derives your window from them by adding and subtracting the ones they did "
-            "report, returning the exact interval covered and which facts went in with "
-            "which sign. It never returns a shorter period than you asked for: a window "
-            "that cannot be derived is refused."
+            "What this desk holds about a subject — a ticker, a portfolio (port_…), a run (run_…), "
+            "a scenario row (calc_…); or, with subject omitted, the desk itself: its portfolios with "
+            "their ids and latest runs, where a book question starts — across every domain: filed "
+            "figures, filing text, prices, its place in the book, briefs; what is NOT held and why; "
+            "the methods compute can produce for it and the procedures an analyst follows. Start "
+            "here. expand opens one domain's detail."
+        ),
+        json_schema={"type": "object", "properties": {
+            "subject": {"type": ["string", "null"], "description": "ticker | port_… | run_… | calc_… | null for the desk"},
+            "expand": {"type": ["string", "null"], "enum": [*catalogue_service.EXPANDS, None]},
+        }, "additionalProperties": False},
+        fn=_describe, tool_class=READ,
+        evidence=Evidence(scope=_RUN_TABLES, names_from="table_names"),
+    ))
+    reg.register(Tool(
+        name="read_fundamentals",
+        display="Reading {ticker}'s filed figures",
+        description=(
+            "An issuer's filed figures. No metric: every balance at one instant (at). A metric: a "
+            "flow over a window (months, or start..end), its last N windows or readings (last_n), "
+            "or a balance at an instant (at). Every figure arrives with its period and a citable id; "
+            "a figure not filed is an absence row, never a substitute."
         ),
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
-            "metric": {"type": "string", "description": "a normalised metric name; "
-                                                        "describe_issuer has them"},
-            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120,
-                       "description": "window length; defaults to 12"},
-            "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, first day covered"},
-            "end": {"type": ["string", "null"], "description": "YYYY-MM-DD, last day covered"},
-            # A floor as well as a ceiling. The predecessor (get_fact_series)
-            # learned that 0 asked for none and got all forty, and -20 on a
-            # twelve-point series returned an empty series with a citable id.
-            "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40,
-                       "description": "more than 1 returns a SERIES: that many consecutive "
-                                      "windows of `months` each, on the issuer's own "
-                                      "reporting grid, oldest first, as one citable calc_id. "
-                                      "Use months=3 for quarters, 12 for fiscal years."},
-        }, "required": ["ticker", "metric"], "additionalProperties": False},
-        fn=_get_flow, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_balance_series",
-        display="Reading {ticker}'s {metric} at each reported date",
-        description=(
-            "One balance-sheet line (cash, total debt, receivables, equity …) at each date "
-            "the issuer reported it, newest last, as one citable series. Nothing is derived "
-            "or carried across dates — a balance is a reading at an instant. get_balance_sheet "
-            "is every line at ONE date; this is ONE line over time."
-        ),
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER,
-            "metric": {"type": "string", "description": "a normalised balance metric; describe_issuer has them"},
-            "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40,
-                       "description": "how many most-recent dates (default 12)"},
-        }, "required": ["ticker", "metric"], "additionalProperties": False},
-        fn=_get_balance_series, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="series_stat",
-        display="Taking the {op} over that series",
-        description=(
-            "One operator over one series you already hold (a calc_id from get_flow with "
-            "last_n, get_balance_series, or calculate). yoy / qoq / pct / abs return a new "
-            "series of changes, each point matched to its prior BY DATE; cagr / avg / min / "
-            "max / std / sum / latest return one number. The result is citable. For growth "
-            "over the last N quarters: get_flow(months=3, last_n=N) then series_stat(yoy)."
-        ),
-        json_schema={"type": "object", "properties": {
-            "series_id": {"type": "string", "description": "calc_… id of a series"},
-            "op": {"type": "string", "enum": list(series_service.OPS)},
-        }, "required": ["series_id", "op"], "additionalProperties": False},
-        fn=_series_stat, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="describe_issuer",
-        display="Looking up what {ticker} reports and what can be computed from it",
-        description=(
-            "Start here for any issuer: identity (name, CIK, sector, whether it can be "
-            "investigated), every financial metric its filings hold with how many periods "
-            "each has, and which named measures (leverage, coverage, margins …) those "
-            "metrics can feed — with the missing input named for the ones they cannot."
-        ),
-        json_schema={"type": "object", "properties": {"ticker": _TICKER},
-                     "required": ["ticker"], "additionalProperties": False},
-        fn=_describe_issuer, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_balance_sheet",
-        display="Reading {ticker}'s balance sheet",
-        description=(
-            "Every balance this issuer reported at ONE date — debt components, cash, "
-            "working capital, equity. Balances from different dates are different "
-            "company-moments and must not be combined, so lines the issuer did not report "
-            "at this date are listed separately with the date they were last reported, "
-            "never substituted in. `at` defaults to the most recent such date."
-        ),
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER,
-            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD; defaults to latest"},
+            "metric": {"type": ["string", "null"], "description": "a metric name from describe(ticker); null for the whole balance sheet"},
+            "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None], "description": "window for a flow (default 12)"},
+            "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, with end: an explicit window"},
+            "end": {"type": ["string", "null"]},
+            "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40, "description": "a series of the last N quarters (flow) or readings (balance)"},
+            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD instant for a balance; null = latest"},
         }, "required": ["ticker"], "additionalProperties": False},
-        fn=_get_balance_sheet, tool_class=READ,
-        evidence=Evidence(),
+        fn=_read_fundamentals, tool_class=READ, evidence=Evidence(),
     ))
     reg.register(Tool(
-        name="calculate",
-        display="Computing {op} of two figures",
+        name="read_filings",
+        display="Reading {ticker}'s filings",
         description=(
-            "Add, subtract, multiply or divide two quantities you already have, by their "
-            "ids (fact_… or calc_…) or by NAME on a run or an analysis row "
-            "(run_…:issuer_exposures.MSFT.weight, run_…:exposure_metrics.portfolio_market_value, "
-            "calc_…:portfolio.integration.room_to_breach.<check>). Compose anything: EBIT, "
-            "leverage, coverage, margins, turnover — and the book's own arithmetic: a weight "
-            "less its limit is the excess, times the book's market value is the dollars to "
-            "sell. None of these needs to be a built-in. The result gets its own calc_id and "
-            "is citable. Combinations that would silently double-count are refused with the "
-            "reason: two balances from different dates added together, two flows over "
-            "overlapping periods added together, a total added to something it already "
-            "contains, two books' figures summed or multiplied, or a book's figure summed "
-            "with a filed one. A balance divided by a flow is fine — that is what leverage "
-            "is — a balance subtracted from a later reading of it is the change over the "
-            "days between, and one book's weight less another's is the change between the "
-            "two books."
-        ),
-        json_schema={"type": "object", "properties": {
-            "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]},
-            "a": {"type": "string", "description": "fact_… or calc_… id, or ref:name for a figure on a run or analysis row"},
-            "b": {"type": "string", "description": "fact_… or calc_… id, or ref:name for a figure on a run or analysis row"},
-            "as_quantity": {"type": ["string", "null"],
-                            "description": "name the result IS — 'market_cap', 'fcf_yield' — "
-                                           "so the table calls it that and your answer can "
-                                           "slot it by the name; omitted, the row is named "
-                                           "by its lineage (a.divide.b)"},
-        }, "required": ["op", "a", "b"], "additionalProperties": False},
-        fn=_calculate, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="rank",
-        display="Ordering {direction} first",
-        description=(
-            "Put two or more quantities in order, and record the order. Use it whenever "
-            "an answer would say which is highest, lowest, largest or worst — the ranking "
-            "is computed here rather than read off by eye, and its result puts a PLACE on "
-            "the table for each name (`accruals_ratio.rank.JPM`, "
-            "`issuer_exposures.weight.rank.MSFT`) beside each value, so the claim can be "
-            "slotted like any other figure. The book's own figures rank by name "
-            "(run_…:issuer_exposures.MSFT.weight, one per holding). Every entry must be the "
-            "same measure, in the same unit, and belong to a different issuer or row; "
-            "anything else is refused with the reason. Each entry keeps its own period, and "
-            "they are stated."
-        ),
-        json_schema={"type": "object", "properties": {
-            "refs": {"type": "array", "minItems": 2, "items": {"type": "string"},
-                     "description": "fact_… or calc_… ids, or ref:name figures on a run, one per name being ranked"},
-            "direction": {"type": "string", "enum": list(typed_calculator.DIRECTIONS),
-                          "description": "which end takes place 1"},
-            "as_quantity": {"type": ["string", "null"],
-                            "description": "what to call the ordered measure on the table; "
-                                           "omitted, the operands' own name is used"},
-        }, "required": ["refs", "direction"], "additionalProperties": False},
-        fn=_rank, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="evaluate_formula",
-        display="Evaluating {name} for {ticker}",
-        description=(
-            "One named measure for one issuer, built from the same primitives you could "
-            "call yourself: the value, the definition that produced it, the period basis, "
-            "a citable calc_id and the source. An input the issuer does not report is "
-            "named rather than left as a hole."
+            "An issuer's filing text: query searches the indexed passages (each a chunk_ id a sentence "
+            "can cite and quote verbatim); item reads one Item of the latest filing whole ('1A', '7', '7A'). "
+            "Figures stated only in prose (segments, products, customers) are quoted from here, not computed."
         ),
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
-            "name": {"type": "string", "description": "a name from describe_issuer's formulas"},
-            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120},
-            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
-        }, "required": ["ticker", "name"], "additionalProperties": False},
-        fn=_evaluate_formula, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_fundamental_panel",
-        display="Building the measures panel for {ticker}",
-        description=(
-            "Every named measure at once for one issuer — leverage, coverage, liquidity, "
-            "cash generation, margins, turnover — each with its definition, period basis "
-            "and calc_id. A shortcut for the whole registry, not a special path: every "
-            "line is reproducible by a single evaluate_formula call. Financial issuers are "
-            "refused, because interest expense is an operating cost for a bank. No "
-            "judgement is attached."
-        ),
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER,
-            "months": {"type": ["integer", "null"], "minimum": 1, "maximum": 120},
-            "at": {"type": ["string", "null"], "description": "YYYY-MM-DD for balance dates"},
-        }, "required": ["ticker"], "additionalProperties": False},
-        fn=_get_fundamental_panel, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_portfolio_snapshot",
-        display="Reading this desk's books and their latest run",
-        description="The portfolio(s) this desk manages: latest exposure metrics, largest sector "
-                    "and issuer weights, and active risk alerts. Takes no arguments — this is how "
-                    "you discover holdings for a portfolio-level question. Each portfolio's numbers "
-                    "carry the run_id that produced them; cite run_id (and alert ids) for portfolio claims.",
-        json_schema={"type": "object", "properties": {}, "additionalProperties": False},
-        fn=_get_portfolio_snapshot, tool_class=READ,
-        evidence=Evidence(scope=("exposure_metrics", "issuer_exposures", "sector_exposures", "risk_alerts", "count")),
-    ))
-    reg.register(Tool(
-        name="get_task_status",
-        display="Checking whether the delegated work has finished",
-        description="Whether delegated work has finished. Accepts the task_/run_/rrun_ id "
-                    "that ensure_company_ready, start_exposure_run or start_issuer_research returned.",
-        json_schema={"type": "object", "properties": {
-            "job_id": {"type": "string", "description": "task_… / run_… / rrun_…"},
-        }, "required": ["job_id"], "additionalProperties": False},
-        fn=_get_task_status, tool_class=READ,
-        evidence=NOT_EVIDENCE,  # reads state, not the world — cite the delegated run's own rows
-    ))
-    reg.register(Tool(
-        name="get_portfolio_positions",
-        display="Reading the holdings",
-        description="Every holding in a portfolio: pos_id, ticker, quantity, sector, market value "
-                    "and weight. Cite the pos_id for a share count. Capped at 50 rows — when "
-                    "truncated is set, total_holdings is the real number and say so. "
-                    "get_portfolio_snapshot only carries the largest few.",
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-        }, "required": ["portfolio_id"], "additionalProperties": False},
-        fn=_get_portfolio_positions, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="read_issuer_brief",
-        display="Opening the latest brief on {ticker}",
-        description="The latest Issuer Risk Brief for a company, with the evidence ids behind "
-                    "each block. Cite those ids, not the brief.",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
-        fn=_read_issuer_brief, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_attribution",
-        display="Reading what the regression attributed the day to",
-        description=(
-            "Why a portfolio moved on the run's date: every factor's beta, return and "
-            "contribution, and every position's weight, return and contribution — the "
-            "complete set, not a selection. Also the regression behind the betas "
-            "(observations, window, R², alpha, residual). This is the FIRST tool for any "
-            "'why did it move' question; filings describe an issuer over quarters and "
-            "cannot explain one day. Cite the run_id. When factors are collinear each "
-            "beta carries quotable_individually=false — quote their sum instead."
-        ),
-        json_schema={"type": "object", "properties": {
-            # No top_k. No limit. The absence is asserted by a test: a size
-            # argument is how an answer comes to name two positions and imply the
-            # other eight did nothing.
-            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_get_attribution, tool_class=READ,
-        evidence=Evidence(scope=("factor_attributions", "issuer_exposures", "exposure_metrics")),
-    ))
-    reg.register(Tool(
-        name="get_risk_state",
-        display="Reading the run's risk measures",
-        description=(
-            "One run's measured risk state: exposure, volatility and drawdown metrics, and "
-            "how many limit checks ran versus fired. Measures the desk computes but withholds "
-            "pending validation are named in `withheld`, not given as numbers. Describes the "
-            "book on that date; it is not a forecast. Cite the run_id."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_get_risk_state, tool_class=READ,
-        evidence=Evidence(scope=("exposure_metrics", "risk_alerts", "limit_checks", "count")),
-    ))
-    reg.register(Tool(
-        name="list_run_alerts",
-        display="Reading which mandate limits the run raised",
-        description=(
-            "The alerts one run raised, each whole: current value, limit, utilisation, and a "
-            "reads_as sentence composed for you. Use reads_as — the three numbers on an alert "
-            "row are easy to attribute to the wrong quantity, and utilisation is the share of "
-            "the limit consumed, never a level. Cite the alert id or the run id."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_list_run_alerts, tool_class=READ,
-        evidence=Evidence(scope=("risk_alerts", "count")),
-    ))
-    reg.register(Tool(
-        name="list_risk_limits",
-        display="Reading this book's mandate limits",
-        description=(
-            "The limit policy in force for a portfolio: each check's warning and breach level. "
-            "This is what the desk decided, not a measurement of the world — these rows are "
-            "not citable evidence. For a breached level, cite the alert that carries it."
-        ),
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-        }, "required": ["portfolio_id"], "additionalProperties": False},
-        fn=_list_risk_limits, tool_class=READ,
-        evidence=NOT_EVIDENCE,  # policy, not measurement — for a breached level, cite the alert
-    ))
-    reg.register(Tool(
-        name="get_run_freshness",
-        display="Checking how current the latest run is",
-        description=(
-            "How current a portfolio's newest completed run is: the run's date, the latest "
-            "market session, how many sessions have traded since, and whether a run is in "
-            "flight. Two dates kept apart on purpose — 'the run is from Thursday' and 'the "
-            "market has traded twice since' are different facts."
-        ),
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-        }, "required": ["portfolio_id"], "additionalProperties": False},
-        fn=_get_run_freshness, tool_class=READ,
-        evidence=NOT_EVIDENCE,  # two dates about the desk's own work, not the world
-    ))
-    reg.register(Tool(
-        name="reconcile_move",
-        display="Splitting the day's move into market and stock-specific parts",
-        description=(
-            "Reconcile one day's portfolio move in a single call: checks that the position "
-            "contributions sum to the day's return, splits the move into what the factor "
-            "model explains and what it does not (alpha_plus_residual), and names the "
-            "largest factor and the largest position. Use this for 'why did the book move' "
-            "and 'what drove the drawdown' before reaching for anything else. If the "
-            "position identity does not hold, no share of the move is reported at all — "
-            "that is a data problem, not a smaller answer. Cite the run_id or the calc_id."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_reconcile_move, tool_class=READ,
-        evidence=Evidence(scope=("issuer_exposures", "factor_attributions", "exposure_metrics")),
-    ))
-    reg.register(Tool(
-        name="get_portfolio_analysis",
-        display="Ordering the exposures and measuring the room left",
-        description=(
-            "One run's exposures, already ordered and netted: the book's NET exposure to "
-            "rates, credit and equity with the legs that make it up, the distance from each "
-            "limit check to its own "
-            "warning and breach levels, and every holding with its weight and its "
-            "contribution to the day. Use this for 'what is this book exposed to', 'which "
-            "risk is biggest', 'how much room is left' and 'what should I watch' — it "
-            "answers in one call what otherwise takes five, and the ordering and the "
-            "netting are done here rather than by you. A risk no factor measures is "
-            "reported as unmeasured, not as zero. Cite the run_id, or the calc_id for the "
-            "netted betas and the distances. Every distance is an operand for calculate "
-            "by name (calc_id:portfolio.integration.room_to_breach.<check>): times the "
-            "book's market value it is the dollars of room, or of excess."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "an exposure run id (run_...)"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_get_portfolio_analysis, tool_class=READ,
-        evidence=Evidence(scope=("limit_checks", "factor_attributions", "issuer_exposures", "exposure_metrics", "count")),
-    ))
-    reg.register(Tool(
-        name="hypothetical_book",
-        display="Rebuilding the book after the sale",
-        description=(
-            "The book as it would stand after selling some of what it holds — all of a "
-            "name, or a fraction of it — with the weights renormalised over what remains, "
-            "the sector weights, the market value, and every concentration and exposure "
-            "limit check re-run against the portfolio's own thresholds. Use it for 'if I "
-            "sell X, where does concentration land', 'what gets tight, what gets better', "
-            "and 'would trimming Y clear the warning'. The proceeds leave the book (no cash "
-            "line is added). The result is a row whose names are a run's names "
-            "(issuer_exposures.MSFT.weight, limit_checks.issuer_concentration:MSFT.current_value, "
-            "count.alerts), so slot them with ref = the calc_id; and each is an operand for "
-            "calculate — calc_id:issuer_exposures.MSFT.weight less run_id:issuer_exposures.MSFT.weight "
-            "is the change the sale makes. Factor exposures are not re-fitted and are "
-            "reported as unmeasured, never carried over."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "the completed exposure run (run_...) to start from"},
-            "sales": {"type": "array", "minItems": 1, "maxItems": 20,
-                      "items": {"type": "object", "properties": {
-                          "ticker": {"type": "string"},
-                          "fraction": {"type": "number", "exclusiveMinimum": 0, "maximum": 1,
-                                       "description": "share of the position sold; omitted means all of it"},
-                      }, "required": ["ticker"], "additionalProperties": False},
-                      "description": "what is sold, one entry per name"},
-        }, "required": ["run_id", "sales"], "additionalProperties": False},
-        fn=_hypothetical_book, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="describe_run",
-        display="Reading what the run holds, by name",
-        description=(
-            "Start here for any question about THIS BOOK: everything one completed run "
-            "holds, named exactly as a slot takes it, grouped by the question each group "
-            "answers — book size, concentration, mandate (each check against its tiers and "
-            "the room left), factor exposure, attribution, risk, counts. The values "
-            "come back on the table beside the names. Also says what this face can and "
-            "cannot do. Read it before reaching for the per-table tools."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "an exposure run id (run_...) from get_portfolio_snapshot"},
-        }, "required": ["run_id"], "additionalProperties": False},
-        fn=_describe_run, tool_class=READ,
-        evidence=Evidence(scope=tuple(qn.RUN_TABLES)),
-    ))
-    reg.register(Tool(
-        name="read_quantities",
-        display="Reading the named figures from the run",
-        description=(
-            "The exact figures a question needs, by name, in one call — names from "
-            "describe_run (or any table you have seen), e.g. issuer_exposures.MSFT.weight, "
-            "limit_checks.sector_concentration:Technology.breach_level. Unknown names are "
-            "returned as unknown, not guessed. Reads a run (run_…) or a hypothetical_book "
-            "row (calc_…) alike."
-        ),
-        json_schema={"type": "object", "properties": {
-            "run_id": {"type": "string", "description": "a run id (run_…) or a hypothetical_book row id (calc_…)"},
-            "names": {"type": "array", "minItems": 1, "maxItems": 120, "items": {"type": "string"}},
-        }, "required": ["run_id", "names"], "additionalProperties": False},
-        fn=_read_quantities, tool_class=READ,
-        evidence=Evidence(names_from="names"),
-    ))
-    reg.register(Tool(
-        name="get_drawdown_episodes",
-        display="Measuring the drawdowns over the window",
-        description=(
-            "When this portfolio fell and whether it came back: every peak-to-trough "
-            "episode at least 5% deep in the span, deepest first, with the trough date and "
-            "the recovery date (null while still under water). Use this for 'have there "
-            "been drawdowns' and 'what was the worst one'. A depth is a distance below a "
-            "running high, not a return."
-        ),
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-            # An enum rather than a day count. "The last 37 days" is a window
-            # chosen after seeing the answer.
-            "span": {"type": ["string", "null"], "enum": ["3m", "6m", "1y", "3y", None],
-                     "description": "history to search (default 1y)"},
-        }, "required": ["portfolio_id"], "additionalProperties": False},
-        fn=_get_drawdown_episodes, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="explain_episode",
-        display="Explaining what happened between {peak} and {trough}",
-        description=(
-            "What happened between a peak and a trough: the book's cumulative return over "
-            "that window, the benchmark's over the same window, and each holding's. These "
-            "are fixed-window returns — they do NOT break the drawdown's depth into parts, "
-            "because depth depends on the path and is not additive. Say the window when "
-            "you quote any of these."
-        ),
-        json_schema={"type": "object", "properties": {
-            "portfolio_id": {"type": "string"},
-            "peak": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
-            "trough": {"type": "string", "description": "YYYY-MM-DD, from get_drawdown_episodes"},
-        }, "required": ["portfolio_id", "peak", "trough"], "additionalProperties": False},
-        fn=_explain_episode, tool_class=READ,
-        evidence=Evidence(),
-    ))
-    reg.register(Tool(
-        name="get_market_stats",
-        display="Reading {ticker}'s price return",
-        description="Price return over a window (1m/3m/6m/1y), optionally relative to a benchmark (default SPY).",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER,
-            "window": {"type": "string", "enum": ["1m", "3m", "6m", "1y"], "default": "1y"},
-            # str | None in the signature: None means "no benchmark comparison",
-            # which calc_service branches on. Omitting and sending null are the
-            # same intent, and a model with non-strict function calling sends both.
-            "benchmark": {"type": ["string", "null"], "default": "SPY"},
-        }, "required": ["ticker"], "additionalProperties": False},
-        fn=_get_market_stats, tool_class=READ,
-        evidence=Evidence(),
-    ))
-
-    # ── V16: the price side of price × fundamentals (H1) and the single-name
-    # price analytics the portfolio layer always had (H3). Registered from the
-    # service's own _TOOL_SPECS — the schema, display, description and evidence
-    # declaration are data beside the producer they describe, so the face and
-    # the service cannot drift apart.
-    def _price_fn(service_fn: str):
-        svc = getattr(price_analytics_service, service_fn)
-
-        async def _fn(db: AsyncSession, **args):
-            # None means "use the default" — the schemas admit null because a
-            # model with non-strict function calling sends it (see the
-            # benchmark note on get_market_stats).
-            return await svc(db, invoked_by=current_session_id(),
-                             **{k: v for k, v in args.items() if v is not None})
-        return _fn
-
-    for _spec in price_analytics_service._TOOL_SPECS:
-        reg.register(Tool(
-            name=_spec["name"], display=_spec["display"],
-            description=_spec["description"], json_schema=_spec["json_schema"],
-            fn=_price_fn(_spec["service_fn"]), tool_class=READ,
-            evidence=Evidence(**_spec["evidence"]),
-        ))
-
-    reg.register(Tool(
-        name="search_filing_passages",
-        display="Searching {ticker}'s filings for \u201c{query}\u201d",
-        description="Semantic search across an issuer's indexed 10-K/10-Q; returns passages with citation anchors.",
-        json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "query": {"type": "string"},
-            "k": {"type": "integer", "default": 5, "minimum": 1, "maximum": 10},
+            "query": {"type": ["string", "null"]},
+            "item": {"type": ["string", "null"], "description": "'1', '1A', '7', '7A', … "},
+            "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             "form_type": _FORM_TYPE,
-            "item_code": {"type": ["string", "null"], "minLength": 1,
-                          "description": "narrow to an Item, e.g. 'Item 1A'"},
-        }, "required": ["ticker", "query"], "additionalProperties": False},
-        fn=_search_filing_passages, tool_class=READ,
-        evidence=Evidence(),
+        }, "required": ["ticker"], "additionalProperties": False},
+        fn=_read_filings, tool_class=READ, evidence=Evidence(),
     ))
     reg.register(Tool(
-        name="get_filing_section",
-        display="Reading {item_code} of {ticker}'s filing in full",
-        description="Read a whole SEC Item verbatim from the most recent filing (e.g. Item 1A Risk Factors).",
+        name="read_prices",
+        display="Reading {ticker}'s prices",
+        description=(
+            "A name's daily adjusted closes over a named window, as one citable series (the level "
+            "every return-derived figure is measured on); with no window, one session's close and "
+            "adjusted close. Statistics over prices are compute methods (price.*)."
+        ),
         json_schema={"type": "object", "properties": {
-            "ticker": _TICKER, "item_code": {"type": "string", "minLength": 1},
-            "form_type": _FORM_TYPE,
-        }, "required": ["ticker", "item_code"], "additionalProperties": False},
-        fn=_get_filing_section, tool_class=READ,
-        evidence=Evidence(),
+            "ticker": _TICKER,
+            "window": {"type": ["string", "null"], "enum": ["1m", "3m", "6m", "1y", "3y", None]},
+            "as_of": {"type": ["string", "null"], "description": "YYYY-MM-DD for a single session; null = latest"},
+        }, "required": ["ticker"], "additionalProperties": False},
+        fn=_read_prices, tool_class=READ, evidence=Evidence(),
     ))
     reg.register(Tool(
-        name="list_alerts",
-        display="Checking for alerts naming {ticker}",
-        description="Portfolio risk alerts naming this issuer (concentration, etc.).",
-        json_schema={"type": "object", "properties": {"ticker": _TICKER}, "required": ["ticker"], "additionalProperties": False},
-        fn=_list_alerts, tool_class=READ,
-        evidence=Evidence(),
+        name="compute",
+        display="Computing",
+        description=(
+            "The one place a figure is computed; every result is a citable row. Either an op over "
+            "operands — add/subtract/multiply/divide (two operands), rank (two or more, with direction), "
+            f"regress (two series), or a series statistic ({', '.join(compute_service.SERIES_OPS)}; one "
+            "series) — where an operand is a fact_/calc_ id or a figure by name on a run, analysis or "
+            "scenario row (run_…:issuer_exposures.MSFT.weight); or a method from describe's list over a "
+            "subject (a ticker, a run_…, a port_…) with its params — issuer measures, price.*, book.*. "
+            "method and subject take lists: ten issuers' net margin is one call. Refusals say why and "
+            "what would go through."
+        ),
+        json_schema={"type": "object", "properties": {
+            "op": {"type": ["string", "null"], "enum": [*compute_service.OPS, None]},
+            "operands": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40},
+            "direction": {"type": ["string", "null"], "enum": ["highest", "lowest", None], "description": "for rank"},
+            "method": {"type": ["string", "array", "null"], "items": {"type": "string"}, "maxItems": 40,
+                       "description": "a method name, or a list"},
+            "subject": {"type": ["string", "array", "null"], "items": {"type": "string"}, "maxItems": 40,
+                        "description": "ticker | run_… | port_…, or a list"},
+            "params": {"type": ["object", "null"], "description": "the method's params (describe lists them)"},
+            "as_quantity": {"type": ["string", "null"], "description": "what to call an op's result, e.g. 'dollars_to_sell'"},
+        }, "additionalProperties": False},
+        fn=_compute_for(kinds), tool_class=READ,
+        evidence=Evidence(scope=_RUN_TABLES),
     ))
     reg.register(Tool(
         name="think",
-        display="Making a note before going on",
-        description="Pause to write an analytical note before anchoring a conclusion. No side effect, no budget.",
-        json_schema={"type": "object", "properties": {
-            "thought": {"type": "string"},
-        }, "required": ["thought"], "additionalProperties": False},
+        display="Thinking",
+        description="Pause and note a thought. Free; no evidence; never an answer.",
+        json_schema={"type": "object", "properties": {"thought": {"type": "string"}},
+                     "required": ["thought"], "additionalProperties": False},
         fn=_think, tool_class=REFLECTION,
-        evidence=NOT_EVIDENCE,  # the model talking to itself
+        evidence=NOT_EVIDENCE,
+    ))
+    register_book_tool(reg)
+    return reg
 
+
+def register_book_tool(reg: ToolRegistry) -> ToolRegistry:
+    """read_book is registered on every read registry and listed on the META
+    face only (faces.py): a face is what a mount serves, and a registered
+    tool outside the face is unknown to that mount (test_mcp_face_scope)."""
+    reg.register(Tool(
+        name="read_book",
+        display="Reading from {ref}",
+        description=(
+            "The desk's own work, by name. A run or scenario row (run_…, calc_…): figures by the names "
+            "describe lists (issuer_exposures.MSFT.weight, limit_checks.issuer_concentration:MSFT.breach_level, "
+            "count.alerts), or the sections alerts / attribution / risk_state. A portfolio (port_…): "
+            f"{', '.join(_PORTFOLIO_SECTIONS)}. A ticker: brief, alerts. A task (task_…, rrun_…): its state."
+        ),
+        json_schema={"type": "object", "properties": {
+            "ref": {"type": "string"},
+            "names": {"type": "array", "minItems": 1, "maxItems": 120, "items": {"type": "string"}},
+        }, "required": ["ref", "names"], "additionalProperties": False},
+        fn=_read_book, tool_class=READ,
+        evidence=Evidence(scope=_RUN_TABLES, names_from="names"),
     ))
     return reg

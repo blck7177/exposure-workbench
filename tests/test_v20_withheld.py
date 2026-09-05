@@ -99,10 +99,9 @@ def test_every_reader_that_used_to_serve_a_withheld_measure_now_asks_withheld_py
 
 
 def test_the_entry_point_and_the_manifest_carry_the_withheld_sentence():
-    from exposure_workbench.tools import definitions
-    assert "withheld_note()" in inspect.getsource(definitions._get_portfolio_snapshot)
-    assert "withheld_pending_validation" in inspect.getsource(definitions)
-    assert any("withholds" in c for c in definitions._FACE_CAPABILITIES["cannot"])
+    from exposure_workbench.services import catalogue_service
+    assert "withheld_note()" in inspect.getsource(catalogue_service.describe)
+    assert '"withheld"' in inspect.getsource(catalogue_service.describe)
 
 
 def test_withheld_check_filters_read_the_type_before_the_colon():

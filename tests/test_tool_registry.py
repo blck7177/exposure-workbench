@@ -88,7 +88,7 @@ def _wire(monkeypatch, *, built=None):
     async def _record(db, session_id, **kw):
         log["recorded"].append(kw["evidence_refs"])
 
-    async def _reserve(db, session_id, is_external_search=False):
+    async def _reserve(db, session_id, is_external_search=False, message_id=None):
         pass
 
     monkeypatch.setattr(R.tbl, "build", _build)
@@ -286,10 +286,10 @@ def test_schemas_are_valid_function_defs():
 
 
 def test_required_judgment_fields_are_in_schema():
-    """schema-as-interface: get_flow can't be called without ticker+metric."""
+    """schema-as-interface: read_fundamentals can't be called without a ticker."""
     reg = build_read_registry()
-    gfs = reg.get("get_flow")
-    assert set(gfs.json_schema["required"]) == {"ticker", "metric"}
+    gfs = reg.get("read_fundamentals")
+    assert set(gfs.json_schema["required"]) == {"ticker"}
 
 
 def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
@@ -300,11 +300,11 @@ def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
     read that as a smaller face rather than as the wrong registry for this face.
     """
     reg = build_read_registry()
-    assert "get_flow" in faces.resolve(reg, faces.READ_CORE)
+    assert "read_fundamentals" in faces.resolve(reg, faces.READ_CORE)
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
         faces.resolve(reg, faces.FACE_META_AGENT)
-    assert "start_issuer_research" in str(exc.value)   # tools/registries.build_meta_registry, P7
+    assert "start" in str(exc.value)   # tools/registries.build_meta_registry
 
 
 def test_redact_args_masks_key_class_fields_only():

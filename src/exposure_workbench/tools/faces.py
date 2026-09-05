@@ -20,100 +20,29 @@ smaller face.
 
 from __future__ import annotations
 
-# Read + reflection tools available to every agent surface.
+# Read + reflection tools available to every agent surface (V23: the data
+# domains an issuer question needs, the one compute, and the pause).
 READ_CORE = [
-    # V9-A2/A3. Any window, and one instant — the two primitives report analysis
-    # is composed from. On both faces: an issuer's filings are issuer-scoped
-    # facts, which is what the research face is for too.
-    "get_flow",
-    "get_balance_sheet",
-    # V10-S2. The series axis of the same two primitives, and the one operator
-    # over a series; describe_issuer is the single locating tool.
-    "get_balance_series",
-    "series_stat",
-    "describe_issuer",
-    # V9-A5. The four operators, typed: they refuse the combinations the
-    # citation gate cannot see and allow every other one.
-    "calculate",
-    "rank",
-    # V9-D/P. The method map, one measure, and all of them at once — the last
-    # being a batch of the second, with no privileged path of its own.
-    "evaluate_formula",
-    "get_fundamental_panel",
-    "get_market_stats",
-    # V16 — the price side of price × fundamentals (H1) and the single-name
-    # price analytics the book already had at portfolio level (H3). On both
-    # faces for the same reason get_market_stats is: an issuer's market data
-    # is issuer-scoped.
-    "get_price",
-    "get_price_series",
-    "get_rolling_volatility",
-    "get_beta",
-    "regress_series",
-    "get_momentum_12_1",
-    "get_distance_from_52w_high",
-    "get_adv",
-    # V21-S2. The deepest fall in a window, subtracted where every other
-    # estimate is made — the model used to slot the peak for "decline".
-    "get_drawdown",
-    "search_filing_passages",
-    "get_filing_section",
-    "list_alerts",
+    "describe",
+    "read_fundamentals",
+    "read_filings",
+    "read_prices",
+    "compute",
     "think",
 ]
 
-# Meta-agent adds the portfolio entry point + delegation + respond (P7); research
-# adds search_external_research + submit_brief (P6). Kept as names here.
-# get_portfolio_snapshot is meta-only: it frames a portfolio-level question, which
-# is the meta-agent's job. The research face stays issuer-scoped (adding portfolio
-# weights would change brief generation and needs its own validation).
-# get_task_status, get_portfolio_positions and read_issuer_brief are meta-only for
-# the same reason get_portfolio_snapshot is: they answer questions ABOUT this
-# desk's own work rather than about an issuer's filings. read_issuer_brief is also
-# kept off the research face deliberately — letting a brief-writing agent cite a
-# previous brief's ids is a citation loop, not a source.
-META_ONLY_READS = [
-    "get_portfolio_snapshot", "get_task_status", "get_portfolio_positions", "read_issuer_brief",
-    # V8-A. The run's own findings. Meta-only for the same reason as the four
-    # above: they answer questions about THIS DESK's portfolios, and the research
-    # face is issuer-scoped by construction. A brief-writing agent that could
-    # read the book's attribution would be writing about the holder, not the
-    # issuer.
-    "get_attribution", "get_risk_state", "list_run_alerts", "list_risk_limits",
-    "get_run_freshness",
-    # V8-B. One call that reconciles a day's move, built on get_attribution's
-    # own service rather than a second copy of the query.
-    "reconcile_move",
-    # V14-A. The ordering, the netting and the distances, done once server-side.
-    # Meta-only for the same reason as the rest of this block: it answers a
-    # question about THIS DESK's book. It sits beside reconcile_move rather than
-    # inside get_portfolio_snapshot deliberately — the snapshot frames a
-    # question and is called first every time, and putting a run's whole
-    # analysis into it would make every conversation pay for one.
-    "get_portfolio_analysis",
-    # V15-S2b. The book's own manifest and its read-by-name: what a run holds,
-    # named the way the exit takes it, and the exact quantities a question
-    # needs in one call. Meta-only like everything about THIS DESK's book.
-    "describe_run", "read_quantities",
-    # V8-D. When the book fell and what the window between two dates held. Both
-    # are about a portfolio, so both are meta-only.
-    "get_drawdown_episodes", "explain_episode",
-    # V22. The book after a sale, as a row every other tool can read and the
-    # calculator can take operands from. A hypothetical book is still THIS
-    # desk's book.
-    "hypothetical_book",
-]
+# The meta face adds the desk's own book (read_book), the web, delegation and
+# the exit. read_book is meta-only for the reason the old portfolio reads
+# were: it answers questions about THIS DESK's book, and the research face is
+# issuer-scoped by construction — a brief-writing agent reading the book's
+# weights would be writing about the holder, not the issuer.
+META_ONLY_READS = ["read_book"]
 
-# V19: search_external_research is on BOTH faces. Until then the chat had no
-# web at all — asked for the news, the model searched filings and said so in a
-# capability statement only describe_run carried. The sub-budget
-# (external_search_budget per session) and the src_ declaration are the tool's
-# own and travel with it.
 FACE_META_AGENT = READ_CORE + META_ONLY_READS + [
-    "search_external_research",
-    "ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond",
+    "search_web",
+    "start", "respond",
 ]
-FACE_RESEARCH = READ_CORE + ["search_external_research", "submit_brief"]
+FACE_RESEARCH = READ_CORE + ["search_web", "submit_brief"]
 
 # What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
 # at /mcp/<name> and every token carries the name it was minted for, so the same

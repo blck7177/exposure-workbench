@@ -127,37 +127,37 @@ METRICS: dict[str, MetricSemantics] = {
         note="All term debt, current maturities INCLUDED — a component of what the "
              "issuer owes, NOT the total. Which components an issuer files varies, "
              "so a total is composed rather than read off a line.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
     "long_term_debt_noncurrent": MetricSemantics(
         note="Term debt due beyond twelve months, excluding the current maturities. "
              "A component, so a total that adds it to a line already containing it "
              "counts the same debt twice.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
     "current_portion_long_term_debt": MetricSemantics(
         note="The current maturities of long-term debt on their own. Already inside "
              "long_term_debt_total, so adding the two is a double count rather than "
              "a total.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
     "debt_current_total": MetricSemantics(
         note="Every debt the issuer classifies as current, whatever its origin — a "
              "wider line than the current maturities of term debt, so the two are "
              "not interchangeable.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
     "short_term_borrowings": MetricSemantics(
         note="Short-dated borrowings such as commercial paper and revolver draws. A "
              "component of debt_current_total rather than a synonym for it: an "
              "issuer filing both files two different numbers.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
     "commercial_paper": MetricSemantics(
         note="Short-dated debt outside the term structure — a component, NOT a "
              "synonym for the current debt total. A filed zero is a reported value "
              "rather than an absence.",
-        for_a_total_call="evaluate_formula(name='total_debt')",
+        for_a_total_call="compute(method=name='total_debt')",
     ),
 
     # ── interest: an accrual, a cash payment, and a bank's revenue ────────────
@@ -270,21 +270,21 @@ WORKED_EXAMPLES: dict[str, tuple[WorkedExample, ...]] = {
     "issuer": (
         WorkedExample(
             question="What is this issuer's total debt / net debt / leverage?",
-            calls=("evaluate_formula(name='total_debt')",),
+            calls=("compute(method=name='total_debt')",),
             why="One producer per named measure. A balance-sheet line is a component "
                 "whatever its name ends in, and a total added to a component it "
                 "contains double-counts.",
         ),
         WorkedExample(
             question="How has revenue (or any flow) grown over the last four quarters?",
-            calls=("get_flow(metric=..., months=3, last_n=4)",
-                   "series_stat(series_id=..., op='yoy')"),
+            calls=("read_fundamentals(metric=..., months=3, last_n=4)",
+                   "compute(op=series_id=..., op='yoy')"),
             why="Pick the metric whose latest_period_end reaches the present — one "
                 "carrying superseded_by returns a short series, not an error.",
         ),
         WorkedExample(
             question="Why is a measure defined the way it is?",
-            calls=("evaluate_formula(name=...)",),
+            calls=("compute(method=name=...)",),
             why="The result carries an authority you may name: cite_as is the section "
                 "to say, url is where to read it. Name it rather than 'the registry'.",
         ),
@@ -292,14 +292,14 @@ WORKED_EXAMPLES: dict[str, tuple[WorkedExample, ...]] = {
     "portfolio": (
         WorkedExample(
             question="Why are there large drawdowns?",
-            calls=("get_drawdown_episodes()", "explain_episode(peak=..., trough=...)"),
+            calls=("compute(method='book.drawdown_episodes', subject=<port>)", "compute(method='book.explain_episode', subject=<port>, params=peak=..., trough=...)"),
             why="A drawdown is a peak-to-trough episode over many sessions; "
-                "reconcile_move explains ONE session. Measure the episodes before "
+                "book.reconcile explains ONE session. Measure the episodes before "
                 "explaining them.",
         ),
         WorkedExample(
             question="Was the loss market-driven or company-specific?",
-            calls=("reconcile_move(run_id=...)",),
+            calls=("compute(method='book.reconcile', subject=run_id=...)",),
             why="factor_share and unexplained_share come back with it and the larger "
                 "one is the answer. Positions and factors are two decompositions of "
                 "the same number, so the position table cannot argue a move was "
@@ -307,7 +307,7 @@ WORKED_EXAMPLES: dict[str, tuple[WorkedExample, ...]] = {
         ),
         WorkedExample(
             question="Which factor hurt the most?",
-            calls=("get_attribution(run_id=...)",),
+            calls=("read_book(names=['attribution'], ref=run_id=...)",),
             why="Each row carries quotable_individually: under collinearity no single "
                 "beta is determined, so name the sum — a lone coefficient is refused.",
         ),
