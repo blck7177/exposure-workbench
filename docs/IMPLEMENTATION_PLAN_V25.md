@@ -1,6 +1,9 @@
 # V25 — the book across updates, the issuer page redrawn: reads only, no new measure
 
-Status: **proposed, not built** (2026-09-05). Written from the code at commit
+Status: **built** (2026-09-05). §12 records what the build did that this plan
+did not say, and why. Phases A–D are green: 2,042 offline tests, 17 live tests,
+66 web unit tests, `tsc`, `next build`, and both pages read against the local
+stack. Nothing is committed and nothing is deployed. Written from the code at commit
 `70912b9` (V24 phase F/G) and from the live database on this machine; every
 count below was measured, not recalled. The two mockups the boss reviewed on
 2026-09-05 are the visual spec: *Book Page, Tier One* and *Issuer Page, Second
@@ -362,10 +365,17 @@ workflow change, no model prompt change.
 - **D1 · Δ column source.** As planned: from stored weights in A1. The
   alternative — writing `issuer_exposures.weight_change` in the workflow — is a
   run-time change and is not in this batch.
-- **D2 · Ratios in the picker.** The three margins appear both as rows under
-  *Ratios* and as the `share` view of gross profit / operating income / net
-  income. Kept, because a reader looks for the word "net margin"; say if it
-  should be one entry.
+- **D2 · Ratios in the picker.** *Decided 2026-09-06: both doors stay, and they
+  now point at each other.* The three margins appear both as rows under *Ratios*
+  and as the `share` view of gross profit / operating income / net income, and
+  both resolve to one ledger row (`calc_2f9eba710a99` for net margin on MSFT).
+  Keeping only the Ratios row would cost the flow its follow-up question
+  ("this $31.78B — how much of revenue is that?"); keeping only the share view
+  would take `net_margin` out of the list that is meant to be the inventory of
+  what this desk holds, while briefs go on citing it. What was actually wrong
+  was never the second door: the share view was headed "Net income as a share of
+  revenue", four words that never say "Net margin", so a reader arriving by each
+  door could not tell one calculation from two. See §13.
 - **D3 · Retire the Baseline measures table** from the Financials tab. Its
   16 rows are the picker's ratios and the returns strip, same calc ids.
   Planned: retire. The ladder and How assembled stay.
@@ -433,3 +443,156 @@ issuer `weight_change` in the workflow (D1).
 - Issuer Page, Second Draft (mockup): <https://claude.ai/code/artifact/9ff0e6be-99ae-44d7-abaa-db1b11e69d67>
   (the Financials panel there draws bars; §0.1 changes it to a line — the list, views and controls stand)
 - Issuer Page, first draft, superseded: <https://claude.ai/code/artifact/466912dd-79a6-441f-b83a-708d25775873>
+
+## §12 What the build found, and what it changed (2026-09-05)
+
+Written after the fact, from the work rather than from the plan.
+
+### Two defects this batch did not set out to fix, and had to
+
+**D-1 · The ladder's slot key was never the wire's key.** `WindowSlot` was
+typed `end: string`; `fundamentals_service._slot` has always written
+`period_end` (`analytics/units.POINT_PERIOD_KEY`). So `s.end` was `undefined`
+on every slot the API has ever returned: `WindowLadder` positioned its bars at
+`NaN` and its year axis threw on `undefined.slice(0, 4)`. TypeScript cannot
+catch this — JSON arrives as `any` — and the offline guards read the handler,
+not the shape. The Financials panel's Level view hit it on its first render.
+
+Fixed in the five readers (`lib/charts.ts`, `charts/grids.tsx`,
+`issuer/panels.tsx`, `lib/measures.ts`, the test fixture), and pinned by
+`test_v25_reads.py::test_the_ladders_slot_type_names_the_key_the_server_sends`,
+which reads `units.POINT_PERIOD_KEY` and the `.ts` type together. `fmtMonth` is
+now guarded like `fmtDate` beside it: a formatter that throws on a missing date
+takes the page down, and the guard on `fmtDate` was earned the same way.
+
+**D-2 · `find_recorded` was not scoped to an issuer.** It matched on operation
+and params containment alone. A balance series records `{metric, last_n, ...}`
+and puts the ticker in the row's own `company_id` column, so a lookup for
+MSFT's long-term debt matched AAPL's row of the same metric — the same class of
+miss as a proper subset, arriving from the other side. `company_ticker` is now
+an optional argument; operations whose subject is not an issuer (reconcile, the
+drawdown scan) pass nothing and are unaffected.
+
+### Three things built that the plan did not name
+
+- **`balance_points` split out of `get_balance_series`.** A7 could not "look
+  the calculation up first" while the only entry point recorded — the shape
+  `/reconcile` learned in V13-S5. The read is now a function that writes
+  nothing (not a ledger row, not an absence row) and the recorder calls it.
+  `get_balance_series` also records `through` now, so the lookup key can name
+  which series it wants.
+- **The rail on the issuer page reads the run, not the position rows.**
+  `positions.market_value` is a snapshot column (the demo book's is dated Jul
+  23) and the strip beside it reads the run's own issuer rows (Sep 3). One
+  screen carried MSFT at $1.33M in the rail and $1.79M three inches right, both
+  true of different days and neither saying which.
+- **The book rail shows the time on a day that ran more than once.** Five rows
+  reading "Sep 3, 2026" is five different runs that looks like one run listed
+  five times — the same collapsing `run-series` performs, said the other way
+  round, because on that rail a run IS the thing being picked.
+
+### Where the plan was wrong about its own tests
+
+`test_v13_issuer_panels.py` sliced a handler's source from its `async def` to
+the section comment that followed. A7 and A8 were added between `panel_series`
+and that comment, so the slice swallowed them and the guard failed on a minting
+call in a different handler — one whose own test says it must be there. The
+slice is now bounded by the next `@router.` decorator, which does not move when
+a neighbour is added, and `measures` joined the parametrisation rather than
+being excused from it.
+
+### Decisions taken by default (§7 stands, unanswered)
+
+D1, D2, D3, D5 and D6 were built as planned; D4 (the brush computes nothing)
+and D7 (book before issuer) needed no decision in the end. **D2 in
+particular — the three margins appearing both as ratios and as the `share` view
+of their numerators — is live and still worth a second opinion.**
+
+### Not done, and named
+
+`scripts/smoke_ui.py` has the three new DOM assertions and has not been run
+against a deploy — the local web container serves the page and the API on two
+ports, and the script needs one origin. The `share` and `yoy` views are
+exercised over HTTP for MSFT only
+(`test_every_view_a_measure_offers_answers`); an issuer whose recipe lacks
+them is covered by the offline derivation test and not by a browser.
+
+## §13 D2 as built — the two doors name each other (2026-09-06)
+
+`lib/measures.linkedRatio` is the whole rule, and it is a pure function so the
+rule can be stated in a test rather than inferred from a render. Given the
+selected measure, the current view and the issuer's ratio rows, it answers:
+*which ledger row is this chart actually drawing?* Null on every view but
+`share`, null on a flow with no margin, null when the recipe did not compute
+that margin for this issuer, and null in the other direction — standing on Net
+margin, knowing you could also have arrived from Net income does not help.
+
+Where its answer goes, in three places:
+
+| surface | before | after |
+|---|---|---|
+| chart title | `Net income as a share of revenue` | `Net margin` |
+| beside it | — | `net income ÷ revenue` |
+| under it | — | `The same row as Ratios → Net margin — one calculation, reached from either side.` |
+| the list | nothing | the `Net margin` row lights (teal ring) and reads *the row the chart is drawing — you are looking at it from Flows*, and scrolls itself into view |
+
+Five cases pinned in `apps/web/tests/financials.test.ts`. No API change; the
+`share_metric` field the server has been sending since A8 is what carries it.
+
+The discipline this settles, stated once so the next batch inherits it: **one
+figure, one source — not one figure, one door.** `find_recorded` reusing a
+calculation and the reconcile line asserting an identity are the same rule.
+Two entrances do not break it. Two names that do not acknowledge each other do.
+
+## §14 A defect the picker made visible (2026-09-06)
+
+Not in this plan's scope, found by looking at the panel §13 had just changed,
+and fixed on the boss's word.
+
+**The reading.** `Current ratio 128.3%` and `Cash ÷ long-term debt 102.2%` in
+the measure list. A current ratio is `1.28×`. Not a page problem:
+`analytics/display_conventions.display` is the one rule the server and
+`lib/display.ts` share, so an answer or a brief citing either figure printed a
+percent too.
+
+**Why.** money ÷ money is a `RATIO` to the unit algebra and can be nothing
+else — net margin and current ratio are the same operation on the same units —
+so which of the two dimensionless readings a named measure has must be
+DECLARED. `analytics/formulas.py` has declared `current_ratio` a multiple since
+V17. `services/recipe.ratio()` never asked.
+
+**Why V17's migration did not already fix it.** It lists `current_ratio` among
+its eight. It keyed on `params.result_type.quantity`, and the standard recipe
+passes no `as_quantity`: 61 of this desk's 87 `calc.series.divide` rows carry a
+null quantity. The rows that migration was written for were invisible to it,
+and `test_v9_formulas.py`'s eight-measure guard went on passing, because the
+registry was right the whole time. Nothing was going to surface this except a
+reader looking at the number — which is what the picker made possible.
+
+**The fix, in three parts.**
+
+1. `recipe._reading_of(label)` takes the reading from the registry, and only
+   when it is dimensionless: declaring `money` on a quotient is not a reading
+   of it, `units.refine` would refuse, and a producer must not be able to turn
+   a correct calculation into a refusal by consulting a table.
+   `cash_to_long_term_debt_noncurrent` is stated at its call site, because it is
+   not in the registry — it is a label this recipe composes and nothing
+   evaluates by name, and adding it to `FORMULAS` would make it a formula the
+   agent can ask for, a wider claim than "this quotient reads as a multiple".
+2. `infra/migrations/v25_recipe_multiple.sql` — 23 rows (12 current_ratio
+   across 8 issuers, 11 cash÷debt across 7), found through the recipe's own
+   manifest, which is the only handle these anonymous rows have. Both places
+   set, column and JSONB, for the reason `v15_calc_unit.sql` introduced the
+   column. No value, operand, basis, input ref or period touched: an UPDATE on
+   an append-only ledger that stays one. Applied locally; idempotent (a second
+   run reported `UPDATE 0`). Named in `docs/PRODUCTION.md`, which its own guard
+   required.
+3. `test_v25_reads.py` gains the guard that would have caught it: every
+   quotient the recipe computes whose registry family is liquidity, leverage,
+   coverage or turnover must read as a multiple — checked against the family,
+   not against a list of names, so a ninth such measure is covered on arrival.
+
+**Left standing, and named so it is not rediscovered.** The recipe's series
+rows record no `result_type.quantity`. It is why V17 missed them and why this
+migration had to go through the manifest. Naming them changes how the model's
+table refers to those rows, which is the agent path and not this batch.

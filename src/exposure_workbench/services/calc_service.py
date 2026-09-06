@@ -118,6 +118,7 @@ async def _record(
 
 async def find_recorded(
     db: AsyncSession, operation: str, params: dict,
+    company_ticker: str | None = None,
 ) -> CalcLedger | None:
     """The most recent ledger row for exactly this call, if there is one (V13-S5).
 
@@ -151,13 +152,21 @@ async def find_recorded(
     identifies a call and this will hand back the wrong row, which is why each
     operation exports the identifying set (reconcile_service.identifying_params)
     rather than each caller composing one by hand.
+
+    V25 adds `company_ticker`, because containment over params alone is not
+    identity for an operation whose params do not name the issuer. A balance
+    series records `{metric, last_n, ...}` and puts the ticker in the row's own
+    company column, so a lookup for MSFT's long-term debt matched AAPL's row —
+    the same class of miss as a proper subset, arriving from the other side.
+    Operations whose subject is not an issuer (a reconciliation, a drawdown
+    scan) pass nothing and are unaffected.
     """
+    q = (select(CalcLedger)
+         .where(CalcLedger.operation == operation, CalcLedger.params.contains(params)))
+    if company_ticker is not None:
+        q = q.where(CalcLedger.company_id == company_ticker)
     row = (await db.execute(
-        select(CalcLedger)
-        .where(CalcLedger.operation == operation, CalcLedger.params.contains(params))
-        .order_by(CalcLedger.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+        q.order_by(CalcLedger.created_at.desc()).limit(1))).scalar_one_or_none()
     return row
 
 

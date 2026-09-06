@@ -6,8 +6,7 @@ import {
 import { LineChart } from "../charts/line";
 import { CitationMap, CoverageTable, WindowLadder } from "../charts/grids";
 import type {
-  CitationMap as CitationMapData, Containment, CoverageRow, PanelSeries,
-  PanelSeriesResponse, PriceIndex, ReportedWindows,
+  CitationMap as CitationMapData, Containment, CoverageRow, PriceIndex, ReportedWindows,
 } from "@/lib/charts";
 
 /**
@@ -24,25 +23,71 @@ import type {
 
 // ── price, indexed ───────────────────────────────────────────────────────────
 
-export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
+export function PriceVsBenchmark({ index, span, onSpan, benchmark, onBenchmark, benchmarks, briefDate }: {
+  index: PriceIndex;
+  /** The window, from the endpoint's own list (`index.spans`). */
+  span: string;
+  onSpan: (span: string) => void;
+  /** What to index against. Any ticker this desk prices is accepted; the page
+   *  offers the market and macro factors, and the book's other holdings when
+   *  the reader came from a book (V25). */
+  benchmark: string;
+  onBenchmark: (ticker: string) => void;
+  benchmarks: { ticker: string; label: string }[];
+  /** The day the desk last wrote about this name, marked as a second rule: a
+   *  reader can then see what the price did after the brief they are about to
+   *  read was written. */
+  briefDate?: string | null;
+}) {
   const pts = index.points;
+  const spans = index.spans ?? [span];
+  const controls = (
+    <div className="flex items-center gap-2">
+      <div className="flex rounded border border-[#30363d] overflow-hidden text-[11px]">
+        {spans.map((s) => (
+          <button key={s} onClick={() => onSpan(s)} aria-pressed={s === span}
+            className={`px-2 py-0.5 ${s === span ? "bg-[#1d2530] text-slate-200" : "text-slate-500 hover:text-slate-300"}`}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+        against
+        <select value={benchmark} onChange={(e) => onBenchmark(e.target.value)}
+          aria-label="Benchmark"
+          className="bg-[#0d1117] border border-[#30363d] rounded px-1.5 py-0.5 text-slate-300">
+          {benchmarks.map((b) => (
+            <option key={b.ticker} value={b.ticker}>{b.label}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+
   if (pts.length < 2) {
     return (
-      <ChartCard title={`${index.ticker} against ${index.benchmark}`}>
+      <ChartCard title={`${index.ticker} against ${index.benchmark}`} controls={controls}>
         <p className="text-xs text-slate-500 py-6">{index.detail ?? "No price history held for this issuer."}</p>
       </ChartCard>
     );
   }
   const at = new Map(pts.map((p, i) => [p.date, i]));
+  const onOrAfter = (date: string) => {
+    const exact = at.get(date);
+    if (exact != null) return exact;
+    const i = pts.findIndex((p) => p.date >= date);
+    return i >= 0 ? i : null;
+  };
   // A filing is marked at the first session on or after it was filed: the market
   // could not have read it earlier, and snapping to an exact date that fell on a
   // weekend would silently drop the mark.
   const markers = index.filings
     .map((f) => {
-      const i = at.get(f.date) ?? pts.findIndex((p) => p.date >= f.date);
-      return i >= 0 ? { at: i, label: f.form } : null;
+      const i = onOrAfter(f.date);
+      return i == null ? null : { at: i, label: f.form };
     })
     .filter((m): m is { at: number; label: string } => m != null);
+  const briefAt = briefDate ? onOrAfter(briefDate.slice(0, 10)) : null;
 
   const step = Math.max(1, Math.floor(pts.length / 6));
   const table: TableSpec = {
@@ -55,9 +100,11 @@ export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
     <ChartCard
       title={`${index.ticker} against ${index.benchmark}`}
       aside={index.span}
+      controls={controls}
       table={table}
       note={<>{index.basis ?? "adjusted close, indexed to 100 at the first session shown"}
-        {markers.length > 0 && ". Rules mark the days this desk's filings were filed"}.</>}>
+        {markers.length > 0 && ". Rules mark the days this desk's filings were filed"}
+        {briefAt != null && ", and the day its brief was written"}.</>}>
       <LineChart
         x={pts.map((p) => p.date)}
         height={220}
@@ -66,7 +113,10 @@ export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
             endLabel: pts[pts.length - 1].value.toFixed(0) },
           { key: "b", label: index.benchmark, points: pts.map((p) => p.benchmark), colour: C.grey, width: 1.5 },
         ]}
-        markers={markers}
+        markers={[
+          ...markers,
+          ...(briefAt == null ? [] : [{ at: briefAt, label: "brief" }]),
+        ]}
         xTicks={pts.map((p, i) => ({ at: i, label: fmtMonth(p.date) }))
           .filter((_, i) => i % step === 0 && i < pts.length - step / 2)}
         yFormat={(v) => v.toFixed(0)}
@@ -79,6 +129,8 @@ export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
       <Legend items={[
         { label: index.ticker, colour: C.s1, shape: "line" },
         { label: index.benchmark, colour: C.grey, shape: "line" },
+        ...(markers.length > 0 ? [{ label: "Filing arrived", shape: "tick" as const, colour: "#6c7887" }] : []),
+        ...(briefAt != null ? [{ label: "Brief written", shape: "tick" as const, colour: "#6c7887" }] : []),
       ]} />
     </ChartCard>
   );
@@ -86,12 +138,17 @@ export function PriceVsBenchmark({ index }: { index: PriceIndex }) {
 
 // ── the windows a measure can be produced over ───────────────────────────────
 
-export function Windows({ data, metrics, metric, onMetric, onOpen }: {
+export function Windows({ data, metrics, metric, onMetric, onOpen, today }: {
   data: ReportedWindows;
   metrics: { metric: string; label: string }[];
   metric: string;
   onMetric: (m: string) => void;
   onOpen?: (factId: string) => void;
+  /** The last session this desk has priced (V25). The ladder has taken this
+   *  prop since V13 and nothing passed it, so the gap between the newest filed
+   *  window and now — the thing a reader is judging the figures' age by — was
+   *  the one interval the panel could not show. */
+  today?: string | null;
 }) {
   const money = (v: number) =>
     Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(2)}B`
@@ -112,7 +169,7 @@ export function Windows({ data, metrics, metric, onMetric, onOpen }: {
       table={{
         columns: ["Window", "From", "To", "Value", "How"],
         rows: data.rows.flatMap((r) => r.slots.map((s) => [
-          r.label, fmtDate(s.start), fmtDate(s.end),
+          r.label, fmtDate(s.start), fmtDate(s.period_end),
           s.value == null ? "—" : money(s.value),
           s.value == null ? (s.unreachable ?? "no held filing reaches it")
             : (s.terms?.length ?? 1) > 1 ? `derived · ${s.derivation ?? ""}` : "as filed",
@@ -124,13 +181,14 @@ export function Windows({ data, metrics, metric, onMetric, onOpen }: {
           {data.detail ?? `Nothing filed for ${data.label} that this desk holds.`}
         </p>
       ) : (
-        <WindowLadder rows={data.rows} format={money} onOpen={onOpen}
+        <WindowLadder rows={data.rows} format={money} onOpen={onOpen} today={today ?? undefined}
           ariaLabel={`Windows of ${data.label} this desk can produce, by window length`} />
       )}
       <Legend items={[
         { label: "As filed", colour: C.s1, shape: "swatch" },
         { label: "Derived — a signed path over filed boundaries", colour: C.s1, shape: "outline" },
         { label: "No held filing reaches it", shape: "dashed" },
+        ...(today ? [{ label: "Today", shape: "tick" as const, colour: "#6c7887" }] : []),
       ]} />
     </ChartCard>
   );
@@ -138,17 +196,27 @@ export function Windows({ data, metrics, metric, onMetric, onOpen }: {
 
 // ── what this desk holds ─────────────────────────────────────────────────────
 
-export function Coverage({ rows }: { rows: CoverageRow[] }) {
+export function Coverage({ rows, selected, onSelect }: {
+  rows: CoverageRow[];
+  /** V25: the measure the ladder above is showing. A row here is the way into
+   *  it — the table and the ladder are one list and one picker, not two lists
+   *  that happen to be about the same issuer. */
+  selected?: string;
+  onSelect?: (metric: string) => void;
+}) {
   const flows = rows.filter((r) => r.kind === "flow").length;
   const stopped = rows.filter((r) => r.superseded_by?.length).length;
   return (
     <ChartCard
       title="Reported and derived measures"
       aside={`${rows.length} measures · ${flows} flows`}
-      note={stopped > 0
-        ? "A measure with a named successor is not absent by accident — the issuer stopped reporting it as a separate line."
-        : "Periods and the date each measure runs to, so a question can be asked of what is actually here."}>
-      <CoverageTable rows={rows} />
+      note={<>
+        {stopped > 0
+          ? "A measure with a named successor is not absent by accident — the issuer stopped reporting it as a separate line."
+          : "Periods and the date each measure runs to, so a question can be asked of what is actually here."}
+        {onSelect && " Choose a flow to put it in the ladder above."}
+      </>}>
+      <CoverageTable rows={rows} selected={selected} onSelect={onSelect} />
     </ChartCard>
   );
 }
@@ -184,69 +252,6 @@ export function BriefProvenance({ map }: { map: CitationMapData }) {
 }
 
 // ── margins over the reported windows ────────────────────────────────────────
-
-/**
- * The three margins as the recipe computed them — one calc row per series, so
- * the line and an answer citing net margin point at the same calculation.
- *
- * A LINE, not the dot plot first sketched for this: the recipe's series are one
- * window length marching through time, which is change-over-time, and the form
- * follows the data that exists rather than the panel that was imagined.
- */
-export function Margins({ data, onOpen }: {
-  data: PanelSeriesResponse;
-  onOpen?: (id: string) => void;
-}) {
-  const margins = data.series.filter((s) => s.metric.endsWith("_margin"));
-  if (margins.length === 0) return null;
-  const x = margins[0].points.map((p) => p.end);
-  const at = (s: PanelSeries) => {
-    const by = new Map(s.points.map((p) => [p.end, p.value]));
-    return x.map((d) => by.get(d) ?? null);
-  };
-  const colours = [C.s1, C.s2, C.s3];
-
-  return (
-    <ChartCard
-      title="Margins"
-      aside={data.as_of ? `computed ${fmtDate(data.as_of)}` : undefined}
-      table={{
-        columns: ["Quarter end", ...margins.map((s) => s.label)],
-        rows: x.map((d, i) => [fmtDate(d), ...margins.map((s) => {
-          const v = at(s)[i];
-          return v == null ? "—" : `${(v * 100).toFixed(2)}%`;
-        })]),
-      }}
-      note={<>Each line is one ledgered calculation over the issuer&apos;s filed quarters
-        {onOpen && margins.map((s, i) => (
-          <span key={s.metric}>{i === 0 ? " — " : " · "}
-            <button onClick={() => onOpen(s.calc_id)}
-              className="text-teal-400 hover:text-teal-300 hover:underline">{s.label.toLowerCase()}</button>
-          </span>
-        ))}.
-      </>}>
-      <LineChart
-        x={x}
-        height={200}
-        series={margins.map((s, i) => ({
-          key: s.metric, label: s.label, points: at(s), colour: colours[i % colours.length],
-          endLabel: `${((s.points[s.points.length - 1]?.value ?? 0) * 100).toFixed(1)}%`,
-        }))}
-        xTicks={x.map((d, i) => ({ at: i, label: fmtMonth(d) }))
-          .filter((_, i) => i % Math.max(1, Math.floor(x.length / 5)) === 0)}
-        yFormat={(v) => `${(v * 100).toFixed(0)}%`}
-        ariaLabel="Gross, operating and net margin over the issuer's filed quarters"
-        tipRows={(i) => margins.map((s, k) => ({
-          label: s.label, colour: colours[k % colours.length],
-          value: at(s)[i] == null ? "—" : `${((at(s)[i] as number) * 100).toFixed(2)}%`,
-        }))}
-      />
-      <Legend items={margins.map((s, i) => ({
-        label: s.label, colour: colours[i % colours.length], shape: "line" as const,
-      }))} />
-    </ChartCard>
-  );
-}
 
 // ── how a composed figure is assembled ───────────────────────────────────────
 

@@ -69,8 +69,14 @@ export const fmtDate = (iso: string | null | undefined): string => {
   return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
 };
 
-export const fmtMonth = (iso: string): string =>
-  `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`;
+/** Guarded like `fmtDate` beside it, and for the reason that guard earned its
+ *  keep: an undefined date reached this from a wire type that promised a string
+ *  and the page went blank on a `.slice` of undefined. A missing date is a
+ *  dash; it is not a crash. */
+export const fmtMonth = (iso: string | null | undefined): string => {
+  if (!iso || iso.length < 7) return "—";
+  return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`;
+};
 
 // ── scales ───────────────────────────────────────────────────────────────────
 

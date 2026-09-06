@@ -5,6 +5,8 @@ import React from "react";
 import type { Evidence } from "@/lib/issuer";
 import { display as displayValue } from "@/lib/display";
 import { AuditOnly } from "../audit";
+import { C, fmtDate, fmtMonth } from "../charts/frame";
+import { LineChart } from "../charts/line";
 
 /**
  * Evidence, rendered as what it is (V13-S3).
@@ -92,6 +94,66 @@ function fmtValue(v: unknown, unit?: unknown): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+/**
+ * A series, drawn where a series was described (V25).
+ *
+ * The drawer knew a calculation had twelve points and said so: "12 points ·
+ * 2023-06-30 → 2026-03-31". Which is the shape of the answer to "how has this
+ * moved" without being the answer. The points were on the row the whole time —
+ * this is the ledger's own `result.points`, or a fact record's `points`, drawn
+ * and not recomputed.
+ *
+ * The list of numbers moves under Technical details rather than away: a reader
+ * checking a figure against a filing wants the figure, and a chart is not one.
+ */
+function seriesPoints(body: Record<string, unknown>): { period: string; value: number }[] {
+  const raw = body.points ?? (body.result as Record<string, unknown> | undefined)?.points;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((p) => {
+    // A fact's points are [period, value]; a calc row's are objects ending on
+    // `end`, `as_of` or `period_end`. Both spellings are the ledger's own.
+    if (Array.isArray(p) && p.length >= 2 && typeof p[1] === "number") {
+      return [{ period: String(p[0]), value: p[1] }];
+    }
+    if (p && typeof p === "object") {
+      const o = p as Record<string, unknown>;
+      const period = o.end ?? o.as_of ?? o.period_end;
+      if (typeof period === "string" && typeof o.value === "number") {
+        return [{ period, value: o.value }];
+      }
+    }
+    return [];
+  });
+}
+
+function SeriesChart({ points, unit, label }: {
+  points: { period: string; value: number }[];
+  unit: string | null;
+  label: string;
+}) {
+  if (points.length < 2) return null;
+  const format = (v: number) => (unit ? displayValue(v, unit) : String(Number(v.toPrecision(6))));
+  return (
+    <div className="-mx-1">
+      <LineChart
+        x={points.map((p) => p.period)}
+        height={150}
+        padLeft={62}
+        series={[{
+          key: "series", label, colour: C.s1,
+          points: points.map((p) => p.value),
+          endLabel: format(points[points.length - 1].value),
+        }]}
+        xTicks={points.map((p, i) => ({ at: i, label: fmtMonth(p.period) }))
+          .filter((_, i) => i % Math.max(1, Math.ceil(points.length / 4)) === 0)}
+        yFormat={format}
+        ariaLabel={`${label}, ${points.length} points from ${points[0].period} to ${points[points.length - 1].period}`}
+        tipRows={(i) => [{ label: fmtDate(points[i].period), value: format(points[i].value), colour: C.s1 }]}
+      />
+    </div>
+  );
+}
+
 export function EvidenceCard({ evidence, onOpen }: {
   evidence: Evidence & { label?: string };
   onOpen: (id: string) => void;
@@ -117,7 +179,12 @@ export function EvidenceCard({ evidence, onOpen }: {
             </div>
           )}
           {b.kind === "series" && Array.isArray(b.points) && (
-            <div className="font-mono text-sm text-slate-200">
+            <SeriesChart points={seriesPoints(b)}
+              unit={typeof b.unit === "string" ? b.unit : null}
+              label={String(b.measure ?? "series").replace(/[._]/g, " ")} />
+          )}
+          {b.kind === "series" && Array.isArray(b.points) && (
+            <div className="font-mono text-[11px] text-slate-400">
               {(b.points as [string, number][]).length} points
               {(b.points as [string, number][]).length > 0 && (
                 <> · {String((b.points as [string, number][])[0][0])} → {String((b.points as [string, number][]).slice(-1)[0][0])}</>
@@ -190,6 +257,17 @@ export function EvidenceCard({ evidence, onOpen }: {
               {fmtValue((b.result as Record<string, unknown>).value)}
             </div>
           )}
+          {/* V25: a calculation whose result is points is a line, not a count.
+              The unit is on the row (V15-S1), so the axis reads the way the
+              rest of the desk reads. */}
+          <SeriesChart points={seriesPoints(b)}
+            unit={typeof b.unit_class === "string" ? b.unit_class
+              : typeof ((b.params as Record<string, unknown> | undefined)?.result_type as
+                  Record<string, unknown> | undefined)?.unit_class === "string"
+                ? String(((b.params as Record<string, unknown>).result_type as
+                    Record<string, unknown>).unit_class).toUpperCase()
+                : null}
+            label={evidence.label ?? String(b.operation ?? "series")} />
           <dl className="m-0">
             <Field label="Operation">{String(b.operation ?? "—")}</Field>
             {upstream.length > 0 && (

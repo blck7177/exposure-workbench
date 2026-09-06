@@ -30,10 +30,16 @@ Exit status is 0 when every check passes, 1 otherwise, so it can gate a deploy.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import sys
 
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "https://desk-for-one.com"
+
+# The public demo book. Named here rather than looked up: this script must be
+# able to say WHICH book a page was asked about, and a book discovered at
+# runtime could be a different one on each run.
+DEMO_BOOK = os.getenv("SMOKE_PORTFOLIO", "port_001")
 
 # Every id prefix this system mints. Deliberately the whole family and not the
 # ones a given page happens to render: a new surface leaking `rrun_…` is exactly
@@ -43,14 +49,29 @@ ID = re.compile(r"\b(fact|calc|chunk|src|run|alert|pos|rrun|task|sess|brief|port
 
 # Strings that are transport, a provider's own words, or this machine's inside.
 # The failure surface must carry none of them (V13-S2).
+#
+# The provider names need an adjacent technical token, and that is not a
+# loosening — it is the check saying what it always meant. An issuer page is
+# ABOUT companies: this desk's own AAPL brief cites a Reuters headline reading
+# "Apple alleges OpenAI employee accessed circuit plans", and a Microsoft brief
+# discusses the OpenAI partnership at length. Both are the product working. What
+# must never reach a reader is our own plumbing — `openai.APIError`,
+# `OPENAI_API_KEY`, `tavily_client` — and those all carry a module, a key or an
+# error word beside the name (V25).
 OPERATOR_ONLY = re.compile(
-    r"openai|anthropic|tavily|asyncpg|sqlalchemy|Traceback|exposure-postgres|"
+    r"(openai|anthropic|tavily)[ _.]?(api|key|client|error|sdk|rate.?limit|timeout)|"
+    r"\b(openai|anthropic|tavily)\.[a-z_]+|"
+    r"asyncpg|sqlalchemy|Traceback|exposure-postgres|"
     r"exposure-mcp|localhost:\d|127\.0\.0\.1|InsufficientPrivilege|row-level security",
     re.I)
 
 VIEWS = [
     ("book", "/", []),
     ("issuer", "/issuer/AAPL", []),
+    # V25: the issuer page reached from a book. The strip it grows there reads
+    # that book's own run, and the ids on it must stay behind the switch like
+    # every other.
+    ("issuer · in a book", "/issuer/AAPL?portfolio=" + DEMO_BOOK, []),
     ("issuer · financials", "/issuer/AAPL", ["Financials"]),
     ("issuer · filings", "/issuer/AAPL", ["Filings"]),
     ("issuer · brief", "/issuer/AAPL", ["Brief"]),
@@ -115,6 +136,48 @@ async def main() -> int:
         if still != "true":
             failures.append("the audit switch reset on navigation — it is not hoisted "
                             "into the layout, or cacheComponents assumptions changed")
+        await ctx.close()
+
+        # ── V25: three claims about what is drawn, not about what is absent ──
+        #
+        # The checks above pass on a page that renders nothing. These are the
+        # other direction: the panels this batch added must actually be there,
+        # and the one that must NOT be there without a book must not be.
+        ctx, page, _ = await _open(browser, "/", [])
+        await page.wait_for_timeout(2500)
+        marks = await page.locator("section:has-text('Across updates') svg circle").count()
+        print(f"  {'PASS' if marks >= 8 else 'FAIL'}  the book across its updates "
+              f"({marks} marks drawn)")
+        if marks < 8:
+            failures.append("the across-updates panel drew almost nothing — the run "
+                            "series read failed, or the book has one update")
+        room = await page.get_by_role("columnheader", name=re.compile("Room to limit")).count()
+        print(f"  {'PASS' if room else 'FAIL'}  holdings carry the room to each limit")
+        if not room:
+            failures.append("the holdings table has no room column")
+        await ctx.close()
+
+        # The financials picker draws ONE line for the measure that is chosen.
+        ctx, page, _ = await _open(browser, "/issuer/AAPL", [])
+        await page.wait_for_timeout(3000)
+        lines = await page.locator("section:has-text('Financials') path[stroke='#3987e5']").count()
+        print(f"  {'PASS' if lines >= 1 else 'FAIL'}  the financials picker draws a line "
+              f"({lines})")
+        if lines < 1:
+            failures.append("the financials panel drew no line — /measures failed, or "
+                            "the chosen measure has no series")
+        await ctx.close()
+
+        # And the strip that must not appear without a book.
+        ctx, page, _ = await _open(browser, "/issuer/AAPL", [])
+        await page.wait_for_timeout(2500)
+        text = await page.inner_text("body")
+        unasked = "In this book" in text
+        print(f"  {'PASS' if not unasked else 'FAIL'}  no book named, no exposure stated")
+        if unasked:
+            failures.append("the issuer page claimed 'in this book' for a reader who "
+                            "named no book — the query that took the newest row on any "
+                            "book is back")
         await ctx.close()
         await browser.close()
 

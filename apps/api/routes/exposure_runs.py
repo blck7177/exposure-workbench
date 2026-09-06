@@ -63,6 +63,13 @@ class IssuerExposureOut(BaseModel):
     weight_change: float | None
     daily_pnl: float | None
     daily_return: float | None
+    # V25. Yesterday's weight × this name's return: the share of the BOOK's day
+    # this position accounts for. calc_pnl has computed it and the row has held
+    # it since V8; it was the one figure a "top contributors" sentence is made
+    # of that no reader could check, because it never reached the wire. The page
+    # labels it "of the book's day" and never "contribution" alone — the word
+    # names two different quantities on a risk page (analytics/pnl.py).
+    contribution: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -314,6 +321,16 @@ async def run_limit_book(run_id: str, db: AsyncSession = Depends(get_db)):
             # ran against them.
             "utilisation": (None if r.current_value is None or not r.breach_level
                             else round(float(r.current_value) / float(r.breach_level), 6)),
+            # V25. How much room is left, signed: negative means the check is
+            # already past that tier. Written here for the same reason
+            # `utilisation` is — it is a subtraction between two figures on this
+            # row, and a page repeating it per holding would be a measure
+            # computed on the client. None where either side was not recorded;
+            # never zero, which would read as "exactly at the tier".
+            "room_warning": (None if r.current_value is None or r.warning_level is None
+                             else round(float(r.warning_level) - float(r.current_value), 8)),
+            "room_breach": (None if r.current_value is None or r.breach_level is None
+                            else round(float(r.breach_level) - float(r.current_value), 8)),
         })
     unrecorded = sum(1 for r in rows if r.current_value is None)
     return {

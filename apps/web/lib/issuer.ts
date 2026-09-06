@@ -14,7 +14,14 @@ export type MetricAvail = { metric: string; periods: number; latest_period_end: 
 export type Snapshot = {
   company: { ticker: string; name: string; cik: string | null; exchange: string | null; sector: string | null; industry: string | null; is_investigable: boolean };
   latest_filing: { form_type: string; filing_date: string; accession: string; source_url: string | null } | null;
-  portfolio_exposure: { market_value: number | null; weight: number | null; daily_return: number | null } | null;
+  /** V25. The named book's own latest run, or null when no book was named:
+   *  the query that took the newest row on ANY book is gone, because the demo
+   *  book is public and it was showing one reader another's money. */
+  portfolio_exposure: {
+    portfolio_id: string; run_id: string; as_of: string;
+    market_value: number | null; weight: number | null;
+    daily_pnl: number | null; daily_return: number | null; contribution: number | null;
+  } | null;
   available_metrics: MetricAvail[];
 };
 
@@ -113,7 +120,8 @@ export type SessionSummary = { id: string; kind: string; started_at: string; end
 
 // ─── reads ──────────────────────────────────────────────────────────────────
 export const listCompanies = () => j<CompanyRow[]>("/api/companies");
-export const getSnapshot = (t: string) => j<Snapshot>(`/api/issuers/${t}/snapshot`);
+export const getSnapshot = (t: string, portfolioId?: string) =>
+  j<Snapshot>(`/api/issuers/${t}/snapshot${portfolioId ? `?portfolio=${portfolioId}` : ""}`);
 export const getFinancials = (t: string) => j<{ ticker: string; calcs: CalcRow[] }>(`/api/issuers/${t}/financials`);
 export const getFilings = (t: string) => j<{ ticker: string; filings: FilingRow[] }>(`/api/issuers/${t}/filings`);
 export const getSection = (id: string) => j<{ id: string; item_code: string; title: string; text: string }>(`/api/filing-sections/${id}`);

@@ -1,8 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
+import { C, fmtMonth } from "../charts/frame";
+import { LineChart } from "../charts/line";
 import { display as displayValue } from "@/lib/display";
+import { getEvidence } from "@/lib/issuer";
 import { useAudit } from "../audit";
 import { AnswerText, idsIn } from "./AnswerText";
 
@@ -371,6 +374,107 @@ function Cites({
  * under it is the model's word and the arrow is the series'. The two can
  * disagree, and when they do the reader sees both.
  */
+/**
+ * A series fact, drawn (V25).
+ *
+ * A `chart` block used to render as the words "open the series" and a link. The
+ * points were never missing — the fact's own record holds every one of them,
+ * which is what the drawer draws when the link is followed — so the reader was
+ * being asked to leave the answer to see the shape of the thing the sentence
+ * was about.
+ *
+ * The points are fetched from the evidence the block already cites, when the
+ * block is on screen, and cached by id: an answer citing seventeen series makes
+ * seventeen small reads as they are scrolled to, and none for the ones that are
+ * never looked at. Nothing here computes anything — the line is the ledger's
+ * own points, and the chip beside it still opens the row.
+ */
+const seriesCache = new Map<string, { period: string; value: number }[]>();
+
+function InlineSeries({ id, unit, onOpen }: {
+  id: string;
+  unit: string | null | undefined;
+  onOpen: () => void;
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const [points, setPoints] = useState<{ period: string; value: number }[] | null>(
+    () => seriesCache.get(id) ?? null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (points || failed) return;
+    const el = host.current;
+    if (!el) return;
+    let cancelled = false;
+    const load = () => {
+      getEvidence(id).then((ev) => {
+        if (cancelled) return;
+        const body = ev.body as Record<string, unknown>;
+        const raw = (body.points ?? (body.result as Record<string, unknown> | undefined)?.points);
+        const rows = Array.isArray(raw) ? raw : [];
+        const parsed = rows.flatMap((p) => {
+          // A fact's points are [period, value] pairs; a calc row's are objects
+          // that end on `end`, `as_of` or `period_end`. Both are the ledger's
+          // own spellings and neither is normalised on the way in.
+          if (Array.isArray(p) && p.length >= 2 && typeof p[1] === "number") {
+            return [{ period: String(p[0]), value: p[1] }];
+          }
+          if (p && typeof p === "object") {
+            const o = p as Record<string, unknown>;
+            const period = o.end ?? o.as_of ?? o.period_end;
+            if (typeof period === "string" && typeof o.value === "number") {
+              return [{ period, value: o.value }];
+            }
+          }
+          return [];
+        });
+        if (parsed.length < 2) { setFailed(true); return; }
+        seriesCache.set(id, parsed);
+        setPoints(parsed);
+      }).catch(() => { if (!cancelled) setFailed(true); });
+    };
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { observer.disconnect(); load(); }
+    });
+    observer.observe(el);
+    return () => { cancelled = true; observer.disconnect(); };
+  }, [id, points, failed]);
+
+  // No frame while there is nothing to draw: an empty axis looks like a series
+  // that measured zero, and the sentence above already carries the figures.
+  if (failed) return null;
+  return (
+    <div ref={host} style={{ margin: "0.4rem 0" }}>
+      {points && (
+        <LineChart
+          x={points.map((p) => p.period)}
+          series={[{
+            key: id, label: "", colour: C.s1,
+            points: points.map((p) => p.value),
+            endLabel: unit ? displayValue(points[points.length - 1].value, unit) : undefined,
+          }]}
+          height={132}
+          padLeft={58}
+          xTicks={points.map((p, i) => ({ at: i, label: fmtMonth(p.period) }))
+            .filter((_, i) => i % Math.max(1, Math.ceil(points.length / 4)) === 0)}
+          yFormat={(v) => (unit ? displayValue(v, unit) : String(v))}
+          ariaLabel={`${points.length} points, ${points[0].period} to ${points[points.length - 1].period}`}
+          tipRows={(i) => [{
+            label: points[i].period,
+            value: unit ? displayValue(points[i].value, unit) : String(points[i].value),
+            colour: C.s1,
+          }]}
+        />
+      )}
+      <button type="button" onClick={onOpen}
+        style={{ background: "none", border: "none", padding: 0, font: "inherit",
+                 fontSize: "0.78rem", color: "var(--accent, #2dd4bf)", cursor: "pointer" }}>
+        {points ? "open the series" : "open the series"}
+      </button>
+    </div>
+  );
+}
+
 function SeriesLine({ series, onOpen }: { series: TrendSeries; onOpen: () => void }) {
   const arrow = { up: "↑", down: "↓", flat: "→" }[series.direction];
   const v = (x: number) => displayValue(x, series.unit_class);
@@ -590,32 +694,23 @@ export function AnswerBlocks({
               </div>
             );
 
-          case "chart":
-            // The series itself lives in the ledger, and the drawer already
-            // knows how to show a series. Until the inline drawing lands, the
-            // honest thing is to name what would be drawn and let the reader
-            // open it — not to render an empty frame that looks like a chart
-            // with no data. V24: the series is a fact and states its own line.
+          case "chart": {
+            // V25: the series is drawn from the ledger's own points, fetched
+            // from the evidence this block already cites. The sentence above it
+            // (`SeriesLine`) stays — it states the two ends and the direction,
+            // and it is what a reader with no chart still gets.
+            const ref = b.fact?.id ?? b.series_ref ?? "";
             return (
-              <p key={i} style={{ margin: "0.5rem 0" }}>
+              <div key={i} style={{ margin: "0.5rem 0" }}>
                 {b.title ? <strong>{b.title} </strong> : null}
-                {b.fact?.series ? <SeriesLine series={b.fact.series} onOpen={() => onOpen(b.fact!.id)} /> : null}
-                <button
-                  type="button"
-                  onClick={() => onOpen(b.fact?.id ?? b.series_ref ?? "")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    font: "inherit",
-                    color: "var(--accent, #1f6f54)",
-                    cursor: "pointer",
-                  }}
-                >
-                  open the series
-                </button>
-              </p>
+                {b.fact?.series ? <SeriesLine series={b.fact.series} onOpen={() => onOpen(ref)} /> : null}
+                {ref ? (
+                  <InlineSeries id={ref} unit={b.fact?.unit ?? b.fact?.series?.unit_class}
+                    onOpen={() => onOpen(ref)} />
+                ) : null}
+              </div>
             );
+          }
 
           case "trend":
             return (

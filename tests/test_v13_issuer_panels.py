@@ -32,8 +32,29 @@ from exposure_workbench.services import formula_service as fsvc
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = (ROOT / "apps" / "api" / "routes" / "issuers.py").read_text()
-CONTAINMENT = SRC[SRC.index("async def containment_view"):SRC.index("async def panel_series")]
-PANEL = SRC[SRC.index("async def panel_series"):SRC.index("# ── filings tab")]
+
+
+def _handler(name: str) -> str:
+    """One handler's body: from its `async def` to the next route's decorator.
+
+    The bound used to be the section comment that happened to follow, and V25
+    added two endpoints between `panel_series` and that comment — so the slice
+    swallowed them and the guard failed on a minting call that was in a
+    different handler entirely, one whose own test says it must be there.
+    A handler ends where the next one is declared; that is the boundary, and it
+    does not move when a neighbour is added.
+    """
+    start = SRC.index(f"async def {name}")
+    rest = SRC[start:]
+    end = rest.find("\n@router.")
+    return rest if end < 0 else rest[:end]
+
+
+CONTAINMENT = _handler("containment_view")
+PANEL = _handler("panel_series")
+# V25. The picker is a read like the two above it: it asks the interval engine
+# what the latest window of each flow is, in process, and records nothing.
+MEASURES = _handler("measures")
 
 
 class _Co:
@@ -98,7 +119,8 @@ def test_the_view_reads_the_balance_sheet_the_formula_path_reads():
 
 
 @pytest.mark.parametrize("segment,name", [(CONTAINMENT, "containment_view"),
-                                          (PANEL, "panel_series")])
+                                          (PANEL, "panel_series"),
+                                          (MEASURES, "measures")])
 @pytest.mark.parametrize("minting", ["get_flow(", "get_balance_series(",
                                      "tc.calculate(", "_record(", "refuse(",
                                      "db.commit"])

@@ -332,16 +332,39 @@ async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) ->
                          if len(slots) != len(derived) else ""))}
 
 
-async def get_balance_series(
+def identifying_params_balance_series(ticker: str, metric: str, last_n: int, through: str) -> dict:
+    """The part of a balance series' record that says WHICH series this is (V25).
+
+    `through` is load-bearing for the same reason it is on a drawdown scan: the
+    same (issuer, metric, last_n) after the next 10-Q is a DIFFERENT series, and
+    a lookup keyed without it would hand a page the id of a calculation that
+    stops a quarter short of what it draws. `unit_class` and the basis sentence
+    stay outside the key — they are what the series turned out to be, not which
+    series was asked for; find_recorded matches by containment, so both sit in
+    the row beside these.
+
+    The ticker is NOT in this dict: the row records it in its own company
+    column, and the lookup passes it to find_recorded as `company_ticker`.
+    """
+    return {"metric": metric, "last_n": last_n, "through": through}
+
+
+async def balance_points(
     db: AsyncSession, ticker: str, metric: str, *, last_n: int = 12,
-    invoked_by: str = "agent",
 ) -> dict:
-    """One balance-sheet line at each date the issuer reported it, newest last.
+    """One balance-sheet line at each date the issuer reported it — the read.
+
+    Separated from the recorder below (V25) for the reason the reconcile read
+    was: a page that draws this series must be able to hand back the id of the
+    calculation that was already performed, and the only way to do that without
+    minting a row per page view is for the arithmetic and the recording to be
+    two functions. This one queries and resolves restatements; it writes
+    nothing, and its refusals are plain dicts rather than the absence ROWS the
+    agent's path records.
 
     No derivation, no alignment, no filling: a balance is a reading at an
     instant and there is nothing to add across instants (R2). Restatements are
-    resolved by the one rule. `get_balance_sheet` is every line at ONE date;
-    this is ONE line at every date — the same rows, the other axis.
+    resolved by the one rule.
     """
     ticker = ticker.upper()
     if metric not in SUPPORTED_METRICS:
@@ -360,12 +383,7 @@ async def get_balance_series(
                FinancialFact.value.is_not(None))
     )).all()
     if not rows:
-        return await _metric_absence(
-            db, "not_reported", "not_reported", ticker, metric,
-            why=f"This desk holds no {metric} for {ticker} as a balance at any date.",
-            invoked_by=invoked_by,
-            detail=f"{ticker} reports no {metric} as a balance; it may be a flow — "
-                   f"call read_fundamentals, or describe to see which it is")
+        return {"error": "not_reported", "ticker": ticker, "metric": metric}
     best: dict[date, tuple] = {}
     for pe, value, fid, acc, fd in rows:
         prev = best.get(pe)
@@ -378,18 +396,45 @@ async def get_balance_series(
     points = [{units.POINT_PERIOD_KEY: d.isoformat(), "value": best[d][0],
                "fact_ids": [best[d][1]]}
               for d in dates]
+    return {
+        "ticker": ticker, "metric": metric, "unit": unit, "unit_class": unit.upper(),
+        "points": points,
+        "through": points[-1][units.POINT_PERIOD_KEY],
+        "basis": f"{metric} as reported at each of {len(points)} instants, "
+                 f"{points[0][units.POINT_PERIOD_KEY]}.."
+                 f"{points[-1][units.POINT_PERIOD_KEY]}; "
+                 f"no value is carried across dates",
+    }
+
+
+async def get_balance_series(
+    db: AsyncSession, ticker: str, metric: str, *, last_n: int = 12,
+    invoked_by: str = "agent",
+) -> dict:
+    """`balance_points`, recorded — the agent's entry point, and the recipe's.
+
+    `get_balance_sheet` is every line at ONE date; this is ONE line at every
+    date — the same rows, the other axis.
+    """
+    read = await balance_points(db, ticker, metric, last_n=last_n)
+    if "error" in read:
+        if read["error"] != "not_reported":
+            return read
+        return await _metric_absence(
+            db, "not_reported", "not_reported", ticker.upper(), metric,
+            why=f"This desk holds no {metric} for {ticker.upper()} as a balance at any date.",
+            invoked_by=invoked_by,
+            detail=f"{ticker.upper()} reports no {metric} as a balance; it may be a flow — "
+                   f"call read_fundamentals, or describe to see which it is")
+    points, unit = read["points"], read["unit"]
     calc_id = await cs._record(
-        db, ticker, OP_BALANCE_SERIES,
-        {"metric": metric, "last_n": last_n,
+        db, read["ticker"], OP_BALANCE_SERIES,
+        {**identifying_params_balance_series(read["ticker"], metric, last_n, read["through"]),
          "result_type": {"unit_class": unit, "kind": "instant", "quantity": metric}},
         {"points": points}, [p["fact_ids"][0] for p in points], {}, invoked_by,
     )
-    return {"calc_id": calc_id, "ticker": ticker, "metric": metric, "unit_class": unit.upper(),
-            "points": points,
-            "basis": f"{metric} as reported at each of {len(points)} instants, "
-                     f"{points[0][units.POINT_PERIOD_KEY]}.."
-                     f"{points[-1][units.POINT_PERIOD_KEY]}; "
-                     f"no value is carried across dates"}
+    return {"calc_id": calc_id, "ticker": read["ticker"], "metric": metric,
+            "unit_class": read["unit_class"], "points": points, "basis": read["basis"]}
 
 
 async def quarterly_points(db: AsyncSession, ticker: str, metric: str, *, last_n: int = 8):

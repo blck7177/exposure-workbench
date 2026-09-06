@@ -17,6 +17,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import units
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import series_service as ss
@@ -41,6 +43,30 @@ _MARGIN_NUMERATORS = (("gross_margin", "gross_profit"),
                       ("operating_margin", "operating_income"),
                       ("net_margin", "net_income"))
 _RETURN_WINDOWS = (("1m", 30), ("3m", 91), ("1y", 365))
+
+
+def _reading_of(label: str) -> str | None:
+    """How a named measure READS, from the registry that declares it (V25).
+
+    The unit algebra cannot tell a margin from a coverage ratio: both are money
+    ÷ money, both are dimensionless, and only the registry knows which of the
+    two readings a named measure has (analytics/units.REFINEMENTS, and V17's
+    migration note). `analytics/formulas.py` has declared `current_ratio` a
+    multiple since V17 — and this recipe never asked, so every current ratio it
+    computed was recorded as a ratio and printed as `128.3%`, on the page and to
+    the model alike. V17's own migration lists `current_ratio` and did not
+    correct these rows, because it keyed on `result_type.quantity` and the
+    recipe records none.
+
+    Only a DIMENSIONLESS declaration is passed on. Declaring `money` on a
+    quotient is not a reading of it, so `units.refine` would refuse and the row
+    would not be written at all — a producer must not be able to turn a correct
+    calculation into a refusal by consulting a table.
+    """
+    formula = fm.FORMULAS.get(label)
+    if formula is None or formula.unit_class not in units.DIMENSIONLESS:
+        return None
+    return formula.unit_class
 
 
 def _unavailable(label: str, out: dict) -> dict:
@@ -87,14 +113,16 @@ async def run_standard_recipe(
                                                       invoked_by=invoked_by)
         return series[key]
 
-    async def ratio(label: str, num: dict, den: dict, op: str = "divide") -> None:
+    async def ratio(label: str, num: dict, den: dict, op: str = "divide",
+                    as_unit: str | None = None) -> None:
         if num.get("error"):
             out[label] = _unavailable(label, num)
             return
         if den.get("error"):
             out[label] = _unavailable(label, den)
             return
-        got = await tc.calculate(db, op, num["calc_id"], den["calc_id"], invoked_by=invoked_by)
+        got = await tc.calculate(db, op, num["calc_id"], den["calc_id"], invoked_by=invoked_by,
+                                 as_unit_class=as_unit or _reading_of(label))
         out[label] = _unavailable(label, got) if got.get("error") else got
 
     # 1) growth (YoY on quarterly series; Q4 is a derived window like any other)
@@ -118,6 +146,10 @@ async def run_standard_recipe(
     await ratio("free_cash_flow", await flow("operating_cash_flow"), await flow("capex"), "subtract")
 
     # 5) liquidity / leverage — balances, at each reported instant
+    # A current ratio is 1.28×, never 128.3%. money ÷ money is a RATIO to the
+    # algebra and can be nothing else — net margin and current ratio are the
+    # same operation on the same units — so which of the two readings it is has
+    # to be DECLARED, and `_reading_of` takes that from the registry (V25).
     await ratio("current_ratio", await balance("current_assets"), await balance("current_liabilities"))
     # V9-M1 renamed the denominator. `long_term_debt` accepted both LongTermDebt
     # (current maturities included) and LongTermDebtNoncurrent (excluded) and
@@ -125,8 +157,13 @@ async def run_standard_recipe(
     # between issuers and between quarters. It now names the noncurrent balance,
     # which is what "long-term debt" means on a balance sheet, and the key says
     # so — a reader of this number can no longer be wrong about which it is.
+    # Stated here rather than read from the registry, because this label is not
+    # in it: it is a measure this recipe composes and nothing evaluates by name.
+    # Adding it to FORMULAS would make it a formula the agent can ask for, which
+    # is a wider claim than "this quotient is read as a multiple".
     await ratio("cash_to_long_term_debt_noncurrent",
-                await balance("cash_and_equivalents"), await balance("long_term_debt_noncurrent"))
+                await balance("cash_and_equivalents"), await balance("long_term_debt_noncurrent"),
+                as_unit=units.MULTIPLE)
 
     # 6) market returns, absolute and benchmark-relative
     for label, days in _RETURN_WINDOWS:

@@ -24,11 +24,17 @@ import { C, Tooltip, useTooltip, useWidth, fmtDate } from "./frame";
  * numbers nobody reads; the ones that matter here are the ones near ±1, because
  * those are the reason a single coefficient is not quotable.
  */
-export function Heatmap({ labels, matrix, ariaLabel, window: win }: {
+export function Heatmap({ labels, matrix, ariaLabel, window: win, focusKey, onPoint }: {
   labels: string[];
   matrix: (number | null)[][];
   ariaLabel: string;
   window?: { from: string; to: string; observations: number };
+  /** V25. The factor the reader is pointing at from the waterfall or the betas
+   *  beside this. Its row and column lift; the rest of the grid steps back, so
+   *  "what does this factor move with" is answered by looking rather than by
+   *  counting cells across. */
+  focusKey?: string | null;
+  onPoint?: (key: string | null) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -54,12 +60,13 @@ export function Heatmap({ labels, matrix, ariaLabel, window: win }: {
       <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} role="img" aria-label={ariaLabel}>
         {labels.map((l, j) => (
           <text key={`h-${l}`} x={padLeft + j * cell + cell / 2} y={padTop - 4} textAnchor="middle"
-            fontFamily="var(--font-geist-mono)" fontSize={10} fill={C.ink3}>{short(l)}</text>
+            fontFamily="var(--font-geist-mono)" fontSize={10}
+            fill={focusKey === l ? "#e6edf3" : C.ink3}>{short(l)}</text>
         ))}
         {matrix.map((row, i) => (
           <g key={`r-${labels[i]}`}>
             <text x={padLeft - 6} y={padTop + i * cell + cell / 2 + 4} textAnchor="end"
-              fontSize={11} fill="#9aa7b7">{labels[i]}</text>
+              fontSize={11} fill={focusKey === labels[i] ? "#e6edf3" : "#9aa7b7"}>{labels[i]}</text>
             {row.map((v, j) => {
               const x = padLeft + j * cell;
               const y = padTop + i * cell;
@@ -67,15 +74,17 @@ export function Heatmap({ labels, matrix, ariaLabel, window: win }: {
                 return <rect key={j} x={x + 1} y={y + 1} width={cell - 2} height={cell - 2}
                   rx={3} fill={C.grid} />;
               }
+              const lit = focusKey == null || labels[i] === focusKey || labels[j] === focusKey;
               return (
-                <g key={j}>
+                <g key={j} opacity={lit ? 1 : 0.35}>
                   <rect x={x + 1} y={y + 1} width={cell - 2} height={cell - 2} rx={3}
                     fill={v == null ? C.grid : colour(v)}
                     onPointerMove={(e) => show(e.clientX, e.clientY, `${labels[i]} × ${labels[j]}`, [
                       { label: "Correlation of daily returns", value: v == null ? "—" : v.toFixed(3) },
                       ...(win ? [{ label: "Window", value: `${win.observations} sessions to ${win.to}` }] : []),
                     ])}
-                    onPointerLeave={hide} />
+                    onPointerEnter={() => onPoint?.(labels[i])}
+                    onPointerLeave={() => { onPoint?.(null); hide(); }} />
                   {v != null && Math.abs(v) >= 0.7 && (
                     <text x={x + cell / 2} y={y + cell / 2 + 3.5} textAnchor="middle" fontSize={9.5}
                       fill="#fff" pointerEvents="none" fontFamily="var(--font-geist-mono)">
@@ -98,7 +107,7 @@ export function Heatmap({ labels, matrix, ariaLabel, window: win }: {
 export type LadderRow = {
   months: number;
   label: string;
-  slots: { start: string; end: string; value: number | null;
+  slots: { start: string; period_end: string; value: number | null;
            fact_ids?: string[]; terms?: { fact_id: string; sign: number }[];
            derivation?: string; unreachable?: string }[];
 };
@@ -134,13 +143,13 @@ export function WindowLadder({ rows, format, today, ariaLabel, onOpen }: {
   const height = rows.length * rowH + 28;
 
   const days = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
-  const all = rows.flatMap((r) => r.slots.flatMap((s) => [days(s.start), days(s.end)]));
+  const all = rows.flatMap((r) => r.slots.flatMap((s) => [days(s.start), days(s.period_end)]));
   if (all.length === 0) return <div ref={ref} className="text-xs text-slate-600 py-6">No reported windows.</div>;
   const t0 = Math.min(...all);
   const t1 = Math.max(...all, today ? days(today) : -Infinity);
   const X = (iso: string) => padLeft + ((days(iso) - t0) / Math.max(1, t1 - t0)) * (w - padLeft - padRight);
 
-  const years = Array.from(new Set(rows.flatMap((r) => r.slots.map((s) => s.end.slice(0, 4)))));
+  const years = Array.from(new Set(rows.flatMap((r) => r.slots.map((s) => s.period_end.slice(0, 4)))));
 
   return (
     <div ref={ref} className="relative">
@@ -168,13 +177,13 @@ export function WindowLadder({ rows, format, today, ariaLabel, onOpen }: {
               <text x={padLeft - 8} y={y + 13} textAnchor="end" fontSize={11} fill="#9aa7b7">{r.label}</text>
               {r.slots.map((s) => {
                 const x0 = X(s.start) + 1;
-                const x1 = X(s.end) - 1;
+                const x1 = X(s.period_end) - 1;
                 const bw = Math.max(4, x1 - x0);
                 const derived = (s.terms?.length ?? 0) > 1;
                 const label = s.value == null ? "" : format(s.value);
                 const fits = bw > label.length * 6.4 + 12;
                 return (
-                  <g key={`${r.months}-${s.end}`}>
+                  <g key={`${r.months}-${s.period_end}`}>
                     {s.value == null ? (
                       <rect x={x0} y={y} width={bw} height={18} rx={4} fill="none"
                         stroke={C.ink3} strokeDasharray="3 3" />
@@ -194,7 +203,7 @@ export function WindowLadder({ rows, format, today, ariaLabel, onOpen }: {
                         const id = s.fact_ids?.[0] ?? s.terms?.[0]?.fact_id;
                         if (id && onOpen) onOpen(id);
                       }}
-                      onPointerMove={(e) => show(e.clientX, e.clientY, `${s.start} → ${s.end}`,
+                      onPointerMove={(e) => show(e.clientX, e.clientY, `${s.start} → ${s.period_end}`,
                         s.value == null
                           ? [{ label: "Not derivable", value: s.unreachable ?? "no path" }]
                           : [
@@ -226,9 +235,14 @@ export function WindowLadder({ rows, format, today, ariaLabel, onOpen }: {
  * with a named successor says the thing a chip cannot: interest expense is not
  * absent by accident, it stopped being reported as a separate line.
  */
-export function CoverageTable({ rows }: {
+export function CoverageTable({ rows, selected, onSelect }: {
   rows: { metric: string; label: string; periods: number | null; latest: string | null;
           kind: string | null; windows_filed: string[] | null; superseded_by: string[] | null }[];
+  /** V25. A flow row is a way into the ladder; a balance is not — the ladder is
+   *  about windows, and a balance has none. A row with nothing to open gets no
+   *  affordance pretending it does. */
+  selected?: string;
+  onSelect?: (metric: string) => void;
 }) {
   return (
     <div className="overflow-x-auto max-h-[380px]">
@@ -243,10 +257,19 @@ export function CoverageTable({ rows }: {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.metric} className="align-top">
+          {rows.map((r) => {
+            const openable = onSelect != null && r.kind === "flow";
+            return (
+            <tr key={r.metric} className={`align-top ${r.metric === selected ? "bg-[#161b22]" : ""}`}>
               <td className="py-1.5 pr-3 border-b border-[#161b22] text-slate-300">
-                {r.label}
+                {openable ? (
+                  <button onClick={() => onSelect(r.metric)}
+                    title="Show this measure's windows in the ladder"
+                    className={`text-left hover:underline decoration-dotted underline-offset-2 ${
+                      r.metric === selected ? "text-slate-100 font-medium" : "hover:text-slate-100"}`}>
+                    {r.label}
+                  </button>
+                ) : r.label}
                 {r.superseded_by?.length ? (
                   <span className="block text-[10.5px] text-amber-500/80 leading-snug">
                     no longer reported — see {r.superseded_by.join(", ")}
@@ -262,7 +285,8 @@ export function CoverageTable({ rows }: {
                 {r.windows_filed?.length ? r.windows_filed.join(", ") : "—"}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -86,7 +86,16 @@ export function Rail({
 
       {runs.length > 0 && (
         <Section title="Updates">
-          {runs.slice(0, 8).map((r) => (
+          {runs.slice(0, 8).map((r, i, list) => {
+            // A day this book was measured more than once shows the time as
+            // well as the date. Five rows reading "Sep 3, 2026" is a list of
+            // five different runs that looks like one run listed five times —
+            // and it is the same collapsing the run series performs, said here
+            // the other way round, because on this rail a run IS the thing
+            // being picked.
+            const sameDay = list.some((o) => o.id !== r.id && o.as_of_date === r.as_of_date);
+            const at = r.completed_at ?? r.started_at ?? r.created_at;
+            return (
             <button key={r.id} onClick={() => onSelectRun(r.id)}
               className={`w-full text-left px-3 py-1.5 flex flex-col gap-0.5 border-l-2 transition-colors ${
                 r.id === selectedRunId
@@ -94,6 +103,11 @@ export function Rail({
                   : "border-transparent hover:bg-[#11161d]"}`}>
               <span className="text-[12px] text-slate-300 flex items-center gap-1.5">
                 {fmtDate(r.as_of_date)}
+                {sameDay && at && (
+                  <span className="text-[10px] text-slate-500">
+                    {new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                  </span>
+                )}
                 {r.status !== "completed" && (
                   <span className={`text-[9.5px] uppercase tracking-wide ${
                     r.status === "failed" ? "text-red-400" : "text-blue-400"}`}>
@@ -107,7 +121,8 @@ export function Rail({
                 </span>
               </AuditOnly>
             </button>
-          ))}
+            );
+          })}
         </Section>
       )}
 

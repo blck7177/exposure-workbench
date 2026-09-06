@@ -14,14 +14,17 @@ import { CitationList } from "../../components/evidence/Cite";
 import { useEvidence } from "../../components/evidence/Column";
 import { fmtDate, fmtMoney, fmtPct } from "../../components/charts/frame";
 import {
-  BriefProvenance, Coverage, HowAssembled, Margins, PriceVsBenchmark, Windows,
+  BriefProvenance, Coverage, HowAssembled, PriceVsBenchmark, Windows,
 } from "../../components/issuer/panels";
-import { getPositions, listTasks } from "@/lib/api";
+import { Financials } from "../../components/issuer/Financials";
+import { InBook } from "../../components/issuer/InBook";
+import { getPortfolio, getPositions, listTasks } from "@/lib/api";
 import {
-  getCitationMap, getContainment, getCoverage, getEvidenceLabels, getPanelSeries,
-  getPriceIndex, getWindows,
-  type CitationMap as CitationMapData, type Containment, type CoverageRow,
-  type EvidenceLabel, type PanelSeriesResponse, type PriceIndex, type ReportedWindows,
+  getBriefs, getCitationMap, getContainment, getCoverage, getEvidenceLabels, getLimitBook,
+  getMeasures, getPriceIndex, getRunSeries, getWindows,
+  type BriefSummary, type CitationMap as CitationMapData, type Containment, type CoverageRow,
+  type EvidenceLabel, type LimitCheckRow, type Measures, type PriceIndex,
+  type ReportedWindows, type RunSeries,
 } from "@/lib/charts";
 import { explainApiError, explainRunError } from "@/lib/errors";
 import { apiErrorDetail } from "@/lib/http";
@@ -87,8 +90,21 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   // reload that would lose the reader's place.
   const [dataKey, setDataKey] = useState(0);
   const [index, setIndex] = useState<PriceIndex | null>(null);
-  const [panel, setPanel] = useState<PanelSeriesResponse | null>(null);
+  const [span, setSpan] = useState("1y");
+  const [benchmark, setBenchmark] = useState("SPY");
+  const [measures, setMeasures] = useState<Measures | null>(null);
   const [coverage, setCoverage] = useState<CoverageRow[] | null>(null);
+  // The book the reader came from, when they came from one: its name, its
+  // dated updates and the tiers it judges this name by. Absent for a
+  // hand-typed URL, and the strip is absent with it.
+  const [bookName, setBookName] = useState<string | null>(null);
+  const [series, setSeries] = useState<RunSeries | null>(null);
+  const [checks, setChecks] = useState<LimitCheckRow[]>([]);
+  const [briefs, setBriefs] = useState<BriefSummary[]>([]);
+  // Which metric the Financials tab's ladder is showing. Held here rather than
+  // in the tab so the Windows view of the Financials panel can send a reader
+  // to the ladder for the measure they were already looking at.
+  const [ladderMetric, setLadderMetric] = useState("revenue");
   // The whole run, not just its status: the timeline and the failure sentence
   // both arrive on it, and one poll already carries all three.
   const [run, setRun] = useState<ResearchRun | null>(null);
@@ -106,17 +122,51 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
   // held a sentence for that exact code, written for exactly this reader.
   useEffect(() => {
     let ignore = false;
-    getSnapshot(tk).then((s) => { if (!ignore) { setSnap(s); setUnprepared(false); } })
+    // The book is a parameter now: without it the snapshot answers with no
+    // exposure at all, rather than with the newest row on whichever book
+    // happens to hold the name (V25).
+    getSnapshot(tk, portfolioId).then((s) => { if (!ignore) { setSnap(s); setUnprepared(false); } })
       .catch((e) => {
         if (ignore) return;
         if (apiErrorDetail(e)?.error === "not_prepared") { setUnprepared(true); return; }
         setError(explainApiError(e).notice);
       });
-    getPriceIndex(tk).then((i) => { if (!ignore) setIndex(i); }).catch(() => setIndex(null));
-    getPanelSeries(tk).then((ps) => { if (!ignore) setPanel(ps); }).catch(() => setPanel(null));
+    getMeasures(tk).then((m) => { if (!ignore) setMeasures(m); }).catch(() => setMeasures(null));
     getCoverage(tk).then((c) => { if (!ignore) setCoverage(c.measures); }).catch(() => setCoverage([]));
+    getBriefs(tk).then((b) => { if (!ignore) setBriefs(b.briefs); }).catch(() => setBriefs([]));
     return () => { ignore = true; };
-  }, [tk, dataKey]);
+  }, [tk, dataKey, portfolioId]);
+
+  // The price chart's own reads, on the window and the benchmark the reader
+  // asked for — both parameters this endpoint has always accepted and the page
+  // has always sent one value for.
+  useEffect(() => {
+    let ignore = false;
+    getPriceIndex(tk, span, benchmark)
+      .then((i) => { if (!ignore) setIndex(i); }).catch(() => setIndex(null));
+    return () => { ignore = true; };
+  }, [tk, dataKey, span, benchmark]);
+
+  // What the book the reader came from says about this name.
+  useEffect(() => {
+    if (!portfolioId) { setBookName(null); setSeries(null); setChecks([]); return; }
+    let ignore = false;
+    getPortfolio(portfolioId).then((p) => { if (!ignore) setBookName(p.name); }).catch(() => {});
+    getRunSeries(portfolioId, "all")
+      .then((s) => { if (!ignore) setSeries(s); }).catch(() => setSeries(null));
+    return () => { ignore = true; };
+  }, [portfolioId]);
+
+  // The tiers that book judges this name by, from its own latest update — the
+  // run the strip's figures come from, so the weight and the tier it is
+  // measured against belong to one measurement.
+  useEffect(() => {
+    const runId = snap?.portfolio_exposure?.run_id;
+    if (!runId) { setChecks([]); return; }
+    let ignore = false;
+    getLimitBook(runId).then((b) => { if (!ignore) setChecks(b.checks); }).catch(() => setChecks([]));
+    return () => { ignore = true; };
+  }, [snap?.portfolio_exposure?.run_id]);
 
   const runResearch = async () => {
     setError(null);
@@ -149,12 +199,34 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
     return () => clearInterval(iv);
   }, [runId, runStatus]);
 
-  const e = snap?.portfolio_exposure;
   const working = !!runStatus && runStatus !== "completed" && runStatus !== "failed";
+  const { open: openEvidence } = useEvidence();
+  // The newest period any measure runs to — what "the figures" are through,
+  // which is not the same date as when the filing arrived.
+  const fiscalThrough = [
+    ...(measures?.flows ?? []).map((f) => f.through),
+    ...(measures?.balances ?? []).map((b) => b.through),
+  ].filter((d): d is string => !!d).sort().pop() ?? null;
+
+  // What the price chart may be indexed against. The endpoint accepts any
+  // ticker this desk prices; this is the list worth offering — the factor set
+  // the book's own regression uses, and, when the reader came from a book, the
+  // names they hold beside this one.
+  const benchmarkChoices = [
+    { ticker: "SPY", label: "SPY · the market" },
+    { ticker: "QQQ", label: "QQQ · growth" },
+    { ticker: "IWM", label: "IWM · small cap" },
+    { ticker: "TLT", label: "TLT · rates" },
+    { ticker: "HYG", label: "HYG · credit" },
+    { ticker: "GLD", label: "GLD · gold" },
+    ...(series?.updates[series.updates.length - 1]?.issuers ?? [])
+      .filter((i) => i.ticker !== tk)
+      .map((i) => ({ ticker: i.ticker, label: `${i.ticker} · in this book` })),
+  ].filter((b, i, all) => all.findIndex((o) => o.ticker === b.ticker) === i);
 
   return (
     <>
-      {portfolioId && <BookRail portfolioId={portfolioId} current={tk} />}
+      {portfolioId && <BookRail portfolioId={portfolioId} current={tk} series={series} />}
 
       <main className="flex-1 min-w-0 overflow-y-auto">
         <div className="max-w-[1180px] mx-auto px-5 py-4 flex flex-col gap-3">
@@ -172,9 +244,14 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
               <p className="text-[11.5px] text-slate-500 mt-0.5">
                 {[snap?.company.industry || snap?.company.sector, snap?.company.exchange]
                   .filter(Boolean).join(" · ")}
-                {e && <> · in this book <span className="text-slate-400">{fmtMoney(e.market_value)}</span>
-                  {e.weight != null && <> · {fmtPct(e.weight, 2)}</>}</>}
+                {snap?.latest_filing && <> · fiscal figures through {fmtDate(fiscalThrough)}</>}
               </p>
+              <IssuerFreshness
+                filing={snap?.latest_filing ?? null}
+                filedThrough={fiscalThrough}
+                computed={measures?.as_of ?? null}
+                priced={index?.points[index.points.length - 1]?.date ?? null}
+                briefed={briefs[0]?.created_at ?? null} />
               <AuditOnly>
                 <span className="block mt-1 font-mono text-[10px] text-slate-600">
                   CIK {snap?.company.cik ?? "—"}{portfolioId ? ` · ${portfolioId}` : ""}
@@ -224,21 +301,39 @@ function IssuerView({ params }: { params: Promise<{ ticker: string }> }) {
             ))}
           </div>
 
+          {/* The order a reader asks in (V25): what this is to my book, then
+              the price, then the fundamentals, then what the desk wrote. The
+              strip appears only when a book was named — see InBook. */}
           {!unprepared && tab === "Overview" && (
             <div className="flex flex-col gap-3">
-              {index && <PriceVsBenchmark index={index} />}
-              {panel && <OverviewMargins panel={panel} />}
-              {coverage && coverage.length > 0 && <Coverage rows={coverage} />}
-              {coverage?.length === 0 && (
+              {snap?.portfolio_exposure && (
+                <InBook ticker={tk} snapshot={snap} series={series} checks={checks}
+                  bookName={bookName} />
+              )}
+              {index && (
+                <PriceVsBenchmark index={index} span={span} onSpan={setSpan}
+                  benchmark={benchmark} onBenchmark={setBenchmark}
+                  briefDate={briefs[0]?.created_at ?? null}
+                  benchmarks={benchmarkChoices} />
+              )}
+              {measures && <Financials ticker={tk} measures={measures} onOpen={openEvidence}
+                onWindows={(m) => { setLadderMetric(m); setTab("Financials"); }} />}
+              {measures === null && coverage?.length === 0 && (
                 <p className="text-xs text-slate-500 py-8 text-center">
                   Nothing is ingested for {tk} yet — refresh the brief to read its filings.
                 </p>
               )}
+              <BriefShort ticker={tk} brief={briefs[0] ?? null} onRead={() => setTab("Brief")} />
             </div>
           )}
-          {!unprepared && tab === "Financials" && <FinancialsTab ticker={tk} coverage={coverage ?? []} />}
+          {!unprepared && tab === "Financials" && (
+            <FinancialsTab ticker={tk} coverage={coverage ?? []}
+              metric={ladderMetric} onMetric={setLadderMetric} />
+          )}
           {!unprepared && tab === "Filings" && <FilingsTab ticker={tk} />}
-          {!unprepared && tab === "Brief" && <BriefTab ticker={tk} runStatus={runStatus} />}
+          {!unprepared && tab === "Brief" && (
+            <BriefTab ticker={tk} runStatus={runStatus} briefs={briefs} />
+          )}
           <div className="h-6" />
         </div>
       </main>
@@ -334,38 +429,171 @@ function PrepareIssuer({ ticker, onReady }: { ticker: string; onReady: () => voi
 }
 
 
-function OverviewMargins({ panel }: { panel: PanelSeriesResponse }) {
+/**
+ * How old each thing on this page is (V25).
+ *
+ * FOUR DATES, said together, because they are four and the page said none of
+ * them. A filing arrives (Apr 29) for a period that ended a month earlier (Mar
+ * 31); the recipe computed its ratios and returns on another day (Aug 20); the
+ * prices run to a third (Sep 3); and the brief was written on a fourth (Jul
+ * 24). The book page has had this line since V13-S1 for exactly one reason —
+ * "Aug 20" alone does not say whether that is the freshest there is or a week
+ * of silence — and the issuer page, where the four dates genuinely differ,
+ * had nothing.
+ *
+ * The evidence that this matters is on the page itself: MSFT's brief says the
+ * name underperformed SPY by 42.4% over a year, and the ledger's own return
+ * row, computed a month later, says 21.0%. Neither is wrong. Only the dates
+ * make that legible.
+ *
+ * The amber dot marks the brief, and only the brief: it is the one thing here
+ * a model wrote, and the one that goes stale without anything failing.
+ */
+function IssuerFreshness({ filing, filedThrough, computed, priced, briefed }: {
+  filing: { form_type: string; filing_date: string } | null;
+  filedThrough: string | null;
+  computed: string | null;
+  priced: string | null;
+  briefed: string | null;
+}) {
+  if (!filing && !computed && !priced && !briefed) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-slate-500 mt-1">
+      {filing && (
+        <>
+          <span aria-hidden className="text-emerald-500">●</span>
+          <span>Filed to {fmtDate(filedThrough ?? filing.filing_date)}</span>
+          <span className="text-slate-600">· {filing.form_type} on {fmtDate(filing.filing_date)}</span>
+        </>
+      )}
+      {computed && <span className="text-slate-600">· figures computed {fmtDate(computed)}</span>}
+      {priced && <span className="text-slate-600">· priced to {fmtDate(priced)}</span>}
+      {briefed && (
+        <>
+          <span className="text-slate-600">·</span>
+          <span aria-hidden className="text-amber-500">●</span>
+          <span>brief written {fmtDate(briefed.slice(0, 10))}</span>
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * The desk's brief, in one paragraph, at the bottom of the Overview (V25).
+ *
+ * The one thing on this page a model wrote, and the only thing that had no date
+ * beside its figures. MSFT's brief says the name underperformed SPY by 42.4%
+ * over a year; the ledger's own return row, computed a month later, says 21.0%.
+ * Both were true when written, and a reader can only see that if the page says
+ * when.
+ */
+function BriefShort({ ticker, brief, onRead }: {
+  ticker: string;
+  brief: BriefSummary | null;
+  onRead: () => void;
+}) {
   const { open } = useEvidence();
-  return <Margins data={panel} onOpen={open} />;
+  const [text, setText] = useState<string | null>(null);
+  const [citations, setCitations] = useState<string[]>([]);
+  const [labels, setLabels] = useState<Record<string, EvidenceLabel>>({});
+  useEffect(() => {
+    if (!brief) { setText(null); return; }
+    let ignore = false;
+    getLatestBrief(ticker)
+      .then((d) => {
+        if (ignore) return;
+        setText(d.brief?.financial_summary ?? null);
+        setCitations(d.brief?.citations ?? []);
+      })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, [ticker, brief]);
+
+  // A brief written before the block exit carries its citations INSIDE the
+  // prose — `[fact_d92b…, calc_50c6…]` at the end of a sentence — so rendering
+  // it as a string puts eight internal ids in front of a reader. `AnswerText`
+  // is the renderer that turns them into chips, and it needs their captions.
+  useEffect(() => {
+    const ids = text ? idsIn(text, citations) : [];
+    if (ids.length === 0) return;
+    let ignore = false;
+    getEvidenceLabels(ids).then((r) => { if (!ignore) setLabels(r.labels); }).catch(() => {});
+    return () => { ignore = true; };
+  }, [text, citations]);
+
+  if (!brief) return null;
+  return (
+    <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
+      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-[#21262d] flex-wrap">
+        <h3 className="text-sm font-medium text-slate-200">The desk&apos;s brief</h3>
+        <span className="text-[11px] text-slate-500">
+          {fmtDate(brief.created_at?.slice(0, 10))} · {brief.citations} citations
+        </span>
+        <span title="Every figure in the brief was true at the date it was written. The measures
+                     above it are computed on their own dates, and the two can differ."
+          className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-400">
+          figures as of {fmtDate(brief.created_at?.slice(0, 10))}
+        </span>
+        <button onClick={onRead}
+          className="ml-auto text-[11.5px] text-teal-400 hover:text-teal-300">Read the brief →</button>
+      </header>
+      <div className="px-4 py-3 text-[12.5px] leading-relaxed text-slate-300">
+        {text
+          ? <AnswerText text={text} citations={citations} labels={labels} onOpen={open} />
+          : <span className="text-slate-600">…</span>}
+      </div>
+    </section>
+  );
 }
 
 // ── the book you came from, as a way back into it ────────────────────────────
 
-function BookRail({ portfolioId, current }: { portfolioId: string; current: string }) {
+/**
+ * The book you came from, as a way back into it.
+ *
+ * V25: valued by the run, not by the position rows. `positions.market_value` is
+ * a column of a snapshot — the demo book's is dated Jul 23 — and the strip
+ * beside this rail reads the run's own issuer rows, dated Sep 3. So one screen
+ * carried MSFT at $1.33M in the rail and $1.79M three inches to the right,
+ * both true of different days and neither saying which. One book, one
+ * measurement: the rail now reads the same update the strip does.
+ */
+function BookRail({ portfolioId, current, series }: {
+  portfolioId: string;
+  current: string;
+  series: RunSeries | null;
+}) {
   const [positions, setPositions] = useState<Position[]>([]);
   useEffect(() => {
+    if (series) return;   // the run has it; the snapshot is the fallback shape
     let ignore = false;
     getPositions(portfolioId).then((p) => { if (!ignore) setPositions(p); }).catch(() => {});
     return () => { ignore = true; };
-  }, [portfolioId]);
-  if (positions.length === 0) return null;
+  }, [portfolioId, series]);
+
+  const last = series?.updates[series.updates.length - 1];
+  const rows = last
+    ? last.issuers.map((i) => ({ ticker: i.ticker, value: i.market_value }))
+    : positions.map((p) => ({ ticker: p.ticker, value: p.market_value }));
+  if (rows.length === 0) return null;
   return (
     <nav className="w-[228px] shrink-0 border-r border-[#21262d] bg-[#0d1117] overflow-y-auto"
       aria-label="Holdings of the book you came from">
       <div className="px-3 pt-3 pb-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-600">
-        Holdings
+        Holdings{last && <span className="normal-case tracking-normal"> · {fmtDate(last.as_of)}</span>}
       </div>
-      {[...positions]
-        .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
-        .map((p) => (
-          <Link key={p.id} href={`/issuer/${p.ticker}?portfolio=${portfolioId}`}
+      {[...rows]
+        .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+        .map((r) => (
+          <Link key={r.ticker} href={`/issuer/${r.ticker}?portfolio=${portfolioId}`}
             className={`px-3 py-1 flex items-baseline gap-2 border-l-2 ${
-              p.ticker === current
+              r.ticker === current
                 ? "border-blue-500 bg-[#161b22]"
                 : "border-transparent hover:bg-[#11161d]"}`}>
-            <span className="font-mono text-[11.5px] text-slate-300 w-12 shrink-0">{p.ticker}</span>
+            <span className="font-mono text-[11.5px] text-slate-300 w-12 shrink-0">{r.ticker}</span>
             <span className="text-[10.5px] text-slate-600 tabular-nums ml-auto">
-              {fmtMoney(p.market_value)}
+              {fmtMoney(r.value)}
             </span>
           </Link>
         ))}
@@ -432,9 +660,15 @@ function ResearchProgress({ run, stale }: { run: ResearchRun; stale: boolean }) 
 
 // ── financials ───────────────────────────────────────────────────────────────
 
-function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: CoverageRow[] }) {
+function FinancialsTab({ ticker, coverage, metric, onMetric }: {
+  ticker: string;
+  coverage: CoverageRow[];
+  /** Held by the page so the Overview's Windows view can send a reader here
+   *  showing the measure they were already looking at. */
+  metric: string;
+  onMetric: (metric: string) => void;
+}) {
   const flows = coverage.filter((c) => c.kind === "flow");
-  const [metric, setMetric] = useState("revenue");
   const [windows, setWindows] = useState<ReportedWindows | null>(null);
   const [calcs, setCalcs] = useState<CalcRow[] | null>(null);
   const [assembly, setAssembly] = useState<Containment | null>(null);
@@ -445,6 +679,17 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
     getWindows(ticker, metric).then((w) => { if (!ignore) setWindows(w); }).catch(() => setWindows(null));
     return () => { ignore = true; };
   }, [ticker, metric]);
+  // The last session this desk has priced: the ladder's `today` rule. The prop
+  // has existed since V13 and nothing passed it, so the gap between the last
+  // filed window and now was the one thing the ladder could not show.
+  const [today, setToday] = useState<string | null>(null);
+  useEffect(() => {
+    let ignore = false;
+    getPriceIndex(ticker, "1y")
+      .then((p) => { if (!ignore) setToday(p.points[p.points.length - 1]?.date ?? null); })
+      .catch(() => setToday(null));
+    return () => { ignore = true; };
+  }, [ticker]);
   useEffect(() => {
     getFinancials(ticker).then((d) => setCalcs(d.calcs)).catch(() => setCalcs([]));
     getContainment(ticker).then(setAssembly).catch(() => setAssembly(null));
@@ -457,7 +702,8 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
   return (
     <div className="flex flex-col gap-3">
       {windows && (
-        <Windows data={windows} metrics={options} metric={metric} onMetric={setMetric} onOpen={open} />
+        <Windows data={windows} metrics={options} metric={metric} onMetric={onMetric}
+          today={today} onOpen={open} />
       )}
       {calcs && calcs.length > 0 && (
         <section className="rounded-lg border border-[#21262d] bg-[#11161d]">
@@ -508,7 +754,9 @@ function FinancialsTab({ ticker, coverage }: { ticker: string; coverage: Coverag
         </section>
       )}
       {assembly && <HowAssembled data={assembly} onOpen={open} />}
-      {coverage.length > 0 && <Coverage rows={coverage} />}
+      {coverage.length > 0 && (
+        <Coverage rows={coverage} selected={metric} onSelect={onMetric} />
+      )}
     </div>
   );
 }
@@ -600,7 +848,13 @@ const SECTIONS: [string, BriefSection][] = [
   ["Open questions", "open_questions"],
 ];
 
-function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | null }) {
+function BriefTab({ ticker, runStatus, briefs }: {
+  ticker: string;
+  runStatus: string | null;
+  /** Every brief this desk wrote for the name, newest first. NVDA has three,
+   *  LLY two; the page showed only the latest and said nothing about the rest. */
+  briefs: BriefSummary[];
+}) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [map, setMap] = useState<CitationMapData | null>(null);
@@ -644,6 +898,26 @@ function BriefTab({ ticker, runStatus }: { ticker: string; runStatus: string | n
 
   return (
     <div className="flex flex-col gap-3">
+      {briefs.length > 0 && (
+        <section className="rounded-lg border border-[#21262d] bg-[#11161d] px-4 py-2.5
+                            flex flex-wrap items-center gap-2 text-[11.5px] text-slate-500">
+          <span>Briefs for {ticker}</span>
+          {briefs.map((b) => (
+            <span key={b.id}
+              className={`rounded border px-2 py-0.5 ${b.is_current
+                ? "border-blue-500/60 text-slate-200" : "border-[#30363d] text-slate-400"}`}>
+              {fmtDate(b.created_at?.slice(0, 10))}
+              <span className="text-slate-500"> · {b.citations} citations
+                {b.is_current ? " · current" : ""}</span>
+            </span>
+          ))}
+          <span className="text-slate-600">
+            {briefs.length === 1
+              ? "one so far — a brief is written by a research run, not by a schedule"
+              : `${briefs.length} written; the current one is what the sections below are`}
+          </span>
+        </section>
+      )}
       {map && map.sections.length > 0 && <BriefProvenance map={map} />}
 
       {!brief ? (

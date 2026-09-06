@@ -379,6 +379,16 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v24_facts.sql
 
+# v25_recipe_multiple.sql corrects how 23 rows READ and touches no value: a
+# current ratio of 1.28 was recorded as a ratio and printed as "128.3%", on the
+# page and to the model alike (display_conventions is one rule shared by both).
+# The registry has declared current_ratio a multiple since V17; the recipe never
+# asked, and V17's own migration missed these rows because it keyed on
+# result_type.quantity, which the recipe records none of. Safe to run before or
+# after the code, and idempotent — a second run matches nothing.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v25_recipe_multiple.sql
+
 docker compose up -d
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.

@@ -7,10 +7,12 @@ import { useEffect, useState } from "react";
 
 import { AuditOnly, useAudit } from "../audit";
 import { C, fmtDate, fmtMoney, fmtPct, fmtSignedPct, titleFromKey } from "../charts/frame";
+import { useFocus } from "./Focus";
+import { deltaLabel, sortRows } from "@/lib/book";
 import { ReturnHistogram, Sparkline } from "../charts/line";
 import { collapseSteps, stepPhrase } from "../steps";
 import { useEvidence } from "../evidence/Column";
-import { getAuditSummary, type AuditSummary, type History } from "@/lib/charts";
+import { getAuditSummary, type AuditSummary, type History, type LimitCheckRow, type RunSeries } from "@/lib/charts";
 import { explainRunError } from "@/lib/errors";
 import { formatDateTime, formatDuration } from "@/lib/formatting";
 import type {
@@ -273,14 +275,88 @@ export function Warnings({ alerts, labels, onAsk }: {
 
 // ── holdings ─────────────────────────────────────────────────────────────────
 
-export function Holdings({ issuers, asOf, portfolioId, onAsk }: {
+/**
+ * The book's holdings, with the three columns the run already stored (V25).
+ *
+ * What the table had: ticker, sector, market value, weight, the day. Which is
+ * "what is in it" and nothing about whether any of that is new or close to a
+ * line. What it has now:
+ *
+ *   Δ                 the weight's move since the previous DATED update. Not
+ *                     `issuer_exposures.weight_change`, which the workflow has
+ *                     written NULL into on every row it has ever written; the
+ *                     run series subtracts two stored weights on the server.
+ *   Contribution      yesterday's weight × this name's return — the share of
+ *                     the BOOK's day. Stored since V8, on the wire since V25,
+ *                     and never labelled "contribution" alone in the header,
+ *                     because the word names two quantities on a risk page.
+ *   Room              this name's own issuer tier minus its weight, from the
+ *                     limit book. Negative when it is already over.
+ *
+ * Sorting is a view: the rows are the ones the run wrote, in a different order.
+ * Nulls sort last in both directions — a name with no comparison is not the
+ * smallest move, it is no move at all.
+ */
+type SortKey = "ticker" | "sector" | "market_value" | "weight" | "delta" | "day" | "contribution" | "room";
+
+export function Holdings({ issuers, asOf, portfolioId, onAsk, series, checks }: {
   issuers: IssuerExposure[];
   asOf: string;
   portfolioId: string | null;
   onAsk: (q: string) => void;
+  /** The dated updates: where Δ comes from, and which date it is against. */
+  series: RunSeries | null;
+  /** This run's limit book: the issuer tiers, and the room left under them. */
+  checks: LimitCheckRow[];
 }) {
+  const { focus, point } = useFocus();
+  const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>(
+    { key: "market_value", desc: true });
   if (issuers.length === 0) return null;
-  const rows = [...issuers].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
+
+  const updates = series?.updates ?? [];
+  const last = updates[updates.length - 1];
+  const previous = updates.length > 1 ? updates[updates.length - 2].as_of : null;
+  const delta = Object.fromEntries(
+    (last?.issuers ?? []).map((i) => [i.ticker, i.weight_change_vs_prev]));
+  const contribution = Object.fromEntries(
+    (last?.issuers ?? []).map((i) => [i.ticker, i.contribution]));
+  const tier = Object.fromEntries(
+    checks.filter((c) => c.key.startsWith("issuer_concentration:"))
+      .map((c) => [c.key.slice("issuer_concentration:".length), c]));
+
+  // The run's own contribution column when the series has not arrived (or the
+  // book has one update): the same figure from the same row, not a second one.
+  const contributionOf = (i: IssuerExposure) => contribution[i.ticker] ?? i.contribution;
+
+  const cell = (i: IssuerExposure, key: SortKey): number | string | null => {
+    switch (key) {
+      case "ticker": return i.ticker;
+      case "sector": return i.sector ?? "";
+      case "market_value": return i.market_value;
+      case "weight": return i.weight;
+      case "delta": return delta[i.ticker] ?? null;
+      case "day": return i.daily_return;
+      case "contribution": return contributionOf(i);
+      case "room": return tier[i.ticker]?.room_warning ?? null;
+    }
+  };
+  const rows = sortRows(issuers, (i) => cell(i, sort.key), sort.desc);
+
+  const head = (key: SortKey, label: React.ReactNode, title?: string) => (
+    <th key={key} title={title}
+      className={`text-right font-medium py-1.5 px-2 ${key === "ticker" || key === "sector" ? "text-left" : ""}`}>
+      <button onClick={() => setSort((s) => s.key === key ? { key, desc: !s.desc } : { key, desc: true })}
+        aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : "none"}
+        className={`inline-flex items-center gap-1 ${sort.key === key ? "text-slate-300" : "hover:text-slate-300"}`}>
+        {label}
+        <span aria-hidden className={sort.key === key ? "opacity-100" : "opacity-0"}>
+          {sort.desc ? "\u25be" : "\u25b4"}
+        </span>
+      </button>
+    </th>
+  );
+
   return (
     <section className="rounded-lg border border-[#21262d] bg-[#11161d] overflow-hidden">
       <header className="flex items-center gap-2 px-4 py-2.5 border-b border-[#21262d]">
@@ -291,39 +367,86 @@ export function Holdings({ issuers, asOf, portfolioId, onAsk }: {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-slate-500">
-              <th className="text-left font-medium py-1.5 px-4">Ticker</th>
-              <th className="text-left font-medium py-1.5 px-2">Sector</th>
-              <th className="text-right font-medium py-1.5 px-2">Market value</th>
-              <th className="text-right font-medium py-1.5 px-2">Weight</th>
-              <th className="text-right font-medium py-1.5 px-2">Day</th>
+              {head("ticker", "Ticker")}
+              {head("sector", "Sector")}
+              {head("market_value", "Market value")}
+              {head("weight", "Weight")}
+              {head("delta", deltaLabel(previous),
+                previous ? `The weight's move since the update dated ${fmtDate(previous)}`
+                         : "No earlier dated update to compare with")}
+              {head("day", "Day")}
+              {head("contribution", "Of the book's day",
+                "Yesterday's weight times this name's return — the share of the book's day this position accounts for")}
+              {head("room", "Room to limit",
+                "This name's own warning tier less its weight. Negative means it is already over.")}
               <th className="py-1.5 px-4" />
             </tr>
           </thead>
           <tbody className="divide-y divide-[#21262d]">
-            {rows.map((i) => (
-              <tr key={i.ticker} className="hover:bg-[#161b22]">
-                <td className="py-1.5 px-4">
-                  <Link href={`/issuer/${i.ticker}${portfolioId ? `?portfolio=${portfolioId}` : ""}`}
-                    className="font-mono text-[11.5px] text-blue-400 hover:text-blue-300 hover:underline">
-                    {i.ticker}
-                  </Link>
-                </td>
-                <td className="py-1.5 px-2 text-slate-500">{titleFromKey(i.sector)}</td>
-                <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">{fmtMoney(i.market_value)}</td>
-                <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">{fmtPct(i.weight, 2)}</td>
-                <td className={`py-1.5 px-2 text-right tabular-nums ${
-                  (i.daily_return ?? 0) < 0 ? "text-red-400" : "text-emerald-400"}`}>
-                  {fmtSignedPct(i.daily_return, 2)}
-                </td>
-                <td className="py-1.5 px-4 text-right">
-                  <button onClick={() => onAsk(`Why did ${i.ticker} move on ${fmtDate(asOf)}?`)}
-                    className="text-[11px] text-slate-500 hover:text-slate-200">Ask</button>
-                </td>
-              </tr>
-            ))}
+            {rows.map((i) => {
+              const t = tier[i.ticker];
+              const room = t?.room_warning ?? null;
+              const dw = delta[i.ticker] ?? null;
+              const contrib = contributionOf(i);
+              const lit = focus == null || (focus.kind === "ticker" && focus.key === i.ticker);
+              return (
+                <tr key={i.ticker}
+                  onPointerEnter={() => point({ kind: "ticker", key: i.ticker })}
+                  onPointerLeave={() => point(null)}
+                  className={`${focus?.kind === "ticker" && focus.key === i.ticker ? "bg-[#161b22]" : "hover:bg-[#161b22]"} ${lit ? "" : "opacity-45"}`}>
+                  <td className="py-1.5 px-4">
+                    <Link href={`/issuer/${i.ticker}${portfolioId ? `?portfolio=${portfolioId}` : ""}`}
+                      className="font-mono text-[11.5px] text-blue-400 hover:text-blue-300 hover:underline">
+                      {i.ticker}
+                    </Link>
+                  </td>
+                  <td className="py-1.5 px-2 text-slate-500">{titleFromKey(i.sector)}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">{fmtMoney(i.market_value)}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">{fmtPct(i.weight, 2)}</td>
+                  <td className={`py-1.5 px-2 text-right tabular-nums ${
+                    dw == null ? "text-slate-600" : dw < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                    {dw == null ? "\u2014" : fmtSignedPct(dw, 2)}
+                  </td>
+                  <td className={`py-1.5 px-2 text-right tabular-nums ${
+                    (i.daily_return ?? 0) < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                    {fmtSignedPct(i.daily_return, 2)}
+                  </td>
+                  <td className={`py-1.5 px-2 text-right tabular-nums ${
+                    contrib == null ? "text-slate-600" : contrib < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                    {contrib == null ? "\u2014" : fmtSignedPct(contrib, 3)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {room == null ? <span className="text-slate-600">\u2014</span> : (
+                      <span className={`inline-flex items-center gap-2 justify-end ${
+                        room < 0 ? "text-amber-400" : "text-slate-300"}`}>
+                        <span aria-hidden
+                          className="inline-block h-[5px] w-14 rounded bg-[#16243a] relative overflow-hidden">
+                          <span className="absolute inset-y-0 left-0 rounded"
+                            style={{ width: `${Math.min(100, Math.max(0, ((t?.utilisation ?? 0) * 100)))}%`,
+                                     background: room < 0 ? C.warn : C.s1 }} />
+                        </span>
+                        {room < 0 ? `over by ${fmtPct(-room, 1)}` : fmtPct(room, 1)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-1.5 px-4 text-right">
+                    <button onClick={() => onAsk(`Why did ${i.ticker} move on ${fmtDate(asOf)}?`)}
+                      className="text-[11px] text-slate-500 hover:text-slate-200">Ask</button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      <footer className="px-4 py-2 border-t border-[#21262d] text-[11px] text-slate-500 leading-snug">
+        Every column is a figure this run recorded.{" "}
+        {previous
+          ? <>&Delta; is against the update dated {fmtDate(previous)} — this book&apos;s previous
+              measurement, not the previous session.</>
+          : <>There is no earlier dated update to compare this one with.</>}{" "}
+        Room is this name&apos;s own warning tier less its weight.
+      </footer>
     </section>
   );
 }

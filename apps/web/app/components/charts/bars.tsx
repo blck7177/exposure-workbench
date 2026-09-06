@@ -38,11 +38,16 @@ export type WaterfallStep = { label: string; short?: string; value: number; tota
  * floats from the running sum. The connector between bars is a hairline, not a
  * mark: it carries no value and must not read as one.
  */
-export function Waterfall({ steps, format, height = 200, ariaLabel }: {
+export function Waterfall({ steps, format, height = 200, ariaLabel, focusKey, onPoint }: {
   steps: WaterfallStep[];
   format: (v: number) => string;
   height?: number;
   ariaLabel: string;
+  /** V25. The bar the reader is pointing at from somewhere else on the page —
+   *  a holdings row, a factor. Drawn forward while the rest step back, so
+   *  "which of these ten bars is MSFT" stops being a question. */
+  focusKey?: string | null;
+  onPoint?: (key: string | null) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -91,10 +96,20 @@ export function Waterfall({ steps, format, height = 200, ariaLabel }: {
           const x = padLeft + slot * i + (slot - bw) / 2;
           const up = b.value >= 0;
           const colour = b.total ? C.grey : up ? C.s1 : C.neg;
-          const labelled = b.total || Math.abs(b.value) >= biggest * 0.25;
+          const key = b.short ?? b.label;
+          const lit = focusKey == null || b.total || key === focusKey || b.label === focusKey;
+          // The focused bar is labelled whatever its size: a reader who pointed
+          // at a name is asking for its number, and "too small to label" is an
+          // answer about the chart rather than about the name.
+          const labelled = b.total || (focusKey != null && lit)
+            || Math.abs(b.value) >= biggest * 0.25;
           return (
-            <g key={b.label}>
+            <g key={b.label} opacity={lit ? 1 : 0.28}>
               <path d={barPath(x, Y(b.y0), Y(b.y1), bw, up)} fill={colour} />
+              {focusKey != null && lit && !b.total && (
+                <rect x={x - 4} y={top} width={bw + 8} height={plotH} rx={4} fill="none"
+                  stroke="#93c5fd" strokeWidth={1.25} strokeDasharray="3 3" />
+              )}
               {labelled && (
                 <text x={x + bw / 2} y={up ? Y(Math.max(b.y0, b.y1)) - 5 : Y(Math.min(b.y0, b.y1)) + 12}
                   textAnchor="middle" fontSize={10.5} fill="#e6edf3">{format(b.value)}</text>
@@ -113,7 +128,8 @@ export function Waterfall({ steps, format, height = 200, ariaLabel }: {
                   { label: b.total ? "Return" : "Contribution", value: format(b.value) },
                   ...(b.total ? [] : [{ label: "Running total", value: format(b.y1) }]),
                 ])}
-                onPointerLeave={hide} />
+                onPointerEnter={() => onPoint?.(b.total ? null : key)}
+                onPointerLeave={() => { onPoint?.(null); hide(); }} />
             </g>
           );
         })}
@@ -140,13 +156,23 @@ export type TierBar = {
  * a value crosses, and drawing it as a bar would make the reader compare two
  * lengths when the question is which side of a mark they are on.
  */
-export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpen }: {
+export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpen,
+                          tiersPerRow = false, focusKey, onPoint }: {
   bars: TierBar[];
   format: (v: number) => string;
   labelWidth?: number;
   ariaLabel: string;
   max?: number;
   onOpen?: (id: string) => void;
+  /** V25. Each row carries its own tier marks instead of one pair of rules for
+   *  the whole chart. Off by default, because the stress scenarios it was
+   *  written for genuinely share one pair — and on for sectors, where they do
+   *  not: this book allows Technology 40% and Consumer Discretionary 15%, and a
+   *  single rule drawn from the first bar judges six sectors by the seventh's
+   *  limit. */
+  tiersPerRow?: boolean;
+  focusKey?: string | null;
+  onPoint?: (key: string | null) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -169,19 +195,36 @@ export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpe
               fontSize={10} fill={C.ink3}>{format(t)}</text>
           </g>
         ))}
-        {warn != null && <line x1={X(warn)} x2={X(warn)} y1={2} y2={height - 16} stroke={C.warn} strokeWidth={1.5} />}
-        {breach != null && <line x1={X(breach)} x2={X(breach)} y1={2} y2={height - 16} stroke={C.crit} strokeWidth={1.5} />}
+        {!tiersPerRow && warn != null && (
+          <line x1={X(warn)} x2={X(warn)} y1={2} y2={height - 16} stroke={C.warn} strokeWidth={1.5} />)}
+        {!tiersPerRow && breach != null && (
+          <line x1={X(breach)} x2={X(breach)} y1={2} y2={height - 16} stroke={C.crit} strokeWidth={1.5} />)}
         {bars.map((b, i) => {
           const y = 6 + i * rowH;
           const over = b.warning != null && b.value >= b.warning;
+          const lit = focusKey == null || b.key === focusKey;
+          // A value label under its own tier mark is unreadable; when the two
+          // are within a few pixels the value moves past the further mark.
+          const marks = tiersPerRow
+            ? [b.warning, b.breach].filter((v): v is number => v != null)
+            : [];
+          const crowding = marks.some((m) => m > b.value && X(m) - X(b.value) < 42);
+          const labelAt = crowding ? Math.max(...marks) : b.value;
           return (
-            <g key={b.key}>
-              <text x={labelWidth - 8} y={y + 12} textAnchor="end" fontSize={11.5} fill="#9aa7b7">
+            <g key={b.key} opacity={lit ? 1 : 0.32}>
+              <text x={labelWidth - 8} y={y + 12} textAnchor="end" fontSize={11.5}
+                fill={focusKey === b.key ? "#e6edf3" : "#9aa7b7"}>
                 {b.label}
               </text>
               <rect x={X(0)} y={y} width={Math.max(2, X(b.value) - X(0))} height={13} rx={3}
                 fill={over ? C.warn : C.s1} />
-              <text x={X(b.value) + 6} y={y + 11} fontSize={11} fill="#e6edf3"
+              {tiersPerRow && b.warning != null && (
+                <line x1={X(b.warning)} x2={X(b.warning)} y1={y - 2} y2={y + 15}
+                  stroke={C.warn} strokeWidth={2} />)}
+              {tiersPerRow && b.breach != null && (
+                <line x1={X(b.breach)} x2={X(b.breach)} y1={y - 2} y2={y + 15}
+                  stroke={C.crit} strokeWidth={2} />)}
+              <text x={X(labelAt) + 6} y={y + 11} fontSize={11} fill="#e6edf3"
                 fontFamily="var(--font-geist-mono)">{format(b.value)}</text>
               <rect x={0} y={y - 4} width={w} height={rowH} fill="transparent"
                 style={b.openId && onOpen ? { cursor: "pointer" } : undefined}
@@ -189,7 +232,8 @@ export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpe
                 onPointerMove={(e) => show(e.clientX, e.clientY, b.label, b.tip ?? [
                   { label: "Value", value: format(b.value) },
                 ])}
-                onPointerLeave={hide} />
+                onPointerEnter={() => onPoint?.(b.key)}
+                onPointerLeave={() => { onPoint?.(null); hide(); }} />
             </g>
           );
         })}
@@ -201,13 +245,18 @@ export function TierBars({ bars, format, labelWidth = 150, ariaLabel, max, onOpe
 
 // ── diverging bars, for coefficients that have a sign ────────────────────────
 
-export function DivergingBars({ rows, format, labelWidth = 84, ariaLabel, dashed }: {
+export function DivergingBars({ rows, format, labelWidth = 84, ariaLabel, dashed,
+                                focusKey, onPoint }: {
   rows: { key: string; label: string; value: number; tip?: TipRow[] }[];
   format: (v: number) => string;
   labelWidth?: number;
   ariaLabel: string;
   /** Outline every bar: the row itself says the value is not determined alone. */
   dashed?: boolean;
+  /** V25. The factor the reader is pointing at from the waterfall or the
+   *  correlation grid beside this. */
+  focusKey?: string | null;
+  onPoint?: (key: string | null) => void;
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const { tip, show, hide } = useTooltip();
@@ -232,9 +281,11 @@ export function DivergingBars({ rows, format, labelWidth = 84, ariaLabel, dashed
           const y = 6 + i * rowH;
           const x0 = X(Math.min(0, r.value));
           const x1 = X(Math.max(0, r.value));
+          const lit = focusKey == null || r.key === focusKey || r.label === focusKey;
           return (
-            <g key={r.key}>
-              <text x={labelWidth - 8} y={y + 11} textAnchor="end" fontSize={11.5} fill="#9aa7b7">
+            <g key={r.key} opacity={lit ? 1 : 0.3}>
+              <text x={labelWidth - 8} y={y + 11} textAnchor="end" fontSize={11.5}
+                fill={focusKey != null && lit ? "#e6edf3" : "#9aa7b7"}>
                 {r.label}
               </text>
               <rect x={x0} y={y} width={Math.max(2, x1 - x0)} height={13} rx={3}
@@ -250,7 +301,8 @@ export function DivergingBars({ rows, format, labelWidth = 84, ariaLabel, dashed
                 onPointerMove={(e) => show(e.clientX, e.clientY, r.label, r.tip ?? [
                   { label: "Value", value: format(r.value) },
                 ])}
-                onPointerLeave={hide} />
+                onPointerEnter={() => onPoint?.(r.key)}
+                onPointerLeave={() => { onPoint?.(null); hide(); }} />
             </g>
           );
         })}

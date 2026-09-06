@@ -50,13 +50,36 @@ app/
   page.tsx              the book workbench
   issuer/[ticker]/      the issuer workspace
   components/           shared surfaces (analyst dock, evidence, timeline, …)
+    book/Focus.tsx      what the reader is pointing at, shared by six panels
+    book/composition.tsx  sectors, and every dated update of the book
+    charts/multiples.tsx  one small chart per thing, on a shared calendar axis
+    issuer/InBook.tsx     the position, as the book the reader came from records it
+    issuer/Financials.tsx a measure chosen from a list, drawn as a line
 lib/
   http.ts               the ONE transport — the token is attached in one place
   api.ts / issuer.ts    typed clients over it
+  charts.ts             the panel reads: history, limit book, run series, measures
   types.ts              the wire shapes, mirroring apps/api
+  book.ts               the book page's pure decisions (delta label, sort, focus)
+  measures.ts           the issuer picker's pure decisions (views, windows, gaps)
   errors.ts             a server refusal -> a sentence a person can act on
   formatting.ts         money / percent / date / duration
 ```
+
+### The reads a panel stands on (V25)
+
+Three of them are new, and none computes a measure:
+
+| read | serves |
+|---|---|
+| `GET /portfolios/{id}/run-series` | the book across its dated updates — the composition row, the mandate book's second mode, the holdings Δ, the issuer page's weight path |
+| `GET /issuers/{t}/measures` | the Financials picker: every measure the desk holds, with the views each supports |
+| `GET /issuers/{t}/balance-series` | a balance line at each instant it was reported (reuses its ledger row) |
+
+`GET /issuers/{t}/snapshot` now takes `?portfolio=`; without it there is no
+`portfolio_exposure` at all. The strip on the issuer page is absent for a
+hand-typed URL, which is the correct loss — the line it replaced was a figure
+about somebody else's book.
 
 ## Checks
 
@@ -64,6 +87,7 @@ There is no front-end test runner. What stands in for one:
 
 ```bash
 npx tsc --noEmit          # the wire shapes and the components agree
+npm run test              # the pure decisions: delta labels, sorts, focus, gaps
 npx next build            # the production build the image runs
 ```
 

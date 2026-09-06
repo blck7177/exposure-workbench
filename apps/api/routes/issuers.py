@@ -21,7 +21,8 @@ from exposure_workbench.db.session import get_db
 from exposure_workbench.analytics import containment as ct
 from exposure_workbench.analytics import display_names as dn, interval_algebra as ia
 from exposure_workbench.services import (
-    calc_service, company_service, fundamentals_service, market_data_service, period_semantics,
+    calc_service, company_service, exposure_run_service, fundamentals_service,
+    market_data_service, measures_service, period_semantics,
 )
 from exposure_workbench.services import evidence_resolver_service as ev
 
@@ -30,6 +31,13 @@ router = APIRouter()
 # Named windows, for the same reason the portfolio history has them: how far back
 # a chart looks is a product decision, not a query parameter.
 _SPANS = {"1y": 365, "3y": 365 * 3, "5y": 365 * 5}
+
+
+def _f(v) -> float | None:
+    """A Numeric column as a float, or None — never zero (the rule
+    routes/exposure_runs.py states: a figure that was not recorded and a figure
+    that measured zero are different facts)."""
+    return None if v is None else float(v)
 
 
 async def _company(db: AsyncSession, ticker: str) -> Company:
@@ -116,15 +124,53 @@ async def list_companies(db: AsyncSession = Depends(get_db)):
 # ── snapshot tab ──────────────────────────────────────────────────────────────────
 
 @router.get("/issuers/{ticker}/snapshot", dependencies=[Depends(optional_user)])
-async def snapshot(ticker: str, db: AsyncSession = Depends(get_db)):
+async def snapshot(ticker: str, portfolio: str | None = None,
+                   db: AsyncSession = Depends(get_db)):
+    """Who this issuer is, what this desk last filed for it, and — only when a
+    book is named — what it is in THAT book.
+
+    V25 fixes what `portfolio_exposure` was. It took the newest issuer_exposures
+    row for this ticker on ANY book, ordered by created_at, which is the wrong
+    book the moment two books hold the name: the demo book is public, so a
+    signed-in reader looking at their own MSFT could be shown the demo's market
+    value and weight with nothing on the page saying whose. The issuer page
+    already arrives with `?portfolio=` — it is how the reader got here from
+    their book — and now that parameter decides.
+
+    Without it there is no answer, so none is given. That is a real loss for a
+    hand-typed URL and it is the correct one: the line it replaces was a figure
+    about somebody else's money.
+    """
     c = await _company(db, ticker)
     metrics = await calc_service.list_available_metrics(db, c.ticker)
     latest_filing = (await db.execute(
         select(Filing).where(Filing.company_id == c.id).order_by(Filing.filing_date.desc())
     )).scalars().first()
-    exposure = (await db.execute(
-        select(IssuerExposure).where(IssuerExposure.ticker == c.ticker).order_by(IssuerExposure.created_at.desc())
-    )).scalars().first()
+
+    exposure = None
+    if portfolio:
+        # The book's own latest completed run, and that run's row for this
+        # name. A book that has never completed a run, or one that does not
+        # hold the name, has no exposure to state — and says so by omission
+        # rather than by a zero.
+        run = await exposure_run_service.get_latest_completed_run(db, portfolio)
+        if run is not None:
+            row = (await db.execute(
+                select(IssuerExposure).where(IssuerExposure.run_id == run.id,
+                                             IssuerExposure.ticker == c.ticker)
+            )).scalars().first()
+            if row is not None:
+                exposure = {
+                    "portfolio_id": portfolio,
+                    "run_id": run.id,
+                    "as_of": run.as_of_date.isoformat(),
+                    "market_value": _f(row.market_value),
+                    "weight": _f(row.weight),
+                    "daily_pnl": _f(row.daily_pnl),
+                    "daily_return": _f(row.daily_return),
+                    "contribution": _f(row.contribution),
+                }
+
     return {
         "company": {"ticker": c.ticker, "name": c.name, "cik": c.cik, "exchange": c.exchange,
                     "sector": c.sector, "industry": c.industry, "is_investigable": c.is_investigable},
@@ -132,11 +178,7 @@ async def snapshot(ticker: str, db: AsyncSession = Depends(get_db)):
             "form_type": latest_filing.form_type, "filing_date": latest_filing.filing_date.isoformat(),
             "accession": latest_filing.accession_number, "source_url": latest_filing.source_url,
         },
-        "portfolio_exposure": None if exposure is None else {
-            "market_value": float(exposure.market_value) if exposure.market_value else None,
-            "weight": float(exposure.weight) if exposure.weight else None,
-            "daily_return": float(exposure.daily_return) if exposure.daily_return else None,
-        },
+        "portfolio_exposure": exposure,
         "available_metrics": metrics["metrics"],
     }
 
@@ -246,6 +288,10 @@ async def price_index(ticker: str, benchmark: str = "SPY", span: str = "1y",
         .order_by(Filing.filing_date))).scalars().all()
     return {
         "ticker": c.ticker, "benchmark": benchmark, "span": span,
+        # V25: the windows this endpoint accepts, so the span control offers the
+        # endpoint's own list. `benchmark` has always been a parameter too — any
+        # ticker this desk prices — and the page sent SPY and nothing else.
+        "spans": sorted(_SPANS),
         "basis": "adjusted close, indexed to 100 at the first session shown",
         "points": points,
         "filings": [{"date": f.filing_date.isoformat(), "form": f.form_type,
@@ -562,6 +608,61 @@ async def panel_series(ticker: str, metrics: str = "",
     return out
 
 
+@router.get("/issuers/{ticker}/balance-series", dependencies=[Depends(optional_user)])
+async def balance_series(ticker: str, metric: str = "cash_and_equivalents", last_n: int = 12,
+                         db: AsyncSession = Depends(get_db)):
+    """One balance-sheet line at each date it was reported (V25).
+
+    A balance is a reading at an instant, so this is a series of readings and
+    not a series of windows: nothing is added across dates, nothing is carried
+    forward, and the panel that draws it says so.
+
+    It reuses rather than mints, the same discipline /reconcile and the history
+    endpoint keep. `get_balance_series` records — the recipe and the agent both
+    call it, and their rows are what an answer cites — so a page redrawing this
+    on every visit would turn "this desk performed N calculations" into "a
+    browser was open". The lookup asks for the row identified by
+    (issuer, metric, last_n, through) and only the first read of a new filing's
+    series performs the calculation.
+    """
+    c = await _company(db, ticker)
+    read = await fundamentals_service.balance_points(db, c.ticker, metric, last_n=last_n)
+    if "error" in read:
+        code = read["error"]
+        raise HTTPException(404 if code in ("not_reported", "unknown_company") else 422,
+                            {**read, "label": dn.metric(metric)})
+    existing = await calc_service.find_recorded(
+        db, fundamentals_service.OP_BALANCE_SERIES,
+        fundamentals_service.identifying_params_balance_series(
+            c.ticker, metric, last_n, read["through"]),
+        company_ticker=c.ticker)
+    if existing is not None:
+        calc_id = existing.id
+    else:
+        recorded = await fundamentals_service.get_balance_series(
+            db, c.ticker, metric, last_n=last_n, invoked_by="page")
+        calc_id = recorded.get("calc_id")
+    return {"ticker": c.ticker, "metric": metric, "label": dn.metric(metric),
+            "unit_class": read["unit_class"], "calc_id": calc_id,
+            "points": read["points"], "basis": read["basis"]}
+
+
+@router.get("/issuers/{ticker}/measures", dependencies=[Depends(optional_user)])
+async def measures(ticker: str, db: AsyncSession = Depends(get_db)):
+    """Every measure this desk holds for the issuer, and what can be drawn of it.
+
+    The one read the Financials picker is built from (V25). Three groups — flows
+    over a window, ratios the recipe computed, balances at an instant — and each
+    row states which VIEWS it supports, so the client renders controls rather
+    than deciding what a measure is capable of. Nothing is computed and nothing
+    is recorded; see services/measures_service.py.
+    """
+    out = await measures_service.list_measures(db, ticker)
+    if out.get("error") == "unknown_company":
+        raise HTTPException(404, {"error": "unknown_ticker", "ticker": ticker.upper()})
+    return out
+
+
 # ── filings tab ────────────────────────────────────────────────────────────────────
 
 @router.get("/issuers/{ticker}/filings", dependencies=[Depends(optional_user)])
@@ -610,6 +711,36 @@ async def research_sources(ticker: str, db: AsyncSession = Depends(get_db)):
 
 
 # ── latest brief for an issuer ─────────────────────────────────────────────────────
+
+@router.get("/issuers/{ticker}/briefs", dependencies=[Depends(optional_user)])
+async def briefs(ticker: str, db: AsyncSession = Depends(get_db)):
+    """Every brief this desk has written for the issuer, newest first (V25).
+
+    The brief is the only thing on the issuer page a model wrote, and it was the
+    only thing with no date beside its figures: MSFT's says the name underperformed
+    SPY by 42.4% over a year, and the ledger's own return row, computed a month
+    later, says 21.0%. Both were true when written. A reader can only see that if
+    the page says when each was written and that there may be more than one —
+    NVDA has three, LLY two.
+
+    RLS decides which rows this returns, and no total is reported: a count of
+    what the caller cannot see would need an unscoped query, and there is none.
+    """
+    c = await _company(db, ticker)
+    rows = (await db.execute(
+        select(IssuerBrief).where(IssuerBrief.company_id == c.id)
+        .order_by(IssuerBrief.created_at.desc()))).scalars().all()
+    return {"ticker": c.ticker, "briefs": [{
+        "id": b.id,
+        "research_run_id": b.research_run_id,
+        "created_at": b.created_at.isoformat() if b.created_at else None,
+        "citations": len(b.citations or []),
+        "sections": sum(1 for k in ("financial_summary", "key_changes", "management_explanation",
+                                    "market_context", "portfolio_implications", "open_questions")
+                        if getattr(b, k)),
+        "is_current": i == 0,
+    } for i, b in enumerate(rows)]}
+
 
 @router.get("/issuers/{ticker}/latest-brief", dependencies=[Depends(optional_user)])
 async def latest_brief(ticker: str, db: AsyncSession = Depends(get_db)):

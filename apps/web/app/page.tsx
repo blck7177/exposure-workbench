@@ -8,6 +8,8 @@ import { PortfolioModal } from "./components/PortfolioModal";
 import { useDockContext } from "./components/analyst/Dock";
 import { fmtDate } from "./components/charts/frame";
 import { Rail } from "./components/book/Rail";
+import { AcrossUpdates, Sectors } from "./components/book/composition";
+import { FocusProvider } from "./components/book/Focus";
 import {
   FactorBetas, FactorCorrelations, MandateBook, Stress, ValueAndDrawdown, WhereTheDayWent,
 } from "./components/book/panels";
@@ -17,8 +19,9 @@ import {
 } from "./components/book/sections";
 import { createRun, getFreshness, getPositions, getRun, listPortfolios, listRuns } from "@/lib/api";
 import {
-  getFactorCorrelation, getHistory, getLimitBook, getStress,
-  type FactorCorrelation, type History, type LimitBook, type Scenario,
+  getFactorCorrelation, getHistory, getLimitBook, getReconcile, getRunSeries, getStress,
+  type FactorCorrelation, type History, type LimitBook, type Reconcile, type RunSeries,
+  type Scenario,
 } from "@/lib/charts";
 import { explainApiError, explainRunError } from "@/lib/errors";
 import type {
@@ -85,6 +88,13 @@ export default function BookPage() {
   const [limitBook, setLimitBook] = useState<LimitBook | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[] | null>(null);
   const [correlation, setCorrelation] = useState<FactorCorrelation | null>(null);
+  const [reconcile, setReconcile] = useState<Reconcile | null>(null);
+  // The book's own updates, and how far back the value chart is looking. Two
+  // separate windows on purpose: the value path is a price history in sessions,
+  // the series is this book's own measurements, and one control over both would
+  // be one control over two different axes.
+  const [series, setSeries] = useState<RunSeries | null>(null);
+  const [span, setSpan] = useState("3y");
   const [launching, setLaunching] = useState(false);
 
   const portfolio = portfolios.find((p) => p.id === portfolioId) ?? null;
@@ -120,7 +130,11 @@ export default function BookPage() {
     let ignore = false;   // drop results that resolve after a book switch
     getPositions(portfolioId).then((p) => { if (!ignore) setPositions(p); }).catch(() => {});
     getFreshness(portfolioId).then((f) => { if (!ignore) setFreshness(f); }).catch(() => {});
-    getHistory(portfolioId).then((h) => { if (!ignore) setHistory(h); }).catch(() => setHistory(null));
+    // Every update this book has recorded. Separate from the run reads because
+    // it is about the book rather than about one run: it survives switching
+    // between runs, which is exactly when a reader is comparing them.
+    getRunSeries(portfolioId, "all")
+      .then((s) => { if (!ignore) setSeries(s); }).catch(() => setSeries(null));
     listRuns(portfolioId).then((data) => {
       if (ignore) return;
       setRuns(data);
@@ -128,6 +142,17 @@ export default function BookPage() {
     }).catch(() => {});
     return () => { ignore = true; };
   }, [portfolioId]);
+
+  // The value path, on the span the reader asked for. Its own effect, so
+  // changing the span redraws one chart rather than reloading the page's five
+  // reads.
+  useEffect(() => {
+    if (!portfolioId) return;
+    let ignore = false;
+    getHistory(portfolioId, span)
+      .then((h) => { if (!ignore) setHistory(h); }).catch(() => setHistory(null));
+    return () => { ignore = true; };
+  }, [portfolioId, span]);
 
   // Poll while a run is in flight, then stop. The old page polled every two
   // seconds forever, which turned an open tab into a load generator against a
@@ -146,6 +171,10 @@ export default function BookPage() {
         } else if (portfolioId) {
           listRuns(portfolioId).then((d) => { if (!ignore) setRuns(d); }).catch(() => {});
           getFreshness(portfolioId).then((f) => { if (!ignore) setFreshness(f); }).catch(() => {});
+          // A finished run is a new dated update: the series it belongs in is
+          // one point longer than the one on screen.
+          getRunSeries(portfolioId, "all")
+            .then((s) => { if (!ignore) setSeries(s); }).catch(() => {});
         }
       } catch {
         // A poll that fails is not a page that fails: the run's own panels are
@@ -165,6 +194,10 @@ export default function BookPage() {
     getStress(selectedRunId).then((s) => { if (!ignore) setScenarios(s.scenarios); }).catch(() => setScenarios(null));
     getFactorCorrelation(selectedRunId)
       .then((c) => { if (!ignore) setCorrelation(c); }).catch(() => setCorrelation(null));
+    // Whether the day's two decompositions close. The endpoint reuses the
+    // calculation it recorded the first time, so this is a read (V13-S5).
+    getReconcile(selectedRunId)
+      .then((r) => { if (!ignore) setReconcile(r); }).catch(() => setReconcile(null));
     return () => { ignore = true; };
   }, [selectedRunId, run?.status, run?.id]);
 
@@ -173,11 +206,12 @@ export default function BookPage() {
     try { window.localStorage.setItem(LAST_BOOK, id); } catch { /* not remembering is not a failure */ }
     setRun(null); setSelectedRunId(null); setRuns([]);
     setHistory(null); setLimitBook(null); setScenarios(null); setCorrelation(null);
+    setSeries(null); setReconcile(null);
   };
 
   const selectRun = (id: string) => {
     setSelectedRunId(id);
-    setLimitBook(null); setScenarios(null); setCorrelation(null);
+    setLimitBook(null); setScenarios(null); setCorrelation(null); setReconcile(null);
   };
 
   const onPortfolioCreated = useCallback((created: Portfolio) => {
@@ -186,6 +220,7 @@ export default function BookPage() {
       setChosenPortfolioId(created.id);
       setRun(null); setSelectedRunId(null); setRuns([]);
       setHistory(null); setLimitBook(null); setScenarios(null); setCorrelation(null);
+      setSeries(null); setReconcile(null);
     }).catch(() => {});
   }, []);
 
@@ -197,7 +232,7 @@ export default function BookPage() {
       const created = await createRun(portfolioId);
       setRun(created);
       setSelectedRunId(created.id);
-      setLimitBook(null); setScenarios(null); setCorrelation(null);
+      setLimitBook(null); setScenarios(null); setCorrelation(null); setReconcile(null);
     } catch (e) {
       setError(explainApiError(e).notice);
     } finally {
@@ -221,7 +256,7 @@ export default function BookPage() {
     (correlation?.tickers ?? []).map((t, i) => [t, correlation?.labels[i] ?? t]));
 
   return (
-    <>
+    <FocusProvider>
       <SignedInProbe onChange={setSignedIn} />
       <PortfolioModal open={modalOpen} onClose={() => setModalOpen(false)}
         onCreated={(p) => { setModalOpen(false); onPortfolioCreated(p); }} />
@@ -301,12 +336,27 @@ export default function BookPage() {
 
           <AuditStrip signedIn={signedIn} />
 
-          {history && history.points.length > 1 && <ValueAndDrawdown history={history} />}
+          {history && history.points.length > 1 && (
+            <ValueAndDrawdown history={history} span={span} onSpan={setSpan} onAsk={ask} />
+          )}
 
           <Warnings alerts={alerts} labels={checkLabels} onAsk={ask} />
 
           {run && <Holdings issuers={run.issuer_exposures ?? []} asOf={run.as_of_date}
-              portfolioId={portfolioId} onAsk={ask} />}
+              portfolioId={portfolioId} onAsk={ask}
+              series={series} checks={limitBook?.checks ?? []} />}
+
+          {/* What the book is made of, and whether that is new. Side by side
+              because neither answers the reader's question alone: a 35%
+              Technology weight is a different fact depending on whether it was
+              31% in June. */}
+          {run && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <Sectors sectors={run.sector_exposures ?? []}
+                checks={limitBook?.checks ?? []} series={series} />
+              {series && <AcrossUpdates series={series} checks={limitBook?.checks ?? []} />}
+            </div>
+          )}
 
           {run && (run.factor_attributions?.length ?? 0) > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -315,8 +365,9 @@ export default function BookPage() {
                 issuers={run.issuer_exposures ?? []}
                 dailyReturn={metrics?.daily_return ?? null}
                 dailyPnl={metrics?.daily_pnl ?? null} names={factorNames}
-                info={run.methods?.attribution} />
-              {limitBook && <MandateBook book={limitBook} inert={facts.inertOverrides} />}
+                info={run.methods?.attribution} reconcile={reconcile} />
+              {limitBook && <MandateBook book={limitBook} inert={facts.inertOverrides}
+                series={series} />}
             </div>
           )}
 
@@ -359,6 +410,6 @@ export default function BookPage() {
           <div className="h-6" />
         </div>
       </main>
-    </>
+    </FocusProvider>
   );
 }

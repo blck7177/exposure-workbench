@@ -93,9 +93,17 @@ export interface IssuerExposure {
   sector: string | null;
   market_value: number | null;
   weight: number | null;
+  // Always null: the workflow writes None into this column on every issuer row
+  // it has ever written. The book page's Δ column comes from the run series
+  // instead, where it is a subtraction between two stored weights (V25).
   weight_change: number | null;
   daily_pnl: number | null;
   daily_return: number | null;
+  // V25. Yesterday's weight × this name's return — the share of the BOOK's day
+  // this position accounts for. Stored since V8 and on the wire since V25;
+  // never labelled "contribution" alone, because the word names two different
+  // quantities on a risk page.
+  contribution: number | null;
 }
 
 export interface FactorAttribution {

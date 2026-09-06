@@ -21,8 +21,8 @@ from exposure_workbench.analytics import drawdown as dd
 from exposure_workbench.analytics.risk_metrics import _TRADING_DAYS_PER_YEAR
 from exposure_workbench.services import (
     calc_service, drawdown_service, exposure_run_service, market_data_service,
-    portfolio_csv, portfolio_service, run_reads_service, schedule_service,
-    usage_service,
+    portfolio_csv, portfolio_service, run_reads_service, run_series_service,
+    schedule_service, usage_service,
 )
 
 router = APIRouter()
@@ -439,12 +439,44 @@ async def get_portfolio_history(
              "recovery_days": e.recovery_days, "recovered": e.recovery_date is not None}
             for e in episodes
         ],
+        # V25: what this endpoint accepts, so the span control lists the
+        # endpoint's own windows rather than a copy of them in TypeScript — the
+        # `3y` the client used to hard-code was such a copy, and it outlived the
+        # day anyone remembered the other two were there.
+        "spans": sorted(_SPANS),
         "methods": dict(METHODS),   # V20: the ⓘ text beside each measure, from the code
         "valuation_assumption": (
             "quantities are held fixed at today's holdings for the whole span — "
             "the book has one position snapshot and no holding history to replay"
         ),
     }
+
+
+@router.get("/portfolios/{portfolio_id}/run-series", dependencies=[Depends(optional_user)])
+async def get_portfolio_run_series(
+    portfolio_id: str,
+    span: str = run_series_service.DEFAULT_SPAN,
+    db: AsyncSession = Depends(get_db),
+):
+    """What this book has MEASURED, update by update (V25).
+
+    The book page reads one run at a time, so every question of the form "is
+    this new" was answerable by the database and by nothing on the page. This
+    is the axis: one point per dated update, carrying the weights, the sector
+    shares and the mandate readings that update recorded.
+
+    It computes nothing. The single subtraction it performs — a weight against
+    the same name's weight on the previous DATED update — is done in the
+    service, beside both figures, rather than in a browser: the rule that a
+    page renders what a run stored and never a second opinion about it.
+    """
+    portfolio = await portfolio_service.get_portfolio(db, portfolio_id)
+    if not portfolio:
+        raise HTTPException(404, {"error": "unknown_portfolio", "portfolio_id": portfolio_id})
+    out = await run_series_service.get_run_series(db, portfolio_id, span)
+    if out.get("error") == "unknown_span":
+        raise HTTPException(422, out)
+    return {**out, "spans": sorted(run_series_service.SPANS)}
 
 
 @router.get("/portfolios/{portfolio_id}/dashboard", response_model=DashboardOut,
