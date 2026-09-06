@@ -268,3 +268,28 @@ async def test_a_valid_call_is_unaffected_by_the_check():
         assert "error" not in out, out
     finally:
         await engine.dispose()
+
+
+async def test_a_holding_read_live_is_dated_by_its_valuation():
+    """read_book(port, positions) through the wrapper, against the real service:
+    the service returns `valued_as_of` as a date OBJECT, and the holding facts
+    must carry that date, not the day of the reading (the 2026-09-05 leak)."""
+    from datetime import date as _date
+    engine, mk = await _mk()
+    try:
+        reg = build_read_registry()
+        async with mk() as db:
+            s = await sess.create_session(db, kind="meta")
+            await db.commit()
+            sid = s.id
+        async with mk() as db:
+            out = await R.invoke(reg, db, sid, "read_book", {"ref": "port_001", "names": ["positions"]})
+            await db.commit()
+        valued = out["section"]["positions"]["valued_as_of"]
+        assert isinstance(valued, str) and valued != _date.today().isoformat(), out["section"]["positions"].keys()
+        rows = out["facts"]["rows"]
+        cols = out["facts"]["columns"]
+        as_of = {r[cols.index("as_of")] for r in rows if str(r[cols.index("measure")]).startswith("issuer_exposures.")}
+        assert as_of == {valued}, as_of
+    finally:
+        await engine.dispose()

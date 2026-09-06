@@ -43,6 +43,7 @@ from typing import Any, Callable
 
 from exposure_workbench.analytics import resources as rs
 from exposure_workbench.services import facts as F
+from exposure_workbench.utils import json as ejson
 
 # ── units ─────────────────────────────────────────────────────────────────────
 
@@ -652,9 +653,20 @@ READ_BY_NAME = {
 
 
 def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None]:
-    """(facts shown, note, held_back) for one tool result — the wrapper's call."""
+    """(facts shown, note, held_back) for one tool result — the wrapper's call.
+
+    The adapter reads the payload in the form the model reads it: serialized
+    once with the encoder the agent loop uses, and loaded back. In process a
+    service hands over `datetime.date` and `Decimal`; on the wire those are an
+    ISO string and a float, and that is the only form the fixtures ever held.
+    _as_of_of asks `isinstance(v, str)`, so a date OBJECT was skipped and the
+    holding fell back to the reading day: live read_book(port_001) showed every
+    position "as of 2026-09-05" beside a payload saying valued_as_of 2026-09-03,
+    and 2,006 offline tests over 47 wire-form fixtures could not see it. One
+    round-trip here, and no adapter needs to know what a service returns.
+    """
     adapter = ADAPTERS[tool]
-    facts, note = adapter(args or {}, result)
+    facts, note = adapter(args or {}, ejson.loads(ejson.dumps(result)))
     kept, held = F.cap(facts)
     if held:
         held["how"] = READ_BY_NAME.get(tool, "ask for fewer names")

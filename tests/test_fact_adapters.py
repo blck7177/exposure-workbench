@@ -9,6 +9,9 @@ I3  every numeric key has a declared unit (UnknownUnit otherwise) — pinned by
 from __future__ import annotations
 
 import json
+import re
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -241,3 +244,49 @@ def test_the_catalogues_not_held_and_cannot_are_absence_facts(adapted):
     assert absent and {f.params["reason"] for f in absent} <= {"not_held", "cannot"}
     assert any(f.measure == "segment_revenue" and "read_filings" in f.text for f in absent)
     assert all(F.is_fact_id(v) for v in note["not_held"].values()) and all(f.as_of for f in absent)
+
+
+# ── the adapter sees the wire form ────────────────────────────────────────────
+# Every fixture above is wire-form JSON. In process a service hands the wrapper
+# `datetime.date` and `Decimal`, and that is the form the adapter saw live: on
+# 2026-09-05 read_book(port_001) showed every holding as of the READING day
+# because _as_of_of skipped a date object and fell back to today. This walks
+# each fixture back into the in-process form and asserts the facts are the
+# same ones — so the class of "the fixture never held what the service returns"
+# stays closed by adapt() itself, not by each adapter's care.
+
+_DATE_STR = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _in_process_form(node):
+    if isinstance(node, dict):
+        return {k: _in_process_form(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_in_process_form(v) for v in node]
+    if isinstance(node, str) and _DATE_STR.match(node):
+        return date.fromisoformat(node)
+    if isinstance(node, float):
+        return Decimal(repr(node))
+    return node
+
+
+def _shape(f: F.Fact) -> tuple:
+    return (f.kind, f.subject, f.measure, f.unit, f.value, f.as_of, f.window, f.text,
+            tuple(sorted((f.params or {}).items())), f.sources, f.points)
+
+
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_adapter_reads_the_wire_form_whatever_the_service_returned(adapted, name):
+    tool, args = CASES[name]
+    facts, _n, _h = adapted[name]
+    again, _n2, _h2 = fa.adapt(tool, args, _in_process_form(_load(name)))
+    assert [_shape(f) for f in again] == [_shape(f) for f in facts], name
+
+
+def test_a_holding_is_dated_by_its_valuation_not_by_the_reading():
+    payload = _load("read_book_port")
+    payload["section"]["positions"]["valued_as_of"] = date(2026, 9, 3)
+    facts, _n, _h = fa.adapt("read_book", {"ref": "port_001", "names": ["positions"]}, payload)
+    holdings = [f for f in facts if f.measure.startswith("issuer_exposures.")]
+    assert holdings and {f.as_of for f in holdings} == {"2026-09-03"}
+    assert date.today().isoformat() not in {f.as_of for f in holdings}
