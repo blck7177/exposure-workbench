@@ -133,7 +133,7 @@ _TICKER_WINDOW = {"type": "object", "properties": {
 _PRICE_METHODS: tuple[Method, ...] = (
     Method(
         name="price.volatility", subject_kind="price", family="risk",
-        describes="annualised volatility of the last N daily returns",
+        describes="annualised volatility of the last N daily returns; a short window reacts, a long one is the baseline",
         procedure="standard deviation of daily simple returns over the window × √252",
         authority="CFA Program, Quantitative Methods (return volatility); √252 annualisation is the industry convention",
         fails_when="fewer than 20 sessions in the window (VOL_MIN_OBS): refused with the counts, never shortened",
@@ -146,7 +146,7 @@ _PRICE_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="price.beta", subject_kind="price", family="risk",
-        describes="OLS beta, alpha and R² of a name's daily returns on a benchmark's (default SPY)",
+        describes="a name's sensitivity to a benchmark: OLS beta, alpha and R² of its daily returns on the benchmark's (default SPY; TLT for rates, HYG for credit — the per-name sensitivity)",
         procedure="ordinary least squares of adjusted daily returns on the benchmark's, aligned by date",
         authority="Sharpe (1964) market model; CFA Program, Portfolio Management (beta estimation)",
         fails_when="fewer than 60 aligned observations (BETA_MIN_OBS); a benchmark with no price history",
@@ -178,7 +178,7 @@ _PRICE_METHODS: tuple[Method, ...] = (
         name="price.adv", subject_kind="price", family="liquidity",
         describes="average daily volume over the last N sessions, in shares a session and in dollars a session — the liquidity a position is measured against: a position's market value divided by dollar ADV is its days to liquidate",
         procedure="mean of daily volume, and of close × volume, over the window; sessions without volume dropped and counted",
-        authority="desk convention for days-to-liquidate arithmetic (20/30/60-session windows)",
+        authority="average daily volume as the standard market-depth measure; days to liquidate = position ÷ (participation rate × dollar ADV), the days-to-cash framing of SEC Rule 22e-4",
         fails_when="fewer than 20 sessions (ADV_MIN_OBS) or no recorded volume",
         executor="price.adv", unit_class="count_per_day",
         params_schema={"type": "object", "properties": {
@@ -217,7 +217,7 @@ _PRICE_METHODS: tuple[Method, ...] = (
 _BOOK_METHODS: tuple[Method, ...] = (
     Method(
         name="book.analysis", subject_kind="run", family="book",
-        describes="one run's exposures ordered and netted, and the distance from every limit check to its warning and breach tiers",
+        describes="one run's factor exposures netted per risk (net beta), positions ordered by weight, and the room from every limit check to its warning and breach tiers",
         procedure="net beta per risk = Σ beta_i × direction_i (TLT and HYG move opposite to the risk they proxy); room = tier − current; positions ordered by weight",
         authority="arithmetic over the run's own rows; instrument directions are properties of the factor ETFs, not of any issuer",
         fails_when="the run is not completed; a risk no factor in the regression measures is reported unmeasured, not zero",
@@ -321,14 +321,22 @@ RANK_OP = "rank"
 REGRESS_OP = "regress"
 
 
-# ── readings: how a figure is read, never a threshold in a computation ───────
+# ── readings: what this DESK knows about reading a measure ───────────────────
+#
+# V25. Seventeen readings used to live here and fourteen were the textbook —
+# "high ROE on thin equity is leverage, not profitability" — which the model
+# already holds and never asked for (1 call in 23 across the 2026-09-06
+# battery). A reading now states only what the desk knows and the textbook
+# does not: a tag the held issuers stopped filing, a measure the book-level
+# fit cannot give, a quantity this desk invented. Refusal conditions that were
+# written here as prose ("EBITDA is zero or negative") are Formula data now
+# (denominator_must_be_positive), where the evaluator applies them.
 
 @dataclass(frozen=True)
 class Reading:
-    """What an analyst knows about reading one measure. Guidance for the
-    agent's sentence, with its authority; nothing here reaches compute."""
+    """What this desk knows about reading one measure that a textbook does not.
+    Guidance for the agent's sentence, with its authority; nothing here reaches compute."""
     method: str
-    compare_within: str
     reads: str
     meaningless_when: str
     authority: str
@@ -341,88 +349,131 @@ class Reading:
 
 
 READINGS: dict[str, Reading] = {r.method: r for r in (
-    Reading("debt_to_ebitda", "the issuer's sector and its own prior periods",
-            "gross and net conventions differ by the cash held; energy, utilities and telecoms are usually read net; the ratio says how many years of EBITDA the debt represents",
-            "EBITDA is zero or negative; a financial issuer (debt is its raw material)",
-            "CFA Program, Financial Analysis Techniques — solvency ratios"),
-    Reading("net_debt_to_ebitda", "the issuer's sector and its own prior periods",
-            "net of cash the issuer could apply to the debt; read beside the gross ratio, and say which cash line was netted",
-            "EBITDA is zero or negative; a financial issuer",
-            "CFA Program, Financial Analysis Techniques — solvency ratios"),
-    Reading("ebit_interest_coverage", "the issuer's own prior periods and rated peers",
-            "how many times operating earnings cover the interest bill; falling coverage with flat EBIT means the debt got dearer",
-            "interest expense is zero or unreported (7 of 8 held issuers stopped tagging InterestExpense after 2024 — the registry names the substitute)",
-            "CFA Program, Financial Analysis Techniques — coverage ratios"),
-    Reading("free_cash_flow", "the issuer's own prior periods; revenue for a margin",
-            "no uniform definition (SEC C&DI 102.07): say it is operating cash flow less capex; a negative FCF in a year of heavy capex is an investment, not a loss, and the capex line says which",
-            "a financial issuer (cash generation runs through the loan book)",
-            "SEC Non-GAAP C&DI 102.07"),
-    Reading("fcf_margin", "the issuer's sector and its own prior periods",
-            "free cash flow per dollar of revenue; compare with net margin to see how much of earnings turns into cash",
-            "revenue is zero; a financial issuer",
-            "CFA Program, Financial Analysis Techniques"),
-    Reading("capex_intensity", "the issuer's sector and its own prior periods",
-            "capex per dollar of revenue; rising intensity with rising revenue is expansion, rising intensity with flat revenue is a heavier business",
-            "revenue is zero",
-            "CFA Program, Financial Analysis Techniques — activity ratios"),
-    Reading("gross_margin", "the issuer's sector and its own prior periods",
-            "what is left after the cost of what was sold; the first line where a demand or mix shift shows up in the numbers",
-            "cost of revenue is not reported",
-            "CFA Program, Financial Reporting — profitability ratios"),
-    Reading("operating_margin", "the issuer's sector and its own prior periods",
-            "profit after operating costs, before interest and tax; compare with gross margin to separate cost of goods from overhead",
-            "operating income is not reported",
-            "CFA Program, Financial Reporting — profitability ratios"),
-    Reading("net_margin", "the issuer's sector and its own prior periods",
-            "profit per dollar of revenue after everything; a gap from operating margin is interest, tax and non-operating items",
-            "revenue is zero",
-            "CFA Program, Financial Reporting — profitability ratios"),
-    Reading("roe", "the issuer's sector and its own prior periods; decompose with DuPont",
-            "return on the owners' capital; high ROE on thin equity is leverage, not profitability — read the equity multiplier beside it",
-            "equity is negative (a loss over negative equity prints as a positive return)",
-            "Damodaran, Return on Capital, Return on Invested Capital and Return on Equity: Measurement and Implications"),
-    Reading("roic", "the issuer's sector and its own prior periods; the cost of capital",
-            "return on all capital employed, before financing; the measure to compare across capital structures",
-            "invested capital is zero or negative; a financial issuer",
-            "Damodaran, Return on Capital, Return on Invested Capital and Return on Equity"),
-    Reading("asset_turnover", "the issuer's sector",
-            "revenue per dollar of assets; capital-intensive businesses turn slowly by construction, so compare within sector only",
-            "total assets is zero",
-            "CFA Program, Financial Analysis Techniques — activity ratios"),
-    Reading("current_ratio", "the issuer's sector and its own prior periods",
-            "current assets over current liabilities; a ratio under one is normal for issuers that collect before they pay (retail, subscription)",
-            "an issuer without a classified balance sheet (banks, insurers)",
-            "CFA Program, Financial Analysis Techniques — liquidity ratios"),
-    Reading("accruals_ratio", "the issuer's own prior periods and its sector",
-            "the share of earnings not backed by cash; persistently high accruals precede lower future earnings",
-            "average net operating assets is zero",
-            "Sloan (1996), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows about Future Earnings?"),
-    Reading("price.beta", "the benchmark named; the book's other holdings",
-            "sensitivity of the name's daily return to the benchmark's; against a factor ETF (TLT, HYG) it is the name's sensitivity to that risk — the per-name measure the book-level regression does not give",
+    Reading("ebit_interest_coverage",
+            "7 of the 8 held issuers stopped tagging InterestExpense after 2024; the registry substitutes "
+            "the non-operating interest line and the result's definition names the substitution — say which "
+            "line was used when the coverage is quoted",
+            "interest expense is zero or unreported under both tags",
+            "the desk's own corpus measurement (V9_FORMULA_BASIS); CFA Program, coverage ratios"),
+    Reading("price.beta",
+            "against a factor ETF (TLT for rates, HYG for credit) this is the name's own sensitivity to that "
+            "risk — the per-name figure the book-level factor regression does not give; the book-level fit "
+            "is over the BOOK's return and says nothing per name",
             "fewer than 60 aligned sessions; a benchmark whose returns are collinear with another factor's",
-            "Sharpe (1964); CFA Program, Portfolio Management"),
-    Reading("price.volatility", "the name's own longer windows; the index; the book's other holdings",
-            "a short window (21d) reacts, a long one (252d) is the baseline; say which, and compare the two to say whether volatility is rising",
-            "fewer than 20 sessions",
-            "CFA Program, Quantitative Methods"),
-    Reading("book.analysis", "the portfolio's own thresholds",
-            "room_to_warning below zero means the check is already in warning; room_to_breach is what remains before the hard tier; a net beta says which way the book moves if the risk materialises, with the legs that make it up",
-            "a run not completed; a collinear fit (legs not quotable individually, the net is)",
+            "the factor model's regression record; Sharpe (1964)"),
+    Reading("book.analysis",
+            "room_to_warning below zero means the check is already in warning; room_to_breach is what remains "
+            "before the hard tier; a net beta is this desk's netting of the legs, and TLT and HYG enter with "
+            "the sign opposite to the risk they proxy",
+            "a run not completed; a collinear fit (the legs are not quotable individually, the net is)",
             "the portfolio's risk_limits; the factor model's own regression record"),
 )}
 
 
-# ── procedures: what a competent analyst does for a kind of question ──────────
+# ── the desk's rules: its own facts and policies, which a textbook does not carry ─
+#
+# The reference layer (V25). Every skill below leans on these; they are written
+# once and rendered with describe, scoped to the subject's kind. A rule is a
+# fact about THIS desk — how it defines a measure, what it holds, what it will
+# not do — never an explanation of finance.
+
+@dataclass(frozen=True)
+class Rule:
+    scope: str          # all | issuer | book
+    rule: str
+    authority: str
+
+    def __post_init__(self) -> None:
+        if self.scope not in ("all", "issuer", "book"):
+            raise ValueError(f"rule scope {self.scope!r}")
+        if not self.authority.strip():
+            raise ValueError("a rule states its authority")
+
+
+DESK_RULES: tuple[Rule, ...] = (
+    # policies
+    Rule("all", "Every figure stated is a fact a tool returned. A figure the desk does not hold is an "
+                "absence, said as such with its reason — never a nearby figure under the asked-for name, "
+                "never an estimate.", "the desk's evidence discipline (services/gate)"),
+    Rule("all", "The desk does not forecast. Asked for next year's figure, it says so and gives what the "
+                "issuer's own filings say would move the figure either way.", "the desk's mandate"),
+    Rule("all", "No measure carries a threshold. A number is laid out with what it is compared against "
+                "and the reading belongs to the reader.", "decision of 2026-08-24 (test_no_formula_carries_a_threshold)"),
+    Rule("all", "A premise the user asserts is checked against the desk's figure first and corrected with "
+                "it before the question is answered; a premise the desk holds no figure for is neither "
+                "agreed with nor denied.", "the desk's evidence discipline"),
+    Rule("all", "A comparison is one measure over the same windows: level first, then slope, then what it "
+                "means for the question — never a table with no sentence after it.",
+         "CFA Program, Financial Analysis Techniques (cross-sectional analysis)"),
+    # issuer facts: how this desk defines and holds things
+    Rule("issuer", "EBIT and EBITDA start from NET INCOME, adding back interest and tax — not from operating "
+                   "income. Where an issuer carries large non-operating income the two differ, and a "
+                   "correct EBIT is then mostly non-operating.", "SEC C&DI 103.01, 103.02"),
+    Rule("issuer", "Free cash flow is operating cash flow less capital expenditures, and the definition is "
+                   "stated beside the number because it has no uniform one.", "SEC C&DI 102.07"),
+    Rule("issuer", "Credit measures built on interest (coverage, leverage) are refused for a financial issuer: "
+                   "interest is a bank's operating cost and deposits its raw material. ROE, ROA and the "
+                   "accruals ratio do apply to banks.", "the formula registry's not_for_financials"),
+    Rule("issuer", "Segment, product, geographic and customer-concentration figures are not held as facts; "
+                   "they are quoted from the filing's own sentences, cited, never derived from parts.",
+         "ASC 280; Regulation S-K Item 101(c)"),
+    Rule("issuer", "A name the desk has not prepared is started (readiness) and said to be in preparation; "
+                   "nothing is estimated for it meanwhile.", "the desk's readiness pipeline"),
+    # book facts: how this desk defines and holds things
+    Rule("book", "A weight is a share of ITS book's market value and of nothing else: a tier in dollars is "
+                 "the book's market value × the tier, and two books' weights are compared by difference, "
+                 "never summed.", "the book algebra (V22)"),
+    Rule("book", "TLT and HYG are the desk's explicit rates and credit instruments; they carry duration and "
+                 "spread directly, and in the netted factor exposure they enter with the sign opposite to "
+                 "the risk they proxy. Equities carry only a measured sensitivity.",
+         "the factor model's regression record"),
+    Rule("book", "A day's P&L contribution is not a sensitivity. A name's rate or credit sensitivity is its "
+                 "beta to TLT or HYG; a name whose beta cannot be fitted is unmeasured, never zero.",
+         "the factor model's regression record"),
+    Rule("book", "A scenario (a hypothetical sale or purchase) re-runs the concentration and exposure checks "
+                 "on the after-book; it does not re-fit betas, volatility or P&L, which are stated unmeasured.",
+         "scenario_service"),
+    Rule("book", "Value at risk, expected shortfall and the stress results are computed by the run and "
+                 "withheld from every surface pending validation; say so if asked, do not rebuild them "
+                 "from other figures.", "analytics/withheld"),
+    Rule("book", "Liquidity is read as days to liquidate: a position's market value over the dollars a day "
+                 "the name trades, at a participation rate the reading states. The desk fixes no rate; the "
+                 "user's, or none, and the answer says which.",
+         "SEC Rule 22e-4 (liquidity expressed as days to convert to cash); average daily volume as the market-depth measure"),
+)
+
+
+def rules_for(scope: str) -> list[Rule]:
+    return [r for r in DESK_RULES if r.scope in ("all", scope)]
+
+
+# ── the analyst's domains: one skill per domain, in the analyst's words ───────
+#
+# V25. The fourteen procedures that were here described CALL CHAINS — "read_book
+# by name: exposure_metrics.portfolio_market_value", "series ops yoy, then
+# subtract" — and the 2026-09-06 battery opened none of them in twenty turns:
+# knowledge written as a script for one tool surface is knowledge bound to the
+# LLM loop. A domain skill is written the way an analyst holds it: the words a
+# user uses for the question, the evidence the question turns on (named as the
+# method cards name it), what THIS desk knows about that domain that a
+# textbook does not, what to compare, how to close, and what is absent here.
+# No tool is named. The set is the analyst's working surface — an issuer read
+# in S&P's order (financial risk, business risk, modifiers) plus its price;
+# a book read in the risk-management order (composition, limits, trades,
+# market risk, drawdown and attribution, liquidity, events) — so a question
+# never asked still lands in a domain.
 
 @dataclass(frozen=True)
 class Procedure:
-    """One kind of question and the steps an analyst takes. A registry row the
-    agent may follow or not; `describe` lists the ones that fit the subject."""
+    """One domain of the analyst's work, as knowledge: what the question sounds
+    like, what evidence it turns on, what this desk knows about it, how it is
+    compared and closed, and what is absent here. Read by the agent; never executed."""
     name: str
     question: str
     subject_kind: str
-    gather: tuple[str, ...]
-    compute: tuple[str, ...]
+    triggers: tuple[str, ...]
+    evidence: tuple[str, ...]
+    desk: tuple[str, ...]
     compare: tuple[str, ...]
     close: tuple[str, ...]
     absent: str
@@ -431,136 +482,276 @@ class Procedure:
     def __post_init__(self) -> None:
         if self.subject_kind not in SUBJECT_KINDS + ("desk",):
             raise ValueError(f"{self.name}: subject_kind {self.subject_kind!r}")
+        for seg in ("triggers", "evidence", "compare", "close"):
+            if not isinstance(getattr(self, seg), tuple) or not getattr(self, seg):
+                raise ValueError(f"{self.name}: {seg} is a non-empty tuple of sentences")
+        if not isinstance(self.desk, tuple):
+            raise ValueError(f"{self.name}: desk is a tuple of sentences (may be empty)")
         if not self.authority.strip():
             raise ValueError(f"{self.name}: a procedure states its authority")
 
 
 PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
+    # ── issuer: financial risk, in the order the desk reads a company ────────
     Procedure(
-        "cut_one_name", "which holding to cut, and what the book looks like after", "portfolio",
-        gather=("the run's weights, contributions and limit checks (read_book)", "each candidate's own measures if the question is about the business (compute issuer methods)"),
-        compute=("rank the holdings by weight and by contribution", "book.sell for the candidate, so the after-book is a row"),
-        compare=("the largest driver of risk against the smallest position — they are different names", "the after-book's checks against the before-book's"),
-        close=("name the candidate and the reason it was chosen over the runner-up", "say what gets tighter and what gets better after the sale, from the scenario's checks"),
-        absent="a candidate with no run figure is not a candidate; say so",
-        authority="the mandate's own limits; concentration review practice",
+        "issuer_earnings_quality", "are the profits real: is cash showing up behind earnings, and is working capital telling a different story", "issuer",
+        triggers=("is the cash actually showing up behind the earnings", "are the profits real",
+                  "are receivables and inventory growing faster than the top line", "put that in days",
+                  "is that one odd quarter or has it been building"),
+        evidence=("operating cash flow beside net income over the same windows, and their ratio (cash conversion)",
+                  "the accruals ratio and its own history",
+                  "receivables, inventory and revenue growth over the same windows; days sales outstanding, days inventory, days payable and the cash conversion cycle",
+                  "capex and stock-based compensation where the gap between cash and earnings needs a reason"),
+        desk=("days measures are built on ending balances, not averages, and the result says so",
+              "a measure over its last N periods is one series, so a trend is read from the series, not from two figures"),
+        compare=("cash conversion and the accruals ratio against the issuer's own prior periods: the evidence is about persistence, not one period",
+                 "receivable and inventory growth against revenue growth over the same windows",
+                 "days against the same days a year earlier"),
+        close=("say whether cash confirms earnings, and if not which line explains the gap and whether it is building",
+               "give the days as days, dated, beside the prior reading"),
+        absent="a quarter the issuer did not file at the window asked is unreachable and stays in place in the series, never closed over",
+        authority="Sloan (1996), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows; Lev & Thiagarajan (1993), Fundamental Information Analysis (inventory and receivables relative to sales); CFA Program, Financial Analysis Techniques (activity ratios)",
     ),
     Procedure(
-        "trim_to_tier", "how much of one holding to sell to bring it back under a concentration tier", "portfolio",
-        gather=("the run's book market value, the holding's weight and market value, and the tier level (read_book by name: exposure_metrics.portfolio_market_value, issuer_exposures.<T>.market_value, limit_checks.issuer_concentration:<T>.warning_level or .breach_level)",),
-        compute=("the tier in dollars: multiply(book market value, tier level)", "the sale: subtract(the holding's market value, the tier in dollars)", "or book.sell at a fraction, and read the after-book's check"),
-        compare=("the sale against the holding's market value — a sale larger than the position, or negative, means the wrong tier or the wrong base was used",),
-        close=("the dollars to sell and the weight it lands at, with the tier named", "what else in the book the sale touches (the after-book's checks if book.sell was run)"),
-        absent="a holding with no check row for the tier asked has no tier to trim to; say so",
-        authority="the mandate's own limits; the V22 route (a weight is a share of ITS book, so the tier in dollars is book value × tier)",
+        "issuer_profitability", "how profitable the issuer is, at which line, against whom, and whether it is mix, pricing or cost", "issuer",
+        triggers=("how profitable is X next to Y", "whose gross margin is holding up better", "is that mix or pricing",
+                  "which is the best business by that measure", "does the ranking hold on return on capital"),
+        evidence=("gross, operating and net margin over the same windows for every name compared",
+                  "ROE, ROA, ROIC and the DuPont legs (net margin, asset turnover, equity multiplier) when the question is about returns",
+                  "the same measure on the same windows for each name, then the ordering"),
+        desk=("the margins name which revenue line they divided by; issuers that report revenue under two tags are read on the one the registry chose",
+              "an ordering is a computation with a row: a superlative in the answer rests on the ranking, not on reading the figures by eye"),
+        compare=("level and slope for each name over the same windows: who is higher, whose is moving",
+                 "gross against operating margin to separate cost of goods from overhead; net against operating to isolate interest, tax and non-operating items",
+                 "a ranking on one measure against the same ranking on another, when the question asks whether it holds"),
+        close=("a sentence for the level, a sentence for the slope, and what that implies for the question asked",
+               "name the runner-up and the gap when a name is called the best"),
+        absent="an issuer whose input is not filed on a line is unmeasured on that line and stays in the comparison as such, never dropped",
+        authority="CFA Program, Financial Reporting (profitability ratios); Damodaran, Return on Capital, Return on Invested Capital and Return on Equity",
     ),
     Procedure(
-        "bear_case_from_filings", "the bear case in the issuer's own words, ordered by which risk is live", "issuer",
-        gather=("Item 1A and the MD&A (read_filings)", "gross margin, inventory, operating cash flow and revenue over the last 4-8 windows (read_fundamentals / compute)"),
-        compute=("gross_margin, capex_intensity, days_inventory where filed", "the position's weight if the name is held (read_book)"),
-        compare=("each named risk against the line where it would first appear: demand → gross margin and inventory; supply → capex and commitments; concentration → the customer note", "the trend of that line over the windows read"),
-        close=("order the risks by which one the numbers already show, not by the filing's order", "say what to watch, by line item, and the position's weight so the reader knows what is at stake"),
-        absent="a risk the filing names without a line the desk holds (e.g. backlog, customer share) is quoted from the filing, not estimated",
-        authority="SEC Regulation S-K Item 105 (risk factors) and Item 303 (MD&A); Sloan (1996) on accruals as the first signal",
+        "issuer_credit_and_balance_sheet", "how much debt the issuer carries against what it earns, how well it covers it, and how much room the balance sheet has", "issuer",
+        triggers=("is it more or less levered than what we own", "how strong is the balance sheet",
+                  "which of the two has more room to keep spending", "can it cover its interest",
+                  "how liquid is the company itself"),
+        evidence=("total debt, net debt, debt to EBITDA and to operating cash flow, FCF to debt",
+                  "EBIT interest coverage",
+                  "the current and quick ratios for the near-term",
+                  "the same measures on the held peers when the question is relative"),
+        desk=("total debt is the widest non-overlapping set of reported debt components, and the result lists what was left out at the date",
+              "interest coverage may rest on a substituted interest line; the definition names it",
+              "coverage and leverage are refused for a financial issuer, and the refusal says why"),
+        compare=("against the issuer's own prior periods first, then against the median of the held names on the same measure",
+                 "gross and net leverage side by side, with the cash line that was netted",
+                 "coverage against the trend of EBIT: falling coverage with flat EBIT means the debt got dearer"),
+        close=("more or less levered than the comparison named, with the place and the figures",
+               "what would have to change in earnings or debt for the reading to flip"),
+        absent="debt maturities, covenants and undrawn facilities are not held as figures; where the filing states them they are quoted",
+        authority="S&P Global Ratings corporate methodology (financial risk profile: cash flow/leverage); CFA Program, solvency and coverage ratios",
     ),
     Procedure(
-        "diligence_sweep", "an open-ended review of one issuer: what stands out", "issuer",
-        gather=("describe the issuer; the panel of measures (issuer.panel)", "the latest 10-K Items 1A and 7", "the price's momentum, volatility and drawdown (price methods)"),
-        compute=("issuer.panel", "price.momentum_12_1, price.volatility, price.drawdown"),
-        compare=("each measure against the issuer's own prior periods (read the series) and, where a peer is held, against it"),
-        close=("three things that stand out, each with the figure and what would change the reading", "if held, the weight and the check it is nearest to"),
-        absent="a measure the panel refused is listed with its reason, never replaced by a neighbour",
-        authority="CFA Program, Financial Analysis Techniques (the analysis framework)",
+        "issuer_capital_allocation", "where the issuer's cash goes and whether the spending is outrunning what supports it", "issuer",
+        triggers=("where is the cash actually going", "is capex growing faster than revenue", "is it over-investing relative to what it depreciates",
+                  "buybacks, dividends, paying down debt: the shape of it", "can it keep doing this"),
+        evidence=("operating cash flow and each use of it — capex, buybacks, dividends, debt repayment — over the same windows, each as a share of operating cash flow",
+                  "free cash flow and FCF margin",
+                  "capex intensity, and capex against depreciation and amortisation",
+                  "capex growth against revenue growth over the same windows"),
+        desk=("a use of cash the issuer did not file is said to be missing; a neighbouring line is never substituted for it",
+              "free cash flow is operating cash flow less capex by definition, so a negative figure with capex above operating cash flow is the capex line, and the result names it"),
+        compare=("the ordering of the uses and whether it changed from the prior year",
+                 "the spread of capex growth over revenue growth, and capex over depreciation, over several windows",
+                 "the same shape on the peer when two issuers are compared"),
+        close=("which use dominates, whether it is accelerating, and what it does to free cash flow",
+               "if held, the position's weight, so the reader knows what is at stake"),
+        absent="the return on the capex is not measurable from the filings; the desk says what the spending is doing to cash and margins, not what it will earn",
+        authority="SEC C&DI 102.07 (free cash flow); CFA Program, Financial Analysis Techniques (cash-flow analysis); S&P financial policy modifier",
+    ),
+    # ── issuer: business risk, in the issuer's own words ────────────────────
+    Procedure(
+        "issuer_business_risk_from_filings", "what the issuer itself says can go wrong, how concentrated the business is, and whether it is still the business it was", "issuer",
+        triggers=("make me the bear case from their own filings", "which risk would show up in the numbers first",
+                  "how concentrated is the revenue", "is what we own still the same business", "how would I see that in the numbers"),
+        evidence=("Item 1A and the MD&A: the named risks, in the issuer's words",
+                  "Item 1 then and now, when the question is whether the business changed",
+                  "the segment, product, customer and geographic passages for concentration",
+                  "for each named risk, the line where it would first appear and that line's trend: demand in gross margin and inventory, supply in capex and commitments, concentration in the customer note"),
+        desk=("concentration figures are quoted from the filing and cited, never computed from parts",
+              "the defining measures of a business — capex intensity, asset turnover, gross margin — are read over the years held as series"),
+        compare=("each named risk against the trend of the line where it shows, so the risks are ordered by what the numbers already show, not by the filing's order",
+                 "the filing's stated shares across years where both years are indexed",
+                 "each defining measure's direction against the thesis's claim"),
+        close=("the risks in the order the numbers rank them, each with the line to watch",
+               "what changed and what did not, with the filing's own sentence for what the business is now",
+               "if held, the position's weight"),
+        absent="a risk the filing names without a line the desk holds (backlog, customer share, supplier terms) is quoted, not estimated",
+        authority="Regulation S-K Items 101, 105 and 303; ASC 280; S&P Global Ratings corporate methodology (business risk profile); Lev & Thiagarajan (1993) for the lines a risk shows in first (gross margin, inventory, receivables, capex)",
+    ),
+    # ── issuer: the price, and the boundary of what the desk will say ───────
+    Procedure(
+        "issuer_price_context", "where the price sits against its own history and the market, and what that says about what is already in it", "issuer",
+        triggers=("where is it trading against its last twelve months", "near the high or the low", "its momentum with the last month left out",
+                  "has it been jumpier", "how has it done against the market"),
+        evidence=("distance from the 52-week high, with the date the high was set",
+                  "12-1 momentum, the last month skipped",
+                  "volatility over a short and a long window",
+                  "the window return and the return relative to a benchmark",
+                  "the deepest drawdown over the window and whether it was regained"),
+        desk=("every price measure is over the adjusted close; the dollar volume is over the as-traded close",
+              "each price measure states its observation floor and is refused, never shortened, below it"),
+        compare=("the short window against the long: a short window reacts, a long one is the baseline",
+                 "the name's return against the benchmark's over the same window",
+                 "the name against the book's other holdings on the same measure"),
+        close=("what the price has already moved on, dated, and what would be new information",
+               "never a view on where the price goes"),
+        absent="valuation multiples (P/E, EV/EBITDA, FCF yield) are not yet measures on this desk; say so rather than deriving one in prose",
+        authority="Jegadeesh & Titman (1993); George & Hwang (2004); CFA Program, Quantitative Methods",
     ),
     Procedure(
-        "rates_scenario", "what a move in rates does to this book, name by name", "portfolio",
-        gather=("the run's factor exposures and net betas (book.analysis)", "each holding's beta to TLT (price.beta with benchmark TLT) — the per-name sensitivity the book-level fit does not give", "the filings' own rate-sensitivity disclosure (Item 7A) for banks and issuers with floating debt"),
-        compute=("book.analysis for the netted rates leg", "price.beta(benchmark=TLT) for each holding"),
-        compare=("the explicit duration (TLT, HYG) against the equities' measured TLT betas", "the sign and size of each name's beta"),
-        close=("where the shock bites, by name, in the order of measured sensitivity", "what is unmeasured (stress withheld; a collinear fit) and say so"),
-        absent="a day's P&L contribution is NOT a rate sensitivity; if no beta can be fitted the name is unmeasured, not zero",
-        authority="the factor model's regression record; Regulation S-K Item 305 (quantitative market-risk disclosure)",
+        "issuer_outlook_boundary", "what the desk will and will not say about the future, and what the issuer's own filings say would move it", "issuer",
+        triggers=("what is your estimate for next year", "what would move revenue either way", "if you could ask management one question",
+                  "what are the catalysts", "is the guidance consistent"),
+        evidence=("the filings' own forward-looking passages: guidance, stated drivers, the outlook section of the MD&A",
+                  "the measures whose recent trend contradicts or confirms the narrative",
+                  "what happened recently, from the web, for anything after the last filing"),
+        desk=("the desk does not forecast; asked for a number about the future it says so and gives what the filings say would move the figure",
+              "the one question for management is built from the line the numbers show moving, not from the narrative"),
+        compare=("management's stated drivers against the lines that have actually moved",
+                 "the same statement across filings for consistency"),
+        close=("the drivers, each with the line it shows in and that line's recent direction",
+               "one question, phrased so the answer would be a number the filings do not yet hold"),
+        absent="a projected figure is absent by policy, not by data; say the policy",
+        authority="the desk's mandate; buy-side practice on reading management statements against the numbers",
+    ),
+    # ── the book: composition, limits, trades ───────────────────────────────
+    Procedure(
+        "book_composition", "what the book is made of, how concentrated it is, and how that has drifted", "portfolio",
+        triggers=("what is my largest exposure", "what share do the top five carry", "has the sector shape drifted",
+                  "are we quietly all in one trade", "tighter or looser than the run before"),
+        evidence=("every position's weight and market value on the latest run, ordered",
+                  "the sum of the top N weights",
+                  "sector weights on the run",
+                  "the same figures on the prior run, for the change"),
+        desk=("a figure on one run and the same figure on another are compared by difference; they are never summed",
+              "the book's own market value is a figure of the run and the base every weight is a share of"),
+        compare=("the top-N share against the prior run's",
+                 "each sector's weight against its prior weight, so drift is the change, not the level",
+                 "the largest name against the runner-up"),
+        close=("the shape in three figures: the largest, the top-N share, the largest sector, each with its change since the prior run",
+               "which single move would change the shape most, from the weights"),
+        absent="ownership as a share of the issuer's float and crowding are not held; say so",
+        authority="the run's own rows; concentration review practice",
     ),
     Procedure(
-        "capital_allocation", "where the issuer's cash is going", "issuer",
-        gather=("operating cash flow, capex, buybacks, dividends, debt repayment over the last 4 windows (read_fundamentals)", "revenue over the same windows"),
-        compute=("each use as a share of operating cash flow (compute divide)", "free_cash_flow", "capex growth against revenue growth (series ops yoy, then subtract)"),
-        compare=("the ordering of the uses", "the spread of capex growth over revenue growth", "the issuer's own prior year"),
-        close=("which use dominates, whether it is accelerating, what it does to FCF", "if held, the position's weight"),
-        absent="any of the five uses not filed: say which; do not substitute a neighbouring line",
-        authority="SEC Non-GAAP C&DI 102.07 (FCF); CFA Program, Financial Analysis Techniques (cash-flow analysis)",
-    ),
-    Procedure(
-        "name_outside_the_book", "can a name be analysed, and how does it compare with what is held", "issuer",
-        gather=("describe the name (admissibility, what is prepared)", "the same measures for the name and for the held peers (compute over a list of subjects)", "the book's checks (read_book)"),
-        compute=("the measure asked for, on the name and on the held names in one call", "rank across them", "book.buy at the proposed weight"),
-        compare=("the name's place in the ranking of the held names", "the after-book's checks against the current ones"),
-        close=("more or less levered (or whichever measure) than the median held name, with the place", "which check the addition would tighten"),
-        absent="a name not prepared is started (start readiness) and said to be in preparation; nothing is estimated for it",
-        authority="the mandate's own limits; peer-comparison practice",
-    ),
-    Procedure(
-        "wrong_premise", "the user asserts a figure that is not what the desk holds", "portfolio",
-        gather=("the run's figure the premise is about (read_book)",),
-        compute=("rank if the premise is a superlative",),
-        compare=("the asserted figure against the desk's figure, naming both",),
-        close=("correct the premise first, with the figure; then answer the question as asked with the corrected figure",),
-        absent="if the desk holds no figure for the premise, say so rather than agreeing or disagreeing",
-        authority="the run's own rows",
-    ),
-    Procedure(
-        "revenue_concentration", "how concentrated the issuer's revenue is", "issuer",
-        gather=("the 10-K's product / segment / customer concentration passages (read_filings, Item 1 and Item 7; the customer note)", "total revenue (read_fundamentals)"),
-        compute=("nothing: segment and product figures are not held as facts on this desk (not_held); the shares are the filing's own statements",),
-        compare=("the filing's stated shares across years, if both years' filings are indexed",),
-        close=("quote the filing's own sentence for the share, cited; say what the concentration is in (a franchise, a customer, a geography)", "if held, the weight"),
-        absent="the share cannot be computed here; it is quoted or it is absent — never derived from parts",
-        authority="ASC 280 (segment reporting); Regulation S-K Item 101(c) (major customers)",
-    ),
-    Procedure(
-        "news_to_position", "what happened recently and whether it touches something held", "portfolio",
-        gather=("search_web per held name, restricted to the period asked", "the run's weights and market values (read_book)", "the price over the period (price.window_return) to see whether the news is already in the price"),
-        compute=("price.window_return over the period for the names touched",),
-        compare=("each item against the name's weight: what is at stake", "the price move against the market's over the same days"),
-        close=("which items touch a held name, the size of that position, and whether the price has already moved", "items that touch nothing held are said to touch nothing"),
-        absent="a search that returns nothing specific is reported as nothing found, not as 'headline-level news'",
-        authority="event-study practice (price reaction over the event window)",
-    ),
-    Procedure(
-        "trigger_levels", "what would have to happen for the mandate's answer to flip", "portfolio",
-        gather=("the checks with their tiers and the current values (read_book / book.analysis)", "the book's market value"),
-        compute=("room to each tier (book.analysis)", "the dollars of room or excess: room × market value (compute multiply)", "the price move that closes the room for a single-name check: room ÷ weight"),
-        compare=("the nearest check first (smallest room)",),
-        close=("the level, in weight points, in dollars, and as a price move, for each check nearest its tier",),
-        absent="a check that did not run (its input withheld) is listed as not run, not as clear",
+        "book_limits_and_triggers", "where the book stands against its mandate, and what would have to happen for a check to trip", "portfolio",
+        triggers=("are we ok on concentration", "which limits am I closest to", "how much room is left",
+                  "what would have to happen for that to flip", "give me the levels"),
+        evidence=("every limit check on the run with its current value, warning and breach tiers, and the room to each",
+                  "the book's market value, for room in dollars",
+                  "the position's weight, for the price move that closes the room on a single-name check"),
+        desk=("room below zero is a check already in warning; the hard tier is the breach level",
+              "a check that did not run because its input is withheld is listed as not run, never as clear",
+              "the tier in dollars is the book's market value × the tier; the price move that closes a single-name check's room is the room over the name's weight"),
+        compare=("the nearest check first, by smallest room",
+                 "the same check on the prior run, for direction"),
+        close=("the level for each check nearest its tier, in weight points, in dollars and as a price move",
+               "which check trips first and on what"),
+        absent="a limit the mandate does not define has no check and no room; say the mandate has none",
         authority="the portfolio's risk_limits; limit-monitoring practice",
     ),
     Procedure(
-        "thesis_check", "is what is held still the business it was bought as", "issuer",
-        gather=("Item 1 (the business description) then and now (read_filings)", "the measures that define the business: capex_intensity, asset_turnover, gross_margin over the years held (compute)", "segment statements from the filing (not_held as figures)"),
-        compute=("the defining measures over the years held (series ops)",),
-        compare=("each measure's direction over the period against the thesis's claim",),
-        close=("what changed and what did not, each with its figure; what the filing itself says the business is now",),
-        absent="the segment mix is quoted from the filing; it is not held as a figure and is not derived",
-        authority="ASC 280; the issuer's own Item 1",
+        "book_hypothetical_trades", "what the book looks like after a sale or a purchase, and what gets tighter or better", "portfolio",
+        triggers=("which one goes", "say I sell that one, where does that leave concentration", "if we put 5% into it does anything get tight",
+                  "how much do I sell to get back under the tier", "how do I take that down without selling the biggest position"),
+        evidence=("the before-book: weights, contributions and every check",
+                  "the after-book as a scenario row: renormalised weights, sector weights, market value and every check re-run",
+                  "the candidates' own measures when the choice is about the business, not the risk",
+                  "the sale that lands a name at a tier: the holding's market value less the tier in dollars"),
+        desk=("a scenario chains: a sale, then a purchase on its result, each a row read like a run",
+              "a scenario re-runs the checks and does not re-fit betas, volatility or P&L; those are stated unmeasured",
+              "a sale larger than the position, or negative, means the wrong tier or the wrong base was used",
+              "a name already held is trimmed or added to through its weight, never bought again"),
+        compare=("the after-book's checks against the before-book's: what tightens, what loosens",
+                 "the largest driver of risk against the smallest position — they are different names",
+                 "the candidate against the runner-up on the measure the choice rests on"),
+        close=("the name and the reason it was chosen over the runner-up",
+               "the dollars to sell and the weight it lands at, with the tier named",
+               "what else the trade touches, from the after-book's checks"),
+        absent="a candidate with no run figure is not a candidate; a name the desk cannot place in a sector cannot be bought in a scenario",
+        authority="the mandate's own limits; the book algebra (V22)",
+    ),
+    # ── the book: market risk, drawdown and attribution, liquidity, events ──
+    Procedure(
+        "book_market_risk", "what the book is exposed to, name by name, and whether it has got riskier", "portfolio",
+        triggers=("rates back up 100bp, where does it bite", "is that us owning TLT or the equities being long duration in disguise",
+                  "has our volatility gone up", "is it the market or something we are holding", "what are we exposed to"),
+        evidence=("the run's factor exposures and the netted beta per risk",
+                  "each holding's own sensitivity to the rates and credit instruments, and to the market",
+                  "each holding's volatility over a short and a long window, and the index's over the same",
+                  "the book's own volatility on this run and earlier runs",
+                  "the filings' own rate-sensitivity disclosure (Item 7A) for banks and floating-rate borrowers"),
+        desk=("TLT and HYG carry explicit duration and spread; equities carry only a measured sensitivity, per name",
+              "a day's P&L contribution is not a sensitivity; an unfittable beta is unmeasured, never zero",
+              "the netted exposure enters TLT and HYG with the sign opposite to the risk they proxy",
+              "stress results are withheld pending validation and are not rebuilt from betas"),
+        compare=("the explicit duration against the equities' measured sensitivities: which side of the exposure is which",
+                 "each name's short-window volatility against its long: whose rose",
+                 "the book's rise against the index's over the same windows: market-wide or specific"),
+        close=("where the shock bites, name by name, in the order of measured sensitivity, with what is unmeasured",
+               "market-wide or specific, and which names, each with the two windows' figures"),
+        absent="correlations between holdings and hidden common bets are not measures on this desk; a collinear fit is stated as such",
+        authority="the factor model's regression record; Regulation S-K Item 305; CFA Program, Quantitative Methods",
     ),
     Procedure(
-        "volatility_attribution", "has the book got jumpier, and is it the market or something held", "portfolio",
-        gather=("the book's 30d and 60d volatility on the run and on earlier runs (read_book across runs)", "each holding's volatility over the short and long windows (price.volatility on the list of holdings)", "the index's volatility over the same windows"),
-        compute=("price.volatility(21) and (252) for each holding and for SPY",),
-        compare=("short against long window per name: whose volatility rose", "the book's rise against the index's"),
-        close=("market-wide or specific, and which names, each with the two windows' figures",),
-        absent="a name with too short a history is unmeasured, not quiet",
-        authority="CFA Program, Quantitative Methods (volatility estimation)",
+        "book_drawdown_and_attribution", "how the book fell and recovered, and how much of what it did was the market against what was held", "portfolio",
+        triggers=("walk me through the worst drawdown", "how deep, how fast, did we get it back", "what was driving it",
+                  "how much is just the market moving and how much is us", "why did the book move on the last run"),
+        evidence=("every drawdown episode of the book over the span, deepest first, with trough and recovery dates",
+                  "the book's return and each holding's contribution between a peak and a trough",
+                  "one day's move reconciled: position contributions against the day's return, factor-explained share against the residual",
+                  "the book's return against the market's over the same window"),
+        desk=("episodes are found on today's holdings replayed over the span, and the answer says so",
+              "a reconciliation whose position identity does not hold within tolerance reports no share of the move at all"),
+        compare=("the episode's depth and length against the market's over the same dates",
+                 "the factor-explained share against the residual: the market against us",
+                 "each holding's contribution against its weight: who hurt more than their size"),
+        close=("depth, dates and recovery in one sentence, then the names that made it, then market against specific",
+               "what the share not explained by factors is made of, by name"),
+        absent="a period with fewer sessions than the span needs has no episodes; a day without a completed run has no reconciliation",
+        authority="the standard drawdown definition (Magdon-Ismail et al., 2004); Brinson-style position attribution; the factor model's decomposition",
     ),
     Procedure(
-        "peer_comparison", "how one issuer compares with another on one front", "issuer",
-        gather=("the same measure for both, over the same windows (compute over a list of subjects)",),
-        compute=("the measure per issuer per window", "the spread or the ratio between them (compute subtract / divide)", "rank if more than two"),
-        compare=("level and slope: who is higher, and whose is moving faster",),
-        close=("a sentence for the level, a sentence for the slope, and what that implies for the question asked — never a table with no sentence after it",),
-        absent="an issuer whose input is not filed is listed as unmeasured on that line, not dropped",
-        authority="CFA Program, Financial Analysis Techniques (cross-sectional analysis)",
+        "book_liquidity", "how fast the book can be sold down, and which names would hurt", "portfolio",
+        triggers=("if I had to get out in a hurry which positions hurt", "liquidity not price", "how many days at a quarter of daily volume",
+                  "how long to sell that down", "which names are hard to exit"),
+        evidence=("each position's market value on the run",
+                  "each name's dollars a day traded over the window, and shares a day",
+                  "days to liquidate: the position over the dollars a day at the participation rate"),
+        desk=("the participation rate is the user's or is stated with the figure; the desk fixes none, and the window (20, 30 or 60 sessions) is stated",
+              "days come from the algebra — a position over a daily flow is a count of days — and a position over anything else is not days"),
+        compare=("names ordered by days to liquidate, largest first",
+                 "the same name at a lower participation rate, when the question is a hurry",
+                 "days against the position's weight: a large weight with few days is size, not liquidity"),
+        close=("the names that would hurt, each with its days at the stated rate, and the total the book could clear in a day",
+               "whether the problem is one name or the book"),
+        absent="a name with fewer sessions of recorded volume than the window is unmeasured, not liquid; the ETFs' underlying liquidity is not looked through",
+        authority="SEC Rule 22e-4 (liquidity as days to convert to cash); average daily volume as the market-depth measure",
+    ),
+    Procedure(
+        "book_events", "what happened recently, whether it touches something held, and whether the price already moved on it", "portfolio",
+        triggers=("anything happen in the last week that matters for what we hold", "which of those touches a position",
+                  "how big is that position", "is that already in the price", "what is coming up"),
+        evidence=("recent items about each held name, restricted to the period asked",
+                  "the run's weights and market values for what is at stake",
+                  "the name's return over the period against the market's, to see whether the news is in the price"),
+        desk=("an item is tied to a position by the name it touches and the weight of that position; an item that touches nothing held is said to touch nothing",
+              "a search that returns nothing specific is reported as nothing found, not as headline-level news"),
+        compare=("each item against the position's weight: what is at stake",
+                 "the price move over the event window against the market's"),
+        close=("which items touch a held name, the size of that position, and whether the price has already moved",
+               "what would change the reading: an item that would touch the largest position"),
+        absent="an earnings calendar is not held; dates are quoted from the filing or the web, not inferred",
+        authority="event-study practice (price reaction over the event window)",
     ),
 )}
 

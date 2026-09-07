@@ -174,12 +174,14 @@ FORMULAS: dict[str, Formula] = {
         inputs=("total_debt", "ebitda"), op="divide", basis="mixed",
         unit_class="multiple", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow: the instant and the window are both stated.",
+        denominator_must_be_positive=("EBITDA is zero or negative: a multiple of nothing, or of a loss, does not say how many years of earnings the debt represents"),
     ),
     "debt_to_operating_cash_flow": Formula(
         expression="total debt ÷ operating cash flow",
         inputs=("total_debt", "operating_cash_flow"), op="divide", basis="mixed",
         unit_class="multiple", family="leverage", source_url=SEC_NON_GAAP,
         note="A balance over a flow; both bases stated.",
+        denominator_must_be_positive=("operating cash flow is zero or negative: debt over a cash outflow is not a payback"),
     ),
     "fcf_to_debt": Formula(
         expression="free cash flow ÷ total debt",
@@ -308,6 +310,7 @@ FORMULAS: dict[str, Formula] = {
               "date, one filing surface. Damodaran notes ending-balance ROIC "
               "understates when capital grew during the period; the instant used is "
               "stated with the number."),
+        denominator_must_be_positive=("invested capital is zero or negative: a return over no capital, or over negative capital, prints a sign no reader can interpret"),
     ),
 
     # ── efficiency and structure (V16, Tier 1) ───────────────────────────────
@@ -392,6 +395,7 @@ FORMULAS: dict[str, Formula] = {
         note=("A balance over a flow — the covenant form; the instant and the window "
               "are both stated. Net debt here is total debt less all cash, NOT an "
               "agency net debt (see net_debt)."),
+        denominator_must_be_positive=("EBITDA is zero or negative: a multiple of nothing, or of a loss, does not say how many years of earnings the debt represents"),
     ),
 
     # ── the working-capital cycle (V16, Tier 1) ──────────────────────────────

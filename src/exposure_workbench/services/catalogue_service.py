@@ -126,9 +126,10 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
 _HOW_TO_READ = (
     "Every name under `table` is a figure you can slot {ref, name} or use as an operand "
     "(ref:name) in compute. `methods` are what compute can produce for this subject; "
-    "`procedures` are how an analyst approaches a kind of question about it; `not_held` and "
-    "`cannot` are figures this desk does not have and why — say so, do not substitute. "
-    "expand=<domain> opens one domain's detail."
+    "`procedures` are the analyst's domains for this kind of subject — each says what the question "
+    "sounds like, the evidence it turns on and how it is closed (expand=procedures for the whole); "
+    "`desk_rules` are this desk's own conventions and policies; `not_held` and `cannot` are figures "
+    "this desk does not have and why — say so, do not substitute. expand=<domain> opens one domain's detail."
 )
 
 
@@ -158,8 +159,10 @@ async def _desk(db: AsyncSession) -> dict:
         "domains": ["fundamentals (filed figures)", "filings (text)", "prices", "book (runs, positions, limits)",
                     "web (search_web)"],
         "methods": {k: [m.name for m in skill.methods_for(k)] for k in ("issuer", "price", "run", "portfolio")},
-        "procedures": [{"name": p.name, "question": p.question, "subject": p.subject_kind}
+        "procedures": [{"name": p.name, "question": p.question, "subject": p.subject_kind,
+                        "asked_as": list(p.triggers[:2])}
                        for p in skill.PROCEDURES.values()],
+        "desk_rules": _rules("all"),
         "not_held": NOT_HELD,
         "cannot": CANNOT,
     }
@@ -191,6 +194,7 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
     out["cannot"] = {k: v for k, v in CANNOT.items() if k == "per_name_factor_sensitivity"}
     out["methods"] = _methods("issuer", expand == "methods") | _methods("price", expand == "methods")
     out["procedures"] = _procedures("issuer", expand == "procedures")
+    out["desk_rules"] = _rules("issuer")
     if expand == "readings":
         out["readings"] = _readings()
     return out
@@ -361,6 +365,7 @@ async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
         "freshness": fresh,
         "methods": _methods("portfolio", expand == "methods") | _methods("run", expand == "methods"),
         "procedures": _procedures("portfolio", expand == "procedures"),
+        "desk_rules": _rules("book"),
         "cannot": CANNOT,
     }
     if expand == "book" and positions:
@@ -381,6 +386,7 @@ async def _run(db: AsyncSession, run_id: str, expand: str | None) -> dict:
             "as_of": run.as_of_date.isoformat(), **out,
             "methods": _methods("run", expand == "methods"),
             "procedures": _procedures("portfolio", expand == "procedures"),
+            "desk_rules": _rules("book"),
             "cannot": CANNOT}
 
 
@@ -460,16 +466,29 @@ def _methods(kind: str, full: bool) -> dict:
 
 
 def _procedures(kind: str, full: bool) -> list:
+    """The analyst's domains that fit a kind of subject. Level 1 is the name,
+    the question and the words a user asks it in — enough to know which one
+    fits; level 2 (expand=procedures) is the whole domain in the analyst's
+    words. No tool is named at either level: the evidence is named as the
+    method cards name it, and the model chooses the call."""
     ps = skill.procedures_for(kind)
     if not full:
-        return [{"name": p.name, "question": p.question} for p in ps]
-    return [{"name": p.name, "question": p.question, "gather": list(p.gather), "compute": list(p.compute),
+        return [{"name": p.name, "question": p.question, "asked_as": list(p.triggers[:2])} for p in ps]
+    return [{"name": p.name, "question": p.question, "asked_as": list(p.triggers),
+             "evidence": list(p.evidence), "this_desk": list(p.desk),
              "compare": list(p.compare), "close": list(p.close), "absent": p.absent, "authority": p.authority}
             for p in ps]
 
 
+def _rules(scope: str) -> list:
+    """The desk's own conventions and policies that bear on a kind of subject —
+    what a textbook does not carry. Rendered at every level: they are short,
+    and a model that has not read them substitutes and estimates."""
+    return [{"rule": r.rule, "authority": r.authority} for r in skill.rules_for(scope)]
+
+
 def _readings() -> list:
-    return [{"method": r.method, "compare_within": r.compare_within, "reads": r.reads,
+    return [{"method": r.method, "reads": r.reads,
              "meaningless_when": r.meaningless_when, "authority": r.authority}
             for r in skill.READINGS.values()]
 

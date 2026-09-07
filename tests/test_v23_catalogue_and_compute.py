@@ -122,14 +122,63 @@ def test_every_reading_is_about_a_method_and_every_procedure_about_a_subject_kin
         assert r.method in skill.METHODS
     for p in skill.PROCEDURES.values():
         assert p.subject_kind in skill.SUBJECT_KINDS + ("desk",)
-        assert p.gather and p.close and p.absent.strip() and p.authority.strip(), p.name
+        assert p.triggers and p.evidence and p.close and p.absent.strip() and p.authority.strip(), p.name
 
 
-def test_the_battery_thirteen_angles_have_a_procedure_each():
-    assert len(skill.PROCEDURES) >= 13
-    assert {"cut_one_name", "bear_case_from_filings", "rates_scenario", "capital_allocation",
-            "revenue_concentration", "news_to_position", "trigger_levels", "thesis_check",
-            "peer_comparison"} <= set(skill.PROCEDURES)
+def test_the_analysts_domains_are_the_skill_set():
+    """V25. A domain per area of the analyst's work — an issuer in S&P's order
+    (financial risk, business risk, the price, the boundary), a book in the
+    risk-management order — so a question never asked still lands in one."""
+    issuer = [p.name for p in skill.procedures_for("issuer")]
+    book = [p.name for p in skill.procedures_for("portfolio")]
+    assert issuer == ["issuer_earnings_quality", "issuer_profitability", "issuer_credit_and_balance_sheet",
+                      "issuer_capital_allocation", "issuer_business_risk_from_filings", "issuer_price_context",
+                      "issuer_outlook_boundary"]
+    assert book == ["book_composition", "book_limits_and_triggers", "book_hypothetical_trades", "book_market_risk",
+                    "book_drawdown_and_attribution", "book_liquidity", "book_events"]
+    assert len(skill.PROCEDURES) == 14
+
+
+def test_a_domain_is_knowledge_not_a_call_script():
+    """The 2026-09-06 finding: 78% of the old procedures' gather/compute steps
+    named a tool, a row or an op, and the model opened none of them. A domain
+    names its evidence as the method cards do and never a tool, an id or an
+    operator; the model chooses the call."""
+    import re
+    scripted = re.compile(r"\b(read_book|read_fundamentals|read_filings|read_prices|search_web|compute\(|describe\()"
+                          r"|\b(issuer_exposures|exposure_metrics|limit_checks)\.|\bcalc_|\brun_[0-9a-f]"
+                          r"|\b(multiply|subtract|divide|yoy)\(")
+    for p in skill.PROCEDURES.values():
+        for seg in ("triggers", "evidence", "desk", "compare", "close"):
+            for sentence in getattr(p, seg):
+                assert not scripted.search(sentence), (p.name, seg, sentence)
+        assert not scripted.search(p.absent), (p.name, "absent", p.absent)
+        assert all(isinstance(getattr(p, seg), tuple) for seg in ("triggers", "evidence", "desk", "compare", "close"))
+
+
+def test_no_rule_or_domain_rests_on_a_desk_convention():
+    """Boss, 2026-09-07: a sentence in the registry is an industry standard or
+    has evidence behind it, or it is not there. 'Desk convention' is neither."""
+    import inspect
+    from exposure_workbench.analytics import skill as _s
+    src = inspect.getsource(_s)
+    assert "desk convention" not in src.lower()
+    for p in _s.PROCEDURES.values():
+        assert "convention" not in " ".join(p.desk).lower(), p.name
+
+
+def test_the_desks_rules_are_scoped_and_reach_every_describe():
+    assert {r.scope for r in skill.DESK_RULES} == {"all", "issuer", "book"}
+    assert len(skill.rules_for("issuer")) > len([r for r in skill.DESK_RULES if r.scope == "all"])
+    assert len(skill.rules_for("book")) > len([r for r in skill.DESK_RULES if r.scope == "all"])
+    assert all(r.authority.strip() for r in skill.DESK_RULES)
+
+
+def test_a_reading_states_what_the_desk_knows_and_the_textbook_does_not():
+    """Fourteen textbook readings were removed (V25); the three that remain each
+    carry a fact about this desk — a tag the held issuers stopped filing, a
+    figure the book-level fit cannot give, a quantity the desk invented."""
+    assert set(skill.READINGS) == {"ebit_interest_coverage", "price.beta", "book.analysis"}
 
 
 def test_an_unknown_method_is_refused_with_near_names():
