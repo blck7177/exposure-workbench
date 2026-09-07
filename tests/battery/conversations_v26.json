@@ -1,0 +1,472 @@
+[
+ {
+  "tag": "W01-stop-sweep-across-book",
+  "note": "The cross-sectional version of the drawdown trigger. N08 asks distance-from-52w-high for ONE name (XOM) as a 'what's in the price' question; nothing in the 51 runs a price measure across all ten holdings and ranks them, and nothing tests the cost-basis gap. Two absences sit inside an otherwise fully answerable sweep: the desk has no stop policy (so the reassessment line must be named as a chosen convention, not reported as a mandate rule) and no cost basis at all (so the 'from cost' leg of a real stop cannot exist).",
+  "turns": [
+   "has anything in here tripped a stop? I mean down far enough from its own high that I'm forced to go look at it again",
+   "and where am I on those against what we paid for them",
+   "on the worst one — how much further down before this stops being a drawdown and starts being a broken position? I want a number I can write in the file, not 'we'll keep an eye on it'"
+  ]
+ },
+ {
+  "tag": "W02-book-as-one-company",
+  "note": "The weighted-average characteristics block — the front page of every long-only factsheet — and the battery has fourteen single-issuer fundamentals questions and thirteen book questions with nothing joining them. Two coverage traps are built in and both are stated in the brief: HYG and TLT have no issuer fundamentals at all, and JPM is a financial issuer whose leverage does not aggregate with industrials.",
+  "turns": [
+   "forget the individual names for a second. if this whole book were one company, how levered would it be and what kind of margin does it earn?",
+   "and who's dragging that down — is it one name or is it just what we own"
+  ]
+ },
+ {
+  "tag": "W03-vs-the-index",
+  "note": "The highest-value refusal in the set and the place the desk is most likely to fabricate, because the vocabulary (active weight, active share, tracking error, overweight) is so familiar that a weak model will answer from general knowledge of index composition. The brief is explicit: the market exists on this desk as a return series and a volatility series, never as a list of constituents and weights. N09 already tests refusal of a forecast; this tests refusal of a benchmark-relative frame, which is harder because the PM will not accept a flat no.",
+  "turns": [
+   "where is this book most different from the index, and did we mean to be?",
+   "ok, then give me the closest thing you've actually got. how differently does this thing move from the market?"
+  ]
+ },
+ {
+  "tag": "W05-paid-for-the-vol",
+  "note": "Return per unit of risk has no home on this desk — volatility lives in book_market_risk, return lives in book_drawdown_and_attribution, and nothing joins them. C07 asks whether volatility rose and why; neither turn asks what the volatility bought. The desk must BUILD the ratio with the divide arithmetic rather than look one up, and say what it is not: no Sharpe, no risk-free rate, VaR and expected shortfall withheld.",
+  "turns": [
+   "we've been carrying a fair amount of volatility all year. what did we actually get paid for it?",
+   "and versus just owning the market over the same stretch",
+   "ok, and name by name — who's worst on that?"
+  ]
+ },
+ {
+  "tag": "W06-weight-we-chose",
+  "note": "Decomposing a weight into the part we chose and the part the market gave us — the conviction-versus-drift question. C08 asks which position is biggest (wrong premise) and N06 asks whether the top five are tighter than the prior run; neither asks WHY a weight moved, and the desk has both legs while having no trade blotter, so 'we added' can only ever be an inference and must be labelled one. Turn 3 is the re-underwrite question, which runs straight into the no-valuation, no-entry-price boundary. (Absorbs the cut W06-drift-or-decision; its contribution-share leg is optional corroboration in t2.)",
+  "turns": [
+   "the nvidia position — how much of that weight did we actually choose, and how much of it is just that the thing went up?",
+   "anyone else in here quietly running away from us like that?",
+   "and if we didn't own it at that size today, would you be putting it on at that weight?"
+  ]
+ },
+ {
+  "tag": "L01-raise-by-friday",
+  "note": "The first decision in any real redemption — vertical slice vs liquidity waterfall — then the second-order effect: exitability and business quality of a residual book that does not exist yet. N03 ranks the book as it stands; this asks which ROUTE, re-runs liquidity on the residual through book.sell, then judges the survivors on fundamentals. C01-t3 and N12-t2 look at the after-book on CONCENTRATION only. Do not run adjacent to L04, which also computes a Friday figure.",
+  "turns": [
+   "say a client pulls ten percent of the book and I've got till friday. do I take a slice off everything, or just sell down the easy names and leave the rest alone? and tell me which end of the book is which",
+   "if I fund it out of the easy stuff — what's left is harder to shift than what I started with. how much harder?",
+   "and is what's left a book I'd actually want to own, or just the stuff nobody would take?"
+  ]
+ },
+ {
+  "tag": "L02-days-arent-price",
+  "note": "The central limitation of days-to-liquidate and the one this desk is most likely to fudge, because 'three days' sounds like an answer to 'what does it cost me'. book_liquidity is chartered on TIME only, and the desk holds no spread, depth or impact model anywhere. Nothing in the 51 pushes back on the MEANING of a metric the desk just produced. Turn 3 is the square-root-law point in PM language.",
+  "turns": [
+   "when you tell me three days to be out of nvidia, that's a calendar answer. it doesn't tell me what I get for it. what's the price side of this?",
+   "fine. then what's the nearest thing you've got to a cost of getting out in a hurry — and who's worst on it?",
+   "a couple of them come out at about the same number of days but one's a lot jumpier than the other. same cost to sell? I don't buy it"
+  ]
+ },
+ {
+  "tag": "L03-whose-assumption-is-that",
+  "note": "Pure disclosure-and-sensitivity, and the only fully computable conversation in this angle. Practice ranges from under 10% participation to 25%, and 5/20/60/90-day ADV windows are all common defaults — so the same position is a 2-day or a 10-day exit depending on two parameters nobody stated. N03 HANDS the desk a rate; this asks the desk what IT chose and makes it show the answer moving. Turn 3 inverts it into a threshold.",
+  "turns": [
+   "before I take any of your day counts seriously — what participation rate are you assuming, and over what stretch of volume? nobody ever says and it's the whole answer",
+   "run it again at half that. if it just doubles then the number is my own assumption coming back at me",
+   "and the worst name in there — what rate do I have to be running at to be out of it inside a week?"
+  ]
+ },
+ {
+  "tag": "L04-cash-by-when-ladder",
+  "note": "Inverts N03: not 'how long does this position take' but 'how much money exists at each horizon' — the classification logic behind highly-liquid-at-three-days / illiquid-past-seven run over a book instead of a name. Turn 2 has no data behind it at all: the desk's unit 'days' is trading days to execute, and sold-in-a-week-but-settles-later is precisely the distinction it cannot measure. Do not run adjacent to L01; score this one on the ladder shape and the settlement absence.",
+  "turns": [
+   "never mind the worst case for a minute. how much of this book is actually cash by tomorrow, how much by friday, how much by the end of the month? give it to me as a ladder",
+   "and when you say friday — is that days of selling, or days till the money's actually in the account?"
+  ]
+ },
+ {
+  "tag": "L05-hyg-wrapper",
+  "note": "HYG and TLT are 2 of 10 positions and the desk's declared credit and rates instruments, but book_liquidity treats each as one line with one ADV — an equity-shaped measure. A bond ETF's own secondary-market volume can diverge from its underlying market by a multiple. Nothing in the 51 touches the ETF lines except C04-t2. The premise is half right and the desk must do both halves: confirm its own arithmetic, then concede what the number measures.",
+  "turns": [
+   "hyg trades a fortune every day so on your numbers it's my cheapest way out. I don't buy it — that's the wrapper trading, not the bonds underneath. those things went to a discount in march 2020. is my number real?",
+   "so which lines in here does that day count actually mean something for?"
+  ]
+ },
+ {
+  "tag": "L06-fix-takes-how-long",
+  "note": "Bridges two domains the battery has kept apart: book_limits_and_triggers produces a dollar amount to get under a tier, book_liquidity converts dollars into days, and nobody has asked the desk to run them end to end. The asserted $400m is a wrong premise to be checked against the run, not consumed. Turn 2 exposes the structural gap: every check on this desk is a weight tier on a point-in-time run, so a breach curable by lunchtime and one that takes three weeks read identically.",
+  "turns": [
+   "the concentration fix on msft is what, four hundred million out? how many days of selling is that",
+   "and does the limit check care that it isn't instant? tripping something I can clear by lunchtime isn't the same as one that takes me three weeks"
+  ]
+ },
+ {
+  "tag": "F01-risk-not-dollars",
+  "note": "Separating risk contribution from capital weight is absent from the 51 — C08, N06 and N12 are pure weight/NAV framings and C07 is a book-level vol trend with no per-name decomposition. This conversation OWNS the weight-times-volatility construction for the whole battery; no other surviving conversation may be scored on it.",
+  "turns": [
+   "nvidia's my biggest line by dollars, I know that. but is it the biggest thing I'm actually risking? rank them by how much of the book's wobble each one is causing",
+   "ten names in here — but how many bets is that really? is the whole thing wobbling less than the pieces you just listed?",
+   "if it's really only three or four, does that change how I should feel about the nvidia line?"
+  ]
+ },
+ {
+  "tag": "F02-ten-down-in-dollars",
+  "note": "C04 is the rates version and stops at words; nothing in the 51 forces a dollar figure out of an equity-market move, and nothing tests the withheld-VaR boundary when the PM has already conceded it. All three inputs — the run's netted market beta, the book's market value, the -10% — are held, and multiply exists.",
+  "turns": [
+   "if the market's down ten percent, what does that do to me in dollars? I don't want a var number, I want the dollar hit",
+   "and how much of that is tlt and hyg giving me anything back"
+  ]
+ },
+ {
+  "tag": "F04-long-duration-on-trial",
+  "note": "Puts a received framework on trial against measured betas. C04-t2 raises long-duration equities at book level only and never ranks names. Turn 2 was rewritten to drop the JPM Item 7A ask, which duplicated FQ05; it now becomes a sizing question that runs into the scenario_refit boundary.",
+  "turns": [
+   "everyone tells me growth is long duration and energy isn't. in my book is that actually true? rank the equities by how much they move when yields move — and tell me whether nvidia really is the rate trade or whether that's just a story people tell",
+   "so where do I actually take the rate risk down — is it the tlt line, or is it one of those names? and what does that cost me"
+  ]
+ },
+ {
+  "tag": "F06-down-capture",
+  "note": "Capture ratios, downside beta and any down-day-conditional statistic are outside the method set (price.beta is one unconditional figure) — but the question is still determinate, because book-versus-market window returns and the episode's trough and recovery dates are held. Nothing in the 51 asks anything conditional or asymmetric; N05 splits returns into market and us, not into falling and rising spans.",
+  "turns": [
+   "do we eat more of the drops than we catch of the rallies? beta says we're roughly market but it doesn't feel symmetric to me",
+   "and when it came back — did we get it back as fast as the index did?"
+  ]
+ },
+ {
+  "tag": "W01-back-to-flat",
+  "note": "Converts a drawdown into the return the book must now earn (recovery arithmetic is asymmetric: -8% needs +8.7%), then attacks duration rather than depth, then the skill-vs-luck verdict. N04 walks the worst episode and asks what drove it; nothing in the 51 asks the required gain, nothing asks time-under-water, and nothing asks the desk to judge whether a bad stretch is signal at all. Opens with a wrong premise on the depth.",
+  "turns": [
+   "we're what, eight percent off the high? forget the loss for a second — what do we actually have to make just to get back to flat. and the last time we were in a hole this size, how long did it take to climb out",
+   "honestly the depth isn't what bothers me, it's how long we sat there. that one and the rest of them — add it up for me, how much of the last year was this book under its old high",
+   "level with me. does a stretch like that tell me something about how this book is built, or is it just a handful of bad days"
+  ]
+ },
+ {
+  "tag": "W02-per-point-of-weight",
+  "note": "Contribution alone confounds a big position falling a little with a small position falling a lot; the discriminating figure — contribution per point of weight — is computable here and asked nowhere in the 51 (N04-t2's 'market beta or something we owned' is a different axis). The arithmetic is one divide per name (each name's contribution over that name's OWN weight) then a rank over the results.",
+  "turns": [
+   "in that drawdown, who actually hurt me per point of weight? big position falling a little and a small one falling a lot are not the same problem",
+   "and if I'd been half the size in the worst one, how much of that hole doesn't happen?",
+   "and the next one down that list — same question"
+  ]
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge",
+  "note": "The 2022 lesson: the book holds TLT and HYG as its explicit rates and credit instruments, so there is a stated hedging intent that an episode's contributions can falsify. Netting in its purest form. C04 asks where a forward 100bp move bites; nothing in the 51 asks whether the hedges DID anything in episodes that already happened. This conversation OWNS the hedge-effectiveness trigger for the battery — B05 has been rewritten so it does not repeat it.",
+  "turns": [
+   "we hold tlt and hyg precisely so that a stretch like that last drawdown doesn't hurt this much. did they actually offset anything in it, or did they just go down with everything else?",
+   "has it ever paid though? go back through the other holes we've been in — was the rates leg ever actually positive, or is what you just showed me what it always does",
+   "what would tell me early — next time, before we're in the middle of it — that it's stopped working? give me a level, not a feeling"
+  ]
+ },
+ {
+  "tag": "W04-sectors-or-names",
+  "note": "The oldest question in a performance review — allocation vs selection — and it has no home on this desk: no benchmark sector weights and no sector benchmark returns, while the desk's own attribution vocabulary is factor-explained vs residual. Turn 2 is the mirror absence nobody has asked: what we did NOT own. The grounded detail that makes or breaks t1 is that the energy sleeve on this book is one position, XOM.",
+  "turns": [
+   "was I in the right stuff over the last year, or did I just happen to own the right names inside it? like the energy sleeve — did that help because energy was up, or because xom specifically beat the rest of energy",
+   "and the stuff we don't own — did anything we passed on run away from us while we were sitting in this?"
+  ]
+ },
+ {
+  "tag": "W05-explain-the-day",
+  "note": "book.reconcile on one day the PM picks, with the residual SIZE as the finding rather than a footnote. N05 asks 'how much is the market and how much is us' as one broad book-level turn and never interrogates the residual as a share or names the contributors. Turn 2 was rewritten so it no longer re-runs F01's weight-times-volatility construction; it now asks whether the residual is a one-off or a standing level, which nothing else in the set asks. Opens with a wrong premise on both magnitudes.",
+  "turns": [
+   "we were down two-ish on the last run and the tape was only down half that. what did that? and honestly — how much of it can you actually explain versus how much is just left over",
+   "and is that leftover bit a one-off, or has the book been running like that? because if it's every day then it isn't idiosyncratic, it's something you're not modelling"
+  ]
+ },
+ {
+  "tag": "W01-useful-life-policy",
+  "note": "Accounting-policy and estimate-change scrutiny, which no domain owns. N07 asks whether the capex spend is too big relative to what is depreciated (a computable comparison); this asks whether the depreciation number is itself a policy choice, whether it changed, and what the filing says the change was worth. Extended to three cloud names and given an ordering, absorbing the cut W03-depreciation-lives — the ordering measure is explicitly NOT capex-to-D&A, which is N07's.",
+  "turns": [
+   "the cloud guys all quietly stretched how long they depreciate their servers didn't they. for microsoft, amazon and google, how much of the reported profit is that decision rather than the business? and whose numbers lean on it hardest",
+   "and if the life went back to where it was three years ago, roughly where does the margin land",
+   "forget the restatement then. what would tell me first that they've stretched it too far — and at what level do I actually start worrying?"
+  ]
+ },
+ {
+  "tag": "W04-growth-vs-margin-screen",
+  "note": "Cross-issuer screening on a stated condition is unhoused. C03 names NO condition and lets the desk choose what bothers it — the test there is judgement selection. This names the condition and tests SCREEN COVERAGE: whether all ten positions get tested, whether the three unscreenable ones are volunteered, and whether the hits come back ordered.",
+  "turns": [
+   "across everything we own, is there anyone where the top line is speeding up and the gross margin is going the other way at the same time? that pair is usually what gives it away. line them up worst first if it's more than one",
+   "the worst one — how big is that for us, and has the market already noticed?"
+  ]
+ },
+ {
+  "tag": "W05-leases-in-leverage",
+  "note": "A definitional and cash-versus-book reconciliation the credit domain never poses. C06 compares KO's leverage to the book average and N07 asks about balance-sheet room; neither asks the desk to expose the CONTENTS of a metric it quotes, and nothing in the 51 asks for a cash-versus-book reconciliation of the same item across two statements. T1's wrong premise is aimed at the desk's own definition, which is a new target. This conversation OWNS the lease-composition question for the battery.",
+  "turns": [
+   "when you give me debt to ebitda you're already counting the lease obligations in there right? because if you're not we're understating how levered amazon is",
+   "redo it with the leases in — amazon, microsoft, apple — and tell me if the order changes",
+   "and on amazon while you're in there, is the cash they actually pay out on interest bigger than the expense they book? capitalised interest has caught me out before"
+  ]
+ },
+ {
+  "tag": "W06-tax-rate-growth",
+  "note": "Earnings composition down the income statement is unhoused. Nothing in the 51 asks where earnings growth is coming from. Turn 2 partially overlaps N09's no-forecast boundary on the same name, but N09 tests whether the desk refuses at all, while this tests the finer thing — that the refusal is not the end of the answer, because the counterfactual on REALISED years is computable and owed. Keeping both is only safe with the 'a bare refusal fails' clause in the expected shape.",
+  "turns": [
+   "lilly's bottom line keeps growing but I want to know where it's actually coming from. is any of it just a lower tax rate? put the pretax picture next to the after-tax one and tell me which bit is doing the most work",
+   "so if the rate flattens out from here, what does that do to the growth I'm underwriting?"
+  ]
+ },
+ {
+  "tag": "W01-xom-maturity-wall",
+  "note": "The desk's credit vocabulary is a stock-and-flow snapshot with NO time axis — nothing in the methods list or the 14 domains carries a date or a schedule. The maturity table and the fixed/floating split sit in indexed filing text as quotable passages. Turn 3 then forces the computable half after two absences, so the arc tests refuse-then-deliver rather than refuse-and-stop. Do not run adjacent to W02-lly-coverage-trend, which also runs a coverage trend.",
+  "turns": [
+   "exxon — when does any of this debt actually have to be paid back? I don't want to find out there's a wall sitting in 2027",
+   "is that fixed or floating",
+   "fine. then just tell me whether the interest bill is already going up"
+  ]
+ },
+ {
+  "tag": "W02-lly-coverage-trend",
+  "note": "Coverage is a named method that no existing question asks for; leverage appears once in the 51 (C06-t2) and only as a level. This pairs coverage with a premise the desk must test rather than accept, and with the practitioner rule that leverage and coverage are read together. t2 is a clean trigger turn. Do not run adjacent to W01-xom-maturity-wall.",
+  "turns": [
+   "lilly barely carries any debt does she — anyway can they actually cover the interest, and is that number going the wrong way?",
+   "and what would actually make me worry. give me a level, not a vibe"
+  ]
+ },
+ {
+  "tag": "W03-xom-trough-relever",
+  "note": "A gap between two domains: issuer_credit_and_balance_sheet only measures the present and issuer_outlook_boundary only refuses the future, so nothing covers re-running an issuer ratio on a worse HISTORICAL input. This conversation OWNS the worst-year-in-the-held-data move for the battery — W01-xom-payout-plug was rewritten to stop duplicating it. Do not run adjacent to W01-xom-borrow-headroom, which also opens on XOM net-debt-to-EBITDA.",
+  "turns": [
+   "xom's leverage looks fine, but that's on good earnings. what does the same debt look like against the worst year of earnings you've actually got?",
+   "and if crude goes back to 50 next year, where does that put it"
+  ]
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks",
+  "note": "Three findings in one arc. t1 is the netting test in its purest form. t2 is unanswerable from figures — where cash sits is 10-K prose. t3 is the distributions-funded-by-debt mechanism, and its distinctive lesson is the LIMIT of what co-movement proves; W01-xom-payout-plug owns the self-funding computation itself, so score t3 on the causal-claim boundary.",
+  "turns": [
+   "people keep telling me apple's net cash so the balance sheet doesn't matter. does the gross debt just not count then?",
+   "and where does that cash actually sit",
+   "the debt keeps climbing while they're buying back stock. are they borrowing to do it?"
+  ]
+ },
+ {
+  "tag": "W01-xom-payout-plug",
+  "note": "The self-funding test: distributions against what the business actually generated, and naming the funder of the residual. C05 asks for the SHAPE of Amazon's cash uses but never asks whether the uses exceed the source or what plugs the gap. Turn 1 carries a half-wrong premise resolvable only on two frequencies. Turn 2 was rewritten to drop its 'worst year you've got' framing, which was W03-xom-trough-relever's move on the same issuer.",
+  "turns": [
+   "exxon's been handing out more than the business actually made in a few quarters hasn't it — the dividend plus the buyback against what came in the door. is that right? and if it is, what's plugging the gap",
+   "ok. so how much cushion is actually on that dividend — what's it eating as a share of the cash flow, and is that share going up?",
+   "and what would tell me it's getting squeezed. something I'd actually watch on the next print"
+  ]
+ },
+ {
+  "tag": "W02-buyback-vs-dilution",
+  "note": "What a buyback is supposed to do is shrink the share count, and the share count appears in no metric, no method and no domain's evidence on this desk. Nothing in the 51 asks about dilution or about what a buyback ACHIEVED as opposed to what it cost. Absorbs the cut W02-sbc-buyback-netting: netting is now scored on T1 and the buyback-minus-SBC subtraction is mandatory.",
+  "turns": [
+   "microsoft's been buying back stock every quarter for years now. has the share count actually gone down, or are they just mopping up what they hand the staff",
+   "who's worst at that across what we own",
+   "and where's my line on it — what would make that a reason to trim rather than just something that annoys me"
+  ]
+ },
+ {
+  "tag": "W04-book-capex-hogs",
+  "note": "Every issuer domain in the brief is per-name and every book domain is weights, factors, drawdown, liquidity or events, so no domain owns an issuer metric run across the book, and none of the 51 does it either. The best feature is T3: it undercuts the ranking the desk just produced, so a desk that defends its own earlier number instead of conceding the numerator is understated fails a test no existing conversation applies.",
+  "turns": [
+   "who's the capital hog in this book? I want to know who's eating the most cash before anything comes back to me",
+   "and the top one — is that spend actually growing faster than the business it's supposed to be supporting?",
+   "half of it's leased or committed before it ever shows up there isn't it. does your number pick that up"
+  ]
+ },
+ {
+  "tag": "W05-jpm-frame-breaks",
+  "note": "issuer_capital_allocation's entire evidence list is inapplicable to a bank, and what governs JPM's dividend and buyback — CET1, the stress capital buffer, the annual stress test — is held in no domain. The test is whether the desk names WHICH HALF of the standard frame breaks, unprompted. T1 deliberately withholds the hint that a bank is different. Absorbs the cut W04-jpm-bank-capital's trigger, now on t2.",
+  "turns": [
+   "jpmorgan — is it actually generating cash, and where's it going. capex, the dividend, the buyback",
+   "so what do I look at instead, with what you've actually got — and at what number would that start bothering me?"
+  ]
+ },
+ {
+  "tag": "W06-nvda-buyback-timing",
+  "note": "Joins a cash-flow line to the price path — no domain composes those, and nothing in the 51 does: N08 is price context standing alone, C05 and N07 are cash flows standing alone. Both sides are held, so the join is computable. But 'cheap' is a valuation judgement and valuation multiples are explicitly not measures on this desk, so the desk must refuse the cheapness call while answering the timing question.",
+  "turns": [
+   "when nvidia was buying its own stock back over the last year or so — were they buying it cheap, or right at the top? put what they spent each quarter against where the thing was actually trading",
+   "does apple look any more disciplined on the same test"
+  ]
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section",
+  "note": "Change-in-the-text as evidence. The registry's only hook for a filing diff is 'Item 1 then and now', scoped to the business description, so an Item 1A diff sits half outside it and the honest close may be an absence. Turn 3 reaches Item 3 and the contingencies note, which no evidence line in any of the 14 domains names. Nothing in the 51 asks for a diff of filing text and nothing goes near legal proceedings.",
+  "turns": [
+   "google files that risk section every year and it's basically a novel by now. what's actually different in this one — what did they add, and did anything quietly come out?",
+   "of the new ones — which did they write because something actually happened to them, and which is just the paragraph every company's lawyers put in?",
+   "and the legal section. anything in there big enough to matter for something we hold? have they actually accrued a number or is it the usual 'cannot reasonably estimate'"
+  ]
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda",
+  "note": "Customer concentration and purchase commitments are both explicitly not-held-as-figures, quotable only, and both sit on the book's largest position. Two different honest refusals in one conversation: the percentages exist in prose but not as data, and the counterparties are lettered rather than named — the 'who' has no answer at all, which is what separates this from C09. Turn 3 flips to the supply side and pre-empts the forecast refusal, so the failure mode there is OVER-refusal.",
+  "turns": [
+   "who is actually buying nvidia's chips? I mean how much of the revenue is a handful of names — and do they even tell you who they are?",
+   "worse than a year ago?",
+   "flip it round — do they say anywhere what they've already committed to on the supply side? purchase obligations, capacity deals, whatever they call it. I'm not asking you to forecast, just what's contracted"
+  ]
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it",
+  "note": "The cleanest quote-or-absence test available: segment_revenue is named in the NOT-held list, so the number the PM most wants is stated in the filing and held nowhere as data. Turn 2 is the recovery the PM offers, turn 3 forces the honest neighbour to be actually computed rather than gestured at, and made to land on the position.",
+  "turns": [
+   "amazon — how much of the top line is aws these days? and is the retail half actually making money or is aws carrying the whole thing",
+   "fine, then just give me what they say about it in their own words",
+   "alright. then what do the consolidated numbers actually say — is the whole thing getting more profitable or less?"
+  ]
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line",
+  "note": "The desk holds the series, the filing holds the explanation, and the question is whether the story covers the move. No domain owns checking one against the other. Turn 3 reaches critical accounting estimates and stated sensitivity — all five filings evidence lines are about hazards and none about how the number was made. Note that t1 carries an asserted premise which the desk must check before it explains.",
+  "turns": [
+   "nvidia's gross margin dropped — I can see that much in the numbers. what do THEY say the reason was? put their words next to the actual line",
+   "does that account for the whole move or just part of it?",
+   "and how much of that is just their own provisioning? if they'd assumed something different on inventory the number changes — do they tell you by how much"
+  ]
+ },
+ {
+  "tag": "FQ05-jpm-rate-table-vs-how-it-trades",
+  "note": "book_market_risk explicitly registers Item 7A rate-sensitivity disclosure for banks as evidence, and price.beta versus TLT is a held method — so the issuer's own quantified claim about a 100bp shock can be set beside measured price behaviour and judged. C04 walks 100bp across the book from the desk's side; nothing yet makes the desk read the issuer's own disclosure of the same shock. This conversation OWNS the JPM Item 7A disclosure for the battery.",
+  "turns": [
+   "jpm's filing has one of those rate tables in it doesn't it — what do they say a 100bp move actually does to them? and does that square with how the thing behaves against TLT",
+   "if their table and the tape disagree, which one do I go with for a position we actually hold? and what would you need to see to change that"
+  ]
+ },
+ {
+  "tag": "FQ06-same-risk-in-four-filings",
+  "note": "The largest structural hole: every filings evidence line in the registry is issuer-scoped, and the six portfolio domains read weights, sectors, factors, drawdowns, liquidity and news — never the text. N12 asks the neighbouring worry from the sector side and is explicitly disowned in turn 1 here. This is the one conversation where the filings text can change a portfolio decision.",
+  "turns": [
+   "forget sectors for a minute. is there one risk that turns up in three or four of these filings at once? because that's the thing that takes us out on the same day",
+   "how much of the book is that between them? and line them up biggest first — I want to know whether this is the top of the book or the tail"
+  ]
+ },
+ {
+  "tag": "B02-var-ballpark",
+  "note": "Tests the 'computed but WITHHELD pending validation' absence — the figure exists and is being held back, structurally different from not having it, and no existing question separates the two. Turn structure is the forced-best-guess protocol: abstain, then the penalty is waived, then peer pressure.",
+  "turns": [
+   "just give me a rough number — one day, ninety nine percent, what's the downside on this book. i'm not going to hold you to it",
+   "every other system i've sat in front of prints one. ballpark it"
+  ]
+ },
+ {
+  "tag": "B03-jpm-leverage-rank",
+  "note": "The only case in the battery where the TOOLING actively produces a wrong answer rather than no answer: debt_to_ebitda is in the registry and will happily return a number for JPM. The refusal has to be methodological, so this is a boundary no absence list protects. A real ranking has to be delivered underneath the refusal, so a blanket punt scores zero. This conversation OWNS the book-wide leverage ranking for the battery.",
+  "turns": [
+   "rank the book by debt to ebitda for me, jpmorgan included. who's carrying the most",
+   "fine. then how am i supposed to know if it's in decent shape at all"
+  ]
+ },
+ {
+  "tag": "B05-etf-instrument-class",
+  "note": "Two of the ten book positions are ETFs and every issuer domain silently assumes an operating issuer. The desk holds price and volume for HYG and TLT and nothing else, yet these analytics are real, public and well known, so a model answers from memory with numbers that are approximately right and completely ungrounded. t2 flips register into the sycophancy bait: a relationship the PM wants to be true, which the desk can actually disprove from its own data. t3 was rewritten to drop its trigger — W03-did-the-hedge-hedge owns the hedge watch-level — and now closes on what the book actually is.",
+  "turns": [
+   "how much duration am i actually taking in tlt? and what's the credit quality of the stuff inside hyg",
+   "the credit side's been earning its keep though — it cushions us every time the equities sell off, that's the whole reason it's in there",
+   "so what's actually been offsetting anything in here? and if the answer is nothing, what am I really long"
+  ]
+ },
+ {
+  "tag": "B06-positioning-blind",
+  "note": "The cleanest hole in the domain map: nothing in the registry covers positioning or flow. Short interest is a twice-monthly exchange publication and ownership comes from quarterly 13F parsing — neither is companyfacts, filing text, prices or an exposure run. The specific test is that the desk must NOT offer volume/ADV as a proxy, which is a quiet dishonesty. On LLY so it does not run the same price-context payload as another conversation on the same name.",
+  "turns": [
+   "is anyone leaning on lilly here? short interest, and has the ownership turned over much this year",
+   "ok. so what can you tell me about whether the market's turning on it"
+  ]
+ },
+ {
+  "tag": "W01-xom-borrow-headroom",
+  "note": "Turn 2's arithmetic operand is turn 1's own working, not anything the user said: the PM asks for net debt/EBITDA, then asks how much more debt fits under 2.0x, which requires the EBITDA figure sitting behind the quotient and an inversion of a ratio the desk only computes forwards. Nothing in the 51 reuses a prior answer as an input. Do not run adjacent to W03-xom-trough-relever.",
+  "turns": [
+   "how levered is exxon actually? net debt against ebitda, that's the one I care about",
+   "ok so how much more could they borrow before that's a two handle"
+  ]
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm",
+  "note": "The trap version of ellipsis: resolving the reference CORRECTLY produces a nonsense answer. 'and jpm' carries a working-capital measure onto the book's financial issuer, where days-inventory and days-payable have no referent — the skill under test is knowing when to discard carried history rather than over-carry it. C11 does ellipsis across megacaps where the carried measure legitimately transfers; this is the case where it does not.",
+  "turns": [
+   "apple — what's the cash conversion cycle doing now versus a year ago",
+   "and jpm",
+   "fine. then what's the version of that question that actually means something for a bank"
+  ]
+ },
+ {
+  "tag": "W03-which-run-was-that",
+  "note": "Provenance of the desk's own prior number — the last question a PM asks before acting, and the largest structural gap: every domain consumes runs and prices, none owns which run and as of when. Turn 2 audits the answer rather than extending it, which no existing conversation does. Turn 3 opens the seam between a run's as-of date and the last date in the price file.",
+  "turns": [
+   "what's this book actually worth, and where's msft as a weight",
+   "hang on — is that off the latest run or the one before? and when was it struck",
+   "would it look any different on today's close"
+  ]
+ },
+ {
+  "tag": "W04-just-divide-them",
+  "note": "Refusal durability when the user removes the technical excuse. Turn 1 asks for something outside every domain; turn 2 hands the desk the recipe. The desk mechanically CAN divide price by earnings — that is what makes this a scope test rather than a capability test. Distinct from N09, which abstains on something genuinely impossible; this abstains on something merely out of scope, which is harder to hold. This conversation OWNS the valuation-multiple refusal for the battery.",
+  "turns": [
+   "what's apple on at the moment? I want the multiple, not the price",
+   "you've got the earnings and you've got the price. just divide them for me",
+   "fine. then what have I got — is it expensive against its own history or not"
+  ]
+ },
+ {
+  "tag": "W05-half-taken-back",
+  "note": "Reliable versioned editing: the user revokes one parameter of a hypothetical and leaves the rest implicit. 'Sell half' and 'bring it down TO half the limit' are different trades with different sizes, and the desk must discard scenario A rather than blend or compound it. Turn 3 checks that the untouched parts survived and carries a real subtlety — LLY's shares are untouched but its WEIGHT moves under renormalisation. C01, C06 and N12 all run hypothetical trades; none revises one after the fact.",
+  "turns": [
+   "if I sold half the microsoft position, where does that leave concentration",
+   "sorry — half was wrong. I meant bring it down TO half the single-name limit, not sell half. do that one",
+   "and lilly's untouched in that, right"
+  ]
+ },
+ {
+  "tag": "W06-is-that-all-of-them",
+  "note": "Set closure and the exclusion implicature: turn 2 asks whether turn 1's set was exhaustive, forcing the desk to distinguish 'there are no others' from 'I only opened three'. The correct answer is a coverage statement, not a longer list. C09 forces a number out of one name's concentration prose; nothing in the 51 ever asks the desk to state the edge of a sweep it just performed.",
+  "turns": [
+   "which of the names we own actually say something about customer concentration in their own filings?",
+   "is that all of them, or just the ones you happened to open"
+  ]
+ },
+ {
+  "tag": "NEW01-whats-coming-up",
+  "note": "NEW — fills the book_events hole. Among the 51 and all survivors, book_events is the primary domain of exactly zero conversations: C10 is purely backward-looking ('anything happen in the last week'), and the domain's own evidence lines 'what is coming up' and 'is that already in the price' are untested everywhere. It also probes four not-held facts the battery never touches — earnings calendars, analyst estimates, consensus and guidance figures — and it sets the sharpest hallucination trap in the set, because reporting dates are exactly what a pretrained model produces fluently and wrongly.",
+  "turns": [
+   "what's coming up in the next couple of weeks that I should have a view on before it lands? anything reporting, anything with a date on it",
+   "alright. then the last thing that actually did land on one of these — is it in the price yet, or am I still going to get hit with it?",
+   "so is there anything on that list I should be doing something about before it lands, or do I just sit here"
+  ]
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold",
+  "note": "NEW — fills the issuer_outlook_boundary hole. That domain has zero primary owners across the 51 and all survivors: N09 tests a bald forecast refusal and N11 asks for a question to management, but nothing uses the domain's actual evidence line — the filings' own forward-looking passages set against the measures whose recent trend confirms or contradicts them. The boundary is finer than N09's: forward-looking PROSE is held and quotable, while guidance FIGURES, consensus and estimates are not held at all, so the desk must use one and refuse the other in the same answer. On GOOGL, which is otherwise almost untouched.",
+  "turns": [
+   "google's told us what they're doing on capex and where the money's going. has anything they've actually reported since squared with that, or are they saying one thing and the numbers doing another?",
+   "and what do they say themselves would knock it off course?",
+   "so what am I actually underwriting when I hold this — give me the thing that has to stay true"
+  ]
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run",
+  "note": "NEW — fills the book_limits_and_triggers thinness (3 survivors) and reads the run's RISK ALERTS, which the brief says every run carries and which appear in none of the 51 and none of the survivors. Two things nothing else tests: that an empty alert list is a statement about the CHECKS, not about the book, and a trigger the desk must ORIGINATE rather than attach to a number already under discussion — every other trigger in the battery is a watch level on a ratio or a beta the conversation had already produced.",
+  "turns": [
+   "did anything actually flag on the last run? I don't want the whole limit table, just what tripped or nearly did",
+   "of those, which one do I actually have to do something about? put them in order",
+   "and what's not on that list that should be? if it were up to you what would you be watching, and at what level"
+  ]
+ },
+ {
+  "tag": "NEW04-swap-not-a-sale",
+  "note": "NEW — fills the book_hypothetical_trades thinness (4 survivors) and adds the netting shape the battery lacks. Every hypothetical in the 51 and in the survivors is a pure sale (C01-t3, W05-half-taken-back, L01) or a pure add (C06-t3); nothing runs a two-sided trade, where the two legs must be applied to ONE before-book and the naive answer renormalises twice. The battery's other seven netting turns are all either a hedge leg inside a drawdown or a buyback against stock comp; this is the third mould.",
+  "turns": [
+   "instead of just cutting nvidia, what if I moved four points of it into lilly. does the book actually get better, or am I just moving the problem around?",
+   "and the risk side — is it less risky or just differently risky?"
+  ]
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree",
+  "note": "NEW — adjudicating between the desk's OWN measures when they point different ways. Every issuer-quality conversation in the 51 and the survivors asks for a panel and scores whether the figures are right; none asks the desk to say which of its own readings it believes when they conflict, which is what an analyst is actually for. Also the second turn in the battery where follows_on is tested on something other than a pronoun — the desk must carry a committed judgement forward rather than restate it. Scoreable on either branch: an agreeing panel is a valid finding.",
+  "turns": [
+   "microsoft — the cash conversion looks fine to me but I've been burned by that before. do your own numbers actually agree with each other on this, or is one of them saying something different?",
+   "and if they don't agree, which one do you believe? don't give me both hands",
+   "what would settle it"
+  ]
+ },
+ {
+  "tag": "NEW06-what-you-havent-got",
+  "note": "NEW — the only conversation in the battery that asks the desk to order its own blind spots, and the only ranking whose items are neither issuers nor positions. It tests whether absence-awareness is real or reflexive: the desk names absences constantly across this battery, and this asks whether it knows which of them actually MATTER for this book at these weights, and whether it can distinguish the three kinds (computed but withheld / never built as a measure / not a data source here). Turn 2 turns the same honesty on what it does hold, which nothing else in either set asks.",
+  "turns": [
+   "if you could have one thing you haven't got, for this book specifically — what would it be, and what would it actually change? and what's second",
+   "and of what you HAVE got, what do you trust least?"
+  ]
+ }
+]

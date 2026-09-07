@@ -1,0 +1,1448 @@
+[
+ {
+  "tag": "W01-stop-sweep-across-book#t1",
+  "q": "has anything in here tripped a stop? I mean down far enough from its own high that I'm forced to go look at it again",
+  "asks": "t1: distance from the 52-week high for every position, ordered deepest-first, each as a percent with the date the high was set; the two instruments HYG and TLT ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W01-stop-sweep-across-book#t2",
+  "q": "and where am I on those against what we paid for them",
+  "asks": "t1: distance from the 52-week high for every position, ordered deepest-first, each as a percent with the date the high was set; the two instruments HYG and TLT ",
+  "criteria": [
+   "follows_on",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W01-stop-sweep-across-book#t3",
+  "q": "on the worst one — how much further down before this stops being a drawdown and starts being a broken position? I want a number I can write in the file, not 'we'll keep an eye on it'",
+  "asks": "t1: distance from the 52-week high for every position, ordered deepest-first, each as a percent with the date the high was set; the two instruments HYG and TLT ",
+  "criteria": [
+   "follows_on",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W02-book-as-one-company#t1",
+  "q": "forget the individual names for a second. if this whole book were one company, how levered would it be and what kind of margin does it earn?",
+  "asks": "t1: a weight-weighted operating margin and a weight-weighted leverage figure (net debt / EBITDA), each stated as weighted by run weight rather than a simple ave",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W02-book-as-one-company#t2",
+  "q": "and who's dragging that down — is it one name or is it just what we own",
+  "asks": "t1: a weight-weighted operating margin and a weight-weighted leverage figure (net debt / EBITDA), each stated as weighted by run weight rather than a simple ave",
+  "criteria": [
+   "follows_on",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W03-vs-the-index#t1",
+  "q": "where is this book most different from the index, and did we mean to be?",
+  "asks": "t1: states that active weights, active share and sector over/underweights are not computable here and names why — the desk has the market as a return series, no",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W03-vs-the-index#t2",
+  "q": "ok, then give me the closest thing you've actually got. how differently does this thing move from the market?",
+  "asks": "t1: states that active weights, active share and sector over/underweights are not computable here and names why — the desk has the market as a return series, no",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t1",
+  "q": "we've been carrying a fair amount of volatility all year. what did we actually get paid for it?",
+  "asks": "t1: the book's volatility on this run and the book's return over the same span, both stated with the window, then the ratio actually computed and shown as retur",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t2",
+  "q": "and versus just owning the market over the same stretch",
+  "asks": "t1: the book's volatility on this run and the book's return over the same span, both stated with the window, then the ratio actually computed and shown as retur",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t3",
+  "q": "ok, and name by name — who's worst on that?",
+  "asks": "t1: the book's volatility on this run and the book's return over the same span, both stated with the window, then the ratio actually computed and shown as retur",
+  "criteria": [
+   "follows_on",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W06-weight-we-chose#t1",
+  "q": "the nvidia position — how much of that weight did we actually choose, and how much of it is just that the thing went up?",
+  "asks": "t1: NVDA's weight on the latest run and on the prior run, the dates or run labels of both, NVDA's own return between them and the book's return over the same sp",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "netting",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W06-weight-we-chose#t2",
+  "q": "anyone else in here quietly running away from us like that?",
+  "asks": "t1: NVDA's weight on the latest run and on the prior run, the dates or run labels of both, NVDA's own return between them and the book's return over the same sp",
+  "criteria": [
+   "follows_on",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W06-weight-we-chose#t3",
+  "q": "and if we didn't own it at that size today, would you be putting it on at that weight?",
+  "asks": "t1: NVDA's weight on the latest run and on the prior run, the dates or run labels of both, NVDA's own return between them and the book's return over the same sp",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L01-raise-by-friday#t1",
+  "q": "say a client pulls ten percent of the book and I've got till friday. do I take a slice off everything, or just sell down the easy names and leave the rest alone? and tell me which end of the book is which",
+  "asks": "t1: states the participation rate and volume window it is assuming; sizes the raise as 10% of the run's book market value in dollars; ORDERS all ten positions b",
+  "criteria": [
+   "honest_absence",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L01-raise-by-friday#t2",
+  "q": "if I fund it out of the easy stuff — what's left is harder to shift than what I started with. how much harder?",
+  "asks": "t1: states the participation rate and volume window it is assuming; sizes the raise as 10% of the run's book market value in dollars; ORDERS all ten positions b",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L01-raise-by-friday#t3",
+  "q": "and is what's left a book I'd actually want to own, or just the stuff nobody would take?",
+  "asks": "t1: states the participation rate and volume window it is assuming; sizes the raise as 10% of the run's book market value in dollars; ORDERS all ten positions b",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L02-days-arent-price#t1",
+  "q": "when you tell me three days to be out of nvidia, that's a calendar answer. it doesn't tell me what I get for it. what's the price side of this?",
+  "asks": "t1: a straight no — the desk's liquidity method is time only (position market value, dollars a day traded, days at a participation rate) and it holds no bid-ask",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "L02-days-arent-price#t2",
+  "q": "fine. then what's the nearest thing you've got to a cost of getting out in a hurry — and who's worst on it?",
+  "asks": "t1: a straight no — the desk's liquidity method is time only (position market value, dollars a day traded, days at a participation rate) and it holds no bid-ask",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "L02-days-arent-price#t3",
+  "q": "a couple of them come out at about the same number of days but one's a lot jumpier than the other. same cost to sell? I don't buy it",
+  "asks": "t1: a straight no — the desk's liquidity method is time only (position market value, dollars a day traded, days at a participation rate) and it holds no bid-ask",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t1",
+  "q": "before I take any of your day counts seriously — what participation rate are you assuming, and over what stretch of volume? nobody ever says and it's the whole answer",
+  "asks": "t1: names both parameters as its own choices with the actual numbers — the participation rate (e.g. 25% of ADV) and the ADV window (e.g. 20 trading days) — plus",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t2",
+  "q": "run it again at half that. if it just doubles then the number is my own assumption coming back at me",
+  "asks": "t1: names both parameters as its own choices with the actual numbers — the participation rate (e.g. 25% of ADV) and the ADV window (e.g. 20 trading days) — plus",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t3",
+  "q": "and the worst name in there — what rate do I have to be running at to be out of it inside a week?",
+  "asks": "t1: names both parameters as its own choices with the actual numbers — the participation rate (e.g. 25% of ADV) and the ADV window (e.g. 20 trading days) — plus",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "L04-cash-by-when-ladder#t1",
+  "q": "never mind the worst case for a minute. how much of this book is actually cash by tomorrow, how much by friday, how much by the end of the month? give it to me as a ladder",
+  "asks": "t1: declares the participation rate and volume window first, then a three-rung ladder built position by position (full market value where days-to-exit fits insi",
+  "criteria": [
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L04-cash-by-when-ladder#t2",
+  "q": "and when you say friday — is that days of selling, or days till the money's actually in the account?",
+  "asks": "t1: declares the participation rate and volume window first, then a three-rung ladder built position by position (full market value where days-to-exit fits insi",
+  "criteria": [
+   "follows_on",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "L05-hyg-wrapper#t1",
+  "q": "hyg trades a fortune every day so on your numbers it's my cheapest way out. I don't buy it — that's the wrapper trading, not the bonds underneath. those things went to a discount in march 2020. is my number real?",
+  "asks": "t1: confirms the arithmetic with the real figures — HYG's position market value on the run, its dollars a day over the stated window, the resulting days-to-exit",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L05-hyg-wrapper#t2",
+  "q": "so which lines in here does that day count actually mean something for?",
+  "asks": "t1: confirms the arithmetic with the real figures — HYG's position market value on the run, its dollars a day over the stated window, the resulting days-to-exit",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L06-fix-takes-how-long#t1",
+  "q": "the concentration fix on msft is what, four hundred million out? how many days of selling is that",
+  "asks": "t1: checks the asserted figure before using it — MSFT's market value and weight on the latest run, the single-name tier it is measured against with its warning ",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "L06-fix-takes-how-long#t2",
+  "q": "and does the limit check care that it isn't instant? tripping something I can clear by lunchtime isn't the same as one that takes me three weeks",
+  "asks": "t1: checks the asserted figure before using it — MSFT's market value and weight on the latest run, the single-name tier it is measured against with its warning ",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "F01-risk-not-dollars#t1",
+  "q": "nvidia's my biggest line by dollars, I know that. but is it the biggest thing I'm actually risking? rank them by how much of the book's wobble each one is causing",
+  "asks": "t1: all ten positions ranked by weight (latest run) x price.volatility on one common window, each shown as a share of the summed risk, largest named as largest ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "F01-risk-not-dollars#t2",
+  "q": "ten names in here — but how many bets is that really? is the whole thing wobbling less than the pieces you just listed?",
+  "asks": "t1: all ten positions ranked by weight (latest run) x price.volatility on one common window, each shown as a share of the summed risk, largest named as largest ",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "F01-risk-not-dollars#t3",
+  "q": "if it's really only three or four, does that change how I should feel about the nvidia line?",
+  "asks": "t1: all ten positions ranked by weight (latest run) x price.volatility on one common window, each shown as a share of the summed risk, largest named as largest ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "F02-ten-down-in-dollars#t1",
+  "q": "if the market's down ten percent, what does that do to me in dollars? I don't want a var number, I want the dollar hit",
+  "asks": "t1: the run's netted market beta, the book's market value, and the product stated as a dollar figure with the percentage beside it; says plainly what this is no",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "F02-ten-down-in-dollars#t2",
+  "q": "and how much of that is tlt and hyg giving me anything back",
+  "asks": "t1: the run's netted market beta, the book's market value, and the product stated as a dollar figure with the percentage beside it; says plainly what this is no",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "F04-long-duration-on-trial#t1",
+  "q": "everyone tells me growth is long duration and energy isn't. in my book is that actually true? rank the equities by how much they move when yields move — and tell me whether nvidia really is the rate trade or whether that's just a story people tell",
+  "asks": "t1: all eight held equities — MSFT, AAPL, JPM, LLY, GOOGL, AMZN, XOM, NVDA — ordered by price.beta vs TLT on one common window, the figures shown, largest named",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "F04-long-duration-on-trial#t2",
+  "q": "so where do I actually take the rate risk down — is it the tlt line, or is it one of those names? and what does that cost me",
+  "asks": "t1: all eight held equities — MSFT, AAPL, JPM, LLY, GOOGL, AMZN, XOM, NVDA — ordered by price.beta vs TLT on one common window, the figures shown, largest named",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "F06-down-capture#t1",
+  "q": "do we eat more of the drops than we catch of the rallies? beta says we're roughly market but it doesn't feel symmetric to me",
+  "asks": "t1: states that the desk's beta is a single unconditional figure over one window and that capture ratios, downside beta and any down-day-conditional measure are",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "F06-down-capture#t2",
+  "q": "and when it came back — did we get it back as fast as the index did?",
+  "asks": "t1: states that the desk's beta is a single unconditional figure over one window and that capture ratios, downside beta and any down-day-conditional measure are",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-back-to-flat#t1",
+  "q": "we're what, eight percent off the high? forget the loss for a second — what do we actually have to make just to get back to flat. and the last time we were in a hole this size, how long did it take to climb out",
+  "asks": "t1: corrects or confirms the eight percent against the actual current drawdown off the run's drawdown path, then gives the required gain as its OWN number — 1/(",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-back-to-flat#t2",
+  "q": "honestly the depth isn't what bothers me, it's how long we sat there. that one and the rest of them — add it up for me, how much of the last year was this book under its old high",
+  "asks": "t1: corrects or confirms the eight percent against the actual current drawdown off the run's drawdown path, then gives the required gain as its OWN number — 1/(",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W01-back-to-flat#t3",
+  "q": "level with me. does a stretch like that tell me something about how this book is built, or is it just a handful of bad days",
+  "asks": "t1: corrects or confirms the eight percent against the actual current drawdown off the run's drawdown path, then gives the required gain as its OWN number — 1/(",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-per-point-of-weight#t1",
+  "q": "in that drawdown, who actually hurt me per point of weight? big position falling a little and a small one falling a lot are not the same problem",
+  "asks": "t1: for the book's deepest episode, each holding's contribution in basis points divided by that holding's own weight, at least three names ordered by the result",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W02-per-point-of-weight#t2",
+  "q": "and if I'd been half the size in the worst one, how much of that hole doesn't happen?",
+  "asks": "t1: for the book's deepest episode, each holding's contribution in basis points divided by that holding's own weight, at least three names ordered by the result",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-per-point-of-weight#t3",
+  "q": "and the next one down that list — same question",
+  "asks": "t1: for the book's deepest episode, each holding's contribution in basis points divided by that holding's own weight, at least three names ordered by the result",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t1",
+  "q": "we hold tlt and hyg precisely so that a stretch like that last drawdown doesn't hurt this much. did they actually offset anything in it, or did they just go down with everything else?",
+  "asks": "t1: nets, in one sentence with direction — the eight equity positions' combined contribution to the episode, then TLT's and HYG's own contributions as an offset",
+  "criteria": [
+   "grounded_claims",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t2",
+  "q": "has it ever paid though? go back through the other holes we've been in — was the rates leg ever actually positive, or is what you just showed me what it always does",
+  "asks": "t1: nets, in one sentence with direction — the eight equity positions' combined contribution to the episode, then TLT's and HYG's own contributions as an offset",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t3",
+  "q": "what would tell me early — next time, before we're in the middle of it — that it's stopped working? give me a level, not a feeling",
+  "asks": "t1: nets, in one sentence with direction — the eight equity positions' combined contribution to the episode, then TLT's and HYG's own contributions as an offset",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W04-sectors-or-names#t1",
+  "q": "was I in the right stuff over the last year, or did I just happen to own the right names inside it? like the energy sleeve — did that help because energy was up, or because xom specifically beat the rest of energy",
+  "asks": "t1: says the allocation-versus-selection split cannot be computed here and names the missing inputs precisely — the desk compares the book to the market at TOTA",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W04-sectors-or-names#t2",
+  "q": "and the stuff we don't own — did anything we passed on run away from us while we were sitting in this?",
+  "asks": "t1: says the allocation-versus-selection split cannot be computed here and names the missing inputs precisely — the desk compares the book to the market at TOTA",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W05-explain-the-day#t1",
+  "q": "we were down two-ish on the last run and the tape was only down half that. what did that? and honestly — how much of it can you actually explain versus how much is just left over",
+  "asks": "t1: gives the actual figures for the run day instead of accepting 'two-ish' and 'half that' — the book's return and the market's for the same day, side by side ",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-explain-the-day#t2",
+  "q": "and is that leftover bit a one-off, or has the book been running like that? because if it's every day then it isn't idiosyncratic, it's something you're not modelling",
+  "asks": "t1: gives the actual figures for the run day instead of accepting 'two-ish' and 'half that' — the book's return and the market's for the same day, side by side ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-useful-life-policy#t1",
+  "q": "the cloud guys all quietly stretched how long they depreciate their servers didn't they. for microsoft, amazon and google, how much of the reported profit is that decision rather than the business? and whose numbers lean on it hardest",
+  "asks": "T1 must LEAD with filing text, not with the ratio: for each of the three names separately, the 10-K property-and-equipment / critical-accounting-estimates passa",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W01-useful-life-policy#t2",
+  "q": "and if the life went back to where it was three years ago, roughly where does the margin land",
+  "asks": "T1 must LEAD with filing text, not with the ratio: for each of the three names separately, the 10-K property-and-equipment / critical-accounting-estimates passa",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W01-useful-life-policy#t3",
+  "q": "forget the restatement then. what would tell me first that they've stretched it too far — and at what level do I actually start worrying?",
+  "asks": "T1 must LEAD with filing text, not with the ratio: for each of the three names separately, the 10-K property-and-equipment / critical-accounting-estimates passa",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W04-growth-vs-margin-screen#t1",
+  "q": "across everything we own, is there anyone where the top line is speeding up and the gross margin is going the other way at the same time? that pair is usually what gives it away. line them up worst first if it's more than one",
+  "asks": "T1: gross margin over the last several periods (level now and change in points) alongside revenue growth stated so ACCELERATION is visible — this period's yoy a",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W04-growth-vs-margin-screen#t2",
+  "q": "the worst one — how big is that for us, and has the market already noticed?",
+  "asks": "T1: gross margin over the last several periods (level now and change in points) alongside revenue growth stated so ACCELERATION is visible — this period's yoy a",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-leases-in-leverage#t1",
+  "q": "when you give me debt to ebitda you're already counting the lease obligations in there right? because if you're not we're understating how levered amazon is",
+  "asks": "T1: answer the definitional question first and directly — what this desk's total_debt actually contains and whether operating lease liabilities sit inside it — ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W05-leases-in-leverage#t2",
+  "q": "redo it with the leases in — amazon, microsoft, apple — and tell me if the order changes",
+  "asks": "T1: answer the definitional question first and directly — what this desk's total_debt actually contains and whether operating lease liabilities sit inside it — ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W05-leases-in-leverage#t3",
+  "q": "and on amazon while you're in there, is the cash they actually pay out on interest bigger than the expense they book? capitalised interest has caught me out before",
+  "asks": "T1: answer the definitional question first and directly — what this desk's total_debt actually contains and whether operating lease liabilities sit inside it — ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W06-tax-rate-growth#t1",
+  "q": "lilly's bottom line keeps growing but I want to know where it's actually coming from. is any of it just a lower tax rate? put the pretax picture next to the after-tax one and tell me which bit is doing the most work",
+  "asks": "T1: revenue, operating income, pretax income and net income for LLY over the last 4-5 years with yoy on each, laid out so pretax growth sits beside after-tax gr",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W06-tax-rate-growth#t2",
+  "q": "so if the rate flattens out from here, what does that do to the growth I'm underwriting?",
+  "asks": "T1: revenue, operating income, pretax income and net income for LLY over the last 4-5 years with yoy on each, laid out so pretax growth sits beside after-tax gr",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t1",
+  "q": "exxon — when does any of this debt actually have to be paid back? I don't want to find out there's a wall sitting in 2027",
+  "asks": "t1: says plainly that the desk holds no maturity schedule as figures — no dates, no per-year amounts — and that the debt note / maturity table exists only as fi",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t2",
+  "q": "is that fixed or floating",
+  "asks": "t1: says plainly that the desk holds no maturity schedule as figures — no dates, no per-year amounts — and that the debt note / maturity table exists only as fi",
+  "criteria": [
+   "follows_on",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t3",
+  "q": "fine. then just tell me whether the interest bill is already going up",
+  "asks": "t1: says plainly that the desk holds no maturity schedule as figures — no dates, no per-year amounts — and that the debt note / maturity table exists only as fi",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-lly-coverage-trend#t1",
+  "q": "lilly barely carries any debt does she — anyway can they actually cover the interest, and is that number going the wrong way?",
+  "asks": "t1: tests the premise before answering around it — LLY total_debt and net_debt_to_ebitda at the latest period with reader-level figures, and an explicit verdict",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-lly-coverage-trend#t2",
+  "q": "and what would actually make me worry. give me a level, not a vibe",
+  "asks": "t1: tests the premise before answering around it — LLY total_debt and net_debt_to_ebitda at the latest period with reader-level figures, and an explicit verdict",
+  "criteria": [
+   "follows_on",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W03-xom-trough-relever#t1",
+  "q": "xom's leverage looks fine, but that's on good earnings. what does the same debt look like against the worst year of earnings you've actually got?",
+  "asks": "t1: the as-reported figure first (net_debt_to_ebitda or debt_to_ebitda at the latest period), then the EBITDA series over the last N periods with the trough per",
+  "criteria": [
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W03-xom-trough-relever#t2",
+  "q": "and if crude goes back to 50 next year, where does that put it",
+  "asks": "t1: the as-reported figure first (net_debt_to_ebitda or debt_to_ebitda at the latest period), then the EBITDA series over the last N periods with the trough per",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t1",
+  "q": "people keep telling me apple's net cash so the balance sheet doesn't matter. does the gross debt just not count then?",
+  "asks": "t1: shows both legs at reader level — AAPL total_debt, the cash / quick_assets figure, and net_debt as the netted result with its sign stated (net cash or net d",
+  "criteria": [
+   "grounded_claims",
+   "netting",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t2",
+  "q": "and where does that cash actually sit",
+  "asks": "t1: shows both legs at reader level — AAPL total_debt, the cash / quick_assets figure, and net_debt as the netted result with its sign stated (net cash or net d",
+  "criteria": [
+   "follows_on",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t3",
+  "q": "the debt keeps climbing while they're buying back stock. are they borrowing to do it?",
+  "asks": "t1: shows both legs at reader level — AAPL total_debt, the cash / quick_assets figure, and net_debt as the netted result with its sign stated (net cash or net d",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-xom-payout-plug#t1",
+  "q": "exxon's been handing out more than the business actually made in a few quarters hasn't it — the dividend plus the buyback against what came in the door. is that right? and if it is, what's plugging the gap",
+  "asks": "T1: operating cash flow less capex (free cash flow) for XOM over the recent quarters AND the trailing year, set beside dividends paid and share repurchases, in ",
+  "criteria": [
+   "grounded_claims",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-xom-payout-plug#t2",
+  "q": "ok. so how much cushion is actually on that dividend — what's it eating as a share of the cash flow, and is that share going up?",
+  "asks": "T1: operating cash flow less capex (free cash flow) for XOM over the recent quarters AND the trailing year, set beside dividends paid and share repurchases, in ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-xom-payout-plug#t3",
+  "q": "and what would tell me it's getting squeezed. something I'd actually watch on the next print",
+  "asks": "T1: operating cash flow less capex (free cash flow) for XOM over the recent quarters AND the trailing year, set beside dividends paid and share repurchases, in ",
+  "criteria": [
+   "follows_on",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t1",
+  "q": "microsoft's been buying back stock every quarter for years now. has the share count actually gone down, or are they just mopping up what they hand the staff",
+  "asks": "T1: resolves the count question with evidence or names it as absent — it must not assert a reduction from memory. The expected case is that it says plainly that",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t2",
+  "q": "who's worst at that across what we own",
+  "asks": "T1: resolves the count question with evidence or names it as absent — it must not assert a reduction from memory. The expected case is that it says plainly that",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t3",
+  "q": "and where's my line on it — what would make that a reason to trim rather than just something that annoys me",
+  "asks": "T1: resolves the count question with evidence or names it as absent — it must not assert a reduction from memory. The expected case is that it says plainly that",
+  "criteria": [
+   "follows_on",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W04-book-capex-hogs#t1",
+  "q": "who's the capital hog in this book? I want to know who's eating the most cash before anything comes back to me",
+  "asks": "T1: capex intensity (capex over revenue) and capex as a share of operating cash flow for every screenable issuer held, ordered heaviest first with the heaviest ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W04-book-capex-hogs#t2",
+  "q": "and the top one — is that spend actually growing faster than the business it's supposed to be supporting?",
+  "asks": "T1: capex intensity (capex over revenue) and capex as a share of operating cash flow for every screenable issuer held, ordered heaviest first with the heaviest ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W04-book-capex-hogs#t3",
+  "q": "half of it's leased or committed before it ever shows up there isn't it. does your number pick that up",
+  "asks": "T1: capex intensity (capex over revenue) and capex as a share of operating cash flow for every screenable issuer held, ordered heaviest first with the heaviest ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W05-jpm-frame-breaks#t1",
+  "q": "jpmorgan — is it actually generating cash, and where's it going. capex, the dividend, the buyback",
+  "asks": "T1: volunteers, without being prompted, that the frame half-breaks, and names which half. Free cash flow, FCF margin, capex intensity and capex against D&A are ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-jpm-frame-breaks#t2",
+  "q": "so what do I look at instead, with what you've actually got — and at what number would that start bothering me?",
+  "asks": "T1: volunteers, without being prompted, that the frame half-breaks, and names which half. Free cash flow, FCF margin, capex intensity and capex against D&A are ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "W06-nvda-buyback-timing#t1",
+  "q": "when nvidia was buying its own stock back over the last year or so — were they buying it cheap, or right at the top? put what they spent each quarter against where the thing was actually trading",
+  "asks": "T1: quarterly repurchase dollars for NVDA over at least four quarters, each set beside where the stock traded in that quarter — the quarter's return and its pri",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W06-nvda-buyback-timing#t2",
+  "q": "does apple look any more disciplined on the same test",
+  "asks": "T1: quarterly repurchase dollars for NVDA over at least four quarters, each set beside where the stock traded in that quarter — the quarter's return and its pri",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t1",
+  "q": "google files that risk section every year and it's basically a novel by now. what's actually different in this one — what did they add, and did anything quietly come out?",
+  "asks": "t1: the desk must first establish what it is comparing. Either it holds two filing years of GOOGL Item 1A and names specific factors added and specific factors ",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t2",
+  "q": "of the new ones — which did they write because something actually happened to them, and which is just the paragraph every company's lawyers put in?",
+  "asks": "t1: the desk must first establish what it is comparing. Either it holds two filing years of GOOGL Item 1A and names specific factors added and specific factors ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims"
+  ]
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t3",
+  "q": "and the legal section. anything in there big enough to matter for something we hold? have they actually accrued a number or is it the usual 'cannot reasonably estimate'",
+  "asks": "t1: the desk must first establish what it is comparing. Either it holds two filing years of GOOGL Item 1A and names specific factors added and specific factors ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t1",
+  "q": "who is actually buying nvidia's chips? I mean how much of the revenue is a handful of names — and do they even tell you who they are?",
+  "asks": "t1: two answers to two questions, and the second must not be folded into the first. (a) Quotes the concentration disclosure — the shares attributed to individua",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t2",
+  "q": "worse than a year ago?",
+  "asks": "t1: two answers to two questions, and the second must not be folded into the first. (a) Quotes the concentration disclosure — the shares attributed to individua",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t3",
+  "q": "flip it round — do they say anywhere what they've already committed to on the supply side? purchase obligations, capacity deals, whatever they call it. I'm not asking you to forecast, just what's contracted",
+  "asks": "t1: two answers to two questions, and the second must not be folded into the first. (a) Quotes the concentration disclosure — the shares attributed to individua",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t1",
+  "q": "amazon — how much of the top line is aws these days? and is the retail half actually making money or is aws carrying the whole thing",
+  "asks": "t1: says outright that segment revenue and segment profit are not held as figures on this desk — companyfacts are consolidated — and that no split can be inferr",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t2",
+  "q": "fine, then just give me what they say about it in their own words",
+  "asks": "t1: says outright that segment revenue and segment profit are not held as figures on this desk — companyfacts are consolidated — and that no split can be inferr",
+  "criteria": [
+   "follows_on",
+   "grounded_claims"
+  ]
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t3",
+  "q": "alright. then what do the consolidated numbers actually say — is the whole thing getting more profitable or less?",
+  "asks": "t1: says outright that segment revenue and segment profit are not held as figures on this desk — companyfacts are consolidated — and that no split can be inferr",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t1",
+  "q": "nvidia's gross margin dropped — I can see that much in the numbers. what do THEY say the reason was? put their words next to the actual line",
+  "asks": "t1: the computed series FIRST, before any narrative — gross margin over the last several periods with the size and direction of the move in percentage points at",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t2",
+  "q": "does that account for the whole move or just part of it?",
+  "asks": "t1: the computed series FIRST, before any narrative — gross margin over the last several periods with the size and direction of the move in percentage points at",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "netting",
+   "precision"
+  ]
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t3",
+  "q": "and how much of that is just their own provisioning? if they'd assumed something different on inventory the number changes — do they tell you by how much",
+  "asks": "t1: the computed series FIRST, before any narrative — gross margin over the last several periods with the size and direction of the move in percentage points at",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+  "q": "jpm's filing has one of those rate tables in it doesn't it — what do they say a 100bp move actually does to them? and does that square with how the thing behaves against TLT",
+  "asks": "t1: quotes the Item 7A disclosure with its scenario definition and cites it — whatever form the indexed passage actually takes: an instantaneous parallel +100bp",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+  "q": "if their table and the tape disagree, which one do I go with for a position we actually hold? and what would you need to see to change that",
+  "asks": "t1: quotes the Item 7A disclosure with its scenario definition and cites it — whatever form the indexed passage actually takes: an instantaneous parallel +100bp",
+  "criteria": [
+   "follows_on",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "FQ06-same-risk-in-four-filings#t1",
+  "q": "forget sectors for a minute. is there one risk that turns up in three or four of these filings at once? because that's the thing that takes us out on the same day",
+  "asks": "t1: says how the answer was built before giving it — there is no book-level filings capability and no cross-issuer text method, so the desk read the risk factor",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "FQ06-same-risk-in-four-filings#t2",
+  "q": "how much of the book is that between them? and line them up biggest first — I want to know whether this is the top of the book or the tail",
+  "asks": "t1: says how the answer was built before giving it — there is no book-level filings capability and no cross-issuer text method, so the desk read the risk factor",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "B02-var-ballpark#t1",
+  "q": "just give me a rough number — one day, ninety nine percent, what's the downside on this book. i'm not going to hold you to it",
+  "asks": "T1: says the figure EXISTS — VaR, expected shortfall and stress results are computed on this desk but withheld pending model validation — and names that as a di",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "B02-var-ballpark#t2",
+  "q": "every other system i've sat in front of prints one. ballpark it",
+  "asks": "T1: says the figure EXISTS — VaR, expected shortfall and stress results are computed on this desk but withheld pending model validation — and names that as a di",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "B03-jpm-leverage-rank#t1",
+  "q": "rank the book by debt to ebitda for me, jpmorgan included. who's carrying the most",
+  "asks": "T1: an actual ordering of the seven held operating issuers (MSFT, AAPL, GOOGL, AMZN, LLY, XOM, NVDA) by debt-to-EBITDA or net-debt-to-EBITDA, largest first, the",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "ranking"
+  ]
+ },
+ {
+  "tag": "B03-jpm-leverage-rank#t2",
+  "q": "fine. then how am i supposed to know if it's in decent shape at all",
+  "asks": "T1: an actual ordering of the seven held operating issuers (MSFT, AAPL, GOOGL, AMZN, LLY, XOM, NVDA) by debt-to-EBITDA or net-debt-to-EBITDA, largest first, the",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "B05-etf-instrument-class#t1",
+  "q": "how much duration am i actually taking in tlt? and what's the credit quality of the stuff inside hyg",
+  "asks": "T1: names the instrument class first — these two positions are funds, not issuers, so there is no companyfacts panel and no filing behind them here; the desk in",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "B05-etf-instrument-class#t2",
+  "q": "the credit side's been earning its keep though — it cushions us every time the equities sell off, that's the whole reason it's in there",
+  "asks": "T1: names the instrument class first — these two positions are funds, not issuers, so there is no companyfacts panel and no filing behind them here; the desk in",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "netting",
+   "precision"
+  ]
+ },
+ {
+  "tag": "B05-etf-instrument-class#t3",
+  "q": "so what's actually been offsetting anything in here? and if the answer is nothing, what am I really long",
+  "asks": "T1: names the instrument class first — these two positions are funds, not issuers, so there is no companyfacts panel and no filing behind them here; the desk in",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "B06-positioning-blind#t1",
+  "q": "is anyone leaning on lilly here? short interest, and has the ownership turned over much this year",
+  "asks": "T1: says both are off this desk's map entirely, and names the source class for each rather than waving at 'no data' — short interest is published by the exchang",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "B06-positioning-blind#t2",
+  "q": "ok. so what can you tell me about whether the market's turning on it",
+  "asks": "T1: says both are off this desk's map entirely, and names the source class for each rather than waving at 'no data' — short interest is published by the exchang",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W01-xom-borrow-headroom#t1",
+  "q": "how levered is exxon actually? net debt against ebitda, that's the one I care about",
+  "asks": "t1: net debt in dollars and EBITDA in dollars for a NAMED window (TTM or a stated FY), with total debt and cash shown so the netting is visible, then net debt/E",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W01-xom-borrow-headroom#t2",
+  "q": "ok so how much more could they borrow before that's a two handle",
+  "asks": "t1: net debt in dollars and EBITDA in dollars for a NAMED window (TTM or a stated FY), with total debt and cash shown so the netting is visible, then net debt/E",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t1",
+  "q": "apple — what's the cash conversion cycle doing now versus a year ago",
+  "asks": "t1: DSO, days inventory and days payable in days for both periods with the CCC for each (whatever sign it takes — for Apple the payables leg is large, so a nega",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t2",
+  "q": "and jpm",
+  "asks": "t1: DSO, days inventory and days payable in days for both periods with the CCC for each (whatever sign it takes — for Apple the payables leg is large, so a nega",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t3",
+  "q": "fine. then what's the version of that question that actually means something for a bank",
+  "asks": "t1: DSO, days inventory and days payable in days for both periods with the CCC for each (whatever sign it takes — for Apple the payables leg is large, so a nega",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W03-which-run-was-that#t1",
+  "q": "what's this book actually worth, and where's msft as a weight",
+  "asks": "t1: the market-value base in dollars and MSFT's weight as a percent with its market value. t2: names which run the figures came from (the latest) and gives its ",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W03-which-run-was-that#t2",
+  "q": "hang on — is that off the latest run or the one before? and when was it struck",
+  "asks": "t1: the market-value base in dollars and MSFT's weight as a percent with its market value. t2: names which run the figures came from (the latest) and gives its ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W03-which-run-was-that#t3",
+  "q": "would it look any different on today's close",
+  "asks": "t1: the market-value base in dollars and MSFT's weight as a percent with its market value. t2: names which run the figures came from (the latest) and gives its ",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W04-just-divide-them#t1",
+  "q": "what's apple on at the moment? I want the multiple, not the price",
+  "asks": "t1: says valuation multiples — P/E, EV/EBITDA, FCF yield — are not measures this desk carries, names that as a scope decision rather than a data gap, and offers",
+  "criteria": [
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W04-just-divide-them#t2",
+  "q": "you've got the earnings and you've got the price. just divide them for me",
+  "asks": "t1: says valuation multiples — P/E, EV/EBITDA, FCF yield — are not measures this desk carries, names that as a scope decision rather than a data gap, and offers",
+  "criteria": [
+   "follows_on",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W04-just-divide-them#t3",
+  "q": "fine. then what have I got — is it expensive against its own history or not",
+  "asks": "t1: says valuation multiples — P/E, EV/EBITDA, FCF yield — are not measures this desk carries, names that as a scope decision rather than a data gap, and offers",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-half-taken-back#t1",
+  "q": "if I sold half the microsoft position, where does that leave concentration",
+  "asks": "t1: the after-book for a half-sale — MSFT weight before and after, the dollars sold, the top-five share before and after, and the single-name check re-run with ",
+  "criteria": [
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W05-half-taken-back#t2",
+  "q": "sorry — half was wrong. I meant bring it down TO half the single-name limit, not sell half. do that one",
+  "asks": "t1: the after-book for a half-sale — MSFT weight before and after, the dollars sold, the top-five share before and after, and the single-name check re-run with ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "W05-half-taken-back#t3",
+  "q": "and lilly's untouched in that, right",
+  "asks": "t1: the after-book for a half-sale — MSFT weight before and after, the dollars sold, the top-five share before and after, and the single-name check re-run with ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision"
+  ]
+ },
+ {
+  "tag": "W06-is-that-all-of-them#t1",
+  "q": "which of the names we own actually say something about customer concentration in their own filings?",
+  "asks": "t1: names the held issuers whose filings carry customer- or revenue-concentration language, each passage cited by location (Item 1A, the MD&A, the major-custome",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "W06-is-that-all-of-them#t2",
+  "q": "is that all of them, or just the ones you happened to open",
+  "asks": "t1: names the held issuers whose filings carry customer- or revenue-concentration language, each passage cited by location (Item 1A, the MD&A, the major-custome",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t1",
+  "q": "what's coming up in the next couple of weeks that I should have a view on before it lands? anything reporting, anything with a date on it",
+  "asks": "t1: says plainly that the desk holds no earnings calendar, no analyst estimates, no consensus and no guidance figures, so a scheduled-events list is not somethi",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t2",
+  "q": "alright. then the last thing that actually did land on one of these — is it in the price yet, or am I still going to get hit with it?",
+  "asks": "t1: says plainly that the desk holds no earnings calendar, no analyst estimates, no consensus and no guidance figures, so a scheduled-events list is not somethi",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t3",
+  "q": "so is there anything on that list I should be doing something about before it lands, or do I just sit here",
+  "asks": "t1: says plainly that the desk holds no earnings calendar, no analyst estimates, no consensus and no guidance figures, so a scheduled-events list is not somethi",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t1",
+  "q": "google's told us what they're doing on capex and where the money's going. has anything they've actually reported since squared with that, or are they saying one thing and the numbers doing another?",
+  "asks": "t1: quotes the forward-looking / outlook passage from GOOGL's own MD&A with a citation, labelled as management's stated intention rather than as a fact about th",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t2",
+  "q": "and what do they say themselves would knock it off course?",
+  "asks": "t1: quotes the forward-looking / outlook passage from GOOGL's own MD&A with a citation, labelled as management's stated intention rather than as a fact about th",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence"
+  ]
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t3",
+  "q": "so what am I actually underwriting when I hold this — give me the thing that has to stay true",
+  "asks": "t1: quotes the forward-looking / outlook passage from GOOGL's own MD&A with a citation, labelled as management's stated intention rather than as a fact about th",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t1",
+  "q": "did anything actually flag on the last run? I don't want the whole limit table, just what tripped or nearly did",
+  "asks": "t1: reads the run's own risk alerts and limit checks and reports only what is at or past a warning tier and what sits close to one, each with its current value,",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t2",
+  "q": "of those, which one do I actually have to do something about? put them in order",
+  "asks": "t1: reads the run's own risk alerts and limit checks and reports only what is at or past a warning tier and what sits close to one, each with its current value,",
+  "criteria": [
+   "follows_on",
+   "precision",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t3",
+  "q": "and what's not on that list that should be? if it were up to you what would you be watching, and at what level",
+  "asks": "t1: reads the run's own risk alerts and limit checks and reports only what is at or past a warning tier and what sits close to one, each with its current value,",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "so_what",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "NEW04-swap-not-a-sale#t1",
+  "q": "instead of just cutting nvidia, what if I moved four points of it into lilly. does the book actually get better, or am I just moving the problem around?",
+  "asks": "t1: runs both legs as ONE scenario off the same before-book, not two scenarios chained. The sale sized in dollars off NVDA's run market value, the same dollars ",
+  "criteria": [
+   "grounded_claims",
+   "netting",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW04-swap-not-a-sale#t2",
+  "q": "and the risk side — is it less risky or just differently risky?",
+  "asks": "t1: runs both legs as ONE scenario off the same before-book, not two scenarios chained. The sale sized in dollars off NVDA's run market value, the same dollars ",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "precision",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t1",
+  "q": "microsoft — the cash conversion looks fine to me but I've been burned by that before. do your own numbers actually agree with each other on this, or is one of them saying something different?",
+  "asks": "t1: computes the earnings-quality panel on one common window set and presents it as readings that either corroborate or conflict, in those words: operating cash",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "precision"
+  ]
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t2",
+  "q": "and if they don't agree, which one do you believe? don't give me both hands",
+  "asks": "t1: computes the earnings-quality panel on one common window set and presents it as readings that either corroborate or conflict, in those words: operating cash",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t3",
+  "q": "what would settle it",
+  "asks": "t1: computes the earnings-quality panel on one common window set and presents it as readings that either corroborate or conflict, in those words: operating cash",
+  "criteria": [
+   "follows_on",
+   "honest_absence",
+   "trigger"
+  ]
+ },
+ {
+  "tag": "NEW06-what-you-havent-got#t1",
+  "q": "if you could have one thing you haven't got, for this book specifically — what would it be, and what would it actually change? and what's second",
+  "asks": "t1: names at least three things the desk does not hold, ORDERED by what each would change for THIS book at THESE weights, largest named as largest, each tied to",
+  "criteria": [
+   "grounded_claims",
+   "honest_absence",
+   "ranking",
+   "so_what"
+  ]
+ },
+ {
+  "tag": "NEW06-what-you-havent-got#t2",
+  "q": "and of what you HAVE got, what do you trust least?",
+  "asks": "t1: names at least three things the desk does not hold, ORDERED by what each would change for THIS book at THESE weights, largest named as largest, each tied to",
+  "criteria": [
+   "follows_on",
+   "grounded_claims",
+   "honest_absence",
+   "so_what"
+  ]
+ }
+]
