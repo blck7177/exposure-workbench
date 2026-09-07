@@ -1,0 +1,3442 @@
+{
+ "scored": [
+  {
+   "tag": "W01-stop-sweep-across-book#t1",
+   "question_tag": "W01-stop-sweep-across-book#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201clatest alerts for port_001 as of 2026-09-03\u201d and \u201cI would need to read prices\u201d show no filed evidence for the drawdown claim."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"The desk does not hold a drawdown-episode section for this portfolio\" and \"I would need to read prices for the holdings to check it.\""
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c16.3%\u201d and \u201c12.7%\u201d are rounded to reader-usable precision, not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cMSFT is the largest weight in the book at 16.3%, with AAPL next at 14.9%, then JPM at 14.8%\u201d names the largest and orders the drivers by magnitude."
+    }
+   }
+  },
+  {
+   "tag": "W01-stop-sweep-across-book#t2",
+   "question_tag": "W01-stop-sweep-across-book#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI cannot say where either name sits versus purchase price\u201d and shifts to concentration warnings instead of the requested purchase-price comparison."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk does not hold cost basis or unrealized gain/loss for these positions, so I cannot say where either name sits versus purchase price\u201d plainly names the missing figure and why."
+    }
+   }
+  },
+  {
+   "tag": "W01-stop-sweep-across-book#t3",
+   "question_tag": "W01-stop-sweep-across-book#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over MSFT threshold question with \u201cthe gap to the breach line is -1.25%\u201d and a file-ready number."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an actionable filing point: \u201cThat is the number you can write in the file.\u201d"
+    },
+    "trigger": {
+     "met": true,
+     "why": "\"it is already at 16.3%, with the warning line at 15.0%\" gives a quantified threshold that changes the assessment."
+    }
+   }
+  },
+  {
+   "tag": "W02-book-as-one-company#t1",
+   "question_tag": "W02-book-as-one-company#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives generic portfolio talk and explicitly says there is \"no held figure\" for book-wide margin or leverage, rather than a grounded company-period claim."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cthe book does not carry balance-sheet debt figures here\u201d and \u201cthere is no held figure for book-wide earnings margin at the whole-book level\u201d clearly name the absence and nearest held proxy."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201cgross exposure is $10.99M\u201d and \u201cgross exposure pct is 100.0%\u201d use clean, readable precision rather than ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "W02-book-as-one-company#t2",
+   "question_tag": "W02-book-as-one-company#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"mostly a basket effect, not one single dragger\" directly answers whether it\u2019s one name or just the portfolio."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It says \"mostly a basket effect, not one single dragger\" and lists weights without ranking or naming the largest as the largest."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cthe next useful pass is to pull each holding\u2019s net margin,\u201d offering more work instead of a portfolio action."
+    }
+   }
+  },
+  {
+   "tag": "W03-vs-the-index#t1",
+   "question_tag": "W03-vs-the-index#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives figures but no system evidence or named period; it reads like generic portfolio commentary rather than grounded claims."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk\u2019s own alerts show the book is intentionally outside issuer limits... What I cannot prove... because no index benchmark series is held here.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W03-vs-the-index#t2",
+   "question_tag": "W03-vs-the-index#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over measure by using the book\u2019s market beta, saying it is \u201c1.245 to SPY\u201d and \u201cmore sensitive to market moves.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a nearby figure as \u201cmarket beta... 124.5%\u201d instead of plainly saying the exact asked-for split isn\u2019t held and naming the closest held measure."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c124.5%, which is 1.245 to SPY\u201d is rounded to a reader-usable precision, not ledger-raw digits."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with restated volatility data and \u201cnot a direct tracking-error versus SPY,\u201d not an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t1",
+   "question_tag": "W05-paid-for-the-vol#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 16,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives generic attribution talk, but no grounded filed figure for \u201cvolatility\u201d or \u201cyear-to-date\u201d evidence behind the claim."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It discusses attribution and says no year-to-date realized-volatility figure is held, but it still doesn't plainly state the nearest held thing as what it is."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses reader-appropriate precision like \u201c1.16%,\u201d \u201c1.30%,\u201d and dollar amounts rounded to cents/thousands, not raw ledger precision."
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t2",
+   "question_tag": "W05-paid-for-the-vol#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI cannot state a standalone excess-return number\u201d and redirects to computing SPY return, not answering the carried-over comparison."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives generic, uncited comparisons and says \u201cI need to compute portfolio return minus SPY return,\u201d without a filed figure or quoted passage."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded figures like \u201c1.16%\u201d and \u201c1.30%,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t3",
+   "question_tag": "W05-paid-for-the-vol#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cworst by daily contribution was 0.43%;\u201d but gives no name-by-name identification, failing \u201cwho\u2019s worst on that?\u201d"
+    },
+    "ranking": {
+     "met": false,
+     "why": "It ranks by size only in a vague way and never names the drivers \u201cname by name\u201d or clearly identifies the largest by name."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating percentages, with no implication a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t1",
+   "question_tag": "W06-weight-we-chose#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cFor NVDA in the run, the desk holds the position weight as 4.16% and the market value as $457K\u201d gives specific filed figures and period-linked evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"It does not hold a cost basis or gain-share figure ... I cannot split the weight ... offers the nearest thing the desk holds.\""
+    },
+    "netting": {
+     "met": false,
+     "why": "It says \u201ccannot split the weight\u201d and provides no netted chosen-versus-appreciation figure with direction."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"4.16%\" and \"$457K\" are appropriately rounded; no ledger-raw precision like \"33.878625%\" appears."
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t2",
+   "question_tag": "W06-weight-we-chose#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It answers with \u201cNo\u201d and discusses \u201cthe book shows,\u201d not the prior NVDA weight split the user asked about."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer says \u201cNVDA is only 4.16%\u201d and does not order drivers by magnitude or name the largest as largest."
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t3",
+   "question_tag": "W06-weight-we-chose#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI cannot say from the book whether I would put it on at that weight,\u201d which dodges the buy-at-that-size question."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites a system-held figure, \u201cthe desk shows it at 4.16%,\u201d and frames the rest as lacking book evidence."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It avoids saying plainly the desk does not hold the asked-for \u201cwould you put it on\u201d figure, and instead speculates about needing a thesis or rule."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by saying \u201cI would need either a trade thesis or a rebalance rule,\u201d which offers more work instead of an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t1",
+   "question_tag": "L01-raise-by-friday#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cthe desk does not hold the liquidity ranking needed to name which positions are easiest to exit,\u201d but then still implies \u201csell the most liquid names first\u201d without holding that figure."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded percentages like \u201c16.3%,\u201d \u201c4.16%,\u201d and \u201c15.0%,\u201d not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe largest weight is MSFT at 16.3%\u201d clearly names the biggest driver and then orders the rest by size down to \u201cNVDA at 4.16%.\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe cleaner first pass is usually to sell the most liquid names first\u201d is an actionable implication for the portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t2",
+   "question_tag": "L01-raise-by-friday#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe residual book is more concentrated in the hard-to-move tail than the book you started with\u201d answers the follow-on\u2019s \u201chow much harder?\u201d through the carried-over concentration measure."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites specific holdings and percentages, including \u201cMSFT | 16.3%\u201d and \u201cNVDA | 4.16%,\u201d which are grounded, filed-style figures."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c16.3% \u2026 4.16% \u2026 12.1%\u201d uses reader-appropriate rounded precision, not ledger-raw decimals."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe residual book is more concentrated in the hard-to-move tail\u201d gives a portfolio-manager action implication, not just a restatement of weights."
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t3",
+   "question_tag": "L01-raise-by-friday#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe residual book is still a book I\u2019d want to own more than an unattractive tail\u201d directly answers the asked \u201cwant to own, or just the stuff nobody would take?\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cMSFT sits at 16.3%\u2026 LLY sits at 12.7%\u2026\u201d, plus \u201cissuer-concentration alerts\u201d and \u201cthe desk does not hold a liquidity ranking here.\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "It says \u201cI cannot say which names are easy or hard to shift\u2026 because the desk does not hold a liquidity ranking here.\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe remainder becomes relatively more dominated by the names already under limit pressure\u201d gives an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "L02-days-arent-price#t1",
+   "question_tag": "L02-days-arent-price#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "Uses specific filed figures and a named period: \u201cclosed at $228.45,\u201d \u201clast six months,\u201d and \u201ctrailing-52-week high\u2026 2026-05-14.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a price and performance, but never says the asked-for price side is unavailable or that this is just the nearest held figure."
+    }
+   }
+  },
+  {
+   "tag": "L02-days-arent-price#t2",
+   "question_tag": "L02-days-arent-price#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"It answers the carried-over measure: 'price distance from the trailing 52-week high' and identifies 'NVDA is at -2.98%.'\""
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It names a proxy, but then says \u201cthe desk cannot say\u201d and gives no nearest-held worst name or clear absence reason for the split."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c-2.98%\u201d is reader-level precision, not ledger-raw, and the answer avoids excess decimals like \u201c0.5556454228194568.\u201d"
+    },
+    "ranking": {
+     "met": false,
+     "why": "The answer says \u201cI need the same price-side figure computed across the holdings\u201d and \u201cdoes not hold the same price-side figure for the other names,\u201d so it never ranks drivers by magnitude or names the"
+    }
+   }
+  },
+  {
+   "tag": "L02-days-arent-price#t3",
+   "question_tag": "L02-days-arent-price#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from the prior price-side \u201cdistance from the trailing 52-week high\u201d to ADV/volatility and never answers the same cost-to-sell measure."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives figures, but they\u2019re generic-looking proxies; no quoted passage or identified period ties the \u201csame cost to sell\u201d claim to system evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cWhat I do not have is a desk-held per-name impact model or spread estimate, so I cannot turn that into a precise exit-cost number; the nearest held proxy is ADV plus volatility\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an actionable implication: \u201cthe one with higher volatility is the more fragile exit,\u201d which a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t1",
+   "question_tag": "L03-whose-assumption-is-that#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It says \u201cnot held here\u201d and gives no filed figure, quoted passage, or named period behind the participation-rate claim."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cfigure is not held here\u201d and \u201cthere is no published participation-rate assumption or volume-window method\u201d plainly state the gap and why."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses no raw ledger precision; it avoids numbers entirely and says \"no published participation-rate assumption or volume-window method.\""
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t2",
+   "question_tag": "L03-whose-assumption-is-that#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI can\u2019t answer that\u201d and asks for \u201ca trade-size fact,\u201d instead of answering the carried-over \u201crun it again at half that.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "It uses clean whole-number phrasing like \u201c10 positions\u201d and avoids ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI need a trade-size fact... or you need to ask,\u201d which is only a request for more work, not an actionable portfolio implication."
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t3",
+   "question_tag": "L03-whose-assumption-is-that#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe worst name by current weight is 16.3%, which is MSFT\u201d answers the carried-over \u201cworst name in there\u201d entity, though not the one-week exit rate."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c16.3%\u201d is appropriately rounded, not ledger-raw precision."
+    },
+    "trigger": {
+     "met": false,
+     "why": "\"It says 'there is no desk figure for a one-week exit rate' and gives no quantified monitoring threshold that would change the assessment.\""
+    }
+   }
+  },
+  {
+   "tag": "L04-cash-by-when-ladder#t1",
+   "question_tag": "L04-cash-by-when-ladder#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "honest_absence": {
+     "met": true,
+     "why": "\"the desk does not hold an actual cash balance for this book\" plainly names why and offers the nearest held figure: \"$10.99M, the portfolio market value.\""
+    },
+    "precision": {
+     "met": false,
+     "why": "It gives \u201c$10.99M\u201d only, and avoids any laddered by-date cash figures the question asked for."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by offering \u201cgive me the sell list,\u201d not an implication a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "L04-cash-by-when-ladder#t2",
+   "question_tag": "L04-cash-by-when-ladder#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cFriday\u201d is interpreted as \u201ccalendar time until cash is settled and in the account,\u201d directly answering the user\u2019s clarification."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"For this book, the desk holds positions but no cash-balance figure, and I do not have a settlement schedule fact,\" names the gap and the nearest thing held."
+    }
+   }
+  },
+  {
+   "tag": "L05-hyg-wrapper#t1",
+   "question_tag": "L05-hyg-wrapper#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cthere is no issuer-side figure\u2026 and no filing-based way to prove a March 2020 NAV discount from this desk alone.\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"there is no issuer-side figure for the bonds underneath here\" and \"What the desk does hold is the ETF price series\" plainly state the gap and nearest held data."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c$79.21\u201d is rounded to two decimals, not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating wrapper price limits and \u201cthe right next step is a separate market-data / fund-NAV check,\u201d not an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "L05-hyg-wrapper#t2",
+   "question_tag": "L05-hyg-wrapper#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It points to \u201cthe lines in here\u201d and distinguishes exposure-date lines from the ETF price series, answering the line-type question."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cnot held as a filing figure here,\u201d but doesn\u2019t plainly name the nearest held figure as such for the asked day count."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by distinguishing data sources, not with an actionable implication for the book a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "L06-fix-takes-how-long#t1",
+   "question_tag": "L06-fix-takes-how-long#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives figures but no system-evidence source, filed figure, or quoted/named-period basis for the MSFT claim."
+    },
+    "precision": {
+     "met": true,
+     "why": "It rounds to two significant figures: \u201c$2.20M\u201d and \u201c0.0002 days,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating the data, not with an action a portfolio manager could take."
+    }
+   }
+  },
+  {
+   "tag": "L06-fix-takes-how-long#t2",
+   "question_tag": "L06-fix-takes-how-long#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cthe desk does not hold a days-to-remedy figure,\u201d instead of answering the asked instant-vs-slow limit-check distinction."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"The desk does not hold a days-to-remedy figure for this limit check, so there is no citable figure here for how long it would take to fix.\""
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cthat is a separate liquidity question,\u201d offering more work instead of an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "F01-risk-not-dollars#t1",
+   "question_tag": "F01-risk-not-dollars#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives no named-period, filed figure, or per-name contribution; \u201cI cannot yet give a defensible name-by-name wobble ranking\u201d is generic rather than evidence-based."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cthe desk does not hold per-name factor sensitivity as a published figure\u201d and \u201cit is not already held as a single figure.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201cThe desk\u2019s analysis says the measured net exposures are: rates up is a gain, credit spreads widening is a loss, and equity down is a loss\u201d avoids ledger-raw precision."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It says \u201cI cannot yet give a defensible name-by-name wobble ranking\u201d and only gives book-level factor exposures, not an ordered largest-to-smallest driver list."
+    }
+   }
+  },
+  {
+   "tag": "F01-risk-not-dollars#t2",
+   "question_tag": "F01-risk-not-dollars#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe book\u2019s own daily return is 1.16%\u201d and \u201cthe sum of the holding contributions\u201d directly answers whether the whole thing wobbles less than the pieces."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a nearby figure instead of saying no \u201cwobble share\u201d is held, and it does not plainly say the gap is absent or only the nearest held figure is available."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"The book\u2019s own daily return is 1.16%\" uses reader-level precision, not raw ledger precision."
+    }
+   }
+  },
+  {
+   "tag": "F01-risk-not-dollars#t3",
+   "question_tag": "F01-risk-not-dollars#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over \u201cwhat you\u2019re actually risking\u201d by saying NVDA is \u201cless important as a risk story\u201d and shifts focus to the bigger contributors."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific filed figures and named periods: \u201c1.16%,\u201d \u201cNVDA\u2019s own contribution is 0.07%,\u201d and \u201cLLY at 12.7% against 12.0%.\u201d"
+    },
+    "so_what": {
+     "met": true,
+     "why": "The final sentence gives an actionable implication: \u201cthe top few names the real place to look.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "F02-ten-down-in-dollars#t1",
+   "question_tag": "F02-ten-down-in-dollars#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives generic scenario language and no filed figure or quoted passage supporting the \u201c1.30%\u201d or \u201c$10.99M\u201d claims."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cthe desk does not hold a precomputed market-down-ten-percent dollar scenario,\u201d but then pivots to factor math instead of plainly giving the nearest held figure as such."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c$10.99M\u201d is quoted at ledger-level precision, not the two or three significant figures the sentence needs."
+    }
+   }
+  },
+  {
+   "tag": "F02-ten-down-in-dollars#t2",
+   "question_tag": "F02-ten-down-in-dollars#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It re-answers the prior market-down scenario and says \u201cI cannot\u201d instead of resolving \u201chow much of that is tlt and hyg giving me anything back.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "Uses specific figures and a named period: \u201cHYG\u2019s position P&L is $1.00K, and TLT\u2019s is $960.\u201d"
+    },
+    "netting": {
+     "met": true,
+     "why": "\u201cTLT and HYG are both giving back a little\u2026 Their contributions are also both positive\u2026 so together they are a small offset rather than a drag.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer rounds to readable figures like \u201c$1.00K,\u201d \u201c$960,\u201d and \u201c0.01%,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by withholding actionability: \u201cI cannot truthfully turn that into a published ten-percent-stress dollar hit without computing a fresh scenario.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "F04-long-duration-on-trial#t1",
+   "question_tag": "F04-long-duration-on-trial#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cthe desk\u2019s rate-factor proxy\u201d and \u201cthe desk does hold a rate beta for NVDA: 0.20\u00d7\u201d are grounded, named-period claims from the system\u2019s evidence."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c0.20\u00d7\u201d and \u201c3.92\u00d7\u201d are rounded, reader-appropriate figures rather than raw ledger precision."
+    },
+    "ranking": {
+     "met": false,
+     "why": "The names are listed \u201cXOM\u2026 GOOGL\u2026 NVDA\u2026 AAPL\u2026 MSFT\u2026 JPM\u201d in a flat sequence, not clearly ordered by magnitude with the largest first."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cNVDA behaves as a risk-on / spread-sensitive name more than a pure rates-duration trade\u201d is an actionable implication for the book."
+    }
+   }
+  },
+  {
+   "tag": "F04-long-duration-on-trial#t2",
+   "question_tag": "F04-long-duration-on-trial#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 5,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt is the cleanest lever is the TLT line\u201d directly answers where to take rate risk down, and \u201cI cannot price the drag\u201d addresses what it costs."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\"It cites specific book figures and periods like \u201cTLT line: 5.98%\u201d and \u201c12.5% for GOOGL,\u201d grounding the claim in system evidence.\""
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"the desk can tell you what the book holds and how sensitive each line is, but it does not hold a validated trade-refit or a dollar P&L cost\""
+    },
+    "precision": {
+     "met": true,
+     "why": "\"5.98%\" and \"12.5% for GOOGL at 0.55\u00d7\" use reader-level precision, not ledger-raw digits."
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with an actionable implication: \u201ctrimming TLT removes the most direct duration exposure,\u201d which a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "F06-down-capture#t1",
+   "question_tag": "F06-down-capture#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201clatest run,\u201d \u201cmarket factor alone contributed 1.30%,\u201d and \u201cMSFT at 16.3%\u201d are system-specific figures, but the key symmetry claim is still not directly evidenced."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cit does not hold a direct upside-capture or downside-capture figure\u201d but then offers to \u201ccompute a closer proxy,\u201d which is not the nearest thing as-held."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201cThe market factor alone contributed 1.30%, while the growth factor contributed -0.23%\u201d uses reader-level precision, not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "F06-down-capture#t2",
+   "question_tag": "F06-down-capture#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It answers the index/book recovery comparison only partially and then says \u201cI cannot say whether the book got back as fast as SPY.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-appropriate precision like \u201c8.88%,\u201d \u201c1.16%,\u201d and dates, not ledger-raw excessive decimals."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI cannot say whether the book got back as fast as SPY,\u201d which offers no actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t1",
+   "question_tag": "W01-back-to-flat#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "No filed figure or named period supports \u201ceight percent off the high\u201d or \u201clast time we were in a hole this size.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded percentages like \u201c16.3%,\u201d \u201c15.0%,\u201d \u201c12.7%,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI\u2019d need the episode record or a run that publishes drawdown episodes,\u201d offering more work, not an actionable implication for the book."
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t2",
+   "question_tag": "W01-back-to-flat#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI can\u2019t add up the book\u2019s time below its prior peak\u201d and only discusses current max drawdown, not the asked share of the last year."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cThe portfolio run does show the book\u2019s current max drawdown as 17.7%\u201d lacks a filed period and episode duration; it says the exact share is \u201cabsent here.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer avoids ledger-raw precision; it uses \u201c17.7%\u201d rather than unwieldy figures like \u201c33.878625%\u201d or \u201c0.5556454228194568.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t3",
+   "question_tag": "W01-back-to-flat#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe book\u2019s max drawdown is 17.7%, with rolling volatility at 12.2% over 30d and 13.2% over 60d\u201d uses system-backed figures and a named period."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cI can\u2019t prove whether the whole stretch was one cluster or a longer grind, because the desk does not hold drawdown-episode timing for this book.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by saying \u201cthe duration piece is absent here,\u201d with no portfolio action or implication."
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t1",
+   "question_tag": "W02-per-point-of-weight#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 19,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer uses specific figures, but gives no cited period or evidence source from the system: \u201cOn this run\u2026,\u201d \u201cMSFT contributed 0.43% on weight 16.3%.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c2.64%,\u201d \u201c0.43%,\u201d \u201c16.3%,\u201d and \u201c1.53%\u201d are rounded to reader-useful precision, not raw ledger precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "It says \u201cthe largest contribution per unit weight\u201d and then orders \u201cNext by the same metric were\u2026,\u201d with MSFT named as largest."
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t2",
+   "question_tag": "W02-per-point-of-weight#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It refuses to answer \u201chow much of that hole\u201d and says the \u201cdrawdown helpers are not held on the run.\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe missing piece is the actual worst-name hole from the drawdown, which is not filed here as a figure.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It gives no numeric figure at any precision; the answer only says the needed \u201cworst-name hole\u201d is \u201cnot filed here as a figure.\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating missing data and method limits, not with an actionable portfolio implication for a manager."
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t3",
+   "question_tag": "W02-per-point-of-weight#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer explicitly resolves the carried-over \u201cnext one down that list \u2014 same question\u201d by naming the next name, AMZN, and giving its half-size effect."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-friendly figures like \u201c0.11%\u201d and \u201c7.07%,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating limits: \u201cWhat I cannot do from the held figures...\u201d rather than closing with a portfolio-manager action."
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t1",
+   "question_tag": "W03-did-the-hedge-hedge#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cOn the latest attribution run\u201d with \u201cHYG\u2019s direct contribution was 0.01% and TLT\u2019s was 0.01%\u201d grounds the claim in system evidence and a named period."
+    },
+    "netting": {
+     "met": true,
+     "why": "\"did not offset the rest in a meaningful way\" states the net and its direction."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded figures like \u201c0.01%\u201d and \u201c1.30%,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cdid not materially hedge it on that date\u201d gives the actionable implication a portfolio manager could use."
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t2",
+   "question_tag": "W03-did-the-hedge-hedge#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer directly addresses whether the rates leg ever helped, saying \u201cnot consistently\u201d and citing TLT/HYG returns and drawdowns."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "No system-specific evidence or quoted filed figures beyond generic TLT/HYG metrics; the answer reads like unsupported general analysis."
+    },
+    "precision": {
+     "met": false,
+     "why": "The answer uses ledger-raw precision like \u201c0.01%\u201d and \u201c1.16%\u201d where the criterion asks for reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t3",
+   "question_tag": "W03-did-the-hedge-hedge#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It asks for \u201ca level\u201d next time, but the answer says \u201cI do not yet hold the drawdown-episode series\u201d and \u201cneed the drawdown episode facts.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c5.98% and 7.21%\u201d are rounded to reader-level precision, not raw ledger precision."
+    },
+    "trigger": {
+     "met": false,
+     "why": "It mentions \u201cthe point where that sleeve stopped offsetting\u201d but gives no quantified level, move, or spread that would trigger a change."
+    }
+   }
+  },
+  {
+   "tag": "W04-sectors-or-names#t1",
+   "question_tag": "W04-sectors-or-names#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cIt cannot state the exact 1y return\u2026 the desk does not hold a computed return fact for it\u201d and relies on generic comparison."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cthe desk does not hold a computed return fact for it and compute did not accept that raw price series as an operand\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating data and offering more work: \u201cI can compute the exact 1y return... If you want, I can...\u201d."
+    }
+   }
+  },
+  {
+   "tag": "W04-sectors-or-names#t2",
+   "question_tag": "W04-sectors-or-names#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It asks whether unowned names \u201cran away,\u201d but the answer says \u201cthe book facts here do not include the unowned universe\u201d and gives no comparison."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives no filed figure or named period for the unowned universe; it says \u201cthe book facts here do not include the unowned universe.\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "What I cannot say from the desk is that the unowned universe outran the book... there is no held figure for the best non-owned performers."
+    }
+   }
+  },
+  {
+   "tag": "W05-explain-the-day#t1",
+   "question_tag": "W05-explain-the-day#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 13,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\"On the last run, the book\u2019s daily return was 1.16% ... named position contributions sum to 1.16%,\" citing specific run figures and named holdings/period."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"1.16%, 0.43%, 0.24%, 0.20%, 0.15%, -0.05%, -0.01%, 1.30%, -0.23%, 0.03%\" are reader-precision percentages, not overly raw ledger precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cThe biggest single positive came from MSFT at 0.43%, then JPM at 0.24%\u201d shows descending order with the largest named as largest."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can next break that down...\u201d instead of a portfolio-actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "W05-explain-the-day#t2",
+   "question_tag": "W05-explain-the-day#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts to a 750-day regression window and says \u201cI cannot yet say,\u201d instead of answering whether the leftover was every day."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe last completed run\u2019s residual was 0.14%\u2026 on a 750-day regression window\u201d and \u201cI cannot yet say from the held figures whether it has been happening every day.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cI cannot yet say ... whether it has been happening every day,\u201d but then shifts to conjecture instead of plainly naming the missing historical residual series."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201ca persistent pattern would be plausible\u201d is an actionable implication that a portfolio manager could use, not just restated data."
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t1",
+   "question_tag": "W01-useful-life-policy#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 21,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives no filed depreciation-period figures or quoted passages; it says \u201cthe figure is absent\u201d and relies on generic comparisons."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cthe desk can only say this partially\u201d but then offers comparative numbers instead of plainly saying the asked-for split isn\u2019t held."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c39.3% and 22.9%,\u201d \u201c12.2% and -0.33%,\u201d and \u201c54.8% and 11.9%\u201d are too precise for prose here."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It ranks AMZN first and says MSFT/GOOGL are \u201cabsent,\u201d so the drivers are not ordered by magnitude with the largest clearly named."
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t2",
+   "question_tag": "W01-useful-life-policy#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 16,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It asks \u201cif the life went back\u2026 where does the margin land,\u201d but the answer switches to \u201cpre-depreciation operating margin\u201d and \u201clatest point\u201d instead of the carried-over life-period question."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a nearby proxy as if it were the asked margin, instead of saying the desk lacks that figure or method."
+    },
+    "precision": {
+     "met": true,
+     "why": "The figures are rounded to reader-usable precision like \u201c$107B\u201d and \u201c$38.12B,\u201d not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t3",
+   "question_tag": "W01-useful-life-policy#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts to \u201cdepreciation burden\u201d ratios and gives no actual worry level, saying \u201cI do not have a desk-issued threshold.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gives a \u201clatest depreciation burden is 52.4%\u201d figure instead of saying the desk lacks a threshold and naming the nearest held metric."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want the cross-company read, I can pull\u2026\u201d instead of a portfolio-actionable implication."
+    },
+    "trigger": {
+     "met": false,
+     "why": "\u201cNo measure carries a threshold\u201d and \u201cI do not have a desk-issued threshold\u201d give no quantified level that would change the assessment."
+    }
+   }
+  },
+  {
+   "tag": "W04-growth-vs-margin-screen#t1",
+   "question_tag": "W04-growth-vs-margin-screen#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cAMZN is the clear one... revenue is $717B (2025-12-31)... 2024\u21922025 growth faster... while operating margin is 11.2% (2025-12-31)\u201d ties the claim to specific period data."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It names AMZN instead of plainly saying the desk lacks the asked-for split, and it never states a missing method for \u201cacross everything we own.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201crevenue is $717B\u201d and \u201coperating margin is 11.2%\u201d use reader-level precision, not ledger-raw decimals."
+    },
+    "ranking": {
+     "met": false,
+     "why": "\u201cAMZN is the clear one\u201d is a single finding, but it does not line up multiple names \u201cworst first\u201d by magnitude."
+    }
+   }
+  },
+  {
+   "tag": "W04-growth-vs-margin-screen#t2",
+   "question_tag": "W04-growth-vs-margin-screen#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over \u201cworst one\u201d as AMZN and gives \u201chow big is that for us\u201d plus whether the market has noticed."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201c7.07% \u2026 on 2026-09-03\u201d and \u201c14.89% over 2025-09-03..2026-09-03\u201d are specific, period-based claims grounded in system evidence."
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses overly raw precision like \u201c7.07%,\u201d \u201c776700,\u201d and \u201c14.89%,\u201d instead of reader-level rounded figures."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It is already partially in the tape\" gives a clear implication a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t1",
+   "question_tag": "W05-leases-in-leverage#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "Uses generic \u201cthe desk\u2019s default\u201d wording without any filed period or evidence-backed citation."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a combined \u201cdebt-plus-lease obligation figure\u201d of 42 instead of saying the requested debt-to-EBITDA with leases isn\u2019t held as a figure."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c21 and 21\u201d is appropriately rounded, not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t2",
+   "question_tag": "W05-leases-in-leverage#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 12,
+   "met": 1,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "\"It does not answer whether the order changes; it says the comparison is \u201cblocked\u201d and that a \u201cclean three-way order change cannot be closed.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "No filed-period evidence or quoted source is shown; it reads like generic desk commentary with figures but no grounded citation trail."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I do not have a like-for-like lease-in debt-to-EBITDA for all three names because the desk cannot produce MSFT EBITDA and cannot produce AAPL EBITDA\""
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses raw figures like \u201c$22.24B\u201d and \u201c$12.49B,\u201d which is more precise than the sentence needs."
+    },
+    "ranking": {
+     "met": false,
+     "why": "It mentions Amazon, Microsoft, and Apple, but gives no ordered ranking or largest-to-smallest statement."
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t3",
+   "question_tag": "W05-leases-in-leverage#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201ccash paid on interest is not shown as bigger\u201d and \u201ccannot prove,\u201d so it doesn\u2019t answer the user\u2019s yes/no comparison."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It cites a booked figure, but says \u201cthe desk does not hold a separate filed figure for cash paid for interest for AMZN.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cI cannot prove cash interest was larger\u201d but never plainly gives the nearest held figure as what it is."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"$2.53B\" is appropriately rounded; it does not reproduce ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI cannot prove cash interest was larger,\u201d not an action implication a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "W06-tax-rate-growth#t1",
+   "question_tag": "W06-tax-rate-growth#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cPretax income was $8.85B and net income was $7.40B\u201d and \u201cOn a trailing twelve-month basis, pretax income was $31.12B and net income was $25.28B\u201d are specific, period-based figures."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c16.4%\u201d and \u201c18.8%\u201d are reader-level rounded figures, not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\"The single biggest driver of the bottom line, it is the pretax earnings level; taxes explain part of the spread\" names the largest driver as the largest."
+    }
+   }
+  },
+  {
+   "tag": "W06-tax-rate-growth#t2",
+   "question_tag": "W06-tax-rate-growth#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 13,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe pretax line is doing the heavy lifting\u201d and \u201cif the tax rate flattens from here, it mostly takes away a small extra lift.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gave a specific tax-rate analysis instead of saying the desk lacked the requested figure or split and naming the nearest held metric."
+    },
+    "precision": {
+     "met": false,
+     "why": "The answer reproduces raw precision like \u201c18.8%,\u201d \u201c16.4%,\u201d \u201c25.28B,\u201d and \u201c31.12B\u201d instead of rounding to reader-appropriate figures."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It ends with an actionable implication: 'your growth thesis leans more entirely on pretax expansion and less on margin-through-tax.'"
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t1",
+   "question_tag": "W01-xom-maturity-wall#t1",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 9,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer uses placeholders like \u201c[10-K Item 8]\u201d instead of any actual filed figures or named period, so the claim isn\u2019t grounded in system evidence."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives specific maturity buckets instead of saying the desk lacks the split or method; no plain \u201cnot held as a figure\u201d gap is stated."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded bucket terms like \u201cwithin one year,\u201d \u201cin 2027,\u201d and \u201clater bucket,\u201d not ledger-raw precise figures."
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t2",
+   "question_tag": "W01-xom-maturity-wall#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It answers \u201cMostly fixed, not floating\u201d instead of the prior-turn maturity question about \u201cwhen does any of this debt actually have to be paid back?\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gives \u201cMostly fixed, not floating\u201d instead of plainly saying the desk does not hold a fixed/floating figure or split."
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t3",
+   "question_tag": "W01-xom-maturity-wall#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cthe bill is already moving up\u201d and \u201cthe interest burden is up\u201d directly answer whether the interest bill is already going up."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe filing says\u2026 higher in the first quarter of 2026\u201d and gives figures: \u201c$295M\u2026 latest quarter\u201d and \u201c$693M\u2026 trailing twelve months.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c$295M\u201d and \u201c$693M\u201d are rounded to reader-appropriate precision, not raw ledger digits."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating that \u201cthe interest burden is up\u201d and says \u201cthe source is not cleanly identified,\u201d with no portfolio-manager action."
+    }
+   }
+  },
+  {
+   "tag": "W02-lly-coverage-trend#t1",
+   "question_tag": "W02-lly-coverage-trend#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "Includes filed figures and dated periods like \u201c2026-03-31,\u201d \u201c2025-01-01..2025-12-31,\u201d and \u201c2022-12-31..2025-12-31.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "2.12\u00d7 and 29.75\u00d7 are ledger-raw exactness; the criterion requires reader-appropriate precision, not overprecise decimals."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cnothing here by itself points to a debt-service problem\u201d gives a portfolio-manageable implication."
+    }
+   }
+  },
+  {
+   "tag": "W02-lly-coverage-trend#t2",
+   "question_tag": "W02-lly-coverage-trend#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cI would not be worried on interest coverage unless it fell into the low single digits\u201d gives a level, not a vibe."
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201clow single digits,\u201d \u201cabove 1\u00d7,\u201d and \u201cfell below 1\u00d7\u201d are quantified thresholds that would change the assessment."
+    }
+   }
+  },
+  {
+   "tag": "W03-xom-trough-relever#t1",
+   "question_tag": "W03-xom-trough-relever#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites system-specific figures: \u201cXOM\u2019s worst filed 12-month net income series as $28.84B\u201d and \u201clatest balance sheet liabilities are $203B.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c$28.84B\u201d is too ledger-precise for prose under this criterion."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI could not finish the debt-to-worst-year-earnings ratio,\u201d which is an offer/explanation, not an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "W03-xom-trough-relever#t2",
+   "question_tag": "W03-xom-trough-relever#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from \u201csame debt against the worst year of earnings\u201d to \u201ccrude-at-50 earnings bridge\u201d and says \u201cI can\u2019t state where leverage would land.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cXOM\u2019s filing says\u2026 it reported average production prices for crude oil per barrel\u201d and cites \u201c2025-12-31\u201d and \u201c$182B,\u201d so it rests on system evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "The answer says \u201cThe filing does not give a ready-made crude-at-50 earnings bridge\u201d and offers \u201cthe closest filed proxy\u201d as what it is."
+    }
+   }
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t1",
+   "question_tag": "W06-aapl-net-cash-buybacks#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites Apple-specific filed figures: \u201clong_term_debt_total $82.70B\u201d and \u201ccash_and_equivalents $45.57B,\u201d grounded in a named period."
+    },
+    "netting": {
+     "met": true,
+     "why": "\u201clong_term_debt_total $82.70B and cash_and_equivalents $45.57B, so the net debt after cash is $37.13B\u201d states the net with direction."
+    },
+    "precision": {
+     "met": true,
+     "why": "$82.70B, $45.57B, $37.13B, $265B, and $106B are rounded to reader-appropriate precision."
+    }
+   }
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t2",
+   "question_tag": "W06-aapl-net-cash-buybacks#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe latest 10-Q shows 23 for cash and cash equivalents on the balance sheet\u201d directly answers where that cash sits."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gives a location split, but not the requested honest absence; it presents a held breakdown instead of saying \u201cnot held as a figure\u201d or \u201cno method.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t3",
+   "question_tag": "W06-aapl-net-cash-buybacks#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer directly addresses \u201care they borrowing to do it?\u201d with \u201cYes \u2014 Apple is using debt financing alongside buybacks.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe filing says the company uses net proceeds from the commercial paper program for general corporate purposes, including dividends and share repurchases\u201d and cites a named period."
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses a raw figure \u201c$82.70B\u201d and a garbled \u201c[10-Q Part I, Item 1]\u201d, not reader-appropriate rounded precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201csome repurchases are debt-funded\u201d is an actionable implication a portfolio manager could use."
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t1",
+   "question_tag": "W01-xom-payout-plug#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 10,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "Cites XOM quarter-specific figures and dates like \u201c$9.20B (2026-03-31)\u201d and \u201c$2.23B (2026-03-31),\u201d grounding the claim in system evidence."
+    },
+    "netting": {
+     "met": true,
+     "why": "It states the gap was \u201cplugged mainly by cash on hand,\u201d and says the return \u201cwas larger\u201d than operating cash flow less capex, so the net direction is clear."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c$9.20B,\u201d \u201c$2.23B,\u201d and \u201c$8.44B\u201d use raw ledger precision rather than reader-appropriate rounded figures."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It explains the gap but ends by saying \u201cI do not have a filed figure here,\u201d with no portfolio-manager action or implication."
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t2",
+   "question_tag": "W01-xom-payout-plug#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cdividends paid as a share of operating cash flow is 33.2%, and the series rises from 19.5% through 33.2%\u201d directly answers the carryover measure and trend."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cUsing XOM\u2019s annual windows\u201d and the specific figures \u201c33.2%\u201d and \u201c19.5%\u201d show period-based, evidence-grounded claims."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c33.2%\u201d and \u201c19.5%\u201d are reader-appropriate precision, not ledger-raw overprecision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable implication: \u201cthe dividend is taking a larger slice of cash flow over time, not less.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t3",
+   "question_tag": "W01-xom-payout-plug#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cdividend payout share of operating cash flow\u2026 it has moved from 31.0% to 33.2%\u201d directly answers what to watch on the next print and whether it\u2019s squeezing."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable watchpoint: \u201cthat is the pressure point, not the headline dividend alone.\u201d"
+    },
+    "trigger": {
+     "met": true,
+     "why": "\u201cIt is 33.2%, and it has moved from 31.0% to 33.2%\u201d gives a quantified monitoring threshold that would change the assessment."
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t1",
+   "question_tag": "W02-buyback-vs-dilution#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 11,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201c7434000000 to 7429000000\u201d and \u201ca filing passage says Microsoft repurchased shares\u201d provide company- and period-specific evidence."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a net-share-count answer and an estimate, instead of plainly saying the desk lacks the specific split and naming the nearest held figure."
+    },
+    "netting": {
+     "met": true,
+     "why": "The answer states the net direction clearly: \u201cshares outstanding did edge down\u201d and \u201ca small net reduction, not a flat share count.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses ledger-raw precision like \u201c7434000000 to 7429000000\u201d and \u201c$11.97B,\u201d which is more precise than needed."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cThe net share count has still drifted lower, just slowly\u201d is an actionable implication a portfolio manager could use."
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t2",
+   "question_tag": "W02-buyback-vs-dilution#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It pivots to \u201cbiggest position in the book\u201d and says \u201cthat answers concentration, not dilution,\u201d instead of identifying who is worst at offsetting employee issuance."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I cannot yet tell you who is worst at offsetting employee issuance... What the book does show is the current exposure ranking... That answers concentration, not dilution.\""
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses rounded portfolio weights like \u201c16.3%\u201d and \u201c14.9%,\u201d not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cMSFT is the largest weight at 16.3%, followed by AAPL\u2026\u201d names the largest and orders the drivers by magnitude."
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t3",
+   "question_tag": "W02-buyback-vs-dilution#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 13,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt\u2019s a governance/capital-allocation smell, not a standalone sell signal\u201d answers the trim-vs-annoyance line."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It closes with a portfolio action: 'I\u2019d treat it as a governance/capital-allocation smell, not a standalone sell signal.'\""
+    },
+    "trigger": {
+     "met": false,
+     "why": "\u201cif the share count stops drifting lower\u201d is a condition, but no quantified level, move, or basis-point threshold is given."
+    }
+   }
+  },
+  {
+   "tag": "W04-book-capex-hogs#t1",
+   "question_tag": "W04-book-capex-hogs#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 5,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cMSFT at 16.3%\u201d and \u201cAAPL at 14.9%\u201d are specific portfolio figures tied to a named book, not generic prose."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk does not hold a direct \u2018cash eaten\u2019 measure\u201d and \u201cdoes not hold portfolio-wide cash outflow or burn by issuer,\u201d while offering \u201clargest exposure\u201d as the nearest held figure."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"MSFT at 16.3%, AAPL at 14.9%, and JPM at 14.8%\" uses reader-appropriate precision rather than ledger-raw decimals."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cMSFT at 16.3%\u201d is named first as \u201cthe largest issuer weight,\u201d with the next biggest listed after it."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating exposure and saying \u201cI\u2019d need a different held figure,\u201d without a portfolio-manager action or implication."
+    }
+   }
+  },
+  {
+   "tag": "W04-book-capex-hogs#t2",
+   "question_tag": "W04-book-capex-hogs#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cthe top holding, MSFT\u201d and \u201cwhether that spend is growing faster than the business\u201d directly address the prior \u201ccapital hog\u201d entity and comparison."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer cites \u201cMSFT,\u201d \u201ccapex intensity is 30.5%,\u201d and \u201cbook weight is 16.3%,\u201d but gives no actual business-growth figure or comparison."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201ccapex intensity is 30.5%, and the book weight is 16.3%\u201d uses reader-level precision, not ledger-raw decimals."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by saying \u201cI cannot say\u201d and \u201cI need a held growth measure,\u201d not with an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "W04-book-capex-hogs#t3",
+   "question_tag": "W04-book-capex-hogs#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"The filing separately says Microsoft had additional leases, primarily for datacenters, that had not yet commenced; that is in the latest 10-Q lease passage.\""
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe capex figure I used for MSFT is $97.22B\u201d and \u201cthe latest 10-Q lease passage\u201d are period- and filing-grounded claims."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "The answer says \u201cNo: $97.22B is only the capex line, not the whole committed package\u201d and explains the separate lease/commitment load."
+    }
+   }
+  },
+  {
+   "tag": "W05-jpm-frame-breaks#t1",
+   "question_tag": "W05-jpm-frame-breaks#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201clatest full-year window,\u201d \u201cbuybacks were $32.39B and dividends paid were $17.18B,\u201d and \u201cCash on the balance sheet was $312B\u201d are specific, evidence-based period claims."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cI do not have a capex figure,\u201d but gives no nearest held substitute for capex as asked."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201cbuybacks were $32.39B and dividends paid were $17.18B\u201d reproduces ledger-raw precision instead of two or three significant figures."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating cash figures and says \u201cI can answer dividends and buybacks, but not capex,\u201d without a portfolio-actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "W05-jpm-frame-breaks#t2",
+   "question_tag": "W05-jpm-frame-breaks#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 3,
+   "judged": 6,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over issue by focusing on \u201coperating cash flow,\u201d \u201cbuybacks,\u201d and \u201cdividends paid,\u201d which are the entities from the prior turn."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201coperating cash flow $-108B, buybacks $32.39B, dividends paid $17.18B\u201d are specific filed figures, with a JPM-linked period context."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk does not give me a capex-based free-cash-flow screen for JPM\u201d and \u201cI cannot give you a desk-approved numeric threshold\u201d plainly state the gap and nearest available figures."
+    },
+    "precision": {
+     "met": false,
+     "why": "It reproduces raw-like precision: \u201c$32.39B, $17.18B, 21,\u201d and \u201c$49.56B,\u201d rather than rounding to reader-appropriate figures."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can pull the recent series,\u201d not a portfolio-manager action or closing implication."
+    },
+    "trigger": {
+     "met": false,
+     "why": "\u201cNo desk-approved numeric threshold\u201d and \u201cI cannot give you a desk-approved numeric threshold\u201d mean no quantified level was given."
+    }
+   }
+  },
+  {
+   "tag": "W06-nvda-buyback-timing#t1",
+   "question_tag": "W06-nvda-buyback-timing#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 12,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\"2024-10-27 | $11.00B | $141.54\" and the rest are named quarters with specific figures, so it rests on evidenced periods rather than generic prose."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives quarterly buybacks and prices, but never says the asked-for gap is absent or why; it just answers with a nearby figure table."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c$11.00B\u201d, \u201c$7.81B\u201d, \u201c$14.10B\u201d and prices like \u201c$141.54\u201d use reader-appropriate precision, not raw ledger precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe program was not concentrated at the top\u201d is an actionable implication a portfolio manager could use."
+    }
+   }
+  },
+  {
+   "tag": "W06-nvda-buyback-timing#t2",
+   "question_tag": "W06-nvda-buyback-timing#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cWhat I cannot yet do... because Apple\u2019s filed buyback figure is held as annual 12-month windows,\u201d so it doesn\u2019t answer the same quarter-by-quarter test."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites specific filed figures and dates like \u201c$90.71B (2025-09-27)\u201d and \u201c$210.43, $224.25, and $238.56,\u201d grounding the claim in evidence."
+    },
+    "precision": {
+     "met": false,
+     "why": "The answer uses ledger-raw precision like \u201c$90.71B (2025-09-27)\u201d and \u201c$328.21 (2026-09-03)\u201d instead of rounded figures."
+    },
+    "so_what": {
+     "met": false,
+     "why": "\"what I cannot yet do... If you want the exact quarterly matching test, I can pull...\" offers more work instead of closing with an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t1",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It makes claims about \u201c[10-K Item 1A]\u201d changes and \u201cthe added emphasis\u201d without quoting any filed passage or named period evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk has an absence for a diff-style \u2018removed risk factor\u2019 figure, so I can\u2019t claim a specific item disappeared\u2026 that is not held as a ready figure here.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t2",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It directly answers \u201cwhat did they add\u201d and \u201cdid anything quietly come out,\u201d distinguishing new AI/capacity items from generic boilerplate."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe AI infrastructure, lease, power, and supply-chain constraints\u201d and \u201cspecific live regimes\u201d are tied to \u201c10-K Item 1A\u201d and \u201c10-K Item 8,\u201d not generic prose."
+    }
+   }
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t3",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cit does not give a standalone legal-reserve total\u201d and \u201csome matters are not reasonably estimable\u201d directly answer the accrual-vs-estimate question."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cthey record a liability when a loss is probable and reasonably estimable\u201d and \u201cmay be unable to estimate the reasonably possible loss\u201d are grounded in the filing."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cI can\u2019t safely write the hidden number\u201d but does not plainly name the nearest held figure or say \u201ccannot reasonably estimate\u201d as the answer to accrual."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cFor the book, the thing to watch is whether a named matter turns into a quantified charge, an injunction, or a forced business change.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t1",
+   "question_tag": "FQ02-who-actually-buys-nvda#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites specific filed figures and a period: \u201clatest 10-K,\u201d \u201c22%,\u201d \u201c14%,\u201d and named customer types from the filing."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"the desk does not hold a named customer list\" and \"not filed as a named customer roster\" plainly name the absence and nearest held info."
+    }
+   }
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t2",
+   "question_tag": "FQ02-who-actually-buys-nvda#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cworse than a year ago\u201d is answered by comparing fiscal 2026 concentration to fiscal 2025 and saying \u201clooks more concentrated than a year ago.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "Uses specific filing figures and named periods: \u201c22%\u2026 in fiscal 2026\u201d versus \u201c12%\u2026 in fiscal 2025.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It answers concentration, not the asked \u201cworse than a year ago?\u201d gap with a plain \u201cnot held as a figure/no method\u201d for that exact split."
+    }
+   }
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t3",
+   "question_tag": "FQ02-who-actually-buys-nvda#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer directly resolves the supply-side commitments asked for: \u201ccontracted supply-side commitments\u201d and \u201coutstanding inventory purchase and long-term supply and capacity obligations.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201c[10-K Item 15]\u201d and \u201c[10-K Item 7]\u201d are placeholders, not filed figures or quoted passages grounded in evidence."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives totals and qualitative structure, but \u201cnot a vendor-by-vendor contract roster or a split\u201d and no plain \u201cnot held\u201d for the asked supply commitments."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"The filing gives the total and qualitative structure\"; a portfolio manager could act on the disclosed contractual exposure and fiscal-2027 payment timing."
+    }
+   }
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t1",
+   "question_tag": "FQ03-is-aws-carrying-it#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 11,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives generic assertions and a mistaken \u201cAWS is 11.5%\u201d without a quoted filed period or specific evidence-backed segment revenue figure."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives \u201cAWS is 11.5% of Amazon\u2019s trailing-twelve-month revenue\u201d and \u201ccomputed share,\u201d not a plainly absent figure."
+    }
+   }
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t2",
+   "question_tag": "FQ03-is-aws-carrying-it#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt also describes North America as primarily retail sales plus advertising and subscription services, International as the same for internationally focused stores, and AWS\u2026\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201c[10-Q Part I, Item 2]\u201d and \u201cQ1 2026\u201d show period-specific, filed evidence rather than generic prose."
+    }
+   }
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t3",
+   "question_tag": "FQ03-is-aws-carrying-it#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer directly addresses \u201cis the whole thing getting more profitable or less?\u201d and says \u201cthe whole company has been getting more profitable.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses reader-appropriate precision like \u201c11.1%,\u201d \u201c33.9%,\u201d and \u201c77.67B,\u201d not ledger-raw decimal noise."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It restates that \u201cthe consolidated bottom line is improving too\u201d but does not close with an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t1",
+   "question_tag": "FQ04-their-story-against-my-line#t1",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It cites \u201c10-K Item 7\u201d but gives no actual quoted line or filed figure from the evidence."
+    },
+    "precision": {
+     "met": false,
+     "why": "It says \u201cthe gross-margin decline was caused by the shift\u2026\u201d but gives no actual line or precise quoted figures, despite the request to put their words next to the line."
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t2",
+   "question_tag": "FQ04-their-story-against-my-line#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers whether \u201cthat account for the whole move or just part of it\u201d by saying \u201cthe filing says\u2026 [and] those two stated causes are the full explanation.\u201d"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It does not say the desk lacks the figure or method; instead it asserts \u201cthe filing says\u201d and \u201cThose two stated causes are the full explanation.\u201d"
+    },
+    "netting": {
+     "met": false,
+     "why": "It names two causes \u201cas\u201d separate impacts, but never states any netting or offsetting direction."
+    },
+    "precision": {
+     "met": true,
+     "why": "It uses qualitative wording and avoids raw ledger precision; no over-precise figures like \u201c33.878625%\u201d appear."
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t3",
+   "question_tag": "FQ04-their-story-against-my-line#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe closest filed quantitative answer is the gross-profit series \u2026 not the provisioning split you asked for\u201d addresses the provisioning share and says they do not quantify it."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cBut the desk does not hold a filed figure that attributes the gross-margin move to a specific assumption change, so there is no citable number\u201d"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating data: \u201cno citable number\u201d and \u201cgross profit by year,\u201d with no portfolio-manager implication."
+    }
+   }
+  },
+  {
+   "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+   "question_tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives generic framing like \u201cearnings-at-risk is an instantaneous shock measure\u201d without any filed figure, quoted passage, or named period."
+    },
+    "precision": {
+     "met": false,
+     "why": "It avoids any concrete 100bp figure and gives no precise table number to assess."
+    }
+   }
+  },
+  {
+   "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+   "question_tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 11,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cgo with the tape for market P&L\u201d and \u201cthe filing table as a cross-check\u201d directly answers which one to use for a held position."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cmanage the position by what the market is doing now\u201d gives an actionable portfolio implication at the end."
+    },
+    "trigger": {
+     "met": false,
+     "why": "It says \u201cevidence\u201d and \u201cmaterially different sensitivity row\u201d but gives no quantified threshold or level that would change the assessment."
+    }
+   }
+  },
+  {
+   "tag": "FQ06-same-risk-in-four-filings#t1",
+   "question_tag": "FQ06-same-risk-in-four-filings#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "The answer cites specific filings and periods: \u201cAAPL [10-K Item 1A], MSFT [10-K Item 1A], GOOGL [10-K Item 1A], and NVDA [10-K Item 1A].\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk does not hold a per-name factor-sensitivity figure for this book\u201d plainly says the missing split and gives the nearest held thing: \u201cthe book\u2019s return\u201d factor regression."
+    }
+   }
+  },
+  {
+   "tag": "FQ06-same-risk-in-four-filings#t2",
+   "question_tag": "FQ06-same-risk-in-four-filings#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt answers the carried-over book question with \u2018Across the four names, the shared-risk sleeve is 47.8% of the book\u2019 and ranks them biggest first.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-appropriate rounding like \u201c47.8%,\u201d \u201c16.3%,\u201d and \u201c4.16%,\u201d not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "It ranks \u201cMSFT 16.3%, then AAPL 14.9%, then GOOGL 12.5%, then NVDA 4.16%,\u201d with the largest named first."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cThat puts the cluster near the top of the book, not the tail\u201d is an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "B02-var-ballpark#t1",
+   "question_tag": "B02-var-ballpark#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific figures and a named period: \u201c17.7% ... as of 2026-09-03,\u201d plus LLY and MSFT warnings."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cIt does not hold that figure for this run\u201d plainly says why, and it offers nearest held metrics as what they are."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses rounded percentages like \u201c17.7%,\u201d \u201c12.2%,\u201d and \u201c13.2%,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "B02-var-ballpark#t2",
+   "question_tag": "B02-var-ballpark#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from the requested \u201cone day, ninety nine percent downside\u201d to \u201c1.16% latest daily return\u201d and \u201c17.7% max drawdown,\u201d not the asked measure."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific held figures: \u201c1.16% for the latest daily return\u201d and \u201c17.7% for max drawdown,\u201d grounding the claim in system evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I can\u2019t print a one-day downside number here because the desk does not hold that figure for this book\" plainly states the absence and gives the nearest held figures."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c1.16%\u201d and \u201c17.7%\u201d are appropriately rounded; no ledger-raw precision is reproduced."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with data and alerts\u2014\u201cLLY and MSFT concentration warnings\u201d\u2014but no actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "B03-jpm-leverage-rank#t1",
+   "question_tag": "B03-jpm-leverage-rank#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe answer cites system evidence and period coverage: \u2018AMZN at 0.65\u00d7, XOM at 0.23\u00d7\u2019 plus issuer-specific filing periods like \u2018AAPL\u2019s most recent filed period ends 2026-03-28.\u2019"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cJPM is an absence on this measure, because debt_to_ebitda is not applicable to JPM,\u201d and it gives the nearest held figures for others."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded figures like \u201c0.65\u00d7\u201d and \u201c0.23\u00d7,\u201d not ledger-raw decimals, satisfying reader-level precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "\u201cAMZN carries the most debt relative to EBITDA, ahead of XOM\u201d names the largest and orders the drivers by magnitude."
+    }
+   }
+  },
+  {
+   "tag": "B03-jpm-leverage-rank#t2",
+   "question_tag": "B03-jpm-leverage-rank#t2",
+   "answered": true,
+   "gate_refusals": 7,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It deflects: \u201cI could not produce an answer\u201d and \u201cAsk again\u201d instead of saying whether the \u201cdecent shape\u201d measure/finding from prior context is met."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives no company, period, filed figure, or quoted evidence; it is only a generic refusal."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It says it cannot answer, but does not name what is \u201cnot filed,\u201d \u201cnot held as a figure,\u201d or the nearest thing the desk does hold."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cAsk again, or narrow the question,\u201d which is only a request for more work, not an actionable portfolio implication."
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t1",
+   "question_tag": "B05-etf-instrument-class#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It says \u201cthe actual duration figure is not held here\u201d and \u201cthe desk does not hold filing text yet,\u201d so no grounded figures or periods support the claims."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"The actual duration figure is not held here\" and \"the desk does not hold filing text yet\" plainly state the absence and the nearest thing held."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"The actual duration figure is not held here\" and no raw ledger-style percentages are reproduced."
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t2",
+   "question_tag": "B05-etf-instrument-class#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from TLT duration/HYG credit quality to \u201ccushioning\u201d equity sell-offs, asking for attribution not the prior measure."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "No filed figure, quoted passage, or named period proves \u201ccushioning\u201d; it says only \u201cHYG is in port_001 with weight 7.21%\u201d and calls the claim \u201cunverified.\u201d"
+    },
+    "netting": {
+     "met": false,
+     "why": "It lists HYG and TLT side by side, but never states any net offset or direction between them."
+    },
+    "precision": {
+     "met": true,
+     "why": "The figures are rounded appropriately: \u201c7.21%\u201d and \u201c5.98%\u201d use reader-usable precision, not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t3",
+   "question_tag": "B05-etf-instrument-class#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cnot evidence of an offset\u201d and \u201ccannot say ... either one has been offsetting drawdowns,\u201d so it doesn\u2019t resolve the cushioning claim."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "\u201cNo measured hedge effectiveness\u201d and \u201cnot evidence of an offset\u201d are generic; no filed figure, quoted passage, or named period grounds the claim."
+    },
+    "netting": {
+     "met": true,
+     "why": "It says \u201cthe answer is nothing\u201d and then states \u201cwhat you are really long is the equity basket plus two duration/credit proxies.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer avoids ledger-raw precision; it uses rounded labels like \u201c100.0%\u201d and no spurious many-decimal figures."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cSo the clean reading is: you are long concentrated US growth and quality equities, with a smaller overlay in credit and duration.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "B06-positioning-blind#t1",
+   "question_tag": "B06-positioning-blind#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201c1y adjusted-close return is 58.2%\u2026 latest 10-Q shows\u2026 10b5-1 sale plans\u2026 The 10-K points me to the proxy\u201d uses system-specific filed evidence and period references."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I do not have filed short-interest figures for LLY on this desk, so I cannot say how much short selling is actually on the name.\""
+    }
+   }
+  },
+  {
+   "tag": "B06-positioning-blind#t2",
+   "question_tag": "B06-positioning-blind#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 10,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cthe market looks cautious but not decisively hostile\u201d directly answers whether the market\u2019s turning on LLY."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cOver the last year, LLY\u2019s adjusted-close return is 58.2%, and its deepest drawdown...\u201d; it cites specific figures and filings, not generic market prose."
+    },
+    "precision": {
+     "met": true,
+     "why": "\"58.2%\" and \"23.2%\" are rounded to reader-usable precision, not ledger-raw precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with an actionable implication: \u201cWhat would change that reading is a persistent failure to hold the post-drawdown recovery\u2026\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-borrow-headroom#t1",
+   "question_tag": "W01-xom-borrow-headroom#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It gives a specific ratio and period: \u201c0.10\u00d7, measured as of 2026-03-31 over the 2025-04-01..2026-03-31 window.\u201d"
+    },
+    "precision": {
+     "met": false,
+     "why": "It reproduces ledger-raw precision in prose: \u201c0.096x,\u201d which is more exact than the reader needs."
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-borrow-headroom#t2",
+   "question_tag": "W01-xom-borrow-headroom#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It refuses to answer \u201chow much more could they borrow\u201d and says \u201cAsk again,\u201d instead of resolving the carried-over leverage question."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "\"No issuer or metric\" and no figure, quoted passage, or named period appear, so the claim is not grounded in evidence."
+    },
+    "precision": {
+     "met": false,
+     "why": "The answer gives no borrowing figure at all, so it never demonstrates reader-level precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cAsk again, or narrow the question,\u201d which is only an offer to do more work, not an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t1",
+   "question_tag": "W02-ccc-carried-to-jpm#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites Apple\u2019s named periods and specific figures for cash conversion cycle and inputs, showing grounded evidence rather than generic prose."
+    },
+    "precision": {
+     "met": false,
+     "why": "\"-71.07\" and \"34.89 | 9.45 | 115.40\" preserve overly raw precision rather than reader-appropriate significant figures."
+    }
+   }
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t2",
+   "question_tag": "W02-ccc-carried-to-jpm#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cJPM has no held figure for cash conversion cycle\u201d directly answers the carried-over JPM query by resolving the same measure, albeit with a negative finding."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites JPM-specific filed evidence: \"the fundamentals table for JPM does not file it\" and \"operating cash flow 21\" with a named period."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cJPM has no held figure for cash conversion cycle\u2026 the fundamentals table for JPM does not file it\u201d plainly says why and offers nearby held figures."
+    }
+   }
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t3",
+   "question_tag": "W02-ccc-carried-to-jpm#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt\u2019s the version for a bank: \u2018cash conversion of earnings\u2019\u2026 whether earnings are translating into cash, not how long inventory sits or payables stretch.\u201d"
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "Uses named company and periods: \u201cFor JPM,\u201d \u201ctoday versus a year earlier,\u201d plus specific filed figures for operating cash flow and net income."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses rounded figures like \u201c-38.6%,\u201d \u201c-139.2%,\u201d and \u201c$-148B,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201ccash is now coming in materially weaker than earnings\u201d gives a bank-relevant implication a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t1",
+   "question_tag": "W03-which-run-was-that#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It gives filed-like specifics\u2014\u201c$10.99M,\u201d \u201c2026-09-03,\u201d and \u201cMSFT is 16.3%\u201d\u2014instead of generic prose."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201cThe book\u2019s market value is $10.99M\u201d and \u201cMSFT is 16.3%\u201d use reader-appropriate precision, not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t2",
+   "question_tag": "W03-which-run-was-that#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI do not have a separate figure for the prior run,\u201d so it doesn\u2019t answer \u201clatest run or the one before?\u201d or \u201cwhen was it struck.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives a specific-looking figure, but no evidence, quoted passage, or named period beyond vague \u201clatest run\u201d and \u201cprior run.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c$10.99M\u201d and \u201c16.3%\u201d use reader-appropriate precision, not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t3",
+   "question_tag": "W03-which-run-was-that#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI cannot say whether today\u2019s close would make it look different,\u201d instead of resolving today\u2019s close against the carried-over book value/weight."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I do not hold a later completed run or a today-struck book valuation\" plainly states the gap and names the nearest held figure."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c$10.99M and 16.3%\u201d are appropriately rounded, not ledger-raw precision."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI cannot say whether today\u2019s close would make it look different,\u201d which offers more work instead of an actionable implication."
+    }
+   }
+  },
+  {
+   "tag": "W04-just-divide-them#t1",
+   "question_tag": "W04-just-divide-them#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cThe desk does not currently hold that as a figure for AAPL\u201d and it names the nearest held item: \u201cthe closest held ratio is 100.0% ... revenue divided by stockholders\u2019 equity.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W04-just-divide-them#t2",
+   "question_tag": "W04-just-divide-them#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt\u2019s using the latest diluted EPS and latest adjusted close to compute a price-to-EPS multiple,\u201d which answers the \u201cdivide them\u201d request."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gave a computed \u201cprice-to-EPS multiple\u201d from filed EPS and price instead of saying the requested split was not held or unavailable."
+    }
+   }
+  },
+  {
+   "tag": "W04-just-divide-them#t3",
+   "question_tag": "W04-just-divide-them#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 10,
+   "met": 2,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from \u201cjust divide them\u201d to \u201ctrailing P/E from the desk yet\u201d and \u201clooks expensive versus its own recent price history,\u201d not the asked multiple."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201clatest adjusted close\u201d \u201c1y series\u201d and \u201clatest annual diluted EPS series $7.46 (2025-09-27)\u201d ground it in system evidence and named periods."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a proxied \u201clooks expensive\u201d verdict instead of plainly saying the asked figure/split isn\u2019t held and naming the missing method."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201c$328.21\u201d and \u201c$7.46\u201d are given as exact ledger values rather than rounded to reader-friendly precision in prose."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an actionable implication: \u201clooks expensive versus its own recent price history,\u201d which a portfolio manager could act on."
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t1",
+   "question_tag": "W05-half-taken-back#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives generic arithmetic and cites \u201ccurrent MSFT weight 16.3%\u201d and \u201ccurrent Microsoft concentration check is 20.0%,\u201d but no grounded system evidence or filed period."
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c81.3% of the current MSFT weight 16.3%\u201d and \u201c20.0%\u201d use reader-appropriate rounded precision."
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t2",
+   "question_tag": "W05-half-taken-back#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It asks for \u201cbring it down TO half the single-name limit,\u201d but the answer says it \u201ccannot compute\u201d and asks for \u201cthe limit figure.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It uses generic placeholders and says \u201cI cannot compute\u201d because \u201cthe desk does not hold a `limit_checks...limit` figure,\u201d with no grounded post-trade figure or filed period."
+    },
+    "precision": {
+     "met": false,
+     "why": "\u201cThe current Microsoft weight is 16.3%, and the current Microsoft concentration breach level is 20.0%\u201d uses only existing rounded figures, but it never computes the requested \u201cbring it down TO half th"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by offering more work: \u201cIf you want me to do the trade scenario, I need the exact target instruction...\u201d"
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t3",
+   "question_tag": "W05-half-taken-back#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cLLY is untouched by the MSFT scenario\u201d directly answers whether Lilly is affected by the prior Microsoft question."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites system-specific figures: \u201cLLY at 12.7%,\u201d \u201cconcentration check at 18.0%,\u201d and \u201cMSFT at 16.3%.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201c12.7%,\u201d \u201c18.0%,\u201d \u201c16.3%,\u201d and \u201c20.0%\u201d use reader-appropriate precision, not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "W06-is-that-all-of-them#t1",
+   "question_tag": "W06-is-that-all-of-them#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 11,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\"which says one bottler accounted for 10% of net operating revenues in 2025\" and similar named-period, filing-based claims anchor the answer in evidence."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"did not surface a comparable explicit customer-concentration disclosure ... so on this desk that is an absence rather than a substitute claim.\""
+    }
+   }
+  },
+  {
+   "tag": "W06-is-that-all-of-them#t2",
+   "question_tag": "W06-is-that-all-of-them#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cjust the names I had opened\u201d and \u201csweep the owned issuers,\u201d so it doesn\u2019t answer whether it\u2019s all of them."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "It says \u201cjust the names I had opened\u201d and gives no system-grounded evidence or named period beyond generic process language."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"It\u2019s just the names I had opened\" plainly says it is not a full sweep and names the gap: \"not a desk-wide figure for customer concentration.\""
+    }
+   }
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t1",
+   "question_tag": "NEW01-whats-coming-up#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 11,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It mentions \u201cLLY,\u201d \u201cMSFT,\u201d etc., but gives no filed date or specific near-term reporting schedule, and says \u201cI do not hold a desk-wide dated calendar.\u201d"
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"I do not hold a desk-wide dated calendar of the next couple of weeks\u2019 reports or events as a filed figure.\""
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI need to look it up issuer by issuer,\u201d not with a portfolio action or implication."
+    }
+   }
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t2",
+   "question_tag": "NEW01-whats-coming-up#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It answers with MSFT concentration and \u201cprice tape,\u201d not the asked \u201cwhat\u2019s coming up in the next couple of weeks\u201d dated catalyst."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cMSFT window return over 2026-08-04..2026-09-03 was 3.71% as of 2026-09-03\u201d gives a named period and filed figure."
+    },
+    "precision": {
+     "met": true,
+     "why": "The answer uses rounded figures like \u201c3.71%\u201d and \u201c16.3%,\u201d not ledger-raw precision."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cif the event is bad, you can still get hit at the portfolio level\u201d is a usable portfolio action implication."
+    }
+   }
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t3",
+   "question_tag": "NEW01-whats-coming-up#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over issue of which names need action before the catalyst, focusing on LLY and MSFT warnings."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gives concentration breaches but says \u201cI do not hold an event-specific expected move or catalyst calendar,\u201d not a named missing figure/split with the nearest held equivalent."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cMSFT is the cleaner one to look at first\u201d and \u201cthat means you are already carrying concentration risk\u201d gives an actionable implication for the portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t1",
+   "question_tag": "NEW02-does-the-story-still-hold#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 13,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer uses generic claims like \u201cthe filings and filed figures line up\u201d without any quoted passage or specific filed period evidence supporting the substance."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It never says the figure is unreported or unavailable; instead it presents capex numbers and a narrative that they \u201cline up.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "\"The filed annual series show capex rising to $91.45B\" uses reader-appropriate precision, not ledger-raw decimals."
+    }
+   }
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t2",
+   "question_tag": "NEW02-does-the-story-still-hold#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"They say the main ways this can go off course are that the extra investment may not be commercially viable...\""
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "Generic risk-factor prose with no named period or quoted filing evidence."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer lists risks but does not say the desk lacks a figure or split, nor name a \u201cnearest thing\u201d it holds."
+    }
+   }
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t3",
+   "question_tag": "NEW02-does-the-story-still-hold#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"The company\u2019s own list of what can knock it off course\" directly answers the carried-over underwriting question."
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives generic AI-capex risks, but no quoted passage or named period; it could describe any company."
+    },
+    "so_what": {
+     "met": true,
+     "why": "That final line gives an actionable implication: \u201cyou are underwriting execution plus monetization on the AI capex cycle, not just spending.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t1",
+   "question_tag": "NEW03-what-flagged-on-the-run#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "It gives specific numbers and tickers, but no evidence or quoted filed passage is shown to ground \u201clast run fired 2\u201d or the dates."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives tripped checks and figures, but never says the desk lacks a near-miss figure or names the nearest thing held as such."
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-level precision like \u201c12.7%\u201d and \u201c16.3%,\u201d not ledger-raw precision."
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t2",
+   "question_tag": "NEW03-what-flagged-on-the-run#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It orders the two flagged entities from the prior turn and explains which one needs action first: \u201cMSFT first, then LLY.\u201d"
+    },
+    "precision": {
+     "met": true,
+     "why": "Uses reader-appropriate precision like \u201c16.3%,\u201d \u201c15.0%,\u201d and \u201c81.3%,\u201d not ledger-raw precision."
+    },
+    "ranking": {
+     "met": true,
+     "why": "The answer orders them, naming \u201cMSFT first, then LLY,\u201d and identifies MSFT as the largest/priority driver."
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an actionable implication: \u201cMSFT is the one you actually have to act on first.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t3",
+   "question_tag": "NEW03-what-flagged-on-the-run#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"The answer stays on the same issuer-concentration warnings from the prior turn and answers \u201cwhat\u2019s not on that list\u201d by naming MSFT and LLY with levels.\""
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "The answer plainly says it \"can't name a new threshold\" and anchors on \"the desk\u2019s own issuer-concentration warning set.\""
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating limits and \u201cI can\u2019t infer a separate \u2018should be\u2019 list,\u201d not by giving a portfolio-manageable implication."
+    },
+    "trigger": {
+     "met": true,
+     "why": "The answer gives explicit levels: \u201c15.0%,\u201d \u201c12.0%,\u201d and \u201cwhatever would move toward a breach if concentration keeps rising.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "NEW04-swap-not-a-sale#t1",
+   "question_tag": "NEW04-swap-not-a-sale#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 2,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites specific book figures and period-specific concentrations: \u201cNVDA is 4.16% and LLY is 12.7%\u2026 MSFT\u2026 16.3%.\u201d"
+    },
+    "netting": {
+     "met": false,
+     "why": "It lists NVDA and LLY side by side, but never states the net exposure with direction after the 4-point shift."
+    },
+    "precision": {
+     "met": true,
+     "why": "It uses reader-level precision like \u201c4.16%,\u201d \u201c12.7%,\u201d and \u201c16.3%,\u201d not ledger-raw excessive decimals."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating concentrations and \u201cwould not be a clean de-risking trade,\u201d without a clear actionable implication for the portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "NEW04-swap-not-a-sale#t2",
+   "question_tag": "NEW04-swap-not-a-sale#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 3,
+   "judged": 5,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer addresses \u201cless risky or just differently risky\u201d and says \u201clikely differently risky, not proven less risky.\u201d"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "No filed figures, quoted passage, or named period appear; it reads like generic desk commentary rather than evidence-based claim."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"What I cannot state ... is whether the scenario is numerically less risky ... because those post-trade measures are withheld on this desk\""
+    },
+    "precision": {
+     "met": true,
+     "why": "\u201clikely differently risky, not proven less risky\u201d answers the question without reproducing raw-precision figures."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201clikely differently risky, not proven less risky,\u201d which is a conclusion, but not a concrete portfolio-manager action."
+    }
+   }
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t1",
+   "question_tag": "NEW05-your-numbers-disagree#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "grounded_claims": {
+     "met": false,
+     "why": "The answer gives figures but no named period or source-backed evidence; it reads like generic analysis rather than grounded claims."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives numbers and a conclusion, but never says the desk lacks a figure or method and offers only held measures."
+    },
+    "precision": {
+     "met": false,
+     "why": "It uses exact ledger-style precision like \u201c68.86, 4.41, and 135.75\u201d and \u201c-62.48,\u201d rather than reader-appropriate rounding."
+    }
+   }
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t2",
+   "question_tag": "NEW05-your-numbers-disagree#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 9,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the disagreement directly by saying \u201cI believe the cash-flow side first\u201d and names the cash-flow evidence."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "It cites MSFT, amounts, and the period \u201c2025-04-01..2026-03-31,\u201d so the claim rests on specific system evidence."
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"So the shortcut is: if the two ever split, I trust the cash-flow evidence... and I treat the split as a warning\" gives an actionable implication for a portfolio manager."
+    }
+   }
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t3",
+   "question_tag": "NEW05-your-numbers-disagree#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 14,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the \u201cwhat would settle it\u201d by naming the deciding evidence: \u201c$-44.92B\u201d accruals and \u201c$72.92B\u201d free cash flow for the same window."
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It names other facts but never says plainly what the desk does not hold for \u201cwhat would settle it,\u201d nor gives the nearest held figure as such."
+    },
+    "trigger": {
+     "met": true,
+     "why": "It gives quantified decision points: \u201c$-44.92B\u201d accruals and \u201c$72.92B\u201d free cash flow, with a change in assessment if they \u201csplit.\u201d"
+    }
+   }
+  },
+  {
+   "tag": "NEW06-what-you-havent-got#t1",
+   "question_tag": "NEW06-what-you-havent-got#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 4,
+   "met": 3,
+   "judged": 4,
+   "criteria": {
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cas of 10,\u201d \u201cLLY and MSFT,\u201d and \u201ccurrent run\u201d tie the claims to specific book evidence and period, not generic prose."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"does not hold\" and \"that is not held as a figure\" plainly name the gaps and the nearest held method, with no estimate."
+    },
+    "ranking": {
+     "met": true,
+     "why": "It names \u201cone thing\u201d first and \u201cSecond would be,\u201d clearly ordering the drivers by magnitude."
+    },
+    "so_what": {
+     "met": false,
+     "why": "It describes missing data and risk analysis, but ends without a concrete portfolio-manager action or implication."
+    }
+   }
+  },
+  {
+   "tag": "NEW06-what-you-havent-got#t2",
+   "question_tag": "NEW06-what-you-havent-got#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 4,
+   "judged": 4,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe book\u2019s risk readout beyond the two concentration alerts\u201d and \u201cthe missing per-name factor sensitivity\u201d directly answer what was previously described as missing."
+    },
+    "grounded_claims": {
+     "met": true,
+     "why": "\u201cThe clearest facts we do have are the LLY and MSFT concentration warnings, 12.7% and 16.3%\u201d cites specific run evidence and named figures."
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cthe broader market-risk and attribution figures are not named on this run and the desk withholds some scenario outputs entirely\u201d and it points to the nearest held figures: \u201cLLY and MSFT concentration"
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cIt ends with an actionable implication: \u2018the least trustworthy part is the absence of a full, citable decomposition of what is driving the risk picture.\u2019\u201d"
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "grounded_claims": [
+   55,
+   100
+  ],
+  "honest_absence": [
+   43,
+   81
+  ],
+  "precision": [
+   63,
+   87
+  ],
+  "ranking": [
+   11,
+   20
+  ],
+  "follows_on": [
+   50,
+   84
+  ],
+  "so_what": [
+   33,
+   73
+  ],
+  "trigger": [
+   5,
+   11
+  ],
+  "netting": [
+   6,
+   10
+  ]
+ }
+}

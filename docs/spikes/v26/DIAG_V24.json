@@ -1,0 +1,834 @@
+[
+ {
+  "tag": "N01-earnings-quality#t1",
+  "elapsed_s": 16.0,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 16,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 7,
+   "compute": 6,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "divide",
+   "divide",
+   "divide",
+   "latest",
+   "latest"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_775d34fafb86\"], \"as_quantity\": \"latest_cash_conversion\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_4e0882f04a88\"], \"as_quantity\": \"latest_ocf\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"accruals_ratio\", \"months\": 3, \"ticker\": \"NVDA\"}"
+   },
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"7\", \"ticker\": \"NVDA\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 19000,
+  "prompt_tokens_sum": 130419,
+  "answered": true
+ },
+ {
+  "tag": "N01-earnings-quality#t2",
+  "elapsed_s": 5.9,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 10,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 4,
+   "compute": 5
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_a1b532cfa440\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13189,
+  "prompt_tokens_sum": 39651,
+  "answered": true
+ },
+ {
+  "tag": "N02-working-capital#t1",
+  "elapsed_s": 12.3,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 6,
+   "compute": 7
+  },
+  "methods": [],
+  "ops": [
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_6c86839736a3\"], \"as_quantity\": \"accounts_receivable_yoy\"}"
+   },
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"calc_f594531cfe8f\", \"calc_7c06037bcf46\", \"f_1686ec3af182\"], \"as_quantity\": \"yoy_growth_compare\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_d9f19d8ee584\"], \"as_quantity\": \"accounts_receivable_yoy\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14050,
+  "prompt_tokens_sum": 104553,
+  "answered": true
+ },
+ {
+  "tag": "N02-working-capital#t2",
+  "elapsed_s": 5.1,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 4,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 1,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "days_inventory",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11800,
+  "prompt_tokens_sum": 48285,
+  "answered": true
+ },
+ {
+  "tag": "N03-liquidity#t1",
+  "elapsed_s": 17.1,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 2,
+   "compute": 5,
+   "read_book": 1
+  },
+  "methods": [
+   "price.adv",
+   "price.adv",
+   "price.adv"
+  ],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"price.adv\", \"params\": {\"window\": \"3m\"}, \"subject\": [\"AAPL\", \"JPM\", \"LLY\", \"MSFT\", \"GOOGL\", \"HYG\", \"AMZN\", \"TLT\", \"XOM\", \"NVDA\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 32451,
+  "prompt_tokens_sum": 184078,
+  "answered": true
+ },
+ {
+  "tag": "N03-liquidity#t2",
+  "elapsed_s": 9.7,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 1,
+   "compute": 4,
+   "read_prices": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "latest",
+   "divide"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_fcc2ca4f2c88\"], \"as_quantity\": \"aapl_latest_price\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13883,
+  "prompt_tokens_sum": 84219,
+  "answered": true
+ },
+ {
+  "tag": "N04-drawdown-anatomy#t1",
+  "elapsed_s": 3.2,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6187,
+  "prompt_tokens_sum": 20500,
+  "answered": true
+ },
+ {
+  "tag": "N04-drawdown-anatomy#t2",
+  "elapsed_s": 7.7,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 2,
+   "compute": 2,
+   "read_prices": 1
+  },
+  "methods": [
+   "price.beta"
+  ],
+  "ops": [
+   "latest",
+   "divide"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"price.beta\", \"params\": {\"benchmark\": \"SPY\"}, \"subject\": [\"AAPL\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "What I cannot yet say from the desk is the exact episode path, because the drawdown-episode and explain-episode rows are not held on the run surface I was able to read;"
+   }
+  ],
+  "prompt_tokens_max": 13136,
+  "prompt_tokens_sum": 50424,
+  "answered": true
+ },
+ {
+  "tag": "N05-market-or-us#t1",
+  "elapsed_s": 11.6,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_prices": 1,
+   "compute": 5
+  },
+  "methods": [
+   "price.window_return",
+   "price.window_return",
+   "book.analysis"
+  ],
+  "ops": [
+   "pct",
+   "latest",
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_6d574430eeb7\"], \"as_quantity\": \"SPY_1m_return\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_6d574430eeb7\"]}"
+   },
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"pct\", \"method\": \"price.window_return\", \"params\": {\"window\": \"1m\"}, \"subject\": \"SPY\"}"
+   },
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.analysis\", \"params\": {\"benchmark\": \"SPY\"}, \"subject\": \"run_e6249206a002\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16591,
+  "prompt_tokens_sum": 132933,
+  "answered": true
+ },
+ {
+  "tag": "N06-top-five#t1",
+  "elapsed_s": 8.9,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 4,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "add",
+   "add"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10052,
+  "prompt_tokens_sum": 59197,
+  "answered": true
+ },
+ {
+  "tag": "N07-capex-cycle#t1",
+  "elapsed_s": 7.1,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 16,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_fundamentals": 8,
+   "compute": 6
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "yoy",
+   "yoy",
+   "yoy",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_64663dd56c2e\"], \"as_quantity\": \"MSFT capex yoy\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 8, \"metric\": \"depreciation_and_amortization\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 8, \"metric\": \"capital_expenditures\", \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 20679,
+  "prompt_tokens_sum": 61016,
+  "answered": true
+ },
+ {
+  "tag": "N07-capex-cycle#t2",
+  "elapsed_s": 8.8,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 18,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_fundamentals": 12,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"at\": null, \"metric\": \"cash and cash equivalents\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"at\": null, \"metric\": \"total debt\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"at\": null, \"metric\": \"shareholders' equity\", \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 22278,
+  "prompt_tokens_sum": 129902,
+  "answered": true
+ },
+ {
+  "tag": "N08-whats-in-the-price#t1",
+  "elapsed_s": 9.3,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 8,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_prices": 3,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "min",
+   "max",
+   "latest",
+   "max"
+  ],
+  "describe_levels": [
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"min\", \"operands\": [\"f_b6f588ae1907\"], \"as_quantity\": \"1y_low\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"max\", \"operands\": [\"f_b6f588ae1907\"], \"as_quantity\": \"1y_high\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_b6f588ae1907\"], \"as_quantity\": \"latest_price\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"max\", \"operands\": [\"f_d625b9c7ba61\"], \"as_quantity\": \"1y_high\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10765,
+  "prompt_tokens_sum": 90962,
+  "answered": true
+ },
+ {
+  "tag": "N08-whats-in-the-price#t2",
+  "elapsed_s": 5.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 3,
+   "read_prices": 1
+  },
+  "methods": [
+   "price.momentum_12_1",
+   "price.window_return"
+  ],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"price.window_return\", \"params\": {\"end\": \"2026-08-05\", \"start\": \"2025-09-04\"}, \"subject\": \"XOM\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9794,
+  "prompt_tokens_sum": 43268,
+  "answered": true
+ },
+ {
+  "tag": "N09-no-forecast#t1",
+  "elapsed_s": 11.2,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 6,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 1,
+   "compute": 3,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [
+   "yoy",
+   "yoy",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_a2f834c706b5\"], \"as_quantity\": \"revenue_growth\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15961,
+  "prompt_tokens_sum": 119527,
+  "answered": true
+ },
+ {
+  "tag": "N09-no-forecast#t2",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"LLY\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 12800,
+  "prompt_tokens_sum": 37153,
+  "answered": true
+ },
+ {
+  "tag": "N10-margin-debate#t1",
+  "elapsed_s": 23.3,
+  "error": null,
+  "llm_calls": 16,
+  "tool_calls": 17,
+  "respond_attempts": 5,
+  "gate_refusals": 4,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure",
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_filings": 4,
+   "compute": 7,
+   "read_fundamentals": 4
+  },
+  "methods": [
+   "gross_margin",
+   "gross_margin"
+  ],
+  "ops": [
+   "divide",
+   "divide",
+   "divide",
+   "qoq",
+   "qoq",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "operands",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_cbc07dc492f3\", \"f_05ee512061ba\", \"f_a8a9bdb13ba7\", \"f_faa5d8401a3f\"], \"as_quantity\": \"gross_margin_ratio\"}"
+   },
+   {
+    "error": "not_a_quantity",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_cbc07dc492f3\", \"f_05ee512061ba\"], \"as_quantity\": \"AAPL_gm\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 38628,
+  "prompt_tokens_sum": 481830,
+  "answered": true
+ },
+ {
+  "tag": "N11-one-question#t1",
+  "elapsed_s": 7.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 10,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "operands",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_26a0bd796af4\", \"f_42d799fac4da\", \"f_6bc4524bf29b\", \"f_5530ce7d001d\"], \"as_quantity\": \"residual_cash_after_capex_buybacks_dividends\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 17681,
+  "prompt_tokens_sum": 81519,
+  "answered": true
+ },
+ {
+  "tag": "N12-sector-drift#t1",
+  "elapsed_s": 9.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [
+   "book.analysis",
+   "book.reconcile"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11041,
+  "prompt_tokens_sum": 39573,
+  "answered": true
+ },
+ {
+  "tag": "N12-sector-drift#t2",
+  "elapsed_s": 9.3,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_?\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9378,
+  "prompt_tokens_sum": 38821,
+  "answered": true
+ }
+]

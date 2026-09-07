@@ -1,0 +1,1184 @@
+[
+ {
+  "tag": "C01-trim-one#t1",
+  "elapsed_s": 12.5,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7322,
+  "prompt_tokens_sum": 29330,
+  "answered": true
+ },
+ {
+  "tag": "C01-trim-one#t2",
+  "elapsed_s": 22.6,
+  "error": null,
+  "llm_calls": 13,
+  "tool_calls": 17,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 4,
+   "read_book": 1,
+   "read_fundamentals": 4,
+   "compute": 6,
+   "read_filings": 2
+  },
+  "methods": [
+   "issuer_profitability",
+   "issuer_earnings_quality",
+   "issuer_credit_and_balance_sheet",
+   "issuer_capital_allocation"
+  ],
+  "ops": [
+   [
+    "divide",
+    "divide",
+    "divide",
+    "divide",
+    "subtract",
+    "subtract",
+    "subtract",
+    "subtract"
+   ],
+   "divide",
+   "divide",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book",
+   "book",
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": [\"issuer_profitability\", \"issuer_earnings_quality\", \"issuer_credit_and_balance_sheet\", \"issuer_capital_allocation\"], \"params\": {\"last_n\": 4}, \"subject\": [\"LLY\", \"MSFT\"]}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_?\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 32403,
+  "prompt_tokens_sum": 274425,
+  "answered": true
+ },
+ {
+  "tag": "C01-trim-one#t3",
+  "elapsed_s": 8.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 3
+  },
+  "methods": [
+   "book.sell",
+   "book.sell"
+  ],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.sell\", \"params\": {\"ticker\": \"LLY\", \"weight\": 0.1267}, \"subject\": \"run_aacdb498c66f\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14777,
+  "prompt_tokens_sum": 60403,
+  "answered": true
+ },
+ {
+  "tag": "C02-nvda-bear#t1",
+  "elapsed_s": 25.2,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 5,
+  "respond_attempts": 5,
+  "gate_refusals": 4,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: not_on_ledger",
+   "error: kind_does_not_fit",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 4
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 15592,
+  "prompt_tokens_sum": 98753,
+  "answered": true
+ },
+ {
+  "tag": "C02-nvda-bear#t2",
+  "elapsed_s": 17.2,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 6,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: kind_does_not_fit",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 3,
+   "read_fundamentals": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "series_not_derivable",
+    "args": "{\"last_n\": 8, \"metric\": \"revenue\", \"months\": 3, \"ticker\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 21905,
+  "prompt_tokens_sum": 183358,
+  "answered": true
+ },
+ {
+  "tag": "C03-smoke#t1",
+  "elapsed_s": 8.5,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 4,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 3,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "procedures",
+   "book"
+  ],
+  "opened_a_domain": true,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18114,
+  "prompt_tokens_sum": 26528,
+  "answered": true
+ },
+ {
+  "tag": "C03-smoke#t2",
+  "elapsed_s": 6.1,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 8034,
+  "prompt_tokens_sum": 24472,
+  "answered": true
+ },
+ {
+  "tag": "C03-smoke#t3",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 5
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_1\"}"
+   },
+   {
+    "tool": "read_book",
+    "error": "unknown_run",
+    "args": "{\"ref\": \"run_85acaef8d4c\", \"names\": [\"issuer_exposures.MSFT.weight\", \"limit_checks.issuer_concentration:MSFT.breach_level\"]}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9408,
+  "prompt_tokens_sum": 24590,
+  "answered": true
+ },
+ {
+  "tag": "C04-rates-100bp#t1",
+  "elapsed_s": 20.1,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 11
+  },
+  "methods": [],
+  "ops": [
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply",
+   "multiply"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"multiply\", \"operands\": [\"f_312e0557804f\", \"f_9114b3549063\"], \"as_quantity\": \"rates_factor_contribution_check\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 21992,
+  "prompt_tokens_sum": 84284,
+  "answered": true
+ },
+ {
+  "tag": "C04-rates-100bp#t2",
+  "elapsed_s": 12.7,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 6,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2,
+   "read_prices": 1
+  },
+  "methods": [
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta"
+  ],
+  "ops": [
+   "latest",
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": [\"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\", \"price.beta\"], \"params\": {"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_43b130725a16\"], \"as_quantity\": \"TLT 1m return\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name: the desk says per-name factor sensitivity is not held as such;"
+   }
+  ],
+  "prompt_tokens_max": 14638,
+  "prompt_tokens_sum": 86352,
+  "answered": true
+ },
+ {
+  "tag": "C05-amzn-capital#t1",
+  "elapsed_s": 11.6,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 7,
+   "compute": 5,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "divide",
+   "subtract",
+   "divide",
+   "rank"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "incomparable_quantities",
+    "args": "{\"op\": \"rank\", \"operands\": [\"f_cbb71f985c05\", \"f_387970a40c92\", \"f_4acace0029d1\"], \"direction\": \"highest\", \"as_quantity\": \"cash_use_shape\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"free_cash_flow\", \"months\": 12, \"ticker\": \"AMZN\"}"
+   },
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 3, \"item\": \"7\", \"ticker\": \"AMZN\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 13925,
+  "prompt_tokens_sum": 105486,
+  "answered": true
+ },
+ {
+  "tag": "C05-amzn-capital#t2",
+  "elapsed_s": 10.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 7
+  },
+  "methods": [
+   "capex",
+   "revenue",
+   "capex_intensity",
+   "capex",
+   "revenue",
+   "capex_intensity",
+   "free_cash_flow",
+   "operating_cash_flow",
+   "free_cash_flow"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"capex\", \"params\": {\"months\": 12}, \"subject\": \"AMZN\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"revenue\", \"params\": {\"months\": 12}, \"subject\": \"AMZN\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": [\"capex_intensity\", \"free_cash_flow\", \"operating_cash_flow\"], \"params\": {\"months\": 12}, \"subject\": \"AMZN\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13056,
+  "prompt_tokens_sum": 74335,
+  "answered": true
+ },
+ {
+  "tag": "C05-amzn-capital#t3",
+  "elapsed_s": 12.7,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 4,
+   "read_fundamentals": 6,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals",
+   "filings",
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"AMZN\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 23148,
+  "prompt_tokens_sum": 154246,
+  "answered": true
+ },
+ {
+  "tag": "C06-new-name-ko#t1",
+  "elapsed_s": 2.3,
+  "error": null,
+  "llm_calls": 2,
+  "tool_calls": 1,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6246,
+  "prompt_tokens_sum": 9041,
+  "answered": true
+ },
+ {
+  "tag": "C06-new-name-ko#t2",
+  "elapsed_s": 11.2,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 31,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 29,
+   "compute": 1
+  },
+  "methods": [
+   "net_debt_to_ebitda"
+  ],
+  "ops": [
+   "avg"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"avg\", \"method\": \"net_debt_to_ebitda\", \"params\": {\"last_n\": 1}, \"subject\": [\"AAPL\", \"AMZN\", \"GOOGL\", \"JPM\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 8, \"metric\": \"net_debt_to_ebitda\", \"ticker\": \"KO\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 1, \"metric\": \"total_debt\", \"ticker\": \"AAPL\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "not_reported_at_this_date",
+    "args": "{\"at\": \"2026-04-03\", \"metric\": \"long_term_debt_total\", \"ticker\": \"KO\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 12986,
+  "prompt_tokens_sum": 61211,
+  "answered": true
+ },
+ {
+  "tag": "C06-new-name-ko#t3",
+  "elapsed_s": 4.3,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11474,
+  "prompt_tokens_sum": 33956,
+  "answered": true
+ },
+ {
+  "tag": "C07-vol-rising#t1",
+  "elapsed_s": 11.1,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 6,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 3,
+   "compute": 2
+  },
+  "methods": [
+   "book.analysis",
+   "book.analysis"
+  ],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"book.analysis\", \"params\": {}, \"subject\": \"port_001\"}"
+   },
+   {
+    "error": "unknown_run",
+    "args": "{\"method\": \"book.analysis\", \"params\": {}, \"subject\": \"port_001\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13992,
+  "prompt_tokens_sum": 104319,
+  "answered": true
+ },
+ {
+  "tag": "C07-vol-rising#t2",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [
+   "book.analysis"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.analysis\", \"params\": {\"window\": \"1m\"}, \"subject\": \"port_001\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15471,
+  "prompt_tokens_sum": 39256,
+  "answered": true
+ },
+ {
+  "tag": "C08-wrong-premise#t1",
+  "elapsed_s": 6.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 3,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "duplicate_operand",
+    "args": "{\"op\": \"rank\", \"operands\": [\"f_7172aa899512\", \"f_7172aa899512\"], \"direction\": \"highest\", \"as_quantity\": \"largest_position_check\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7938,
+  "prompt_tokens_sum": 35459,
+  "answered": true
+ },
+ {
+  "tag": "C08-wrong-premise#t2",
+  "elapsed_s": 6.3,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 4,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12514,
+  "prompt_tokens_sum": 44999,
+  "answered": true
+ },
+ {
+  "tag": "C09-lly-concentration#t1",
+  "elapsed_s": 8.1,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 4,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_filings": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"LLY\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 13209,
+  "prompt_tokens_sum": 24095,
+  "answered": true
+ },
+ {
+  "tag": "C09-lly-concentration#t2",
+  "elapsed_s": 15.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"LLY\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 12666,
+  "prompt_tokens_sum": 48426,
+  "answered": true
+ },
+ {
+  "tag": "C10-news-to-position#t1",
+  "elapsed_s": 18.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18411,
+  "prompt_tokens_sum": 36329,
+  "answered": true
+ },
+ {
+  "tag": "C10-news-to-position#t2",
+  "elapsed_s": 4.7,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7451,
+  "prompt_tokens_sum": 23387,
+  "answered": true
+ },
+ {
+  "tag": "C11-ellipsis#t1",
+  "elapsed_s": 17.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 10,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "compute": 4,
+   "read_fundamentals": 4
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"divide\", \"operands\": [\"MSFT:operating_income\", \"MSFT:revenue\"], \"as_quantity\": \"operating_margin\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20832,
+  "prompt_tokens_sum": 98850,
+  "answered": true
+ },
+ {
+  "tag": "C11-ellipsis#t2",
+  "elapsed_s": 4.6,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 3,
+   "read_book": 1
+  },
+  "methods": [
+   "issuer.panel",
+   "operating_margin",
+   "operating_margin"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"issuer.panel\", \"params\": {\"last_n\": 1}, \"subject\": [\"AAPL\", \"MSFT\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7258,
+  "prompt_tokens_sum": 28691,
+  "answered": true
+ },
+ {
+  "tag": "C11-ellipsis#t3",
+  "elapsed_s": 7.7,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 5,
+   "compute": 2
+  },
+  "methods": [
+   "operating_margin",
+   "roic"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "fundamentals",
+   "fundamentals",
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 37755,
+  "prompt_tokens_sum": 113021,
+  "answered": true
+ },
+ {
+  "tag": "C12-trigger-levels#t1",
+  "elapsed_s": 4.2,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [
+   "book.drawdown_episodes"
+  ],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"book.drawdown_episodes\", \"params\": {}, \"subject\": \"port_001\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14764,
+  "prompt_tokens_sum": 23119,
+  "answered": true
+ },
+ {
+  "tag": "C12-trigger-levels#t2",
+  "elapsed_s": 7.2,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7948,
+  "prompt_tokens_sum": 38389,
+  "answered": true
+ },
+ {
+  "tag": "C13-xom-still-oil#t1",
+  "elapsed_s": 20.7,
+  "error": null,
+  "llm_calls": 12,
+  "tool_calls": 13,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: kind_does_not_fit",
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 3,
+   "read_fundamentals": 4,
+   "compute": 3,
+   "read_book": 2
+  },
+  "methods": [
+   "issuer.panel"
+  ],
+  "ops": [
+   "pct",
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_5d58c7d01a71\", \"f_b008c1864c88\"], \"as_quantity\": \"capex_to_revenue\"}"
+   },
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"issuer.panel\", \"params\": {\"last_n\": 5}, \"subject\": \"XOM\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18032,
+  "prompt_tokens_sum": 159331,
+  "answered": true
+ },
+ {
+  "tag": "C13-xom-still-oil#t2",
+  "elapsed_s": 8.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 11,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_filings": 1,
+   "read_fundamentals": 5,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "pct",
+   "latest"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_f223f201c354\"], \"as_quantity\": \"net_income_change\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_f223f201c354\"], \"as_quantity\": \"net_income_latest\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 8, \"metric\": \"operating_income\", \"ticker\": \"XOM\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 8, \"metric\": \"cash_from_operations\", \"ticker\": \"XOM\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 18760,
+  "prompt_tokens_sum": 94333,
+  "answered": true
+ }
+]

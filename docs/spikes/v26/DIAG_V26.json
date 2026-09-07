@@ -1,0 +1,5271 @@
+[
+ {
+  "tag": "W01-stop-sweep-across-book#t1",
+  "elapsed_s": 11.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "the desk does not hold a drawdown-episode section for this portfolio, so I cannot say whether anything is also down far enough from its own high to force a second look without a price read."
+   }
+  ],
+  "prompt_tokens_max": 11398,
+  "prompt_tokens_sum": 50554,
+  "answered": true
+ },
+ {
+  "tag": "W01-stop-sweep-across-book#t2",
+  "elapsed_s": 11.1,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_fundamentals": 2,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"at\": \"2026-09-03\", \"metric\": \"price_to_cost_basis\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"at\": \"2026-09-03\", \"metric\": \"price.window_return\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 14907,
+  "prompt_tokens_sum": 88316,
+  "answered": true
+ },
+ {
+  "tag": "W01-stop-sweep-across-book#t3",
+  "elapsed_s": 11.2,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 6,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 3,
+   "read_book": 2
+  },
+  "methods": [
+   "issuer_exposures.weight",
+   "issuer_exposures.weight"
+  ],
+  "ops": [
+   "max",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"max\", \"method\": \"issuer_exposures.weight\", \"params\": {\"names\": [\"MSFT\", \"LLY\", \"AAPL\", \"JPM\", \"GOOGL\", \"HYG\", \"AMZN\", \"TLT\", \"XOM\", \"NVDA\"]}, \"subject\": \"port_001\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"issuer_exposures.weight\", \"params\": {\"last_n\": 1}, \"subject\": [\"MSFT\", \"LLY\", \"AAPL\", \"JPM\", \"GOOGL\", \"HYG\", \"AMZN\", \"TLT\", \"XOM\", \"NVDA\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10223,
+  "prompt_tokens_sum": 66942,
+  "answered": true
+ },
+ {
+  "tag": "W02-book-as-one-company#t1",
+  "elapsed_s": 10.7,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 3,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 2
+  },
+  "methods": [
+   "book.analysis",
+   "book.reconcile"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_name",
+    "args": "{}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9425,
+  "prompt_tokens_sum": 44567,
+  "answered": true
+ },
+ {
+  "tag": "W02-book-as-one-company#t2",
+  "elapsed_s": 6.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2
+  },
+  "methods": [
+   "net_margin",
+   "net_margin"
+  ],
+  "ops": [
+   "avg"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"avg\", \"method\": \"net_margin\", \"subject\": [\"LLY\", \"MSFT\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"NVDA\", \"AAPL\", \"XOM\"]}"
+   },
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"net_margin\", \"params\": {\"last_n\": 1}, \"subject\": [\"LLY\", \"MSFT\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"NVDA\", \"AAPL\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7566,
+  "prompt_tokens_sum": 23712,
+  "answered": true
+ },
+ {
+  "tag": "W03-vs-the-index#t1",
+  "elapsed_s": 6.4,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 4,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "incomparable_quantities",
+    "args": "{\"op\": \"rank\", \"operands\": [\"f_cfbe8b5f0809\", \"f_62520394637d\", \"f_14cf47687364\", \"f_92782945dd3c\", \"f_29de4fc83355\", \"f_b36ccb9f12a6\", \"f_09e1ebc31739\", \"f_6fa733a022a3\", \"f_dddd4"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20150,
+  "prompt_tokens_sum": 48496,
+  "answered": true
+ },
+ {
+  "tag": "W03-vs-the-index#t2",
+  "elapsed_s": 10.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 3,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 2
+  },
+  "methods": [
+   "book.analysis"
+  ],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_e374348a4beb\", \"f_22a2ef1d8e86\"], \"as_quantity\": \"active_beta_gap\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18848,
+  "prompt_tokens_sum": 81780,
+  "answered": true
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t1",
+  "elapsed_s": 11.6,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 16,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "read_prices": 9,
+   "compute": 4
+  },
+  "methods": [
+   "latest"
+  ],
+  "ops": [
+   "sum",
+   "sum",
+   "sum"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"sum\", \"operands\": [\"f_4a211eb09f49\", \"f_fe87ccbf9071\", \"f_96c0afac05e6\", \"f_6dc4bbe81e8a\", \"f_f3da20aaab26\", \"f_cc0cf6b9afde\", \"f_0006389a373a\"], \"as_quantity\": \"total_fact"
+   },
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"sum\", \"operands\": [\"f_4a211eb09f49\", \"f_fe87ccbf9071\"], \"as_quantity\": \"market_plus_credit\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"latest\", \"params\": {\"name\": \"attribution.attribution_portfolio_return\"}, \"subject\": \"run_6093c5caee31\"}"
+   },
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"sum\", \"operands\": [\"f_7f484e9a5081\", \"f_a382c818004f\", \"f_569db93276a9\", \"f_9dfe5242a25f\", \"f_8c74c893ae91\", \"f_2990372d0afc\", \"f_6d6856acbb4c\"], \"as_quantity\": \"total_fact"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.volatility",
+    "sentence": "The desk does hold price volatility as a method, but it does not hold a year-to-date realized-volatility figure for the portfolio, so I cannot say how much volatility was \u201cpaid for\u201d in a single total without computing th"
+   },
+   {
+    "claims_absent": "price.volatility",
+    "sentence": "it does not prove that annual volatility was monetized, because the desk has no filed figure here for book volatility over the year."
+   }
+  ],
+  "prompt_tokens_max": 29163,
+  "prompt_tokens_sum": 155471,
+  "answered": true
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t2",
+  "elapsed_s": 10.4,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 1,
+   "read_prices": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "book",
+   "procedures"
+  ],
+  "opened_a_domain": true,
+  "compute_errors": [
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_f53b2501d54e\", \"f_8ec8ef91916d\"], \"as_quantity\": \"active_return_minus_market\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20346,
+  "prompt_tokens_sum": 108287,
+  "answered": true
+ },
+ {
+  "tag": "W05-paid-for-the-vol#t3",
+  "elapsed_s": 7.5,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_?\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 11575,
+  "prompt_tokens_sum": 35238,
+  "answered": true
+ },
+ {
+  "tag": "W06-weight-we-chose#t1",
+  "elapsed_s": 4.6,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6492,
+  "prompt_tokens_sum": 21120,
+  "answered": true
+ },
+ {
+  "tag": "W06-weight-we-chose#t2",
+  "elapsed_s": 8.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "add"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7638,
+  "prompt_tokens_sum": 30436,
+  "answered": true
+ },
+ {
+  "tag": "W06-weight-we-chose#t3",
+  "elapsed_s": 3.6,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6940,
+  "prompt_tokens_sum": 15997,
+  "answered": true
+ },
+ {
+  "tag": "L01-raise-by-friday#t1",
+  "elapsed_s": 8.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11459,
+  "prompt_tokens_sum": 40991,
+  "answered": true
+ },
+ {
+  "tag": "L01-raise-by-friday#t2",
+  "elapsed_s": 7.4,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9873,
+  "prompt_tokens_sum": 28522,
+  "answered": true
+ },
+ {
+  "tag": "L01-raise-by-friday#t3",
+  "elapsed_s": 11.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 8808,
+  "prompt_tokens_sum": 42912,
+  "answered": true
+ },
+ {
+  "tag": "L02-days-arent-price#t1",
+  "elapsed_s": 8.5,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 6,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_prices": 1,
+   "compute": 3
+  },
+  "methods": [
+   "price.window_return",
+   "price.distance_from_52w_high"
+  ],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "methods",
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_5f5143010bd1@2026-09-03\", \"f_5f5143010bd1@2026-03-04\"], \"as_quantity\": \"price_return_6m\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16195,
+  "prompt_tokens_sum": 105120,
+  "answered": true
+ },
+ {
+  "tag": "L02-days-arent-price#t2",
+  "elapsed_s": 11.2,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 11,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_prices": 3,
+   "compute": 5,
+   "read_book": 1
+  },
+  "methods": [
+   "price.distance_from_52w_high"
+  ],
+  "ops": [
+   "max",
+   "max",
+   "max",
+   "max"
+  ],
+  "describe_levels": [
+   "methods",
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "series_in_set",
+    "args": "{\"op\": \"max\", \"operands\": [\"f_98ee5764b72c\", \"f_26c66e7b68f9\", \"f_038fe0e3b0b7\"], \"as_quantity\": \"trailing_high_price\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"max\", \"operands\": [\"f_98ee5764b72c\"], \"as_quantity\": \"trailing_6m_high_price\"}"
+   },
+   {
+    "error": "unknown_name",
+    "args": "{\"op\": \"max\", \"operands\": [\"calc_5e657c61ef0b:NVDA.adj_close\"], \"as_quantity\": \"trailing_6m_high_price\"}"
+   },
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"max\", \"operands\": [\"f_98ee5764b72c@2026-09-03\"], \"as_quantity\": \"trailing_high_price\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18603,
+  "prompt_tokens_sum": 137065,
+  "answered": true
+ },
+ {
+  "tag": "L02-days-arent-price#t3",
+  "elapsed_s": 7.1,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 5,
+   "read_book": 1
+  },
+  "methods": [
+   "price.distance_from_52w_high",
+   "price.volatility",
+   "price.adv",
+   "price.volatility",
+   "price.distance_from_52w_high",
+   "price.adv"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": [\"price.distance_from_52w_high\", \"price.volatility\", \"price.adv\"], \"params\": {\"window\": \"1y\"}, \"subject\": [\"NVDA\", \"AAPL\", \"MSFT\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \""
+   },
+   {
+    "error": "unknown_method",
+    "args": "{}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 19415,
+  "prompt_tokens_sum": 56212,
+  "answered": true
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t1",
+  "elapsed_s": 2.4,
+  "error": null,
+  "llm_calls": 2,
+  "tool_calls": 1,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 5624,
+  "prompt_tokens_sum": 8423,
+  "answered": true
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t2",
+  "elapsed_s": 8.1,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 2,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "scale"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "params",
+    "args": "{\"op\": \"scale\", \"params\": {\"by\": 0.5}, \"operands\": [\"f_093c114ddb0d\"], \"as_quantity\": \"positions_after_half\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6755,
+  "prompt_tokens_sum": 46984,
+  "answered": true
+ },
+ {
+  "tag": "L03-whose-assumption-is-that#t3",
+  "elapsed_s": 5.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7383,
+  "prompt_tokens_sum": 30821,
+  "answered": true
+ },
+ {
+  "tag": "L04-cash-by-when-ladder#t1",
+  "elapsed_s": 9.9,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 5,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "sum",
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_a_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_64a7bf3e7f84\"], \"as_quantity\": \"portfolio_market_value\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10203,
+  "prompt_tokens_sum": 61483,
+  "answered": true
+ },
+ {
+  "tag": "L04-cash-by-when-ladder#t2",
+  "elapsed_s": 2.8,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9157,
+  "prompt_tokens_sum": 17840,
+  "answered": true
+ },
+ {
+  "tag": "L05-hyg-wrapper#t1",
+  "elapsed_s": 7.8,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: name_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_prices": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7820,
+  "prompt_tokens_sum": 31274,
+  "answered": true
+ },
+ {
+  "tag": "L05-hyg-wrapper#t2",
+  "elapsed_s": 6.4,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7572,
+  "prompt_tokens_sum": 30278,
+  "answered": true
+ },
+ {
+  "tag": "L06-fix-takes-how-long#t1",
+  "elapsed_s": 6.3,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 6,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 4
+  },
+  "methods": [
+   "book.sell",
+   "price.adv"
+  ],
+  "ops": [
+   "multiply",
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.sell\", \"params\": {\"amount\": \"f_360d1b48e198\", \"issuer\": \"MSFT\"}, \"subject\": \"run_6093c5caee31\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 8089,
+  "prompt_tokens_sum": 44665,
+  "answered": true
+ },
+ {
+  "tag": "L06-fix-takes-how-long#t2",
+  "elapsed_s": 6.5,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9286,
+  "prompt_tokens_sum": 35634,
+  "answered": true
+ },
+ {
+  "tag": "F01-risk-not-dollars#t1",
+  "elapsed_s": 8.7,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [
+   "book.analysis"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12390,
+  "prompt_tokens_sum": 32665,
+  "answered": true
+ },
+ {
+  "tag": "F01-risk-not-dollars#t2",
+  "elapsed_s": 7.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "sum"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15807,
+  "prompt_tokens_sum": 55202,
+  "answered": true
+ },
+ {
+  "tag": "F01-risk-not-dollars#t3",
+  "elapsed_s": 5.3,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_1\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 14536,
+  "prompt_tokens_sum": 27398,
+  "answered": true
+ },
+ {
+  "tag": "F02-ten-down-in-dollars#t1",
+  "elapsed_s": 5.3,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 1,
+   "read_book": 1
+  },
+  "methods": [
+   "book.analysis"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.analysis\", \"params\": {\"shock\": -0.1, \"factor\": \"market\"}, \"subject\": \"run_6093c5caee31\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14051,
+  "prompt_tokens_sum": 28239,
+  "answered": true
+ },
+ {
+  "tag": "F02-ten-down-in-dollars#t2",
+  "elapsed_s": 6.6,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15245,
+  "prompt_tokens_sum": 38956,
+  "answered": true
+ },
+ {
+  "tag": "F04-long-duration-on-trial#t1",
+  "elapsed_s": 16.9,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 7,
+  "respond_attempts": 4,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unknown_point",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 6
+  },
+  "methods": [
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "rank"
+  ],
+  "ops": [
+   "rank",
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"rank\", \"method\": \"price.beta\", \"params\": {\"benchmark\": \"TLT\"}, \"subject\": [\"AAPL\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"], \"direction\": \"highest\"}"
+   },
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"price.beta\", \"params\": {\"last_n\": 252, \"benchmark\": \"TLT\"}, \"subject\": [\"AAPL\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"]}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"op\": null, \"method\": \"rank\", \"params\": {\"window\": \"1y\", \"benchmark\": \"TLT\"}, \"subject\": [\"AAPL\", \"AMZN\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "this desk also does not hold a per-name factor sensitivity beyond these price.beta estimates, and it does not re-fit scenarios after a trade."
+   }
+  ],
+  "prompt_tokens_max": 19519,
+  "prompt_tokens_sum": 128217,
+  "answered": true
+ },
+ {
+  "tag": "F04-long-duration-on-trial#t2",
+  "elapsed_s": 9.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 5
+  },
+  "methods": [
+   "price.beta",
+   "price.beta",
+   "price.beta",
+   "price.beta"
+  ],
+  "ops": [
+   "latest",
+   "latest",
+   "multiply"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"price.beta\", \"params\": {\"window\": \"1y\", \"benchmark\": \"TLT\"}, \"subject\": [\"TLT\", \"NVDA\", \"AAPL\", \"MSFT\", \"GOOGL\", \"JPM\", \"KO\", \"LLY\", \"AMZN\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "that scenario-refit figure is absent by design, a scenario (book.sell / book.buy) re-runs the limit checks and does not re-fit betas, volatility or P&L: stated unmeasured."
+   }
+  ],
+  "prompt_tokens_max": 19810,
+  "prompt_tokens_sum": 36398,
+  "answered": true
+ },
+ {
+  "tag": "F06-down-capture#t1",
+  "elapsed_s": 10.3,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "add",
+   "sum"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"add\", \"operands\": [\"f_c53898446621\", \"f_088916e9b860\", \"f_511a1d3b8cca\", \"f_45812c5a0ffb\", \"f_3c22808102b0\", \"f_c921257686fb\", \"f_87bce3a956a0\"], \"as_quantity\": \"total_fact"
+   },
+   {
+    "error": "not_alone",
+    "args": "{\"op\": \"sum\", \"operands\": [\"f_c53898446621\", \"f_088916e9b860\", \"f_511a1d3b8cca\", \"f_45812c5a0ffb\", \"f_3c22808102b0\", \"f_c921257686fb\", \"f_87bce3a956a0\"], \"as_quantity\": \"total_fact"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "What I can say from the desk is limited: it holds a market attribution and a 750-day regression window, but it does not hold a direct upside-capture or downside-capture figure, and it does not re-fit betas in a hypotheti"
+   }
+  ],
+  "prompt_tokens_max": 14995,
+  "prompt_tokens_sum": 65724,
+  "answered": true
+ },
+ {
+  "tag": "F06-down-capture#t2",
+  "elapsed_s": 8.4,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_prices": 1,
+   "compute": 2
+  },
+  "methods": [
+   "price.drawdown",
+   "price.drawdown"
+  ],
+  "ops": [
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"pct\", \"method\": \"price.drawdown\", \"params\": {\"window\": \"1y\"}, \"subject\": \"SPY\", \"operands\": [\"f_46d9e2769fe5\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "But the desk does not hold a book-level drawdown episode or recovery-date series for this run, so I cannot say whether the book got back as fast as SPY from the figures currently published."
+   }
+  ],
+  "prompt_tokens_max": 16795,
+  "prompt_tokens_sum": 86879,
+  "answered": true
+ },
+ {
+  "tag": "W01-back-to-flat#t1",
+  "elapsed_s": 14.2,
+  "error": null,
+  "llm_calls": 12,
+  "tool_calls": 5,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2
+  },
+  "methods": [
+   "price.distance_from_52w_high",
+   "price.distance_from_52w_high"
+  ],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"price.distance_from_52w_high\", \"params\": {}, \"subject\": \"port_001\"}"
+   },
+   {
+    "error": "fact_adapter_error",
+    "args": "{\"method\": \"price.distance_from_52w_high\", \"params\": {}, \"subject\": \"port_001\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10781,
+  "prompt_tokens_sum": 101855,
+  "answered": true
+ },
+ {
+  "tag": "W01-back-to-flat#t2",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "read_prices": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "undefined_quotient",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_aef7fbaa333f\", \"f_c9c929849e81\"], \"as_quantity\": \"max_drawdown_per_observation\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "So the exact share of the last year spent below the prior peak is absent here: there is no held figure for the episode calendar, and no method on the desk that turns the current max drawdown into elapsed time."
+   }
+  ],
+  "prompt_tokens_max": 9653,
+  "prompt_tokens_sum": 45187,
+  "answered": true
+ },
+ {
+  "tag": "W01-back-to-flat#t3",
+  "elapsed_s": 9.2,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 3,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_1\"}"
+   }
+  ],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "I can\u2019t prove whether the whole stretch was one cluster or a longer grind, because the desk does not hold drawdown-episode timing for this book."
+   }
+  ],
+  "prompt_tokens_max": 11461,
+  "prompt_tokens_sum": 63569,
+  "answered": true
+ },
+ {
+  "tag": "W02-per-point-of-weight#t1",
+  "elapsed_s": 16.8,
+  "error": null,
+  "llm_calls": 12,
+  "tool_calls": 19,
+  "respond_attempts": 3,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 4,
+   "read_prices": 9,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "undefined_quotient",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_0383f305fd1d\", \"f_7d3fdd26d2d9\"], \"as_quantity\": \"AAPL_price_per_weight\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 25459,
+  "prompt_tokens_sum": 216394,
+  "answered": true
+ },
+ {
+  "tag": "W02-per-point-of-weight#t2",
+  "elapsed_s": 4.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "I can\u2019t answer that from the book as held: the run row does not publish a drawdown decomposition or worst-name attribution, and the drawdown helpers are not held on the run."
+   }
+  ],
+  "prompt_tokens_max": 6397,
+  "prompt_tokens_sum": 21254,
+  "answered": true
+ },
+ {
+  "tag": "W02-per-point-of-weight#t3",
+  "elapsed_s": 8.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12858,
+  "prompt_tokens_sum": 63146,
+  "answered": true
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t1",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 3,
+   "read_prices": 2
+  },
+  "methods": [
+   "price.window_return",
+   "price.window_return"
+  ],
+  "ops": [
+   "regress",
+   "pct",
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"regress\", \"method\": [\"price.window_return\", \"price.window_return\"], \"params\": {\"window\": \"1y\"}, \"subject\": [\"TLT\", \"HYG\"]}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_4f9d663a032c\"], \"as_quantity\": \"TLT_1m_return\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_cf93bdd9991c\"], \"as_quantity\": \"HYG_1m_return\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "what it does not hold here is a computed one-step return series for those tapes, so I\u2019m not going to invent a drawdown offset metric."
+   }
+  ],
+  "prompt_tokens_max": 13553,
+  "prompt_tokens_sum": 73679,
+  "answered": true
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t2",
+  "elapsed_s": 9.3,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 8,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_book": 3,
+   "compute": 3
+  },
+  "methods": [
+   "price.window_return",
+   "price.drawdown",
+   "price.window_return"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"price.window_return\", \"params\": {\"end\": \"2025-05-12\", \"start\": \"2025-02-28\"}, \"subject\": [\"TLT\", \"HYG\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13399,
+  "prompt_tokens_sum": 51165,
+  "answered": true
+ },
+ {
+  "tag": "W03-did-the-hedge-hedge#t3",
+  "elapsed_s": 5.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 3,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [
+   "book.drawdown_episodes"
+  ],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "book",
+   "methods",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"book.drawdown_episodes\", \"subject\": \"port_001\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14053,
+  "prompt_tokens_sum": 44753,
+  "answered": true
+ },
+ {
+  "tag": "W04-sectors-or-names#t1",
+  "elapsed_s": 9.6,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unknown_point"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_prices": 1,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "yoy",
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_b4011adc36b1\"]}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_b4011adc36b1\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16488,
+  "prompt_tokens_sum": 86873,
+  "answered": true
+ },
+ {
+  "tag": "W04-sectors-or-names#t2",
+  "elapsed_s": 11.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16247,
+  "prompt_tokens_sum": 72124,
+  "answered": true
+ },
+ {
+  "tag": "W05-explain-the-day#t1",
+  "elapsed_s": 10.0,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 13,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_prices": 9,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "sum",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20856,
+  "prompt_tokens_sum": 89106,
+  "answered": true
+ },
+ {
+  "tag": "W05-explain-the-day#t2",
+  "elapsed_s": 11.0,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15197,
+  "prompt_tokens_sum": 68270,
+  "answered": true
+ },
+ {
+  "tag": "W01-useful-life-policy#t1",
+  "elapsed_s": 14.3,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 21,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 3,
+   "compute": 18
+  },
+  "methods": [
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "net_income",
+   "operating_cash_flow",
+   "capex",
+   "depreciation",
+   "issuer.panel",
+   "issuer.panel",
+   "issuer.panel"
+  ],
+  "ops": [
+   "latest",
+   "latest",
+   "latest"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "fundamentals",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": [\"net_income\", \"operating_cash_flow\", \"capex\", \"depreciation\"], \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"net_income\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"operating_cash_flow\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"capex\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"depreciation\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 47957,
+  "prompt_tokens_sum": 175292,
+  "answered": true
+ },
+ {
+  "tag": "W01-useful-life-policy#t2",
+  "elapsed_s": 15.4,
+  "error": null,
+  "llm_calls": 14,
+  "tool_calls": 16,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 12,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"operating_margin\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"depreciation_amortization\", \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 10826,
+  "prompt_tokens_sum": 119129,
+  "answered": true
+ },
+ {
+  "tag": "W01-useful-life-policy#t3",
+  "elapsed_s": 10.0,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12197,
+  "prompt_tokens_sum": 72662,
+  "answered": true
+ },
+ {
+  "tag": "W04-growth-vs-margin-screen#t1",
+  "elapsed_s": 22.8,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 11,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 7,
+   "read_fundamentals": 2,
+   "read_filings": 1
+  },
+  "methods": [
+   "gross_margin",
+   "gross_margin",
+   "revenue",
+   "revenue",
+   "gross_margin",
+   "gross_margin",
+   "gross_margin",
+   "revenue",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin",
+   "operating_margin"
+  ],
+  "ops": [
+   "yoy",
+   "yoy"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": [\"revenue\", \"revenue\"], \"params\": {\"last_n\": 8}, \"subject\": [\"AAPL\", \"AMZN\"]}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"revenue\", \"params\": {\"last_n\": 8}, \"subject\": [\"AAPL\", \"LLY\", \"AMZN\", \"GOOGL\", \"MSFT\", \"NVDA\", \"XOM\", \"KO\"]}"
+   },
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_65be3db02888\", \"f_d6aca3eda4c7\", \"f_48aaa673f3ed\", \"f_ac5d5f8edf4d\", \"f_b4f8084a4041\", \"f_d85f3ce37c19\", \"f_dab93f729014\", \"f_a0294cb303e4\"], \"as_quan"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_74f299a10696\"], \"as_quantity\": \"revenue_growth\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 26520,
+  "prompt_tokens_sum": 162904,
+  "answered": true
+ },
+ {
+  "tag": "W04-growth-vs-margin-screen#t2",
+  "elapsed_s": 12.2,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 11,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 3,
+   "read_prices": 3,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "pct",
+   "latest",
+   "subtract",
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_5e3b4ff20e8a\"], \"as_quantity\": \"price_return_1y\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_5e3b4ff20e8a\"], \"as_quantity\": \"latest_price\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 18159,
+  "prompt_tokens_sum": 145399,
+  "answered": true
+ },
+ {
+  "tag": "W05-leases-in-leverage#t1",
+  "elapsed_s": 3.7,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "add"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10227,
+  "prompt_tokens_sum": 22921,
+  "answered": true
+ },
+ {
+  "tag": "W05-leases-in-leverage#t2",
+  "elapsed_s": 10.1,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 12,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 8,
+   "read_fundamentals": 3
+  },
+  "methods": [
+   "debt_to_ebitda",
+   "ebitda",
+   "total_debt",
+   "operating lease liability total",
+   "total_debt",
+   "ebitda"
+  ],
+  "ops": [
+   "add",
+   "add",
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"debt_to_ebitda\", \"params\": {\"include_leases\": true}, \"subject\": [\"AMZN\", \"MSFT\", \"AAPL\"]}"
+   },
+   {
+    "error": "incomparable_quantities",
+    "args": "{\"op\": \"rank\", \"operands\": [\"f_76a9b55501d0\", \"f_5ac0b92aa6be\", \"f_c20c18e3bd18\"], \"direction\": \"highest\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "not_reported_at_this_date",
+    "args": "{\"at\": \"2026-03-28\", \"metric\": \"operating_lease_liability_total\", \"ticker\": \"AAPL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 10218,
+  "prompt_tokens_sum": 80604,
+  "answered": true
+ },
+ {
+  "tag": "W05-leases-in-leverage#t3",
+  "elapsed_s": 7.1,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 3,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14867,
+  "prompt_tokens_sum": 42835,
+  "answered": true
+ },
+ {
+  "tag": "W06-tax-rate-growth#t1",
+  "elapsed_s": 8.4,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 11,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 6,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14057,
+  "prompt_tokens_sum": 79706,
+  "answered": true
+ },
+ {
+  "tag": "W06-tax-rate-growth#t2",
+  "elapsed_s": 11.9,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 13,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 6,
+   "compute": 6
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "subtract",
+   "subtract",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15445,
+  "prompt_tokens_sum": 57005,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t1",
+  "elapsed_s": 20.2,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 9,
+  "respond_attempts": 5,
+  "gate_refusals": 4,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: kind_does_not_fit",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "read_filings": 5,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "add"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "overlapping_quantities",
+    "args": "{\"op\": \"add\", \"operands\": [\"f_e681fd79f351\", \"f_2edba81d0f76\"], \"as_quantity\": \"debt_due_within_one_year_plus_current_portion\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 33036,
+  "prompt_tokens_sum": 243238,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t2",
+  "elapsed_s": 11.1,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 4,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"XOM\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 17915,
+  "prompt_tokens_sum": 88176,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-maturity-wall#t3",
+  "elapsed_s": 9.1,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 9,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 5,
+   "read_fundamentals": 2,
+   "read_filings": 1
+  },
+  "methods": [
+   "interest_expense",
+   "interest_expense",
+   "interest_paid",
+   "interest_paid"
+  ],
+  "ops": [
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"interest_expense\", \"params\": {\"months\": 3}, \"subject\": \"XOM\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"interest_paid\", \"params\": {\"months\": 3}, \"subject\": \"XOM\"}"
+   },
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_fe6cefa83f43\", \"f_fe6cefa83f43\"], \"as_quantity\": \"interest_expense_yoy_placeholder\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15640,
+  "prompt_tokens_sum": 78309,
+  "answered": true
+ },
+ {
+  "tag": "W02-lly-coverage-trend#t1",
+  "elapsed_s": 12.9,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 7
+  },
+  "methods": [
+   "debt_to_operating_cash_flow",
+   "ebit_interest_coverage",
+   "ebit_interest_coverage",
+   "debt_to_operating_cash_flow",
+   "debt_to_operating_cash_flow",
+   "ebit_interest_coverage",
+   "debt_to_operating_cash_flow",
+   "ebit_interest_coverage"
+  ],
+  "ops": [
+   "latest",
+   "latest",
+   "qoq",
+   "qoq"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"debt_to_operating_cash_flow\", \"params\": {\"months\": 12}, \"subject\": \"LLY\", \"as_quantity\": \"debt_to_ocf\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14732,
+  "prompt_tokens_sum": 77203,
+  "answered": true
+ },
+ {
+  "tag": "W02-lly-coverage-trend#t2",
+  "elapsed_s": 11.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 6,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 5
+  },
+  "methods": [
+   "ebit_interest_coverage",
+   "debt_to_operating_cash_flow",
+   "net_debt_to_ebitda",
+   "current_ratio",
+   "free_cash_flow"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "series_not_derivable",
+    "args": "{\"method\": \"free_cash_flow\", \"params\": {\"last_n\": 4}, \"subject\": \"LLY\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14651,
+  "prompt_tokens_sum": 67685,
+  "answered": true
+ },
+ {
+  "tag": "W03-xom-trough-relever#t1",
+  "elapsed_s": 4.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 3,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "min"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"min\", \"operands\": [\"f_e6f077d83e03\"], \"as_quantity\": \"worst_year_net_income\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12802,
+  "prompt_tokens_sum": 37927,
+  "answered": true
+ },
+ {
+  "tag": "W03-xom-trough-relever#t2",
+  "elapsed_s": 13.6,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 5,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "compute": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 17070,
+  "prompt_tokens_sum": 128734,
+  "answered": true
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t1",
+  "elapsed_s": 7.9,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 6,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 4,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13390,
+  "prompt_tokens_sum": 62704,
+  "answered": true
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t2",
+  "elapsed_s": 9.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 3,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"10\", \"ticker\": \"AAPL\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 15788,
+  "prompt_tokens_sum": 84563,
+  "answered": true
+ },
+ {
+  "tag": "W06-aapl-net-cash-buybacks#t3",
+  "elapsed_s": 6.4,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2,
+   "read_fundamentals": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"7\", \"ticker\": \"AAPL\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 15083,
+  "prompt_tokens_sum": 44187,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-payout-plug#t1",
+  "elapsed_s": 9.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 10,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_fundamentals": 5,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "add",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "operands",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_9320874f500f\", \"f_466e28058952\", \"f_1253e032008d\", \"f_862b722a3529\"], \"as_quantity\": \"cash_after_capex_and_returns\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"XOM\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 13433,
+  "prompt_tokens_sum": 75997,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-payout-plug#t2",
+  "elapsed_s": 5.1,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_48420e097a5b\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10994,
+  "prompt_tokens_sum": 55511,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-payout-plug#t3",
+  "elapsed_s": 5.3,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "yoy"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_b6032e4194b9\"], \"as_quantity\": \"change_in_dividend_payout_share\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11138,
+  "prompt_tokens_sum": 56135,
+  "answered": true
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t1",
+  "elapsed_s": 15.7,
+  "error": null,
+  "llm_calls": 12,
+  "tool_calls": 11,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 5,
+   "read_filings": 1,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "subtract",
+   "latest",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_fce548ea87d0\", \"f_ad2484120464\"], \"as_quantity\": \"net_change_shares_outstanding_2024_06_30_to_2026_03_31\"}"
+   },
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_2e1082bb5e92@2024-06-30\", \"f_2e1082bb5e92@2026-03-31\"], \"as_quantity\": \"net_change_shares_outstanding_2024_06_30_to_2026_03_31\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_2e1082bb5e92\"], \"as_quantity\": \"latest_shares_outstanding\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20409,
+  "prompt_tokens_sum": 199549,
+  "answered": true
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t2",
+  "elapsed_s": 13.7,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 3,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11735,
+  "prompt_tokens_sum": 74853,
+  "answered": true
+ },
+ {
+  "tag": "W02-buyback-vs-dilution#t3",
+  "elapsed_s": 18.3,
+  "error": null,
+  "llm_calls": 13,
+  "tool_calls": 13,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_fundamentals": 6,
+   "read_filings": 1,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "yoy",
+   "latest",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"yoy\", \"operands\": [\"f_a302446af847\", \"f_b5c135c4b47b\", \"f_12b749474c00\"]}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_a302446af847\"]}"
+   },
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_a302446af847:shares_outstanding\", \"f_a302446af847:shares_outstanding\"]}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 12, \"metric\": \"common_stock_shares_outstanding\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 12, \"metric\": \"treasury_stock\", \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 12, \"metric\": \"share_based_compensation\", \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 17115,
+  "prompt_tokens_sum": 170959,
+  "answered": true
+ },
+ {
+  "tag": "W04-book-capex-hogs#t1",
+  "elapsed_s": 3.6,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6734,
+  "prompt_tokens_sum": 15133,
+  "answered": true
+ },
+ {
+  "tag": "W04-book-capex-hogs#t2",
+  "elapsed_s": 4.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 6,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 4
+  },
+  "methods": [
+   "issuer_capital_allocation",
+   "issuer_capital_allocation",
+   "capex_intensity",
+   "revenue"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"issuer_capital_allocation\", \"params\": {\"last_n\": 8, \"metric\": \"capex_intensity\"}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"revenue\", \"params\": {\"last_n\": 8}, \"subject\": \"MSFT\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7218,
+  "prompt_tokens_sum": 22450,
+  "answered": true
+ },
+ {
+  "tag": "W04-book-capex-hogs#t3",
+  "elapsed_s": 11.0,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 3,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15855,
+  "prompt_tokens_sum": 85273,
+  "answered": true
+ },
+ {
+  "tag": "W05-jpm-frame-breaks#t1",
+  "elapsed_s": 6.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 4,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "add",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11294,
+  "prompt_tokens_sum": 44540,
+  "answered": true
+ },
+ {
+  "tag": "W05-jpm-frame-breaks#t2",
+  "elapsed_s": 9.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 3,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "add"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11219,
+  "prompt_tokens_sum": 64141,
+  "answered": true
+ },
+ {
+  "tag": "W06-nvda-buyback-timing#t1",
+  "elapsed_s": 9.7,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 12,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 1,
+   "read_prices": 9,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "avg"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"avg\", \"operands\": [\"f_d30b5e4c36fa\"], \"as_quantity\": \"avg_price_1y\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15809,
+  "prompt_tokens_sum": 68719,
+  "answered": true
+ },
+ {
+  "tag": "W06-nvda-buyback-timing#t2",
+  "elapsed_s": 12.1,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 8,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "read_prices": 3,
+   "compute": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_bbe249ce7839\"], \"as_quantity\": \"AAPL latest adjusted close\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15381,
+  "prompt_tokens_sum": 107134,
+  "answered": true
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t1",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_filings": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings",
+   "readings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 16996,
+  "prompt_tokens_sum": 38875,
+  "answered": true
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t2",
+  "elapsed_s": 14.4,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 4,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: kind_does_not_fit",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 19076,
+  "prompt_tokens_sum": 97140,
+  "answered": true
+ },
+ {
+  "tag": "FQ01-what-changed-in-the-risk-section#t3",
+  "elapsed_s": 14.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 14417,
+  "prompt_tokens_sum": 50225,
+  "answered": true
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t1",
+  "elapsed_s": 14.1,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 5,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: kind_does_not_fit",
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_filings": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 20860,
+  "prompt_tokens_sum": 145042,
+  "answered": true
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t2",
+  "elapsed_s": 6.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 4,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_a_quantity",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_288ce90fcf61\", \"f_c11c3d05e066\"], \"as_quantity\": \"delta in concentration\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9692,
+  "prompt_tokens_sum": 39838,
+  "answered": true
+ },
+ {
+  "tag": "FQ02-who-actually-buys-nvda#t3",
+  "elapsed_s": 7.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 12013,
+  "prompt_tokens_sum": 36599,
+  "answered": true
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t1",
+  "elapsed_s": 18.5,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 11,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 2,
+   "read_filings": 5,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"7\", \"ticker\": \"AMZN\", \"form_type\": \"10-Q\"}"
+   },
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"Part II, Item 1A\", \"ticker\": \"AMZN\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 25840,
+  "prompt_tokens_sum": 211985,
+  "answered": true
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t2",
+  "elapsed_s": 7.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 2,
+  "respond_attempts": 4,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 10, \"item\": \"7\", \"ticker\": \"AMZN\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 10795,
+  "prompt_tokens_sum": 46768,
+  "answered": true
+ },
+ {
+  "tag": "FQ03-is-aws-carrying-it#t3",
+  "elapsed_s": 8.5,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 8,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 3,
+   "compute": 4
+  },
+  "methods": [],
+  "ops": [
+   "cagr",
+   "cagr",
+   "cagr",
+   "cagr"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"cagr\", \"operands\": [\"f_b0787b4e2f86\"], \"as_quantity\": \"revenue_cagr\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12383,
+  "prompt_tokens_sum": 106676,
+  "answered": true
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t1",
+  "elapsed_s": 11.1,
+  "error": null,
+  "llm_calls": 12,
+  "tool_calls": 6,
+  "respond_attempts": 5,
+  "gate_refusals": 4,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure",
+   "error: unverified_quote",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2,
+   "read_fundamentals": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "not_a_quantity",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_59c4c68f0bcf\", \"f_59c4c68f0bcf\"], \"as_quantity\": \"test\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"gross margin\", \"ticker\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 10648,
+  "prompt_tokens_sum": 83112,
+  "answered": true
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t2",
+  "elapsed_s": 2.9,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 5714,
+  "prompt_tokens_sum": 11580,
+  "answered": true
+ },
+ {
+  "tag": "FQ04-their-story-against-my-line#t3",
+  "elapsed_s": 6.8,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 4,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: kind_does_not_fit",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "read_filings": 1,
+   "read_fundamentals": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"gross margin\", \"months\": 12, \"ticker\": \"NVDA\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 7450,
+  "prompt_tokens_sum": 42428,
+  "answered": true
+ },
+ {
+  "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+  "elapsed_s": 14.3,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 3,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"JPM\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 15134,
+  "prompt_tokens_sum": 62146,
+  "answered": true
+ },
+ {
+  "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+  "elapsed_s": 14.3,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 11,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_filings": 2,
+   "read_book": 2,
+   "read_prices": 2,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "regress",
+   "regress",
+   "regress"
+  ],
+  "describe_levels": [
+   "filings",
+   "level1"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"regress\", \"operands\": [\"f_f8750adccf93\", \"f_2ad2d4f4656e\"], \"as_quantity\": \"JPM_vs_TLT_beta\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"regress\", \"operands\": [\"calc_2b79bf74e37c:f_f8750adccf93\", \"calc_3e56fbd37c92:f_2ad2d4f4656e\"], \"as_quantity\": \"JPM_vs_TLT_beta\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"regress\", \"operands\": [\"f_f8750adccf93\", \"f_2ad2d4f4656e\"], \"as_quantity\": \"JPM_vs_TLT_beta\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"JPM\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 24115,
+  "prompt_tokens_sum": 171580,
+  "answered": true
+ },
+ {
+  "tag": "FQ06-same-risk-in-four-filings#t1",
+  "elapsed_s": 8.1,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 3,
+   "read_filings": 4
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "procedures",
+   "filings"
+  ],
+  "opened_a_domain": true,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"AAPL\"}"
+   }
+  ],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name, so I cannot quantify how much of each holding sits on that common shock from the l"
+   }
+  ],
+  "prompt_tokens_max": 19940,
+  "prompt_tokens_sum": 93007,
+  "answered": true
+ },
+ {
+  "tag": "FQ06-same-risk-in-four-filings#t2",
+  "elapsed_s": 5.2,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 2
+  },
+  "methods": [],
+  "ops": [
+   "sum",
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10370,
+  "prompt_tokens_sum": 38186,
+  "answered": true
+ },
+ {
+  "tag": "B02-var-ballpark#t1",
+  "elapsed_s": 4.0,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 8293,
+  "prompt_tokens_sum": 24448,
+  "answered": true
+ },
+ {
+  "tag": "B02-var-ballpark#t2",
+  "elapsed_s": 5.5,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 2,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unsourced_figure",
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 9477,
+  "prompt_tokens_sum": 44734,
+  "answered": true
+ },
+ {
+  "tag": "B03-jpm-leverage-rank#t1",
+  "elapsed_s": 5.9,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 3,
+   "read_book": 1
+  },
+  "methods": [
+   "debt_to_ebitda",
+   "debt_to_ebitda"
+  ],
+  "ops": [
+   "rank"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"debt_to_ebitda\", \"params\": {\"last_n\": 1}, \"subject\": [\"JPM\", \"AAPL\", \"AMZN\", \"GOOGL\", \"KO\", \"LLY\", \"MSFT\", \"NVDA\", \"XOM\"]}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12300,
+  "prompt_tokens_sum": 27608,
+  "answered": true
+ },
+ {
+  "tag": "B03-jpm-leverage-rank#t2",
+  "elapsed_s": 26.0,
+  "error": null,
+  "llm_calls": 16,
+  "tool_calls": 5,
+  "respond_attempts": 7,
+  "gate_refusals": 7,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: not_on_ledger",
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_book": 3
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "methods"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 25598,
+  "prompt_tokens_sum": 294420,
+  "answered": true
+ },
+ {
+  "tag": "B05-etf-instrument-class#t1",
+  "elapsed_s": 5.9,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 6,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 2,
+   "compute": 2,
+   "read_filings": 2
+  },
+  "methods": [
+   "price.beta",
+   "price.beta"
+  ],
+  "ops": [
+   "latest",
+   "latest"
+  ],
+  "describe_levels": [
+   "book",
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"price.beta\", \"params\": {\"window\": \"1y\", \"benchmark\": \"^TNX\"}, \"subject\": \"TLT\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"1A\", \"ticker\": \"HYG\"}"
+   },
+   {
+    "tool": "read_filings",
+    "error": "not_indexed",
+    "args": "{\"k\": 5, \"query\": \"credit quality ratings portfolio investment grade high yield below investment grade Moody's S&P Fitch\", \"ticker\": \"HYG\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9989,
+  "prompt_tokens_sum": 47499,
+  "answered": true
+ },
+ {
+  "tag": "B05-etf-instrument-class#t2",
+  "elapsed_s": 4.8,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_prices": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_7c8b259462b0\"], \"as_quantity\": \"TLT_1y_change\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "but the desk does not hold a book-level factor-covariance or episode attribution figure that would prove the cushion effect, and per the book\u2019s own rule a name\u2019s rate or credit sensitivity is a fitted beta to TLT or HYG,"
+   }
+  ],
+  "prompt_tokens_max": 9091,
+  "prompt_tokens_sum": 37977,
+  "answered": true
+ },
+ {
+  "tag": "B05-etf-instrument-class#t3",
+  "elapsed_s": 6.6,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "sum"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.drawdown",
+    "sentence": "it cannot say from published figures that either one has been offsetting drawdowns, because that attribution measure is not held here."
+   }
+  ],
+  "prompt_tokens_max": 9343,
+  "prompt_tokens_sum": 29315,
+  "answered": true
+ },
+ {
+  "tag": "B06-positioning-blind#t1",
+  "elapsed_s": 10.5,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 9,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_filings": 4,
+   "read_prices": 1,
+   "compute": 3
+  },
+  "methods": [
+   "price.drawdown",
+   "price.drawdown",
+   "price.window_return"
+  ],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"price.drawdown\", \"params\": {\"window\": \"1y\"}, \"subject\": \"LLY\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 20580,
+  "prompt_tokens_sum": 144687,
+  "answered": true
+ },
+ {
+  "tag": "B06-positioning-blind#t2",
+  "elapsed_s": 8.7,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 10,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_prices": 1,
+   "read_filings": 3,
+   "compute": 5
+  },
+  "methods": [
+   "price.window_return",
+   "price.window_return",
+   "price.drawdown"
+  ],
+  "ops": [
+   "latest",
+   "pct",
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_286475d3dc29\"], \"as_quantity\": \"1y_return\"}"
+   },
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_286475d3dc29\"], \"as_quantity\": \"1y_return\"}"
+   },
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"pct\", \"method\": \"price.window_return\", \"params\": {\"window\": \"1y\"}, \"subject\": \"LLY\", \"as_quantity\": \"1y_return\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16881,
+  "prompt_tokens_sum": 104871,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-borrow-headroom#t1",
+  "elapsed_s": 3.7,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 1
+  },
+  "methods": [
+   "net_debt_to_ebitda"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 10043,
+  "prompt_tokens_sum": 32481,
+  "answered": true
+ },
+ {
+  "tag": "W01-xom-borrow-headroom#t2",
+  "elapsed_s": 14.3,
+  "error": null,
+  "llm_calls": 16,
+  "tool_calls": 13,
+  "respond_attempts": 1,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 12
+  },
+  "methods": [
+   "net_debt_to_ebitda",
+   "net_debt_to_ebitda",
+   "net_debt",
+   "ebitda",
+   "net_debt",
+   "ebitda"
+  ],
+  "ops": [
+   "latest",
+   "multiply",
+   "subtract",
+   "scale",
+   "scale",
+   "scale",
+   "subtract",
+   "multiply",
+   "scale"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "op_or_method",
+    "args": "{\"op\": \"latest\", \"method\": \"net_debt_to_ebitda\", \"params\": {\"months\": 12}, \"subject\": \"XOM\", \"as_quantity\": \"net_debt_to_ebitda\"}"
+   },
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"multiply\", \"operands\": [\"f_b24668881a54\", \"2\"]}"
+   },
+   {
+    "error": "incompatible_bases",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_b24668881a54\", \"f_a6c96fa8bca2\"]}"
+   },
+   {
+    "error": "params",
+    "args": "{\"op\": \"scale\", \"params\": {\"by\": 2}, \"operands\": [\"f_b24668881a54\"], \"as_quantity\": \"two_x_ebitda\"}"
+   },
+   {
+    "error": "operands",
+    "args": "{\"op\": \"scale\", \"params\": {\"by\": \"f_b24668881a54\"}, \"operands\": [\"f_b24668881a54\", \"f_b24668881a54\"]}"
+   },
+   {
+    "error": "incompatible_bases",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_9d8f1392769a\", \"f_a6c96fa8bca2\"], \"as_quantity\": \"additional_net_debt_room\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13560,
+  "prompt_tokens_sum": 179077,
+  "answered": true
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t1",
+  "elapsed_s": 6.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 4
+  },
+  "methods": [
+   "cash_conversion_cycle",
+   "days_sales_outstanding",
+   "days_inventory",
+   "days_payable"
+  ],
+  "ops": [
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"f_5d5adc1d3bd7@2025-09-27\", \"f_5d5adc1d3bd7@2024-09-28\"], \"as_quantity\": \"days\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12293,
+  "prompt_tokens_sum": 60086,
+  "answered": true
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t2",
+  "elapsed_s": 3.9,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 1,
+   "read_fundamentals": 1
+  },
+  "methods": [],
+  "ops": [
+   "add"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "operands",
+    "args": "{\"op\": \"add\", \"operands\": [\"f_?\"]}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 2, \"metric\": \"cash_conversion_cycle\", \"months\": 12, \"ticker\": \"JPM\"}"
+   }
+  ],
+  "false_absence": [
+   {
+    "claims_absent": "cash_conversion_cycle",
+    "sentence": "JPM has no held figure for cash conversion cycle: f_? is absent because the desk does not map that metric for a financial issuer, and the fundamentals table for JPM does not file it."
+   }
+  ],
+  "prompt_tokens_max": 9308,
+  "prompt_tokens_sum": 30256,
+  "answered": true
+ },
+ {
+  "tag": "W02-ccc-carried-to-jpm#t3",
+  "elapsed_s": 5.2,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 2,
+   "read_fundamentals": 2,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals",
+   "procedures"
+  ],
+  "opened_a_domain": true,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 16204,
+  "prompt_tokens_sum": 74746,
+  "answered": true
+ },
+ {
+  "tag": "W03-which-run-was-that#t1",
+  "elapsed_s": 3.5,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6171,
+  "prompt_tokens_sum": 20462,
+  "answered": true
+ },
+ {
+  "tag": "W03-which-run-was-that#t2",
+  "elapsed_s": 3.5,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6362,
+  "prompt_tokens_sum": 21057,
+  "answered": true
+ },
+ {
+  "tag": "W03-which-run-was-that#t3",
+  "elapsed_s": 8.3,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 6,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 3,
+   "read_book": 1,
+   "read_prices": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book",
+   "book",
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "unknown_portfolio",
+    "args": "{\"expand\": \"book\", \"subject\": \"port_?\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 12078,
+  "prompt_tokens_sum": 66499,
+  "answered": true
+ },
+ {
+  "tag": "W04-just-divide-them#t1",
+  "elapsed_s": 5.0,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "compute": 2
+  },
+  "methods": [
+   "price.window_return"
+  ],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 11105,
+  "prompt_tokens_sum": 45160,
+  "answered": true
+ },
+ {
+  "tag": "W04-just-divide-them#t2",
+  "elapsed_s": 3.9,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 4,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 1,
+   "read_prices": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 13147,
+  "prompt_tokens_sum": 49257,
+  "answered": true
+ },
+ {
+  "tag": "W04-just-divide-them#t3",
+  "elapsed_s": 9.6,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 10,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_prices": 1,
+   "read_fundamentals": 3,
+   "compute": 3,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "divide"
+  ],
+  "describe_levels": [
+   "methods"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "fact_adapter_error",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_af627f93bb26\", \"f_7cab25dc2564\"], \"as_quantity\": \"price_to_eps\"}"
+   },
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"divide\", \"operands\": [\"f_af627f93bb26@2026-09-03\", \"f_7cab25dc2564@2025-09-27\"], \"as_quantity\": \"price_to_eps\"}"
+   },
+   {
+    "error": "fact_adapter_error",
+    "args": "{\"op\": \"divide\", \"params\": {\"method\": \"latest\"}, \"operands\": [\"f_af627f93bb26\", \"f_7cab25dc2564\"], \"as_quantity\": \"price_to_eps\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15707,
+  "prompt_tokens_sum": 109509,
+  "answered": true
+ },
+ {
+  "tag": "W05-half-taken-back#t1",
+  "elapsed_s": 5.0,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 5,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "divide",
+   "divide",
+   "multiply"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6991,
+  "prompt_tokens_sum": 35030,
+  "answered": true
+ },
+ {
+  "tag": "W05-half-taken-back#t2",
+  "elapsed_s": 4.5,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "divide"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_name",
+    "args": "{\"op\": \"divide\", \"operands\": [\"run_6093c5caee31:issuer_exposures.MSFT.weight\", \"run_6093c5caee31:limit_checks.issuer_concentration:MSFT.limit\"], \"as_quantity\": \"msft_weight_as_shar"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6806,
+  "prompt_tokens_sum": 21787,
+  "answered": true
+ },
+ {
+  "tag": "W05-half-taken-back#t3",
+  "elapsed_s": 3.8,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 6561,
+  "prompt_tokens_sum": 21784,
+  "answered": true
+ },
+ {
+  "tag": "W06-is-that-all-of-them#t1",
+  "elapsed_s": 9.9,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 11,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_filings": 9
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 36567,
+  "prompt_tokens_sum": 116185,
+  "answered": true
+ },
+ {
+  "tag": "W06-is-that-all-of-them#t2",
+  "elapsed_s": 5.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: unsourced_figure"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 12828,
+  "prompt_tokens_sum": 52439,
+  "answered": true
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t1",
+  "elapsed_s": 10.1,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 11,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "read_filings": 8
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"k\": 5, \"item\": \"8\", \"ticker\": \"AAPL\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 32004,
+  "prompt_tokens_sum": 120607,
+  "answered": true
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t2",
+  "elapsed_s": 10.1,
+  "error": null,
+  "llm_calls": 9,
+  "tool_calls": 6,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: not_standalone"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "read_prices": 1,
+   "compute": 3
+  },
+  "methods": [
+   "price.window_return"
+  ],
+  "ops": [
+   "pct",
+   "pct"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_series",
+    "args": "{\"op\": \"pct\", \"operands\": [\"f_5b7bbb696eec\"], \"as_quantity\": \"MSFT_1m_return\"}"
+   },
+   {
+    "error": "unknown_name",
+    "args": "{\"op\": \"pct\", \"operands\": [\"calc_a41aada45429:MSFT.adj_close\"], \"as_quantity\": \"MSFT_1m_return\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 17120,
+  "prompt_tokens_sum": 121408,
+  "answered": true
+ },
+ {
+  "tag": "NEW01-whats-coming-up#t3",
+  "elapsed_s": 12.3,
+  "error": null,
+  "llm_calls": 8,
+  "tool_calls": 2,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: unverified_quote",
+   "error: unverified_quote"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 17851,
+  "prompt_tokens_sum": 111530,
+  "answered": true
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t1",
+  "elapsed_s": 14.6,
+  "error": null,
+  "llm_calls": 11,
+  "tool_calls": 13,
+  "respond_attempts": 3,
+  "gate_refusals": 2,
+  "gate_reasons": [
+   "error: not_on_ledger",
+   "error: kind_does_not_fit"
+  ],
+  "tools": {
+   "describe": 2,
+   "read_filings": 4,
+   "read_fundamentals": 6,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "latest"
+  ],
+  "describe_levels": [
+   "filings",
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "series_only",
+    "args": "{\"op\": \"latest\", \"operands\": [\"f_4e82be22b5aa\", \"f_d22873ffd71e\", \"f_e5dbf57f47bc\", \"f_9c5afc032233\", \"f_80afafd4f3b8\", \"f_c9a2e10e1036\"], \"as_quantity\": \"latest values\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   },
+   {
+    "tool": "read_filings",
+    "error": "section_not_found",
+    "args": "{\"item\": \"7\", \"ticker\": \"GOOGL\", \"form_type\": \"10-Q\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 20259,
+  "prompt_tokens_sum": 157595,
+  "answered": true
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t2",
+  "elapsed_s": 2.4,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 5764,
+  "prompt_tokens_sum": 12104,
+  "answered": true
+ },
+ {
+  "tag": "NEW02-does-the-story-still-hold#t3",
+  "elapsed_s": 4.3,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_filings": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "filings"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "describe",
+    "error": "fact_adapter_error",
+    "args": "{\"expand\": \"filings\", \"subject\": \"GOOGL\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 6102,
+  "prompt_tokens_sum": 18603,
+  "answered": true
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t1",
+  "elapsed_s": 2.7,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 8731,
+  "prompt_tokens_sum": 17136,
+  "answered": true
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t2",
+  "elapsed_s": 3.4,
+  "error": null,
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "read_book": 2,
+   "describe": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_book",
+    "error": "unknown_run",
+    "args": "{\"ref\": \"run_latest\", \"names\": [\"alerts\", \"risk_state\", \"limit_checks.issuer_concentration.LLY.breach_level\", \"limit_checks.issuer_concentration.MSFT.breach_lev"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9025,
+  "prompt_tokens_sum": 20792,
+  "answered": true
+ },
+ {
+  "tag": "NEW03-what-flagged-on-the-run#t3",
+  "elapsed_s": 5.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 3,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "read_book": 2,
+   "describe": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_book",
+    "error": "unknown_run",
+    "args": "{\"ref\": \"run_latest\", \"names\": [\"alerts\", \"risk_state\"]}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 9146,
+  "prompt_tokens_sum": 39253,
+  "answered": true
+ },
+ {
+  "tag": "NEW04-swap-not-a-sale#t1",
+  "elapsed_s": 5.7,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 7,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 4
+  },
+  "methods": [
+   "book.sell",
+   "book.sell"
+  ],
+  "ops": [
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "invalid_params",
+    "args": "{\"method\": \"book.sell\", \"params\": {\"issuer\": \"NVDA\", \"weight\": 0.04}, \"subject\": \"run_6093c5caee31\"}"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14907,
+  "prompt_tokens_sum": 65811,
+  "answered": true
+ },
+ {
+  "tag": "NEW04-swap-not-a-sale#t2",
+  "elapsed_s": 7.4,
+  "error": null,
+  "llm_calls": 5,
+  "tool_calls": 3,
+  "respond_attempts": 2,
+  "gate_refusals": 1,
+  "gate_reasons": [
+   "error: not_on_ledger"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 1,
+   "compute": 1
+  },
+  "methods": [],
+  "ops": [
+   "subtract"
+  ],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 15427,
+  "prompt_tokens_sum": 53680,
+  "answered": true
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t1",
+  "elapsed_s": 6.4,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 8,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "compute": 7
+  },
+  "methods": [
+   "cash_conversion_cycle",
+   "accruals_ratio",
+   "free_cash_flow",
+   "operating_cash_flow",
+   "capex",
+   "days_sales_dso",
+   "days_inventory",
+   "days_payable",
+   "cash_conversion_cycle",
+   "accruals",
+   "accruals_ratio",
+   "free_cash_flow",
+   "fcf_margin",
+   "days_sales_outstanding",
+   "days_inventory",
+   "days_payable",
+   "cash_conversion_cycle",
+   "accruals",
+   "accruals_ratio",
+   "free_cash_flow",
+   "fcf_margin"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "fundamentals"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"operating_cash_flow\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": \"capex\", \"params\": {\"months\": 12}, \"subject\": \"MSFT\"}"
+   },
+   {
+    "error": "unknown_method",
+    "args": "{\"method\": [\"days_sales_dso\", \"days_inventory\", \"days_payable\", \"cash_conversion_cycle\", \"accruals\", \"accruals_ratio\", \"free_cash_flow\", \"fcf_margin\"], \"params\": {\"months\": 12}, \"s"
+   }
+  ],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 14869,
+  "prompt_tokens_sum": 66747,
+  "answered": true
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t2",
+  "elapsed_s": 7.8,
+  "error": null,
+  "llm_calls": 10,
+  "tool_calls": 9,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 5,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "subtract",
+   "subtract"
+  ],
+  "describe_levels": [
+   "methods"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [
+   {
+    "error": "unknown_operand",
+    "args": "{\"op\": \"subtract\", \"operands\": [\"MSFT:net_income\", \"MSFT:operating_cash_flow\"], \"as_quantity\": \"accruals\"}"
+   }
+  ],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 4, \"metric\": \"accruals_ratio\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"last_n\": 1, \"metric\": \"fcf_margin\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 13850,
+  "prompt_tokens_sum": 110717,
+  "answered": true
+ },
+ {
+  "tag": "NEW05-your-numbers-disagree#t3",
+  "elapsed_s": 5.8,
+  "error": null,
+  "llm_calls": 6,
+  "tool_calls": 14,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_fundamentals": 10,
+   "compute": 3
+  },
+  "methods": [],
+  "ops": [
+   "subtract",
+   "divide",
+   "subtract"
+  ],
+  "describe_levels": [
+   "methods"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"accruals\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"accruals_ratio\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"free_cash_flow\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"cash_conversion_cycle\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"days_sales_outstanding\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"days_inventory\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   },
+   {
+    "tool": "read_fundamentals",
+    "error": "metric_not_filed",
+    "args": "{\"metric\": \"days_payable\", \"months\": 12, \"ticker\": \"MSFT\"}"
+   }
+  ],
+  "false_absence": [],
+  "prompt_tokens_max": 15763,
+  "prompt_tokens_sum": 74483,
+  "answered": true
+ },
+ {
+  "tag": "NEW06-what-you-havent-got#t1",
+  "elapsed_s": 9.1,
+  "error": null,
+  "llm_calls": 7,
+  "tool_calls": 4,
+  "respond_attempts": 4,
+  "gate_refusals": 3,
+  "gate_reasons": [
+   "error: not_standalone",
+   "error: not_on_ledger",
+   "error: id_in_prose"
+  ],
+  "tools": {
+   "describe": 1,
+   "read_book": 2,
+   "compute": 1
+  },
+  "methods": [
+   "book.analysis",
+   "book.reconcile"
+  ],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [
+   {
+    "claims_absent": "price.beta",
+    "sentence": "Second would be the missing per-name factor sensitivity: the desk says that is not held as a figure and, by method, must be taken as price.beta against the relevant ETF one name at a time, not from the book-wide factor r"
+   }
+  ],
+  "prompt_tokens_max": 15130,
+  "prompt_tokens_sum": 80464,
+  "answered": true
+ },
+ {
+  "tag": "NEW06-what-you-havent-got#t2",
+  "elapsed_s": 3.3,
+  "error": null,
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "respond_attempts": 1,
+  "gate_refusals": 0,
+  "gate_reasons": [],
+  "tools": {
+   "describe": 1,
+   "read_book": 1
+  },
+  "methods": [],
+  "ops": [],
+  "describe_levels": [
+   "book"
+  ],
+  "opened_a_domain": false,
+  "compute_errors": [],
+  "tool_errors": [],
+  "false_absence": [],
+  "prompt_tokens_max": 7019,
+  "prompt_tokens_sum": 15902,
+  "answered": true
+ }
+]
