@@ -19,13 +19,18 @@ and every ratio on this panel rests on that.
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import containment as ct
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import interval_algebra as ia
+from exposure_workbench.analytics import units as u
 from exposure_workbench.db.models import Position
 from exposure_workbench.services import absence_service as ab
+from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import fundamentals_service as fs
 from exposure_workbench.services import typed_calculator as tc
 
@@ -536,6 +541,113 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
     if used_instead:
         out["substituted_inputs"] = used_instead
     return out
+
+
+OP_FORMULA_SERIES = "calc.series.formula"
+FORMULA_SERIES_MAX = 16
+
+
+async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
+                                  months: int = 12, last_n: int = 4,
+                                  invoked_by: str = "agent") -> dict:
+    """One named measure over its last N periods, as ONE series row.
+
+    WHY THIS EXISTS (V25). A formula was evaluated for one window only, so the
+    series operators — yoy, cagr, the trend — applied to filed metrics and
+    never to a measure: "gross margin over the last eight quarters" was eight
+    evaluations the model had to schedule itself, and five of the fourteen
+    analyst procedures ask for exactly that ("over the last 4-8 windows").
+
+    The periods are the issuer's own: the slots `consecutive_windows` derives
+    for the formula's first flow input (the same slots read_fundamentals
+    (last_n=…) returns), and for a pure balance-sheet measure the dates the
+    first balance input was reported at. Each slot is `evaluate_formula` pinned
+    to that window — every rule it applies, applied per period — and a slot it
+    refuses stays in place as an unreachable point, never closed over.
+    """
+    ticker = ticker.upper()
+    if name not in fm.FORMULAS:
+        return {"error": "unknown_formula", "formula": name, "known": sorted(fm.FORMULAS),
+                "detail": "a series is of a registry formula; total_debt and filed metrics "
+                          "have their own series through read_fundamentals(last_n=…)"}
+    if not 2 <= int(last_n) <= FORMULA_SERIES_MAX:
+        return {"error": "invalid_params", "formula": name,
+                "detail": f"last_n is between 2 and {FORMULA_SERIES_MAX}; got {last_n}"}
+    f = fm.FORMULAS[name]
+    reason = f.not_for_financials
+    if reason is not None:
+        refusal = await _bank_refusal(db, ticker, name, invoked_by, reason=reason, cache={})
+        if refusal:
+            return refusal
+    company_id = await fs._company_id(db, ticker)
+    if company_id is None:
+        return {"error": "unknown_company", "ticker": ticker}
+
+    leaves = await _leaf_inputs(f)
+    slots: list[dict] = []          # {start?, end, at?}
+    grid = None
+    for leaf in leaves:
+        candidates = (leaf,) + tuple(f.alternatives.get(leaf, ()))
+        for cand in candidates:
+            facts = await fs._flow_facts(db, company_id, cand)
+            if facts:
+                for w in ia.consecutive_windows(facts, months=months, last_n=int(last_n)):
+                    slots.append({"start": w.start, "end": w.end})
+                grid = f"{cand}'s {months}-month windows"
+                break
+        if slots:
+            break
+    if not slots:
+        for leaf in leaves:
+            bp = await fs.balance_points(db, ticker, leaf, last_n=int(last_n))
+            if not bp.get("error") and bp.get("points"):
+                for pt in bp["points"]:
+                    slots.append({"end": date.fromisoformat(pt[u.POINT_PERIOD_KEY])})
+                grid = f"the dates {leaf} was reported at"
+                break
+    if not slots:
+        return {"error": "series_not_derivable", "formula": name, "ticker": ticker,
+                "detail": f"no period grid for {name}: none of its inputs "
+                          f"({', '.join(leaves)}) is filed as a series by {ticker}"}
+
+    points: list[dict] = []
+    input_ids: list[str] = []
+    for slot in slots:
+        end = slot["end"]
+        window = (slot["start"].isoformat(), end.isoformat()) if slot.get("start") else None
+        ev = await evaluate_formula(db, ticker, name, months=months, at=end.isoformat(),
+                                    invoked_by=invoked_by, _cache={}, _window=window)
+        pt = {u.POINT_PERIOD_KEY: end.isoformat()}
+        if window:
+            pt["start"] = window[0]
+        if ev.get("error"):
+            pt |= {"value": None, "unreachable": ev.get("detail") or ev.get("statement") or ev["error"]}
+        else:
+            pt |= {"value": ev["value"], "fact_ids": [ev["calc_id"]]}
+            input_ids.append(ev["calc_id"])
+        points.append(pt)
+    derived = [p for p in points if p.get("value") is not None]
+    if not derived:
+        return {"error": "series_not_derivable", "formula": name, "ticker": ticker,
+                "detail": f"{name} could not be evaluated on any of {len(points)} periods of "
+                          f"{grid}; the first refusal: {points[0].get('unreachable')}"}
+    kind = "flow" if slots[0].get("start") else "instant"
+    rt = {"unit_class": f.unit_class, "kind": kind, "quantity": name, "months": months,
+          "issuers": [ticker]}
+    calc_id = await cs._record(
+        db, ticker, OP_FORMULA_SERIES,
+        {"formula": name, "months": months, "last_n": int(last_n), "result_type": rt},
+        {"points": points}, input_ids,
+        {"unreachable_slots": len(points) - len(derived)} if len(points) != len(derived) else {},
+        invoked_by,
+    )
+    return {"calc_id": calc_id, "formula": name, "ticker": ticker, "months": months,
+            "last_n": int(last_n), "unit_class": f.unit_class.upper(), "points": points,
+            "definition": f.expression, "authority": fm.authority(f),
+            "basis": (f"{name} evaluated on each of {len(points)} consecutive periods of {grid}, "
+                      f"{points[0][u.POINT_PERIOD_KEY]}..{points[-1][u.POINT_PERIOD_KEY]}"
+                      + (f"; {len(points) - len(derived)} period(s) not derivable, kept in place"
+                         if len(points) != len(derived) else ""))}
 
 
 _REGISTRY_PROSE = ("note", "authority")

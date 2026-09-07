@@ -54,7 +54,7 @@ export function display(value: number, unit_class: string): string {
     const digits = Math.abs(pct) >= 10 ? PERCENT_DIGITS.ge10 : PERCENT_DIGITS.lt10;
     return `${fixed(pct, digits)}%`;
   }
-  if (unit_class === "MONEY") {
+  if (unit_class === "MONEY" || unit_class === "MONEY_PER_DAY") {
     let scale = 1;
     let suffix = "";
     for (const [s, name] of MONEY_SCALES) {
@@ -66,7 +66,8 @@ export function display(value: number, unit_class: string): string {
     }
     const scaled = v / scale;
     const digits = Math.abs(scaled) >= 100 ? MONEY_DIGITS.ge100 : MONEY_DIGITS.lt100;
-    return `$${fixed(scaled, digits)}${suffix}`;
+    // A flow says its period: dollars a day is not dollars.
+    return `$${fixed(scaled, digits)}${suffix}${unit_class === "MONEY_PER_DAY" ? "/day" : ""}`;
   }
   if (unit_class === "MONEY_PER_SHARE") {
     return `$${fixed(v, MONEY_PER_SHARE_DIGITS)}`;
@@ -75,7 +76,12 @@ export function display(value: number, unit_class: string): string {
     return `${fixed(v, MULTIPLE_DIGITS)}×`;
   }
   if (unit_class === "COUNT") {
-    return Number.isInteger(v) ? String(v) : fixed(v, 2);
+    if (Number.isInteger(v)) return String(v);
+    // A fraction of a day is not "0.00": below a hundredth the count keeps four places.
+    return Math.abs(v) >= 0.01 ? fixed(v, 2) : fixed(v, 4);
+  }
+  if (unit_class === "COUNT_PER_DAY") {
+    return `${Math.round(v).toLocaleString("en-US")}/day`;
   }
   return String(value);
 }

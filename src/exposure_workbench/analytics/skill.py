@@ -89,6 +89,8 @@ _ISSUER_PARAMS = {"type": "object", "properties": {
     "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None],
                "description": "window for flow-based measures (default 12)"},
     "at": {"type": ["string", "null"], "description": "YYYY-MM-DD instant for balance-based measures; omitted = latest"},
+    "last_n": {"type": ["integer", "null"], "minimum": 2, "maximum": 16,
+               "description": "the measure over its last N periods (months each) as ONE series, for yoy/cagr/trend; omitted = one value"},
 }, "additionalProperties": False}
 
 
@@ -174,11 +176,11 @@ _PRICE_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="price.adv", subject_kind="price", family="liquidity",
-        describes="average daily volume over the last N sessions, in shares and in dollars",
+        describes="average daily volume over the last N sessions, in shares a session and in dollars a session — the liquidity a position is measured against: a position's market value divided by dollar ADV is its days to liquidate",
         procedure="mean of daily volume, and of close × volume, over the window; sessions without volume dropped and counted",
         authority="desk convention for days-to-liquidate arithmetic (20/30/60-session windows)",
         fails_when="fewer than 20 sessions (ADV_MIN_OBS) or no recorded volume",
-        executor="price.adv", unit_class="count",
+        executor="price.adv", unit_class="count_per_day",
         params_schema={"type": "object", "properties": {
             "window_days": {"type": ["integer", "null"], "enum": [20, 30, 60, None],
                             "description": "sessions in the window (default 20)"}},

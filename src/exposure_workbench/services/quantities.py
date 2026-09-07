@@ -58,12 +58,15 @@ MONEY = "MONEY"
 COUNT = "COUNT"
 MULTIPLE = "MULTIPLE"
 MONEY_PER_SHARE = "MONEY_PER_SHARE"
+MONEY_PER_DAY = "MONEY_PER_DAY"
+COUNT_PER_DAY = "COUNT_PER_DAY"
 
 # units.fact_unit speaks the algebra's lowercase names; the gate speaks these.
 # One total bridge over the algebra's classes, so a stored fact's unit is
 # judged once (analytics/units.py) and only translated here.
 _UNIT_CLASS_OF = {units.MONEY: MONEY, units.RATIO: RATIO, units.COUNT: COUNT,
-                  units.MONEY_PER_SHARE: MONEY_PER_SHARE, units.MULTIPLE: MULTIPLE}
+                  units.MONEY_PER_SHARE: MONEY_PER_SHARE, units.MULTIPLE: MULTIPLE,
+                  units.MONEY_PER_DAY: MONEY_PER_DAY, units.COUNT_PER_DAY: COUNT_PER_DAY}
 
 # What a ledger row IS, for the assertion checks (trend needs a series, absence
 # needs a refusal). `scalar` is everything else a calc row can be.
@@ -187,7 +190,7 @@ def _numbers_in(payload, prefix: str, out: list, source_id: str) -> None:
 
 def _calc_unit(row: CalcLedger) -> str:
     """The row's own column first, then the params blob, then the legacy table."""
-    if row.unit_class in (MONEY, RATIO, COUNT, MONEY_PER_SHARE, MULTIPLE):
+    if row.unit_class in _UNIT_CLASS_OF.values():
         return row.unit_class
     recorded = ((row.params or {}).get("result_type") or {}).get("unit_class")
     if recorded in units.UNIT_CLASSES:

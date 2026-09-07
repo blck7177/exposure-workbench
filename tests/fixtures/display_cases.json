@@ -114,6 +114,30 @@
       "unit_class": "MULTIPLE",
       "display": "0.85×",
       "reader_value": 0.846
+    },
+    {
+      "value": 0.0001025,
+      "unit_class": "COUNT",
+      "display": "0.0001",
+      "reader_value": 0.0001
+    },
+    {
+      "value": 16200000000,
+      "unit_class": "MONEY_PER_DAY",
+      "display": "$16.20B/day",
+      "reader_value": 16200000000
+    },
+    {
+      "value": 3250000.4,
+      "unit_class": "MONEY_PER_DAY",
+      "display": "$3.25M/day",
+      "reader_value": 3250000
+    },
+    {
+      "value": 51234567.4,
+      "unit_class": "COUNT_PER_DAY",
+      "display": "51,234,567/day",
+      "reader_value": 51234567
     }
   ]
 }

@@ -27,6 +27,7 @@ from exposure_workbench.services import typed_calculator as tc
 
 MONEY, RATIO, COUNT, MPS = units.MONEY, units.RATIO, units.COUNT, units.MONEY_PER_SHARE
 MULT = units.MULTIPLE
+MPD, CPD = units.MONEY_PER_DAY, units.COUNT_PER_DAY
 
 
 def q(unit: str, v: float = 2.0, sid: str = "x", on: str | None = None,
@@ -48,6 +49,9 @@ PRODUCT_CASES = [
     (MPS, MULT, MPS),           # EPS × P/E = price
     (RATIO, MULT, RATIO),       # net margin × asset turnover = ROA
     (MULT, MULT, MULT),         # asset turnover × equity multiplier
+    (MPD, RATIO, MPD),          # dollar ADV × participation = sellable a day
+    (CPD, RATIO, CPD),          # share ADV × participation
+    (MPS, CPD, MPD),            # price × shares a day = dollars a day
 ]
 
 QUOTIENT_CASES = [
@@ -63,6 +67,14 @@ QUOTIENT_CASES = [
     (MONEY, MULT, MONEY),       # debt ÷ (debt/EBITDA) = EBITDA
     (MPS, MULT, MPS),           # price ÷ (P/E) = EPS
     (MULT, MULT, RATIO),        # this year's leverage against last year's
+    (MONEY, MPD, COUNT),        # position ÷ dollar ADV = days to liquidate
+    (COUNT, CPD, COUNT),        # shares held ÷ share ADV = days
+    (MPD, MPD, RATIO),          # one name's turnover against another's
+    (CPD, CPD, RATIO),
+    (MPD, RATIO, MPD),          # dollars a day ÷ a share = dollars a day
+    (CPD, RATIO, CPD),
+    (MPD, CPD, MPS),            # dollars a day ÷ shares a day = a price
+    (MPD, MPS, CPD),            # dollars a day ÷ a price = shares a day
 ]
 
 

@@ -297,14 +297,16 @@ async def test_adv_mints_share_count_and_dollar_value_as_two_quantities(monkeypa
     out = await pas.adv(db, "KO", window_days=20)
     assert out["adv_shares"]["value"] == pytest.approx(15500.0)   # mean of 6000..25000
     assert out["adv_dollars"]["value"] == pytest.approx(155000.0)
-    assert out["adv_shares"]["unit_class"] == u.COUNT
-    assert out["adv_dollars"]["unit_class"] == u.MONEY
+    # V25: a day's volume is a flow — shares a session, dollars a session — so
+    # that a position over it is DAYS (units.QUOTIENTS), not a ratio.
+    assert out["adv_shares"]["unit_class"] == u.COUNT_PER_DAY
+    assert out["adv_dollars"]["unit_class"] == u.MONEY_PER_DAY
     assert out["adv_shares"]["quantity"] == "KO.adv_shares.20d"
     assert out["adv_dollars"]["quantity"] == "KO.adv_dollars.20d"
     assert out["n"] == 20
     shares_row = next(r for r in db.rows if r.id == out["adv_shares"]["calc_id"])
     dollars_row = next(r for r in db.rows if r.id == out["adv_dollars"]["calc_id"])
-    assert shares_row.unit_class == "COUNT" and dollars_row.unit_class == "MONEY"
+    assert shares_row.unit_class == "COUNT_PER_DAY" and dollars_row.unit_class == "MONEY_PER_DAY"
 
 
 async def test_dollar_adv_uses_the_as_traded_close_not_the_adjusted_one(monkeypatch):

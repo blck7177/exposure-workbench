@@ -163,7 +163,10 @@ async def test_the_ops_are_the_calculators_and_the_series_modules_own():
     assert set(cmp.SERIES_OPS) == set(ss.OPS)
     assert (await cmp.compute(None, op="add", operands=["a"]))["error"] == "operands"
     assert (await cmp.compute(None, op="rank", operands=["a"]))["error"] == "operands"
-    assert (await cmp.compute(None, op="yoy", operands=["a", "b"]))["error"] == "operands"
+    # V25: a change op over a SET of figures is refused for what it is — a
+    # series operator asked of separate figures — and the refusal says how the
+    # change between two figures is computed (test_arithmetic_closure).
+    assert (await cmp.compute(None, op="yoy", operands=["a", "b"]))["error"] == "series_only"
 
 
 async def test_a_list_of_subjects_fans_out_to_one_row_each(monkeypatch):

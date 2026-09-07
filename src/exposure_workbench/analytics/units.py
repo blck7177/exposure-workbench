@@ -27,8 +27,18 @@ MONEY_PER_SHARE = "money_per_share"
 # algebra cannot tell the two apart (see REFINEMENTS below): the registry
 # declares which one a named measure is, and this class is what it declares.
 MULTIPLE = "multiple"
+# Flows per trading session (V25). Every class above is a STOCK — a balance, a
+# count, a price — and stock ÷ stock is dimensionless, which is right for
+# margins and wrong for a position over its daily turnover: $1.6M held ÷ $16B
+# traded a day is 0.0001 DAYS, and the 2026-09-06 battery rendered it "0.01%"
+# because the algebra had no row that could say otherwise. Average daily
+# volume is money (or shares) PER SESSION, and a stock over a flow is a time —
+# the only way "how many days to get out" can come from the algebra rather
+# than from a caller's declaration.
+MONEY_PER_DAY = "money_per_day"
+COUNT_PER_DAY = "count_per_day"
 
-UNIT_CLASSES = (MONEY, RATIO, COUNT, MONEY_PER_SHARE, MULTIPLE)
+UNIT_CLASSES = (MONEY, RATIO, COUNT, MONEY_PER_SHARE, MULTIPLE, MONEY_PER_DAY, COUNT_PER_DAY)
 
 # The dimensionless classes: pure numbers, distinguished only by how they read.
 DIMENSIONLESS = (RATIO, MULTIPLE)
@@ -50,6 +60,12 @@ PRODUCTS: dict[frozenset[str], str] = {
     frozenset((MONEY_PER_SHARE, MULTIPLE)): MONEY_PER_SHARE,
     frozenset((RATIO, MULTIPLE)): RATIO,
     frozenset((MULTIPLE,)): MULTIPLE,
+    # A flow scaled by a share is a flow: 20% participation of a day's dollar
+    # volume is the dollars that can be sold a day. And price × shares a day is
+    # the dollars a day — how dollar ADV is made from share ADV.
+    frozenset((MONEY_PER_DAY, RATIO)): MONEY_PER_DAY,
+    frozenset((COUNT_PER_DAY, RATIO)): COUNT_PER_DAY,
+    frozenset((MONEY_PER_SHARE, COUNT_PER_DAY)): MONEY_PER_DAY,
 }
 
 # Quotients are ordered: (numerator, denominator) -> unit of the result.
@@ -70,6 +86,19 @@ QUOTIENTS: dict[tuple[str, str], str] = {
     # Two like multiples compared — this year's leverage against last year's —
     # is a share of one by the other, which reads as a percent.
     (MULTIPLE, MULTIPLE): RATIO,
+    # A stock over a flow is a time, in the flow's own period: a position over
+    # its daily turnover is days to liquidate; shares held over shares a day
+    # likewise. Two like flows compared are a share; a flow over a share is a
+    # flow; dollars a day over shares a day is a price; dollars a day over a
+    # price is shares a day.
+    (MONEY, MONEY_PER_DAY): COUNT,
+    (COUNT, COUNT_PER_DAY): COUNT,
+    (MONEY_PER_DAY, MONEY_PER_DAY): RATIO,
+    (COUNT_PER_DAY, COUNT_PER_DAY): RATIO,
+    (MONEY_PER_DAY, RATIO): MONEY_PER_DAY,
+    (COUNT_PER_DAY, RATIO): COUNT_PER_DAY,
+    (MONEY_PER_DAY, COUNT_PER_DAY): MONEY_PER_SHARE,
+    (MONEY_PER_DAY, MONEY_PER_SHARE): COUNT_PER_DAY,
 }
 
 # What the ALGEBRA computes, refined by what the REGISTRY declares. The algebra

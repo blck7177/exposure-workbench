@@ -67,7 +67,7 @@ class Fact:
     kind: str
     measure: str                                  # what it is: net_margin | issuer_exposures.weight | "Item 7"
     subject: str | None = None                    # MSFT | port_… | run_… | None for the desk
-    unit: str | None = None                       # RATIO | MONEY | COUNT | MULTIPLE | MONEY_PER_SHARE | None
+    unit: str | None = None                       # RATIO | MONEY | COUNT | MULTIPLE | MONEY_PER_SHARE | MONEY_PER_DAY | COUNT_PER_DAY | None
     value: float | None = None                    # scalar
     points: tuple[tuple[str, float], ...] | None = None   # series: (period, value)
     text: str | None = None                       # passage text | absence statement | task state

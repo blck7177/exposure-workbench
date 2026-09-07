@@ -19,7 +19,7 @@ from exposure_workbench.analytics import display_conventions as dc
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "display_cases.json"
 TS_MIRROR = ROOT / "apps" / "web" / "lib" / "display.ts"
-UNIT_CLASSES = ("RATIO", "PERCENT", "MONEY", "MONEY_PER_SHARE", "MULTIPLE", "COUNT")
+UNIT_CLASSES = ("RATIO", "PERCENT", "MONEY", "MONEY_PER_SHARE", "MULTIPLE", "COUNT", "MONEY_PER_DAY", "COUNT_PER_DAY")
 
 CASES = json.loads(FIXTURE.read_text())["cases"]
 

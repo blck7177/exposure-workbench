@@ -122,7 +122,8 @@ def _err(code: str, detail: str) -> dict:
 # of quantities._UNIT_CLASS_OF, written here so this module does not import
 # the namer at load time (the namer imports RANK_OP from here).
 _ALGEBRA_UNIT = {"MONEY": MONEY, "RATIO": RATIO, "COUNT": COUNT,
-                 "MONEY_PER_SHARE": MONEY_PER_SHARE, "MULTIPLE": MULTIPLE}
+                 "MONEY_PER_SHARE": MONEY_PER_SHARE, "MULTIPLE": MULTIPLE,
+                 "MONEY_PER_DAY": units.MONEY_PER_DAY, "COUNT_PER_DAY": units.COUNT_PER_DAY}
 
 # The separator between a row and a figure on it: `run_x:issuer_exposures.
 # MSFT.weight`. A colon, because a name may hold dots (every run name does)
@@ -1197,3 +1198,132 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
             "type": rt, "operands": refs, "quality_flags": flags,
             "basis": (f"{len(entries)} quantities named {quantity}, ordered {direction} "
                       f"first; each entry keeps its own period")}
+
+
+# ── statistics over a SET of scalars (V25) ────────────────────────────────────
+
+SET_OPS = ("avg", "min", "max", "std", "abs")
+SET_OP_PREFIX = "calc.set."
+
+
+def _fold_basis(typed: list[Typed]) -> dict:
+    """The periods a set statistic rests on: every leaf of every entry."""
+    instants: set[str] = set()
+    intervals: set[tuple[str, str]] = set()
+    for t in typed:
+        lv = _leaves(t)
+        instants |= set(lv["instants"])
+        intervals |= {tuple(x) for x in lv["intervals"]}
+    return {"mixed": " ; ".join(_basis_str(t) or t.source_id for t in typed),
+            "leaves": {"instants": sorted(instants),
+                       "intervals": [list(x) for x in sorted(intervals)]}}
+
+
+async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
+                    as_quantity: str | None = None, invoked_by: str = "agent") -> dict:
+    """A statistic over a set of scalar quantities, recorded as one row.
+
+    WHY THIS EXISTS. `avg`, `min`, `max`, `std` and `abs` were defined on a
+    SERIES only — a ledgered run of one metric over consecutive periods — and
+    the 2026-09-06 battery asked them of a set of figures six times (five
+    holdings' weights, ten names' days-to-sell) and was refused `unknown_series`
+    each time. A set of like figures is the other thing an analyst takes a
+    statistic of, and the rules it needs are rank's, not a series': one unit,
+    one measure, no entry twice. `sum` over a set is `add` folded over it and
+    lives in compute_service, where the fold is.
+
+    min and max ARE one of the entries and keep that entry's basis and issuer;
+    avg and std rest on every entry and carry all their leaves. abs takes one.
+    """
+    if op not in SET_OPS:
+        return _err("unsupported_op", f"{op!r}; set statistics: {', '.join(SET_OPS)}")
+    refs = list(refs or [])
+    if op == "abs":
+        if len(refs) != 1:
+            return _err("operands", f"abs takes one operand; got {len(refs)}")
+    elif len(refs) < 2:
+        return _err("too_few_operands",
+                    f"a statistic over a set needs at least two figures; got {len(refs)}. "
+                    f"For a statistic over one figure's history, take the series "
+                    f"(read_fundamentals(last_n=…) or compute(method=…, params={{'last_n': …}}))")
+    if len(set(refs)) != len(refs):
+        dupes = sorted({r for r in refs if refs.count(r) > 1})
+        return _err("duplicate_operand", f"{', '.join(dupes)} appears more than once in the set")
+
+    typed: list[Typed] = []
+    for ref in refs:
+        t = await _resolve(db, ref)
+        if isinstance(t, dict):
+            return t
+        if isinstance(t, TypedSeries):
+            return _err("series_in_set",
+                        f"{ref} is a series. A statistic over ONE series is compute(op={op!r}, "
+                        f"operands=[{ref!r}]); a set statistic takes scalar figures only.")
+        typed.append(t)
+
+    units_seen = {t.unit_class for t in typed}
+    if len(units_seen) > 1:
+        return _err("incomparable_units",
+                    f"these are not one measure: {', '.join(sorted(units_seen))}. A statistic "
+                    f"over mixed units averages dollars with percentages.")
+    quantities_seen = {t.quantity for t in typed}
+    if op != "abs" and (len(quantities_seen) > 1 or None in quantities_seen):
+        named = sorted(str(q) for q in quantities_seen)
+        return _err("incomparable_quantities",
+                    f"a statistic over a set is over one measure held by several, or one "
+                    f"measure over several periods; these are {', '.join(named)}. Compute "
+                    f"the same measure, under the same name, for each first.")
+    bases = {t.base for t in typed}
+    if len(bases) > 1 and None not in bases:
+        return _err("different_books",
+                    f"these figures belong to different books ({', '.join(sorted(b for b in bases if b))}); "
+                    f"a share of one book and a share of another are not one measure.")
+
+    values = [t.value for t in typed]
+    quantity = typed[0].quantity
+    unit = typed[0].unit_class
+    issuers = tuple(sorted({i for t in typed for i in t.issuers}))
+    if op == "abs":
+        value = abs(values[0])
+        chosen = typed[0]
+        result = replace(chosen, value=value, issuers=issuers)
+    elif op in ("min", "max"):
+        chosen = (min if op == "min" else max)(typed, key=lambda t: t.value)
+        value = chosen.value
+        result = replace(chosen, issuers=issuers)
+    else:
+        mean = sum(values) / len(values)
+        if op == "avg":
+            value = mean
+        else:
+            value = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        same_instant = {t.instant for t in typed}
+        same_interval = {t.interval for t in typed}
+        if len(same_instant) == 1 and None not in same_instant:
+            result = Typed(value=value, unit_class=unit, instant=typed[0].instant, issuers=issuers)
+        elif len(same_interval) == 1 and None not in same_interval:
+            result = Typed(value=value, unit_class=unit, interval=typed[0].interval, issuers=issuers)
+        else:
+            result = Typed(value=value, unit_class=unit, recorded_basis=_fold_basis(typed), issuers=issuers)
+    base = bases.pop() if len(bases) == 1 else None
+    result = replace(result, base=base)
+    basis = result.basis()
+    rt = {"unit_class": unit, "basis": basis,
+          "quantity": as_quantity or f"{quantity or 'figure'}.{op}",
+          "issuers": list(issuers), "kind": "scalar", "entries": len(typed)}
+    if base:
+        rt["base"] = base
+    if as_quantity:
+        rt["named_by"] = "session"
+    calc_id = await cs._record(
+        db, None, f"{SET_OP_PREFIX}{op}",
+        {"op": op, "operands": refs, "operand_types": [t.as_dict() for t in typed],
+         "result_type": rt},
+        {"value": value}, refs, {}, invoked_by,
+    )
+    out = {"calc_id": calc_id, "op": op, "value": value, "type": rt, "operands": refs,
+           "basis": (f"{op} over {len(typed)} figures named {quantity}"
+                     + (f"; the {op} is {chosen.source_id}'s" if op in ("min", "max") else ""))}
+    if "leaves" in basis:
+        out["periods"] = basis["leaves"]
+    return out

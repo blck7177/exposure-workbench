@@ -28,12 +28,14 @@ MONEY_PER_SHARE_DIGITS = 2
 
 # Decimal places kept in the model-facing table, per unit class.
 MODEL_DECIMALS = {"RATIO": 4, "PERCENT": 4, "MONEY": 0, "MONEY_PER_SHARE": 2,
-                  "MULTIPLE": 3, "COUNT": 2}
+                  "MULTIPLE": 3, "COUNT": 2, "MONEY_PER_DAY": 0, "COUNT_PER_DAY": 0}
 
 
 def reader_value(value: float, unit_class: str) -> float | int:
     """The figure as the model's table shows it: rounded to the unit's precision."""
     places = MODEL_DECIMALS.get(unit_class, 4)
+    if unit_class == "COUNT" and 0 < abs(float(value)) < 0.01:
+        places = 4                       # a fraction of a day survives the table
     v = round(float(value), places)
     if places == 0 or (unit_class == "COUNT" and float(v).is_integer()):
         return int(v)
@@ -47,7 +49,7 @@ def display(value: float, unit_class: str) -> str:
         pct = v * 100
         digits = PERCENT_DIGITS["ge10"] if abs(pct) >= 10 else PERCENT_DIGITS["lt10"]
         return f"{pct:.{digits}f}%"
-    if unit_class == "MONEY":
+    if unit_class in ("MONEY", "MONEY_PER_DAY"):
         scale, suffix = 1.0, ""
         for s, name in MONEY_SCALES:
             if abs(v) >= s:
@@ -55,11 +57,18 @@ def display(value: float, unit_class: str) -> str:
                 break
         scaled = v / scale
         digits = MONEY_DIGITS["ge100"] if abs(scaled) >= 100 else MONEY_DIGITS["lt100"]
-        return f"${scaled:.{digits}f}{suffix}"
+        # A flow says its period: dollars a day is not dollars.
+        return f"${scaled:.{digits}f}{suffix}" + ("/day" if unit_class == "MONEY_PER_DAY" else "")
     if unit_class == "MONEY_PER_SHARE":
         return f"${v:.{MONEY_PER_SHARE_DIGITS}f}"
     if unit_class == "MULTIPLE":
         return f"{v:.{MULTIPLE_DIGITS}f}×"
     if unit_class == "COUNT":
-        return str(int(v)) if v.is_integer() else f"{v:.2f}"
+        if v.is_integer():
+            return str(int(v))
+        # A fraction of a day — a position that clears in 0.0001 sessions — is
+        # not "0.00": below a hundredth the count keeps four places.
+        return f"{v:.2f}" if abs(v) >= 0.01 else f"{v:.4f}"
+    if unit_class == "COUNT_PER_DAY":
+        return f"{int(round(v)):,}/day"
     return str(value)

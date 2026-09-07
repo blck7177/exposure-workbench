@@ -708,8 +708,11 @@ async def adv(db: AsyncSession, ticker: str, window_days: int = 20,
                  "window": {"from": span[0], "to": span[1]},
                  "basis": (f"mean over the last {n} sessions with recorded volume; "
                            f"dollar ADV is as-traded close × as-traded volume")}
-    for key, value, unit, col in (("adv_shares", shares, u.COUNT, "shares"),
-                                  ("adv_dollars", dollars, u.MONEY, "dollars")):
+    # V25: a day's volume is a FLOW — shares a session, dollars a session — not
+    # a count or a balance. Typed as such, a position divided by it is days
+    # (units.QUOTIENTS), which is the arithmetic this method exists for.
+    for key, value, unit, col in (("adv_shares", shares, u.COUNT_PER_DAY, "shares"),
+                                  ("adv_dollars", dollars, u.MONEY_PER_DAY, "dollars")):
         quantity = f"{ticker}.{key}.{window_days}d"
         calc_id = await cs._record(
             db, ticker, f"{OP_ADV}.{col}",

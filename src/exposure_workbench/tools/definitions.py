@@ -436,13 +436,15 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
         display="Computing",
         description=(
             "The one place a figure is computed; every result is a citable row. Either an op over "
-            "operands — add/subtract/multiply/divide (two operands), rank (two or more, with direction), "
-            f"regress (two series), or a series statistic ({', '.join(compute_service.SERIES_OPS)}; one "
-            "series) — where an operand is a FACT id from a result's `facts` block (f_…), a fact_/calc_ "
-            "id, or a figure by name on a run row (run_…:issuer_exposures.MSFT.weight); or a method from describe's list over a "
-            "subject (a ticker, a run_…, a port_…) with its params — issuer measures, price.*, book.*. "
-            "method and subject take lists: ten issuers' net margin is one call. Refusals say why and "
-            "what would go through."
+            "operands — add/multiply (two or more), subtract/divide (two; or a list with params.by: each "
+            "operand divided or multiplied by the one figure `by` names), rank (two or more, with direction), "
+            f"regress (two series), or a statistic ({', '.join(compute_service.SERIES_OPS)}) over one "
+            "series, or sum/avg/min/max/std over two or more figures — where an operand is a FACT id from a "
+            "result's `facts` block (f_…), a fact_/calc_ id, or a figure by name on a run row "
+            "(run_…:issuer_exposures.MSFT.weight); or a method from describe's list over a subject (a "
+            "ticker, a run_…, a port_…) with its params — issuer measures, price.*, book.*; an issuer "
+            "measure with params.last_n is its last N periods as one series. method and subject take "
+            "lists: ten issuers' net margin is one call. Refusals say why and what would go through."
         ),
         json_schema={"type": "object", "properties": {
             "op": {"type": ["string", "null"], "enum": [*compute_service.OPS, None]},

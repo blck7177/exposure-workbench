@@ -106,7 +106,7 @@ def test_I2_every_fact_says_as_of_or_window(adapted, name):
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_every_fact_has_a_unit_or_is_text(adapted, name):
     facts, _n, _h = adapted[name]
-    bad = [f.measure for f in facts if f.kind in (F.SCALAR, F.SERIES) and f.unit not in ("RATIO", "MONEY", "COUNT", "MULTIPLE", "MONEY_PER_SHARE", "PERCENT")]
+    bad = [f.measure for f in facts if f.kind in (F.SCALAR, F.SERIES) and f.unit not in ("RATIO", "MONEY", "COUNT", "MULTIPLE", "MONEY_PER_SHARE", "PERCENT", "MONEY_PER_DAY", "COUNT_PER_DAY")]
     assert bad == [], f"{name}: {bad[:8]}"
 
 
