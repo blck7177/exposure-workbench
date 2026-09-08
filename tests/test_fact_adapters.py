@@ -29,6 +29,14 @@ CASES: dict[str, tuple[str, dict]] = {
     "describe_portfolio": ("describe", {"subject": "port_001"}),
     "describe_issuer_expand_fundamentals": ("describe", {"subject": "MSFT", "expand": "fundamentals"}),
     "describe_issuer_expand_methods": ("describe", {"subject": "MSFT", "expand": "methods"}),
+    # V28 C2: the expand values that had no fixture — the filings one is the payload that
+    # crashed the adapter on every issuer for two versions (X3), unseen by 2,133 tests.
+    "describe_issuer_expand_filings": ("describe", {"subject": "MSFT", "expand": "filings"}),
+    "describe_issuer_expand_readings": ("describe", {"subject": "MSFT", "expand": "readings"}),
+    "describe_issuer_expand_procedures": ("describe", {"subject": "MSFT", "expand": "procedures"}),
+    "describe_issuer_domain": ("describe", {"subject": "MSFT", "expand": "issuer_earnings_quality"}),
+    "describe_portfolio_domain": ("describe", {"subject": "port_001", "expand": "book_liquidity"}),
+    "describe_desk_expand_refused": ("describe", {"expand": "book"}),
     "describe_unknown": ("describe", {"subject": "ZZZZ"}),
     "read_fundamentals_flow": ("read_fundamentals", {"ticker": "MSFT", "metric": "revenue", "months": 12}),
     "read_fundamentals_sheet": ("read_fundamentals", {"ticker": "MSFT"}),

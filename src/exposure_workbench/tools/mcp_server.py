@@ -30,6 +30,7 @@ from mcp import types
 from mcp.server.lowlevel import Server
 
 from exposure_workbench.auth.context import current_user_ctx
+from exposure_workbench.services import gate
 from exposure_workbench.tools import faces, mcp_request, registry as R
 
 SERVER_NAME = "exposure-workbench"
@@ -44,12 +45,10 @@ holdings and alerts, and delegation of long work to background runs.
 
 Every tool result carries a `facts` block — one row per figure, with its id
 (f_…), what it is, whose, its unit, value, as-of and window — and a `note` in
-which each figure stands as its fact id. State no number you did not get as a
-fact; write the fact's id into the sentence where the figure goes. The gate refuses an answer that points at what was
+which each figure stands as its fact id. """ + gate.PROSE_RULE + """ The gate refuses an answer that points at what was
 never shown, or writes a number the facts cannot account for.
 
-Calculations belong to the tools: a number you worked out yourself has no id to
-cite. Delegation tools return immediately with a run id; they do not block."""
+Delegation tools return immediately with a run id; they do not block."""
 
 
 def build_mcp_server(

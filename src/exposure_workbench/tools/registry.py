@@ -35,6 +35,7 @@ from exposure_workbench.services import fact_adapters as fa
 from exposure_workbench.services import ledger as ledger_svc
 from exposure_workbench.services import facts as fct
 from exposure_workbench.services import trace_service
+from exposure_workbench.services import name_table
 from exposure_workbench.tools.arg_validation import validate_args
 
 logger = logging.getLogger(__name__)
@@ -187,7 +188,12 @@ async def invoke(
             status="rejected", duration_ms=int((time.monotonic() - started) * 1000),
             message_id=message_id,
         )
-        return {"error": "invalid_arguments", "problems": problems}
+        # V27: a name that failed an enum but IS a name the desk has — a method
+        # written as a metric, a filed line written as a method — is told what
+        # it is and the call that takes it. Same table as the catalogue's rows.
+        route = {p["value"]: name_table.route(p["value"]) for p in problems
+                 if isinstance(p.get("value"), str) and name_table.get(p["value"])}
+        return {"error": "invalid_arguments", "problems": problems, **({"route": route} if route else {})}
 
     # 2) reserve budget. REFLECTION and GATE are free by design, for the same
     # reason stated two different ways: the budget bounds how much EVIDENCE a

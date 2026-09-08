@@ -305,11 +305,11 @@ async def _named_context(db: AsyncSession, rid: str) -> tuple[str, date] | dict:
     row about a run — an analysis (portfolio.integration) or a scenario
     (book.scenario) — says so in its params; a scenario's base is the row
     itself, because the hypothetical book IS that row."""
-    from exposure_workbench.db.models import ExposureRun
+    from exposure_workbench.services import run_reads_service
     if rid.startswith("run_"):
-        run = (await db.execute(select(ExposureRun).where(ExposureRun.id == rid))).scalar_one_or_none()
-        if run is None:
-            return _err("unknown_operand", f"{rid} is not a run this desk holds")
+        run = await run_reads_service.completed_run(db, rid)        # V28 C1: the one door
+        if isinstance(run, dict):
+            return _err("unknown_operand", f"{rid} is not a completed run this desk holds: {run.get('detail') or run.get('error')}")
         return rid, run.as_of_date
     row = (await db.execute(select(CalcLedger).where(CalcLedger.id == rid))).scalar_one_or_none()
     params = (row.params or {}) if row is not None else {}
@@ -322,8 +322,8 @@ async def _named_context(db: AsyncSession, rid: str) -> tuple[str, date] | dict:
     if params.get("as_of"):
         as_of = date.fromisoformat(params["as_of"])
     elif params.get("run_id"):
-        run = (await db.execute(select(ExposureRun).where(ExposureRun.id == params["run_id"]))).scalar_one_or_none()
-        as_of = run.as_of_date if run is not None else None
+        run = await run_reads_service.completed_run(db, params["run_id"])
+        as_of = run.as_of_date if not isinstance(run, dict) else None
     elif (rt.get("basis") or {}).get("instant"):
         as_of = date.fromisoformat(rt["basis"]["instant"])   # a calculator row of the book
     if as_of is None:
@@ -1081,6 +1081,48 @@ def _label_of(t: Typed) -> str | None:
     return t.issuers[0] if len(t.issuers) == 1 else None
 
 
+def _basis_key(t: Typed):
+    """The window a figure is over, as something two figures can be compared on."""
+    if t.instant is not None:
+        return ("instant", t.instant.isoformat())
+    if t.interval is not None:
+        return ("interval", t.interval[0].isoformat(), t.interval[1].isoformat())
+    if t.recorded_basis:
+        import json
+        return ("recorded", json.dumps(t.recorded_basis, sort_keys=True, default=str))
+    return None
+
+
+def _comparison_axis(typed: list[Typed], what: str) -> str | dict:
+    """What varies across a set of figures being ordered or summarised (V28 B1).
+
+    The unit algebra says what is comparable; this function only reads the
+    identity the figures carry. Two shapes are one comparison: ONE measure held
+    by several issuers (each keeps its own fiscal window — a 52/53-week filer's
+    quarter ends days from a calendar filer's), or SEVERAL measures of ONE
+    issuer over ONE window (capex, buybacks and dividends of MSFT in the same
+    year, which the capital-allocation skill asks to be ordered). Until V28 the
+    second was refused as 'incomparable' because the row's labels assumed the
+    issuer was the only axis — a labelling convenience overruling domain
+    judgement. Returns 'issuer' or 'quantity', or a refusal."""
+    quantities = {t.quantity for t in typed}
+    if None in quantities:
+        return _err("unnamed_quantity",
+                    f"{what} needs every figure to carry the measure it is; one of these does not")
+    if len(quantities) == 1:
+        return "issuer"
+    holders = {t.issuers for t in typed}
+    windows = {_basis_key(t) for t in typed}
+    if len(holders) == 1 and len(next(iter(holders))) == 1 and len(windows) == 1 and None not in windows:
+        return "quantity"
+    named = sorted(str(q) for q in quantities)
+    return _err("incomparable_quantities",
+                f"{what} is over one measure held by several, or over several measures of one "
+                f"holder over one window; these are {', '.join(named)} over "
+                f"{len(holders)} holder(s) and {len(windows)} window(s). Compute the same "
+                f"measure for each name, or the same window for each measure, first.")
+
+
 async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
                as_quantity: str | None = None, invoked_by: str = "agent") -> dict:
     """Order quantities that are comparable, and record the order.
@@ -1133,23 +1175,19 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
                     f"these are not one measure: {', '.join(sorted(units_seen))}. An order "
                     f"over mixed units ranks dollars against percentages.")
 
-    quantities_seen = {t.quantity for t in typed}
-    if len(quantities_seen) > 1 or None in quantities_seen:
-        named = sorted(str(q) for q in quantities_seen)
-        return _err("incomparable_quantities",
-                    f"an ordering compares one measure across several holders; these are "
-                    f"{', '.join(named)}. Compute the same measure for each name first.")
-    quantity = typed[0].quantity
+    axis = _comparison_axis(typed, "an ordering")
+    if isinstance(axis, dict):
+        return axis
+    quantity = typed[0].quantity if axis == "issuer" else None
 
-    labels = [_label_of(t) for t in typed]
+    labels = [_label_of(t) if axis == "issuer" else t.quantity for t in typed]
     if None in labels or len(set(labels)) != len(labels):
         # Two entries this function cannot tell apart would produce a table with
         # two rows called the same thing, and a rank name that resolves to
         # whichever was written last. Refused rather than numbered.
         return _err("indistinguishable_operands",
-                    f"each entry in an ordering must belong to exactly one issuer, and to a "
-                    f"different one: got {[l or '?' for l in labels]}. Rank one measure "
-                    f"across issuers.")
+                    f"each entry in an ordering must be one figure of one {axis}, and a "
+                    f"different one: got {[l or '?' for l in labels]}.")
 
     # V24: the entry's date as data beside the basis sentence — an instant's
     # date, or the end of an interval — so the Fact made of it says as of when.
@@ -1168,7 +1206,7 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
             e["rank"] = i + 1
 
     values = [e["value"] for e in entries]
-    name = as_quantity or quantity
+    name = as_quantity or quantity or f"{_label_of(typed[0]) or 'figures'}.rank"
     unit = typed[0].unit_class
     result = {
         "ordering": entries,
@@ -1178,8 +1216,8 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
         "spread": max(values) - min(values),
     }
     flags = {"tied_places": ties} if ties else {}
-    rt = {"unit_class": unit, "kind": "ranking", "quantity": name,
-          "issuers": sorted({lb for lb in labels if lb})}
+    rt = {"unit_class": unit, "kind": "ranking", "quantity": name, "axis": axis,
+          "issuers": sorted({i for t in typed for i in t.issuers})}
     bases = {t.base for t in typed}
     if len(bases) == 1 and None not in bases:
         rt["base"] = bases.pop()     # an ordering of one book's figures is a figure of it
@@ -1196,8 +1234,10 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
             "as_of": max(dated) if dated else None,
             "leader": result["leader"], "ordering": entries, "spread": result["spread"],
             "type": rt, "operands": refs, "quality_flags": flags,
-            "basis": (f"{len(entries)} quantities named {quantity}, ordered {direction} "
-                      f"first; each entry keeps its own period")}
+            "basis": ((f"{len(entries)} quantities named {quantity}, ordered {direction} "
+                       f"first; each entry keeps its own period") if axis == "issuer" else
+                      (f"{len(entries)} measures of {_label_of(typed[0])} over one window, "
+                       f"ordered {direction} first"))}
 
 
 # ── statistics over a SET of scalars (V25) ────────────────────────────────────
@@ -1267,12 +1307,10 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
                     f"these are not one measure: {', '.join(sorted(units_seen))}. A statistic "
                     f"over mixed units averages dollars with percentages.")
     quantities_seen = {t.quantity for t in typed}
-    if op != "abs" and (len(quantities_seen) > 1 or None in quantities_seen):
-        named = sorted(str(q) for q in quantities_seen)
-        return _err("incomparable_quantities",
-                    f"a statistic over a set is over one measure held by several, or one "
-                    f"measure over several periods; these are {', '.join(named)}. Compute "
-                    f"the same measure, under the same name, for each first.")
+    if op != "abs":
+        axis = _comparison_axis(typed, "a statistic over a set")
+        if isinstance(axis, dict):
+            return axis
     bases = {t.base for t in typed}
     if len(bases) > 1 and None not in bases:
         return _err("different_books",
@@ -1280,7 +1318,7 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
                     f"a share of one book and a share of another are not one measure.")
 
     values = [t.value for t in typed]
-    quantity = typed[0].quantity
+    quantity = typed[0].quantity if len(quantities_seen) == 1 else None
     unit = typed[0].unit_class
     issuers = tuple(sorted({i for t in typed for i in t.issuers}))
     if op == "abs":
@@ -1308,8 +1346,11 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
     base = bases.pop() if len(bases) == 1 else None
     result = replace(result, base=base)
     basis = result.basis()
+    # V28 B1: several measures of one holder have no shared measure name; the
+    # row is named for the holder, and the basis sentence says what it is over.
+    holder = issuers[0] if len(issuers) == 1 else None
     rt = {"unit_class": unit, "basis": basis,
-          "quantity": as_quantity or f"{quantity or 'figure'}.{op}",
+          "quantity": as_quantity or f"{quantity or holder or 'figure'}.{op}",
           "issuers": list(issuers), "kind": "scalar", "entries": len(typed)}
     if base:
         rt["base"] = base
@@ -1322,7 +1363,8 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
         {"value": value}, refs, {}, invoked_by,
     )
     out = {"calc_id": calc_id, "op": op, "value": value, "type": rt, "operands": refs,
-           "basis": (f"{op} over {len(typed)} figures named {quantity}"
+           "basis": ((f"{op} over {len(typed)} figures named {quantity}" if quantity else
+                      f"{op} over {len(typed)} measures of {holder or 'several holders'} over one window")
                      + (f"; the {op} is {chosen.source_id}'s" if op in ("min", "max") else ""))}
     if "leaves" in basis:
         out["periods"] = basis["leaves"]

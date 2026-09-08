@@ -227,18 +227,20 @@ async def test_a_change_op_over_a_set_says_what_it_needs(monkeypatch):
 
 
 async def test_a_single_series_still_routes_to_the_series_service(monkeypatch):
+    """V28 A1: the series op receives the RESOLVED series — its points and the
+    row it rests on — never an id to reload."""
     series = tc.TypedSeries(points=((date(2025, 12, 31), q(1.0, sid="s")),), unit_class=RATIO,
                             kind="flow", quantity="gross_margin", source_id="calc_s")
     desk = _Desk(monkeypatch, {"calc_s": series})
     seen = {}
 
-    async def stat(_db, sid, op, invoked_by="agent"):
-        seen.update(sid=sid, op=op)
+    async def stat(_db, points, rtype, sid, op, invoked_by="agent"):
+        seen.update(sid=sid, op=op, n=len(points), unit=rtype["unit_class"])
         return {"calc_id": "calc_x", "op": op, "value": 1.0}
 
-    monkeypatch.setattr(cmp.series_service, "series_stat", stat)
+    monkeypatch.setattr(cmp.series_service, "stat_over", stat)
     out = await desk.op("yoy", ["calc_s"])
-    assert seen == {"sid": "calc_s", "op": "yoy"} and out["calc_id"] == "calc_x"
+    assert seen == {"sid": "calc_s", "op": "yoy", "n": 1, "unit": RATIO} and out["calc_id"] == "calc_x"
     both = await desk.op("avg", ["calc_s", "calc_s"])
     assert both["error"] == "duplicate_operand"
 

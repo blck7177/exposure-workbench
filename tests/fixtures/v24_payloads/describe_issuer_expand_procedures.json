@@ -1,0 +1,1082 @@
+{
+ "subject": "MSFT",
+ "kind": "issuer",
+ "identity": {
+  "ticker": "MSFT",
+  "name": "Microsoft Corporation",
+  "cik": "789019",
+  "sector": null,
+  "industry": null,
+  "investigable": true
+ },
+ "fundamentals": {
+  "metrics": 37,
+  "latest_period_end": "2026-03-31",
+  "kinds": {
+   "instant": 17,
+   "flow": 20
+  },
+  "names": [
+   "accounts_payable",
+   "accounts_receivable",
+   "amortization_of_intangibles",
+   "buybacks",
+   "capex",
+   "cash_and_equivalents",
+   "cash_and_restricted_cash",
+   "commercial_paper",
+   "cost_of_revenue",
+   "current_assets",
+   "current_liabilities",
+   "current_portion_long_term_debt",
+   "depreciation",
+   "dividends_paid",
+   "eps_basic",
+   "eps_diluted",
+   "gross_profit",
+   "income_tax_expense",
+   "interest_expense",
+   "interest_expense_nonoperating",
+   "inventory",
+   "long_term_debt_noncurrent",
+   "long_term_debt_total",
+   "net_income",
+   "operating_cash_flow",
+   "operating_income",
+   "operating_lease_liability_noncurrent",
+   "operating_lease_liability_total",
+   "pretax_income",
+   "revenue",
+   "sbc",
+   "shares_basic_weighted",
+   "shares_diluted_weighted",
+   "shares_outstanding",
+   "stockholders_equity",
+   "total_assets",
+   "total_liabilities"
+  ],
+  "fiscal": {
+   "latest_period_end": "2026-03-31",
+   "how_to_ask": "A flow is measured over an interval and a balance is read at an instant; they are different kinds of number and may not be added. Ask read_fundamentals for the window you want — months=3 for a quarter, months=12 for a year — and it derives exactly that window from the periods this issuer filed, or refuses. It never returns a shorter period than the one you asked for.",
+   "fiscal_year_ends": "Jun 30",
+   "fiscal_quarters_align_with_calendar": true
+  },
+  "methods_computable": 29,
+  "methods_not_computable": {
+   "ebitda": "missing depreciation_amortization",
+   "debt_to_ebitda": "missing depreciation_amortization",
+   "net_debt_to_ebitda": "missing depreciation_amortization"
+  }
+ },
+ "filings": {
+  "filings": {
+   "10-K": {
+    "count": 1,
+    "latest": "2025-07-30"
+   },
+   "10-Q": {
+    "count": 1,
+    "latest": "2026-04-29"
+   }
+  },
+  "items_indexed": [
+   "Item 1",
+   "Item 10",
+   "Item 11",
+   "Item 12",
+   "Item 13",
+   "Item 14",
+   "Item 15",
+   "Item 16",
+   "Item 1A",
+   "Item 1B",
+   "Item 1C",
+   "Item 2",
+   "Item 3",
+   "Item 4",
+   "Item 5",
+   "Item 6",
+   "Item 7",
+   "Item 7A",
+   "Item 8",
+   "Item 9",
+   "Item 9A",
+   "Item 9B",
+   "Item 9C",
+   "Part I, Item 1",
+   "Part I, Item 2",
+   "Part I, Item 3",
+   "Part I, Item 4",
+   "Part II, Item 1",
+   "Part II, Item 1A",
+   "Part II, Item 2",
+   "Part II, Item 5",
+   "Part II, Item 6"
+  ],
+  "passages": 348,
+  "read_with": "read_filings(ticker, query=…) for passages; read_filings(ticker, item='1A') for a section"
+ },
+ "prices": {
+  "sessions": 898,
+  "from": "1998-10-05",
+  "to": "2026-09-04",
+  "read_with": "read_prices(ticker, window)"
+ },
+ "book": {
+  "held_in": [
+   {
+    "portfolio_id": "port_001",
+    "run_id": "run_72e6617afeb7",
+    "as_of": "2026-09-04",
+    "names": [
+     "issuer_exposures.MSFT.weight",
+     "issuer_exposures.MSFT.market_value",
+     "issuer_exposures.MSFT.contribution",
+     "exposure_metrics.portfolio_market_value",
+     "limit_checks.issuer_concentration:MSFT.current_value",
+     "limit_checks.issuer_concentration:MSFT.warning_level",
+     "limit_checks.issuer_concentration:MSFT.breach_level",
+     "risk_alerts.issuer_concentration:MSFT.current_value",
+     "risk_alerts.issuer_concentration:MSFT.limit_value",
+     "risk_alerts.issuer_concentration:MSFT.utilization"
+    ],
+    "checks": [
+     {
+      "name": "limit_checks.issuer_concentration:MSFT.current_value",
+      "status": "warning"
+     }
+    ],
+    "alerts": [
+     "warning"
+    ],
+    "methods_on_this_run": [
+     "book.analysis",
+     "book.reconcile",
+     "book.sell",
+     "book.buy"
+    ],
+    "procedures": [
+     "book_composition",
+     "book_limits_and_triggers",
+     "book_hypothetical_trades",
+     "book_market_risk",
+     "book_drawdown_and_attribution",
+     "book_liquidity",
+     "book_events"
+    ],
+    "everything_else": "describe('run_72e6617afeb7')"
+   }
+  ]
+ },
+ "desk": {
+  "brief": {
+   "id": "brief_20660dfc0271",
+   "created_at": "2026-07-24T06:04:07.795985+00:00"
+  },
+  "read_with": "read_book('MSFT', names=['brief'])"
+ },
+ "not_held": {
+  "segment_revenue": "not held as figures (companyfacts carries no dimensions); stated in the 10-K's segment note and Item 7 — read_filings",
+  "product_revenue": "not held as figures; stated in Item 7 and the product table — read_filings",
+  "geographic_revenue": "not held as figures; stated in the segment note — read_filings",
+  "customer_concentration": "not held as figures; stated in Item 1 / the concentration note — read_filings",
+  "backlog": "not held as figures; stated in Item 7 where the issuer discloses it — read_filings"
+ },
+ "cannot": {
+  "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's sensitivity to a factor is price.beta with that factor's ETF as benchmark (TLT for rates, HYG for credit), one call per name"
+ },
+ "methods": {
+  "issuer": [
+   {
+    "name": "ebit",
+    "is": "issuer method",
+    "does": "net income + interest expense + income tax expense",
+    "call": "compute(method='ebit', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "ebitda",
+    "is": "issuer method",
+    "does": "EBIT + depreciation and amortisation",
+    "call": "compute(method='ebitda', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "free_cash_flow",
+    "is": "issuer method",
+    "does": "operating cash flow − capital expenditures",
+    "call": "compute(method='free_cash_flow', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "total_debt",
+    "is": "issuer method",
+    "does": "the widest non-overlapping set of reported debt components",
+    "call": "compute(method='total_debt', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "net_debt",
+    "is": "issuer method",
+    "does": "total debt − cash and equivalents",
+    "call": "compute(method='net_debt', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "ebit_interest_coverage",
+    "is": "issuer method",
+    "does": "EBIT ÷ interest expense, over the same window",
+    "call": "compute(method='ebit_interest_coverage', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "debt_to_ebitda",
+    "is": "issuer method",
+    "does": "total debt ÷ EBITDA",
+    "call": "compute(method='debt_to_ebitda', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "debt_to_operating_cash_flow",
+    "is": "issuer method",
+    "does": "total debt ÷ operating cash flow",
+    "call": "compute(method='debt_to_operating_cash_flow', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "fcf_to_debt",
+    "is": "issuer method",
+    "does": "free cash flow ÷ total debt",
+    "call": "compute(method='fcf_to_debt', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "current_ratio",
+    "is": "issuer method",
+    "does": "current assets ÷ current liabilities",
+    "call": "compute(method='current_ratio', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "gross_margin",
+    "is": "issuer method",
+    "does": "gross profit ÷ revenue",
+    "call": "compute(method='gross_margin', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "operating_margin",
+    "is": "issuer method",
+    "does": "operating income ÷ revenue",
+    "call": "compute(method='operating_margin', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "net_margin",
+    "is": "issuer method",
+    "does": "net income ÷ revenue",
+    "call": "compute(method='net_margin', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "days_sales_outstanding",
+    "is": "issuer method",
+    "does": "accounts receivable ÷ revenue × 365",
+    "call": "compute(method='days_sales_outstanding', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "days_inventory",
+    "is": "issuer method",
+    "does": "inventory ÷ cost of revenue × 365",
+    "call": "compute(method='days_inventory', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "days_payable",
+    "is": "issuer method",
+    "does": "accounts payable ÷ cost of revenue × 365",
+    "call": "compute(method='days_payable', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "roe",
+    "is": "issuer method",
+    "does": "net income ÷ stockholders' equity",
+    "call": "compute(method='roe', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "roa",
+    "is": "issuer method",
+    "does": "net income ÷ total assets",
+    "call": "compute(method='roa', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "tax_burden",
+    "is": "issuer method",
+    "does": "net income ÷ pretax income",
+    "call": "compute(method='tax_burden', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "nopat",
+    "is": "issuer method",
+    "does": "operating income × tax burden",
+    "call": "compute(method='nopat', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "invested_capital",
+    "is": "issuer method",
+    "does": "total debt + stockholders' equity − cash and equivalents",
+    "call": "compute(method='invested_capital', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "roic",
+    "is": "issuer method",
+    "does": "NOPAT ÷ invested capital",
+    "call": "compute(method='roic', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "asset_turnover",
+    "is": "issuer method",
+    "does": "revenue ÷ total assets",
+    "call": "compute(method='asset_turnover', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "equity_multiplier",
+    "is": "issuer method",
+    "does": "total assets ÷ stockholders' equity",
+    "call": "compute(method='equity_multiplier', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "quick_assets",
+    "is": "issuer method",
+    "does": "current assets − inventory",
+    "call": "compute(method='quick_assets', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "quick_ratio",
+    "is": "issuer method",
+    "does": "(current assets − inventory) ÷ current liabilities",
+    "call": "compute(method='quick_ratio', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "fcf_margin",
+    "is": "issuer method",
+    "does": "free cash flow ÷ revenue",
+    "call": "compute(method='fcf_margin', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "capex_intensity",
+    "is": "issuer method",
+    "does": "capital expenditures ÷ revenue",
+    "call": "compute(method='capex_intensity', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "net_debt_to_ebitda",
+    "is": "issuer method",
+    "does": "net debt ÷ EBITDA",
+    "call": "compute(method='net_debt_to_ebitda', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "cash_conversion_cycle",
+    "is": "issuer method",
+    "does": "days sales outstanding + days inventory − days payable",
+    "call": "compute(method='cash_conversion_cycle', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "accruals",
+    "is": "issuer method",
+    "does": "net income − operating cash flow",
+    "call": "compute(method='accruals', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "accruals_ratio",
+    "is": "issuer method",
+    "does": "(net income − operating cash flow) ÷ total assets",
+    "call": "compute(method='accruals_ratio', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ]
+   },
+   {
+    "name": "issuer.panel",
+    "is": "issuer method",
+    "does": "every named issuer measure this desk knows, evaluated once, with each one's own refusal where an input is missing",
+    "call": "compute(method='issuer.panel', subject='MSFT')",
+    "params": [
+     "months",
+     "at",
+     "last_n"
+    ],
+    "yields": [
+     "ebit",
+     "ebitda",
+     "free_cash_flow",
+     "total_debt",
+     "net_debt",
+     "ebit_interest_coverage",
+     "debt_to_ebitda",
+     "debt_to_operating_cash_flow",
+     "fcf_to_debt",
+     "current_ratio",
+     "gross_margin",
+     "operating_margin",
+     "net_margin",
+     "days_sales_outstanding",
+     "days_inventory",
+     "days_payable",
+     "roe",
+     "roa",
+     "tax_burden",
+     "nopat",
+     "invested_capital",
+     "roic",
+     "asset_turnover",
+     "equity_multiplier",
+     "quick_assets",
+     "quick_ratio",
+     "fcf_margin",
+     "capex_intensity",
+     "net_debt_to_ebitda",
+     "cash_conversion_cycle",
+     "accruals",
+     "accruals_ratio"
+    ]
+   }
+  ],
+  "price": [
+   {
+    "name": "price.volatility",
+    "is": "price method",
+    "does": "annualised volatility of the last N daily returns; a short window reacts, a long one is the baseline",
+    "call": "compute(method='price.volatility', subject='MSFT')",
+    "params": [
+     "window_days"
+    ],
+    "yields": [
+     "{ticker}.vol.{n}d"
+    ]
+   },
+   {
+    "name": "price.beta",
+    "is": "price method",
+    "does": "a name's sensitivity to a benchmark: OLS beta, alpha and R² of its daily returns on the benchmark's (default SPY; TLT for rates, HYG for credit — the per-name sensitivity)",
+    "call": "compute(method='price.beta', subject='MSFT')",
+    "params": [
+     "benchmark",
+     "window"
+    ],
+    "yields": [
+     "{ticker}.beta",
+     "{ticker}.alpha",
+     "{ticker}.r_squared"
+    ]
+   },
+   {
+    "name": "price.momentum_12_1",
+    "is": "price method",
+    "does": "cumulative adjusted return from ~12 months back through 21 sessions back, the last month skipped",
+    "call": "compute(method='price.momentum_12_1', subject='MSFT')",
+    "yields": [
+     "{ticker}.momentum_12_1"
+    ]
+   },
+   {
+    "name": "price.distance_from_52w_high",
+    "is": "price method",
+    "does": "how far the adjusted close sits below its trailing-year high, with the date the high was set",
+    "call": "compute(method='price.distance_from_52w_high', subject='MSFT')",
+    "yields": [
+     "{ticker}.distance_from_52w_high"
+    ]
+   },
+   {
+    "name": "price.adv",
+    "is": "price method",
+    "does": "average daily volume over the last N sessions, in shares a session and in dollars a session — the liquidity a position is measured against: a position's market value divided by dollar ADV is its days to liquidate",
+    "call": "compute(method='price.adv', subject='MSFT')",
+    "params": [
+     "window_days"
+    ],
+    "yields": [
+     "{ticker}.adv.shares",
+     "{ticker}.adv.dollars"
+    ]
+   },
+   {
+    "name": "price.drawdown",
+    "is": "price method",
+    "does": "the deepest peak-to-trough fall of the adjusted close over a window: peak, trough, fall and depth, dated, with the recovery date if regained",
+    "call": "compute(method='price.drawdown', subject='MSFT')",
+    "params": [
+     "window"
+    ],
+    "yields": [
+     "{ticker}.drawdown.peak",
+     "{ticker}.drawdown.trough",
+     "{ticker}.drawdown.fall",
+     "{ticker}.drawdown.depth"
+    ]
+   },
+   {
+    "name": "price.window_return",
+    "is": "price method",
+    "does": "total return over a named window, and relative to a benchmark when one is given",
+    "call": "compute(method='price.window_return', subject='MSFT')",
+    "params": [
+     "window",
+     "benchmark"
+    ],
+    "yields": [
+     "{ticker}.window_return",
+     "{ticker}.window_return.relative"
+    ]
+   }
+  ]
+ },
+ "procedures": [
+  {
+   "name": "issuer_earnings_quality",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "are the profits real: is cash showing up behind earnings, and is working capital telling a different story",
+   "asked_as": [
+    "is the cash actually showing up behind the earnings",
+    "are the profits real",
+    "are receivables and inventory growing faster than the top line",
+    "put that in days",
+    "is that one odd quarter or has it been building"
+   ],
+   "methods": [
+    "accruals_ratio",
+    "accruals",
+    "days_sales_outstanding",
+    "days_inventory",
+    "days_payable",
+    "cash_conversion_cycle"
+   ],
+   "reads": [
+    "operating_cash_flow",
+    "net_income",
+    "accounts_receivable",
+    "inventory",
+    "revenue",
+    "capex",
+    "sbc"
+   ],
+   "open": "describe('MSFT', expand='issuer_earnings_quality')",
+   "evidence": [
+    "operating cash flow beside net income over the same windows, and their ratio (cash conversion)",
+    "the accruals ratio and its own history",
+    "receivables, inventory and revenue growth over the same windows; days sales outstanding, days inventory, days payable and the cash conversion cycle",
+    "capex and stock-based compensation where the gap between cash and earnings needs a reason"
+   ],
+   "this_desk": [
+    "days measures are built on ending balances, not averages, and the result says so",
+    "a measure over its last N periods is one series, so a trend is read from the series, not from two figures"
+   ],
+   "compare": [
+    "cash conversion and the accruals ratio against the issuer's own prior periods: the evidence is about persistence, not one period",
+    "receivable and inventory growth against revenue growth over the same windows",
+    "days against the same days a year earlier"
+   ],
+   "close": [
+    "say whether cash confirms earnings, and if not which line explains the gap and whether it is building",
+    "give the days as days, dated, beside the prior reading"
+   ],
+   "absent": "a quarter the issuer did not file at the window asked is unreachable and stays in place in the series, never closed over",
+   "authority": "Sloan (1996), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows; Lev & Thiagarajan (1993), Fundamental Information Analysis (inventory and receivables relative to sales); CFA Program, Financial Analysis Techniques (activity ratios)"
+  },
+  {
+   "name": "issuer_profitability",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "how profitable the issuer is, at which line, against whom, and whether it is mix, pricing or cost",
+   "asked_as": [
+    "how profitable is X next to Y",
+    "whose gross margin is holding up better",
+    "is that mix or pricing",
+    "which is the best business by that measure",
+    "does the ranking hold on return on capital"
+   ],
+   "methods": [
+    "gross_margin",
+    "operating_margin",
+    "net_margin",
+    "roe",
+    "roa",
+    "roic",
+    "asset_turnover",
+    "equity_multiplier",
+    "tax_burden",
+    "issuer.panel"
+   ],
+   "reads": [
+    "revenue",
+    "gross_profit",
+    "operating_income",
+    "net_income"
+   ],
+   "open": "describe('MSFT', expand='issuer_profitability')",
+   "evidence": [
+    "gross, operating and net margin over the same windows for every name compared",
+    "ROE, ROA, ROIC and the DuPont legs (net margin, asset turnover, equity multiplier) when the question is about returns",
+    "the same measure on the same windows for each name, then the ordering"
+   ],
+   "this_desk": [
+    "the margins name which revenue line they divided by; issuers that report revenue under two tags are read on the one the registry chose",
+    "an ordering is a computation with a row: a superlative in the answer rests on the ranking, not on reading the figures by eye"
+   ],
+   "compare": [
+    "level and slope for each name over the same windows: who is higher, whose is moving",
+    "gross against operating margin to separate cost of goods from overhead; net against operating to isolate interest, tax and non-operating items",
+    "a ranking on one measure against the same ranking on another, when the question asks whether it holds"
+   ],
+   "close": [
+    "a sentence for the level, a sentence for the slope, and what that implies for the question asked",
+    "name the runner-up and the gap when a name is called the best"
+   ],
+   "absent": "an issuer whose input is not filed on a line is unmeasured on that line and stays in the comparison as such, never dropped",
+   "authority": "CFA Program, Financial Reporting (profitability ratios); Damodaran, Return on Capital, Return on Invested Capital and Return on Equity"
+  },
+  {
+   "name": "issuer_credit_and_balance_sheet",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "how much debt the issuer carries against what it earns, how well it covers it, and how much room the balance sheet has",
+   "asked_as": [
+    "is it more or less levered than what we own",
+    "how strong is the balance sheet",
+    "which of the two has more room to keep spending",
+    "can it cover its interest",
+    "how liquid is the company itself"
+   ],
+   "methods": [
+    "total_debt",
+    "net_debt",
+    "debt_to_ebitda",
+    "net_debt_to_ebitda",
+    "debt_to_operating_cash_flow",
+    "fcf_to_debt",
+    "ebit_interest_coverage",
+    "current_ratio",
+    "quick_ratio"
+   ],
+   "reads": [
+    "long_term_debt_total",
+    "cash_and_equivalents",
+    "interest_expense",
+    "current_assets",
+    "current_liabilities"
+   ],
+   "open": "describe('MSFT', expand='issuer_credit_and_balance_sheet')",
+   "evidence": [
+    "total debt, net debt, debt to EBITDA and to operating cash flow, FCF to debt",
+    "EBIT interest coverage",
+    "the current and quick ratios for the near-term",
+    "the same measures on the held peers when the question is relative"
+   ],
+   "this_desk": [
+    "total debt is the widest non-overlapping set of reported debt components, and the result lists what was left out at the date",
+    "interest coverage may rest on a substituted interest line; the definition names it",
+    "coverage and leverage are refused for a financial issuer, and the refusal says why"
+   ],
+   "compare": [
+    "against the issuer's own prior periods first, then against the median of the held names on the same measure",
+    "gross and net leverage side by side, with the cash line that was netted",
+    "coverage against the trend of EBIT: falling coverage with flat EBIT means the debt got dearer"
+   ],
+   "close": [
+    "more or less levered than the comparison named, with the place and the figures",
+    "what would have to change in earnings or debt for the reading to flip"
+   ],
+   "absent": "debt maturities, covenants and undrawn facilities are not held as figures; where the filing states them they are quoted",
+   "authority": "S&P Global Ratings corporate methodology (financial risk profile: cash flow/leverage); CFA Program, solvency and coverage ratios"
+  },
+  {
+   "name": "issuer_capital_allocation",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "where the issuer's cash goes and whether the spending is outrunning what supports it",
+   "asked_as": [
+    "where is the cash actually going",
+    "is capex growing faster than revenue",
+    "is it over-investing relative to what it depreciates",
+    "buybacks, dividends, paying down debt: the shape of it",
+    "can it keep doing this"
+   ],
+   "methods": [
+    "free_cash_flow",
+    "fcf_margin",
+    "capex_intensity"
+   ],
+   "reads": [
+    "operating_cash_flow",
+    "capex",
+    "buybacks",
+    "dividends_paid",
+    "depreciation_amortization",
+    "revenue"
+   ],
+   "open": "describe('MSFT', expand='issuer_capital_allocation')",
+   "evidence": [
+    "operating cash flow and each use of it — capex, buybacks, dividends, debt repayment — over the same windows, each as a share of operating cash flow",
+    "free cash flow and FCF margin",
+    "capex intensity, and capex against depreciation and amortisation",
+    "capex growth against revenue growth over the same windows"
+   ],
+   "this_desk": [
+    "a use of cash the issuer did not file is said to be missing; a neighbouring line is never substituted for it",
+    "free cash flow is operating cash flow less capex by definition, so a negative figure with capex above operating cash flow is the capex line, and the result names it"
+   ],
+   "compare": [
+    "the ordering of the uses and whether it changed from the prior year",
+    "the spread of capex growth over revenue growth, and capex over depreciation, over several windows",
+    "the same shape on the peer when two issuers are compared"
+   ],
+   "close": [
+    "which use dominates, whether it is accelerating, and what it does to free cash flow",
+    "if held, the position's weight, so the reader knows what is at stake"
+   ],
+   "absent": "the return on the capex is not measurable from the filings; the desk says what the spending is doing to cash and margins, not what it will earn",
+   "authority": "SEC C&DI 102.07 (free cash flow); CFA Program, Financial Analysis Techniques (cash-flow analysis); S&P financial policy modifier"
+  },
+  {
+   "name": "issuer_business_risk_from_filings",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "what the issuer itself says can go wrong, how concentrated the business is, and whether it is still the business it was",
+   "asked_as": [
+    "make me the bear case from their own filings",
+    "which risk would show up in the numbers first",
+    "how concentrated is the revenue",
+    "is what we own still the same business",
+    "how would I see that in the numbers"
+   ],
+   "methods": [
+    "capex_intensity",
+    "asset_turnover",
+    "gross_margin"
+   ],
+   "reads": [
+    "1A",
+    "7",
+    "1",
+    "gross_profit",
+    "inventory",
+    "accounts_receivable",
+    "capex"
+   ],
+   "open": "describe('MSFT', expand='issuer_business_risk_from_filings')",
+   "evidence": [
+    "Item 1A and the MD&A: the named risks, in the issuer's words",
+    "Item 1 then and now, when the question is whether the business changed",
+    "the segment, product, customer and geographic passages for concentration",
+    "for each named risk, the line where it would first appear and that line's trend: demand in gross margin and inventory, supply in capex and commitments, concentration in the customer note"
+   ],
+   "this_desk": [
+    "concentration figures are quoted from the filing and cited, never computed from parts",
+    "the defining measures of a business — capex intensity, asset turnover, gross margin — are read over the years held as series"
+   ],
+   "compare": [
+    "each named risk against the trend of the line where it shows, so the risks are ordered by what the numbers already show, not by the filing's order",
+    "the filing's stated shares across years where both years are indexed",
+    "each defining measure's direction against the thesis's claim"
+   ],
+   "close": [
+    "the risks in the order the numbers rank them, each with the line to watch",
+    "what changed and what did not, with the filing's own sentence for what the business is now",
+    "if held, the position's weight"
+   ],
+   "absent": "a risk the filing names without a line the desk holds (backlog, customer share, supplier terms) is quoted, not estimated",
+   "authority": "Regulation S-K Items 101, 105 and 303; ASC 280; S&P Global Ratings corporate methodology (business risk profile); Lev & Thiagarajan (1993) for the lines a risk shows in first (gross margin, inventory, receivables, capex)"
+  },
+  {
+   "name": "issuer_price_context",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "where the price sits against its own history and the market, and what that says about what is already in it",
+   "asked_as": [
+    "where is it trading against its last twelve months",
+    "near the high or the low",
+    "its momentum with the last month left out",
+    "has it been jumpier",
+    "how has it done against the market"
+   ],
+   "methods": [
+    "price.distance_from_52w_high",
+    "price.momentum_12_1",
+    "price.volatility",
+    "price.window_return",
+    "price.drawdown"
+   ],
+   "reads": [],
+   "open": "describe('MSFT', expand='issuer_price_context')",
+   "evidence": [
+    "distance from the 52-week high, with the date the high was set",
+    "12-1 momentum, the last month skipped",
+    "volatility over a short and a long window",
+    "the window return and the return relative to a benchmark",
+    "the deepest drawdown over the window and whether it was regained"
+   ],
+   "this_desk": [
+    "every price measure is over the adjusted close; the dollar volume is over the as-traded close",
+    "each price measure states its observation floor and is refused, never shortened, below it"
+   ],
+   "compare": [
+    "the short window against the long: a short window reacts, a long one is the baseline",
+    "the name's return against the benchmark's over the same window",
+    "the name against the book's other holdings on the same measure"
+   ],
+   "close": [
+    "what the price has already moved on, dated, and what would be new information",
+    "never a view on where the price goes"
+   ],
+   "absent": "valuation multiples (P/E, EV/EBITDA, FCF yield) are not yet measures on this desk; say so rather than deriving one in prose",
+   "authority": "Jegadeesh & Titman (1993); George & Hwang (2004); CFA Program, Quantitative Methods"
+  },
+  {
+   "name": "issuer_outlook_boundary",
+   "is": "domain",
+   "subject": "issuer",
+   "question": "what the desk will and will not say about the future, and what the issuer's own filings say would move it",
+   "asked_as": [
+    "what is your estimate for next year",
+    "what would move revenue either way",
+    "if you could ask management one question",
+    "what are the catalysts",
+    "is the guidance consistent"
+   ],
+   "methods": [],
+   "reads": [
+    "7"
+   ],
+   "open": "describe('MSFT', expand='issuer_outlook_boundary')",
+   "evidence": [
+    "the filings' own forward-looking passages: guidance, stated drivers, the outlook section of the MD&A",
+    "the measures whose recent trend contradicts or confirms the narrative",
+    "what happened recently, from the web, for anything after the last filing"
+   ],
+   "this_desk": [
+    "the desk does not forecast; asked for a number about the future it says so and gives what the filings say would move the figure",
+    "the one question for management is built from the line the numbers show moving, not from the narrative"
+   ],
+   "compare": [
+    "management's stated drivers against the lines that have actually moved",
+    "the same statement across filings for consistency"
+   ],
+   "close": [
+    "the drivers, each with the line it shows in and that line's recent direction",
+    "one question, phrased so the answer would be a number the filings do not yet hold"
+   ],
+   "absent": "a projected figure is absent by policy, not by data; say the policy",
+   "authority": "the desk's mandate; buy-side practice on reading management statements against the numbers"
+  }
+ ],
+ "desk_rules": [
+  {
+   "rule": "Every figure stated is a fact a tool returned. A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate.",
+   "authority": "the desk's evidence discipline (services/gate)"
+  },
+  {
+   "rule": "The desk does not forecast. Asked for next year's figure, it says so and gives what the issuer's own filings say would move the figure either way.",
+   "authority": "the desk's mandate"
+  },
+  {
+   "rule": "No measure carries a threshold. A number is laid out with what it is compared against and the reading belongs to the reader.",
+   "authority": "decision of 2026-08-24 (test_no_formula_carries_a_threshold)"
+  },
+  {
+   "rule": "A premise the user asserts is checked against the desk's figure first and corrected with it before the question is answered; a premise the desk holds no figure for is neither agreed with nor denied.",
+   "authority": "the desk's evidence discipline"
+  },
+  {
+   "rule": "A comparison is one measure over the same windows: level first, then slope, then what it means for the question — never a table with no sentence after it.",
+   "authority": "CFA Program, Financial Analysis Techniques (cross-sectional analysis)"
+  },
+  {
+   "rule": "EBIT and EBITDA start from NET INCOME, adding back interest and tax — not from operating income. Where an issuer carries large non-operating income the two differ, and a correct EBIT is then mostly non-operating.",
+   "authority": "SEC C&DI 103.01, 103.02"
+  },
+  {
+   "rule": "Free cash flow is operating cash flow less capital expenditures, and the definition is stated beside the number because it has no uniform one.",
+   "authority": "SEC C&DI 102.07"
+  },
+  {
+   "rule": "Credit measures built on interest (coverage, leverage) are refused for a financial issuer: interest is a bank's operating cost and deposits its raw material. ROE, ROA and the accruals ratio do apply to banks.",
+   "authority": "the formula registry's not_for_financials"
+  },
+  {
+   "rule": "Segment, product, geographic and customer-concentration figures are not held as facts; they are quoted from the filing's own sentences, cited, never derived from parts.",
+   "authority": "ASC 280; Regulation S-K Item 101(c)"
+  },
+  {
+   "rule": "A name the desk has not prepared is started (readiness) and said to be in preparation; nothing is estimated for it meanwhile.",
+   "authority": "the desk's readiness pipeline"
+  }
+ ],
+ "next": [
+  "describe('MSFT', expand='<domain>')",
+  "read_fundamentals('MSFT', metric='<line>')",
+  "read_filings('MSFT', item='1A')",
+  "read_prices('MSFT', window='1y')"
+ ],
+ "catalogue_as_of": "2026-09-08",
+ "how_to_read": "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain carries `open`. `methods` are what compute produces for this subject. `procedures` are the analyst's domains for this kind of subject, each with its question, the words it is asked in, its methods and what it reads — open one with expand=<domain>. `desk_rules` are this desk's own conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not substitute. `next` lists the calls that open the next level.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures.",
+ "table_names": {
+  "run_72e6617afeb7": [
+   "issuer_exposures.MSFT.weight",
+   "issuer_exposures.MSFT.market_value",
+   "issuer_exposures.MSFT.contribution",
+   "exposure_metrics.portfolio_market_value",
+   "limit_checks.issuer_concentration:MSFT.current_value",
+   "limit_checks.issuer_concentration:MSFT.warning_level",
+   "limit_checks.issuer_concentration:MSFT.breach_level",
+   "risk_alerts.issuer_concentration:MSFT.current_value",
+   "risk_alerts.issuer_concentration:MSFT.limit_value",
+   "risk_alerts.issuer_concentration:MSFT.utilization"
+  ]
+ }
+}

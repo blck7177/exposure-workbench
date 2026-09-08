@@ -42,6 +42,8 @@ from exposure_workbench.services import price_analytics_service as pas
 from exposure_workbench.services import reconcile_service, scenario_service, series_service
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools.arg_validation import validate_args
+from exposure_workbench.analytics import series_ops as so
+from exposure_workbench.services import name_table
 from exposure_workbench.tools.registry import current_session_id
 
 # The ops, as the model spells them. Series ops come from the series module's
@@ -74,6 +76,7 @@ async def compute(db: AsyncSession, *, op: str | None = None, method: str | list
                     f"{', '.join(unknown)}: not a method this desk has",
                     held_on={"method": method} if isinstance(method, str) else {},
                     nearest={m: skill.nearest(m) for m in unknown},
+                    **({"route": routes} if (routes := {m: name_table.route(m) for m in unknown if name_table.get(m)}) else {}),
                     known=sorted(skill.METHODS))
     invoked_by = current_session_id()
     results: list[dict] = []
@@ -203,7 +206,15 @@ async def _stat(db: AsyncSession, op: str, operands: list[str], as_quantity: str
         if isinstance(left, dict):
             return left
         if isinstance(left, tc.TypedSeries):
-            return await series_service.series_stat(db, operands[0], op, invoked_by=invoked_by)
+            # V28 A1: the resolver already produced the series; the op runs over
+            # it. Handing the caller's id back to a loader is what refused every
+            # series FACT (`unknown_series`, 41 times in the 2026-09-07 battery).
+            pts = [so.SeriesPoint(period_end=d, value=t.value,
+                                  input_fact_ids=[t.source_id] if t.source_id else [])
+                   for d, t in left.points]
+            rtype = {"unit_class": left.unit_class, "kind": left.kind, "quantity": left.quantity}
+            return await series_service.stat_over(db, pts, rtype, left.source_id or operands[0], op,
+                                                  invoked_by=invoked_by)
         if op == "abs":
             return await tc.aggregate(db, "abs", operands, as_quantity=as_quantity, invoked_by=invoked_by)
         return _err("not_a_series",

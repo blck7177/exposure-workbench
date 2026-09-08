@@ -29,7 +29,7 @@ say how a figure is read, with its authority, and never enters a computation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from exposure_workbench.analytics import formulas as fm
 
@@ -478,10 +478,24 @@ class Procedure:
     close: tuple[str, ...]
     absent: str
     authority: str
+    # V27: the domain's leaves BY NAME — the methods it turns on (registry names,
+    # checked here) and what it reads (run figure groups, filed lines, filing
+    # items, sections; checked against services/name_table by test, since this
+    # module imports no service). The 2026-09-07 battery opened a domain card
+    # 3 times in 140 turns and matched its evidence sentences to method names
+    # by meaning; a domain that names its leaves can be opened as one node with
+    # every leaf carrying its call.
+    methods: tuple[str, ...] = ()
+    reads: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.subject_kind not in SUBJECT_KINDS + ("desk",):
             raise ValueError(f"{self.name}: subject_kind {self.subject_kind!r}")
+        unknown = [m for m in self.methods if m not in METHODS]
+        if unknown:
+            raise ValueError(f"{self.name}: methods not in the registry: {unknown}")
+        if not isinstance(self.reads, tuple) or not isinstance(self.methods, tuple):
+            raise ValueError(f"{self.name}: methods and reads are tuples of names")
         for seg in ("triggers", "evidence", "compare", "close"):
             if not isinstance(getattr(self, seg), tuple) or not getattr(self, seg):
                 raise ValueError(f"{self.name}: {seg} is a non-empty tuple of sentences")
@@ -754,6 +768,48 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
         authority="event-study practice (price reaction over the event window)",
     ),
 )}
+
+
+# The leaves of each domain, by name. One table beside the declarations so a
+# reviewer sees every link at once; a domain missing here is a construction
+# error, not a silently leafless card.
+_LINKS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "issuer_earnings_quality": (
+        ("accruals_ratio", "accruals", "days_sales_outstanding", "days_inventory", "days_payable", "cash_conversion_cycle"),
+        ("operating_cash_flow", "net_income", "accounts_receivable", "inventory", "revenue", "capex", "sbc")),
+    "issuer_profitability": (
+        ("gross_margin", "operating_margin", "net_margin", "roe", "roa", "roic", "asset_turnover", "equity_multiplier",
+         "tax_burden", "issuer.panel"),
+        ("revenue", "gross_profit", "operating_income", "net_income")),
+    "issuer_credit_and_balance_sheet": (
+        ("total_debt", "net_debt", "debt_to_ebitda", "net_debt_to_ebitda", "debt_to_operating_cash_flow", "fcf_to_debt",
+         "ebit_interest_coverage", "current_ratio", "quick_ratio"),
+        ("long_term_debt_total", "cash_and_equivalents", "interest_expense", "current_assets", "current_liabilities")),
+    "issuer_capital_allocation": (
+        ("free_cash_flow", "fcf_margin", "capex_intensity"),
+        ("operating_cash_flow", "capex", "buybacks", "dividends_paid", "depreciation_amortization", "revenue")),
+    "issuer_business_risk_from_filings": (
+        ("capex_intensity", "asset_turnover", "gross_margin"),
+        ("1A", "7", "1", "gross_profit", "inventory", "accounts_receivable", "capex")),
+    "issuer_price_context": (
+        ("price.distance_from_52w_high", "price.momentum_12_1", "price.volatility", "price.window_return", "price.drawdown"),
+        ()),
+    "issuer_outlook_boundary": ((), ("7",)),
+    "book_composition": ((), ("concentration", "whole_book")),
+    "book_limits_and_triggers": ((), ("mandate", "whole_book", "concentration")),
+    "book_hypothetical_trades": (("book.sell", "book.buy"), ("concentration", "mandate", "attribution")),
+    "book_market_risk": (("price.beta", "price.volatility", "book.analysis"), ("factor_exposure", "risk", "7A")),
+    "book_drawdown_and_attribution": (
+        ("book.drawdown_episodes", "book.explain_episode", "book.reconcile", "price.window_return"),
+        ("attribution", "risk")),
+    "book_liquidity": (("price.adv",), ("concentration",)),
+    "book_events": (("price.window_return",), ("concentration",)),
+}
+_missing = set(PROCEDURES) - set(_LINKS)
+_extra = set(_LINKS) - set(PROCEDURES)
+if _missing or _extra:
+    raise RuntimeError(f"domain links: missing {sorted(_missing)}, unknown {sorted(_extra)}")
+PROCEDURES = {name: replace(p, methods=_LINKS[name][0], reads=_LINKS[name][1]) for name, p in PROCEDURES.items()}
 
 
 def procedures_for(subject_kind: str) -> list[Procedure]:

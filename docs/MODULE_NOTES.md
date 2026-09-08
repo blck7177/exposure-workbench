@@ -1029,3 +1029,53 @@ Phase 0:229 条已接受块答案 347 个正文数字 token 在 G3 下重放—�
 ### 守卫
 
 `test_fact_adapters`(47 夹具 × I1/I2/单位/id 与 note 对应/模型形往返/上限)、`test_ledger` + `test_ledger_live`(步骤与表一致、抽屉解析、`f_` 操作数、情景链式)、`test_answer_grammar`、`test_gate`(每个拒绝名一例、§7 每类一例、中文置信度、问题数字、cites 任意事实、指针入串)、`test_tool_registry`(wrapper 的事实记录、adapter 错误是结构化错误、超上限 held_back、每个面上的工具都有 adapter)、`test_submit_gate`、`test_one_resolver`(两个出口同一个门;registry 不再建表)。
+
+## M27 — 目录是 ls:每一项自述是什么、怎么用;域单独打开;名字表是枚举与拒绝信的共享常量(V27,2026-09-07,本地未提交)
+
+### 起因
+
+V26 电池 244 轮:110 个方法名送进 read_book、34 个申报行送进 compute、约 38 个方法名送进 read_fundamentals;114 次 `describe(subject=None, expand='book')` 打在根上被静默忽略;单个分析域根本打不开(EXPANDS 只有六个数据域,`expand=procedures` 一次开全部)。根因一句话:describe 给了名字,没给"这个名字是什么、送哪个工具、填哪个参数",三个工具收自由字符串,绑定全靠模型记。boss 定的形:目录就是 `ls`,一个概念,三处改动,不加层。分析与设计见 `docs/spikes/v26/ROOT_CAUSES.md`、`TREE_SPEC.md`(一页版是方案,长版是参考)。
+
+### 形状
+
+- **名字表**(`services/name_table.py`):模型能写进工具参数的每个名字一条 `Entry{name, kind, consumer, does, subject_kind, on}`,是四个主人之上的**视图**(skill 的方法与域、resources 的 section、concept_mapping 的申报行、series_ops 的 op),同名两种 kind 是 import 时错误。`call(entry, subject, ref)` 渲染一条可抄的调用,主体层用具体 id(那是事实),根用占位符 `<port_…>`/`<ticker>`(根不替模型选主体);必填参数按 schema 出占位符。`route(name)` 回 `{name, is, call}`;`nearest` 跨全部种类。只 import analytics 与纯数据的 concept_mapping,因为 registry 读它、compute_service 读 registry。
+- **目录**(`services/catalogue_service.py`):`_methods` 从裸名变成行 `{name, is, does, call, params?, yields?}`;`_procedures` 每条带 `is: domain`、`methods`、`reads`、`open`;`EXPANDS = VIEWS + PROCEDURES 名`,`describe(subject, expand=<域>)` 走 `_domain()`:卡片全文 + 该域方法行(带 procedure/fails_when,主体按方法种类落到 ticker / 最新完成 run / portfolio)+ 它读的东西(run 图组带 pattern 与 read_book 调用、申报行、filing item、section)+ `next`;域种类与主体不符拒 `domain_not_for_subject` 并列该种类的域。**根不收 expand**:`expand_needs_a_subject` 带两步地址;根的 portfolios 只有一行与 `open`,不再印 run 的图名与 scenario 提示。每层带 `next`;run 带 `sections` 调用;图组各带一条 `call`;`_HOW_TO_READ` 改写(旧文指向不存在的 `table` 键)。`DEFAULT_CEILING` 8k → 24k 字符(MSFT 一级 10.4k → 21.3k 字符,6.1k token;域节点 1.5–2.5k token 替代一次开全部的 5k)。
+- **域连叶子**(`analytics/skill.py`):`Procedure` 加 `methods`、`reads`;链接集中在 `_LINKS` 一张表用 `replace` 灌入,缺一个域是构造期 RuntimeError;`methods` 不在登记表是 ValueError;`reads` 由测试对 `name_table.READABLE` 校验(skill 不许 import service)。
+- **枚举**(`tools/definitions.py`):compute 的 `method` 经 `$defs.method_name` 枚举(按 face 的 kinds,`if/then` 覆盖字符串形、`items` 覆盖列表形),read_fundamentals 的 `metric` 枚举 `SUPPORTED_METRICS`。`arg_validation` 对 >8 项的枚举失配改短信("不是这个参数收的 46 个名字之一;nearest: …")并带 `value`;`registry.invoke` 的 `invalid_arguments` 对表里认识的值附 `route`。read_book 三条路径、read_fundamentals 的 `metric_not_filed`、compute_service 的 `unknown_method` 都附 `route`——同一张表,文本由表生成不手写。
+- **去重载**:run 图组键 `book` → `whole_book`。
+- **描述**:compute 加一句宏观陈述(结果都是事实,方法跑列表再取统计是两次调用);read_book 改成能力陈述(按 describe 为该主体列出的名字读),不写"方法不是行名"这类针对单一失败的否定句。
+
+### 有意不做(boss 2026-09-07 砍掉的)
+
+`about=` 检索、strict 模式、根上的 capabilities 图、`_SYSTEM` 图例、域节点的 `then` 调用链、op+method 管道、循环侧注入、按观察到的混淆新增 DESK_RULES、方法按 subject 改名。判据:树只返回事实与地址,不替模型解释意图;route 只返回调用,绝不代为执行。
+
+### 守卫
+
+`test_v27_directory`(表:每名一种 kind、双 kind 是 import 错误、每域 reads ⊆ READABLE、未知方法不可构造;行:主体层具体 id、根占位符;层:根拒 expand、域按种类;枚举:meta 面 46 全、research 面无 book 方法、metric = 申报行,错门名字 validate_args 即拒且 route 指门;read_book 收到方法名回 route;live:每层 ≤ 上限、域节点每叶带 call)。离线 2145 绿;live 子集绿,`test_symmetry` 与 `test_v12_describe_issuer_live` 里引用 `_describe_run`/`formulas` 的旧测试是 V23 遗留的死测试,未动。
+
+### 待办
+
+未 rebuild 容器、未重跑电池(串行 + 先播 completed run + 两次复现);模型侧措辞待过目:compute 与 read_book 描述、`_HOW_TO_READ`、拒绝信文本、`_LINKS` 的域→方法/reads 选择。
+
+## M28 — 把工作还给角色:序列算子收值、形状写进签名、可比性由身份决定、run 一扇门、生产者声明单位、正文数字规则一句(V28,2026-09-08,本地未提交)
+
+### 起因
+
+boss 2026-09-08 定的全局规则:一次对话里 LLM 提供 intelligence、skill 提供 domain knowledge、tool 正交且让 LLM 能执行它想做的事、validation 确保正确性与可追溯;每个问题先答"谁在做不是自己的工作"。V26 电池剩下的七条按这个规则全是 tool 的一条边界失守:对 LLM(暴露实现分割、承诺了执行不了的意图)、对 skill(替 skill 判什么可比)、对 validation(输出了不完整的东西、没划清地图与事实);外加 validation 对 LLM 的一条(prompt 另持一份规则)。计划 `docs/IMPLEMENTATION_PLAN_V28.md`。
+
+### 形状
+
+- **A1 序列算子收值**(`series_service.stat_over`,`compute_service._stat`):`_resolve` 出来的 TypedSeries 直接进算子,记录行的出处是它的 `source_id`;`series_stat(id)` 保留给直接调用方。`compute_service` 不再把 `operands[…]` 交给任何按 id 重载的函数(源码守卫)。
+- **A2 形状在签名里**(`definitions.py`,`arg_validation._problem`):compute 与 read_filings 的 schema 加 `not{required:[op,method]}` / `not{required:[query,item]}`,子 schema 自带 `description`,`_problem` 对 `not` 用它;registry 在扣预算前就拒。service 里的 `op_or_method`/`query_or_item` 留作直接调用方的后手。
+- **B1 可比性由身份决定**(`typed_calculator._comparison_axis`、`_basis_key`):一个度量跨多持有者(各自窗口)或多个度量、一个持有者、一个窗口;行名取变化的轴(issuer 或 quantity),ranking 行记 `axis`;无名量单独一个拒绝码 `unnamed_quantity`。skill 的 `issuer_capital_allocation.compare` 一字未改。
+- **C1 run 一扇门**(`run_reads_service.completed_run`):存在、可见、`status == completed`,否则 `run_not_completed{status, read: read_book('task_…', names=['state'])}`。catalogue 两处、read_book、typed_calculator 两处、scenario、integration 全走它;白名单只有加载器自己、写入方、任务上报、抽屉。AST 守卫禁止别处 `select(ExposureRun).where(ExposureRun.id==…)`。`start` 描述加一句"完成后可读,进度看任务门"。
+- **C2 生产者声明单位**(`fact_adapters.Ctx.leaf_unit`,`numeric_unit`):容器声明 `numeric_unit` 则其下每个数字叶子按它铸事实;目录的 `items_detail` 声明 `count`。夹具补齐 filings/readings/procedures/两种域节点/根拒绝,共 6 份,`test_every_fixture_has_a_case` 钉住。
+- **D1 正文数字规则一句**(`gate.PROSE_RULE`):`_SYSTEM`、respond 描述、MCP INSTRUCTIONS 逐字 import 它,`_FIX` 由它派生;"never write a number"从 prompt 消失。
+
+### 守卫
+
+`test_v28_roles`(A1 对序列 fact id 算 max/yoy 出行且出处是该 id、compute 源码不调 series_stat;A2 op+method、query+item 在 validate_args 就拒且信里点名两个形状;B1 三个用途同窗口按度量名排序、跨发行人同度量各留窗口、异窗口或异持有者拒绝;C1 AST 守卫 + 未完成 run 回 task 门;C2 声明 count 的容器铸 COUNT 事实、未声明仍 UnknownUnit;D1 三处逐字含 PROSE_RULE)。旧测试三处改钉新边界。离线 2191 绿。
+
+### 待办
+
+rebuild 四镜像;电池按仪器条件重跑(串行、先播 completed run、两次复现、报分布),M27 与 M28 同一轮量。措辞过目:PROSE_RULE、compute/read_filings 的 `not` 描述、`completed_run` 拒绝信、`start` 新句。`describe(MSFT, expand='procedures')` 全域视图 31.8k 字符超 24k 上限,未列入 live 上限测试,是否保留待定。

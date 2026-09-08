@@ -1,0 +1,117 @@
+{
+ "subject": "port_001",
+ "kind": "portfolio",
+ "domain": "book_liquidity",
+ "question": "how fast the book can be sold down, and which names would hurt",
+ "asked_as": [
+  "if I had to get out in a hurry which positions hurt",
+  "liquidity not price",
+  "how many days at a quarter of daily volume",
+  "how long to sell that down",
+  "which names are hard to exit"
+ ],
+ "evidence": [
+  "each position's market value on the run",
+  "each name's dollars a day traded over the window, and shares a day",
+  "days to liquidate: the position over the dollars a day at the participation rate"
+ ],
+ "this_desk": [
+  "the participation rate is the user's or is stated with the figure; the desk fixes none, and the window (20, 30 or 60 sessions) is stated",
+  "days come from the algebra — a position over a daily flow is a count of days — and a position over anything else is not days"
+ ],
+ "compare": [
+  "names ordered by days to liquidate, largest first",
+  "the same name at a lower participation rate, when the question is a hurry",
+  "days against the position's weight: a large weight with few days is size, not liquidity"
+ ],
+ "close": [
+  "the names that would hurt, each with its days at the stated rate, and the total the book could clear in a day",
+  "whether the problem is one name or the book"
+ ],
+ "absent": "a name with fewer sessions of recorded volume than the window is unmeasured, not liquid; the ETFs' underlying liquidity is not looked through",
+ "authority": "SEC Rule 22e-4 (liquidity as days to convert to cash); average daily volume as the market-depth measure",
+ "methods": [
+  {
+   "name": "price.adv",
+   "is": "price method",
+   "does": "average daily volume over the last N sessions, in shares a session and in dollars a session — the liquidity a position is measured against: a position's market value divided by dollar ADV is its days to liquidate",
+   "call": "compute(method='price.adv', subject='<ticker>')",
+   "params": [
+    "window_days"
+   ],
+   "yields": [
+    "{ticker}.adv.shares",
+    "{ticker}.adv.dollars"
+   ],
+   "procedure": "mean of daily volume, and of close × volume, over the window; sessions without volume dropped and counted",
+   "fails_when": "fewer than 20 sessions (ADV_MIN_OBS) or no recorded volume"
+  }
+ ],
+ "reads": [
+  {
+   "name": "concentration",
+   "is": "run figures",
+   "does": "which issuers and sectors the book is concentrated in",
+   "names": [
+    "issuer_exposures.<label>.weight",
+    "sector_exposures.<label>.weight",
+    "issuer_exposures.<label>.market_value"
+   ],
+   "call": "read_book('run_72e6617afeb7', names=['issuer_exposures.<label>.weight'])"
+  }
+ ],
+ "desk_rules": [
+  {
+   "rule": "Every figure stated is a fact a tool returned. A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate.",
+   "authority": "the desk's evidence discipline (services/gate)"
+  },
+  {
+   "rule": "The desk does not forecast. Asked for next year's figure, it says so and gives what the issuer's own filings say would move the figure either way.",
+   "authority": "the desk's mandate"
+  },
+  {
+   "rule": "No measure carries a threshold. A number is laid out with what it is compared against and the reading belongs to the reader.",
+   "authority": "decision of 2026-08-24 (test_no_formula_carries_a_threshold)"
+  },
+  {
+   "rule": "A premise the user asserts is checked against the desk's figure first and corrected with it before the question is answered; a premise the desk holds no figure for is neither agreed with nor denied.",
+   "authority": "the desk's evidence discipline"
+  },
+  {
+   "rule": "A comparison is one measure over the same windows: level first, then slope, then what it means for the question — never a table with no sentence after it.",
+   "authority": "CFA Program, Financial Analysis Techniques (cross-sectional analysis)"
+  },
+  {
+   "rule": "A weight is a share of ITS book's market value and of nothing else: a tier in dollars is the book's market value × the tier, and two books' weights are compared by difference, never summed.",
+   "authority": "the book algebra (V22)"
+  },
+  {
+   "rule": "TLT and HYG are the desk's explicit rates and credit instruments; they carry duration and spread directly, and in the netted factor exposure they enter with the sign opposite to the risk they proxy. Equities carry only a measured sensitivity.",
+   "authority": "the factor model's regression record"
+  },
+  {
+   "rule": "A day's P&L contribution is not a sensitivity. A name's rate or credit sensitivity is its beta to TLT or HYG; a name whose beta cannot be fitted is unmeasured, never zero.",
+   "authority": "the factor model's regression record"
+  },
+  {
+   "rule": "A scenario (a hypothetical sale or purchase) re-runs the concentration and exposure checks on the after-book; it does not re-fit betas, volatility or P&L, which are stated unmeasured.",
+   "authority": "scenario_service"
+  },
+  {
+   "rule": "Value at risk, expected shortfall and the stress results are computed by the run and withheld from every surface pending validation; say so if asked, do not rebuild them from other figures.",
+   "authority": "analytics/withheld"
+  },
+  {
+   "rule": "Liquidity is read as days to liquidate: a position's market value over the dollars a day the name trades, at a participation rate the reading states. The desk fixes no rate; the user's, or none, and the answer says which.",
+   "authority": "SEC Rule 22e-4 (liquidity expressed as days to convert to cash); average daily volume as the market-depth measure"
+  }
+ ],
+ "next": [
+  "describe('port_001')",
+  "compute(method='price.adv', subject='<ticker>')",
+  "read_book('run_72e6617afeb7', names=['issuer_exposures.<label>.weight'])"
+ ],
+ "catalogue_as_of": "2026-09-08",
+ "how_to_read": "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain carries `open`. `methods` are what compute produces for this subject. `procedures` are the analyst's domains for this kind of subject, each with its question, the words it is asked in, its methods and what it reads — open one with expand=<domain>. `desk_rules` are this desk's own conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not substitute. `next` lists the calls that open the next level.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures."
+}

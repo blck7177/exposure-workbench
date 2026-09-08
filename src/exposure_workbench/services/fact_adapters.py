@@ -139,6 +139,10 @@ class Ctx:
     table: str | None = None       # the run table the current rows belong to
     standalone: bool = True
     default_unit: str | None = None   # the unit a result declared for its figures (rank's `type`)
+    # V28 C2: a container that says `numeric_unit` declares the unit of every
+    # numeric leaf beneath it — the producer's declaration, read before the
+    # consumer-side key list. A catalogue's structural counts arrive this way.
+    leaf_unit: str | None = None
 
     def child(self, **changes) -> "Ctx":
         return replace(self, **changes)
@@ -153,7 +157,7 @@ def _unit_for(key: str, ctx: Ctx, obj: dict | None = None) -> str:
         declared = rs.column_unit(ctx.table, key)
         if declared:
             return declared
-    unit = UNIT_BY_KEY.get(key) or (ctx.default_unit if key in ("value",) else None)
+    unit = UNIT_BY_KEY.get(key) or ctx.leaf_unit or (ctx.default_unit if key in ("value",) else None)
     if unit is None:
         raise UnknownUnit(f"{ctx.tool}: no unit declared for numeric key {key!r} (subject {ctx.subject}); "
                           f"add it to fact_adapters.UNIT_BY_KEY or remove it from the payload")
@@ -327,6 +331,8 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                         default_unit=declared.upper() if isinstance(declared, str) else ctx.default_unit)
         if isinstance(node.get("ticker"), str) and key not in ("brief",):
             sub = sub.child(subject=node["ticker"])
+        if isinstance(node.get("numeric_unit"), str):
+            sub = sub.child(leaf_unit=node["numeric_unit"].upper())
         out: dict = {}
         for k, v in node.items():
             if k in DROP_KEYS:

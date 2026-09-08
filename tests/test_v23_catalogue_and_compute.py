@@ -64,7 +64,9 @@ def test_the_description_surface_is_a_third_of_what_it_was():
     reg = build_meta_registry()
     total = sum(len(reg.get(n).description) + len(json.dumps(reg.get(n).json_schema))
                 for n in faces.FACE_META_AGENT)
-    assert total < 12_000, total
+    # V27: the two name enums (46 methods, 47 filed lines) are the directory
+    # itself, in the schema; the description TEXT did not grow.
+    assert total < 14_500, total
 
 
 def test_the_research_faces_compute_is_issuer_scoped():
@@ -261,11 +263,13 @@ def test_the_catalogue_carries_three_kinds_of_absence_in_one_format():
     src = inspect.getsource(cat)
     for key in ('"not_held"', '"cannot"', "methods_not_computable"):
         assert key in src, key
-    assert cat.DEFAULT_CEILING == 8_000
+    assert cat.DEFAULT_CEILING == 24_000     # V27: rows carry is/does/call
 
 
 def test_describe_lists_methods_and_procedures_by_the_subjects_kind():
-    assert cat._methods("run", False) == {"run": [m.name for m in skill.methods_for("run")]}
+    rows = cat._methods("run", False)["run"]
+    assert [r["name"] for r in rows] == [m.name for m in skill.methods_for("run")]
+    assert all({"name", "is", "does", "call"} <= set(r) for r in rows)
     assert [p["name"] for p in cat._procedures("issuer", False)] == \
         [p.name for p in skill.procedures_for("issuer")]
     full = cat._methods("price", True)["price"]

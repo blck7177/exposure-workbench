@@ -114,5 +114,8 @@ def test_an_unmeasured_risk_is_said_rather_than_omitted():
 
 def test_a_run_still_going_is_refused_rather_than_ranked():
     """Half-written children produce a ranking that changes under the reader."""
+    # V28 C1: the refusal moved to the one door every reader of a run goes through.
+    from exposure_workbench.services import run_reads_service
     src = inspect.getsource(isvc)
-    assert "run_not_completed" in src
+    assert "run_reads_service.completed_run(" in src
+    assert "run_not_completed" in inspect.getsource(run_reads_service.completed_run)

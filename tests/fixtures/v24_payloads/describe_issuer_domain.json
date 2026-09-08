@@ -1,0 +1,220 @@
+{
+ "subject": "MSFT",
+ "kind": "issuer",
+ "domain": "issuer_earnings_quality",
+ "question": "are the profits real: is cash showing up behind earnings, and is working capital telling a different story",
+ "asked_as": [
+  "is the cash actually showing up behind the earnings",
+  "are the profits real",
+  "are receivables and inventory growing faster than the top line",
+  "put that in days",
+  "is that one odd quarter or has it been building"
+ ],
+ "evidence": [
+  "operating cash flow beside net income over the same windows, and their ratio (cash conversion)",
+  "the accruals ratio and its own history",
+  "receivables, inventory and revenue growth over the same windows; days sales outstanding, days inventory, days payable and the cash conversion cycle",
+  "capex and stock-based compensation where the gap between cash and earnings needs a reason"
+ ],
+ "this_desk": [
+  "days measures are built on ending balances, not averages, and the result says so",
+  "a measure over its last N periods is one series, so a trend is read from the series, not from two figures"
+ ],
+ "compare": [
+  "cash conversion and the accruals ratio against the issuer's own prior periods: the evidence is about persistence, not one period",
+  "receivable and inventory growth against revenue growth over the same windows",
+  "days against the same days a year earlier"
+ ],
+ "close": [
+  "say whether cash confirms earnings, and if not which line explains the gap and whether it is building",
+  "give the days as days, dated, beside the prior reading"
+ ],
+ "absent": "a quarter the issuer did not file at the window asked is unreachable and stays in place in the series, never closed over",
+ "authority": "Sloan (1996), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows; Lev & Thiagarajan (1993), Fundamental Information Analysis (inventory and receivables relative to sales); CFA Program, Financial Analysis Techniques (activity ratios)",
+ "methods": [
+  {
+   "name": "accruals_ratio",
+   "is": "issuer method",
+   "does": "(net income − operating cash flow) ÷ total assets",
+   "call": "compute(method='accruals_ratio', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "divide over accruals, total_assets",
+   "fails_when": "an input the issuer did not file at the window or instant asked"
+  },
+  {
+   "name": "accruals",
+   "is": "issuer method",
+   "does": "net income − operating cash flow",
+   "call": "compute(method='accruals', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "difference over net_income, operating_cash_flow",
+   "fails_when": "an input the issuer did not file at the window or instant asked"
+  },
+  {
+   "name": "days_sales_outstanding",
+   "is": "issuer method",
+   "does": "accounts receivable ÷ revenue × 365",
+   "call": "compute(method='days_sales_outstanding', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "divide over accounts_receivable, revenue",
+   "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer"
+  },
+  {
+   "name": "days_inventory",
+   "is": "issuer method",
+   "does": "inventory ÷ cost of revenue × 365",
+   "call": "compute(method='days_inventory', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "divide over inventory, cost_of_revenue",
+   "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer"
+  },
+  {
+   "name": "days_payable",
+   "is": "issuer method",
+   "does": "accounts payable ÷ cost of revenue × 365",
+   "call": "compute(method='days_payable', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "divide over accounts_payable, cost_of_revenue",
+   "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: these are non-financial credit measures and they do not apply to a financial issuer"
+  },
+  {
+   "name": "cash_conversion_cycle",
+   "is": "issuer method",
+   "does": "days sales outstanding + days inventory − days payable",
+   "call": "compute(method='cash_conversion_cycle', subject='MSFT')",
+   "params": [
+    "months",
+    "at",
+    "last_n"
+   ],
+   "procedure": "difference over days_sales_outstanding, days_inventory, days_payable",
+   "fails_when": "an input the issuer did not file at the window or instant asked; the issuer is a financial company: a financial issuer holds no inventory and its receivables and payables are not trade credit, so a working-capital cycle measured in days describes nothing"
+  }
+ ],
+ "reads": [
+  {
+   "name": "operating_cash_flow",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='operating_cash_flow')"
+  },
+  {
+   "name": "net_income",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='net_income')"
+  },
+  {
+   "name": "accounts_receivable",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='accounts_receivable')"
+  },
+  {
+   "name": "inventory",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='inventory')"
+  },
+  {
+   "name": "revenue",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='revenue')"
+  },
+  {
+   "name": "capex",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='capex')"
+  },
+  {
+   "name": "sbc",
+   "is": "filed line",
+   "does": "a line as the issuer filed it, by period",
+   "call": "read_fundamentals('MSFT', metric='sbc')"
+  }
+ ],
+ "desk_rules": [
+  {
+   "rule": "Every figure stated is a fact a tool returned. A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate.",
+   "authority": "the desk's evidence discipline (services/gate)"
+  },
+  {
+   "rule": "The desk does not forecast. Asked for next year's figure, it says so and gives what the issuer's own filings say would move the figure either way.",
+   "authority": "the desk's mandate"
+  },
+  {
+   "rule": "No measure carries a threshold. A number is laid out with what it is compared against and the reading belongs to the reader.",
+   "authority": "decision of 2026-08-24 (test_no_formula_carries_a_threshold)"
+  },
+  {
+   "rule": "A premise the user asserts is checked against the desk's figure first and corrected with it before the question is answered; a premise the desk holds no figure for is neither agreed with nor denied.",
+   "authority": "the desk's evidence discipline"
+  },
+  {
+   "rule": "A comparison is one measure over the same windows: level first, then slope, then what it means for the question — never a table with no sentence after it.",
+   "authority": "CFA Program, Financial Analysis Techniques (cross-sectional analysis)"
+  },
+  {
+   "rule": "EBIT and EBITDA start from NET INCOME, adding back interest and tax — not from operating income. Where an issuer carries large non-operating income the two differ, and a correct EBIT is then mostly non-operating.",
+   "authority": "SEC C&DI 103.01, 103.02"
+  },
+  {
+   "rule": "Free cash flow is operating cash flow less capital expenditures, and the definition is stated beside the number because it has no uniform one.",
+   "authority": "SEC C&DI 102.07"
+  },
+  {
+   "rule": "Credit measures built on interest (coverage, leverage) are refused for a financial issuer: interest is a bank's operating cost and deposits its raw material. ROE, ROA and the accruals ratio do apply to banks.",
+   "authority": "the formula registry's not_for_financials"
+  },
+  {
+   "rule": "Segment, product, geographic and customer-concentration figures are not held as facts; they are quoted from the filing's own sentences, cited, never derived from parts.",
+   "authority": "ASC 280; Regulation S-K Item 101(c)"
+  },
+  {
+   "rule": "A name the desk has not prepared is started (readiness) and said to be in preparation; nothing is estimated for it meanwhile.",
+   "authority": "the desk's readiness pipeline"
+  }
+ ],
+ "next": [
+  "describe('MSFT')",
+  "compute(method='accruals_ratio', subject='MSFT')",
+  "compute(method='accruals', subject='MSFT')",
+  "compute(method='days_sales_outstanding', subject='MSFT')",
+  "compute(method='days_inventory', subject='MSFT')",
+  "compute(method='days_payable', subject='MSFT')",
+  "compute(method='cash_conversion_cycle', subject='MSFT')",
+  "read_fundamentals('MSFT', metric='operating_cash_flow')",
+  "read_fundamentals('MSFT', metric='net_income')",
+  "read_fundamentals('MSFT', metric='accounts_receivable')",
+  "read_fundamentals('MSFT', metric='inventory')",
+  "read_fundamentals('MSFT', metric='revenue')",
+  "read_fundamentals('MSFT', metric='capex')",
+  "read_fundamentals('MSFT', metric='sbc')"
+ ],
+ "catalogue_as_of": "2026-09-08",
+ "how_to_read": "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain carries `open`. `methods` are what compute produces for this subject. `procedures` are the analyst's domains for this kind of subject, each with its question, the words it is asked in, its methods and what it reads — open one with expand=<domain>. `desk_rules` are this desk's own conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not substitute. `next` lists the calls that open the next level.",
+ "withheld": "Some measures this run computed are withheld pending validation and are not published anywhere on this desk: expected_shortfall_95, stress_loss_credit, stress_loss_market, stress_loss_rates, stress_loss_tech, var_95_1d, stress_results. Say so if asked; do not estimate them from other figures.",
+ "table_names": {}
+}

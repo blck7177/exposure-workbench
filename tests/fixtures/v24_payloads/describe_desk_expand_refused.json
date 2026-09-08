@@ -1,0 +1,9 @@
+{
+ "error": "expand_needs_a_subject",
+ "detail": "the desk itself has no 'book' to expand: expand opens one view or domain OF A SUBJECT",
+ "next": [
+  "describe('<port_…>')",
+  "describe('<ticker>')",
+  "describe('<subject>', expand='book')"
+ ]
+}

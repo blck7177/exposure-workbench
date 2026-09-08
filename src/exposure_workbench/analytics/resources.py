@@ -245,7 +245,7 @@ def countable() -> tuple[tuple[type, str, str | None], ...]:
 # services/quantities.py reads it to stamp each quantity with its group, so it
 # is a fact about the resources, not about one tool.
 _DECLARED_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("book", "size, day P&L and net/gross exposure of the whole book",
+    ("whole_book", "size, day P&L and net/gross exposure of the whole book",
      ("exposure_metrics.portfolio_market_value", "exposure_metrics.daily_pnl", "exposure_metrics.daily_return",
       "exposure_metrics.gross_exposure", "exposure_metrics.net_exposure",
       "exposure_metrics.gross_exposure_pct", "exposure_metrics.net_exposure_pct")),

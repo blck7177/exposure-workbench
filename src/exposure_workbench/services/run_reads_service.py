@@ -68,6 +68,24 @@ async def _run_or_error(db: AsyncSession, run_id: str) -> ExposureRun | dict:
     return row
 
 
+async def completed_run(db: AsyncSession, run_id: str) -> ExposureRun | dict:
+    """THE door to a run's figures (V28 C1). A run that is not completed is
+    task state, not figures: its children are half-written, and the 2026-09-07
+    battery read one five seconds after starting it and told the reader the
+    book had zero checks and zero alerts — real rows, verified by the gate,
+    false. Twelve places loaded a run by id and three checked its status; every
+    reader goes through here now (test_v28_roles pins it by AST), so a new
+    reader cannot open a door this one does not."""
+    run = await _run_or_error(db, run_id)
+    if isinstance(run, dict):
+        return run
+    if run.status != "completed":
+        return {"error": "run_not_completed", "run_id": run_id, "status": run.status,
+                "detail": f"run {run_id} is {run.status}: its figures are not readable until it completes",
+                **({"read": f"read_book('{run.task_id}', names=['state'])"} if run.task_id else {})}
+    return run
+
+
 # ── A1: attribution ───────────────────────────────────────────────────────────
 
 async def get_attribution(db: AsyncSession, run_id: str) -> dict:
@@ -78,7 +96,7 @@ async def get_attribution(db: AsyncSession, run_id: str) -> dict:
     fact from anything that survives, and inventing them is the failure mode
     this codebase has spent three batches removing.
     """
-    run = await _run_or_error(db, run_id)
+    run = await completed_run(db, run_id)
     if isinstance(run, dict):
         return run
 
@@ -180,7 +198,7 @@ async def get_risk_state(db: AsyncSession, run_id: str) -> dict:
     of it is a forecast, and `not_a_forecast` says so in the payload rather than
     in a prompt, because the payload is what the model reads last.
     """
-    run = await _run_or_error(db, run_id)
+    run = await completed_run(db, run_id)
     if isinstance(run, dict):
         return run
 
@@ -293,7 +311,7 @@ def _alert_row(a: RiskAlert) -> dict:
 
 
 async def list_run_alerts(db: AsyncSession, run_id: str) -> dict:
-    run = await _run_or_error(db, run_id)
+    run = await completed_run(db, run_id)
     if isinstance(run, dict):
         return run
     alerts = list((await db.execute(

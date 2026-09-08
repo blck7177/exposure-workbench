@@ -166,12 +166,10 @@ async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) 
     else:
         run_id = base_id
         prior_holdings = None
-    run = (await db.execute(select(ExposureRun).where(ExposureRun.id == run_id))).scalar_one_or_none()
-    if run is None:
-        return _err("unknown_run", f"no exposure run {run_id}", run_id=run_id)
-    if run.status != "completed":
-        return _err("run_not_completed", f"run {run_id} is {run.status}; a scenario starts "
-                                          f"from a completed run", run_id=run_id, status=run.status)
+    from exposure_workbench.services import run_reads_service
+    run = await run_reads_service.completed_run(db, run_id)     # V28 C1: the one door
+    if isinstance(run, dict):
+        return run
     if prior_holdings is not None:
         holdings = [sc.Holding(str(h["label"]), h.get("sector"),
                                None if h.get("market_value") is None else float(h["market_value"]))

@@ -43,11 +43,17 @@ from exposure_workbench.db.models import (
 )
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import company_service, portfolio_service, run_reads_service
+from exposure_workbench.services import name_table as nt
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services.typed_calculator import SCENARIO_OP
 
-DEFAULT_CEILING = 8_000
-EXPANDS = ("fundamentals", "methods", "procedures", "book", "filings", "readings")
+# V27: every listed entry carries is/does/call, so a subject level is larger
+# than the bare-name catalogue was (MSFT 10.4k → 21.3k chars, 6.1k tokens);
+# the ceiling is pinned per level by test_v27_directory's live test.
+DEFAULT_CEILING = 24_000
+# V27: a view of the subject, or ONE of the analyst's domains opened as a node.
+VIEWS = nt.VIEWS
+EXPANDS = VIEWS + tuple(skill.PROCEDURES)
 
 # What the desk does NOT hold as figures, with where the same fact lives.
 # Derived, not asserted: test_v23_catalogue checks each kind against the
@@ -103,7 +109,25 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
     if expand is not None and expand not in EXPANDS:
         return _err("unknown_expand", f"expand must be one of {', '.join(EXPANDS)}")
     kind = kind_of(subject)
-    if kind == "desk":
+    # V27: the root has nothing to expand. 114 of 308 describe calls in the
+    # 2026-09-07 battery were describe(subject=None, expand='book'), answered
+    # with the bare root; the model then read runs by guessed names, believing
+    # it had already opened "the book". The refusal teaches the two-step
+    # address; it never picks a subject for the model.
+    if kind == "desk" and expand is not None:
+        return _err("expand_needs_a_subject",
+                    f"the desk itself has no '{expand}' to expand: expand opens one view or domain OF A SUBJECT",
+                    next=["describe('<port_…>')", "describe('<ticker>')", f"describe('<subject>', expand='{expand}')"])
+    if expand in skill.PROCEDURES:
+        want = skill.PROCEDURES[expand].subject_kind
+        fits = (kind == "issuer") if want == "issuer" else (kind in ("portfolio", "run", "scenario"))
+        if not fits:
+            right = [p.name for p in skill.procedures_for("issuer" if kind == "issuer" else "portfolio")]
+            return _err("domain_not_for_subject",
+                        f"{expand} is a domain of an {want}, and {subject} is a {kind}; its domains are listed",
+                        domains=right)
+        out = await _domain(db, kind, subject, expand)
+    elif kind == "desk":
         out = await _desk(db)
     elif kind == "issuer":
         out = await _issuer(db, subject, expand)
@@ -124,12 +148,12 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
 
 
 _HOW_TO_READ = (
-    "Every name under `table` is a figure you can slot {ref, name} or use as an operand "
-    "(ref:name) in compute. `methods` are what compute can produce for this subject; "
-    "`procedures` are the analyst's domains for this kind of subject — each says what the question "
-    "sounds like, the evidence it turns on and how it is closed (expand=procedures for the whole); "
-    "`desk_rules` are this desk's own conventions and policies; `not_held` and `cannot` are figures "
-    "this desk does not have and why — say so, do not substitute. expand=<domain> opens one domain's detail."
+    "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain "
+    "carries `open`. `methods` are what compute produces for this subject. `procedures` are the "
+    "analyst's domains for this kind of subject, each with its question, the words it is asked in, its "
+    "methods and what it reads — open one with expand=<domain>. `desk_rules` are this desk's own "
+    "conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not "
+    "substitute. `next` lists the calls that open the next level."
 )
 
 
@@ -141,15 +165,14 @@ async def _desk(db: AsyncSession) -> dict:
     snapshot carried the whole run state, 11.5k characters, before any
     question had been asked)."""
     snaps = await portfolio_service.snapshot_all(db)
+    # V27: each portfolio with one line and `open`; nothing of the run's own
+    # (its figure names are the run's, listed by describe(run_…)).
     portfolios = [{
         "portfolio_id": sn["portfolio_id"], "name": sn["name"], "is_own": sn.get("is_own"),
-        "run_id": sn.get("run_id"), "as_of": sn.get("as_of_date"),
+        "latest_completed_run": sn.get("run_id"), "as_of": sn.get("as_of_date"),
         "positions": len(sn.get("top_issuers") or []) if sn.get("run_id") else None,
         "alerts": len(sn.get("alerts") or []),
-        "market_value_name": f"exposure_metrics.portfolio_market_value on {sn['run_id']}" if sn.get("run_id") else None,
-        "scenario": (f"compute(method='book.sell' | 'book.buy', subject='{sn['run_id']}', params=…) "
-                     f"rebuilds the book after a trade as a row read like a run"
-                     if sn.get("run_id") else None),
+        "open": f"describe('{sn['portfolio_id']}')",
     } for sn in snaps]
     companies = await company_service.list_companies(db, investigable_only=True)
     return {
@@ -158,13 +181,12 @@ async def _desk(db: AsyncSession) -> dict:
         "issuers_prepared": sorted(c.ticker for c in companies),
         "domains": ["fundamentals (filed figures)", "filings (text)", "prices", "book (runs, positions, limits)",
                     "web (search_web)"],
-        "methods": {k: [m.name for m in skill.methods_for(k)] for k in ("issuer", "price", "run", "portfolio")},
-        "procedures": [{"name": p.name, "question": p.question, "subject": p.subject_kind,
-                        "asked_as": list(p.triggers[:2])}
-                       for p in skill.PROCEDURES.values()],
+        "issuer_open": "describe('<ticker>')",
+        "procedures": _procedures("issuer", False) + _procedures("portfolio", False),
         "desk_rules": _rules("all"),
         "not_held": NOT_HELD,
         "cannot": CANNOT,
+        "next": [f"describe('{sn['portfolio_id']}')" for sn in snaps] + ["describe('<ticker>')"],
     }
 
 
@@ -192,11 +214,13 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
     out["desk"] = await _desk_about(db, company.id, tk)
     out["not_held"] = NOT_HELD
     out["cannot"] = {k: v for k, v in CANNOT.items() if k == "per_name_factor_sensitivity"}
-    out["methods"] = _methods("issuer", expand == "methods") | _methods("price", expand == "methods")
-    out["procedures"] = _procedures("issuer", expand == "procedures")
+    out["methods"] = _methods("issuer", expand == "methods", tk) | _methods("price", expand == "methods", tk)
+    out["procedures"] = _procedures("issuer", expand == "procedures", tk)
     out["desk_rules"] = _rules("issuer")
     if expand == "readings":
         out["readings"] = _readings()
+    out["next"] = [f"describe('{tk}', expand='<domain>')", f"read_fundamentals('{tk}', metric='<line>')",
+                   f"read_filings('{tk}', item='1A')", f"read_prices('{tk}', window='1y')"]
     return out
 
 
@@ -272,7 +296,10 @@ async def _filings(db: AsyncSession, company_id: str, full: bool) -> dict:
         "read_with": "read_filings(ticker, query=…) for passages; read_filings(ticker, item='1A') for a section",
     }
     if full:
-        out["items_detail"] = {i: n for i, n in items}
+        # V28 C2: a count of indexed sections is a figure the desk holds about
+        # itself — declared here as COUNT so the adapter mints it, instead of
+        # meeting an undeclared numeric leaf and killing the whole route (X3).
+        out["items_detail"] = {"numeric_unit": "count", **{i: n for i, n in items}}
     return out
 
 
@@ -361,12 +388,18 @@ async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
                       "read_with": f"read_book('{pid}', names=['positions'])"},
         "limits": {"count": len(limits.get("limits", [])) if isinstance(limits, dict) else None,
                    "read_with": f"read_book('{pid}', names=['limits'])"},
-        "runs": [{"run_id": r[0], "as_of": r[1].isoformat(), "status": r[2]} for r in runs],
+        "runs": [{"run_id": r[0], "as_of": r[1].isoformat(), "status": r[2], "open": f"describe('{r[0]}')"}
+                 for r in runs],
         "freshness": fresh,
-        "methods": _methods("portfolio", expand == "methods") | _methods("run", expand == "methods"),
-        "procedures": _procedures("portfolio", expand == "procedures"),
+        # The run methods are rendered on the latest completed run — a fact of
+        # this portfolio listed beside them, not a choice made for the model.
+        "methods": _methods("portfolio", expand == "methods", pid)
+                   | _methods("run", expand == "methods", fresh.get("latest_completed_run") if isinstance(fresh, dict) else None),
+        "procedures": _procedures("portfolio", expand == "procedures", pid),
         "desk_rules": _rules("book"),
         "cannot": CANNOT,
+        "next": ([f"describe('{fresh['latest_completed_run']}')"] if isinstance(fresh, dict) and fresh.get("latest_completed_run") else [])
+                + [f"describe('{pid}', expand='<domain>')", f"read_book('{pid}', names=['positions'])"],
     }
     if expand == "book" and positions:
         out["positions"]["detail"] = positions
@@ -376,18 +409,19 @@ async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
 # ── a run, a scenario ────────────────────────────────────────────────────────
 
 async def _run(db: AsyncSession, run_id: str, expand: str | None) -> dict:
-    run = (await db.execute(select(ExposureRun).where(ExposureRun.id == run_id))).scalar_one_or_none()
-    if run is None:
-        return _err("unknown_run", f"no exposure run {run_id}", run_id=run_id)
-    if run.status != "completed":
-        return _err("run_not_completed", f"run {run_id} is {run.status}", run_id=run_id, status=run.status)
+    run = await run_reads_service.completed_run(db, run_id)       # V28 C1: the one door
+    if isinstance(run, dict):
+        return run
     out = await _book_names(db, run_id, expand == "book")
     return {"subject": run_id, "kind": "run", "portfolio_id": run.portfolio_id,
             "as_of": run.as_of_date.isoformat(), **out,
-            "methods": _methods("run", expand == "methods"),
-            "procedures": _procedures("portfolio", expand == "procedures"),
+            "sections": {s: f"read_book('{run_id}', names=['{s}'])" for s in nt.RUN_SECTIONS},
+            "methods": _methods("run", expand == "methods", run_id),
+            "procedures": _procedures("portfolio", expand == "procedures", run_id),
             "desk_rules": _rules("book"),
-            "cannot": CANNOT}
+            "cannot": CANNOT,
+            "next": [f"read_book('{run_id}', names=[…])", f"describe('{run_id}', expand='<domain>')",
+                     f"describe('{run.portfolio_id}')"]}
 
 
 async def _scenario(db: AsyncSession, cid: str, expand: str | None) -> dict:
@@ -401,7 +435,9 @@ async def _scenario(db: AsyncSession, cid: str, expand: str | None) -> dict:
     params = row.params or {}
     return {"subject": cid, "kind": "scenario", "from_run": params.get("run_id"),
             "as_of": params.get("as_of"), "trade": {k: params[k] for k in ("sales", "buys") if k in params},
-            **out, "methods": [], "cannot": CANNOT}
+            **out,
+            "methods": {"run": [r for r in _methods("run", False, cid)["run"] if r["name"] in ("book.sell", "book.buy")]},
+            "cannot": CANNOT}
 
 
 async def _book_names(db: AsyncSession, ref: str, full: bool) -> dict:
@@ -415,8 +451,10 @@ async def _book_names(db: AsyncSession, ref: str, full: bool) -> dict:
         members = [n for n in names if n not in grouped and any(resources.matches(p, n) for p in patterns)]
         if members:
             grouped.update(members)
+            example = sorted(members)[0]
             groups.append({"group": key, "answers": question,
-                           **(_factored(members) if not full else {"names": sorted(members)})})
+                           **(_factored(members) if not full else {"names": sorted(members)}),
+                           "call": f"read_book('{ref}', names=['{example}'])"})
     rest = [n for n in names if n not in grouped]
     return {"names": len(names), "groups": groups,
             **({"other": _factored(rest)} if rest else {}),
@@ -456,25 +494,81 @@ def _factored(names: list[str]) -> dict:
 
 # ── the skill layer, listed ──────────────────────────────────────────────────
 
-def _methods(kind: str, full: bool) -> dict:
+def _methods(kind: str, full: bool, subject: str | None = None) -> dict:
+    """The subject's methods as rows the model can copy from: name, what it is,
+    one line, the call (V27). `subject` concrete at the subject level, a
+    placeholder above it. `full` (expand=methods) adds the card."""
     ms = skill.methods_for(kind)
-    if not full:
-        return {kind: [m.name for m in ms]}
-    return {kind: [{"name": m.name, "describes": m.describes, "authority": m.authority,
-                    "fails_when": m.fails_when, "params": list(m.params_schema.get("properties", {})),
-                    "yields": list(m.yields)} for m in ms]}
+    rows = [nt.row(nt.TABLE[m.name], subject=subject) for m in ms]
+    if full:
+        for r, m in zip(rows, ms):
+            r.update({"procedure": m.procedure, "authority": m.authority, "fails_when": m.fails_when,
+                      "params": list(m.params_schema.get("properties", {})), "yields": list(m.yields)})
+    return {kind: rows}
 
 
-def _procedures(kind: str, full: bool) -> list:
+async def _domain(db: AsyncSession, kind: str, subject: str, name: str) -> dict:
+    """One analyst domain opened as a node (V27): the card, and its leaves —
+    the methods it turns on and what it reads — each with the call that uses
+    it on THIS subject. The two ids a book domain's calls need, the portfolio
+    and its latest completed run, are looked up here as facts."""
+    p = skill.PROCEDURES[name]
+    ticker = pid = run_id = None
+    if kind == "issuer":
+        ticker = subject.upper()
+    elif kind == "portfolio":
+        pid = subject
+        fresh = await run_reads_service.get_run_freshness(db, pid)
+        run_id = fresh.get("latest_completed_run") if isinstance(fresh, dict) else None
+    elif kind == "run":
+        run = await run_reads_service.completed_run(db, subject)   # V28 C1: the one door
+        if isinstance(run, dict):
+            return run
+        run_id, pid = subject, run.portfolio_id
+    else:
+        run_id = subject          # a scenario row reads like a run
+    by_kind = {"issuer": ticker, "price": ticker, "run": run_id, "portfolio": pid}
+    methods = []
+    for m in p.methods:
+        spec = skill.METHODS[m]
+        r = nt.row(nt.TABLE[m], subject=by_kind.get(spec.subject_kind))
+        r.update({"procedure": spec.procedure, "fails_when": spec.fails_when})
+        methods.append(r)
+    groups = {key: (q, pats) for key, q, pats in resources.RUN_GROUPS}
+    reads = []
+    for r in p.reads:
+        if r in groups:
+            q, pats = groups[r]
+            names = [pt.replace("*", "<label>") for pt in pats]
+            reads.append({"name": r, "is": "run figures", "does": q, "names": names,
+                          "call": f"read_book('{run_id or '<run_…>'}', names=['{names[0]}'])"})
+        else:
+            e = nt.TABLE[r]
+            ref = pid if ("portfolio" in e.on and "run" not in e.on) else run_id
+            reads.append(nt.row(e, subject=ticker, ref=ref))
+    return {"subject": subject, "kind": kind, "domain": name, "question": p.question,
+            "asked_as": list(p.triggers), "evidence": list(p.evidence), "this_desk": list(p.desk),
+            "compare": list(p.compare), "close": list(p.close), "absent": p.absent, "authority": p.authority,
+            "methods": methods, "reads": reads,
+            "desk_rules": _rules("issuer" if kind == "issuer" else "book"),
+            "next": [f"describe('{subject}')"] + [x["call"] for x in methods + reads]}
+
+
+def _procedures(kind: str, full: bool, subject: str | None = None) -> list:
     """The analyst's domains that fit a kind of subject. Level 1 is the name,
     the question and the words a user asks it in — enough to know which one
     fits; level 2 (expand=procedures) is the whole domain in the analyst's
     words. No tool is named at either level: the evidence is named as the
     method cards name it, and the model chooses the call."""
     ps = skill.procedures_for(kind)
+
+    def base(p) -> dict:
+        return {"name": p.name, "is": "domain", "subject": p.subject_kind, "question": p.question,
+                "asked_as": list(p.triggers[:2]), "methods": list(p.methods), "reads": list(p.reads),
+                "open": nt.call(nt.TABLE[p.name], subject=subject)}
     if not full:
-        return [{"name": p.name, "question": p.question, "asked_as": list(p.triggers[:2])} for p in ps]
-    return [{"name": p.name, "question": p.question, "asked_as": list(p.triggers),
+        return [base(p) for p in ps]
+    return [{**base(p), "asked_as": list(p.triggers),
              "evidence": list(p.evidence), "this_desk": list(p.desk),
              "compare": list(p.compare), "close": list(p.close), "absent": p.absent, "authority": p.authority}
             for p in ps]

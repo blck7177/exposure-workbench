@@ -90,9 +90,19 @@ class Verdict:
         return {"error": self.error, "problems": self.problems, "detail": self.detail}
 
 
-_FIX = ("a figure in prose is either a fact on the ledger — point at it as {fact: id}, or it is "
-        "linked for you when it equals one — a figure a cited passage states, or a result "
-        "compute has not produced yet. Compute it, cite the passage that states it, or drop it")
+# V28 D1: THE statement of what a figure in prose may be — the gate's own,
+# handed to the model verbatim (the system prompt, respond's description, the
+# MCP instructions import it) and used by the refusal. Until V28 the prompt
+# said "you never write a number" while G3 below links a number a cited
+# passage states; the model obeyed the stricter text it was given and wrote a
+# passage's id where a figure belonged (59 times in 15 turns, X10/Y2).
+PROSE_RULE = ("A figure in prose is a fact's id written where the number goes — f_3a1b…, or "
+              "f_3a1b…@2025-12-31 for one point of a series — and the reader is shown the fact's "
+              "value with what it is and as of when. A number written out is accepted only when the "
+              "ledger accounts for it: a fact's value, its date, window or parameter, a figure a "
+              "cited passage states in those words, or a number in the user's own question. A "
+              "number you worked out yourself has no id — compute gives it one.")
+_FIX = PROSE_RULE + " Compute it, cite the passage that states it, or drop it."
 
 # Names the ledger holds that are unmistakably the desk's, not words: only a
 # measure with a separator is looked for, so `capex` in a sentence is a word.

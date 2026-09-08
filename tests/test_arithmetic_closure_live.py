@@ -74,7 +74,7 @@ async def test_days_to_liquidate_from_the_book_and_the_tape():
                 assert adv["adv_shares"]["unit_class"] == "count_per_day"
                 from exposure_workbench.services import catalogue_service as cat
                 desk = await cat.describe(db, None)
-                run_id = desk["portfolios"][0]["run_id"]
+                run_id = desk["portfolios"][0]["latest_completed_run"]     # V27: the root names the run as the fact it is
                 days = await cmp.compute(db, op="divide",
                                          operands=[f"{run_id}:issuer_exposures.AAPL.market_value",
                                                    adv["adv_dollars"]["calc_id"]],

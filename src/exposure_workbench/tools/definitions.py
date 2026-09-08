@@ -32,6 +32,7 @@ from exposure_workbench.analytics import withheld as _wh
 from exposure_workbench.db.models import CalcLedger, Company, FinancialFact, RiskAlert
 from exposure_workbench.services import brief_service, catalogue_service, compute_service
 from exposure_workbench.services import fundamentals_service
+from exposure_workbench.services import name_table as nt
 from exposure_workbench.services import company_service
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import job_status_service
@@ -120,6 +121,7 @@ async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None =
                 # The refusal is about THIS argument's value: a batch of reads
                 # for other metrics is not held behind it (agents/batch.py).
                 "held_on": {"metric": metric},
+                **({"route": _routes([metric], ticker=tk)} if nt.get(metric) else {}),
                 "available": have,
                 "detail": (f"{tk} has no filed facts under {metric!r}"
                            + ("" if metric in SUPPORTED_METRICS else
@@ -190,8 +192,31 @@ async def _read_prices(db: AsyncSession, ticker: str, window: str | None = None,
 
 # ── read_book ───────────────────────────────────────────────────────────────────
 
-_PORTFOLIO_SECTIONS = ("positions", "limits", "alerts", "freshness", "runs")
-_RUN_SECTIONS = ("alerts", "attribution", "risk_state")
+_PORTFOLIO_SECTIONS = nt.PORTFOLIO_SECTIONS
+_RUN_SECTIONS = nt.RUN_SECTIONS
+
+
+def _routes(names: list[str], *, ref: str | None = None, ticker: str | None = None) -> dict:
+    """For each name the name table knows: what it is and the call that uses it
+    (V27). The subject is the caller's own ref when the name's kind takes one of
+    that kind, a placeholder otherwise — the refusal teaches the address, it
+    does not perform the call."""
+    out = {}
+    for n in names:
+        e = nt.get(n)
+        if e is None:
+            continue
+        subj = None
+        if e.subject_kind in ("issuer", "price"):
+            subj = ticker
+        elif e.subject_kind == "run" and ref and ref.startswith(("run_", "calc_")):
+            subj = ref
+        elif e.subject_kind == "portfolio" and ref and ref.startswith("port_"):
+            subj = ref
+        elif e.kind in ("filed line", "filing item"):
+            subj = ticker
+        out[n] = nt.route(n, subject=subj, ref=ref)
+    return out
 
 
 async def _read_book(db: AsyncSession, ref: str, names: list[str]) -> dict:
@@ -204,7 +229,7 @@ async def _read_book(db: AsyncSession, ref: str, names: list[str]) -> dict:
     if ref.startswith("port_"):
         return await _portfolio_sections(db, ref, wanted)
     if ref.startswith("run_"):
-        run = await run_reads_service._run_or_error(db, ref)
+        run = await run_reads_service.completed_run(db, ref)        # V28 C1: the one door
         if isinstance(run, dict):
             return run
         sections = [n for n in wanted if n in _RUN_SECTIONS]
@@ -252,6 +277,9 @@ async def _read_book(db: AsyncSession, ref: str, names: list[str]) -> dict:
             out.setdefault("unknown", []).append(n)
     if out.get("unknown"):
         out["detail"] = "for an issuer, names are 'brief' and 'alerts'; its figures are read_fundamentals"
+        routes = _routes(out["unknown"], ticker=company["ticker"])
+        if routes:
+            out["route"] = routes
     return out
 
 
@@ -268,11 +296,17 @@ async def _quantities_by_name(db: AsyncSession, ref: str, as_of: str | None, wan
     # refused bare, and the model read the breach level as the warning).
     import difflib
     nearest = {n: difflib.get_close_matches(n, list(held), n=5, cutoff=0.5) for n in unknown}
+    # V27: a name the table knows — a method, a domain, a filed line — is told
+    # what it is and the call that uses it, instead of the nearest ROW names.
+    routes = _routes(unknown, ref=ref)
     return {"run_id": ref, "as_of": as_of, "names": found,
             "units": {n: held[n].unit_class for n in found},
             "figures": {n: {"value": held[n].value, "unit_class": held[n].unit_class} for n in found},
             **({"unknown": unknown, "nearest": nearest,
-                "detail": f"not names {ref} holds; `nearest` lists the closest it does; describe('{ref}') lists all"}
+                **({"route": routes} if routes else {}),
+                "detail": (f"not names {ref} holds; `route` says what each is and how it is used"
+                           if routes else
+                           f"not names {ref} holds; `nearest` lists the closest it does; describe('{ref}') lists all")}
                if unknown else {})}
 
 
@@ -302,6 +336,9 @@ async def _portfolio_sections(db: AsyncSession, pid: str, wanted: list[str]) -> 
             out.setdefault("unknown", []).append(n)
     if out.get("unknown"):
         out["detail"] = f"a portfolio's sections are {', '.join(_PORTFOLIO_SECTIONS)}"
+        routes = _routes(out["unknown"], ref=pid)
+        if routes:
+            out["route"] = routes
     return out
 
 
@@ -390,7 +427,8 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
         ),
         json_schema={"type": "object", "properties": {
             "ticker": _TICKER,
-            "metric": {"type": ["string", "null"], "description": "a metric name from describe(ticker); null for the whole balance sheet"},
+            "metric": {"type": ["string", "null"], "enum": [*nt.TABLE_FILED_LINES, None],
+                       "description": "one of the filed lines describe(ticker) lists; null for the whole balance sheet"},
             "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None], "description": "window for a flow (default 12)"},
             "start": {"type": ["string", "null"], "description": "YYYY-MM-DD, with end: an explicit window"},
             "end": {"type": ["string", "null"]},
@@ -413,7 +451,11 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "item": {"type": ["string", "null"], "description": "'1', '1A', '7', '7A', … "},
             "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             "form_type": _FORM_TYPE,
-        }, "required": ["ticker"], "additionalProperties": False},
+        }, "required": ["ticker"], "additionalProperties": False,
+            # V28 A2: two shapes, unwritable together, refused before any spend.
+            "not": {"required": ["query", "item"],
+                    "properties": {"query": {"type": "string"}, "item": {"type": "string"}},
+                    "description": "query searches the passages and item reads one Item whole: give one of them, not both"}},
         fn=_read_filings, tool_class=READ,
     ))
     reg.register(Tool(
@@ -435,28 +477,40 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
         name="compute",
         display="Computing",
         description=(
-            "The one place a figure is computed; every result is a citable row. Either an op over "
+            "The one place a figure is computed; every result is a citable row. Two shapes. An op over "
             "operands — add/multiply (two or more), subtract/divide (two; or a list with params.by: each "
             "operand divided or multiplied by the one figure `by` names), rank (two or more, with direction), "
             f"regress (two series), or a statistic ({', '.join(compute_service.SERIES_OPS)}) over one "
             "series, or sum/avg/min/max/std over two or more figures — where an operand is a FACT id from a "
             "result's `facts` block (f_…), a fact_/calc_ id, or a figure by name on a run row "
-            "(run_…:issuer_exposures.MSFT.weight); or a method from describe's list over a subject (a "
-            "ticker, a run_…, a port_…) with its params — issuer measures, price.*, book.*; an issuer "
+            "(run_…:issuer_exposures.MSFT.weight). Or a method over a subject (a ticker, a run_…, a "
+            "port_…) with its params — describe(subject) lists each method with its call; an issuer "
             "measure with params.last_n is its last N periods as one series. method and subject take "
-            "lists: ten issuers' net margin is one call. Refusals say why and what would go through."
+            "lists: ten issuers' net margin is one call. Every result is a fact, so results compose: a "
+            "method over a list, then an op over its facts, is two calls. Refusals say why and what would go through."
         ),
-        json_schema={"type": "object", "properties": {
+        json_schema={"type": "object",
+            "$defs": {"method_name": {"type": "string", "enum": nt.method_names(kinds)}},
+            "properties": {
             "op": {"type": ["string", "null"], "enum": [*compute_service.OPS, None]},
             "operands": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40},
             "direction": {"type": ["string", "null"], "enum": ["highest", "lowest", None], "description": "for rank"},
-            "method": {"type": ["string", "array", "null"], "items": {"type": "string"}, "maxItems": 40,
-                       "description": "a method name, or a list"},
+            "method": {"type": ["string", "array", "null"], "items": {"$ref": "#/$defs/method_name"}, "maxItems": 40,
+                       "if": {"type": "string"}, "then": {"$ref": "#/$defs/method_name"},
+                       "description": "a method name from describe(subject), or a list of them"},
             "subject": {"type": ["string", "array", "null"], "items": {"type": "string"}, "maxItems": 40,
                         "description": "ticker | run_… | port_…, or a list"},
             "params": {"type": ["object", "null"], "description": "the method's params (describe lists them)"},
             "as_quantity": {"type": ["string", "null"], "description": "what to call an op's result, e.g. 'dollars_to_sell'"},
-        }, "additionalProperties": False},
+        }, "additionalProperties": False,
+            # V28 A2: op and method are two shapes of one call. The combination is
+            # unwritable, and the schema says so before the registry spends a slot
+            # — the 2026-09-07 battery paid fifteen slots to be told this by the service.
+            "not": {"required": ["op", "method"],
+                    "properties": {"op": {"type": "string"}, "method": {"type": ["string", "array"]}},
+                    "description": "op and method are two shapes of one call: give op with operands, or method with "
+                                   "subject, never both. A statistic over a method's results is two calls: the method "
+                                   "over the list of subjects, then the op over the facts it returned"}},
         fn=_compute_for(kinds), tool_class=READ,
     ))
     reg.register(Tool(
@@ -479,10 +533,11 @@ def register_book_tool(reg: ToolRegistry) -> ToolRegistry:
         name="read_book",
         display="Reading from {ref}",
         description=(
-            "The desk's own work, by name. A run or scenario row (run_…, calc_…): figures by the names "
-            "describe lists (issuer_exposures.MSFT.weight, limit_checks.issuer_concentration:MSFT.breach_level, "
-            "count.alerts), or the sections alerts / attribution / risk_state. A portfolio (port_…): "
-            f"{', '.join(_PORTFOLIO_SECTIONS)}. A ticker: brief, alerts. A task (task_…, rrun_…): its state."
+            "The desk's own work, by the names describe lists for that subject. A run or scenario row "
+            "(run_…, calc_…): its figures by row name (issuer_exposures.MSFT.weight, "
+            "limit_checks.issuer_concentration:MSFT.breach_level, count.alerts) and its sections "
+            f"({', '.join(_RUN_SECTIONS)}). A portfolio (port_…): its sections ({', '.join(_PORTFOLIO_SECTIONS)}). "
+            "A ticker: brief, alerts. A task (task_…, rrun_…): its state."
         ),
         json_schema={"type": "object", "properties": {
             "ref": {"type": "string"},

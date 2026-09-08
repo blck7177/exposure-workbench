@@ -222,7 +222,8 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "Brief), exposure_run (a portfolio run on the book AS IT IS, on the last completed session "
             "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is "
             "compute(method='book.sell' | 'book.buy', subject=run_…), which answers at once). "
-            "Never blocks; tell the user it is being prepared."
+            "Never blocks; tell the user it is being prepared. A started run's figures are readable "
+            "once its status is completed; read_book(task_…, names=['state']) reports its progress."
         ),
         json_schema={"type": "object", "properties": {
             "kind": {"type": "string", "enum": list(_START_KINDS)},
@@ -236,18 +237,13 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
         name="respond",
         display="Resolving every figure against the table, then answering",
         description=(
-            "Reply to the user. An answer is a list of BLOCKS; a figure is the ID of a fact a tool "
-            "result showed (its `facts` block) WRITTEN INTO YOUR SENTENCE, and the reader is shown "
-            "the fact's own value with what it is and as of when — you never write a number. Blocks: "
-            "`paragraph` (`text`: the sentence, with fact ids in it where the figures go — "
-            "f_3a1b…, or f_3a1b…@2025-12-31 for one point of a series; `cites`: the facts it rests on "
-            "but does not state), `table` (rows of fact ids, one row per thing compared "
+            "Reply to the user. An answer is a list of BLOCKS. " + gate.PROSE_RULE + " Blocks: "
+            "`paragraph` (`text`: the sentence, with fact ids in it where the figures go; "
+            "`cites`: the facts it rests on but does not state), `table` (rows of fact ids, one row per thing compared "
             "and one column per measure; header and row labels come from the facts), `chart` "
             "(kind + a series fact). A claim that something rose or fell points at the series; "
             "that something is not held, at the absence fact; work you started, at its task fact. "
-            "A number written in prose must be one the ledger accounts for — a fact's value, its "
-            "date, its window or parameter, or a figure a cited passage states — else the reply "
-            "is refused: compute it, cite it, or drop it."
+            "A reply the ledger cannot account for is refused: compute it, cite it, or drop it."
         ),
         json_schema=RESPOND_SCHEMA,
         fn=_respond_blocks, tool_class=GATE,

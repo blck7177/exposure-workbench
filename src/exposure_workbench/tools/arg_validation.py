@@ -84,6 +84,28 @@ def _unpack(error):
     return [e2 for e in inner for e2 in _unpack(e)] or [error]
 
 
+def _problem(error) -> dict:
+    """The message, and for an enum miss the VALUE too, so the caller can say
+    what the name is. A long enum is a directory, not a message: forty-six
+    names quoted back cost more than the call did, so the message names the
+    count and the nearest members instead."""
+    if error.validator == "not":
+        # A `not` constraint carries its own sentence (V28 A2): jsonschema's is
+        # the whole forbidden subschema, which names nothing the model can act on.
+        sub = error.validator_value if isinstance(error.validator_value, dict) else {}
+        return {"problem": sub.get("description") or error.message}
+    if error.validator != "enum" or not isinstance(error.instance, str):
+        return {"problem": error.message}
+    members = [v for v in (error.validator_value or []) if isinstance(v, str)]
+    if len(members) <= 8:
+        return {"problem": error.message, "value": error.instance}
+    import difflib
+    near = difflib.get_close_matches(error.instance, members, n=3, cutoff=0.4)
+    tail = f"; nearest: {', '.join(near)}" if near else ""
+    return {"problem": f"{error.instance!r} is not one of the {len(members)} names this argument takes{tail}",
+            "value": error.instance}
+
+
 def validate_args(schema: dict, args: Any) -> list[dict]:
     """Every way `args` fails `schema`, as {field, problem}. Empty means valid."""
     if not isinstance(args, dict):
@@ -92,7 +114,7 @@ def validate_args(schema: dict, args: Any) -> list[dict]:
 
     validator = Draft202012Validator(schema)
     problems = [
-        {"field": field, "problem": e.message}
+        {"field": field, **_problem(e)}
         for top in validator.iter_errors(args)
         for e in _unpack(top)
         for field in _fields(e)

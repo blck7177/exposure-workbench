@@ -160,7 +160,7 @@ async def test_an_operand_with_no_measure_name_is_refused(monkeypatch):
     desk = _Desk(monkeypatch, {"a": q(0.04, sid="a", issuer="MSFT", quantity=None),
                                "b": q(0.31, sid="b", issuer="JPM", quantity=None)})
     out = await desk.rank(["a", "b"], direction="highest")
-    assert out["error"] == "incomparable_quantities"
+    assert out["error"] == "unnamed_quantity"      # V28 B1: its own name, not 'incomparable'
 
 
 async def test_a_series_has_no_single_place_to_take(monkeypatch):

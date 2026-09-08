@@ -85,6 +85,17 @@ async def series_stat(db: AsyncSession, series_id: str, op: str,
     if isinstance(loaded, dict):
         return loaded
     points, rtype = loaded
+    return await stat_over(db, points, rtype, series_id, op, invoked_by=invoked_by)
+
+
+async def stat_over(db: AsyncSession, points: list[so.SeriesPoint], rtype: dict, series_id: str, op: str,
+                    invoked_by: str = "agent") -> dict:
+    """A change or a statistic over a series ALREADY RESOLVED (V28 A1): the
+    points and their recorded type, whatever id the caller wrote — a ledger
+    row's, a fact's. The op operates on the value; nothing here loads by id.
+    `series_id` is the row the result is recorded as resting on."""
+    if op not in OPS:
+        return {"error": "unsupported_op", "op": op, "supported": list(OPS)}
 
     # The result is named for what it did to what — revenue.yoy — instead of
     # quantity=None with the real name hidden in derived_from, where no reader

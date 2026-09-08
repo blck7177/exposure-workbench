@@ -53,17 +53,10 @@ async def get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
     top_k: an answer that names the three worst scenarios out of eight is an
     answer whose reader cannot tell whether the fourth was 0.1% or 7%.
     """
-    run = (await db.execute(
-        select(ExposureRun).where(ExposureRun.id == run_id))).scalar_one_or_none()
-    if run is None:
-        return {"error": "unknown_run", "run_id": run_id,
-                "message": f"no exposure run {run_id}"}
-    if run.status != "completed":
-        # A run still going has children that are half-written. Ordering them
-        # would produce a ranking that changes under the reader.
-        return {"error": "run_not_completed", "run_id": run_id, "status": run.status,
-                "message": f"run {run_id} is {run.status}; its findings are not final"}
-
+    from exposure_workbench.services import run_reads_service
+    run = await run_reads_service.completed_run(db, run_id)     # V28 C1: the one door
+    if isinstance(run, dict):
+        return run
     metrics = (await db.execute(
         select(ExposureMetrics).where(ExposureMetrics.run_id == run_id))).scalar_one_or_none()
     scenarios = list((await db.execute(
