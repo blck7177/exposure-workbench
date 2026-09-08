@@ -83,6 +83,22 @@ BUDGET_FREE_CLASSES = (REFLECTION, GATE)
 
 
 @dataclass(frozen=True)
+class Shapes:
+    """Arguments a tool takes in EXACTLY ONE of two shapes (V28 A2).
+
+    Written here rather than as a JSON Schema `not`, because the provider
+    rejects a function whose parameters carry oneOf/anyOf/allOf/enum/const/not
+    at the top level — the schema is part of the contract with the model, and
+    a constraint the provider will not accept is not a constraint. Declared
+    once: the registry refuses the combination before any budget is spent, the
+    refusal quotes `detail`, and the tool's description says the same thing to
+    the model.
+    """
+    fields: tuple[str, ...]
+    detail: str
+
+
+@dataclass(frozen=True)
 class Tool:
     name: str
     description: str
@@ -90,6 +106,7 @@ class Tool:
     fn: Callable[..., Awaitable[dict]]                  # async (db, **args) -> dict
     tool_class: str                                     # READ | DELEGATION | REFLECTION | GATE
     budget_key: str | None = None                       # e.g. 'external_search'; None = plain tool
+    shapes: Shapes | None = None                        # V28 A2: two shapes, never both
     # V13-S4. What this call looks like to a person watching the turn, as a
     # format template over the call's own arguments:
     #
@@ -181,6 +198,10 @@ async def invoke(
     # 'rejected' status a budget refusal gets, because a refusal is something
     # the desk should be able to see the agent having provoked.
     problems = validate_args(tool.json_schema, args)
+    if not problems and tool.shapes is not None:
+        given = [f for f in tool.shapes.fields if args.get(f) is not None]
+        if len(given) > 1:
+            problems = [{"field": f, "problem": tool.shapes.detail, "value": None} for f in given]
     if problems:
         await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,

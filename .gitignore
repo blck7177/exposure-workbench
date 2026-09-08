@@ -44,3 +44,6 @@ apps/web/.env.local
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Workflow/agent worktrees — never part of the repo
+.claude/

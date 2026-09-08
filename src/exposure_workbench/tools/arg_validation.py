@@ -89,11 +89,6 @@ def _problem(error) -> dict:
     what the name is. A long enum is a directory, not a message: forty-six
     names quoted back cost more than the call did, so the message names the
     count and the nearest members instead."""
-    if error.validator == "not":
-        # A `not` constraint carries its own sentence (V28 A2): jsonschema's is
-        # the whole forbidden subschema, which names nothing the model can act on.
-        sub = error.validator_value if isinstance(error.validator_value, dict) else {}
-        return {"problem": sub.get("description") or error.message}
     if error.validator != "enum" or not isinstance(error.instance, str):
         return {"problem": error.message}
     members = [v for v in (error.validator_value or []) if isinstance(v, str)]

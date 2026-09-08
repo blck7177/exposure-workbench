@@ -1076,6 +1076,18 @@ boss 2026-09-08 定的全局规则:一次对话里 LLM 提供 intelligence、ski
 
 `test_v28_roles`(A1 对序列 fact id 算 max/yoy 出行且出处是该 id、compute 源码不调 series_stat;A2 op+method、query+item 在 validate_args 就拒且信里点名两个形状;B1 三个用途同窗口按度量名排序、跨发行人同度量各留窗口、异窗口或异持有者拒绝;C1 AST 守卫 + 未完成 run 回 task 门;C2 声明 count 的容器铸 COUNT 事实、未声明仍 UnknownUnit;D1 三处逐字含 PROSE_RULE)。旧测试三处改钉新边界。离线 2191 绿。
 
+### ★ 2026-09-08 上线时抓到的两个缺陷(本批自己造的,重建后立刻暴露)
+
+**① A2 的 schema 供应商不接受——线上 chat 全挂。** 顶层 `not` 在 jsonschema 下合法、2191 条离线测试全绿,而 OpenAI 直接 400:
+`schema must have type 'object' and not have 'oneOf'/'anyOf'/'allOf'/'enum'/'const'/'not' at the top level`。
+电池 140 轮全部 0 次工具调用。**根因按角色:schema 是 tool 与 LLM 之间契约的一部分,而我只用离线校验器验了它——供应商不接受的约束不是约束。**
+改法:`registry.Shapes` 声明工具的两个形状(fields + detail),registry 在 `validate_args` 之后、扣预算之前拒;
+两个 schema 回到供应商合法的纯 object。守卫两条:结构守卫(每个注册 schema 顶层无 oneOf/anyOf/allOf/enum/const/not 且 type=object,规则逐字来自供应商的报错)+ live 守卫(把两个面的真实工具表发给供应商,16 token 一次)。
+**② `book.explain_episode` 一调用就 `fact_adapter_error`。** 它在 244 轮电池里被调用 **0 次**,载荷从没过过适配器;V27 把模型路由到它,第一轮就死在 `portfolio_window_return` 无声明单位。
+**根因同 C2 但更深一层:方法的单位是 skill 登记表声明的(`Method.unit_class`),适配器却在读消费者侧的键名表。** 改法:compute 适配器读 `skill.METHODS[method].unit_class` 作为叶子默认单位,`UNIT_BY_KEY` 仍对特定键(如 `sessions`=COUNT)优先。
+守卫:live 审计**每个方法**跑一遍再过适配器——夹具覆盖不了没人调过的形状,37 个可解析方法 0 崩溃(9 条拒绝是已知 `total_debt` 数据缺口)。
+**两条纪律**:①离线绿不代表契约成立,凡是发给外部服务的结构必须有一条真发一次的守卫;②"某能力零调用"本身就是风险信号——它等于说这条路线从未被验证过。
+
 ### 待办
 
-rebuild 四镜像;电池按仪器条件重跑(串行、先播 completed run、两次复现、报分布),M27 与 M28 同一轮量。措辞过目:PROSE_RULE、compute/read_filings 的 `not` 描述、`completed_run` 拒绝信、`start` 新句。`describe(MSFT, expand='procedures')` 全域视图 31.8k 字符超 24k 上限,未列入 live 上限测试,是否保留待定。
+电池按仪器条件重跑(串行、先播 completed run、两次复现、报分布),M27 与 M28 同一轮量。措辞过目:PROSE_RULE、compute/read_filings 的 `Shapes.detail` 两句、`completed_run` 拒绝信、`start` 新句、`skill._LINKS` 的域→方法选择。`describe(MSFT, expand='procedures')` 全域视图 31.8k 字符超 24k 上限,未列入 live 上限测试,是否保留待定。

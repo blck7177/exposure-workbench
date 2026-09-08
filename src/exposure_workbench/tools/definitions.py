@@ -43,7 +43,7 @@ from exposure_workbench.services import security_master_service
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services.typed_calculator import SCENARIO_OP
 from exposure_workbench.tools.registry import (
-    READ, REFLECTION, Tool, ToolRegistry, current_session_id,
+    READ, REFLECTION, Shapes, Tool, ToolRegistry, current_session_id,
 )
 
 
@@ -451,11 +451,10 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "item": {"type": ["string", "null"], "description": "'1', '1A', '7', '7A', … "},
             "k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             "form_type": _FORM_TYPE,
-        }, "required": ["ticker"], "additionalProperties": False,
-            # V28 A2: two shapes, unwritable together, refused before any spend.
-            "not": {"required": ["query", "item"],
-                    "properties": {"query": {"type": "string"}, "item": {"type": "string"}},
-                    "description": "query searches the passages and item reads one Item whole: give one of them, not both"}},
+        }, "required": ["ticker"], "additionalProperties": False},
+        shapes=Shapes(("query", "item"),
+                      "query searches the passages and item reads one Item whole: "
+                      "give one of them, not both"),
         fn=_read_filings, tool_class=READ,
     ))
     reg.register(Tool(
@@ -502,15 +501,14 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
                         "description": "ticker | run_… | port_…, or a list"},
             "params": {"type": ["object", "null"], "description": "the method's params (describe lists them)"},
             "as_quantity": {"type": ["string", "null"], "description": "what to call an op's result, e.g. 'dollars_to_sell'"},
-        }, "additionalProperties": False,
-            # V28 A2: op and method are two shapes of one call. The combination is
-            # unwritable, and the schema says so before the registry spends a slot
-            # — the 2026-09-07 battery paid fifteen slots to be told this by the service.
-            "not": {"required": ["op", "method"],
-                    "properties": {"op": {"type": "string"}, "method": {"type": ["string", "array"]}},
-                    "description": "op and method are two shapes of one call: give op with operands, or method with "
-                                   "subject, never both. A statistic over a method's results is two calls: the method "
-                                   "over the list of subjects, then the op over the facts it returned"}},
+        }, "additionalProperties": False},
+        # V28 A2: op and method are two shapes of one call, refused before the
+        # registry spends a slot — the 2026-09-07 battery paid fifteen slots to
+        # be told this by the service.
+        shapes=Shapes(("op", "method"),
+                      "op and method are two shapes of one call: give op with operands, or method with "
+                      "subject, never both. A statistic over a method's results is two calls: the method "
+                      "over the list of subjects, then the op over the facts it returned"),
         fn=_compute_for(kinds), tool_class=READ,
     ))
     reg.register(Tool(

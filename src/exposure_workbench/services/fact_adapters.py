@@ -42,6 +42,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
 from exposure_workbench.analytics import resources as rs
+from exposure_workbench.analytics import skill
 from exposure_workbench.services import facts as F
 from exposure_workbench.utils import json as ejson
 
@@ -573,8 +574,18 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     group = ("price" if str(method).startswith("price.") else
              "book_derived" if str(method).startswith(("book.", "rank", "calc.set")) or (isinstance(subject, str) and subject.startswith(("run_", "port_", "calc_")))
              else "derived")
+    # V28 C2: what unit a METHOD's figures carry is declared once, on the method
+    # (skill.Method.unit_class), and read here — not guessed from a key name and
+    # not copied into a second list. UNIT_BY_KEY still wins where a specific key
+    # says otherwise (a method whose payload also counts sessions), so this is
+    # the default for the leaves the key list does not name.
+    # Found by book.explain_episode: called ZERO times in the 244-turn battery,
+    # so its payload had never met the adapter; the first turn that reached it
+    # (V27 routed the model there) died on `portfolio_window_return`.
+    declared = skill.METHODS[method].unit_class if method in skill.METHODS else None
     ctx = Ctx("compute", subject=subject.upper() if isinstance(subject, str) and not subject.startswith(("run_", "port_", "calc_")) else subject,
               as_of=result.get("as_of"), group=group,
+              leaf_unit=declared.upper() if isinstance(declared, str) else None,
               sources=tuple(s for s in (result.get("calc_id"),) if _is_id(s)))
     r = copy.deepcopy(result)
     # an op over one issuer's figures is that issuer's figure: the typed

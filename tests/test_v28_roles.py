@@ -18,10 +18,12 @@ import pytest
 from exposure_workbench.analytics.units import COUNT, MONEY, RATIO
 from exposure_workbench.services import compute_service as cmp
 from exposure_workbench.services import fact_adapters as fa
+from exposure_workbench.analytics import skill
 from exposure_workbench.services import gate, series_service
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools.arg_validation import validate_args
-from exposure_workbench.tools.registries import build_meta_registry
+from exposure_workbench.tools.faces import FACE_META_AGENT as FACE_META, FACE_RESEARCH
+from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
 SRC = Path(__file__).parent.parent / "src" / "exposure_workbench"
 
@@ -61,15 +63,62 @@ def test_compute_never_hands_a_series_op_an_id_to_reload():
 
 # ── A2: two shapes of one call are unwritable together, before any spend ──
 
-def test_op_and_method_together_are_refused_by_the_schema_with_the_two_shapes_named():
-    compute = build_meta_registry().tools["compute"].json_schema
-    problems = validate_args(compute, {"op": "avg", "method": "price.beta", "subject": ["MSFT", "AAPL"]})
-    assert problems and "two shapes" in problems[0]["problem"] and "two calls" in problems[0]["problem"]
+async def test_op_and_method_together_are_refused_before_any_spend(monkeypatch):
+    """The refusal happens in the registry, before budget — and the tool DECLARES
+    its two shapes rather than encoding them as a schema `not`, which the
+    provider rejects outright (see the provider-legality test below)."""
+    reg = build_meta_registry()
+    assert reg.tools["compute"].shapes.fields == ("op", "method")
+    assert reg.tools["read_filings"].shapes.fields == ("query", "item")
+
+    spent = []
+    from exposure_workbench.services import agent_session_service as sess
+    from exposure_workbench.tools import registry as R
+
+    async def reserve(*a, **k):
+        spent.append(1)
+    monkeypatch.setattr(sess, "reserve", reserve)
+
+    async def record_step(*a, **k):
+        return None
+    monkeypatch.setattr(R.trace_service, "record_step", record_step)
+
+    out = await R.invoke(reg, None, "sess_x", "compute",
+                         {"op": "avg", "method": "price.beta", "subject": ["MSFT", "AAPL"]})
+    assert out["error"] == "invalid_arguments" and not spent
+    assert "two shapes" in out["problems"][0]["problem"] and "two calls" in out["problems"][0]["problem"]
+    assert {p["field"] for p in out["problems"]} == {"op", "method"}
+
+    out = await R.invoke(reg, None, "sess_x", "read_filings",
+                         {"ticker": "MSFT", "query": "risk", "item": "1A"})
+    assert out["error"] == "invalid_arguments" and "not both" in out["problems"][0]["problem"] and not spent
+
+    # One shape, or the other, passes validation untouched.
+    compute = reg.tools["compute"].json_schema
     assert validate_args(compute, {"op": "avg", "method": None, "operands": ["f_a", "f_b"]}) == []
     assert validate_args(compute, {"method": "price.beta", "subject": "MSFT", "op": None}) == []
-    filings = build_meta_registry().tools["read_filings"].json_schema
-    assert "not both" in validate_args(filings, {"ticker": "MSFT", "query": "risk", "item": "1A"})[0]["problem"]
+    filings = reg.tools["read_filings"].json_schema
     assert validate_args(filings, {"ticker": "MSFT", "item": "1A", "query": None}) == []
+
+
+# The provider's own words, 2026-09-08: "schema must have type 'object' and not
+# have 'oneOf'/'anyOf'/'allOf'/'enum'/'const'/'not' at the top level". A V28
+# schema carried a top-level `not`; jsonschema accepted it, 2,191 offline tests
+# passed, and every LLM call in the battery returned 400 — the whole desk was
+# down until this was found. The schema is part of the contract with the model,
+# so a constraint the provider will not accept is not a constraint.
+_FORBIDDEN_AT_TOP = ("oneOf", "anyOf", "allOf", "enum", "const", "not")
+
+
+@pytest.mark.parametrize("name", sorted(set(FACE_META + FACE_RESEARCH)))
+def test_every_schema_is_one_the_provider_accepts(name):
+    for reg, face in ((build_meta_registry(), FACE_META), (build_research_registry(), FACE_RESEARCH)):
+        if name not in face:
+            continue
+        schema = reg.tools[name].json_schema
+        assert schema.get("type") == "object", f"{name}: parameters must be an object"
+        present = [k for k in _FORBIDDEN_AT_TOP if k in schema]
+        assert present == [], f"{name}: {present} at the top level; the provider rejects the function"
 
 
 # ── B1: what is comparable is the identity's, and the row is named by what varies ──
@@ -195,6 +244,64 @@ def test_a_container_that_declares_its_numeric_unit_is_minted_not_crashed():
                                           "filings": {"items_detail": {"Item 1A": 3}}})
 
 
+def test_a_methods_declared_unit_is_what_its_leaves_carry():
+    """V28 C2, second instance: `book.explain_episode` returns
+    `portfolio_window_return`, a name no key list declared. The METHOD declares
+    its unit (skill.Method.unit_class) and the adapter reads it, so a method
+    whose payload the adapter has never seen cannot die on an undeclared leaf.
+    A specific key still wins: a ratio method that also counts sessions."""
+    payload = {"method": "book.explain_episode", "subject": "port_001", "portfolio_id": "port_001",
+               "window": {"from": "2026-01-08", "to": "2026-03-27"}, "sessions": 55,
+               "portfolio_window_return": -0.1195, "calc_id": "calc_x",
+               "holdings": [{"ticker": "MSFT", "window_return": -0.26, "calc_id": "calc_m"}]}
+    facts, note = fa.compute({"method": "book.explain_episode"}, payload)
+    by = {f.measure.rsplit(".", 1)[-1]: f for f in facts}
+    assert by["portfolio_window_return"].unit == RATIO.upper()
+    assert by["window_return"].unit == RATIO.upper() and by["window_return"].subject == "MSFT"
+    assert by["sessions"].unit == COUNT.upper(), "a declared key beats the method's default"
+    # A method with no declared unit still refuses an undeclared leaf: the rule
+    # is a declaration, not a fallback.
+    with pytest.raises(fa.UnknownUnit):
+        fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
+
+
+@pytest.mark.live
+async def test_every_registry_method_survives_its_own_adapter():
+    """The class this batch found twice (X3 filings, explain_episode): a payload
+    the adapter has never seen. Call every method once and adapt the result —
+    a method nobody has asked for is exactly where an undeclared leaf hides."""
+    import os
+
+    from dotenv import load_dotenv
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from exposure_workbench.services import compute_service as cmp_service
+    load_dotenv(".env", override=True)
+    url = os.getenv("DATABASE_URL_RLS", "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
+    subj = {"issuer": "MSFT", "price": "MSFT", "run": None, "portfolio": "port_001"}
+    params = {"book.explain_episode": {"peak": "2026-01-07", "trough": "2026-03-27"},
+              "book.sell": {"sales": [{"ticker": "MSFT", "fraction": 0.5}]},
+              "book.buy": {"buys": [{"ticker": "KO", "weight": 0.05}]}}
+    engine = create_async_engine(url)
+    mk = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    crashed = []
+    try:
+        async with mk() as db:
+            from exposure_workbench.services import run_reads_service as rr
+            fresh = await rr.get_run_freshness(db, "port_001")
+            subj["run"] = fresh["latest_completed_run"]
+            for name, m in skill.METHODS.items():
+                out = await cmp_service.compute(db, method=name, subject=subj[m.subject_kind],
+                                                params=params.get(name, {}))
+                try:
+                    fa.adapt("compute", {"method": name}, out)
+                except fa.UnknownUnit as e:
+                    crashed.append((name, str(e)))
+    finally:
+        await engine.dispose()
+    assert crashed == [], crashed
+
+
 # ── D1: the model is told validation's own sentence ──
 
 def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
@@ -205,3 +312,67 @@ def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
     assert gate.PROSE_RULE in build_meta_registry().tools["respond"].description
     assert gate._FIX.startswith(gate.PROSE_RULE)
     assert "never write a number" not in meta_agent._SYSTEM
+
+
+@pytest.mark.live
+async def test_the_provider_accepts_every_face_as_written():
+    """The structural test above encodes the provider's rule; this one asks the
+    provider. Cheap (16 output tokens) and the only check that cannot go stale
+    if the rule changes."""
+    import os
+
+    from dotenv import load_dotenv
+    from openai import AsyncOpenAI
+    load_dotenv(".env", override=True)
+    client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    for reg, face in ((build_meta_registry(), FACE_META), (build_research_registry(), FACE_RESEARCH)):
+        await client.chat.completions.create(
+            model=os.environ["OPENAI_MODEL"], max_completion_tokens=16,
+            messages=[{"role": "user", "content": "say ok"}], tools=reg.schemas(face))
+
+
+@pytest.mark.live
+async def test_every_method_the_desk_can_run_survives_its_own_adapter():
+    """X3's class, closed by audit rather than by fixture.
+
+    `describe(expand='filings')` was dead on every issuer for two versions
+    because no fixture covered that payload shape. On 2026-09-08 the same class
+    reappeared the moment V27 routed a live turn to `book.explain_episode` —
+    a method called ZERO times in the 244-turn battery, whose payload had
+    therefore never met the adapter. A fixture per shape cannot cover what
+    nobody has called; this asks every method the desk can run.
+    """
+    import os
+
+    from dotenv import load_dotenv
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from exposure_workbench.analytics import skill
+    from exposure_workbench.services import compute_service as cmp
+    load_dotenv(".env", override=True)
+    url = os.getenv("DATABASE_URL_RLS", "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
+    engine = create_async_engine(url)
+    mk = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    subjects = {"issuer": "MSFT", "price": "MSFT", "run": "run_72e6617afeb7", "portfolio": "port_001"}
+    params = {"book.explain_episode": {"peak": "2026-01-07", "trough": "2026-03-27"},
+              "book.sell": {"sales": [{"ticker": "MSFT", "fraction": 0.25}]},
+              "book.buy": {"buys": [{"ticker": "KO", "weight": 0.03}]}}
+    crashes, adapted = [], 0
+    try:
+        async with mk() as db:
+            for name, m in skill.METHODS.items():
+                subject = subjects.get(m.subject_kind)
+                if subject is None:
+                    continue
+                out = await cmp.compute(db, method=name, subject=subject, params=params.get(name, {}))
+                if out.get("error"):
+                    continue                      # a data-cover refusal is not an adapter defect
+                try:
+                    fa.adapt("compute", {"method": name, "subject": subject}, out)
+                    adapted += 1
+                except Exception as exc:          # noqa: BLE001 — the point is to name it
+                    crashes.append(f"{name}: {type(exc).__name__}: {exc}")
+    finally:
+        await engine.dispose()
+    assert crashes == [], crashes
+    assert adapted >= 30, f"only {adapted} methods resolved; the audit proves nothing on an empty desk"
