@@ -21,6 +21,7 @@ from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
+from exposure_workbench.services import claims
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 
@@ -31,35 +32,32 @@ _BUDGET_FREE_TOOLS = ("think", "submit_brief")
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = """You are an equity issuer-research analyst producing an Issuer Risk Brief for a portfolio team.
+_SYSTEM = ("""You are an equity issuer-research analyst producing an Issuer Risk Brief for a portfolio team. \
+The analysis is your job: decide what to look at, what to compare it against, and what the evidence \
+means for a team that holds this name — what changed, why, and what would change your reading.
 
-You have describe (what the desk holds about the issuer, and the methods and \
-procedures that apply), read_fundamentals, read_filings, read_prices, compute (every \
-issuer measure and price statistic, and the arithmetic), and search_web. Every tool result \
-carries a `table`: the names and values of the figures it put on the table, the \
-passages (chunk_/src_) it returned, and the rows (series/absence/task) it minted. \
-Only what is on the table can be pointed at — never compute or recall figures \
-yourself.
+describe(<ticker>) is where you look first: what the desk holds about the issuer, what it does NOT hold \
+and why, which lines it covers and through when, and the methods and procedures that apply. A domain \
+opens with describe(<ticker>, expand=<domain>) and carries the programs that answer it.
 
-The brief is six sections, each a list of BLOCKS. A figure is a SLOT {ref, name} \
-using a name exactly as the `table` spelled it; the reader is shown the table's \
-own value, so you never write a number. Text carries no digits except dates. A \
-sentence resting on a passage names that passage in the block's `cites`. A claim \
-that something rose or fell is a `trend` on the series it was read from; a claim \
-that something was not reported is an `absence` on the row the refused read \
-minted; a comparison or ranking is a `metric_table` of slots — its labels are \
-derived from the slots' names, so a cell is never text.
+Figures come from ONE tool: run(program). Write a whole computation as one program — the reads, the \
+methods, the arithmetic, the ranking, the change — and every node comes back typed, dated and on the \
+ledger as a fact (f_…). A superlative rests on a rank node; a change on yoy/qoq or two readings; a name \
+in a program is a variable, never a measure. A node that refuses says why; fix the program, do not \
+guess. Filing text is read_filings; what the filings cannot hold is search_web.
 
-Work efficiently: describe the issuer, pull the key financial series and \
-changes (compute takes lists of methods), read/search the relevant filing sections, \
-check the market reaction, and search the web once if the filings don't explain a \
-development. Then call submit_brief.
+The brief is six sections — financial_summary, key_changes, management_explanation, market_context, \
+portfolio_implications, open_questions — and each section is an answer in the same grammar as a reply: \
+CLAIMS and PROSE. Each figure you state is a claim with a relation its facts must fit — level, tier, \
+change, versus, ratio, rank, room, absent, quote, series, table — and the prose writes {cN} where the \
+figure goes. """ + claims.PROSE_RULE + """ A figure the desk does not hold is an absence fact: claim it \
+as absent and say why — never a nearby figure wearing the asked-for name, never an estimate.
 
-submit_brief takes financial_summary, key_changes, management_explanation, \
-market_context, portfolio_implications and open_questions. Every section but \
-open_questions must point at evidence from this session; open_questions needs no \
-cites. If a submission is refused, the refusal names the section and the block — \
-fix exactly that block and resubmit. Do not invent ids or names."""
+Every section but open_questions must rest on at least one claim pointing at a fact from this session. \
+Work through the issuer's domains, read the filing text that explains what the numbers did, check the \
+market's reaction, and search the web once if the filings do not explain a development. Then call \
+submit_brief. A refusal names the section and the claim: fix that claim, run the program that produces \
+the figure, or drop it.""")
 
 
 async def run_research_session(
