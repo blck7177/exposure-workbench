@@ -48,7 +48,7 @@ URL = os.getenv("DATABASE_URL_RLS",
 # V30 Phase 0: the frozen fixture (scripts/battery_fixture.sh). `--fixture` points
 # the battery's own engine at exposure_battery and its tool calls at the fixture
 # face on :8105; nothing then reads or writes the production book.
-FIXTURE_URL = URL.replace("/exposure_workbench", "/exposure_battery")
+FIXTURE_URL = URL.replace("/exposure_workbench", "/" + os.getenv("BATTERY_DB", "exposure_battery"))
 FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 
 _STEPS = text(

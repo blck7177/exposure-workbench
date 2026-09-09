@@ -27,7 +27,18 @@ import statistics
 import sys
 from pathlib import Path
 
-SPELLING = {
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from exposure_workbench.services.claims import SPELLING_REFUSALS   # noqa: E402
+
+# The counter asks a different question from the gate, and the two sets have
+# deliberately diverged since C4. claims.SPELLING_REFUSALS is "this refusal
+# cannot back an absence a reader is told"; a coverage refusal (unknown_name,
+# unknown_point, unknown_method, unknown_metric) left that set because it names
+# what the desk DOES hold. Here the question is only "did the call land", and a
+# coverage refusal is still a round trip spent, so the counter keeps them — which
+# also keeps this series comparable with every round measured before C4. The
+# import is the floor: whatever the gate calls an address error is one here too.
+SPELLING = set(SPELLING_REFUSALS) | {
     "expand_needs_a_subject", "unknown_expand", "domain_not_for_subject", "invalid_arguments",
     "invalid_params", "unknown_method", "unknown_name", "unknown_operand", "unknown_portfolio",
     "unknown_run", "unknown_row", "unknown_series", "unknown_formula", "unknown_metric",
@@ -58,7 +69,7 @@ ALGEBRA = {
 DATA = {
     "metric_not_filed", "not_reported", "not_reported_at_this_date", "no_price_data",
     "no_price_history", "not_prepared", "company_not_found", "section_not_found", "not_indexed",
-    "no_brief", "no_completed_run", "run_not_completed", "input_unavailable",
+    "no_brief", "no_completed_run", "run_not_completed", "input_unavailable", "line_superseded",
     "series_not_derivable", "not_applicable", "empty_series", "no_positions", "no_limits",
     "no_sector", "no_balance_sheet_data", "not_held", "not_listed", "not_investigable",
     "not_an_sec_filer", "active_run_exists", "not_your_portfolio",
@@ -120,13 +131,27 @@ def tally(paths: list[str]) -> dict:
                     zero += 1
                 if _ARTIFACT.search(a):
                     artifacts += 1
-                if _MARK.search(a):
+                # the mark is the MODEL's habit: read its last respond prose, not the
+                # rendered text (V30 renders a quote's passage with its item in brackets)
+                written = a
+                for s in reversed(steps):
+                    if s.get("tool_name") == "respond":
+                        try:
+                            arg = json.loads(s.get("args") or "{}")
+                            pr = arg.get("prose") or arg.get("text") or ""
+                            written = " ".join(pr) if isinstance(pr, list) else str(pr)
+                        except (ValueError, TypeError):
+                            pass
+                        break
+                if _MARK.search(written):
                     marks += 1
                 if _SUPERLATIVE.search(a):
                     superl += 1
-                    ranked = any(s.get("tool_name") == "compute" and s.get("status") == "completed"
-                                 and '"op": "rank"' in (s.get("args") or "").replace("'", '"').replace('"op":"rank"', '"op": "rank"')
-                                 and not (s.get("result") or "").startswith("error") for s in steps)
+                    # a computed ordering: compute(op=rank) before V30, or a program with a rank/top node after
+                    ranked = any(s.get("status") == "completed" and not (s.get("result") or "").startswith("error")
+                                 and ((s.get("tool_name") == "compute" and '"op": "rank"' in (s.get("args") or "").replace("'", '"').replace('"op":"rank"', '"op": "rank"'))
+                                      or (s.get("tool_name") == "run" and ('"fn": "rank"' in (s.get("args") or "") or '"fn": "top"' in (s.get("args") or ""))))
+                                 for s in steps)
                     if not ranked:
                         superl_no_rank += 1
                 for s in steps:

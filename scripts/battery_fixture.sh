@@ -21,10 +21,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DEST=/home/ubuntu/backups/battery
-DB=exposure_battery
+DB="${BATTERY_DB:-exposure_battery}"        # BATTERY_DB=exposure_gold serves the gold snapshot instead
 PORT="${BATTERY_MCP_PORT:-8105}"
-PIDFILE=/tmp/battery_mcp.pid
-LOG=/tmp/battery_mcp.log
+PIDFILE=/tmp/battery_mcp_${PORT}.pid
+LOG=/tmp/battery_mcp_${PORT}.log
 PY=.venv/bin/python
 
 # The production connection strings, from .env, with the database name swapped.
