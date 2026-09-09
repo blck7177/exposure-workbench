@@ -265,6 +265,28 @@ def test_a_methods_declared_unit_is_what_its_leaves_carry():
         fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
 
 
+def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
+    """V29. `rank`'s spread is max − min OF THE RANKED MEASURE, so its unit is
+    MONEY when market values are ranked. A key list said RATIO, and a
+    $1,135,470 spread reached the reader as "113547000.0%". The unit of such a
+    key is not a property of its name: the producer declares it in
+    `type.unit_class` and the adapter reads that."""
+    money = {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04", "spread": 1135470.0,
+             "type": {"unit_class": "money", "kind": "ranking", "quantity": "market_value"}}
+    facts, _ = fa.compute({"op": "rank"}, money)
+    assert next(f for f in facts if f.measure == "spread").unit == MONEY.upper()
+
+    ratio = {**money, "spread": 0.117, "type": {**money["type"], "unit_class": "ratio"}}
+    facts, _ = fa.compute({"op": "rank"}, ratio)
+    assert next(f for f in facts if f.measure == "spread").unit == RATIO.upper()
+
+    # No declaration is a refusal, not a default: the guess is what caused this.
+    with pytest.raises(fa.UnknownUnit, match="computed over"):
+        fa.compute({"op": "rank"}, {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04",
+                                    "spread": 1135470.0})
+    assert "spread" not in fa.UNIT_BY_KEY and "spread" in fa.POLYMORPHIC_KEYS
+
+
 @pytest.mark.live
 async def test_every_registry_method_survives_its_own_adapter():
     """The class this batch found twice (X3 filings, explain_episode): a payload
@@ -295,8 +317,38 @@ async def test_every_registry_method_survives_its_own_adapter():
                                                 params=params.get(name, {}))
                 try:
                     fa.adapt("compute", {"method": name}, out)
-                except fa.UnknownUnit as e:
-                    crashed.append((name, str(e)))
+                except Exception as e:                    # UnknownUnit, or any adapter fault
+                    crashed.append((name, f"{type(e).__name__}: {e}"))
+
+            # The SHAPES a compute result comes in, not only the methods: a list
+            # of methods, a refused list, and every op. Each of the three adapter
+            # crashes this batch found lived in a shape nobody had exercised —
+            # expand='filings', explain_episode, and `entries` from a set
+            # statistic V25 measured at zero uses.
+            two = ["price.volatility", "price.drawdown"]
+            shapes = [({"method": two, "subject": "MSFT"}, {}),
+                      ({"method": two, "subject": "MSFT"}, {"window": "3m"}),    # refused: mixed params
+                      ({"method": ["book.drawdown_episodes", "book.reconcile"], "subject": "port_001"}, {})]
+            for call, params in shapes:
+                out = await cmp_service.compute(db, params=params, **call)
+                try:
+                    fa.adapt("compute", dict(call, params=params), out)
+                except Exception as e:
+                    crashed.append((str(call.get("method")), f"{type(e).__name__}: {e}"))
+
+            one = await cmp_service.compute(db, method="price.distance_from_52w_high", subject="HYG")
+            two_ = await cmp_service.compute(db, method="price.volatility", subject="HYG", params={"window_days": 30})
+            a, b = one.get("calc_id"), two_.get("calc_id")
+            ops = [("abs", [a]), ("add", [a, b]), ("subtract", [a, b]), ("multiply", [a, b]),
+                   ("divide", [a, b]), ("scale", [a]), ("rank", [a, b]), ("avg", [a, b]),
+                   ("min", [a, b]), ("max", [a, b]), ("std", [a, b]), ("sum", [a, b])]
+            for op, operands in ops:
+                kw = {"params": {"factor": 2}} if op == "scale" else ({"direction": "highest"} if op == "rank" else {})
+                out = await cmp_service.compute(db, op=op, operands=operands, **kw)
+                try:
+                    fa.adapt("compute", {"op": op, "operands": operands}, out)
+                except Exception as e:
+                    crashed.append((f"op:{op}", f"{type(e).__name__}: {e}"))
     finally:
         await engine.dispose()
     assert crashed == [], crashed

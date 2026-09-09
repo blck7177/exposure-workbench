@@ -60,6 +60,11 @@ for _r in rs.RUN_CHILDREN:
 UNIT_BY_KEY: dict[str, str] = {
     **_DECLARED_UNITS,
     # money
+    # How many figures a set statistic rested on (typed_calculator._fold, V25) —
+    # a count, declared here because V25's set statistics were used ZERO times in
+    # the 102-turn battery that followed them, so this leaf had never met the
+    # adapter until V28 opened the route (the third payload of this shape).
+    "entries": COUNT,
     "proceeds": MONEY, "market_value_sold": MONEY, "value_then": MONEY, "market_value": MONEY,
     # ratios
     "depth": RATIO, "gap": RATIO, "tolerance": RATIO, "difference": RATIO, "factor_share": RATIO,
@@ -67,7 +72,7 @@ UNIT_BY_KEY: dict[str, str] = {
     "room_to_breach": RATIO, "current": RATIO, "net_beta": RATIO, "gross_beta": RATIO,
     "sum_of_contributions": RATIO, "sum_of_factor_contributions": RATIO, "alpha_plus_residual": RATIO,
     "recorded_alpha_plus_residual": RATIO, "reported_floor": RATIO, "fraction": RATIO,
-    "deepest_depth": RATIO, "spread": RATIO,
+    "deepest_depth": RATIO,
     # counts
     "count": COUNT, "total_holdings": COUNT, "quantity": COUNT, "sessions": COUNT, "sessions_behind": COUNT,
     "runs_in_flight": COUNT, "checks_run": COUNT, "checks_clear": COUNT, "evaluated": COUNT, "fired": COUNT,
@@ -77,6 +82,14 @@ UNIT_BY_KEY: dict[str, str] = {
     "periods_without_comparable_prior": COUNT, "runs": COUNT, "filings": COUNT, "limits": COUNT,
     "holdings": COUNT, "checks": COUNT, "names": COUNT, "periods": COUNT,
 }
+
+# Keys whose unit is NOT a property of the name. They carry the unit of whatever
+# was ranked, subtracted or compared, so the producer's declaration decides and
+# a key list cannot: `rank`'s spread is max − min of the ranked measure, MONEY
+# when market values are ranked. Pinned to RATIO until V29, it rendered a
+# $1,135,470 spread to the reader as "113547000.0%" — the fourth time this batch
+# that a consumer-side guess overruled a producer that knew.
+POLYMORPHIC_KEYS = frozenset({"spread", "difference", "gap"})
 
 # A key whose name is the tool's, not the reader's.
 MEASURE_ALIAS = {"n": "observations"}
@@ -158,6 +171,12 @@ def _unit_for(key: str, ctx: Ctx, obj: dict | None = None) -> str:
         declared = rs.column_unit(ctx.table, key)
         if declared:
             return declared
+    if key in POLYMORPHIC_KEYS:
+        declared = ctx.default_unit or ctx.leaf_unit
+        if declared:
+            return declared
+        raise UnknownUnit(f"{ctx.tool}: {key!r} carries the unit of what it was computed over "
+                          f"(subject {ctx.subject}); the result must declare it in `type.unit_class`")
     unit = UNIT_BY_KEY.get(key) or ctx.leaf_unit or (ctx.default_unit if key in ("value",) else None)
     if unit is None:
         raise UnknownUnit(f"{ctx.tool}: no unit declared for numeric key {key!r} (subject {ctx.subject}); "
@@ -582,7 +601,11 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     # Found by book.explain_episode: called ZERO times in the 244-turn battery,
     # so its payload had never met the adapter; the first turn that reached it
     # (V27 routed the model there) died on `portfolio_window_return`.
-    declared = skill.METHODS[method].unit_class if method in skill.METHODS else None
+    # `method` may be a LIST — compute takes lists, and a refused list call keeps
+    # the whole list in args. One method declares a unit; several do not agree to,
+    # and the per-result branch above has already handled the successful case.
+    one = method if isinstance(method, str) else (method[0] if isinstance(method, list) and len(method) == 1 else None)
+    declared = skill.METHODS[one].unit_class if one in skill.METHODS else None
     ctx = Ctx("compute", subject=subject.upper() if isinstance(subject, str) and not subject.startswith(("run_", "port_", "calc_")) else subject,
               as_of=result.get("as_of"), group=group,
               leaf_unit=declared.upper() if isinstance(declared, str) else None,
