@@ -239,9 +239,12 @@ def test_a_container_that_declares_its_numeric_unit_is_minted_not_crashed():
     assert minted["Item 1A"].unit == COUNT.upper() and minted["Item 1A"].value == 3.0
     assert minted["Item 1A"].measure == "filings.items_detail.Item 1A"
     assert note["filings"]["items_detail"]["Item 7"] == minted["Item 7"].id
-    with pytest.raises(fa.UnknownUnit):
-        fa.describe({"subject": "MSFT"}, {"subject": "MSFT", "kind": "issuer", "catalogue_as_of": "2026-09-08",
-                                          "filings": {"items_detail": {"Item 1A": 3}}})
+    # the declaration is still required — but since the 2026-09-09 hotfix the key
+    # that lacks one degrades to a marker instead of taking the result with it
+    _f, note = fa.describe({"subject": "MSFT"}, {"subject": "MSFT", "kind": "issuer", "catalogue_as_of": "2026-09-08",
+                                                "filings": {"items_detail": {"Item 1A": 3}}})
+    assert note["filings"]["items_detail"]["Item 1A"].startswith(fa.UNTYPED_MARK)
+    assert fa.numeric_leaves(note) == []
 
 
 def test_a_methods_declared_unit_is_what_its_leaves_carry():
@@ -260,9 +263,10 @@ def test_a_methods_declared_unit_is_what_its_leaves_carry():
     assert by["window_return"].unit == RATIO.upper() and by["window_return"].subject == "MSFT"
     assert by["sessions"].unit == COUNT.upper(), "a declared key beats the method's default"
     # A method with no declared unit still refuses an undeclared leaf: the rule
-    # is a declaration, not a fallback.
-    with pytest.raises(fa.UnknownUnit):
-        fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
+    # is a declaration, not a fallback. Since the 2026-09-09 hotfix the refusal
+    # costs that key and not the call.
+    _f, note = fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
+    assert note["whatsit"].startswith(fa.UNTYPED_MARK) and fa.numeric_leaves(note) == []
 
 
 def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
@@ -281,9 +285,14 @@ def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
     assert next(f for f in facts if f.measure == "spread").unit == RATIO.upper()
 
     # No declaration is a refusal, not a default: the guess is what caused this.
+    # The rule is the same after the 2026-09-09 hotfix; only its blast radius
+    # changed. The key mints no fact and the result names the defect.
     with pytest.raises(fa.UnknownUnit, match="computed over"):
-        fa.compute({"op": "rank"}, {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04",
-                                    "spread": 1135470.0})
+        fa._unit_for("spread", fa.Ctx("compute"))
+    facts, note = fa.compute({"op": "rank"}, {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04",
+                                             "spread": 1135470.0})
+    assert not [f for f in facts if f.measure == "spread"]
+    assert note["spread"].startswith(fa.UNTYPED_MARK) and fa.numeric_leaves(note) == []
     assert "spread" not in fa.UNIT_BY_KEY and "spread" in fa.POLYMORPHIC_KEYS
 
 

@@ -37,6 +37,7 @@ service means adding its unit here, and I3 says so at the first test.
 from __future__ import annotations
 
 import copy
+import logging
 import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
@@ -97,6 +98,8 @@ MEASURE_ALIAS = {"n": "observations"}
 # Numbers that are not figures for the model: removed from the note, never a
 # Fact. A retrieval score ranks passages for the tool; a character span
 # locates a passage in a file. Neither is something an answer states.
+logger = logging.getLogger(__name__)
+
 DROP_KEYS = frozenset({"score", "char_span"})
 
 # Structures that are not the tool's figures at all — a refusal's schema for the
@@ -104,7 +107,14 @@ DROP_KEYS = frozenset({"score", "char_span"})
 # verbatim. The first live V24 round hit `minItems` inside `params_schema` and
 # the refusal the model needed became an adapter error.
 PASSTHROUGH_KEYS = frozenset({"params_schema", "problems", "known", "nearest", "available", "held_on",
-                              "expected", "supported", "allowed"})
+                              "expected", "supported", "allowed", "adapter_defect", "untyped",
+                              # A producer's diagnostics about its own computation — how many
+                              # periods did not line up, how many divided by zero. The resolver
+                              # has always excluded them from a row's figures
+                              # (typed_calculator._single_figure); the adapter did not, and
+                              # `unmatched_periods` on XOM took three whole compute results
+                              # down with it. One contract, both readers.
+                              "quality_flags"})
 
 # Numbers that are identity, not figures: kept in the note as they are (they
 # are parameters the model may write, and G3 resolves them from the Fact's
@@ -319,8 +329,12 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                     if _is_id(fid) and fid not in srcs:
                         srcs.append(fid)
             measure = _measure_name(node, key)
+            try:
+                unit = unit.upper() if isinstance(unit, str) else _unit_for(measure.split(".")[-1], ctx)
+            except UnknownUnit as exc:
+                return _untyped(exc)
             f = F.fact(F.SERIES, measure, subject=node.get("ticker") or ctx.subject,
-                       unit=(unit.upper() if isinstance(unit, str) else _unit_for(measure.split(".")[-1], ctx)),
+                       unit=unit,
                        points=pts, as_of=pts[-1][0] if pts and pts[-1][0] != "?" else _as_of_of(node, ctx),
                        window=_window_of(node, ctx) or {"start": pts[0][0], "end": pts[-1][0]},
                        params={**ctx.params, **_params_of(node, ctx)}, sources=tuple(srcs), group=ctx.group)
@@ -332,8 +346,12 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
         if _is_typed_figure(node):
             measure = _measure_name(node, key)
             unit = node.get("unit_class")
+            try:
+                unit = unit.upper() if isinstance(unit, str) else _unit_for(key if key else measure, ctx, node)
+            except UnknownUnit as exc:
+                return _untyped(exc)
             f = F.fact(F.SCALAR, measure, subject=node.get("ticker") or ctx.subject,
-                       unit=(unit.upper() if isinstance(unit, str) else _unit_for(key if key else measure, ctx, node)),
+                       unit=unit,
                        value=float(node["value"]), as_of=_as_of_of(node, ctx), window=_window_of(node, ctx),
                        params={**ctx.params, **_params_of(node, ctx)},
                        standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
@@ -373,12 +391,40 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
         if key in PARAM_KEYS:
             return node
         measure = f"{ctx.table}.{key}" if ctx.table else MEASURE_ALIAS.get(key, path or key)
-        f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=_unit_for(key, ctx), value=float(node),
+        try:
+            unit = _unit_for(key, ctx)
+        except UnknownUnit as exc:
+            # The key loses itself; the result keeps the figures that ARE declared.
+            # Nothing is guessed: no Fact is minted and no number reaches the note, so
+            # the model cannot point at it and the gate cannot account for it.
+            return _untyped(exc)
+        f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit, value=float(node),
                    as_of=ctx.as_of, window=ctx.window, params=dict(ctx.params), standalone=ctx.standalone,
                    sources=ctx.sources, group=ctx.group)
         facts.append(f)
         return f.id
     return node
+
+
+UNTYPED_MARK = "untyped: "
+
+
+def _untyped(exc: "UnknownUnit") -> str:
+    """What stands where a figure the desk cannot type would have gone.
+
+    I3 is unchanged — `_unit_for` still refuses to guess, and a key with no
+    declaration still mints no Fact, so the model can neither point at the
+    number nor have the gate account for it. What changes is the blast radius:
+    the key loses itself instead of the whole tool result. `unmatched_periods`
+    on XOM took three complete compute results down with it, figures and all.
+
+    Fail-loud moves to where it can be fixed rather than where a user is
+    waiting: this logs at ERROR, and `test_no_fixture_payload_leaves_a_key
+    _untyped` fails the build the day a producer adds an undeclared key. A
+    string, never the number: I1 says a note carries no figure that is not a
+    Fact."""
+    logger.error("adapter: %s", exc)
+    return f"{UNTYPED_MARK}{exc}"
 
 
 def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> dict:
@@ -396,7 +442,12 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
             continue
         if _is_num(v) and k not in PARAM_KEYS:
             table = ctx.table or MEASURE_TABLE.get(key) or key
-            f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=_unit_for(k, sub.child(table=ctx.table), row),
+            try:
+                unit = _unit_for(k, sub.child(table=ctx.table), row)
+            except UnknownUnit as exc:
+                out[k] = _untyped(exc)
+                continue
+            f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=unit,
                        value=float(v), as_of=sub.as_of, window=sub.window, params=dict(sub.params),
                        standalone=sub.standalone, sources=sub.sources, group=ctx.group)
             facts.append(f)
@@ -692,6 +743,17 @@ READ_BY_NAME = {
 }
 
 
+def untyped_keys(node: Any, path: str = "") -> list[str]:
+    """Where in a note a figure could not be typed. The walk marks the key; this
+    collects them so the tool's answer can NAME the defect (V24's rule) without
+    also throwing away the figures it did type (the 2026-09-09 hotfix)."""
+    if isinstance(node, dict):
+        return [p for k, v in node.items() for p in untyped_keys(v, f"{path}.{k}" if path else k)]
+    if isinstance(node, list):
+        return [p for i, v in enumerate(node) for p in untyped_keys(v, f"{path}[{i}]")]
+    return [path] if isinstance(node, str) and node.startswith(UNTYPED_MARK) else []
+
+
 def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None]:
     """(facts shown, note, held_back) for one tool result — the wrapper's call.
 
@@ -707,6 +769,16 @@ def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict
     """
     adapter = ADAPTERS[tool]
     facts, note = adapter(args or {}, ejson.loads(ejson.dumps(result)))
+    # A key the desk cannot type is still the tool's own structured failure and is
+    # still named (V24); what changed on 2026-09-09 is that naming it no longer
+    # costs the figures beside it. `unmatched_periods` on XOM took three whole
+    # compute results down, each with every figure it had correctly typed.
+    if (bad := untyped_keys(note)):
+        note["adapter_defect"] = {
+            "untyped": bad,
+            "detail": f"{tool}: no unit is declared for {', '.join(bad)}, so no figure was minted for "
+                      f"it and it cannot be pointed at. The rest of this result stands.",
+        }
     kept, held = F.cap(facts)
     if held:
         held["how"] = READ_BY_NAME.get(tool, "ask for fewer names")

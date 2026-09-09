@@ -173,15 +173,33 @@ async def test_a_delegation_records_the_work_it_started_as_a_task_fact(monkeypat
 
 async def test_an_adapter_that_cannot_name_a_unit_is_the_tools_own_structured_failure(monkeypatch):
     """I3, at run time: a numeric key with no declared unit is never shown as a
-    bare number. The tool answers with a structured error naming the key, and
-    nothing is recorded — loud, not a guess."""
+    bare number. The tool still NAMES the defect — loud, not a guess — and
+    records no fact for it.
+
+    2026-09-09: naming it no longer costs the rest of the result. `spread` in
+    V29 and `unmatched_periods` here are the same lesson from opposite ends: the
+    unit belongs to the quantity, and a key the desk cannot name is one key, not
+    a reason to discard the figures it named correctly. Three whole XOM compute
+    results were thrown away over one quality flag."""
     log = _wire(monkeypatch)
     tool = Tool(name="read_prices", description="", json_schema={"type": "object"},
                 fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2}),
                 tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_prices", {"ticker": "MSFT"})
-    assert out["error"] == "fact_adapter_error" and "frobnication" in out["detail"]
-    assert log["recorded"] == [[]]
+    assert "error" not in out
+    assert out["adapter_defect"]["untyped"] == ["frobnication"] and "frobnication" in out["adapter_defect"]["detail"]
+    assert log["recorded"] == [[]], "no fact was minted for the key it could not name"
+
+
+async def test_a_defective_key_does_not_cost_the_figures_beside_it(monkeypatch):
+    log = _wire(monkeypatch)
+    tool = Tool(name="read_prices", description="", json_schema={"type": "object"},
+                fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2,
+                               "close": {"value": 431.5, "unit_class": "money"}}),
+                tool_class=READ)
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_prices", {"ticker": "MSFT"})
+    assert [r for r in out["facts"]["rows"]], "the declared figure survives"
+    assert out["adapter_defect"]["untyped"] == ["frobnication"]
 
 
 async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(monkeypatch):

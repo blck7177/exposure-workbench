@@ -228,8 +228,46 @@ def test_cap_holds_back_whole_facts():
 
 
 def test_unknown_numeric_key_is_an_error_not_a_guess():
+    """I3 unchanged: the unit rule refuses to guess, and the key mints no Fact."""
     with pytest.raises(fa.UnknownUnit):
-        fa.harvest({"as_of": "2026-01-01", "frobnication": 3.2}, fa.Ctx("t", subject="X"))
+        fa._unit_for("frobnication", fa.Ctx("t", subject="X"))
+
+
+def test_an_unnameable_key_loses_itself_and_not_the_whole_result():
+    """XOM, 2026-09-09: `unmatched_periods` — a quality flag typed_calculator
+    writes and no adapter table names — raised inside the walk, the wrapper
+    returned fact_adapter_error, and three complete compute results went in the
+    bin with it. The key degrades; the figures beside it survive; no number
+    reaches the note (I1), so nothing can be pointed at or accounted for."""
+    facts, note = fa.harvest({"as_of": "2026-01-01", "unit_class": "ratio", "value": 0.25,
+                              "frobnication": 3.2}, fa.Ctx("t", subject="X"))
+    assert [f.measure for f in facts] == ["value"] and facts[0].value == 0.25
+    assert note["frobnication"].startswith(fa.UNTYPED_MARK) and "frobnication" in note["frobnication"]
+    assert fa.numeric_leaves(note) == []
+
+
+def test_a_producers_quality_flags_are_diagnostics_not_figures():
+    """typed_calculator excludes quality_flags from a row's figures on the
+    resolver side and always has; the adapter did not, and one flag key was
+    enough to lose the call. One contract, both readers."""
+    facts, note = fa.harvest({"as_of": "2026-01-01", "unit_class": "ratio", "value": 0.25,
+                              "quality_flags": {"unmatched_periods": 2, "division_by_zero_periods": 1}},
+                             fa.Ctx("t", subject="X"))
+    assert [f.measure for f in facts] == ["value"]
+    assert note["quality_flags"] == {"unmatched_periods": 2, "division_by_zero_periods": 1}
+
+
+def test_no_fixture_payload_leaves_a_key_untyped(adapted):
+    """Where fail-loud went. The walk no longer dies on an undeclared key at
+    runtime, so this is what fails the build the day a producer adds one."""
+    def marks(node, path=""):
+        if isinstance(node, dict):
+            return [m for k, v in node.items() for m in marks(v, f"{path}.{k}" if path else k)]
+        if isinstance(node, list):
+            return [m for i, v in enumerate(node) for m in marks(v, f"{path}[{i}]")]
+        return [(path, node)] if isinstance(node, str) and node.startswith(fa.UNTYPED_MARK) else []
+    found = {name: marks(note) for name, (_f, note, _h) in adapted.items() if marks(note)}
+    assert found == {}, found
 
 
 def test_a_refusals_schema_and_problems_pass_through_untouched():

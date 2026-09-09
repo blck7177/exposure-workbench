@@ -127,6 +127,28 @@ async def _metric_absence(db: AsyncSession, error: str, kind: str, ticker: str, 
         invoked_by=invoked_by, metric=metric, **extra)
 
 
+async def _superseded_line(db: AsyncSession, ticker: str, metric: str, facts: list, invoked_by: str) -> dict | None:
+    """A refusal when another line the registry names continues past this one:
+    the metric's last period against each alternative's coverage. None when the
+    metric reaches as far as any stand-in does."""
+    from exposure_workbench.services import absence_service as ab
+    alts = ab.superseded_by(metric)
+    if not alts:
+        return None
+    mine = max(f.period_end for f in facts).isoformat()
+    covers = await ab.coverage(db, ticker, alts)
+    later = [a for a in alts if covers.get(a) and str(covers[a]["through"]) > mine]
+    if not later:
+        return None
+    return await _metric_absence(
+        db, "line_superseded", "line_superseded", ticker, metric,
+        why=(f"{ticker}'s {metric} line ends {mine}, and this desk holds a later top line for it under "
+             f"{' and '.join(later)}; the latest window of {metric} is not the latest reading."),
+        invoked_by=invoked_by, ends=mine,
+        detail=(f"{metric} for {ticker} ends {mine}; the line continues as {', '.join(later)} — ask for that "
+                f"metric, or give start and end to read {metric} as filed"))
+
+
 async def get_flow(
     db: AsyncSession,
     ticker: str,
@@ -170,6 +192,18 @@ async def get_flow(
             invoked_by=invoked_by,
             detail=f"{ticker} reports no {metric} with a period; it may report "
                    f"a related line instead — call describe")
+
+    if not (start and end):
+        # HOTFIX 2026-09-09. NVDA's `revenue` holds three facts to 2022-01-30 while
+        # `total_revenues` runs to 2026-07-26; "the latest window" and "the last five"
+        # of the retired line settled silently, four years short of the present, and
+        # the answer read them as the present (26.9bn against a 303.0bn top line).
+        # A dated start/end reads the old line as asked; a latest-anchored request is
+        # refused and the continuing line named. V31 §2.2 turns this into the follow
+        # path once the lineage is derived from the overlap.
+        stale = await _superseded_line(db, ticker, metric, facts, invoked_by)
+        if stale:
+            return stale
 
     if last_n is not None and last_n > 1:
         if start or end:

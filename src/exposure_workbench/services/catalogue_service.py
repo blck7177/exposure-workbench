@@ -225,6 +225,7 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
 
 
 async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
+    from exposure_workbench.services import absence_service as ab
     from exposure_workbench.services import formula_service, period_semantics
     metrics = await cs.list_available_metrics(db, tk)
     rows = metrics["metrics"]
@@ -250,8 +251,29 @@ async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
             not_computable[name] = f"missing {', '.join(missing)}"
         else:
             computable.append(name)
+    # HOTFIX 2026-09-09. `names` plus one issuer date said, by omission, that every
+    # name reaches that date. NVDA's `revenue` stops 2022-01-30 and the string did
+    # not occur anywhere in describe's 22.5 KB, so a model that asked for it was
+    # reading a map that was wrong. Every exception is listed; a name absent from
+    # `lines` reaches `latest_period_end` by construction.
+    lines: dict[str, dict] = {}
+    for m in rows:
+        lp = m.get("latest_period_end")
+        if not lp or not latest or str(lp) >= str(latest):
+            continue
+        entry: dict = {"ends": str(lp)}
+        for alt in ab.superseded_by(m["metric"]):
+            nxt = next((r for r in rows if r["metric"] == alt), None)
+            if nxt and str(nxt.get("latest_period_end") or "") > str(lp):
+                entry["continues_as"] = alt
+                entry["through"] = str(nxt["latest_period_end"])
+                break
+        lines[m["metric"]] = entry
+
     out = {
         "metrics": len(rows), "latest_period_end": latest, "kinds": kinds,
+        # what a name covers, wherever that is not the issuer's own latest period
+        **({"lines": lines} if lines else {}),
         # The NAMES, always: thirty-odd short strings. Without them the first
         # live V23 turn guessed `capital_expenditures` and was refused eight
         # times over; a catalogue that makes the reader guess the key is not
