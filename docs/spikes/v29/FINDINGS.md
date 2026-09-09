@@ -234,6 +234,71 @@ different units in different results, only the producer can say which, and the a
 it rather than guess — `UNIT_BY_KEY` is for names whose unit is fixed by definition (`sessions` is
 always a count, drawdown `depth` is always a ratio).
 
+## 5e. The qualitative sweep: 126 defects survived adversarial verification
+
+Six lenses over the 191 replicate-1 turns,每 finding then handed to an independent verifier
+prompted to REFUTE it against the traces and the database. 135 verdicts, **126 survived, 9
+refuted** — the refutations were real work (a "wrong top five" that was in fact the correct top
+five; a superlative that WAS computed at a step the hunter missed).
+
+They fall into five classes. Only the first is new; the rest are known classes this run measures
+at scale.
+
+### (a) USER REPORT — a dimensionless number printed as a percent
+
+The renderer prints every RATIO as a percent. But a dimensionless quotient is not always a
+percentage, and the desk's own unit table already has the other readings (`MULTIPLE`, `COUNT`):
+
+| shipped | what it is |
+|---|---|
+| *"that is **620.9% days**"* | 6.21 days — `days_at_100pct_adv`, unit RATIO |
+| *"the worst measured name would be **14583.3%**"* | 145.8 days, asked for as a day count |
+| *"price-to-earnings multiple is **3012.1%**: 30.1211×"* | a 30.1× multiple, named correctly in the same breath |
+| *"capex ran at **320.9% times** depreciation"* | 3.21× |
+| *"max VIF **1661.9%**"* | a variance inflation factor of 16.6 |
+| *"the gap … is **113547000.0%**"* | $1,135,470 — **fixed this run**, §5d |
+
+Only the last was a wrong UNIT; the others are a wrong READING of a correct unit. `compute` lets
+the model name a result (`as_quantity`) but not say what kind of number it is, so a quotient that
+means days or multiples arrives as a ratio and is rendered as a percent. **Layer: tool (the model
+cannot declare the reading) plus user report (the renderer assumes ratio means percent).**
+The unit algebra already produces `COUNT` for MONEY ÷ MONEY_PER_DAY — that path works; the
+failures are the quotients that never touch a typed per-day operand.
+
+### (b) USER REPORT — a passage label where a number belongs (X10, unchanged)
+
+*"a parallel +100 bps shift would add **+[10-K Item 7]** to net interest income"*,
+*"Mounjaro plus Zepbound were **[10-K Item 7]** in 2025"*, *"total debt was **[10-Q Part I, Item
+2]** while cash and cash equivalents were $8.44B"* — the format visibly working and failing in one
+sentence. Unchanged by this batch: D1 aligned the prompt with the gate, but the gate only accepts
+a prose number that a cited passage states VERBATIM, and the model still prefers the passage id.
+
+### (c) AGENT — role errors, the class V28 deliberately did not touch
+
+Two "top five" answers were again not the top five: `W03` summed MSFT+JPM+AAPL+GOOGL+**AMZN**
+(7th) and called it 65.31%; `N06` summed JPM+LLY+HYG+TLT+**XOM** and called it 45.3%. Also: a
+negative operating cash flow (−$148B) quoted as proof the bank *"is generating operating cash
+flow"*; capex/OCF growth directions reversed against the cited numbers; two window LENGTHS (21 and
+252 sessions) read out as the volatility levels; a threshold read as a reading; `market_value ×
+weight` read aloud as market value *per* unit of weight. **This is X8/X15 at the same rate. The
+gate verifies where a figure came from, not the role the sentence gives it — the 2026-09-01
+contract, still the boss's open decision.**
+
+### (d) AGENT — an absence claimed for something the same session already produced
+
+*"the desk does not hold a per-name rates sensitivity"* — one turn after running `price.beta`
+with `benchmark: TLT` over all ten holdings successfully. *"the drawdown-episode series … not
+held"* — after `book.drawdown_episodes` succeeded in turn 1 of the same conversation. The
+directory fixed *reaching* a capability; it does not make the model remember it已经 reached it.
+
+### (e) AGENT/VALIDATION — turns that gave up with the evidence in hand
+
+Several turns ended on `_GATE_EXHAUSTED_TEXT` (*"I could not produce an answer I can stand
+behind"*) while 7–16 tool calls in that turn had succeeded — read_filings items returned,
+`book.drawdown_episodes` returned, series returned. The turn gathered the evidence and could not
+get an answer through the gate. **Worth its own investigation: whether the gate's refusals were
+correct and the model failed to adapt, or the loop ran out of rounds after the gate refused.**
+
 ## 6. Still open
 
 - Reader-visible defects: `620.9% days` (a ratio called days, the X15 role-error class, unchanged
