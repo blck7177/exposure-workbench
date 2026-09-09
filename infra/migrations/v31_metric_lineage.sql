@@ -36,3 +36,10 @@ CREATE INDEX IF NOT EXISTS ix_metric_lineage_lookup
 -- Reference data about issuers, like companies and financial_facts: readable by
 -- every tenant, written by the owner role only. No RLS policy, mirroring
 -- financial_facts.
+
+-- V31 §8 B1: a brief's claims beside its blocks. `blocks` says which fact filled
+-- which slot; this says what the sentence asserted of it — a level, a change, a
+-- room to a tier — which is what makes a brief's figure traceable to the program
+-- node that produced it rather than only to an id. NULL on briefs written before
+-- V31; nothing reads it for those.
+ALTER TABLE issuer_briefs ADD COLUMN IF NOT EXISTS claims_by_section JSONB;

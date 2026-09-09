@@ -135,12 +135,14 @@ def test_series_stat_takes_an_id_not_a_fetch_spec():
 def test_the_new_tools_are_on_both_faces():
     meta = set(faces.resolve(build_meta_registry(), faces.FACE_META_AGENT))
     research = set(faces.resolve(build_research_registry(), faces.FACE_RESEARCH))
-    # V30: figures come through `run` on both faces; the per-domain reads and
-    # compute stay on the research face until the brief migrates (D5).
+    # V31: figures come through `run` on BOTH faces. The per-domain reads and
+    # compute left the research face with the brief (Phase 2); they stay
+    # registered, because that is what a read registry builds, but no face
+    # names them.
     for name in ("describe", "run"):
         assert name in meta and name in research, name
-    for name in ("read_fundamentals", "compute"):
-        assert name in research and name not in meta, name
+    for name in ("read_fundamentals", "read_prices", "compute"):
+        assert name not in meta and name not in research, name
 
 
 def test_describe_issuer_names_the_missing_input_not_a_hole():

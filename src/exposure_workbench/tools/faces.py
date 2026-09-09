@@ -38,16 +38,21 @@ READ_CORE = [
 # weights would be writing about the holder, not the issuer.
 META_ONLY_READS = ["read_book"]
 
-# V30 (Phase B): the meta face computes through ONE tool, `run`; the
-# per-domain reads and `compute` stay registered for the research face until
-# the brief path migrates (plan D5). read_book stays for briefs and task state.
+# V30 (Phase B): the meta face computes through ONE tool, `run`.
 FACE_META_AGENT = [
     "describe", "run", "read_filings",
 ] + META_ONLY_READS + [
     "search_web",
     "start", "respond", "think",
 ]
-FACE_RESEARCH = READ_CORE + ["run", "search_web", "submit_brief"]
+
+# V31 (Phase 2): so does the research face, and it files its brief in the same
+# grammar the reply uses. `read_fundamentals`, `read_prices` and `compute` are
+# off it — every issuer measure, price statistic, series and piece of arithmetic
+# they offered is a program (docs/PROGRAM_LANGUAGE.md), and a program is one
+# call whose every node is typed and recorded. They stay registered because
+# READ_CORE is what a read registry builds; what a face NAMES is the surface.
+FACE_RESEARCH = ["describe", "run", "read_filings", "search_web", "think", "submit_brief"]
 
 # What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
 # at /mcp/<name> and every token carries the name it was minted for, so the same

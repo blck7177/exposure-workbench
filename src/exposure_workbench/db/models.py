@@ -918,6 +918,10 @@ class IssuerBrief(Base):
     # the blocks keep which id each figure came from, which prose cannot. NULL
     # on briefs written before V15, whose text was the whole submission.
     blocks: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # V31 §8 B1: {section: [claims]} — what each sentence asserted of the fact it
+    # points at (a level, a change, a room to a tier), beside `blocks`, which says
+    # only which fact filled which slot. NULL on briefs written before V31.
+    claims_by_section: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     confidence_flags: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     # No llm_model/prompt_tokens/completion_tokens (V4-S2, dropped in
     # infra/migrations/v4_cost.sql). They were a fossil of the v2 shape where one

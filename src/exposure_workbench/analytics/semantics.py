@@ -270,21 +270,24 @@ WORKED_EXAMPLES: dict[str, tuple[WorkedExample, ...]] = {
     "issuer": (
         WorkedExample(
             question="What is this issuer's total debt / net debt / leverage?",
-            calls=("compute(method=name='total_debt')",),
+            calls=("run({\"let\": [[\"td\", {\"fn\": \"method\", \"name\": \"total_debt\", \"subject\": \"<T>\"}]]})",),
             why="One producer per named measure. A balance-sheet line is a component "
                 "whatever its name ends in, and a total added to a component it "
                 "contains double-counts.",
         ),
         WorkedExample(
             question="How has revenue (or any flow) grown over the last four quarters?",
-            calls=("read_fundamentals(metric=..., months=3, last_n=4)",
-                   "compute(op=series_id=..., op='yoy')"),
-            why="Pick the metric whose latest_period_end reaches the present — one "
-                "carrying superseded_by returns a short series, not an error.",
+            calls=("run({\"let\": [[\"rev\", {\"fn\": \"fundamentals\", \"ticker\": \"<T>\", "
+                   "\"metric\": \"revenue\", \"months\": 3, \"last_n\": 4}], "
+                   "[\"growth\", {\"fn\": \"yoy\", \"of\": \"$rev\"}]]})",),
+            why="One program: the series and the growth over it are two bindings, not "
+                "two round trips. Ask for the line you mean — where an issuer moved a "
+                "quantity to another tag, the desk follows the line it derived from the "
+                "filings and the result says which tag it read (V31 `via`).",
         ),
         WorkedExample(
             question="Why is a measure defined the way it is?",
-            calls=("compute(method=name=...)",),
+            calls=("run({\"let\": [[\"m\", {\"fn\": \"method\", \"name\": \"...\", \"subject\": \"<T>\"}]]})",),
             why="The result carries an authority you may name: cite_as is the section "
                 "to say, url is where to read it. Name it rather than 'the registry'.",
         ),
@@ -292,14 +295,19 @@ WORKED_EXAMPLES: dict[str, tuple[WorkedExample, ...]] = {
     "portfolio": (
         WorkedExample(
             question="Why are there large drawdowns?",
-            calls=("compute(method='book.drawdown_episodes', subject=<port>)", "compute(method='book.explain_episode', subject=<port>, params=peak=..., trough=...)"),
+            calls=("run({\"let\": [[\"eps\", {\"fn\": \"method\", \"name\": \"book.drawdown_episodes\", "
+                   "\"subject\": \"<port>\"}], [\"peak\", {\"fn\": \"pick\", \"of\": \"$eps\", "
+                   "\"key\": \"episodes[0].peak_date\"}], [\"trough\", {\"fn\": \"pick\", \"of\": \"$eps\", "
+                   "\"key\": \"episodes[0].trough_date\"}], [\"why\", {\"fn\": \"method\", "
+                   "\"name\": \"book.explain_episode\", \"subject\": \"<port>\", "
+                   "\"params\": {\"peak\": \"$peak\", \"trough\": \"$trough\"}}]]})",),
             why="A drawdown is a peak-to-trough episode over many sessions; "
                 "book.reconcile explains ONE session. Measure the episodes before "
                 "explaining them.",
         ),
         WorkedExample(
             question="Was the loss market-driven or company-specific?",
-            calls=("compute(method='book.reconcile', subject=run_id=...)",),
+            calls=("run({\"let\": [[\"rec\", {\"fn\": \"method\", \"name\": \"book.reconcile\", \"subject\": \"<run>\"}]]})",),
             why="factor_share and unexplained_share come back with it and the larger "
                 "one is the answer. Positions and factors are two decompositions of "
                 "the same number, so the position table cannot argue a move was "

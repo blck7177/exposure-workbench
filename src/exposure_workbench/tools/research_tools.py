@@ -20,10 +20,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.db.models import IssuerBrief, ResearchRun
-from exposure_workbench.services import answer as A
-from exposure_workbench.services import gate, ledger
+from exposure_workbench.services import claims, ledger
 from exposure_workbench.services import research_search_service as rss
-from exposure_workbench.services.answer import BLOCK_SCHEMAS
 from exposure_workbench.tools.registry import (
     DELEGATION, GATE, Tool, ToolRegistry, current_session_id,
 )
@@ -104,21 +102,21 @@ async def _submit_brief(db: AsyncSession, **sections) -> dict:
     if run is None:
         return {"error": "no_research_run", "detail": "submit_brief called outside a research run"}
 
-    missing = [name for name in CITED_SECTIONS if not A.ids_in(sections[name]["blocks"])]
+    missing = [name for name in CITED_SECTIONS
+               if not [c for c in (sections[name].get("claims") or []) if c.get("of") or c.get("rows")]]
     if missing:
         return {"error": "missing_citations", "sections": missing,
-                "detail": "every section except open_questions must point at evidence — a "
-                          "{fact: id}, a table of fact ids, or a `cites` list of passage facts — "
-                          "from a tool result this session"}
+                "detail": "every section except open_questions must rest on evidence from this "
+                          "session: at least one claim pointing at a fact the desk put on the "
+                          "table (of=f_…, or a table of them)"}
 
     led = await ledger.load(db, session_id)
     accepted: dict[str, dict] = {}
     for name in SECTIONS:
-        blocks = sections[name]["blocks"]
-        verdict = gate.check(blocks, led)
+        verdict = claims.check(sections[name], led)
         if not verdict.ok:
             return {**verdict.as_refusal(), "section": name}
-        accepted[name] = gate.accepted(blocks, verdict, led)
+        accepted[name] = claims.accepted(sections[name], verdict, led)
 
     # The flat list is the union over all six: an id open_questions pointed at
     # was resolved like any other and belongs on the record, even though the
@@ -130,6 +128,11 @@ async def _submit_brief(db: AsyncSession, **sections) -> dict:
         owner_id=run.owner_id,   # V2-C: brief belongs to who triggered the research (RLS WITH CHECK)
         **{name: accepted[name]["text"] for name in SECTIONS},
         blocks={name: accepted[name]["blocks"] for name in SECTIONS},
+        # V31 §8 B1: what each figure CLAIMS, beside where it came from. The
+        # blocks say which fact filled a slot; the claims say what the sentence
+        # asserted of it — a level, a change, a room to a tier — which is what
+        # makes a brief's figure traceable to the node that produced it.
+        claims_by_section={name: accepted[name]["claims"] for name in SECTIONS},
         citations=citations,
         block_citations={name: accepted[name]["citations"] for name in CITED_SECTIONS},
     ))
@@ -139,20 +142,16 @@ async def _submit_brief(db: AsyncSession, **sections) -> dict:
 
 # ── schema ────────────────────────────────────────────────────────────────────────
 
-# One section: a non-empty list of blocks in the exit's grammar. BLOCK_SCHEMAS is
-# imported, not copied — the brief and the reply are the same grammar, and a
-# block shape added there is a block shape a brief may use.
+# V31: one section IS an answer. claims.ANSWER_SCHEMA is imported by identity,
+# not copied — the brief and the reply are one grammar checked by one gate, which
+# is the standing rule the V24 brief path was the last exception to. A relation
+# added to the reply is a relation a brief may use, the same day.
 #
 # Closed, and it matters more here than anywhere else: _submit_brief takes
 # **sections, so an unknown key is not a TypeError — it is dropped in silence,
 # and a mistyped section name would produce a brief that looks complete and is
 # missing a section.
-_SECTION_SCHEMA = {
-    "type": "object",
-    "properties": {"blocks": {"type": "array", "minItems": 1, "items": {"oneOf": BLOCK_SCHEMAS},
-                              "description": "the section, in reading order"}},
-    "required": ["blocks"], "additionalProperties": False,
-}
+_SECTION_SCHEMA = claims.ANSWER_SCHEMA
 
 SUBMIT_BRIEF_SCHEMA = {
     "type": "object",
@@ -195,15 +194,13 @@ def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
         display="Resolving every figure in the brief against the table, then filing it",
         description=(
             "Submit the Issuer Risk Brief: six sections (financial_summary, key_changes, "
-            "management_explanation, market_context, portfolio_implications, open_questions), "
-            "each a list of BLOCKS. A figure is the ID of a fact a tool result showed, written "
-            "into your sentence — the reader is shown the fact's own value; you never write a "
-            "number. Blocks: `paragraph` (`text`: the sentence with fact ids where the figures go, "
-            "f_3a1b… or f_3a1b…@2025-12-31 for a series point; `cites`: the facts it rests on but "
-            "does not state), `table` (rows of fact ids only — header and row labels come from the "
-            "facts), `chart` (kind + a series fact). A number written in prose must be one the "
-            "ledger accounts for. Every section but open_questions must point at evidence from "
-            "this session. A refusal names the section and the block; fix that block and resubmit."
+            "management_explanation, market_context, portfolio_implications, open_questions). "
+            "Each section is an answer in the same grammar as a reply — CLAIMS and PROSE. Each "
+            "claim states one relation over facts you were shown (f_… ids): level, tier, change, "
+            "versus, ratio, rank, room, absent, quote, series, table. " + claims.PROSE_RULE + " "
+            "Every section but open_questions must rest on at least one claim pointing at a fact "
+            "from this session. A refusal names the section and the claim; fix that claim and "
+            "resubmit."
         ),
         json_schema=SUBMIT_BRIEF_SCHEMA,
         fn=_submit_brief, tool_class=GATE,
