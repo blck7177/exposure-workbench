@@ -1,0 +1,220 @@
+{
+ "tag": "F06-down-capture#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "explain_recovery",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$trough",
+      "trough": "$recovery"
+     }
+    }
+   ],
+   [
+    "book_recovery",
+    {
+     "fn": "pick",
+     "of": "$explain_recovery",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_fall",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "spy_recovery",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-05-01"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-03-27"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-03-27"
+     }
+    }
+   ],
+   [
+    "down_capture",
+    {
+     "fn": "div",
+     "a": "$book_fall",
+     "b": "$spy_fall"
+    }
+   ],
+   [
+    "up_capture",
+    {
+     "fn": "div",
+     "a": "$book_recovery",
+     "b": "$spy_recovery"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "book_fall",
+  "spy_fall",
+  "book_recovery",
+  "spy_recovery",
+  "down_capture",
+  "up_capture"
+ ],
+ "note": "the desk's beta is one unconditional figure (net equity beta 0.86 from the run); capture ratios, downside beta and any down-day-conditional statistic are not in the method set. What is determinate is one episode: the year's deepest book drawdown (peak 2026-01-07, trough 03-27, recovered 05-01, picked from book.drawdown_episodes) — the book fell 11.96% while SPY fell 7.80% (ratio 1.53), and came back 14.6% while SPY rose 13.7% (ratio 1.07). The two ratios are computed for that one episode and labelled as such, not as a capture statistic over many periods."
+}

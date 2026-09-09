@@ -1,0 +1,119 @@
+{
+ "tag": "L04-cash-by-when-ladder#t1",
+ "program": {
+  "let": [
+   [
+    "participation",
+    0.25
+   ],
+   [
+    "adv_window_days",
+    20
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_mv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "cap_per_day",
+    {
+     "fn": "scale",
+     "of": "$adv",
+     "factor": 0.25
+    }
+   ],
+   [
+    "days",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": "$cap_per_day"
+    }
+   ],
+   [
+    "cap_tomorrow_1d",
+    {
+     "fn": "scale",
+     "of": "$cap_per_day",
+     "factor": 1,
+     "unit": "money"
+    }
+   ],
+   [
+    "cap_friday_4d",
+    {
+     "fn": "scale",
+     "of": "$cap_per_day",
+     "factor": 4,
+     "unit": "money"
+    }
+   ],
+   [
+    "cap_month_end_17d",
+    {
+     "fn": "scale",
+     "of": "$cap_per_day",
+     "factor": 17,
+     "unit": "money"
+    }
+   ],
+   [
+    "slowest",
+    {
+     "fn": "rank",
+     "of": "$days",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "days",
+  "book_mv",
+  "cap_tomorrow_1d"
+ ],
+ "note": "the ladder's inputs position by position: parameters declared first (25% of 20d ADV), days-to-exit per name, and the dollar capacity each name can shift by the next session (2026-09-08; the run is Friday 2026-09-04 and 09-07 is a holiday), by Friday 09-11 (4 sessions) and by month-end 09-30 (17 sessions). Every name's days < 0.004, so all three rungs equal the whole book ($10.86m by tomorrow). The per-name rung amount is min(mv, capacity) and the language has no elementwise min/clip (_GAPS_A) — irrelevant on this book where capacity exceeds mv everywhere, but a gap for any book where it does not."
+}

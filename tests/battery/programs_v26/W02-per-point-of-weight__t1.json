@@ -1,0 +1,133 @@
+{
+ "tag": "W02-per-point-of-weight#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "per_point_of_weight",
+    {
+     "fn": "div",
+     "a": "$contrib",
+     "b": "$w"
+    }
+   ],
+   [
+    "worst_per_point",
+    {
+     "fn": "rank",
+     "of": "$per_point_of_weight",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "worst_contrib",
+    {
+     "fn": "rank",
+     "of": "$contrib",
+     "direction": "lowest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "per_point_of_weight",
+  "worst_per_point",
+  "contrib"
+ ],
+ "note": "the book's deepest episode is picked from book.drawdown_episodes (peak/trough dates as literals feeding book.explain_episode), each holding's window return over it is read as the `holdings` column, contribution = weight x return, and contribution per point of weight = contribution / that holding's own weight (= the holding's return), ranked lowest-first: MSFT -26.0%, LLY -20.6%, AMZN -17.5%, GOOGL -14.7%, JPM -13.5%, NVDA -11.4%, AAPL -4.3%, TLT/HYG about -1.7%, XOM +45.3%; the plain contribution ranking beside it shows the big-position-small-fall vs small-position-big-fall split. Fixed-window contributions sum to -11.3 points, not the path-dependent -11.96% depth (the method's own caveat)."
+}

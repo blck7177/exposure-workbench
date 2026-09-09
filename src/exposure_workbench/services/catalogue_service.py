@@ -72,6 +72,8 @@ NOT_HELD: dict[str, str] = {
 # a capability is "cannot" when no method's subject kind and yields cover it.
 # The sentences are data; the test pins that each names a real gap.
 CANNOT: dict[str, str] = {
+    "forecast": "the desk does not forecast: asked for next year's figure or a target it says so and gives "
+                "what the issuer's own filings say would move the figure either way (read_filings)",
     "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's "
                                    "sensitivity to a factor is price.beta with that factor's ETF as "
                                    "benchmark (TLT for rates, HYG for credit), one call per name",
@@ -82,6 +84,24 @@ CANNOT: dict[str, str] = {
 
 def _err(code: str, detail: str, **more) -> dict:
     return {"error": code, "detail": detail, **more}
+
+
+# V30: the program expression that reads a run's figure or column, rendered
+# where the catalogue used to print a read_book call.
+def _run_expr(expr: dict) -> str:
+    return "run: " + json.dumps(expr, separators=(", ", ": "), ensure_ascii=False)
+
+
+def _column_call(ref: str, table: str, col: str) -> str:
+    return _run_expr({"fn": "column", "run": ref, "table": table, "col": col})
+
+
+def _name_call(ref: str, name: str) -> str:
+    """`issuer_exposures.<label>.weight` → a column; `count.alerts` → a pick."""
+    parts = name.split(".")
+    if len(parts) == 3:
+        return _column_call(ref, parts[0], parts[2])
+    return _run_expr({"fn": "pick", "of": ref, "key": name})
 
 
 # What a model writes when it means "no subject": the schema says null, and
@@ -115,8 +135,12 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
     # it had already opened "the book". The refusal teaches the two-step
     # address; it never picks a subject for the model.
     if kind == "desk" and expand is not None:
+        # the ids ride on the refusal: asked for a book domain with no id, the
+        # model guessed "port_1" (V30 C2, N12) — the desk knows its own books
+        desk = await _desk(db)
         return _err("expand_needs_a_subject",
                     f"the desk itself has no '{expand}' to expand: expand opens one view or domain OF A SUBJECT",
+                    portfolios=[p["portfolio_id"] for p in desk["portfolios"]], issuers_prepared=desk["issuers_prepared"],
                     next=["describe('<port_…>')", "describe('<ticker>')", f"describe('<subject>', expand='{expand}')"])
     if expand in skill.PROCEDURES:
         want = skill.PROCEDURES[expand].subject_kind
@@ -126,6 +150,13 @@ async def describe(db: AsyncSession, subject: str | None = None, expand: str | N
             return _err("domain_not_for_subject",
                         f"{expand} is a domain of an {want}, and {subject} is a {kind}; its domains are listed",
                         domains=right)
+        # a domain OF a subject the desk has: describe('port_1', expand=…) opened a
+        # view on a book that does not exist (V30 C2, N12); the subject's own
+        # refusal (unknown_portfolio with the ids, not_prepared, company_not_found)
+        if kind == "portfolio" and await portfolio_service.get_portfolio(db, subject) is None:
+            return await _portfolio(db, subject, None)
+        if kind == "issuer" and (await db.execute(select(Company).where(Company.ticker == subject.upper()))).scalar_one_or_none() is None:
+            return await _issuer(db, subject, None)
         out = await _domain(db, kind, subject, expand)
     elif kind == "desk":
         out = await _desk(db)
@@ -219,8 +250,8 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
     out["desk_rules"] = _rules("issuer")
     if expand == "readings":
         out["readings"] = _readings()
-    out["next"] = [f"describe('{tk}', expand='<domain>')", f"read_fundamentals('{tk}', metric='<line>')",
-                   f"read_filings('{tk}', item='1A')", f"read_prices('{tk}', window='1y')"]
+    out["next"] = [f"describe('{tk}', expand='<domain>')", _run_expr({"fn": "fundamentals", "ticker": tk, "metric": "<line>"}),
+                   f"read_filings('{tk}', item='1A')", _run_expr({"fn": "prices", "ticker": tk, "window": "1y"})]
     return out
 
 
@@ -311,7 +342,7 @@ async def _prices(db: AsyncSession, tk: str) -> dict:
     if not n:
         return {"sessions": 0, "note": "no price history on this desk"}
     return {"sessions": n, "from": lo.isoformat(), "to": hi.isoformat(),
-            "read_with": "read_prices(ticker, window)"}
+            "read_with": "run: {\"fn\": \"prices\", \"ticker\": \"" + tk + "\", \"window\": \"1y\"}"}
 
 
 async def _in_book(db: AsyncSession, tk: str) -> dict | None:
@@ -352,6 +383,7 @@ async def _in_book(db: AsyncSession, tk: str) -> dict | None:
             "methods_on_this_run": [m.name for m in skill.methods_for("run")],
             "procedures": [p.name for p in skill.procedures_for("portfolio")],
             "everything_else": f"describe('{run.id}')",
+            "read_with": _run_expr({"fn": "pick", "of": run.id, "key": "<one of names>"}),
         })
     return {"held_in": out} if out else {"held_in": [], "note": "not a position of any run on this desk"}
 
@@ -385,9 +417,9 @@ async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
         "subject": pid, "kind": "portfolio",
         "identity": {"name": p.name, "portfolio_id": pid},
         "positions": {"count": len((positions or {}).get("positions", [])),
-                      "read_with": f"read_book('{pid}', names=['positions'])"},
+                      "read_with": nt.call(nt.TABLE["positions"], ref=pid)},
         "limits": {"count": len(limits.get("limits", [])) if isinstance(limits, dict) else None,
-                   "read_with": f"read_book('{pid}', names=['limits'])"},
+                   "read_with": nt.call(nt.TABLE["limits"], ref=pid)},
         "runs": [{"run_id": r[0], "as_of": r[1].isoformat(), "status": r[2], "open": f"describe('{r[0]}')"}
                  for r in runs],
         "freshness": fresh,
@@ -399,7 +431,7 @@ async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
         "desk_rules": _rules("book"),
         "cannot": CANNOT,
         "next": ([f"describe('{fresh['latest_completed_run']}')"] if isinstance(fresh, dict) and fresh.get("latest_completed_run") else [])
-                + [f"describe('{pid}', expand='<domain>')", f"read_book('{pid}', names=['positions'])"],
+                + [f"describe('{pid}', expand='<domain>')", nt.call(nt.TABLE["positions"], ref=pid)],
     }
     if expand == "book" and positions:
         out["positions"]["detail"] = positions
@@ -415,12 +447,12 @@ async def _run(db: AsyncSession, run_id: str, expand: str | None) -> dict:
     out = await _book_names(db, run_id, expand == "book")
     return {"subject": run_id, "kind": "run", "portfolio_id": run.portfolio_id,
             "as_of": run.as_of_date.isoformat(), **out,
-            "sections": {s: f"read_book('{run_id}', names=['{s}'])" for s in nt.RUN_SECTIONS},
+            "sections": {s: nt.call(nt.TABLE[s], ref=run_id) for s in nt.RUN_SECTIONS},
             "methods": _methods("run", expand == "methods", run_id),
             "procedures": _procedures("portfolio", expand == "procedures", run_id),
             "desk_rules": _rules("book"),
             "cannot": CANNOT,
-            "next": [f"read_book('{run_id}', names=[…])", f"describe('{run_id}', expand='<domain>')",
+            "next": [_column_call(run_id, "issuer_exposures", "weight"), f"describe('{run_id}', expand='<domain>')",
                      f"describe('{run.portfolio_id}')"]}
 
 
@@ -454,13 +486,13 @@ async def _book_names(db: AsyncSession, ref: str, full: bool) -> dict:
             example = sorted(members)[0]
             groups.append({"group": key, "answers": question,
                            **(_factored(members) if not full else {"names": sorted(members)}),
-                           "call": f"read_book('{ref}', names=['{example}'])"})
+                           "call": _name_call(ref, example)})
     rest = [n for n in names if n not in grouped]
     return {"names": len(names), "groups": groups,
             **({"other": _factored(rest)} if rest else {}),
             **({"withheld_collinear": _factored(withheld)} if withheld else {}),
             "units": {r.table: {c.name: c.unit for c in r.columns} for r in resources.RUN_CHILDREN},
-            "read_with": f"read_book('{ref}', names=[…])"}
+            "read_with": _column_call(ref, "<table>", "<col>") + " ; " + _run_expr({"fn": "pick", "of": ref, "key": "<name>"})}
 
 
 def _factored(names: list[str]) -> dict:
@@ -541,7 +573,7 @@ async def _domain(db: AsyncSession, kind: str, subject: str, name: str) -> dict:
             q, pats = groups[r]
             names = [pt.replace("*", "<label>") for pt in pats]
             reads.append({"name": r, "is": "run figures", "does": q, "names": names,
-                          "call": f"read_book('{run_id or '<run_…>'}', names=['{names[0]}'])"})
+                          "call": _name_call(run_id or "<run_…>", names[0])})
         else:
             e = nt.TABLE[r]
             ref = pid if ("portfolio" in e.on and "run" not in e.on) else run_id

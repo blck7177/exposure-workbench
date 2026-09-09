@@ -1,0 +1,102 @@
+{
+ "tag": "F01-risk-not-dollars#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "undiversified_vol",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$vol_63d"
+     }
+    }
+   ],
+   [
+    "book_vol_60d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "diversification_ratio",
+    {
+     "fn": "div",
+     "a": "$book_vol_60d",
+     "b": "$undiversified_vol"
+    }
+   ],
+   [
+    "r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "book_vol_60d",
+  "undiversified_vol",
+  "diversification_ratio"
+ ],
+ "note": "whether the whole wobbles less than the pieces: the book's own 60d vol from the run against the weight-summed 63d vols of the names (windows are the nearest the desk has to each other) — the ratio below 1 is the diversification actually obtained. 'How many bets' cannot be counted: the desk has no correlation or covariance method, so no effective-N; the factor R² and the netted equity beta say how much of the book is one market bet."
+}

@@ -1,0 +1,102 @@
+{
+ "tag": "W02-book-as-one-company#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "om",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "om_lowest",
+    {
+     "fn": "rank",
+     "of": "$om",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "w_om",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$om"
+    }
+   ],
+   [
+    "om_pts",
+    {
+     "fn": "rank",
+     "of": "$w_om",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "nde",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "JPM",
+      "LLY",
+      "GOOGL",
+      "AMZN",
+      "XOM",
+      "NVDA"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "nde_highest",
+    {
+     "fn": "rank",
+     "of": "$nde",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "om_lowest",
+  "om_pts"
+ ],
+ "note": "who drags the weighted margin: the margin ranking lowest-first (AMZN 11.5% is the one low-margin name; the rest sit 33-65%) and each covered name's weight x margin contribution (om_pts) so the answer can say whether it is one name or the mix; nde ranking over the two names that have it (AMZN, XOM both ~0.1x — nobody is levered); the same entry-level coverage refusals as t1."
+}

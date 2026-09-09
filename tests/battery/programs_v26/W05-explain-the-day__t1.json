@@ -1,0 +1,398 @@
+{
+ "tag": "W05-explain-the-day#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_ret",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.daily_return"
+    }
+   ],
+   [
+    "spy_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "SPY",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "spy_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "SPY",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "mkt_chg",
+    {
+     "fn": "sub",
+     "a": "$spy_close_day",
+     "b": "$spy_close_prev"
+    }
+   ],
+   [
+    "mkt_ret",
+    {
+     "fn": "div",
+     "a": "$mkt_chg",
+     "b": "$spy_close_prev"
+    }
+   ],
+   [
+    "rec",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "$r"
+    }
+   ],
+   [
+    "factor_sum",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "sum_of_factor_contributions"
+    }
+   ],
+   [
+    "residual",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "factor_share",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "factor_share"
+    }
+   ],
+   [
+    "unexplained_share",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "MSFT_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "MSFT",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "MSFT_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "MSFT",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "MSFT_chg",
+    {
+     "fn": "sub",
+     "a": "$MSFT_close_day",
+     "b": "$MSFT_close_prev"
+    }
+   ],
+   [
+    "MSFT_ret",
+    {
+     "fn": "div",
+     "a": "$MSFT_chg",
+     "b": "$MSFT_close_prev"
+    }
+   ],
+   [
+    "MSFT_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "MSFT_contrib",
+    {
+     "fn": "mul",
+     "a": "$MSFT_ret",
+     "b": "$MSFT_w"
+    }
+   ],
+   [
+    "JPM_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "JPM",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "JPM_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "JPM",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "JPM_chg",
+    {
+     "fn": "sub",
+     "a": "$JPM_close_day",
+     "b": "$JPM_close_prev"
+    }
+   ],
+   [
+    "JPM_ret",
+    {
+     "fn": "div",
+     "a": "$JPM_chg",
+     "b": "$JPM_close_prev"
+    }
+   ],
+   [
+    "JPM_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "JPM"
+    }
+   ],
+   [
+    "JPM_contrib",
+    {
+     "fn": "mul",
+     "a": "$JPM_ret",
+     "b": "$JPM_w"
+    }
+   ],
+   [
+    "AAPL_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "AAPL_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "AAPL_chg",
+    {
+     "fn": "sub",
+     "a": "$AAPL_close_day",
+     "b": "$AAPL_close_prev"
+    }
+   ],
+   [
+    "AAPL_ret",
+    {
+     "fn": "div",
+     "a": "$AAPL_chg",
+     "b": "$AAPL_close_prev"
+    }
+   ],
+   [
+    "AAPL_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "AAPL"
+    }
+   ],
+   [
+    "AAPL_contrib",
+    {
+     "fn": "mul",
+     "a": "$AAPL_ret",
+     "b": "$AAPL_w"
+    }
+   ],
+   [
+    "LLY_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "LLY",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "LLY_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "LLY",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "LLY_chg",
+    {
+     "fn": "sub",
+     "a": "$LLY_close_day",
+     "b": "$LLY_close_prev"
+    }
+   ],
+   [
+    "LLY_ret",
+    {
+     "fn": "div",
+     "a": "$LLY_chg",
+     "b": "$LLY_close_prev"
+    }
+   ],
+   [
+    "LLY_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "LLY"
+    }
+   ],
+   [
+    "LLY_contrib",
+    {
+     "fn": "mul",
+     "a": "$LLY_ret",
+     "b": "$LLY_w"
+    }
+   ],
+   [
+    "GOOGL_close_day",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "GOOGL",
+      "as_of": "2026-09-04"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "GOOGL_close_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "GOOGL",
+      "as_of": "2026-09-03"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "GOOGL_chg",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_close_day",
+     "b": "$GOOGL_close_prev"
+    }
+   ],
+   [
+    "GOOGL_ret",
+    {
+     "fn": "div",
+     "a": "$GOOGL_chg",
+     "b": "$GOOGL_close_prev"
+    }
+   ],
+   [
+    "GOOGL_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "GOOGL"
+    }
+   ],
+   [
+    "GOOGL_contrib",
+    {
+     "fn": "mul",
+     "a": "$GOOGL_ret",
+     "b": "$GOOGL_w"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "book_ret",
+  "mkt_ret",
+  "factor_share",
+  "unexplained_share"
+ ],
+ "note": "Book's return on the run day (exposure_metrics.daily_return) beside SPY's same-day return from two closes; book.reconcile splits it into the factor-explained sum and the alpha+residual, as shares. The run holds no per-position contribution table and book.explain_episode refuses a one-day window (insufficient_history), so contributions are rebuilt as weight x day-return for the five largest weights."
+}

@@ -1,0 +1,119 @@
+{
+ "tag": "NEW03-what-flagged-on-the-run#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "top5",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "sec",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "sector_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "fi",
+    {
+     "fn": "pick",
+     "of": "$sec",
+     "key": "Fixed_Income"
+    }
+   ],
+   [
+    "ba",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "eq_net_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ],
+   [
+    "eq_gross_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.gross_beta.equity_down"
+    }
+   ],
+   [
+    "rv30",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_30d"
+    }
+   ],
+   [
+    "mdd",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_drawdown"
+    }
+   ],
+   [
+    "hyg_beta",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "HYG",
+     "params": {
+      "benchmark": "SPY"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "episodes",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "top5",
+  "eq_net_beta"
+ ],
+ "note": "What has no limit but should: the top-five share (66% — no concentration-of-the-top check exists), the book's net equity beta (-0.86 net / 1.64 gross, no beta limit), HYG's positive beta to SPY (the 'hedge' that is not one), the 1y drawdown depth (12%) against max_drawdown 17.7%; the trigger levels are proposed off these figures."
+}

@@ -1,0 +1,109 @@
+{
+ "tag": "B06-positioning-blind#t2",
+ "program": {
+  "let": [
+   [
+    "l52",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "mom",
+    {
+     "fn": "method",
+     "name": "price.momentum_12_1",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "rel_1m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "LLY",
+     "params": {
+      "window": "1m",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "rel_3m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "LLY",
+     "params": {
+      "window": "3m",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "abs_1m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "LLY",
+     "params": {
+      "window": "1m"
+     }
+    }
+   ],
+   [
+    "abs_3m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "LLY",
+     "params": {
+      "window": "3m"
+     }
+    }
+   ],
+   [
+    "dd_1y",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "LLY",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "vol30",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "LLY",
+     "params": {
+      "window_days": 30
+     }
+    }
+   ],
+   [
+    "vol252",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "LLY",
+     "params": {
+      "window_days": 252
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "l52",
+  "rel_1m",
+  "rel_3m",
+  "mom"
+ ],
+ "note": "The one thing the desk can say about 'the market turning' is price behaviour: 10.2% off the 52w high (set 2026-08-19), 1m and 3m returns relative to SPY (both slightly negative), 12-1 momentum still +65%, 1y drawdown depth 23%, 30d vs 252d vol. No volume/ADV node on purpose — flow is not positioning."
+}

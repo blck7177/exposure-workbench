@@ -1,0 +1,81 @@
+{
+ "tag": "F02-ten-down-in-dollars#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ],
+   [
+    "gross_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.gross_beta.equity_down"
+    }
+   ],
+   [
+    "book_mv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "pct_hit",
+    {
+     "fn": "scale",
+     "of": "$net_beta_equity",
+     "factor": 0.1
+    }
+   ],
+   [
+    "dollar_hit",
+    {
+     "fn": "scale",
+     "of": {
+      "fn": "mul",
+      "a": "$net_beta_equity",
+      "b": "$book_mv"
+     },
+     "factor": 0.1
+    }
+   ],
+   [
+    "r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "net_beta_equity",
+  "book_mv",
+  "dollar_hit",
+  "pct_hit"
+ ],
+ "note": "the run's netted equity beta (equity_down sense: -0.856 means the book moves -0.856 of an equity move; SPY/QQQ/IWM legs are collinear so only the net is quotable), the book market value, and the product at -10%: -8.56% ≈ -$930k. This is a linear beta estimate over the run's 750-session regression, not VaR (withheld), not a stress result, and it assumes the factor relation holds on the day."
+}

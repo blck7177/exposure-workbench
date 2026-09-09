@@ -1,0 +1,140 @@
+{
+ "tag": "W02-book-as-one-company#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "om",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "w_om",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$om"
+    }
+   ],
+   [
+    "w_cov_om",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": {
+      "fn": "div",
+      "a": "$om",
+      "b": "$om"
+     }
+    }
+   ],
+   [
+    "om_book",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": "$w_om"
+     },
+     "b": {
+      "fn": "sum",
+      "of": "$w_cov_om"
+     }
+    }
+   ],
+   [
+    "nde",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "JPM",
+      "LLY",
+      "GOOGL",
+      "AMZN",
+      "XOM",
+      "NVDA"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "w_nde",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$nde"
+    }
+   ],
+   [
+    "w_cov_nde",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": {
+      "fn": "div",
+      "a": "$nde",
+      "b": "$nde"
+     }
+    }
+   ],
+   [
+    "nde_book",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": "$w_nde"
+     },
+     "b": {
+      "fn": "sum",
+      "of": "$w_cov_nde"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "om_book",
+  "nde_book",
+  "w_cov_om",
+  "w_cov_nde"
+ ],
+ "note": "run-weight-weighted operating margin and net debt/EBITDA, each renormalised over the names the measure exists for (w_cov_* = the weights actually covered, built as weight x (measure/measure) because the language has no label-subset primitive, _GAPS_A): operating_margin settles for AAPL MSFT GOOGL NVDA AMZN only (JPM refused as a financial issuer; LLY and XOM file no operating_income line; TLT and HYG have no issuer accounts), net_debt_to_ebitda settles for AMZN and XOM only (AAPL/LLY no period near the window, MSFT/NVDA total_debt not producible, GOOGL no D&A, JPM bank refusal) — the answer states the coverage weight beside each figure; these entry-level refusals are genuine data absences."
+}

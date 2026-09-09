@@ -1,0 +1,104 @@
+{
+ "tag": "W02-buyback-vs-dilution#t3",
+ "program": {
+  "let": [
+   [
+    "sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$sbc",
+     "b": "$bb"
+    }
+   ],
+   [
+    "rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "sbc_to_rev",
+    {
+     "fn": "div",
+     "a": "$sbc",
+     "b": "$rev"
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "sbc_to_fcf",
+    {
+     "fn": "div",
+     "a": "$sbc",
+     "b": "$fcf"
+    }
+   ],
+   [
+    "sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "shares_outstanding",
+     "last_n": 8
+    }
+   ],
+   [
+    "sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$sh_s"
+    }
+   ],
+   [
+    "sbc_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "sbc",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "sbc_yoy",
+    {
+     "fn": "yoy",
+     "of": "$sbc_s"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "sbc_to_bb",
+  "sh_yoy"
+ ],
+ "note": "The line is drawn on two held ratios: SBC as a share of buybacks (above 1 the count grows) and the share count's yoy sign, with SBC to revenue and to FCF for scale and SBC's own growth. The trim threshold is a convention the answer names."
+}

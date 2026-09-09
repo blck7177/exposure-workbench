@@ -1,0 +1,80 @@
+{
+ "tag": "W03-which-run-was-that#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "mv_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "px_latest",
+    {
+     "fn": "price",
+     "ticker": "MSFT"
+    }
+   ],
+   [
+    "close_latest",
+    {
+     "fn": "pick",
+     "of": "$px_latest",
+     "key": "close"
+    }
+   ],
+   [
+    "px_run",
+    {
+     "fn": "price",
+     "ticker": "MSFT",
+     "as_of": "2026-09-04"
+    }
+   ],
+   [
+    "close_run",
+    {
+     "fn": "pick",
+     "of": "$px_run",
+     "key": "close"
+    }
+   ],
+   [
+    "px_chg",
+    {
+     "fn": "sub",
+     "a": "$close_latest",
+     "b": "$close_run"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "r",
+  "close_latest",
+  "close_run"
+ ],
+ "note": "The latest price session on this desk is the run's own as-of date (both 2026-09-04, px_chg = 0), so 'today's close' is the close the run was struck on and nothing would move. A re-mark at a newer close would need the position quantity, which is not a column the run exposes (see _GAPS_C.md)."
+}

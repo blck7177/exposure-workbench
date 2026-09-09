@@ -1,0 +1,35 @@
+{
+ "tag": "W02-ccc-carried-to-jpm#t2",
+ "program": {
+  "let": [
+   [
+    "jpm_ccc",
+    {
+     "fn": "method",
+     "name": "cash_conversion_cycle",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "jpm_dio",
+    {
+     "fn": "method",
+     "name": "days_inventory",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "jpm_dpo",
+    {
+     "fn": "method",
+     "name": "days_payable",
+     "subject": "JPM"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "jpm_ccc"
+ ],
+ "note": "Carrying the measure to JPM is refused by policy on every node (not_applicable: a financial issuer holds no inventory and its receivables/payables are not trade credit) — the refusal is the answer; these are policy refusals, not data gaps."
+}

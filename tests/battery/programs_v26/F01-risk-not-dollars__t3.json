@@ -1,0 +1,122 @@
+{
+ "tag": "F01-risk-not-dollars#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "w_x_vol",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$vol_63d"
+    }
+   ],
+   [
+    "risk_share",
+    {
+     "fn": "div",
+     "a": "$w_x_vol",
+     "b": {
+      "fn": "sum",
+      "of": "$w_x_vol"
+     }
+    }
+   ],
+   [
+    "risk_share_nvda",
+    {
+     "fn": "pick",
+     "of": "$risk_share",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "risk_per_weight_nvda",
+    {
+     "fn": "div",
+     "a": "$risk_share_nvda",
+     "b": "$w_nvda"
+    }
+   ],
+   [
+    "beta_nvda",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "NVDA",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "r2_nvda",
+    {
+     "fn": "pick",
+     "of": "$beta_nvda",
+     "key": "r2"
+    }
+   ],
+   [
+    "vol_nvda",
+    {
+     "fn": "pick",
+     "of": "$vol_63d",
+     "key": "NVDA"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "risk_share_nvda",
+  "w_nvda",
+  "risk_per_weight_nvda"
+ ],
+ "note": "NVDA's share of standalone risk against its share of capital (risk per point of weight > 1 means it punches above its weight), its 63d vol, and its 1y beta/R² to SPY — the R² says how much of the NVDA line is the same market bet the rest of the book already carries; with no covariance method the 'three or four bets' count stays an inference from R² and the factor model, not a computed figure."
+}

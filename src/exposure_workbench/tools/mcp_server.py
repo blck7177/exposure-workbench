@@ -31,6 +31,7 @@ from mcp.server.lowlevel import Server
 
 from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.services import gate
+from exposure_workbench.services import claims
 from exposure_workbench.tools import faces, mcp_request, registry as R
 
 SERVER_NAME = "exposure-workbench"
@@ -45,7 +46,7 @@ holdings and alerts, and delegation of long work to background runs.
 
 Every tool result carries a `facts` block — one row per figure, with its id
 (f_…), what it is, whose, its unit, value, as-of and window — and a `note` in
-which each figure stands as its fact id. """ + gate.PROSE_RULE + """ The gate refuses an answer that points at what was
+which each figure stands as its fact id. """ + claims.PROSE_RULE + """ A quote claim cites its passage and carries the verbatim span. The gate refuses an answer that points at what was
 never shown, or writes a number the facts cannot account for.
 
 Delegation tools return immediately with a run id; they do not block."""

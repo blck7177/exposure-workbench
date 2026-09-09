@@ -1,0 +1,214 @@
+{
+ "tag": "B05-etf-instrument-class#t2",
+ "program": {
+  "let": [
+   [
+    "hyg_b",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "HYG",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "hyg_beta",
+    {
+     "fn": "pick",
+     "of": "$hyg_b",
+     "key": "beta"
+    }
+   ],
+   [
+    "hyg_r2",
+    {
+     "fn": "pick",
+     "of": "$hyg_b",
+     "key": "r2"
+    }
+   ],
+   [
+    "tlt_b",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "TLT",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "tlt_beta",
+    {
+     "fn": "pick",
+     "of": "$tlt_b",
+     "key": "beta"
+    }
+   ],
+   [
+    "tlt_r2",
+    {
+     "fn": "pick",
+     "of": "$tlt_b",
+     "key": "r2"
+    }
+   ],
+   [
+    "episodes",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "book_dd",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "2026-01-07",
+      "trough": "2026-03-27"
+     }
+    }
+   ],
+   [
+    "hp",
+    {
+     "fn": "prices",
+     "ticker": "HYG",
+     "window": "1y"
+    }
+   ],
+   [
+    "hyg_dd_ret",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$hp",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$hp",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$hp",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "tp",
+    {
+     "fn": "prices",
+     "ticker": "TLT",
+     "window": "1y"
+    }
+   ],
+   [
+    "tlt_dd_ret",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$tp",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$tp",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$tp",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "sp",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_dd_ret",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$sp",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$sp",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$sp",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "contribution"
+    }
+   ],
+   [
+    "dret",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "daily_return"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "hyg_beta",
+  "hyg_r2",
+  "hyg_dd_ret",
+  "book_dd"
+ ],
+ "note": "Tests the claim against the data: HYG's beta to SPY is positive (0.23) with r2 0.60 — it moves WITH equities, not against; in the book's deepest 1y drawdown (peak 2026-01-07, trough 2026-03-27, from book.drawdown_episodes) HYG fell 1.7% and TLT 1.8% while the book fell 12.0% (book_dd) and SPY 7.8% — it did not cushion, it fell less; on the run's -1.14% day HYG contributed -0.005pp. Episode dates are literals read from the episodes payload (dates are not typed figures)."
+}

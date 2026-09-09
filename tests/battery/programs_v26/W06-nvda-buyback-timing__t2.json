@@ -1,0 +1,227 @@
+{
+ "tag": "W06-nvda-buyback-timing#t2",
+ "program": {
+  "let": [
+   [
+    "bb_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "buybacks",
+     "months": 3,
+     "last_n": 6
+    }
+   ],
+   [
+    "px_20240928",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2024-09-28"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20241228",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2024-12-28"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20250329",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2025-03-29"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20250628",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2025-06-28"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20250927",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2025-09-27"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20251227",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2025-12-27"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20260328",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "AAPL",
+      "as_of": "2026-03-28"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "chg_20241228",
+    {
+     "fn": "sub",
+     "a": "$px_20241228",
+     "b": "$px_20240928"
+    }
+   ],
+   [
+    "ret_q_20241228",
+    {
+     "fn": "div",
+     "a": "$chg_20241228",
+     "b": "$px_20240928"
+    }
+   ],
+   [
+    "chg_20250329",
+    {
+     "fn": "sub",
+     "a": "$px_20250329",
+     "b": "$px_20241228"
+    }
+   ],
+   [
+    "ret_q_20250329",
+    {
+     "fn": "div",
+     "a": "$chg_20250329",
+     "b": "$px_20241228"
+    }
+   ],
+   [
+    "chg_20250628",
+    {
+     "fn": "sub",
+     "a": "$px_20250628",
+     "b": "$px_20250329"
+    }
+   ],
+   [
+    "ret_q_20250628",
+    {
+     "fn": "div",
+     "a": "$chg_20250628",
+     "b": "$px_20250329"
+    }
+   ],
+   [
+    "chg_20250927",
+    {
+     "fn": "sub",
+     "a": "$px_20250927",
+     "b": "$px_20250628"
+    }
+   ],
+   [
+    "ret_q_20250927",
+    {
+     "fn": "div",
+     "a": "$chg_20250927",
+     "b": "$px_20250628"
+    }
+   ],
+   [
+    "chg_20251227",
+    {
+     "fn": "sub",
+     "a": "$px_20251227",
+     "b": "$px_20250927"
+    }
+   ],
+   [
+    "ret_q_20251227",
+    {
+     "fn": "div",
+     "a": "$chg_20251227",
+     "b": "$px_20250927"
+    }
+   ],
+   [
+    "chg_20260328",
+    {
+     "fn": "sub",
+     "a": "$px_20260328",
+     "b": "$px_20251227"
+    }
+   ],
+   [
+    "ret_q_20260328",
+    {
+     "fn": "div",
+     "a": "$chg_20260328",
+     "b": "$px_20251227"
+    }
+   ],
+   [
+    "dist_52w_high",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "AAPL",
+     "params": {
+      "window": "1y"
+     },
+     "key": "window_return"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "bb_q",
+  "ret_q_20241228",
+  "ret_q_20250329",
+  "ret_q_20250628",
+  "ret_q_20250927",
+  "ret_q_20251227",
+  "ret_q_20260328"
+ ],
+ "note": "The same test on AAPL: six fiscal quarters of repurchases beside the quarter-end adjusted close and each quarter's return, so steadiness of spend against price moves can be compared with NVDA's. Same limits: no in-quarter average price, no cheapness call."
+}

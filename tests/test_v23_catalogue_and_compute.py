@@ -31,12 +31,13 @@ from exposure_workbench.tools.registries import build_meta_registry, build_resea
 # ── the faces: data domains × verbs ─────────────────────────────────────────
 
 def test_the_meta_face_is_ten_tools_by_domain_and_verb():
+    # V30 Phase B: figures come through ONE tool (run); the per-domain reads and
+    # compute stay registered for the research face until the brief path migrates.
     assert faces.FACE_META_AGENT == [
-        "describe", "read_fundamentals", "read_filings", "read_prices", "compute", "think",
-        "read_book", "search_web", "start", "respond"]
+        "describe", "run", "read_filings", "read_book", "search_web", "start", "respond", "think"]
     assert faces.FACE_RESEARCH == [
         "describe", "read_fundamentals", "read_filings", "read_prices", "compute", "think",
-        "search_web", "submit_brief"]
+        "run", "search_web", "submit_brief"]
     assert faces.resolve(build_meta_registry(), faces.FACE_META_AGENT) == faces.FACE_META_AGENT
     assert faces.resolve(build_research_registry(), faces.FACE_RESEARCH) == faces.FACE_RESEARCH
 

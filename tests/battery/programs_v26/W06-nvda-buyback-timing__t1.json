@@ -1,0 +1,227 @@
+{
+ "tag": "W06-nvda-buyback-timing#t1",
+ "program": {
+  "let": [
+   [
+    "bb_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "buybacks",
+     "months": 3,
+     "last_n": 6
+    }
+   ],
+   [
+    "px_20250126",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2025-01-26"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20250427",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2025-04-27"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20250727",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2025-07-27"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20251026",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2025-10-26"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20260125",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2026-01-25"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20260426",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2026-04-26"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_20260726",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "NVDA",
+      "as_of": "2026-07-26"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "chg_20250427",
+    {
+     "fn": "sub",
+     "a": "$px_20250427",
+     "b": "$px_20250126"
+    }
+   ],
+   [
+    "ret_q_20250427",
+    {
+     "fn": "div",
+     "a": "$chg_20250427",
+     "b": "$px_20250126"
+    }
+   ],
+   [
+    "chg_20250727",
+    {
+     "fn": "sub",
+     "a": "$px_20250727",
+     "b": "$px_20250427"
+    }
+   ],
+   [
+    "ret_q_20250727",
+    {
+     "fn": "div",
+     "a": "$chg_20250727",
+     "b": "$px_20250427"
+    }
+   ],
+   [
+    "chg_20251026",
+    {
+     "fn": "sub",
+     "a": "$px_20251026",
+     "b": "$px_20250727"
+    }
+   ],
+   [
+    "ret_q_20251026",
+    {
+     "fn": "div",
+     "a": "$chg_20251026",
+     "b": "$px_20250727"
+    }
+   ],
+   [
+    "chg_20260125",
+    {
+     "fn": "sub",
+     "a": "$px_20260125",
+     "b": "$px_20251026"
+    }
+   ],
+   [
+    "ret_q_20260125",
+    {
+     "fn": "div",
+     "a": "$chg_20260125",
+     "b": "$px_20251026"
+    }
+   ],
+   [
+    "chg_20260426",
+    {
+     "fn": "sub",
+     "a": "$px_20260426",
+     "b": "$px_20260125"
+    }
+   ],
+   [
+    "ret_q_20260426",
+    {
+     "fn": "div",
+     "a": "$chg_20260426",
+     "b": "$px_20260125"
+    }
+   ],
+   [
+    "chg_20260726",
+    {
+     "fn": "sub",
+     "a": "$px_20260726",
+     "b": "$px_20260426"
+    }
+   ],
+   [
+    "ret_q_20260726",
+    {
+     "fn": "div",
+     "a": "$chg_20260726",
+     "b": "$px_20260426"
+    }
+   ],
+   [
+    "dist_52w_high",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "NVDA"
+    }
+   ],
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "NVDA",
+     "params": {
+      "window": "1y"
+     },
+     "key": "window_return"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "bb_q",
+  "ret_q_20250427",
+  "ret_q_20250727",
+  "ret_q_20251026",
+  "ret_q_20260125",
+  "ret_q_20260426",
+  "ret_q_20260726"
+ ],
+ "note": "Repurchase dollars in each of NVDA's last six fiscal quarters set beside where the stock traded: the adjusted close at each quarter-end and the quarter's return from the prior quarter-end (the desk has no average-price-in-quarter primitive), with today's distance from the 52-week high and one-year return for where those quarters sit on the path. 'Cheap' is a valuation call and no multiple is a measure here."
+}

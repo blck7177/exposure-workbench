@@ -1,0 +1,108 @@
+{
+ "tag": "W04-sectors-or-names#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "energy_weight",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "sector_exposures",
+      "col": "weight"
+     },
+     "key": "Energy"
+    }
+   ],
+   [
+    "xom_weight",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "XOM"
+    }
+   ],
+   [
+    "xom_ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "XOM",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "xom_rel_spy",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "XOM",
+     "params": {
+      "window": "1y",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "spy_ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "SPY",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "uso_ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "USO",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "book_ret_1y",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2025-09-04",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "energy_weight",
+  "xom_weight",
+  "xom_rel_spy",
+  "spy_ret_1y"
+ ],
+ "note": "allocation vs selection cannot be split here: the desk compares the book to the market at TOTAL level only — no benchmark sector weights and no sector index returns (XLE is not a series it holds). What is grounded: the energy sleeve IS one position (sector Energy weight = XOM weight = 4.4%), XOM's 1y return (+46%) and its return relative to SPY (+26 points), the book's 1y return, and the oil ETF USO's 1y return as the nearest thing to 'energy was up' — so the answer can say XOM beat the market but not whether it beat energy."
+}

@@ -1,0 +1,78 @@
+{
+ "tag": "W03-which-run-was-that#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "prev",
+    {
+     "fn": "run",
+     "portfolio": "port_001",
+     "which": "prev"
+    }
+   ],
+   [
+    "pmv_prev",
+    {
+     "fn": "pick",
+     "of": "$prev",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "w_msft_prev",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$prev",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "pmv_chg",
+    {
+     "fn": "sub",
+     "a": "$pmv",
+     "b": "$pmv_prev"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "r",
+  "pmv",
+  "w_msft"
+ ],
+ "note": "Provenance: node r carries the run id and its as-of date (run_34042d64f60c, struck 2026-09-04) — t1's figures are its; prev is the run before (as-of 2026-09-03) with the same two figures so the answer can say they differ and by how much."
+}

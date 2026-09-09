@@ -24,9 +24,11 @@ from sqlalchemy import update
 from exposure_workbench.agents import batch
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
+from exposure_workbench.analytics import skill
+from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
-from exposure_workbench.services import context_budget, gate
+from exposure_workbench.services import claims, context_budget
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
@@ -35,27 +37,30 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM = """You are the analyst for a portfolio risk & issuer-intelligence desk. The \
 analysis is your job: take the question apart, decide what to look at and what to \
-compare, gather it, and say what the evidence shows and what it means for the \
-question asked — including its implication for this book and what would change \
-your reading. describe(subject) is where you look first: it says what the desk \
-holds about a ticker, a portfolio, a run or a scenario, what is NOT held and why, \
-and which methods and procedures apply; the procedures are how an analyst \
-approaches that kind of question. A question about the book starts at describe() \
-with no subject, which lists the portfolios and their ids; never guess an id. Read with read_fundamentals, read_filings, \
-read_prices, read_book; compute with compute, which takes lists — ten names is one \
-call. What the filings cannot hold is search_web. Work that is not ready is start.
+compare, get the figures, and say what the evidence shows and what it means for the \
+question asked — its implication for this book and what would change your reading. \
+describe(subject) is where you look first: what the desk holds about a ticker, a \
+portfolio, a run or a scenario, what is NOT held and why, and the methods and \
+procedures that apply; a book question starts at describe() with no subject, which \
+lists the portfolios and their ids — never guess an id.
 
-The discipline: every figure you state is a FACT a tool returned — each tool result \
-carries a `facts` block (one row per fact: id, kind, subject, measure, unit, value, \
-as of, window, params) and a `note` in which each figure stands as its fact id. \
-""" + gate.PROSE_RULE + """ A figure the desk does not hold is an \
-absence fact: point at it and say why (not filed; not held as a figure; no method) — \
-never a nearby figure wearing the asked-for name, never an estimate. Where the desk \
-holds a figure that answers a different question, say which question it answers.
+Figures come from ONE tool: run(program). Write the whole computation as one program \
+— the reads, the methods over lists of subjects, the arithmetic, the ranking, the \
+change, the scenario — and every node comes back typed, dated and on the ledger as a \
+fact (f_…). A superlative rests on a rank node; a change on yoy/qoq or two readings; \
+the prior run is run(which='prev'); a name in a program is a variable, never a \
+measure. A node that refuses says why; fix the program, do not guess. Filing text is \
+read_filings; what the filings cannot hold is search_web; work that is not ready is start.
 
-Finish every turn by calling respond. If respond refuses, it names the block and \
-the fix: point at a fact you were shown, compute the figure, cite the passage, or \
-drop the sentence."""
+The answer is CLAIMS and PROSE (respond). Each figure you state is a claim with a \
+relation its facts must fit — level, change, ratio, rank, room, absent, quote, series, \
+table — and the prose writes {cN} where the figure goes. """ + claims.PROSE_RULE + """ \
+A figure the desk does not hold is an absence fact: claim it as absent and say why \
+(not filed; not held as a figure; no method) — never a nearby figure wearing the \
+asked-for name, never an estimate.
+
+Finish every turn by calling respond. If respond refuses, it names the claim or the \
+number and the reason: fix that claim, run the program that produces the figure, or drop it."""
 
 
 # What the user is told when the loop ended without the gate ever accepting an
@@ -135,6 +140,20 @@ async def handle_message(
         history = await _load_history(db, session_id)
 
     messages = [{"role": "system", "content": _SYSTEM}, *history]
+    # V30 Phase C: the domains this question is about, pushed — the skill's
+    # own programs and desk lines, matched lexically to the user's words
+    # (analytics/skill.match_domains). Pull (describe expand=<domain>) stays;
+    # this is the arm that does not wait for the model to ask. Recorded on the
+    # message so the two arms can be told apart in a battery.
+    pushed: list[str] = []
+    if get_settings().push_domains:
+        matched = skill.match_domains(user_text)
+        if matched:
+            pushed = [p.name for p in matched]
+            messages.append({"role": "system",
+                             "content": "For this question, the desk's own knowledge (its programs use <port>, <T>, "
+                                        "<T1>/<T2> placeholders: substitute the ids and tickers from describe()):\n\n"
+                                        + skill.push_text(matched)})
     reply_text, reply_citations = None, []
     # What the gate matched, on the turn it accepted (V13-S3). Kept beside the
     # reply rather than recomputed later: re-running the checker over a stored
@@ -247,7 +266,7 @@ async def handle_message(
     # committed before the loop started (routes/agent.py), the work really was
     # done, and hiding the failure from the transcript would leave the user's
     # question sitting there with no reply and no explanation.
-    meta: dict = {"prompt_tokens": prompt_peak}
+    meta: dict = {"prompt_tokens": prompt_peak, "pushed": pushed}
     if reply_verified is not None:
         meta["verified"] = reply_verified
     if reply_blocks is not None:

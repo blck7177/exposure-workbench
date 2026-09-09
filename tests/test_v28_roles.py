@@ -359,9 +359,12 @@ async def test_every_registry_method_survives_its_own_adapter():
 def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
     from exposure_workbench.agents import meta_agent
     from exposure_workbench.tools import mcp_server
-    assert gate.PROSE_RULE in meta_agent._SYSTEM
-    assert gate.PROSE_RULE in mcp_server.INSTRUCTIONS
-    assert gate.PROSE_RULE in build_meta_registry().tools["respond"].description
+    # V30: the chat exit's rule is services/claims.PROSE_RULE (digits allowed when
+    # the ledger accounts for them); gate.PROSE_RULE stays the brief path's until D5.
+    from exposure_workbench.services import claims
+    assert claims.PROSE_RULE in meta_agent._SYSTEM
+    assert claims.PROSE_RULE in mcp_server.INSTRUCTIONS
+    assert claims.PROSE_RULE in build_meta_registry().tools["respond"].description
     assert gate._FIX.startswith(gate.PROSE_RULE)
     assert "never write a number" not in meta_agent._SYSTEM
 

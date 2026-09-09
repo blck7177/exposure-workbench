@@ -319,8 +319,11 @@ async def _named_context(db: AsyncSession, rid: str) -> tuple[str, date] | dict:
     else:
         base = params.get("run_id") or rt.get("base") or rid
     as_of = None
-    if params.get("as_of"):
-        as_of = date.fromisoformat(params["as_of"])
+    # V30: a drawdown row is dated by `through`, an episode explanation by its
+    # `trough` — the date the row's figures are as of, under the row's own name for it
+    dated = params.get("as_of") or params.get("through") or params.get("trough") or params.get("end")
+    if dated:
+        as_of = date.fromisoformat(str(dated)[:10])
     elif params.get("run_id"):
         run = await run_reads_service.completed_run(db, params["run_id"])
         as_of = run.as_of_date if not isinstance(run, dict) else None
@@ -1093,6 +1096,21 @@ def _basis_key(t: Typed):
     return None
 
 
+def _measure_key(t: Typed) -> str | None:
+    """The measure a figure is, for deciding what varies across a set (V30).
+
+    The price rows name their quantity for the holder — `AAPL.beta`, `MSFT.adv.dollars`
+    (V16's `{ticker}.…` yields) — so ten issuers' betas read as ten measures and an
+    ordering over them was refused as incomparable. A quantity spelled
+    `<holder>.<measure>` by a figure whose one holder is that holder IS the
+    measure `<measure>`; the holder is the axis, as it is for every filed
+    quantity. Nothing else about the name is touched."""
+    q = t.quantity
+    if isinstance(q, str) and len(t.issuers) == 1 and q.startswith(f"{t.issuers[0]}."):
+        return q[len(t.issuers[0]) + 1:]
+    return q
+
+
 def _comparison_axis(typed: list[Typed], what: str) -> str | dict:
     """What varies across a set of figures being ordered or summarised (V28 B1).
 
@@ -1105,7 +1123,7 @@ def _comparison_axis(typed: list[Typed], what: str) -> str | dict:
     second was refused as 'incomparable' because the row's labels assumed the
     issuer was the only axis — a labelling convenience overruling domain
     judgement. Returns 'issuer' or 'quantity', or a refusal."""
-    quantities = {t.quantity for t in typed}
+    quantities = {_measure_key(t) for t in typed}
     if None in quantities:
         return _err("unnamed_quantity",
                     f"{what} needs every figure to carry the measure it is; one of these does not")
@@ -1124,7 +1142,8 @@ def _comparison_axis(typed: list[Typed], what: str) -> str | dict:
 
 
 async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
-               as_quantity: str | None = None, invoked_by: str = "agent") -> dict:
+               as_quantity: str | None = None, invoked_by: str = "agent",
+               labels: list[str] | None = None) -> dict:
     """Order quantities that are comparable, and record the order.
 
     WHY THIS EXISTS. The gate guarantees where every figure came from; it says
@@ -1178,9 +1197,16 @@ async def rank(db: AsyncSession, refs: list[str], *, direction: str = "highest",
     axis = _comparison_axis(typed, "an ordering")
     if isinstance(axis, dict):
         return axis
-    quantity = typed[0].quantity if axis == "issuer" else None
+    quantity = _measure_key(typed[0]) if axis == "issuer" else None
 
-    labels = [_label_of(t) if axis == "issuer" else t.quantity for t in typed]
+    own = [_label_of(t) if axis == "issuer" else t.quantity for t in typed]
+    # V30: a derived vector (a share of a sum, a days-to-liquidate) carries every
+    # issuer in each entry, so nothing here can tell its entries apart; the
+    # program that built it knows each entry's label and may say so.
+    if labels is not None and len(labels) == len(typed) and len(set(labels)) == len(labels) \
+            and (None in own or len(set(own)) != len(own)):
+        own = list(labels)
+    labels = own
     if None in labels or len(set(labels)) != len(labels):
         # Two entries this function cannot tell apart would produce a table with
         # two rows called the same thing, and a rank name that resolves to
@@ -1306,7 +1332,7 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
         return _err("incomparable_units",
                     f"these are not one measure: {', '.join(sorted(units_seen))}. A statistic "
                     f"over mixed units averages dollars with percentages.")
-    quantities_seen = {t.quantity for t in typed}
+    quantities_seen = {_measure_key(t) for t in typed}
     if op != "abs":
         axis = _comparison_axis(typed, "a statistic over a set")
         if isinstance(axis, dict):

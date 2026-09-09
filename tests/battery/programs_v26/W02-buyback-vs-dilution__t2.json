@@ -1,0 +1,427 @@
+{
+ "tag": "W02-buyback-vs-dilution#t2",
+ "program": {
+  "let": [
+   [
+    "AAPL_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "shares_outstanding",
+     "last_n": 6
+    }
+   ],
+   [
+    "AAPL_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AAPL_sh_s"
+    }
+   ],
+   [
+    "AAPL_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "AAPL_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "AAPL_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$AAPL_bb",
+     "b": "$AAPL_sbc"
+    }
+   ],
+   [
+    "AAPL_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$AAPL_sbc",
+     "b": "$AAPL_bb"
+    }
+   ],
+   [
+    "MSFT_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "shares_outstanding",
+     "last_n": 6
+    }
+   ],
+   [
+    "MSFT_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$MSFT_sh_s"
+    }
+   ],
+   [
+    "MSFT_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$MSFT_bb",
+     "b": "$MSFT_sbc"
+    }
+   ],
+   [
+    "MSFT_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$MSFT_sbc",
+     "b": "$MSFT_bb"
+    }
+   ],
+   [
+    "GOOGL_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "shares_outstanding",
+     "last_n": 6
+    }
+   ],
+   [
+    "GOOGL_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$GOOGL_sh_s"
+    }
+   ],
+   [
+    "GOOGL_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_bb",
+     "b": "$GOOGL_sbc"
+    }
+   ],
+   [
+    "GOOGL_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$GOOGL_sbc",
+     "b": "$GOOGL_bb"
+    }
+   ],
+   [
+    "NVDA_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "shares_diluted_weighted",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "NVDA_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$NVDA_sh_s"
+    }
+   ],
+   [
+    "NVDA_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "NVDA_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "NVDA_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$NVDA_bb",
+     "b": "$NVDA_sbc"
+    }
+   ],
+   [
+    "NVDA_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$NVDA_sbc",
+     "b": "$NVDA_bb"
+    }
+   ],
+   [
+    "JPM_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "shares_diluted_weighted",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "JPM_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$JPM_sh_s"
+    }
+   ],
+   [
+    "JPM_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "JPM_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "JPM_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$JPM_bb",
+     "b": "$JPM_sbc"
+    }
+   ],
+   [
+    "JPM_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$JPM_sbc",
+     "b": "$JPM_bb"
+    }
+   ],
+   [
+    "AMZN_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "shares_outstanding",
+     "last_n": 6
+    }
+   ],
+   [
+    "AMZN_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AMZN_sh_s"
+    }
+   ],
+   [
+    "AMZN_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$AMZN_bb",
+     "b": "$AMZN_sbc"
+    }
+   ],
+   [
+    "AMZN_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$AMZN_sbc",
+     "b": "$AMZN_bb"
+    }
+   ],
+   [
+    "LLY_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "shares_diluted_weighted",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "LLY_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$LLY_sh_s"
+    }
+   ],
+   [
+    "LLY_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "LLY_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "LLY_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$LLY_bb",
+     "b": "$LLY_sbc"
+    }
+   ],
+   [
+    "LLY_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$LLY_sbc",
+     "b": "$LLY_bb"
+    }
+   ],
+   [
+    "XOM_sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "shares_outstanding",
+     "last_n": 6
+    }
+   ],
+   [
+    "XOM_sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$XOM_sh_s"
+    }
+   ],
+   [
+    "XOM_bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "XOM_sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "XOM_net_buyback",
+    {
+     "fn": "sub",
+     "a": "$XOM_bb",
+     "b": "$XOM_sbc"
+    }
+   ],
+   [
+    "XOM_sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$XOM_sbc",
+     "b": "$XOM_bb"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "AAPL_sh_yoy",
+  "MSFT_sh_yoy",
+  "GOOGL_sh_yoy",
+  "NVDA_sh_yoy",
+  "JPM_sh_yoy",
+  "AMZN_sh_yoy",
+  "LLY_sh_yoy",
+  "XOM_sh_yoy",
+  "AAPL_sbc_to_bb",
+  "MSFT_sbc_to_bb",
+  "GOOGL_sbc_to_bb",
+  "NVDA_sbc_to_bb",
+  "JPM_sbc_to_bb",
+  "LLY_sbc_to_bb"
+ ],
+ "note": "Every issuer held (TLT/HYG are funds): share count yoy from the filed count (shares_outstanding where filed at quarter-ends; diluted weighted shares for NVDA/JPM/LLY where the point-in-time count is sparse), and SBC against buybacks with the net. Expected absences that are part of the answer: XOM files no sbc (metric_not_filed) so its net cannot be formed; AMZN's trailing buybacks are zero (none since 2024) so SBC-to-buybacks is division_by_zero and the count question there is answered by the share series alone. No cross-issuer vector can be formed from these scalars, so 'worst' is read off the eight yoy/ratio nodes, not a rank node (see _GAPS_B.md)."
+}

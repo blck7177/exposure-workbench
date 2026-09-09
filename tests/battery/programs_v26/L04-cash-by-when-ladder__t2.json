@@ -1,0 +1,4 @@
+{
+ "tag": "L04-cash-by-when-ladder#t2",
+ "skip": "the desk's unit is trading sessions of selling at a participation rate; it holds no settlement cycle (T+1 for the equities and ETFs is market convention, not a desk fact) and no cash-in-account date, so nothing is computable — the answer says 'days of selling' and names settlement as the absence."
+}

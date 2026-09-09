@@ -1,0 +1,101 @@
+{
+ "tag": "NEW05-your-numbers-disagree#t3",
+ "program": {
+  "let": [
+   [
+    "accruals_ratio_q",
+    {
+     "fn": "method",
+     "name": "accruals_ratio",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "accruals_latest",
+    {
+     "fn": "latest",
+     "of": "$accruals_ratio_q"
+    }
+   ],
+   [
+    "dso_q",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "dso_latest",
+    {
+     "fn": "latest",
+     "of": "$dso_q"
+    }
+   ],
+   [
+    "dso_ttm",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "accruals_ratio_ttm",
+    {
+     "fn": "method",
+     "name": "accruals_ratio",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "receivables",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "accounts_receivable",
+     "last_n": 8
+    }
+   ],
+   [
+    "receivables_yoy",
+    {
+     "fn": "yoy",
+     "of": "$receivables"
+    }
+   ],
+   [
+    "revenue_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "revenue_yoy",
+    {
+     "fn": "yoy",
+     "of": "$revenue_q"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "accruals_ratio_q",
+  "dso_q",
+  "accruals_latest",
+  "dso_latest"
+ ],
+ "note": "PARTIAL. What settles it is the next quarter's reading against the 8-quarter history: the latest accruals ratio and DSO with their series as the band the trigger is set from. The band's own avg/std over the series is refused (avg/std of a series hits the operand check before the series branch — see _GAPS_C.md), so the level is read off the series points rather than a computed mean/std."
+}

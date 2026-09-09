@@ -1,0 +1,142 @@
+{
+ "tag": "W06-tax-rate-growth#t1",
+ "program": {
+  "let": [
+   [
+    "rev_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "total_revenues",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_s"
+    }
+   ],
+   [
+    "oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "pretax_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "pretax_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "pretax_yoy",
+    {
+     "fn": "yoy",
+     "of": "$pretax_s"
+    }
+   ],
+   [
+    "tax_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "income_tax_expense",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "tax_yoy",
+    {
+     "fn": "yoy",
+     "of": "$tax_s"
+    }
+   ],
+   [
+    "ni_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "net_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "ni_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ni_s"
+    }
+   ],
+   [
+    "tax_burden_s",
+    {
+     "fn": "method",
+     "name": "tax_burden",
+     "subject": "LLY",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "net_margin_s",
+    {
+     "fn": "method",
+     "name": "net_margin",
+     "subject": "LLY",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "pretax_cagr",
+    {
+     "fn": "cagr",
+     "of": "$pretax_s"
+    }
+   ],
+   [
+    "ni_cagr",
+    {
+     "fn": "cagr",
+     "of": "$ni_s"
+    }
+   ],
+   [
+    "rev_cagr",
+    {
+     "fn": "cagr",
+     "of": "$rev_s"
+    }
+   ],
+   [
+    "tax_rate_contribution",
+    {
+     "fn": "sub",
+     "a": "$ni_cagr",
+     "b": "$pretax_cagr"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "rev_yoy",
+  "pretax_yoy",
+  "ni_yoy",
+  "tax_burden_s"
+ ],
+ "note": "LLY's earnings composition over five fiscal years: revenue, pretax income, income tax and net income each with yoy, tax burden (net/pretax = 1 - effective rate) as a series, and the CAGR gap between net and pretax income as the growth the tax rate alone contributed. LLY files no operating_income line (metric_not_filed), so the operating layer is absent; the effective rate itself is read as 1 - tax_burden because series cannot be divided."
+}

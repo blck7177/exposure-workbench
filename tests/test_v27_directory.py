@@ -59,15 +59,15 @@ def test_a_row_says_what_it_is_and_how_it_is_called_with_the_subject_it_was_list
     rows = cat._methods("portfolio", False, "port_001")["portfolio"]
     dd = next(r for r in rows if r["name"] == "book.drawdown_episodes")
     assert dd["is"] == "portfolio method"
-    assert dd["call"] == "compute(method='book.drawdown_episodes', subject='port_001')"
+    assert dd["call"] == 'run: {"fn": "method", "name": "book.drawdown_episodes", "subject": "port_001"}'
     assert dd["params"] == ["span"]
     ex = next(r for r in rows if r["name"] == "book.explain_episode")
-    assert ex["call"] == "compute(method='book.explain_episode', subject='port_001', params={'peak': '<YYYY-MM-DD>', 'trough': '<YYYY-MM-DD>'})"
+    assert ex["call"] == 'run: {"fn": "method", "name": "book.explain_episode", "subject": "port_001", "params": {"peak": "\'<YYYY-MM-DD>\'", "trough": "\'<YYYY-MM-DD>\'"}}'
 
 
 def test_above_the_subject_level_the_call_carries_a_placeholder_not_a_choice():
     rows = cat._methods("run", False)["run"]
-    assert all("subject='<run_…>'" in r["call"] for r in rows)
+    assert all('"subject": "<run_…>"' in r["call"] for r in rows)
     ps = cat._procedures("portfolio", False)
     assert all(p["open"].startswith("describe('<port_…>', expand='") for p in ps)
     ps = cat._procedures("issuer", False, "MSFT")
@@ -77,11 +77,26 @@ def test_above_the_subject_level_the_call_carries_a_placeholder_not_a_choice():
 
 # ── the levels ───────────────────────────────────────────────────────────────
 
+@pytest.mark.live
 @pytest.mark.asyncio
 async def test_the_root_does_not_expand_and_says_what_does():
-    out = await cat.describe(None, None, "book")
+    """V30 C2 (N12): the refusal carries the desk's own ids — asked for a book
+    domain with no subject, the model guessed "port_1" — so it reads the desk."""
+    import os
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from exposure_workbench.auth.context import current_user_ctx
+    url = os.getenv("DATABASE_URL_LOCAL", "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench").replace(
+        "/exposure_workbench", "/exposure_gold")
+    engine = create_async_engine(url)
+    current_user_ctx.set("user_3IDBMeAxLTbecvGorzwV7FCeroR")
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+            out = await cat.describe(db, None, "book")
+    finally:
+        await engine.dispose()
     assert out["error"] == "expand_needs_a_subject"
     assert out["next"][0] == "describe('<port_…>')"
+    assert "port_001" in out["portfolios"] and "MSFT" in out["issuers_prepared"]
 
 
 @pytest.mark.asyncio
@@ -104,10 +119,10 @@ async def test_an_opened_domain_lists_its_leaves_with_their_calls(monkeypatch):
     assert out["domain"] == "book_liquidity" and out["question"]
     adv = out["methods"][0]
     assert adv["name"] == "price.adv" and adv["is"] == "price method"
-    assert adv["call"] == "compute(method='price.adv', subject='<ticker>')"
+    assert adv["call"] == 'run: {"fn": "method", "name": "price.adv", "subject": "<ticker>", "key": "<shares|dollars>"}'
     conc = out["reads"][0]
     assert conc["name"] == "concentration" and conc["is"] == "run figures"
-    assert conc["call"] == "read_book('run_abc', names=['issuer_exposures.<label>.weight'])"
+    assert conc["call"] == 'run: {"fn": "column", "run": "run_abc", "table": "issuer_exposures", "col": "weight"}'
     assert out["next"][0] == "describe('port_001')"
 
 
@@ -133,8 +148,8 @@ def test_a_name_at_the_wrong_door_cannot_be_written_and_the_refusal_says_the_doo
     fundamentals = build_meta_registry().tools["read_fundamentals"].json_schema
     problems = validate_args(fundamentals, {"ticker": "MSFT", "metric": "accruals_ratio"})
     assert problems[0]["value"] == "accruals_ratio"
-    assert nt.route("accruals_ratio")["call"] == "compute(method='accruals_ratio', subject='<ticker>')"
-    assert nt.route("capex", subject="MSFT")["call"] == "read_fundamentals('MSFT', metric='capex')"
+    assert nt.route("accruals_ratio")["call"] == 'run: {"fn": "method", "name": "accruals_ratio", "subject": "<ticker>"}'
+    assert nt.route("capex", subject="MSFT")["call"] == 'run: {"fn": "fundamentals", "ticker": "MSFT", "metric": "capex"}'
 
 
 @pytest.mark.asyncio
@@ -144,8 +159,8 @@ async def test_read_book_given_a_method_name_is_told_it_is_a_method_and_its_call
     monkeypatch.setattr(qn, "of_ref", of_ref)
     out = await definitions._quantities_by_name(None, "run_x", "2026-09-04", ["book.analysis", "book.drawdown_episodes"])
     assert out["route"]["book.analysis"] == {"name": "book.analysis", "is": "run method",
-                                             "call": "compute(method='book.analysis', subject='run_x')"}
-    assert out["route"]["book.drawdown_episodes"]["call"] == "compute(method='book.drawdown_episodes', subject='<port_…>')"
+                                             "call": 'run: {"fn": "method", "name": "book.analysis", "subject": "run_x"}'}
+    assert out["route"]["book.drawdown_episodes"]["call"] == 'run: {"fn": "method", "name": "book.drawdown_episodes", "subject": "<port_…>"}'
     assert "route" in out["detail"]
 
 

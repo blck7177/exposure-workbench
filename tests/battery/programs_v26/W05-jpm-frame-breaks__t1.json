@@ -1,0 +1,155 @@
+{
+ "tag": "W05-jpm-frame-breaks#t1",
+ "program": {
+  "let": [
+   [
+    "ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "ocf_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "operating_cash_flow",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "ocf_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "operating_cash_flow",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "fcf_margin",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "capex_intensity",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "ni",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "div",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "dividends_paid",
+     "months": 12
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "distributions",
+    {
+     "fn": "add",
+     "a": "$div",
+     "b": "$bb"
+    }
+   ],
+   [
+    "payout",
+    {
+     "fn": "div",
+     "a": "$distributions",
+     "b": "$ni"
+    }
+   ],
+   [
+    "div_to_ni",
+    {
+     "fn": "div",
+     "a": "$div",
+     "b": "$ni"
+    }
+   ],
+   [
+    "bb_to_ni",
+    {
+     "fn": "div",
+     "a": "$bb",
+     "b": "$ni"
+    }
+   ],
+   [
+    "div_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "dividends_paid",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "bb_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "buybacks",
+     "months": 12,
+     "last_n": 5
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ocf",
+  "div",
+  "bb",
+  "payout"
+ ],
+ "note": "The half of the frame that works for a bank: dividends and buybacks over the trailing year against net income (payout), with their five-year series. The half that breaks, shown breaking, and those refusals are required content of the answer: capex is not filed (metric_not_filed) and free cash flow, FCF margin and capex intensity refuse as not_applicable; operating cash flow is returned but for a bank it is dominated by trading and deposit flows and is not a cash-generation measure."
+}

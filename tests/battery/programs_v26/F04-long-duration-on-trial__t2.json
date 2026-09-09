@@ -1,0 +1,175 @@
+{
+ "tag": "F04-long-duration-on-trial#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "beta_tlt",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "benchmark": "TLT",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "w_beta_tlt",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$beta_tlt"
+    }
+   ],
+   [
+    "w_tlt",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "TLT"
+    }
+   ],
+   [
+    "rate_exposure_pts",
+    {
+     "fn": "rank",
+     "of": "$w_beta_tlt",
+     "direction": "highest"
+    }
+   ],
+   [
+    "equities_rate_exposure",
+    {
+     "fn": "sum",
+     "of": "$w_beta_tlt"
+    }
+   ],
+   [
+    "book_rate_exposure",
+    {
+     "fn": "add",
+     "a": "$equities_rate_exposure",
+     "b": "$w_tlt"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_rates",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.rates_up"
+    }
+   ],
+   [
+    "mv_tlt",
+    {
+     "fn": "pick",
+     "of": "$mv",
+     "key": "TLT"
+    }
+   ],
+   [
+    "mv_googl",
+    {
+     "fn": "pick",
+     "of": "$mv",
+     "key": "GOOGL"
+    }
+   ],
+   [
+    "after_tlt",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "TLT"
+      }
+     ]
+    }
+   ],
+   [
+    "mv_after_tlt",
+    {
+     "fn": "pick",
+     "of": "$after_tlt",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "after_googl_half",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "GOOGL",
+       "fraction": 0.5
+      }
+     ]
+    }
+   ],
+   [
+    "proceeds_googl_half",
+    {
+     "fn": "pick",
+     "of": "$after_googl_half",
+     "key": "trade.proceeds"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "w_beta_tlt",
+  "w_tlt",
+  "rate_exposure_pts",
+  "mv_tlt"
+ ],
+ "note": "where the rate risk sits in weight x beta-to-TLT points: TLT's own line is 6.1 points by construction (beta 1; the method refuses TLT-on-TLT as self_regression, so it is added as its weight), GOOGL's 5.5 points is the largest single equity leg, XOM's -4.3 offsets. Cost of taking it down is the market value sold: the whole TLT line ($658k) or half of GOOGL ($677k), each as a sell scenario. The scenarios do not refit factor betas (scenario_refit boundary) so the after-book's rate beta is stated by subtraction of the leg, not re-measured; the run's own netted rates beta (0.009, nearly flat) is the factor-model view."
+}

@@ -1,0 +1,116 @@
+{
+ "tag": "B03-jpm-leverage-rank#t2",
+ "program": {
+  "let": [
+   [
+    "jem",
+    {
+     "fn": "method",
+     "name": "equity_multiplier",
+     "subject": "JPM",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "jem_now",
+    {
+     "fn": "at",
+     "of": "$jem",
+     "period": "2026-03-31"
+    }
+   ],
+   [
+    "jem_ago",
+    {
+     "fn": "at",
+     "of": "$jem",
+     "period": "2025-03-31"
+    }
+   ],
+   [
+    "jem_chg",
+    {
+     "fn": "sub",
+     "a": "$jem_now",
+     "b": "$jem_ago"
+    }
+   ],
+   [
+    "jroe",
+    {
+     "fn": "method",
+     "name": "roe",
+     "subject": "JPM",
+     "params": {
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "roe_fy24",
+    {
+     "fn": "at",
+     "of": "$jroe",
+     "period": "2024-12-31"
+    }
+   ],
+   [
+    "roe_fy25",
+    {
+     "fn": "at",
+     "of": "$jroe",
+     "period": "2025-12-31"
+    }
+   ],
+   [
+    "jroa",
+    {
+     "fn": "method",
+     "name": "roa",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "jta",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "total_assets"
+    }
+   ],
+   [
+    "jeq",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "stockholders_equity"
+    }
+   ],
+   [
+    "jni",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "jbs",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "jem_now",
+  "jem_ago",
+  "roe_fy25",
+  "jroa"
+ ],
+ "note": "The bank's shape on this desk: equity multiplier (assets/equity) now vs a year ago, read off its own reported-date series with `at` (a direct sub of two method readings is refused mixed_basis_operand), ROE FY24 vs FY25 on JPM's own grid, ROA, and the balance-sheet lines behind them (cash and restricted cash, short-term borrowings). Regulatory capital ratios (CET1) are not filed lines here — say so."
+}

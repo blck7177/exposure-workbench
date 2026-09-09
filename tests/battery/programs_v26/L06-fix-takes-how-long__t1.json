@@ -1,0 +1,173 @@
+{
+ "tag": "L06-fix-takes-how-long#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_mv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "mv_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "tier_current",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "current_value"
+     },
+     "key": "issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "tier_warning",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "warning_level"
+     },
+     "key": "issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "tier_breach",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "breach_level"
+     },
+     "key": "issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "excess_dollars",
+    {
+     "fn": "mul",
+     "a": {
+      "fn": "sub",
+      "a": "$tier_current",
+      "b": "$tier_warning"
+     },
+     "b": "$book_mv"
+    }
+   ],
+   [
+    "to_sell",
+    {
+     "fn": "scale",
+     "of": "$excess_dollars",
+     "factor": 1.1764706
+    }
+   ],
+   [
+    "adv_msft",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": "MSFT",
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days_to_fix",
+    {
+     "fn": "div",
+     "a": "$to_sell",
+     "b": {
+      "fn": "scale",
+      "of": "$adv_msft",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "check",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "MSFT",
+       "fraction": 0.0807
+      }
+     ]
+    }
+   ],
+   [
+    "msft_after",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$check",
+      "table": "limit_checks",
+      "col": "current_value"
+     },
+     "key": "issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "proceeds_check",
+    {
+     "fn": "pick",
+     "of": "$check",
+     "key": "trade.proceeds"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "mv_msft",
+  "w_msft",
+  "tier_warning",
+  "to_sell",
+  "days_to_fix"
+ ],
+ "note": "the asserted $400m is checked, not consumed: the whole book is $10.86m and MSFT is $1.749m at 16.1% against a 15% warning tier (20% breach). The sale that gets MSFT under warning is (16.1%-15%) x book / (1-15%) = $141k (the 1/0.85 is renormalisation: proceeds leave the book), i.e. 8.07% of the line; days_to_fix at 25% of MSFT's 20d ADV is a few minutes of one session. `check` re-runs the limit checks on that sale and shows MSFT at 15.0%."
+}

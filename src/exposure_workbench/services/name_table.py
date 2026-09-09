@@ -19,6 +19,7 @@ service that reaches the registry.
 from __future__ import annotations
 
 import difflib
+import json
 from dataclasses import dataclass
 
 from exposure_workbench.analytics import resources, series_ops, skill
@@ -85,6 +86,41 @@ READABLE: frozenset[str] = frozenset(
     | set(PORTFOLIO_SECTIONS) | set(RUN_SECTIONS))
 
 
+def symbol_table() -> str:
+    """The program's vocabulary in one screen (V30 Phase C): every name a
+    program may write, by the primitive that takes it. Static — ids (a
+    portfolio, its runs) are facts of the desk and come from describe(). Lives
+    in the `run` tool's description, resident with the schema, so the model
+    never navigates the catalogue to learn a name. ~900 tokens."""
+    cols: dict[str, list[str]] = {}
+    for r in resources.RUN_CHILDREN:
+        cols.setdefault(r.table, []).extend(c.name for c in r.columns)
+
+    def m_line(m) -> str:
+        props = list((m.params_schema or {}).get("properties") or {})
+        key = ""
+        if m.subject_kind == "price" and len(m.yields) > 1:
+            key = " key=" + "|".join(y.split(".")[-1] for y in m.yields)
+        return m.name + (f"({','.join(props)})" if props else "") + key
+
+    lines = [
+        "VOCABULARY. fundamentals metric: " + ", ".join(cm.SUPPORTED_METRICS) + ".",
+        "column table.col / pick key on a run: " + "; ".join(f"{t}.{{{','.join(cs)}}}" for t, cs in cols.items())
+        + " (limit_checks/risk_alerts labels look like issuer_concentration:MSFT).",
+    ]
+    for kind, label in (("issuer", "issuer methods (subject: ticker or [tickers]; params.last_n gives a series)"),
+                        ("price", "price methods (subject: ticker or [tickers])"),
+                        ("run", "run methods (subject: run_… or a scenario)"),
+                        ("portfolio", "portfolio methods (subject: port_…)")):
+        ms = [m for m in skill.METHODS.values() if m.subject_kind == kind]
+        lines.append(label + ": " + ", ".join(m_line(m) for m in ms) + ".")
+    lines.append("ops: add sub mul div(a,b) scale(of,factor) sum avg min max std abs(of) rank(of,direction) top(of,n) "
+                 "select(of,labels) vector(entries={label:$scalar}) yoy qoq pct cagr latest(of) at(of,period) "
+                 "window_return(ticker,start,end,benchmark?) sell(run,sales) buy(run,buys) run(portfolio,which=latest|prev|run_id) "
+                 "column(run,table,col) pick(of,key).")
+    return "\n".join(lines)
+
+
 def get(name: str) -> Entry | None:
     return TABLE.get(name)
 
@@ -117,26 +153,63 @@ def _stub(schema: dict, name: str = "") -> str:
     return "'<…>'"
 
 
+# V30: the program language's spelling of an op the table lists under compute's name.
+_PROGRAM_OP = {"subtract": "sub", "multiply": "mul", "divide": "div"}
+# A section as the program reads it: the run column (or figure) it stands for.
+_SECTION_EXPR = {
+    "positions": ("column", "issuer_exposures", "weight"),
+    "limits": ("column", "limit_checks", "current_value"),
+    "alerts": ("column", "risk_alerts", "current_value"),
+    "attribution": ("column", "factor_attributions", "contribution"),
+    "risk_state": ("pick", "exposure_metrics.volatility_30d", None),
+}
+
+
+def _run_expr(expr: dict) -> str:
+    return "run: " + json.dumps(expr, separators=(", ", ": "), ensure_ascii=False)
+
+
 def call(entry: Entry, subject: str | None = None, ref: str | None = None) -> str:
-    """How the model uses this name: one call it can copy. A concrete subject
-    when the caller has one (the subject level, where it is a fact), a
-    placeholder otherwise (the root, which chooses no subject)."""
+    """How the model uses this name: one expression it can copy into a program
+    (V30), or one tool call where the name is a tool's (a filing item, a
+    domain). A concrete subject when the caller has one (the subject level,
+    where it is a fact), a placeholder otherwise (the root chooses none)."""
     if entry.consumer == "compute" and entry.kind.endswith(" method"):
         m = skill.METHODS[entry.name]
         subj = subject or PLACEHOLDER[m.subject_kind]
         req = (m.params_schema or {}).get("required") or []
         props = (m.params_schema or {}).get("properties") or {}
-        params = ", ".join(f"'{k}': {_stub(props.get(k, {}), k)}" for k in req)
-        tail = f", params={{{params}}}" if params else ""
-        return f"compute(method='{entry.name}', subject='{subj}'{tail})"
+        expr: dict = {"fn": "method", "name": entry.name, "subject": subj}
+        if req:
+            expr["params"] = {k: _stub(props.get(k, {}), k) for k in req}
+        # a price method that yields several figures (beta/alpha/r2; adv shares/dollars)
+        # is picked by key; a book method yields a table read with column/pick
+        if m.subject_kind == "price" and len(m.yields) > 1:
+            expr["key"] = "<" + "|".join(y.split(".")[-1] for y in m.yields) + ">"
+        return _run_expr(expr)
     if entry.kind == "op":
-        return f"compute(op='{entry.name}', operands=['<f_…>', '<f_…>'])"
+        fn = _PROGRAM_OP.get(entry.name, entry.name)
+        if fn in ("add", "sub", "mul", "div"):
+            return _run_expr({"fn": fn, "a": "$x", "b": "$y"})
+        if fn in ("rank",):
+            return _run_expr({"fn": "rank", "of": "$v", "direction": "highest"})
+        if fn == "scale":
+            return _run_expr({"fn": "scale", "of": "$x", "factor": "<n>"})
+        if fn == "regress":
+            return "not in the program language"
+        return _run_expr({"fn": fn, "of": "$series_or_vector"})
     if entry.kind == "filed line":
-        return f"read_fundamentals('{subject or '<ticker>'}', metric='{entry.name}')"
+        return _run_expr({"fn": "fundamentals", "ticker": subject or "<ticker>", "metric": entry.name})
     if entry.kind == "filing item":
         return f"read_filings('{subject or '<ticker>'}', item='{entry.name}')"
     if entry.kind == "section":
         r = ref or PLACEHOLDER["run" if "run" in entry.on and "portfolio" not in entry.on else "portfolio"]
+        kind, a, b = _SECTION_EXPR.get(entry.name, (None, None, None))
+        run_expr = {"fn": "run", "portfolio": r} if r.startswith(("port_", "<port")) else r
+        if kind == "column":
+            return _run_expr({"fn": "column", "run": run_expr, "table": a, "col": b})
+        if kind == "pick":
+            return _run_expr({"fn": "pick", "of": run_expr, "key": a})
         return f"read_book('{r}', names=['{entry.name}'])"
     if entry.kind == "domain":
         return f"describe('{subject or PLACEHOLDER[entry.subject_kind or 'portfolio']}', expand='{entry.name}')"

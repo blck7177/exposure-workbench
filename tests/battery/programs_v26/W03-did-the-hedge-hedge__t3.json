@@ -1,0 +1,95 @@
+{
+ "tag": "W03-did-the-hedge-hedge#t3",
+ "program": {
+  "let": [
+   [
+    "beta_tlt_spy_1y",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "TLT",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "beta_tlt_spy_3m",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "TLT",
+     "params": {
+      "benchmark": "SPY",
+      "window": "3m"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "beta_hyg_spy_1y",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "HYG",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "beta_hyg_spy_3m",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "HYG",
+     "params": {
+      "benchmark": "SPY",
+      "window": "3m"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "tlt_shift",
+    {
+     "fn": "sub",
+     "a": "$beta_tlt_spy_3m",
+     "b": "$beta_tlt_spy_1y"
+    }
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_rates",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.rates_up"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "beta_tlt_spy_1y",
+  "beta_tlt_spy_3m"
+ ],
+ "note": "an early level, not a feeling: a hedge that works has a NEGATIVE beta to equities; TLT's beta to SPY is the number to watch, shown on the 1y window and the 3m window (the 3m one reacts first) with the shift between them; HYG the same. The written trigger is 'TLT's 3m beta to SPY above zero' — it already is (+0.17 on 1y), which is why t1 showed no offset; the run's netted rates beta (0.009) says the book is near-flat to rates overall."
+}

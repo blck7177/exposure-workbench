@@ -1,0 +1,4 @@
+{
+ "tag": "L02-days-arent-price#t1",
+ "skip": "a straight no: the desk's liquidity measure is time only (position market value / participation x dollar ADV); it holds no bid-ask spread, depth, or impact model anywhere in its 46 methods, so no price-side figure exists to compute."
+}

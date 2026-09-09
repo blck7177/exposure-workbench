@@ -1,0 +1,145 @@
+{
+ "tag": "W05-half-taken-back#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "mv_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "MSFT"
+    }
+   ],
+   [
+    "top5_before",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "after",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "MSFT",
+       "fraction": 0.5
+      }
+     ]
+    }
+   ],
+   [
+    "sold",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "trade.proceeds"
+    }
+   ],
+   [
+    "w_after",
+    {
+     "fn": "column",
+     "run": "$after",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_msft_after",
+    {
+     "fn": "pick",
+     "of": "$w_after",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "top5_after",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w_after",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "check_msft_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "limit_checks.issuer_concentration:MSFT.current_value"
+    }
+   ],
+   [
+    "warn_msft",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "limit_checks.issuer_concentration:MSFT.warning_level"
+    }
+   ],
+   [
+    "pmv_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "alerts_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "count.alerts"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "w_msft",
+  "w_msft_after",
+  "sold",
+  "top5_before",
+  "top5_after",
+  "check_msft_after"
+ ],
+ "note": "Scenario A, sell half of MSFT: weight 16.1% -> 8.8%, $874k sold, top-five share before/after, the MSFT single-name check re-run on the after-book against its 15% warning, book value after and the alert count (still 3: the other names renormalise up)."
+}

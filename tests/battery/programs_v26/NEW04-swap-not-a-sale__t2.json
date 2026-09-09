@@ -1,0 +1,186 @@
+{
+ "tag": "NEW04-swap-not-a-sale#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_lly_after",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "LLY"
+     },
+     "b": {
+      "fn": "scale",
+      "of": {
+       "fn": "pick",
+       "of": "$w",
+       "key": "NVDA"
+      },
+      "factor": 0.942845
+     }
+    }
+   ],
+   [
+    "betas",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "NVDA",
+      "LLY"
+     ],
+     "params": {
+      "benchmark": "SPY"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "r2s",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "NVDA",
+      "LLY"
+     ],
+     "params": {
+      "benchmark": "SPY"
+     },
+     "key": "r2"
+    }
+   ],
+   [
+    "vols",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "NVDA",
+      "LLY"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "nvda_dd",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "NVDA",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "lly_dd",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "LLY",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "sec",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "sector_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "tech_after",
+    {
+     "fn": "sub",
+     "a": {
+      "fn": "pick",
+      "of": "$sec",
+      "key": "Technology"
+     },
+     "b": {
+      "fn": "scale",
+      "of": {
+       "fn": "pick",
+       "of": "$w",
+       "key": "NVDA"
+      },
+      "factor": 0.942845
+     }
+    }
+   ],
+   [
+    "health_after",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "pick",
+      "of": "$sec",
+      "key": "Healthcare"
+     },
+     "b": {
+      "fn": "scale",
+      "of": {
+       "fn": "pick",
+       "of": "$w",
+       "key": "NVDA"
+      },
+      "factor": 0.942845
+     }
+    }
+   ],
+   [
+    "lly_breach",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "breach_level"
+     },
+     "key": "issuer_concentration:LLY"
+    }
+   ],
+   [
+    "room_lly_breach",
+    {
+     "fn": "sub",
+     "a": "$lly_breach",
+     "b": "$w_lly_after"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "betas",
+  "vols",
+  "w_lly_after",
+  "room_lly_breach"
+ ],
+ "note": "Less risky or differently risky: NVDA vs LLY market beta and r2 to SPY and 63d realised vol side by side, their 1y drawdowns, and where the weight lands — Technology down 4pt, Healthcare (= LLY alone) up to 16.7%, 1.3pt from the LLY breach level. The book-level factor re-run for the after-book is not available (scenarios carry weights and checks, not betas) — say so."
+}

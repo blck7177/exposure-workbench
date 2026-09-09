@@ -1,0 +1,119 @@
+{
+ "tag": "B03-jpm-leverage-rank#t1",
+ "program": {
+  "let": [
+   [
+    "lev",
+    {
+     "fn": "method",
+     "name": "debt_to_ebitda",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "GOOGL",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "NVDA",
+      "JPM"
+     ]
+    }
+   ],
+   [
+    "rk",
+    {
+     "fn": "rank",
+     "of": "$lev",
+     "direction": "highest"
+    }
+   ],
+   [
+    "nlev",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "GOOGL",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "NVDA",
+      "JPM"
+     ]
+    }
+   ],
+   [
+    "rk_net",
+    {
+     "fn": "rank",
+     "of": "$nlev",
+     "direction": "highest"
+    }
+   ],
+   [
+    "lev_ocf",
+    {
+     "fn": "method",
+     "name": "debt_to_operating_cash_flow",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "GOOGL",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "NVDA",
+      "JPM"
+     ]
+    }
+   ],
+   [
+    "rk_ocf",
+    {
+     "fn": "rank",
+     "of": "$lev_ocf",
+     "direction": "highest"
+    }
+   ],
+   [
+    "td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "GOOGL",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "NVDA"
+     ]
+    }
+   ],
+   [
+    "eb",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "GOOGL",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "NVDA"
+     ]
+    }
+   ]
+  ]
+ },
+ "must": [
+  "rk",
+  "rk_ocf"
+ ],
+ "note": "JPM is in every subject list so its not_applicable refusal (bank: interest is an operating cost) is on the record inside the vector. Data absences on gold: debt_to_ebitda produces only AMZN and XOM (EBITDA needs depreciation_amortization, absent with a period for MSFT/GOOGL and stale to 2023/2024 for AAPL/LLY; total_debt not produced for MSFT/NVDA — commercial paper cover). debt_to_operating_cash_flow is the comparable that covers five of seven (LLY 2.1x highest), so rk_ocf is the real ordering delivered under the refusal."
+}

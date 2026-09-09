@@ -1,0 +1,131 @@
+{
+ "tag": "W04-book-capex-hogs#t2",
+ "program": {
+  "let": [
+   [
+    "capex_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "capex",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$capex_s"
+    }
+   ],
+   [
+    "capex_cagr",
+    {
+     "fn": "cagr",
+     "of": "$capex_s"
+    }
+   ],
+   [
+    "rev_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_s"
+    }
+   ],
+   [
+    "rev_cagr",
+    {
+     "fn": "cagr",
+     "of": "$rev_s"
+    }
+   ],
+   [
+    "ocf_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_cash_flow",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "ocf_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ocf_s"
+    }
+   ],
+   [
+    "ci_s",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "MSFT",
+     "params": {
+      "last_n": 4
+     }
+    }
+   ],
+   [
+    "capex_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "capex",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "capex_q_yoy",
+    {
+     "fn": "yoy",
+     "of": "$capex_q"
+    }
+   ],
+   [
+    "rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "rev_q_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_q"
+    }
+   ],
+   [
+    "growth_gap",
+    {
+     "fn": "sub",
+     "a": "$capex_cagr",
+     "b": "$rev_cagr"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "capex_yoy",
+  "rev_yoy",
+  "ci_s"
+ ],
+ "note": "For the heaviest name by capex intensity (MSFT on the run's ranking): capex growth beside revenue and operating-cash-flow growth, annually and quarterly, capex intensity as a four-year series, and the CAGR gap."
+}

@@ -170,5 +170,5 @@ def test_get_drawdown_is_on_both_faces_from_the_service_spec():
     m = skill.METHODS["price.drawdown"]
     assert m.executor == "price.drawdown" and m.subject_kind == "price"
     assert "compute" in faces.READ_CORE
-    assert "compute" in faces.FACE_META_AGENT and "compute" in faces.FACE_RESEARCH
+    assert "run" in faces.FACE_META_AGENT and "run" in faces.FACE_RESEARCH      # V30: through a program
     assert "peak − trough" in m.procedure, "the method says the subtraction is the desk's"

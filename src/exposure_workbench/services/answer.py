@@ -286,8 +286,15 @@ def fill(rec: dict) -> dict:
         out["display"] = dc.display(rec["value"], unit) if unit else str(rec["value"])
     elif rec.get("kind") == F.SERIES:
         out["series"] = _series_summary(rec)
-        out["display"] = (f"{dc.display(out['series']['to']['value'], unit)} ({out['series']['to']['period']})"
-                          if out["series"] and unit else _words(rec.get("measure") or ""))
+        pts = rec.get("points") or []
+        if out["series"] and unit:
+            out["display"] = f"{dc.display(out['series']['to']['value'], unit)} ({out['series']['to']['period']})"
+        elif len(pts) == 1 and unit:
+            # a yoy over five quarterly balances has one point; the reader saw
+            # "accounts receivable rose accounts receivable yoy" (V30 C2, N02)
+            out["display"] = f"{dc.display(float(pts[0][1]), unit)} ({pts[0][0]})"
+        else:
+            out["display"] = _words(rec.get("measure") or "")
     else:
         out["text"] = rec.get("text")
         out["display"] = {F.ABSENCE: "not held", F.TASK: "started", F.PASSAGE: "passage"}.get(rec.get("kind"), "")

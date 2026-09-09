@@ -1,0 +1,104 @@
+{
+ "tag": "NEW02-does-the-story-still-hold#t1",
+ "program": {
+  "let": [
+   [
+    "capex_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "capex",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$capex_q"
+    }
+   ],
+   [
+    "capex_qoq",
+    {
+     "fn": "qoq",
+     "of": "$capex_q"
+    }
+   ],
+   [
+    "capex_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "ocf_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$capex_ttm",
+     "b": "$ocf_ttm"
+    }
+   ],
+   [
+    "intensity_q",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "GOOGL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "intensity_ttm",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "GOOGL"
+    }
+   ],
+   [
+    "fcf_ttm",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "GOOGL"
+    }
+   ],
+   [
+    "fcf_margin_q",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "GOOGL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "capex_q",
+  "capex_yoy",
+  "capex_ttm",
+  "capex_to_ocf"
+ ],
+ "note": "The MD&A passage is filings text; the numbers that test it are GOOGL's quarterly capex over 8 quarters with yoy/qoq, the TTM capex ($132bn to 2026-06-30) as a share of operating cash flow (71%) and of revenue (30%), and what is left as FCF ($53bn) with the quarterly FCF margin path."
+}

@@ -1,0 +1,103 @@
+{
+ "tag": "W03-xom-trough-relever#t1",
+ "program": {
+  "let": [
+   [
+    "nd2e_now",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "d2e_now",
+    {
+     "fn": "method",
+     "name": "debt_to_ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "nd",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "ebitda_s",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "XOM",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "ebitda_trough",
+    {
+     "fn": "min",
+     "of": "$ebitda_s"
+    }
+   ],
+   [
+    "ebitda_2021",
+    {
+     "fn": "at",
+     "of": "$ebitda_s",
+     "period": "2021-12-31"
+    }
+   ],
+   [
+    "ebitda_latest",
+    {
+     "fn": "latest",
+     "of": "$ebitda_s"
+    }
+   ],
+   [
+    "nd2e_at_trough",
+    {
+     "fn": "div",
+     "a": "$nd",
+     "b": "$ebitda_trough"
+    }
+   ],
+   [
+    "nd2e_at_2021",
+    {
+     "fn": "div",
+     "a": "$nd",
+     "b": "$ebitda_2021"
+    }
+   ],
+   [
+    "d2e_at_2021",
+    {
+     "fn": "div",
+     "a": "$td",
+     "b": "$ebitda_2021"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "nd2e_now",
+  "ebitda_s",
+  "ebitda_trough",
+  "nd2e_at_trough"
+ ],
+ "note": "As-reported net-debt-to-EBITDA (and debt-to-EBITDA) first, then XOM's EBITDA over the five fiscal years held, the trough by `min` over the series, and today's net debt and total debt divided by it. The `min` node carries no period, so `at` on 2021-12-31 (the trough year in the held run; nothing earlier than FY2021 is filed) names the year with the same figure."
+}

@@ -1,0 +1,135 @@
+{
+ "tag": "W02-ccc-carried-to-jpm#t3",
+ "program": {
+  "let": [
+   [
+    "jem",
+    {
+     "fn": "method",
+     "name": "equity_multiplier",
+     "subject": "JPM",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "jem_now",
+    {
+     "fn": "at",
+     "of": "$jem",
+     "period": "2026-03-31"
+    }
+   ],
+   [
+    "jem_ago",
+    {
+     "fn": "at",
+     "of": "$jem",
+     "period": "2025-03-31"
+    }
+   ],
+   [
+    "jem_chg",
+    {
+     "fn": "sub",
+     "a": "$jem_now",
+     "b": "$jem_ago"
+    }
+   ],
+   [
+    "jroe",
+    {
+     "fn": "method",
+     "name": "roe",
+     "subject": "JPM",
+     "params": {
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "roe_fy24",
+    {
+     "fn": "at",
+     "of": "$jroe",
+     "period": "2024-12-31"
+    }
+   ],
+   [
+    "roe_fy25",
+    {
+     "fn": "at",
+     "of": "$jroe",
+     "period": "2025-12-31"
+    }
+   ],
+   [
+    "roa",
+    {
+     "fn": "method",
+     "name": "roa",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "ni_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "ni_ttm_ago",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "start": "2024-04-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "ni_chg",
+    {
+     "fn": "sub",
+     "a": "$ni_ttm",
+     "b": "$ni_ttm_ago"
+    }
+   ],
+   [
+    "assets",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "total_assets"
+    }
+   ],
+   [
+    "equity",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "stockholders_equity"
+    }
+   ],
+   [
+    "bs",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "jem_now",
+  "jem_ago",
+  "roe_fy25",
+  "roe_fy24",
+  "roa"
+ ],
+ "note": "The bank version of 'how is the working capital doing': balance-sheet leverage (assets/equity 13.5x now vs 12.4x a year ago, via the last_n=5 series and `at` — a direct sub of two method readings is refused mixed_basis_operand), ROE FY25 vs FY24 (15.7% vs 17.0%), ROA, TTM net income now vs the year-ago TTM window, with total assets, equity, cash and short-term borrowings. Net interest margin and CET1 are not filed lines on this desk — say so."
+}

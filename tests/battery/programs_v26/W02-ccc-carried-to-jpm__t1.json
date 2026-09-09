@@ -1,0 +1,144 @@
+{
+ "tag": "W02-ccc-carried-to-jpm#t1",
+ "program": {
+  "let": [
+   [
+    "ccc",
+    {
+     "fn": "method",
+     "name": "cash_conversion_cycle",
+     "subject": "AAPL",
+     "params": {
+      "months": 12,
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "ccc_fy24",
+    {
+     "fn": "at",
+     "of": "$ccc",
+     "period": "2024-09-28"
+    }
+   ],
+   [
+    "ccc_fy25",
+    {
+     "fn": "at",
+     "of": "$ccc",
+     "period": "2025-09-27"
+    }
+   ],
+   [
+    "ccc_chg",
+    {
+     "fn": "sub",
+     "a": "$ccc_fy25",
+     "b": "$ccc_fy24"
+    }
+   ],
+   [
+    "dso",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "AAPL",
+     "params": {
+      "months": 12,
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "dso_fy24",
+    {
+     "fn": "at",
+     "of": "$dso",
+     "period": "2024-09-28"
+    }
+   ],
+   [
+    "dso_fy25",
+    {
+     "fn": "at",
+     "of": "$dso",
+     "period": "2025-09-27"
+    }
+   ],
+   [
+    "dio",
+    {
+     "fn": "method",
+     "name": "days_inventory",
+     "subject": "AAPL",
+     "params": {
+      "months": 12,
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "dio_fy24",
+    {
+     "fn": "at",
+     "of": "$dio",
+     "period": "2024-09-28"
+    }
+   ],
+   [
+    "dio_fy25",
+    {
+     "fn": "at",
+     "of": "$dio",
+     "period": "2025-09-27"
+    }
+   ],
+   [
+    "dpo",
+    {
+     "fn": "method",
+     "name": "days_payable",
+     "subject": "AAPL",
+     "params": {
+      "months": 12,
+      "last_n": 2
+     }
+    }
+   ],
+   [
+    "dpo_fy24",
+    {
+     "fn": "at",
+     "of": "$dpo",
+     "period": "2024-09-28"
+    }
+   ],
+   [
+    "dpo_fy25",
+    {
+     "fn": "at",
+     "of": "$dpo",
+     "period": "2025-09-27"
+    }
+   ],
+   [
+    "ccc_ttm",
+    {
+     "fn": "method",
+     "name": "cash_conversion_cycle",
+     "subject": "AAPL"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ccc_fy25",
+  "ccc_fy24",
+  "ccc_chg",
+  "dso_fy25",
+  "dio_fy25",
+  "dpo_fy25"
+ ],
+ "note": "CCC and its three legs for AAPL on two consecutive 12-month windows of its own grid (FY24 to 2024-09-28, FY25 to 2025-09-27) with the change as sub of the two readings (-75.8 -> -71.1 days: negative because DPO dwarfs DSO+DIO), plus the latest TTM reading (to 2026-03-28, -53.9) as 'now'. `at=` on a method shifts only the balances under a latest-TTM flow, so the grid series is the honest year-ago."
+}

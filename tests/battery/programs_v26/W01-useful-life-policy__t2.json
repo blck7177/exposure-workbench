@@ -1,0 +1,247 @@
+{
+ "tag": "W01-useful-life-policy#t2",
+ "program": {
+  "let": [
+   [
+    "MSFT_om_now",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "MSFT_dep_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_rev_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_dep_to_rev_now",
+    {
+     "fn": "div",
+     "a": "$MSFT_dep_now",
+     "b": "$MSFT_rev_now"
+    }
+   ],
+   [
+    "MSFT_dep_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "depreciation",
+     "start": "2022-07-01",
+     "end": "2023-06-30"
+    }
+   ],
+   [
+    "MSFT_rev_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "start": "2022-07-01",
+     "end": "2023-06-30"
+    }
+   ],
+   [
+    "MSFT_dep_to_rev_then",
+    {
+     "fn": "div",
+     "a": "$MSFT_dep_then",
+     "b": "$MSFT_rev_then"
+    }
+   ],
+   [
+    "MSFT_dep_rev_delta",
+    {
+     "fn": "sub",
+     "a": "$MSFT_dep_to_rev_then",
+     "b": "$MSFT_dep_to_rev_now"
+    }
+   ],
+   [
+    "MSFT_om_reverted",
+    {
+     "fn": "sub",
+     "a": "$MSFT_om_now",
+     "b": "$MSFT_dep_rev_delta"
+    }
+   ],
+   [
+    "AMZN_om_now",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_dep_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_rev_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_dep_to_rev_now",
+    {
+     "fn": "div",
+     "a": "$AMZN_dep_now",
+     "b": "$AMZN_rev_now"
+    }
+   ],
+   [
+    "AMZN_dep_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "depreciation",
+     "start": "2022-01-01",
+     "end": "2022-12-31"
+    }
+   ],
+   [
+    "AMZN_rev_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "start": "2022-01-01",
+     "end": "2022-12-31"
+    }
+   ],
+   [
+    "AMZN_dep_to_rev_then",
+    {
+     "fn": "div",
+     "a": "$AMZN_dep_then",
+     "b": "$AMZN_rev_then"
+    }
+   ],
+   [
+    "AMZN_dep_rev_delta",
+    {
+     "fn": "sub",
+     "a": "$AMZN_dep_to_rev_then",
+     "b": "$AMZN_dep_to_rev_now"
+    }
+   ],
+   [
+    "AMZN_om_reverted",
+    {
+     "fn": "sub",
+     "a": "$AMZN_om_now",
+     "b": "$AMZN_dep_rev_delta"
+    }
+   ],
+   [
+    "GOOGL_om_now",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "GOOGL"
+    }
+   ],
+   [
+    "GOOGL_dep_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_rev_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_dep_to_rev_now",
+    {
+     "fn": "div",
+     "a": "$GOOGL_dep_now",
+     "b": "$GOOGL_rev_now"
+    }
+   ],
+   [
+    "GOOGL_dep_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "depreciation",
+     "start": "2022-01-01",
+     "end": "2022-12-31"
+    }
+   ],
+   [
+    "GOOGL_rev_then",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "revenue",
+     "start": "2022-01-01",
+     "end": "2022-12-31"
+    }
+   ],
+   [
+    "GOOGL_dep_to_rev_then",
+    {
+     "fn": "div",
+     "a": "$GOOGL_dep_then",
+     "b": "$GOOGL_rev_then"
+    }
+   ],
+   [
+    "GOOGL_dep_rev_delta",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_dep_to_rev_then",
+     "b": "$GOOGL_dep_to_rev_now"
+    }
+   ],
+   [
+    "GOOGL_om_reverted",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_om_now",
+     "b": "$GOOGL_dep_rev_delta"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "MSFT_om_reverted",
+  "AMZN_om_reverted",
+  "GOOGL_om_reverted"
+ ],
+ "note": "Nearest computable restatement: operating margin now, less the change in depreciation-to-revenue between the fiscal year three years back (FY2023 for MSFT, 2022 for AMZN/GOOGL) and the trailing year: if the depreciation ratio went back to then, the margin moves by that many points. GOOGL's 2022 top line is read under the contract-revenue concept because total_revenues has no derivable 2022 window (window_not_derivable); the two differ only by non-contract income. The filing's own stated dollar effect of the life change is text and absent, and the ratio change also carries mix effects, which the answer must say."
+}

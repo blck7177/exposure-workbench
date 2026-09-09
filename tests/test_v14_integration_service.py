@@ -89,7 +89,7 @@ def test_the_meta_face_resolves_with_the_new_tool_on_it():
     resolved because both are built from the same read registry: the narrowing
     is the face's job, and a tool added to the wrong list would still resolve
     while answering the wrong agent (which the test above holds)."""
-    assert "compute" in faces.resolve(build_meta_registry(), faces.FACE_META_AGENT)
+    assert "run" in faces.resolve(build_meta_registry(), faces.FACE_META_AGENT)
     assert "read_book" not in faces.resolve(build_research_registry(), faces.FACE_RESEARCH)
 
 

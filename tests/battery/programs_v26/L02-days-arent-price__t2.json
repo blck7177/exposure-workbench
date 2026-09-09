@@ -1,0 +1,126 @@
+{
+ "tag": "L02-days-arent-price#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "worst_days",
+    {
+     "fn": "rank",
+     "of": "$days",
+     "direction": "highest"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "worst_vol",
+    {
+     "fn": "rank",
+     "of": "$vol_63d",
+     "direction": "highest"
+    }
+   ],
+   [
+    "days_x_vol",
+    {
+     "fn": "mul",
+     "a": "$days",
+     "b": "$vol_63d"
+    }
+   ],
+   [
+    "worst_days_x_vol",
+    {
+     "fn": "rank",
+     "of": "$days_x_vol",
+     "direction": "highest"
+    }
+   ],
+   [
+    "share_of_a_day",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": "$adv"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "days",
+  "worst_days",
+  "vol_63d"
+ ],
+ "note": "the nearest things the desk has to a cost of hurrying out: days-to-exit at 25% of 20d ADV (worst first: JPM, LLY, HYG), each name's position as a share of one full day's dollar volume, and its 63d vol (the price risk carried while the exit runs); days x vol is offered as a constructed proxy for exposure-during-exit and labelled as such — none of these is a spread, impact or cost figure, which the desk does not hold."
+}

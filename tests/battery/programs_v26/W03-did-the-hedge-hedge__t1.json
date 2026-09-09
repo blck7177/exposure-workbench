@@ -1,0 +1,197 @@
+{
+ "tag": "W03-did-the-hedge-hedge#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "ret_tlt",
+    {
+     "fn": "pick",
+     "of": "$holding_ret",
+     "key": "TLT"
+    }
+   ],
+   [
+    "ret_hyg",
+    {
+     "fn": "pick",
+     "of": "$holding_ret",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_tlt",
+    {
+     "fn": "pick",
+     "of": "$contrib",
+     "key": "TLT"
+    }
+   ],
+   [
+    "contrib_hyg",
+    {
+     "fn": "pick",
+     "of": "$contrib",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_hedges",
+    {
+     "fn": "add",
+     "a": "$contrib_tlt",
+     "b": "$contrib_hyg"
+    }
+   ],
+   [
+    "contrib_all",
+    {
+     "fn": "sum",
+     "of": "$contrib"
+    }
+   ],
+   [
+    "contrib_equities",
+    {
+     "fn": "sub",
+     "a": "$contrib_all",
+     "b": "$contrib_hedges"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_fall",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-01-07"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "contrib_equities",
+  "contrib_tlt",
+  "contrib_hyg",
+  "contrib_hedges"
+ ],
+ "note": "netted with direction over the last hole (2026-01-07..03-27, dates from the episodes payload): the eight equities contributed about -11.0 points together, TLT -0.11 and HYG -0.12 (returns -1.75% and -1.71% at 6.1% and 7.3% weight), -0.23 points as a pair — they offset nothing and went down a little with everything else; the book fell 11.96% (path depth) while SPY fell 7.80% over the same dates. Contributions are fixed-window weight x return from book.explain_episode's holdings column."
+}

@@ -652,9 +652,12 @@ async def test_the_scenario_method_is_on_the_meta_faces_compute_only():
     from exposure_workbench.analytics import skill
     from exposure_workbench.tools.registries import build_research_registry
     assert skill.METHODS["book.sell"].subject_kind == "run"
-    assert "compute" in faces.FACE_META_AGENT and "compute" in faces.FACE_RESEARCH
+    assert "run" in faces.FACE_META_AGENT and "compute" in faces.FACE_RESEARCH   # V30
     out = await build_research_registry().get("compute").fn(
         None, method="book.sell", subject="run_x", params={"sales": [{"ticker": "NVDA"}]})
+    assert out["error"] == "not_on_this_face"
+    out = await build_research_registry().get("run").fn(
+        None, program={"let": [["after", {"fn": "method", "name": "book.sell", "subject": "run_x", "params": {"sales": [{"ticker": "NVDA"}]}}]]})
     assert out["error"] == "not_on_this_face"
 
 

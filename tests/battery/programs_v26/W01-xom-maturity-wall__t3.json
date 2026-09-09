@@ -1,0 +1,121 @@
+{
+ "tag": "W01-xom-maturity-wall#t3",
+ "program": {
+  "let": [
+   [
+    "ie_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "interest_expense",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "ie_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ie_q"
+    }
+   ],
+   [
+    "ie_qoq",
+    {
+     "fn": "qoq",
+     "of": "$ie_q"
+    }
+   ],
+   [
+    "ip_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "interest_paid",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "ip_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ip_q"
+    }
+   ],
+   [
+    "ie_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "interest_expense",
+     "months": 12
+    }
+   ],
+   [
+    "ie_ttm_prior",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "interest_expense",
+     "start": "2024-04-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "ie_ttm_chg",
+    {
+     "fn": "sub",
+     "a": "$ie_ttm",
+     "b": "$ie_ttm_prior"
+    }
+   ],
+   [
+    "td_now",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "td_yago",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM",
+     "params": {
+      "at": "2025-03-31"
+     }
+    }
+   ],
+   [
+    "td_chg",
+    {
+     "fn": "sub",
+     "a": "$td_now",
+     "b": "$td_yago"
+    }
+   ],
+   [
+    "cov_s",
+    {
+     "fn": "method",
+     "name": "ebit_interest_coverage",
+     "subject": "XOM",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ie_q",
+  "ie_yoy",
+  "ie_ttm",
+  "ie_ttm_prior",
+  "ie_ttm_chg"
+ ],
+ "note": "Whether XOM's interest bill is already rising: quarterly interest expense with yoy and qoq, cash interest paid beside it, the trailing year against the prior trailing year, and total debt now versus a year ago so a rising bill can be tied to more debt or a higher rate; coverage over five years as context."
+}

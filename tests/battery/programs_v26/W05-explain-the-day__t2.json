@@ -1,0 +1,263 @@
+{
+ "tag": "W05-explain-the-day#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ],
+   [
+    "fit_residual",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.residual"
+    }
+   ],
+   [
+    "rec_d0904",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_34042d64f60c"
+    }
+   ],
+   [
+    "residual_d0904",
+    {
+     "fn": "pick",
+     "of": "$rec_d0904",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0904",
+    {
+     "fn": "pick",
+     "of": "$rec_d0904",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0904",
+    {
+     "fn": "pick",
+     "of": "$rec_d0904",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0903",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_c1b54faaf60f"
+    }
+   ],
+   [
+    "residual_d0903",
+    {
+     "fn": "pick",
+     "of": "$rec_d0903",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0903",
+    {
+     "fn": "pick",
+     "of": "$rec_d0903",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0903",
+    {
+     "fn": "pick",
+     "of": "$rec_d0903",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0902",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_3c94a47d6547"
+    }
+   ],
+   [
+    "residual_d0902",
+    {
+     "fn": "pick",
+     "of": "$rec_d0902",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0902",
+    {
+     "fn": "pick",
+     "of": "$rec_d0902",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0902",
+    {
+     "fn": "pick",
+     "of": "$rec_d0902",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0901",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_690a3a2db838"
+    }
+   ],
+   [
+    "residual_d0901",
+    {
+     "fn": "pick",
+     "of": "$rec_d0901",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0901",
+    {
+     "fn": "pick",
+     "of": "$rec_d0901",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0901",
+    {
+     "fn": "pick",
+     "of": "$rec_d0901",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0831",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_1d6e9e05bee6"
+    }
+   ],
+   [
+    "residual_d0831",
+    {
+     "fn": "pick",
+     "of": "$rec_d0831",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0831",
+    {
+     "fn": "pick",
+     "of": "$rec_d0831",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0831",
+    {
+     "fn": "pick",
+     "of": "$rec_d0831",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0827",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_d1bbfadbbb7e"
+    }
+   ],
+   [
+    "residual_d0827",
+    {
+     "fn": "pick",
+     "of": "$rec_d0827",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0827",
+    {
+     "fn": "pick",
+     "of": "$rec_d0827",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0827",
+    {
+     "fn": "pick",
+     "of": "$rec_d0827",
+     "key": "unexplained_share"
+    }
+   ],
+   [
+    "rec_d0820",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "run_95ebe31c5e51"
+    }
+   ],
+   [
+    "residual_d0820",
+    {
+     "fn": "pick",
+     "of": "$rec_d0820",
+     "key": "alpha_plus_residual"
+    }
+   ],
+   [
+    "book_ret_d0820",
+    {
+     "fn": "pick",
+     "of": "$rec_d0820",
+     "key": "sum_of_position_contributions"
+    }
+   ],
+   [
+    "unexplained_d0820",
+    {
+     "fn": "pick",
+     "of": "$rec_d0820",
+     "key": "unexplained_share"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "residual_d0904",
+  "residual_d0903",
+  "residual_d0902",
+  "residual_d0901",
+  "residual_d0831",
+  "r2"
+ ],
+ "note": "The residual as a LEVEL on each of the last seven run days (book.reconcile on one completed run per as-of date: alpha_plus_residual beside the day's return; the share is unstable when the day's return is near zero, e.g. 09-02) plus the regression's own R-squared over its 750-session window, which is the standing unexplained fraction (1 - R2). No prior run is assumed: each run id is explicit."
+}

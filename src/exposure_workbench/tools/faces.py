@@ -38,11 +38,16 @@ READ_CORE = [
 # weights would be writing about the holder, not the issuer.
 META_ONLY_READS = ["read_book"]
 
-FACE_META_AGENT = READ_CORE + META_ONLY_READS + [
+# V30 (Phase B): the meta face computes through ONE tool, `run`; the
+# per-domain reads and `compute` stay registered for the research face until
+# the brief path migrates (plan D5). read_book stays for briefs and task state.
+FACE_META_AGENT = [
+    "describe", "run", "read_filings",
+] + META_ONLY_READS + [
     "search_web",
-    "start", "respond",
+    "start", "respond", "think",
 ]
-FACE_RESEARCH = READ_CORE + ["search_web", "submit_brief"]
+FACE_RESEARCH = READ_CORE + ["run", "search_web", "submit_brief"]
 
 # What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
 # at /mcp/<name> and every token carries the name it was minted for, so the same

@@ -1,0 +1,85 @@
+{
+ "tag": "L03-whose-assumption-is-that#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days_at_full_adv",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": "$adv"
+    }
+   ],
+   [
+    "rate_for_5_days",
+    {
+     "fn": "scale",
+     "of": "$days_at_full_adv",
+     "factor": 0.2,
+     "unit": "ratio"
+    }
+   ],
+   [
+    "worst_rate",
+    {
+     "fn": "top",
+     "of": "$rate_for_5_days",
+     "n": 1,
+     "direction": "highest"
+    }
+   ],
+   [
+    "worst_name",
+    {
+     "fn": "rank",
+     "of": "$days_at_full_adv",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "worst_rate",
+  "worst_name"
+ ],
+ "note": "inverting the measure for the slowest name (JPM): the participation rate that gets the whole line out in five sessions is days-at-100%-of-ADV / 5, i.e. mv / (5 x ADV); on this book that is 0.017% of JPM's daily volume — the trigger the PM can write down is that rate, and it is so small that the week is never the binding constraint."
+}

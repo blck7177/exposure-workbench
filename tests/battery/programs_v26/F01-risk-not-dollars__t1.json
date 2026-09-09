@@ -1,0 +1,85 @@
+{
+ "tag": "F01-risk-not-dollars#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "w_x_vol",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$vol_63d"
+    }
+   ],
+   [
+    "risk_share",
+    {
+     "fn": "div",
+     "a": "$w_x_vol",
+     "b": {
+      "fn": "sum",
+      "of": "$w_x_vol"
+     }
+    }
+   ],
+   [
+    "risk_rank",
+    {
+     "fn": "rank",
+     "of": "$w_x_vol",
+     "direction": "highest"
+    }
+   ],
+   [
+    "weight_rank",
+    {
+     "fn": "rank",
+     "of": "$w",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "risk_share",
+  "risk_rank"
+ ],
+ "note": "each position's weight (latest run) times its 63-session annualised vol, shown as a share of the summed weight x vol, with the ranking taken over the per-name weight x vol (the same order as the shares; a share-of-sum vector cannot be ranked, _GAPS_A) beside the plain weight ranking. NVDA is not the biggest line by dollars on this run (MSFT is, at 16.1%; NVDA is 4.2%, the smallest), so the premise is corrected; MSFT tops both lists. This is standalone risk (no correlations), not a marginal-contribution decomposition — the desk has no covariance method."
+}

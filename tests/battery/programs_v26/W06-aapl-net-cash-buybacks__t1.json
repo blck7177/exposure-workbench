@@ -1,0 +1,93 @@
+{
+ "tag": "W06-aapl-net-cash-buybacks#t1",
+ "program": {
+  "let": [
+   [
+    "td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "bs",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL"
+    }
+   ],
+   [
+    "ltd",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "long_term_debt_total"
+    }
+   ],
+   [
+    "cp",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "commercial_paper"
+    }
+   ],
+   [
+    "cur_ltd",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "current_portion_long_term_debt"
+    }
+   ],
+   [
+    "cash",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "cash_and_equivalents"
+    }
+   ],
+   [
+    "quick",
+    {
+     "fn": "method",
+     "name": "quick_assets",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "nd",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "cash_to_debt",
+    {
+     "fn": "div",
+     "a": "$cash",
+     "b": "$td"
+    }
+   ],
+   [
+    "ie_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "interest_expense",
+     "months": 12
+    }
+   ]
+  ]
+ },
+ "must": [
+  "td",
+  "cash",
+  "nd"
+ ],
+ "note": "Both legs of the netting at reader level: AAPL total_debt with its components (long-term debt incl. current maturities, commercial paper), cash and equivalents and quick assets, and net_debt with its sign. The interest_expense read is the cost of that gross debt, but AAPL stops filing the line after 2023-09-30, so the node settles on the last filed window (FY2023, as_of 2023-09-30), not the trailing year; the answer must date it."
+}

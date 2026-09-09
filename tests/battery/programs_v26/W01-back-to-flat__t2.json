@@ -1,0 +1,77 @@
+{
+ "tag": "W01-back-to-flat#t2",
+ "program": {
+  "let": [
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "n_episodes_1y",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "quality_flags.episodes"
+    }
+   ],
+   [
+    "trough_days_0",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_days"
+    }
+   ],
+   [
+    "recovery_days_0",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_days"
+    }
+   ],
+   [
+    "trough_days_1",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[1].trough_days"
+    }
+   ],
+   [
+    "recovery_days_1",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[1].recovery_days"
+    }
+   ],
+   [
+    "episodes_3y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "3y"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "n_episodes_1y",
+  "trough_days_0",
+  "recovery_days_0",
+  "trough_days_1",
+  "recovery_days_1"
+ ],
+ "note": "time under water: two ≥5% episodes in the last year (11.96%: 55 sessions down + 24 back; 6.24%: 18 + 13), so 110 of the year's 253 sessions were spent below a prior high inside a ≥5% hole; dips shallower than the 5% floor are not counted. The day counts come back as literals from the episodes payload, not as figures the program can add (_GAPS_A), so the 110-session sum is done in prose."
+}

@@ -1,0 +1,218 @@
+{
+ "tag": "NEW04-swap-not-a-sale#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "w_lly",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "LLY"
+    }
+   ],
+   [
+    "mv_nvda",
+    {
+     "fn": "pick",
+     "of": "$mv",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "mv_lly",
+    {
+     "fn": "pick",
+     "of": "$mv",
+     "key": "LLY"
+    }
+   ],
+   [
+    "move_dollars",
+    {
+     "fn": "scale",
+     "of": "$pmv",
+     "factor": 0.04
+    }
+   ],
+   [
+    "nvda_fraction",
+    {
+     "fn": "div",
+     "a": "$move_dollars",
+     "b": "$mv_nvda"
+    }
+   ],
+   [
+    "moved_weight",
+    {
+     "fn": "scale",
+     "of": "$w_nvda",
+     "factor": 0.942845
+    }
+   ],
+   [
+    "w_nvda_after",
+    {
+     "fn": "sub",
+     "a": "$w_nvda",
+     "b": "$moved_weight"
+    }
+   ],
+   [
+    "w_lly_after",
+    {
+     "fn": "add",
+     "a": "$w_lly",
+     "b": "$moved_weight"
+    }
+   ],
+   [
+    "lly_breach",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "breach_level"
+     },
+     "key": "issuer_concentration:LLY"
+    }
+   ],
+   [
+    "lly_warning",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "warning_level"
+     },
+     "key": "issuer_concentration:LLY"
+    }
+   ],
+   [
+    "room_lly_breach",
+    {
+     "fn": "sub",
+     "a": "$lly_breach",
+     "b": "$w_lly_after"
+    }
+   ],
+   [
+    "top5_before",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "sale_leg",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "NVDA",
+       "fraction": 0.942845
+      }
+     ]
+    }
+   ],
+   [
+    "swap",
+    {
+     "fn": "buy",
+     "run": "$sale_leg",
+     "buys": [
+      {
+       "ticker": "LLY",
+       "weight": 0.1670047
+      }
+     ]
+    }
+   ],
+   [
+    "w_after_swap",
+    {
+     "fn": "column",
+     "run": "$swap",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "top5_after",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w_after_swap",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "alerts_after",
+    {
+     "fn": "pick",
+     "of": "$swap",
+     "key": "count.alerts"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "move_dollars",
+  "nvda_fraction",
+  "w_lly_after",
+  "room_lly_breach"
+ ],
+ "note": "PARTIAL. Four points of a $10.86m book is $434k = 94.3% of NVDA (nvda_fraction), so the swap is nearly all of NVDA into LLY; the after-weights are computed on the ONE before-book by weight arithmetic (LLY 12.7% -> 16.7%, 1.3pt under its 18% breach and already past its 12% warning; NVDA -> 0.24%); top5 before 66%. The scenario itself is refused: `buy` LLY returns no_sector on gold (LLY's company record carries no sector, a data absence), so the chained sell->buy legs (sizes are literals — the language cannot pass computed nodes into a scenario, see _GAPS_C.md) and the after-book top5/alerts do not settle."
+}

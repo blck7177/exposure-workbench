@@ -1,0 +1,116 @@
+{
+ "tag": "W06-weight-we-chose#t3",
+ "program": {
+  "let": [
+   [
+    "rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "rev_growth",
+    {
+     "fn": "yoy",
+     "of": "$rev"
+    }
+   ],
+   [
+    "op_margin",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 12,
+      "last_n": 4
+     }
+    }
+   ],
+   [
+    "fcf_margin",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "dist_high",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "NVDA"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "NVDA",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "beta_spy",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "NVDA",
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "NVDA",
+     "params": {
+      "window": "1y",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "NVDA"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "w_nvda",
+  "rev_growth",
+  "op_margin"
+ ],
+ "note": "re-underwriting at today's 4.2% weight with what the desk holds: NVDA's revenue growth (yoy of 12-month total_revenues), operating margin over four years, FCF margin, distance from its 52w high, 63d vol, 1y beta/alpha/R² to SPY and 1y return vs SPY. Absent and said so: no valuation multiple (the desk has no valuation method), no entry price, no forecast — so 'would you put it on at this weight' is judged on business quality and risk, not on price."
+}

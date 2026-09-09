@@ -1,0 +1,162 @@
+{
+ "tag": "FQ03-is-aws-carrying-it#t3",
+ "program": {
+  "let": [
+   [
+    "om_s",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "AMZN",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "om_now",
+    {
+     "fn": "latest",
+     "of": "$om_s"
+    }
+   ],
+   [
+    "om_2y",
+    {
+     "fn": "at",
+     "of": "$om_s",
+     "period": "2023-12-31"
+    }
+   ],
+   [
+    "om_chg_2y",
+    {
+     "fn": "sub",
+     "a": "$om_now",
+     "b": "$om_2y"
+    }
+   ],
+   [
+    "om_q",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "AMZN",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "om_q_now",
+    {
+     "fn": "latest",
+     "of": "$om_q"
+    }
+   ],
+   [
+    "om_q_yago",
+    {
+     "fn": "at",
+     "of": "$om_q",
+     "period": "2025-03-31"
+    }
+   ],
+   [
+    "om_q_chg",
+    {
+     "fn": "sub",
+     "a": "$om_q_now",
+     "b": "$om_q_yago"
+    }
+   ],
+   [
+    "nm_s",
+    {
+     "fn": "method",
+     "name": "net_margin",
+     "subject": "AMZN",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "oi_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "oi_yoy",
+    {
+     "fn": "yoy",
+     "of": "$oi_s"
+    }
+   ],
+   [
+    "rev_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_s"
+    }
+   ],
+   [
+    "fcf_margin_s",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "AMZN",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "AMZN_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "AMZN"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "om_s",
+  "om_chg_2y",
+  "om_q_chg"
+ ],
+ "note": "Whether the consolidated whole is getting more or less profitable: operating margin over five fiscal years and eight quarters with the change in points over two years and year-on-year, net and FCF margins, operating income growth against revenue growth, and the position's weight so it lands on the book."
+}

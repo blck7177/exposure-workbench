@@ -1,0 +1,4 @@
+{
+ "tag": "L06-fix-takes-how-long#t2",
+ "skip": "every check on this desk is a weight tier evaluated on a point-in-time run (limit_checks: current_value vs warning/breach level); there is no time-to-cure dimension anywhere, so a breach curable in minutes (t1's days_to_fix) and one that takes weeks read identically — the answer says so and points at t1's days_to_fix as the only bridge."
+}

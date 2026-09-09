@@ -1,0 +1,45 @@
+{
+ "tag": "W01-xom-borrow-headroom#t2",
+ "program": {
+  "let": [
+   [
+    "nd_ebitda",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "net_debt",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "capacity_2x",
+    {
+     "fn": "scale",
+     "of": "$ebitda",
+     "factor": 2.0
+    }
+   ]
+  ]
+ },
+ "must": [
+  "capacity_2x",
+  "net_debt",
+  "nd_ebitda"
+ ],
+ "note": "PARTIAL. Headroom = 2.0 x EBITDA - net debt: capacity_2x ($127.0bn, the net debt a 2.0x handle allows) and net_debt ($6.1bn) are both delivered; the subtraction itself is refused by the calculator (incompatible_bases: a flow scaled by a constant is still a flow, and a balance may be divided by a flow but not subtracted from it) and the ratio form 2.0 - nd_ebitda needs a constant operand the language lacks — see _GAPS_C.md. The answer states the ~$121bn difference from the two nodes."
+}

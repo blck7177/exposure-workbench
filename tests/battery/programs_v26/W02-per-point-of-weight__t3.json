@@ -1,0 +1,139 @@
+{
+ "tag": "W02-per-point-of-weight#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "contrib_lly",
+    {
+     "fn": "pick",
+     "of": "$contrib",
+     "key": "LLY"
+    }
+   ],
+   [
+    "half_size_saves",
+    {
+     "fn": "scale",
+     "of": "$contrib_lly",
+     "factor": 0.5
+    }
+   ],
+   [
+    "contrib_sum",
+    {
+     "fn": "sum",
+     "of": "$contrib"
+    }
+   ],
+   [
+    "lly_share_of_fall",
+    {
+     "fn": "div",
+     "a": "$contrib_lly",
+     "b": "$contrib_sum"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "contrib_lly",
+  "half_size_saves"
+ ],
+ "note": "next down the per-point list is LLY (-20.6%): at 12.7% weight its contribution is about -2.6 points (23% of the summed contributions) and half the size saves about 1.3 points, with the same first-order caveats as t2."
+}

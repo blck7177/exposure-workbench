@@ -1,0 +1,105 @@
+{
+ "tag": "NEW02-does-the-story-still-hold#t3",
+ "program": {
+  "let": [
+   [
+    "rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_q"
+    }
+   ],
+   [
+    "rev_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "months": 12
+    }
+   ],
+   [
+    "op_margin_q",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "GOOGL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "fcf_margin_q",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "GOOGL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "fcf_ttm",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "GOOGL"
+    }
+   ],
+   [
+    "capex_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "ocf_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$capex_ttm",
+     "b": "$ocf_ttm"
+    }
+   ],
+   [
+    "intensity_ttm",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "GOOGL"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "rev_yoy",
+  "fcf_margin_q",
+  "capex_to_ocf"
+ ],
+ "note": "What has to stay true: revenue growth (yoy on the quarterly total_revenues grid — GOOGL's filed line moved from `revenue` to `total_revenues`, so this is the tag that reaches 2026-06-30) must keep operating margin and FCF margin positive while capex takes 71% of operating cash flow; the trigger is capex_to_ocf approaching 1 or FCF margin turning negative."
+}

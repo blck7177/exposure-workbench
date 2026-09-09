@@ -1,0 +1,103 @@
+{
+ "tag": "FQ04-their-story-against-my-line#t3",
+ "program": {
+  "let": [
+   [
+    "inv_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "inventory",
+     "last_n": 8
+    }
+   ],
+   [
+    "inv_pct",
+    {
+     "fn": "pct",
+     "of": "$inv_s"
+    }
+   ],
+   [
+    "dio_s",
+    {
+     "fn": "method",
+     "name": "days_inventory",
+     "subject": "NVDA",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "inv_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "inventory"
+    }
+   ],
+   [
+    "cor_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "cost_of_revenue",
+     "months": 3
+    }
+   ],
+   [
+    "inv_to_cor_q",
+    {
+     "fn": "div",
+     "a": "$inv_now",
+     "b": "$cor_now"
+    }
+   ],
+   [
+    "gm_q",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "rev_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "months": 3
+    }
+   ],
+   [
+    "one_pct_of_inventory",
+    {
+     "fn": "scale",
+     "of": "$inv_now",
+     "factor": 0.01
+    }
+   ],
+   [
+    "one_pct_reserve_in_margin_pts",
+    {
+     "fn": "div",
+     "a": "$one_pct_of_inventory",
+     "b": "$rev_now"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "inv_s",
+  "dio_s",
+  "one_pct_reserve_in_margin_pts"
+ ],
+ "note": "How much provisioning can move the number: the inventory balance over eight quarters, days inventory as a series, inventory against the quarter's cost of revenue, and a held sensitivity: one percent of the inventory balance expressed in gross-margin points of the quarter's revenue. The reserve balance, the period charge and management's own stated sensitivity are note text and are absent."
+}

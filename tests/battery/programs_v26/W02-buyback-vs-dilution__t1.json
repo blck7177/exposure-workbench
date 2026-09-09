@@ -1,0 +1,141 @@
+{
+ "tag": "W02-buyback-vs-dilution#t1",
+ "program": {
+  "let": [
+   [
+    "sh_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "shares_outstanding",
+     "last_n": 13
+    }
+   ],
+   [
+    "sh_pct",
+    {
+     "fn": "pct",
+     "of": "$sh_s"
+    }
+   ],
+   [
+    "sh_yoy",
+    {
+     "fn": "yoy",
+     "of": "$sh_s"
+    }
+   ],
+   [
+    "sh_now",
+    {
+     "fn": "latest",
+     "of": "$sh_s"
+    }
+   ],
+   [
+    "sh_3y",
+    {
+     "fn": "at",
+     "of": "$sh_s",
+     "period": "2023-03-31"
+    }
+   ],
+   [
+    "sh_chg_3y",
+    {
+     "fn": "sub",
+     "a": "$sh_now",
+     "b": "$sh_3y"
+    }
+   ],
+   [
+    "sh_chg_3y_pct",
+    {
+     "fn": "div",
+     "a": "$sh_chg_3y",
+     "b": "$sh_3y"
+    }
+   ],
+   [
+    "dil_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "shares_diluted_weighted",
+     "months": 3,
+     "last_n": 12
+    }
+   ],
+   [
+    "dil_yoy",
+    {
+     "fn": "yoy",
+     "of": "$dil_s"
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "sbc",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "sbc",
+     "months": 12
+    }
+   ],
+   [
+    "net_buyback",
+    {
+     "fn": "sub",
+     "a": "$bb",
+     "b": "$sbc"
+    }
+   ],
+   [
+    "sbc_to_bb",
+    {
+     "fn": "div",
+     "a": "$sbc",
+     "b": "$bb"
+    }
+   ],
+   [
+    "bb_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "buybacks",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "sbc_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "sbc",
+     "months": 12,
+     "last_n": 4
+    }
+   ]
+  ]
+ },
+ "must": [
+  "sh_s",
+  "sh_yoy",
+  "sh_chg_3y_pct",
+  "bb",
+  "sbc",
+  "net_buyback"
+ ],
+ "note": "The count question answered from filed shares: MSFT shares outstanding at thirteen quarter-ends with period and yoy change and the three-year change, diluted weighted shares beside it, and the netting the question is about: trailing buybacks minus SBC, and SBC as a share of buybacks."
+}

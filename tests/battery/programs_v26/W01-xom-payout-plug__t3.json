@@ -1,0 +1,116 @@
+{
+ "tag": "W01-xom-payout-plug#t3",
+ "program": {
+  "let": [
+   [
+    "div_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "fcf_q",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "ocf_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "capex_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "capex",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$capex_q"
+    }
+   ],
+   [
+    "div_q_latest",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 3
+    }
+   ],
+   [
+    "fcf_q_latest",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM",
+     "params": {
+      "months": 3
+     }
+    }
+   ],
+   [
+    "div_to_fcf_q",
+    {
+     "fn": "div",
+     "a": "$div_q_latest",
+     "b": "$fcf_q_latest"
+    }
+   ],
+   [
+    "bb_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "buybacks",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "cash_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "cash_and_equivalents",
+     "last_n": 8
+    }
+   ],
+   [
+    "cash_pct",
+    {
+     "fn": "pct",
+     "of": "$cash_s"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "div_to_fcf_q",
+  "fcf_q",
+  "div_q"
+ ],
+ "note": "What to watch on the next print: the latest quarter's dividend over that quarter's FCF as the watched ratio, with the quarterly FCF, OCF, capex (and its yoy), buybacks and cash balance series that would show a squeeze first. The trigger level is a convention the answer names."
+}

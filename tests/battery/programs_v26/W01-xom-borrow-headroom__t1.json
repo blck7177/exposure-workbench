@@ -1,0 +1,71 @@
+{
+ "tag": "W01-xom-borrow-headroom#t1",
+ "program": {
+  "let": [
+   [
+    "nd_ebitda",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "net_debt",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "total_debt",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "cash",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "cash_and_equivalents"
+    }
+   ],
+   [
+    "netting",
+    {
+     "fn": "sub",
+     "a": "$total_debt",
+     "b": "$cash"
+    }
+   ],
+   [
+    "check",
+    {
+     "fn": "div",
+     "a": "$net_debt",
+     "b": "$ebitda"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "nd_ebitda",
+  "net_debt",
+  "ebitda",
+  "total_debt",
+  "cash"
+ ],
+ "note": "Net debt / EBITDA for XOM on the TTM to 2026-03-31 (0.10x): EBITDA $63.5bn, net debt $6.1bn = total debt $14.5bn less cash $8.4bn (netting shown explicitly and re-divided as check)."
+}

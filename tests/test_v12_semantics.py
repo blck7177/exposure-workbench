@@ -87,7 +87,9 @@ def test_a_component_says_which_call_produces_the_total():
 def test_every_worked_example_calls_tools_that_exist_on_the_face():
     """A face is a promise about what an agent can do; an example naming a tool
     the face does not carry is an instruction to fail."""
-    on_face = set(faces.FACE_META_AGENT)
+    # V30: the examples are not delivered to the model any more (V16 took them
+    # out of the prompt); a name must still be a real tool on SOME face.
+    on_face = set(faces.FACE_META_AGENT) | set(faces.FACE_RESEARCH)
     for group, examples in sm.WORKED_EXAMPLES.items():
         assert examples, group
         for ex in examples:

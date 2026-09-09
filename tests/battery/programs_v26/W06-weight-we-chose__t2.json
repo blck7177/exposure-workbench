@@ -1,0 +1,177 @@
+{
+ "tag": "W06-weight-we-chose#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "r_prev",
+    {
+     "fn": "run",
+     "portfolio": "port_001",
+     "which": "prev"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_prev",
+    {
+     "fn": "column",
+     "run": "$r_prev",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "ret_i",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "daily_return"
+    }
+   ],
+   [
+    "ret_book",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.daily_return"
+    }
+   ],
+   [
+    "one",
+    {
+     "fn": "div",
+     "a": "$ret_book",
+     "b": "$ret_book"
+    }
+   ],
+   [
+    "grow_i",
+    {
+     "fn": "add",
+     "a": "$ret_i",
+     "b": "$one"
+    }
+   ],
+   [
+    "grow_book",
+    {
+     "fn": "add",
+     "a": "$one",
+     "b": "$ret_book"
+    }
+   ],
+   [
+    "w_implied_prev",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$grow_book"
+     },
+     "b": "$grow_i"
+    }
+   ],
+   [
+    "chosen",
+    {
+     "fn": "sub",
+     "a": "$w_implied_prev",
+     "b": "$w_prev"
+    }
+   ],
+   [
+    "drift",
+    {
+     "fn": "sub",
+     "a": "$w",
+     "b": "$w_implied_prev"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "mv_prev",
+    {
+     "fn": "column",
+     "run": "$r_prev",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "pnl",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "daily_pnl"
+    }
+   ],
+   [
+    "traded_dollars",
+    {
+     "fn": "sub",
+     "a": {
+      "fn": "sub",
+      "a": "$mv",
+      "b": "$pnl"
+     },
+     "b": "$mv_prev"
+    }
+   ],
+   [
+    "drift_rank",
+    {
+     "fn": "rank",
+     "of": "$drift",
+     "direction": "highest"
+    }
+   ],
+   [
+    "chosen_rank",
+    {
+     "fn": "rank",
+     "of": "$chosen",
+     "direction": "highest"
+    }
+   ],
+   [
+    "traded_rank",
+    {
+     "fn": "rank",
+     "of": "$traded_dollars",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "drift",
+  "drift_rank"
+ ],
+ "note": "the same decomposition for all ten names between the two runs, ranked: drift highest-first says who is running away on price alone (one session only, so the drift is small everywhere), chosen and traded_dollars ranked show that nothing was traded (GOOGL's -$870 is the only non-zero, a rounding-scale residual). Same different_books construction as t1."
+}

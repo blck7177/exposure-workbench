@@ -1,0 +1,82 @@
+{
+ "tag": "W01-stop-sweep-across-book#t3",
+ "program": {
+  "let": [
+   [
+    "dist_googl",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "GOOGL"
+    }
+   ],
+   [
+    "dd_googl",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "GOOGL",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "depth_1y",
+    {
+     "fn": "pick",
+     "of": "$dd_googl",
+     "key": "depth"
+    }
+   ],
+   [
+    "trough_1y",
+    {
+     "fn": "pick",
+     "of": "$dd_googl",
+     "key": "trough"
+    }
+   ],
+   [
+    "close_now",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "price",
+      "ticker": "GOOGL"
+     },
+     "key": "adj_close"
+    }
+   ],
+   [
+    "to_trough",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": "$trough_1y",
+      "b": "$close_now"
+     },
+     "b": "$close_now"
+    }
+   ],
+   [
+    "vol_googl",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "GOOGL",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "dist_googl",
+  "to_trough",
+  "trough_1y"
+ ],
+ "note": "the worst name from t1 is GOOGL (-15.8% from its high); the number to write in the file is the year's trough price (price.drawdown trough, 317.49) and how much further down that is from today's adjusted close (-6.2%): below the year's low the position is no longer a drawdown inside a known range but a new low; depth_1y (21.0%) and the 63d vol give the scale; the line is a chosen convention, the desk has no stop rule."
+}

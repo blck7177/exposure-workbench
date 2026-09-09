@@ -1,0 +1,4 @@
+{
+ "tag": "W04-just-divide-them#t1",
+ "skip": "scope: valuation multiples (P/E, EV/EBITDA, FCF yield) are declared absent on this desk (analytics/skill.py issuer domain 'absent' line) — a scope decision, not a data gap; no program"
+}

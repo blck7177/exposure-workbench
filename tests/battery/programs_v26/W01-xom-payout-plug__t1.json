@@ -1,0 +1,205 @@
+{
+ "tag": "W01-xom-payout-plug#t1",
+ "program": {
+  "let": [
+   [
+    "fcf_q",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "bb_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "buybacks",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "div_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "ocf_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "div",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 12
+    }
+   ],
+   [
+    "distributions",
+    {
+     "fn": "add",
+     "a": "$bb",
+     "b": "$div"
+    }
+   ],
+   [
+    "gap",
+    {
+     "fn": "sub",
+     "a": "$fcf",
+     "b": "$distributions"
+    }
+   ],
+   [
+    "dist_to_fcf",
+    {
+     "fn": "div",
+     "a": "$distributions",
+     "b": "$fcf"
+    }
+   ],
+   [
+    "cash_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "cash_and_equivalents"
+    }
+   ],
+   [
+    "cash_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "cash_and_equivalents",
+     "at": "2025-03-31"
+    }
+   ],
+   [
+    "cash_chg",
+    {
+     "fn": "sub",
+     "a": "$cash_now",
+     "b": "$cash_yago"
+    }
+   ],
+   [
+    "td_now",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "td_yago",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "XOM",
+     "params": {
+      "at": "2025-03-31"
+     }
+    }
+   ],
+   [
+    "debt_chg",
+    {
+     "fn": "sub",
+     "a": "$td_now",
+     "b": "$td_yago"
+    }
+   ],
+   [
+    "fcf_q_latest",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM",
+     "params": {
+      "months": 3
+     }
+    }
+   ],
+   [
+    "bb_q_latest",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "buybacks",
+     "months": 3
+    }
+   ],
+   [
+    "div_q_latest",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 3
+    }
+   ],
+   [
+    "dist_q_latest",
+    {
+     "fn": "add",
+     "a": "$bb_q_latest",
+     "b": "$div_q_latest"
+    }
+   ],
+   [
+    "gap_q_latest",
+    {
+     "fn": "sub",
+     "a": "$fcf_q_latest",
+     "b": "$dist_q_latest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "fcf_q",
+  "bb_q",
+  "div_q",
+  "fcf",
+  "distributions",
+  "gap"
+ ],
+ "note": "Distributions against what the business generated on two frequencies: FCF, buybacks and dividends quarter by quarter over eight quarters (where a single quarter can be outspent) and over the trailing year (where the premise may fail), the trailing gap and the latest quarter's gap (read directly at months=3: a `latest` of the series cannot be combined by the typed calculator, see _GAPS_B.md), and the two plugs the balance sheet holds: cash's change and total debt's change over the year."
+}

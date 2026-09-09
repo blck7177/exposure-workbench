@@ -31,6 +31,7 @@ from exposure_workbench.analytics import skill
 from exposure_workbench.analytics import withheld as _wh
 from exposure_workbench.db.models import CalcLedger, Company, FinancialFact, RiskAlert
 from exposure_workbench.services import brief_service, catalogue_service, compute_service
+from exposure_workbench.services import program_service as ps
 from exposure_workbench.services import fundamentals_service
 from exposure_workbench.services import name_table as nt
 from exposure_workbench.services import company_service
@@ -379,6 +380,55 @@ def _compute_for(kinds: tuple[str, ...]):
 _compute = _compute_for(ALL_KINDS)
 
 
+# ── run (V30) ────────────────────────────────────────────────────────────────────
+
+def _run_program_for(kinds: tuple[str, ...]):
+    """One program, executed: every node a ledger row and a Fact
+    (services/program_service). The face's kinds bound which methods a
+    program may run, as they bound compute: the research face is issuer-scoped."""
+    async def _run_program(db: AsyncSession, program: dict) -> dict:
+        outside = sorted({m for m in _method_names_in(program)
+                          if m in skill.METHODS and skill.METHODS[m].subject_kind not in kinds})
+        if outside:
+            return {"error": "not_on_this_face", "methods": outside,
+                    "detail": "this face is issuer-scoped; book methods are the meta face's"}
+        return await ps.run(db, program, invoked_by=current_session_id())
+    return _run_program
+
+
+def _method_names_in(node) -> list[str]:
+    out: list[str] = []
+    if isinstance(node, dict):
+        if node.get("fn") == "method":
+            n = node.get("name") or (node.get("args") or [None])[0]
+            if isinstance(n, str):
+                out.append(n)
+        for v in node.values():
+            out += _method_names_in(v)
+    elif isinstance(node, list):
+        for v in node:
+            out += _method_names_in(v)
+    return out
+
+
+RUN_DESCRIPTION = (
+    "Execute one analysis program and get every figure back typed and on the ledger. A program is "
+    "{let: [[name, expr], …], return?: [names]}; expr is {fn, …args}, '$name' (an earlier binding) or a "
+    "literal. Reads: fundamentals(ticker, metric?, months?|start,end?|at?|last_n?) → a flow, a balance, "
+    "a series (last_n) or the whole sheet; prices(ticker, window?) → series; run(portfolio, which?=latest|prev|run_id); "
+    "column(run, table, col) → one figure per label (issuer_exposures.weight/market_value/contribution, "
+    "sector_exposures.weight, limit_checks.current_value/warning_level/breach_level, factor_attributions.beta/contribution); "
+    "pick(of, key) → one figure of a run or table (exposure_metrics.portfolio_market_value; beta; adv_dollars); "
+    "method(name, subject | [subjects], params?, key?) → any describe-listed method, a vector over a list. "
+    "Arithmetic add/sub/mul/div(a, b) (vector∘scalar broadcasts, vector∘vector aligns by label), scale(of, factor); "
+    "sets sum/avg/min/max/std/abs(of), rank(of, direction?), top(of, n); series yoy/qoq/pct/cagr/latest(of), at(of, period); "
+    "scenarios sell(run, sales)/buy(run, buys) read like runs. A name is a variable, never a measure: a result's "
+    "measure is derived from its operation. A node that refuses says why; nodes depending on it refuse with the chain. "
+    "A superlative rests on rank; a change on yoy/qoq or two readings; the prior run on which='prev'.\n"
+    + nt.symbol_table()
+)
+
+
 # ── reflection ──────────────────────────────────────────────────────────────────
 
 async def _think(db: AsyncSession, thought: str) -> dict:
@@ -407,8 +457,9 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
             "a scenario row (calc_…); or, with subject omitted, the desk itself: its portfolios with "
             "their ids and latest runs, where a book question starts — across every domain: filed "
             "figures, filing text, prices, its place in the book, briefs; what is NOT held and why; "
-            "the methods compute can produce for it and the procedures an analyst follows. Start "
-            "here. expand opens one domain's detail."
+            "the methods a program can compute for it and the procedures an analyst follows. Start "
+            "here: describe() alone lists the desk's portfolios and ids; expand needs a subject and opens "
+            "one view or domain of it."
         ),
         json_schema={"type": "object", "properties": {
             "subject": {"type": ["string", "null"], "description": "ticker | port_… | run_… | calc_… | null for the desk"},
@@ -510,6 +561,14 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
                       "subject, never both. A statistic over a method's results is two calls: the method "
                       "over the list of subjects, then the op over the facts it returned"),
         fn=_compute_for(kinds), tool_class=READ,
+    ))
+    reg.register(Tool(
+        name="run",
+        display="Running an analysis program",
+        description=RUN_DESCRIPTION,
+        json_schema={"type": "object", "properties": {"program": ps.schema()},
+                     "required": ["program"], "additionalProperties": False},
+        fn=_run_program_for(kinds), tool_class=READ,
     ))
     reg.register(Tool(
         name="think",

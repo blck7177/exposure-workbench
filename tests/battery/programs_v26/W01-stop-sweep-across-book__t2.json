@@ -1,0 +1,4 @@
+{
+ "tag": "W01-stop-sweep-across-book#t2",
+ "skip": "the desk holds no cost basis / entry price for any position (issuer_exposures has weight, market_value, contribution, daily_pnl, daily_return only), so distance-from-cost cannot exist; the right answer says so and repeats t1's from-high figures."
+}

@@ -1,0 +1,157 @@
+{
+ "tag": "W05-jpm-frame-breaks#t2",
+ "program": {
+  "let": [
+   [
+    "roe",
+    {
+     "fn": "method",
+     "name": "roe",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "roe_s",
+    {
+     "fn": "method",
+     "name": "roe",
+     "subject": "JPM",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "roa",
+    {
+     "fn": "method",
+     "name": "roa",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "eq_mult",
+    {
+     "fn": "method",
+     "name": "equity_multiplier",
+     "subject": "JPM"
+    }
+   ],
+   [
+    "equity_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "stockholders_equity",
+     "last_n": 8
+    }
+   ],
+   [
+    "equity_pct",
+    {
+     "fn": "pct",
+     "of": "$equity_s"
+    }
+   ],
+   [
+    "ni_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "ni_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ni_s"
+    }
+   ],
+   [
+    "ni",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "div",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "dividends_paid",
+     "months": 12
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "distributions",
+    {
+     "fn": "add",
+     "a": "$div",
+     "b": "$bb"
+    }
+   ],
+   [
+    "payout",
+    {
+     "fn": "div",
+     "a": "$distributions",
+     "b": "$ni"
+    }
+   ],
+   [
+    "retained",
+    {
+     "fn": "sub",
+     "a": "$ni",
+     "b": "$distributions"
+    }
+   ],
+   [
+    "ta",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "total_assets"
+    }
+   ],
+   [
+    "equity",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "stockholders_equity"
+    }
+   ],
+   [
+    "equity_to_assets",
+    {
+     "fn": "div",
+     "a": "$equity",
+     "b": "$ta"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "roe",
+  "payout",
+  "eq_mult",
+  "equity_to_assets"
+ ],
+ "note": "What the desk can watch instead of FCF for a bank: ROE (level and five years), ROA, the equity multiplier and equity-to-assets as the held leverage proxy, the payout ratio and what is retained, and equity's own growth. CET1, the stress capital buffer and the stress test are regulatory disclosures not held as figures; the level to worry at is named as a convention against the held ratios."
+}

@@ -1,0 +1,118 @@
+{
+ "tag": "NEW01-whats-coming-up#t2",
+ "program": {
+  "let": [
+   [
+    "px_filing_day",
+    {
+     "fn": "price",
+     "ticker": "NVDA",
+     "as_of": "2026-08-26"
+    }
+   ],
+   [
+    "close_filing_day",
+    {
+     "fn": "pick",
+     "of": "$px_filing_day",
+     "key": "adj_close"
+    }
+   ],
+   [
+    "px_latest",
+    {
+     "fn": "price",
+     "ticker": "NVDA"
+    }
+   ],
+   [
+    "close_latest",
+    {
+     "fn": "pick",
+     "of": "$px_latest",
+     "key": "adj_close"
+    }
+   ],
+   [
+    "move",
+    {
+     "fn": "sub",
+     "a": "$close_latest",
+     "b": "$close_filing_day"
+    }
+   ],
+   [
+    "move_pct",
+    {
+     "fn": "div",
+     "a": "$move",
+     "b": "$close_filing_day"
+    }
+   ],
+   [
+    "rel_1m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "NVDA",
+     "params": {
+      "window": "1m",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "abs_1m",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "NVDA",
+     "params": {
+      "window": "1m"
+     }
+    }
+   ],
+   [
+    "l52",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "NVDA"
+    }
+   ],
+   [
+    "vol21",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "NVDA",
+     "params": {
+      "window_days": 21
+     }
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": {
+       "fn": "run",
+       "portfolio": "port_001"
+      },
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "NVDA"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "move_pct",
+  "rel_1m",
+  "l52"
+ ],
+ "note": "The last thing that landed is NVDA's 10-Q filed 2026-08-26 (period to 2026-07-26; from the filings index, the newest across the book). Since that close NVDA is +9.9% (+$20.70), +5.0% vs SPY over 1m, 2.2% off its 52w high — the move is in the price; 21d vol and NVDA's 4.2% weight size what is left to be hit."
+}

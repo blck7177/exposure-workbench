@@ -1,0 +1,85 @@
+{
+ "tag": "W05-leases-in-leverage#t1",
+ "program": {
+  "let": [
+   [
+    "AMZN_td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_bs",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN"
+    }
+   ],
+   [
+    "AMZN_lease",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_lease_liability_total"
+    }
+   ],
+   [
+    "AMZN_lease_to_debt",
+    {
+     "fn": "div",
+     "a": "$AMZN_lease",
+     "b": "$AMZN_td"
+    }
+   ],
+   [
+    "AMZN_ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_d2e",
+    {
+     "fn": "method",
+     "name": "debt_to_ebitda",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_nd2e",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_debt_plus_lease",
+    {
+     "fn": "add",
+     "a": "$AMZN_td",
+     "b": "$AMZN_lease"
+    }
+   ],
+   [
+    "AMZN_d2e_with_lease",
+    {
+     "fn": "div",
+     "a": "$AMZN_debt_plus_lease",
+     "b": "$AMZN_ebitda"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "AMZN_td",
+  "AMZN_lease",
+  "AMZN_d2e",
+  "AMZN_d2e_with_lease"
+ ],
+ "note": "Answers the definitional premise with figures: AMZN total_debt as the desk builds it (the balance sheet table shows which components it covers; operating_lease_liability_total is a separate filed line outside the cover), the lease liability beside it and as a share of debt, and debt-to-EBITDA as quoted versus with the lease liability added in."
+}

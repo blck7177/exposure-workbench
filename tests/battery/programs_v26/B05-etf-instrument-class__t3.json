@@ -1,0 +1,158 @@
+{
+ "tag": "B05-etf-instrument-class#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "ba",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "eq_net_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ],
+   [
+    "credit_net_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.net_beta.credit_spreads_widen"
+    }
+   ],
+   [
+    "rates_net_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.net_beta.rates_up"
+    }
+   ],
+   [
+    "rec",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "$r"
+    }
+   ],
+   [
+    "factor_share",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "portfolio.reconcile.factor_share"
+    }
+   ],
+   [
+    "sec",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "sector_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "fi",
+    {
+     "fn": "pick",
+     "of": "$sec",
+     "key": "Fixed_Income"
+    }
+   ],
+   [
+    "equity_share",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "add",
+      "a": {
+       "fn": "add",
+       "a": {
+        "fn": "add",
+        "a": {
+         "fn": "add",
+         "a": {
+          "fn": "pick",
+          "of": "$sec",
+          "key": "Technology"
+         },
+         "b": {
+          "fn": "pick",
+          "of": "$sec",
+          "key": "Financials"
+         }
+        },
+        "b": {
+         "fn": "pick",
+         "of": "$sec",
+         "key": "Healthcare"
+        }
+       },
+       "b": {
+        "fn": "pick",
+        "of": "$sec",
+        "key": "Communication_Services"
+       }
+      },
+      "b": {
+       "fn": "pick",
+       "of": "$sec",
+       "key": "Consumer_Discretionary"
+      }
+     },
+     "b": {
+      "fn": "pick",
+      "of": "$sec",
+      "key": "Energy"
+     }
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "contribution"
+    }
+   ],
+   [
+    "day",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.daily_return"
+    }
+   ],
+   [
+    "vif",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_vif"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "eq_net_beta",
+  "equity_share",
+  "fi"
+ ],
+ "note": "What the book really is: 86.7% equity by weight vs 13.3% fixed income; the integration's net equity-down beta (-0.86) against a gross of 1.64 says the fixed-income sleeve nets off almost nothing; credit net beta -0.25 is HYG adding equity-like risk, rates net beta ~0. max_vif 16.6 flags that individual factor betas are collinear, so the answer leans on the net/gross figures, not per-factor betas."
+}

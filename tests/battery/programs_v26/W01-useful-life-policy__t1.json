@@ -1,0 +1,244 @@
+{
+ "tag": "W01-useful-life-policy#t1",
+ "program": {
+  "let": [
+   [
+    "MSFT_dep",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_dep_to_oi",
+    {
+     "fn": "div",
+     "a": "$MSFT_dep",
+     "b": "$MSFT_oi"
+    }
+   ],
+   [
+    "MSFT_dep_to_rev",
+    {
+     "fn": "div",
+     "a": "$MSFT_dep",
+     "b": "$MSFT_rev"
+    }
+   ],
+   [
+    "MSFT_dep_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "depreciation",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "MSFT_dep_yoy",
+    {
+     "fn": "yoy",
+     "of": "$MSFT_dep_s"
+    }
+   ],
+   [
+    "MSFT_capex_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "capex",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "MSFT_capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$MSFT_capex_s"
+    }
+   ],
+   [
+    "AMZN_dep",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_dep_to_oi",
+    {
+     "fn": "div",
+     "a": "$AMZN_dep",
+     "b": "$AMZN_oi"
+    }
+   ],
+   [
+    "AMZN_dep_to_rev",
+    {
+     "fn": "div",
+     "a": "$AMZN_dep",
+     "b": "$AMZN_rev"
+    }
+   ],
+   [
+    "AMZN_dep_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "depreciation",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "AMZN_dep_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AMZN_dep_s"
+    }
+   ],
+   [
+    "AMZN_capex_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "capex",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "AMZN_capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AMZN_capex_s"
+    }
+   ],
+   [
+    "GOOGL_dep",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_dep_to_oi",
+    {
+     "fn": "div",
+     "a": "$GOOGL_dep",
+     "b": "$GOOGL_oi"
+    }
+   ],
+   [
+    "GOOGL_dep_to_rev",
+    {
+     "fn": "div",
+     "a": "$GOOGL_dep",
+     "b": "$GOOGL_rev"
+    }
+   ],
+   [
+    "GOOGL_dep_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "depreciation",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "GOOGL_dep_yoy",
+    {
+     "fn": "yoy",
+     "of": "$GOOGL_dep_s"
+    }
+   ],
+   [
+    "GOOGL_capex_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "capex",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "GOOGL_capex_yoy",
+    {
+     "fn": "yoy",
+     "of": "$GOOGL_capex_s"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "MSFT_dep_to_oi",
+  "AMZN_dep_to_oi",
+  "GOOGL_dep_to_oi"
+ ],
+ "note": "How much reported profit leans on the depreciation line: trailing-year depreciation over operating income (and over revenue) for MSFT, AMZN, GOOGL, plus depreciation growth beside capex growth over four years (depreciation lagging capex is the fingerprint of a longer life). The policy passage, the years and the disclosed dollar effect are 10-K text and are not in the program. No vector can be formed from per-issuer scalars, so the ordering is read off the three dep_to_oi nodes, not a rank node."
+}

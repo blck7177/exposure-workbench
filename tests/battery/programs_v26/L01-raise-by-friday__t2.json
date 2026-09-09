@@ -1,0 +1,180 @@
+{
+ "tag": "L01-raise-by-friday#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "cap_per_day",
+    {
+     "fn": "scale",
+     "of": "$adv",
+     "factor": 0.25
+    }
+   ],
+   [
+    "days_before",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": "$cap_per_day"
+    }
+   ],
+   [
+    "after",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "NVDA"
+      },
+      {
+       "ticker": "AMZN",
+       "fraction": 0.806
+      }
+     ]
+    }
+   ],
+   [
+    "proceeds",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "trade.proceeds"
+    }
+   ],
+   [
+    "mv_after",
+    {
+     "fn": "column",
+     "run": "$after",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "w_after",
+    {
+     "fn": "column",
+     "run": "$after",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "days_after",
+    {
+     "fn": "div",
+     "a": "$mv_after",
+     "b": "$cap_per_day"
+    }
+   ],
+   [
+    "wavg_days_before",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$days_before"
+     }
+    }
+   ],
+   [
+    "wavg_days_after",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w_after",
+      "b": "$days_after"
+     }
+    }
+   ],
+   [
+    "harder",
+    {
+     "fn": "div",
+     "a": "$wavg_days_after",
+     "b": "$wavg_days_before"
+    }
+   ],
+   [
+    "max_days_before",
+    {
+     "fn": "max",
+     "of": "$days_before"
+    }
+   ],
+   [
+    "max_days_after",
+    {
+     "fn": "max",
+     "of": "$days_after"
+    }
+   ],
+   [
+    "hardest_after",
+    {
+     "fn": "rank",
+     "of": "$days_after",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "harder",
+  "wavg_days_before",
+  "wavg_days_after",
+  "proceeds"
+ ],
+ "note": "funding the 10% from the easy end of t1's ranking: sell all of NVDA and 80.6% of AMZN (proceeds $1.0858m ≈ the $1.086m raise), then the residual book's days-to-exit per name and its weight-averaged days against the original — 'how much harder' is the ratio (about 1.09x: the residual is 9% slower to shift per dollar); max days is unchanged because JPM, the slowest line, is untouched."
+}

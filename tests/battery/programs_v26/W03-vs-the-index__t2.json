@@ -1,0 +1,180 @@
+{
+ "tag": "W03-vs-the-index#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ],
+   [
+    "gross_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.gross_beta.equity_down"
+    }
+   ],
+   [
+    "r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ],
+   [
+    "book_vol_60d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "spy_vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "SPY",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "vol_ratio",
+    {
+     "fn": "div",
+     "a": "$book_vol_60d",
+     "b": "$spy_vol_63d"
+    }
+   ],
+   [
+    "book_ret_1y",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2025-09-04",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_ret_1y",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-09-04"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2025-09-04"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2025-09-04"
+     }
+    }
+   ],
+   [
+    "ret_ratio_1y",
+    {
+     "fn": "div",
+     "a": "$book_ret_1y",
+     "b": "$spy_ret_1y"
+    }
+   ],
+   [
+    "betas_spy",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_beta_spy",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$betas_spy"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "net_beta_equity",
+  "r2",
+  "vol_ratio",
+  "ret_ratio_1y"
+ ],
+ "note": "the nearest thing to 'how differently it moves': the run's netted equity beta (-0.856 on the equity_down risk: the book carries ~0.86 of a market move; the SPY/QQQ/IWM legs are collinear so only the net is quotable), the factor model's R², the book's 60d vol over SPY's 63d vol as a ratio, the book's 1y return against SPY's over the same dates as a ratio (book minus market is refused as mixed_worlds — a book figure and an issuer figure may be divided, not differenced — so the excess is read off the two figures, _GAPS_A), and the weight-summed 1y OLS betas to SPY as a cross-check. Active weights, active share and tracking error stay absent: no constituents, no book price series."
+}

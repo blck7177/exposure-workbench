@@ -72,8 +72,12 @@ async def test_an_absence_names_the_metric_that_superseded_the_one_asked_for():
     finally:
         await engine.dispose()
 
-    assert got["error"] == "series_not_derivable"
+    # V30: the retired line is refused as superseded, not as underivable — the
+    # three facts it holds (to 2022-01-30) could derive a series that would read
+    # as the present (C2, N02: DSO "latest" at 2022-01-30)
+    assert got["error"] == "line_superseded"
     assert "total_revenues" in got["statement"], "the stand-in the registry knows about"
+    assert "2022-01-30" in got["statement"], "and where the asked-for line ends"
     assert len(alt["points"]) == 4, "and it really does answer the question"
 
 

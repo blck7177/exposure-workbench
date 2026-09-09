@@ -1,0 +1,119 @@
+{
+ "tag": "NEW06-what-you-havent-got#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "vif",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_vif"
+    }
+   ],
+   [
+    "model_r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ],
+   [
+    "residual",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.residual"
+    }
+   ],
+   [
+    "alpha",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.alpha"
+    }
+   ],
+   [
+    "observations",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.observations"
+    }
+   ],
+   [
+    "rec",
+    {
+     "fn": "method",
+     "name": "book.reconcile",
+     "subject": "$r"
+    }
+   ],
+   [
+    "factor_share",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "portfolio.reconcile.factor_share"
+    }
+   ],
+   [
+    "unexplained_share",
+    {
+     "fn": "pick",
+     "of": "$rec",
+     "key": "portfolio.reconcile.unexplained_share"
+    }
+   ],
+   [
+    "rv30",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_30d"
+    }
+   ],
+   [
+    "rv60",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "mdd",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_drawdown"
+    }
+   ],
+   [
+    "episodes",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "vif",
+  "unexplained_share",
+  "model_r2"
+ ],
+ "note": "Least trusted of what is held: the factor attribution — max VIF 16.6 means individual factor betas are collinear (the run projects them off), r2 0.81 but 49% of the day's move unexplained by the factors (reconcile); next the drawdown history, which holds today's quantities fixed for the whole span (episodes' valuation_assumption); rolling vol and max drawdown are the trusted end (identities and tested std)."
+}

@@ -1,0 +1,83 @@
+{
+ "tag": "L03-whose-assumption-is-that#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days_25pct",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "days_12_5pct",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv",
+      "factor": 0.125
+     }
+    }
+   ],
+   [
+    "ratio",
+    {
+     "fn": "div",
+     "a": "$days_12_5pct",
+     "b": "$days_25pct"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "days_12_5pct",
+  "ratio"
+ ],
+ "note": "the same counts at half the participation (12.5%): days double exactly (ratio 2.0 for every name) because the measure is linear in the rate — which is the PM's point, and the answer concedes it: the day count is the assumption reflected back, and only the ORDER of names is the desk's own finding."
+}

@@ -1,0 +1,114 @@
+{
+ "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+ "program": {
+  "let": [
+   [
+    "jb_1y",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "JPM",
+     "params": {
+      "benchmark": "TLT",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "beta_1y",
+    {
+     "fn": "pick",
+     "of": "$jb_1y",
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_1y",
+    {
+     "fn": "pick",
+     "of": "$jb_1y",
+     "key": "r2"
+    }
+   ],
+   [
+    "jb_3y",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "JPM",
+     "params": {
+      "benchmark": "TLT",
+      "window": "3y"
+     }
+    }
+   ],
+   [
+    "beta_3y",
+    {
+     "fn": "pick",
+     "of": "$jb_3y",
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_3y",
+    {
+     "fn": "pick",
+     "of": "$jb_3y",
+     "key": "r2"
+    }
+   ],
+   [
+    "jb_3m",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "JPM",
+     "params": {
+      "benchmark": "TLT",
+      "window": "3m"
+     }
+    }
+   ],
+   [
+    "beta_3m",
+    {
+     "fn": "pick",
+     "of": "$jb_3m",
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_3m",
+    {
+     "fn": "pick",
+     "of": "$jb_3m",
+     "key": "r2"
+    }
+   ],
+   [
+    "w_jpm",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": {
+       "fn": "run",
+       "portfolio": "port_001"
+      },
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "JPM"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "beta_1y",
+  "r2_1y",
+  "r2_3y",
+  "r2_3m"
+ ],
+ "note": "Carries t1's beta/r2 and adds the 3y and 3m windows: the sign flips and r2 stays near zero on every window, which is the evidence for 'go with neither as a hedge ratio'; the trigger is an r2 that rises on the 3m window. JPM's weight sizes the position."
+}

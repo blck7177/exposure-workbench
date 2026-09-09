@@ -1,0 +1,106 @@
+{
+ "tag": "NEW06-what-you-havent-got#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "sec",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "sector_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "sec_order",
+    {
+     "fn": "rank",
+     "of": "$sec",
+     "direction": "highest"
+    }
+   ],
+   [
+    "fixed_income",
+    {
+     "fn": "pick",
+     "of": "$sec",
+     "key": "Fixed_Income"
+    }
+   ],
+   [
+    "financials",
+    {
+     "fn": "pick",
+     "of": "$sec",
+     "key": "Financials"
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "top5",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "ba",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "eq_gross_beta",
+    {
+     "fn": "pick",
+     "of": "$ba",
+     "key": "portfolio.integration.gross_beta.equity_down"
+    }
+   ],
+   [
+    "vif",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_vif"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "fixed_income",
+  "financials",
+  "w",
+  "top5"
+ ],
+ "note": "The blind spots are ordered by the weight they sit on: a tail measure for the whole book (VaR/ES computed-but-withheld, 100% of $10.86m, gross equity beta 1.64); duration and credit quality for the 13.3% in TLT+HYG (fund characteristics, not a source); bank measures / the rate table for the 14.9% in JPM (never built as measures); positioning (not a source) on everything; the top-five share (66%) sizes the concentration the withheld tail measure would speak to."
+}

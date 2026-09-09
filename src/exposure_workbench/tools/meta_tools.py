@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
-from exposure_workbench.services import answer, gate, ledger
+from exposure_workbench.services import answer, claims, gate, ledger
 from exposure_workbench.tools.registry import (
     DELEGATION, GATE, Tool, ToolRegistry, current_session_id,
 )
@@ -166,16 +166,17 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
 
 # ── respond gate (V24) ──────────────────────────────────────────────────────────
 
-async def _respond_blocks(db: AsyncSession, blocks: list) -> dict:
-    """The exit: every pointer lands on the session's ledger and every digit in
-    the prose is accounted for, or the answer comes back with the block and
-    the reason (services/gate.py). The ledger is read as recorded
-    (services/ledger.py); nothing here rebuilds anything."""
+async def _respond_claims(db: AsyncSession, claims: list, prose: list) -> dict:
+    """The exit (V30): claims typed against the facts they point at, prose whose
+    digits account to the ledger (services/claims.py). The ledger is read as
+    recorded; nothing here rebuilds anything."""
     led = await ledger.load(db, current_session_id())
-    verdict = gate.check(blocks, led, question=await _question(db, current_session_id()))
+    from exposure_workbench.services import claims as claims_mod
+    answer_ = {"claims": claims, "prose": prose}
+    verdict = claims_mod.check(answer_, led, question=await _question(db, current_session_id()))
     if not verdict.ok:
         return verdict.as_refusal()
-    return {"responded": True, "format": "blocks", **gate.accepted(blocks, verdict, led)}
+    return {"responded": True, "format": "blocks", **claims_mod.accepted(answer_, verdict, led)}
 
 
 async def _question(db: AsyncSession, session_id: str) -> str | None:
@@ -190,7 +191,7 @@ async def _question(db: AsyncSession, session_id: str) -> str | None:
 # The exit's grammar, as schema (Law B): services/answer.py owns the block
 # shapes; the brief's sections reuse the same list.
 BLOCK_SCHEMAS = answer.BLOCK_SCHEMAS
-RESPOND_SCHEMA = answer.ANSWER_SCHEMA
+RESPOND_SCHEMA = claims.ANSWER_SCHEMA
 
 
 # ── registration ────────────────────────────────────────────────────────────────
@@ -235,17 +236,16 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
     ))
     reg.register(Tool(
         name="respond",
-        display="Resolving every figure against the table, then answering",
+        display="Checking every claim against its facts, then answering",
         description=(
-            "Reply to the user. An answer is a list of BLOCKS. " + gate.PROSE_RULE + " Blocks: "
-            "`paragraph` (`text`: the sentence, with fact ids in it where the figures go; "
-            "`cites`: the facts it rests on but does not state), `table` (rows of fact ids, one row per thing compared "
-            "and one column per measure; header and row labels come from the facts), `chart` "
-            "(kind + a series fact). A claim that something rose or fell points at the series; "
-            "that something is not held, at the absence fact; work you started, at its task fact. "
-            "A reply the ledger cannot account for is refused: compute it, cite it, or drop it."
+            "Reply to the user. An answer is CLAIMS and PROSE. Each claim states one relation over facts you were "
+            "shown (f_… ids): level (a reading), tier (a warning/breach/limit level, said as one), change (of = later reading, against = earlier; or a yoy/qoq/subtract "
+            "node, or one series), versus (one measure on two subjects, of against against), ratio (a divided or ratio-method figure), rank (an entry of a rank/top node), room (a check's "
+            "current_value against its warning or breach tier), absent (an absence fact), quote (a passage + the "
+            "verbatim span), series (a chart), table (rows of scalar facts). " + claims.PROSE_RULE + " "
+            "A claim whose relation its facts do not fit is refused with the reason; a number the ledger cannot account for is refused."
         ),
         json_schema=RESPOND_SCHEMA,
-        fn=_respond_blocks, tool_class=GATE,
+        fn=_respond_claims, tool_class=GATE,
     ))
     return reg

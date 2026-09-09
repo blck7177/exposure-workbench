@@ -1,0 +1,89 @@
+{
+ "tag": "NEW03-what-flagged-on-the-run#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "alerts",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "risk_alerts",
+     "col": "current_value"
+    }
+   ],
+   [
+    "alert_limits",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "risk_alerts",
+     "col": "limit_value"
+    }
+   ],
+   [
+    "current",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "limit_checks",
+     "col": "current_value"
+    }
+   ],
+   [
+    "warning",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "limit_checks",
+     "col": "warning_level"
+    }
+   ],
+   [
+    "breach",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "limit_checks",
+     "col": "breach_level"
+    }
+   ],
+   [
+    "utilisation",
+    {
+     "fn": "div",
+     "a": "$current",
+     "b": "$warning"
+    }
+   ],
+   [
+    "room_to_warning",
+    {
+     "fn": "sub",
+     "a": "$warning",
+     "b": "$current"
+    }
+   ],
+   [
+    "nearest",
+    {
+     "fn": "top",
+     "of": "$utilisation",
+     "n": 6
+    }
+   ]
+  ]
+ },
+ "must": [
+  "alerts",
+  "alert_limits",
+  "nearest"
+ ],
+ "note": "What tripped: the run's own risk_alerts (MSFT 16.1% vs 15%, LLY 12.7% vs 12%). What nearly did: utilisation = current/warning per check, the six highest (JPM 99%, AAPL 98%, gross exposure 91%, Technology 88%) with the room to warning in the check's own unit. An empty alerts column would be a statement about these checks, not the book."
+}

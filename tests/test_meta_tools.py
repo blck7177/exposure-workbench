@@ -28,24 +28,16 @@ def test_delegation_tools_require_reason():
 
 
 def test_respond_requires_only_blocks():
-    """V14-C. The answer is the only required field, and evidence is no longer a
-    field beside it: an id reaches the gate by being NAMED IN A SLOT, so there is
-    no way to write a figure whose evidence was left out of a separate list. The
-    property the old `citations`-optional schema protected — that a reply stating
-    nothing factual needs no evidence — survives as an answer with no slots in
-    it, which needs no ids and is refused by nothing."""
+    """V30: the answer is claims and prose, both required; evidence is not a
+    field beside them — a fact reaches the gate by being NAMED IN A CLAIM, so a
+    figure cannot be stated with its evidence left out. A reply stating nothing
+    factual is an empty claims list, refused by nothing."""
+    from exposure_workbench.services import claims
     reg = build_meta_registry()
     schema = reg.get("respond").json_schema
-    assert schema["required"] == ["blocks"]
+    assert schema["required"] == ["claims", "prose"]
     assert "citations" not in schema["properties"]
-    # V15-S3: one closed branch per claim type, and the branches together are
-    # exactly the block types the renderer knows.
-    branches = schema["properties"]["blocks"]["items"]["oneOf"]
-    kinds = [b["properties"]["type"]["enum"] for b in branches]
-    assert all(len(k) == 1 for k in kinds), "each branch is one claim type"
-    from exposure_workbench.services import answer as A
-    assert {k[0] for k in kinds} == set(A.BLOCK_TYPES)
-
+    assert schema["properties"]["claims"]["items"]["properties"]["relation"]["enum"] == list(claims.RELATIONS)
 
 def test_respond_description_states_the_rule_the_gate_enforces():
     """The tool description is the model's only contract with the gate. It used

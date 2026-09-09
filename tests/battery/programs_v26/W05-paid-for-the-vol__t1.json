@@ -1,0 +1,108 @@
+{
+ "tag": "W05-paid-for-the-vol#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_vol_60d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "book_vol_30d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_30d"
+    }
+   ],
+   [
+    "book_ret_60d",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2026-06-10",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "book_ret_30d",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2026-07-24",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "ret_per_vol_60d",
+    {
+     "fn": "div",
+     "a": "$book_ret_60d",
+     "b": "$book_vol_60d"
+    }
+   ],
+   [
+    "ret_per_vol_30d",
+    {
+     "fn": "div",
+     "a": "$book_ret_30d",
+     "b": "$book_vol_30d"
+    }
+   ],
+   [
+    "book_ret_1y",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2025-09-04",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "max_dd",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_drawdown"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "book_vol_60d",
+  "book_ret_60d",
+  "ret_per_vol_60d"
+ ],
+ "note": "the book's volatility as the run holds it (60- and 30-session annualised; there is no book price series, so no 1y book vol) and the book's return over exactly the same sessions (2026-06-10..09-04 spans the 60 daily returns; 07-24.. the 30) via book.explain_episode, then the ratio actually computed (return / annualised vol, both stated with their window); the 1y return and the run's max drawdown for the 'all year' framing. This is raw return per unit of vol — no risk-free rate, so not a Sharpe; VaR and expected shortfall are withheld on this desk."
+}

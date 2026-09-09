@@ -1,0 +1,258 @@
+{
+ "tag": "W05-leases-in-leverage#t2",
+ "program": {
+  "let": [
+   [
+    "AMZN_td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_lease",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_lease_liability_total"
+    }
+   ],
+   [
+    "AMZN_dl",
+    {
+     "fn": "add",
+     "a": "$AMZN_td",
+     "b": "$AMZN_lease"
+    }
+   ],
+   [
+    "AMZN_ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_d2e",
+    {
+     "fn": "method",
+     "name": "debt_to_ebitda",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "AMZN_d2e_lease",
+    {
+     "fn": "div",
+     "a": "$AMZN_dl",
+     "b": "$AMZN_ebitda"
+    }
+   ],
+   [
+    "MSFT_td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "MSFT_ltd",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "long_term_debt_total"
+    }
+   ],
+   [
+    "MSFT_lease",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_lease_liability_total"
+    }
+   ],
+   [
+    "MSFT_dl",
+    {
+     "fn": "add",
+     "a": "$MSFT_ltd",
+     "b": "$MSFT_lease"
+    }
+   ],
+   [
+    "MSFT_ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "MSFT_oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_dep",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "depreciation",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_amort",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "amortization_of_intangibles",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_oida",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "add",
+      "a": "$MSFT_oi",
+      "b": "$MSFT_dep"
+     },
+     "b": "$MSFT_amort"
+    }
+   ],
+   [
+    "MSFT_d2e",
+    {
+     "fn": "div",
+     "a": "$MSFT_ltd",
+     "b": "$MSFT_oida"
+    }
+   ],
+   [
+    "MSFT_d2e_lease",
+    {
+     "fn": "div",
+     "a": "$MSFT_dl",
+     "b": "$MSFT_oida"
+    }
+   ],
+   [
+    "AAPL_td_now",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "AAPL_lease_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "operating_lease_liability_total"
+    }
+   ],
+   [
+    "AAPL_td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AAPL",
+     "params": {
+      "at": "2025-09-27"
+     }
+    }
+   ],
+   [
+    "AAPL_lease",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "operating_lease_liability_total",
+     "at": "2025-09-27"
+    }
+   ],
+   [
+    "AAPL_dl",
+    {
+     "fn": "add",
+     "a": "$AAPL_td",
+     "b": "$AAPL_lease"
+    }
+   ],
+   [
+    "AAPL_ebitda",
+    {
+     "fn": "method",
+     "name": "ebitda",
+     "subject": "AAPL",
+     "params": {
+      "at": "2025-09-27"
+     }
+    }
+   ],
+   [
+    "AAPL_oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "operating_income",
+     "start": "2024-09-29",
+     "end": "2025-09-27"
+    }
+   ],
+   [
+    "AAPL_da",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "depreciation_amortization",
+     "start": "2024-09-29",
+     "end": "2025-09-27"
+    }
+   ],
+   [
+    "AAPL_oida",
+    {
+     "fn": "add",
+     "a": "$AAPL_oi",
+     "b": "$AAPL_da"
+    }
+   ],
+   [
+    "AAPL_d2e",
+    {
+     "fn": "div",
+     "a": "$AAPL_td",
+     "b": "$AAPL_oida"
+    }
+   ],
+   [
+    "AAPL_d2e_lease",
+    {
+     "fn": "div",
+     "a": "$AAPL_dl",
+     "b": "$AAPL_oida"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "AMZN_d2e",
+  "AMZN_d2e_lease",
+  "MSFT_d2e",
+  "MSFT_d2e_lease",
+  "AAPL_d2e",
+  "AAPL_d2e_lease"
+ ],
+ "note": "Debt-to-EBITDA without and with operating lease liabilities for AMZN, MSFT, AAPL, so the order can be compared. Expected refusals that are part of the answer: MSFT total_debt is incomplete_cover (commercial_paper last at 2025-06-30) so long_term_debt_total stands in; MSFT/AAPL ebitda refuse for want of a filed interest_expense in the window, so EBITDA is rebuilt as operating income + depreciation (+ amortization); AAPL's lease liability is last filed at 2025-09-27 (not_reported_at_this_date at 2026-03-28), so AAPL is read at that instant. The reorder is read off six scalars; no rank node is possible across issuers."
+}

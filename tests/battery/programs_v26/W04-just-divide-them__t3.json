@@ -1,0 +1,127 @@
+{
+ "tag": "W04-just-divide-them#t3",
+ "program": {
+  "let": [
+   [
+    "px",
+    {
+     "fn": "price",
+     "ticker": "AAPL"
+    }
+   ],
+   [
+    "close",
+    {
+     "fn": "pick",
+     "of": "$px",
+     "key": "close"
+    }
+   ],
+   [
+    "l52",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "mom",
+    {
+     "fn": "method",
+     "name": "price.momentum_12_1",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "AAPL",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "rel_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "AAPL",
+     "params": {
+      "window": "1y",
+      "benchmark": "SPY"
+     }
+    }
+   ],
+   [
+    "dd_3y",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "AAPL",
+     "params": {
+      "window": "3y"
+     }
+    }
+   ],
+   [
+    "vol30",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "AAPL",
+     "params": {
+      "window_days": 30
+     }
+    }
+   ],
+   [
+    "vol252",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "AAPL",
+     "params": {
+      "window_days": 252
+     }
+    }
+   ],
+   [
+    "eps_ttm",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "eps_diluted",
+     "months": 12
+    }
+   ],
+   [
+    "eps",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "eps_diluted",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "eps_g",
+    {
+     "fn": "yoy",
+     "of": "$eps"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "l52",
+  "ret_1y",
+  "rel_1y",
+  "eps_g"
+ ],
+ "note": "'Against its own history' without a multiple: where the price sits in its own range (distance from 52w high, 12-1 momentum, 1y return absolute and vs SPY, 3y drawdown, vol) beside the earnings history the desk does hold (TTM diluted EPS and its growth) — the two halves of a P/E stated separately, never divided."
+}

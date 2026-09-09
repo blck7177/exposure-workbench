@@ -1,0 +1,126 @@
+{
+ "tag": "FQ04-their-story-against-my-line#t1",
+ "program": {
+  "let": [
+   [
+    "gm_q",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "gm_now",
+    {
+     "fn": "latest",
+     "of": "$gm_q"
+    }
+   ],
+   [
+    "gm_prev_q",
+    {
+     "fn": "at",
+     "of": "$gm_q",
+     "period": "2026-04-26"
+    }
+   ],
+   [
+    "gm_yago",
+    {
+     "fn": "at",
+     "of": "$gm_q",
+     "period": "2025-07-27"
+    }
+   ],
+   [
+    "gm_chg_qoq_pts",
+    {
+     "fn": "sub",
+     "a": "$gm_now",
+     "b": "$gm_prev_q"
+    }
+   ],
+   [
+    "gm_chg_yoy_pts",
+    {
+     "fn": "sub",
+     "a": "$gm_now",
+     "b": "$gm_yago"
+    }
+   ],
+   [
+    "gm_a",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "NVDA",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "rev_qoq",
+    {
+     "fn": "qoq",
+     "of": "$rev_q"
+    }
+   ],
+   [
+    "cor_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "cost_of_revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "cor_qoq",
+    {
+     "fn": "qoq",
+     "of": "$cor_q"
+    }
+   ],
+   [
+    "gp_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "gross_profit",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "gp_qoq",
+    {
+     "fn": "qoq",
+     "of": "$gp_q"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "gm_q",
+  "gm_chg_qoq_pts",
+  "gm_chg_yoy_pts"
+ ],
+ "note": "The computed line first, and the premise checked: NVDA gross margin over eight fiscal quarters with the move in points quarter-on-quarter and year-on-year (and the annual series), plus revenue, cost of revenue and gross profit quarterly with qoq so the answer can see which side moved. Management's stated reason is MD&A text and not in the program."
+}

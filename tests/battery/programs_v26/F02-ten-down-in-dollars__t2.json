@@ -1,0 +1,170 @@
+{
+ "tag": "F02-ten-down-in-dollars#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "book_mv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "beta_spy",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "w_beta",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$beta_spy"
+    }
+   ],
+   [
+    "dollar_hit_by_name",
+    {
+     "fn": "scale",
+     "of": {
+      "fn": "mul",
+      "a": "$w_beta",
+      "b": "$book_mv"
+     },
+     "factor": -0.1
+    }
+   ],
+   [
+    "hit_tlt",
+    {
+     "fn": "pick",
+     "of": "$dollar_hit_by_name",
+     "key": "TLT"
+    }
+   ],
+   [
+    "hit_hyg",
+    {
+     "fn": "pick",
+     "of": "$dollar_hit_by_name",
+     "key": "HYG"
+    }
+   ],
+   [
+    "hit_hedges",
+    {
+     "fn": "add",
+     "a": "$hit_tlt",
+     "b": "$hit_hyg"
+    }
+   ],
+   [
+    "beta_spy_equities",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "JPM",
+      "LLY",
+      "GOOGL",
+      "AMZN",
+      "XOM",
+      "NVDA"
+     ],
+     "params": {
+      "benchmark": "SPY",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "hit_equities",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "scale",
+      "of": {
+       "fn": "mul",
+       "a": {
+        "fn": "mul",
+        "a": "$w",
+        "b": "$beta_spy_equities"
+       },
+       "b": "$book_mv"
+      },
+      "factor": -0.1
+     }
+    }
+   ],
+   [
+    "hit_all",
+    {
+     "fn": "sum",
+     "of": "$dollar_hit_by_name"
+    }
+   ],
+   [
+    "beta_tlt_spy",
+    {
+     "fn": "pick",
+     "of": "$beta_spy",
+     "key": "TLT"
+    }
+   ],
+   [
+    "beta_hyg_spy",
+    {
+     "fn": "pick",
+     "of": "$beta_spy",
+     "key": "HYG"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "hit_tlt",
+  "hit_hyg",
+  "hit_hedges",
+  "hit_equities"
+ ],
+ "note": "the hedge lines' part of t1's hit, netted with direction: each name's 1y OLS beta to SPY times its weight times book value times -10%, then TLT's and HYG's dollar figures against the eight equities' sum. Both ETFs carry a small POSITIVE beta to SPY over the year (TLT 0.17, HYG 0.23), so at -10% they lose a little rather than give anything back. This uses per-name 1y betas — a different instrument from the run's 750-session netted factor beta in t1 — and the answer says the two totals differ for that reason."
+}

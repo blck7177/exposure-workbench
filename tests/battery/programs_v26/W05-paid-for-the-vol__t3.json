@@ -1,0 +1,72 @@
+{
+ "tag": "W05-paid-for-the-vol#t3",
+ "program": {
+  "let": [
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "vol_252d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 252
+     }
+    }
+   ],
+   [
+    "ret_per_vol",
+    {
+     "fn": "div",
+     "a": "$ret_1y",
+     "b": "$vol_252d"
+    }
+   ],
+   [
+    "worst",
+    {
+     "fn": "rank",
+     "of": "$ret_per_vol",
+     "direction": "lowest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ret_per_vol",
+  "worst"
+ ],
+ "note": "name by name: each holding's 1y total return divided by its 252-session annualised vol over the same year, ranked lowest-first (TLT and MSFT negative, AMZN next); this is return per unit of vol, not Sharpe."
+}

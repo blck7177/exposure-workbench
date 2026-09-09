@@ -1,0 +1,84 @@
+{
+ "tag": "FQ03-is-aws-carrying-it#t1",
+ "program": {
+  "let": [
+   [
+    "rev",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 12
+    }
+   ],
+   [
+    "oi",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_income",
+     "months": 12
+    }
+   ],
+   [
+    "ni",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "om_now",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "nm_now",
+    {
+     "fn": "method",
+     "name": "net_margin",
+     "subject": "AMZN"
+    }
+   ],
+   [
+    "om_s",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": "AMZN",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "rev_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_s"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "rev",
+  "oi",
+  "om_now"
+ ],
+ "note": "Segment revenue and segment operating income are not held as figures (companyfacts are consolidated); the nearest held thing is the consolidated top line, operating income and operating margin, with the five-year margin series. The AWS share and the retail-versus-AWS split are stated as absent."
+}

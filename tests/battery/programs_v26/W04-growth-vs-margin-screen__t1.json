@@ -1,0 +1,491 @@
+{
+ "tag": "W04-growth-vs-margin-screen#t1",
+ "program": {
+  "let": [
+   [
+    "AAPL_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "AAPL_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AAPL_rev_q"
+    }
+   ],
+   [
+    "MSFT_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "MSFT_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$MSFT_rev_q"
+    }
+   ],
+   [
+    "NVDA_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "NVDA_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$NVDA_rev_q"
+    }
+   ],
+   [
+    "GOOGL_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "GOOGL_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$GOOGL_rev_q"
+    }
+   ],
+   [
+    "AMZN_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "AMZN_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$AMZN_rev_q"
+    }
+   ],
+   [
+    "XOM_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "XOM_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$XOM_rev_q"
+    }
+   ],
+   [
+    "LLY_rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "total_revenues",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "LLY_rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$LLY_rev_q"
+    }
+   ],
+   [
+    "AAPL_gm_s",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "AAPL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "AAPL_gm_now",
+    {
+     "fn": "latest",
+     "of": "$AAPL_gm_s"
+    }
+   ],
+   [
+    "AAPL_gm_yago",
+    {
+     "fn": "at",
+     "of": "$AAPL_gm_s",
+     "period": "2025-03-29"
+    }
+   ],
+   [
+    "AAPL_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$AAPL_gm_now",
+     "b": "$AAPL_gm_yago"
+    }
+   ],
+   [
+    "MSFT_gm_s",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "MSFT_gm_now",
+    {
+     "fn": "latest",
+     "of": "$MSFT_gm_s"
+    }
+   ],
+   [
+    "MSFT_gm_yago",
+    {
+     "fn": "at",
+     "of": "$MSFT_gm_s",
+     "period": "2025-03-31"
+    }
+   ],
+   [
+    "MSFT_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$MSFT_gm_now",
+     "b": "$MSFT_gm_yago"
+    }
+   ],
+   [
+    "NVDA_gm_s",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "NVDA_gm_now",
+    {
+     "fn": "latest",
+     "of": "$NVDA_gm_s"
+    }
+   ],
+   [
+    "NVDA_gm_yago",
+    {
+     "fn": "at",
+     "of": "$NVDA_gm_s",
+     "period": "2025-07-27"
+    }
+   ],
+   [
+    "NVDA_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$NVDA_gm_now",
+     "b": "$NVDA_gm_yago"
+    }
+   ],
+   [
+    "GOOGL_rev_now",
+    {
+     "fn": "latest",
+     "of": "$GOOGL_rev_q"
+    }
+   ],
+   [
+    "GOOGL_cor_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "cost_of_revenue",
+     "months": 3
+    }
+   ],
+   [
+    "GOOGL_gp_now",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_rev_now",
+     "b": "$GOOGL_cor_now"
+    }
+   ],
+   [
+    "GOOGL_gm_now",
+    {
+     "fn": "div",
+     "a": "$GOOGL_gp_now",
+     "b": "$GOOGL_rev_now"
+    }
+   ],
+   [
+    "GOOGL_rev_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "total_revenues",
+     "start": "2025-04-01",
+     "end": "2025-06-30"
+    }
+   ],
+   [
+    "GOOGL_cor_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "cost_of_revenue",
+     "start": "2025-04-01",
+     "end": "2025-06-30"
+    }
+   ],
+   [
+    "GOOGL_gp_yago",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_rev_yago",
+     "b": "$GOOGL_cor_yago"
+    }
+   ],
+   [
+    "GOOGL_gm_yago",
+    {
+     "fn": "div",
+     "a": "$GOOGL_gp_yago",
+     "b": "$GOOGL_rev_yago"
+    }
+   ],
+   [
+    "GOOGL_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$GOOGL_gm_now",
+     "b": "$GOOGL_gm_yago"
+    }
+   ],
+   [
+    "AMZN_rev_now",
+    {
+     "fn": "latest",
+     "of": "$AMZN_rev_q"
+    }
+   ],
+   [
+    "AMZN_cor_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "cost_of_revenue",
+     "months": 3
+    }
+   ],
+   [
+    "AMZN_gp_now",
+    {
+     "fn": "sub",
+     "a": "$AMZN_rev_now",
+     "b": "$AMZN_cor_now"
+    }
+   ],
+   [
+    "AMZN_gm_now",
+    {
+     "fn": "div",
+     "a": "$AMZN_gp_now",
+     "b": "$AMZN_rev_now"
+    }
+   ],
+   [
+    "AMZN_rev_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "revenue",
+     "start": "2025-01-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "AMZN_cor_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "cost_of_revenue",
+     "start": "2025-01-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "AMZN_gp_yago",
+    {
+     "fn": "sub",
+     "a": "$AMZN_rev_yago",
+     "b": "$AMZN_cor_yago"
+    }
+   ],
+   [
+    "AMZN_gm_yago",
+    {
+     "fn": "div",
+     "a": "$AMZN_gp_yago",
+     "b": "$AMZN_rev_yago"
+    }
+   ],
+   [
+    "AMZN_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$AMZN_gm_now",
+     "b": "$AMZN_gm_yago"
+    }
+   ],
+   [
+    "LLY_rev_now",
+    {
+     "fn": "latest",
+     "of": "$LLY_rev_q"
+    }
+   ],
+   [
+    "LLY_cor_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "cost_of_revenue",
+     "months": 3
+    }
+   ],
+   [
+    "LLY_gp_now",
+    {
+     "fn": "sub",
+     "a": "$LLY_rev_now",
+     "b": "$LLY_cor_now"
+    }
+   ],
+   [
+    "LLY_gm_now",
+    {
+     "fn": "div",
+     "a": "$LLY_gp_now",
+     "b": "$LLY_rev_now"
+    }
+   ],
+   [
+    "LLY_rev_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "total_revenues",
+     "start": "2025-01-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "LLY_cor_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "cost_of_revenue",
+     "start": "2025-01-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "LLY_gp_yago",
+    {
+     "fn": "sub",
+     "a": "$LLY_rev_yago",
+     "b": "$LLY_cor_yago"
+    }
+   ],
+   [
+    "LLY_gm_yago",
+    {
+     "fn": "div",
+     "a": "$LLY_gp_yago",
+     "b": "$LLY_rev_yago"
+    }
+   ],
+   [
+    "LLY_gm_chg",
+    {
+     "fn": "sub",
+     "a": "$LLY_gm_now",
+     "b": "$LLY_gm_yago"
+    }
+   ],
+   [
+    "XOM_gm",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "JPM_gm",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "JPM"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "AAPL_rev_yoy",
+  "MSFT_rev_yoy",
+  "NVDA_rev_yoy",
+  "GOOGL_rev_yoy",
+  "AMZN_rev_yoy",
+  "XOM_rev_yoy",
+  "LLY_rev_yoy",
+  "AAPL_gm_chg",
+  "MSFT_gm_chg",
+  "NVDA_gm_chg",
+  "GOOGL_gm_chg",
+  "AMZN_gm_chg",
+  "LLY_gm_chg"
+ ],
+ "note": "The screen over every screenable issuer: quarterly revenue with its yoy series (four points, so acceleration is visible) and gross margin now against the same quarter a year ago in points. gross_margin the method holds only for AAPL/MSFT/NVDA (gross_profit filed); GOOGL/AMZN/LLY file cost_of_revenue instead, so their margin is built as (revenue - cost of revenue)/revenue at two windows. XOM files neither gross_profit nor cost_of_revenue (input_unavailable) and JPM is a bank (not_applicable); TLT/HYG are funds. No cross-issuer vector exists for these scalars, so the worst-first order is read from the gm_chg nodes rather than a rank node."
+}

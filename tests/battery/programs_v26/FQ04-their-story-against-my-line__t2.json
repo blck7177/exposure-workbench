@@ -1,0 +1,151 @@
+{
+ "tag": "FQ04-their-story-against-my-line#t2",
+ "program": {
+  "let": [
+   [
+    "gm_q",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "NVDA",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "gm_now",
+    {
+     "fn": "latest",
+     "of": "$gm_q"
+    }
+   ],
+   [
+    "gm_prev_q",
+    {
+     "fn": "at",
+     "of": "$gm_q",
+     "period": "2026-04-26"
+    }
+   ],
+   [
+    "gm_chg_qoq_pts",
+    {
+     "fn": "sub",
+     "a": "$gm_now",
+     "b": "$gm_prev_q"
+    }
+   ],
+   [
+    "rev_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "months": 3
+    }
+   ],
+   [
+    "rev_prev",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "total_revenues",
+     "start": "2026-01-26",
+     "end": "2026-04-26"
+    }
+   ],
+   [
+    "cor_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "cost_of_revenue",
+     "months": 3
+    }
+   ],
+   [
+    "cor_prev",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "cost_of_revenue",
+     "start": "2026-01-26",
+     "end": "2026-04-26"
+    }
+   ],
+   [
+    "cor_chg",
+    {
+     "fn": "sub",
+     "a": "$cor_now",
+     "b": "$cor_prev"
+    }
+   ],
+   [
+    "rev_chg",
+    {
+     "fn": "sub",
+     "a": "$rev_now",
+     "b": "$rev_prev"
+    }
+   ],
+   [
+    "cor_to_rev_now",
+    {
+     "fn": "div",
+     "a": "$cor_now",
+     "b": "$rev_now"
+    }
+   ],
+   [
+    "cor_to_rev_prev",
+    {
+     "fn": "div",
+     "a": "$cor_prev",
+     "b": "$rev_prev"
+    }
+   ],
+   [
+    "cor_ratio_chg_pts",
+    {
+     "fn": "sub",
+     "a": "$cor_to_rev_now",
+     "b": "$cor_to_rev_prev"
+    }
+   ],
+   [
+    "inv_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "inventory"
+    }
+   ],
+   [
+    "inv_prev",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "inventory",
+     "at": "2026-04-26"
+    }
+   ],
+   [
+    "inv_chg",
+    {
+     "fn": "sub",
+     "a": "$inv_now",
+     "b": "$inv_prev"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "gm_chg_qoq_pts",
+  "cor_ratio_chg_pts",
+  "cor_chg"
+ ],
+ "note": "Sizes the move so their reason can be measured against it: the margin change in points is exactly the cost-of-revenue-to-revenue change; the dollar change in cost of revenue and revenue quarter-on-quarter and the inventory balance's move are the only held figures that bear on a provision story. The stated charge itself is text, so whether it covers the whole move is a netting the answer does with an absent figure named."
+}

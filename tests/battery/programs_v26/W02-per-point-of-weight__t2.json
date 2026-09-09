@@ -1,0 +1,139 @@
+{
+ "tag": "W02-per-point-of-weight#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "contrib_msft",
+    {
+     "fn": "pick",
+     "of": "$contrib",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "half_size_saves",
+    {
+     "fn": "scale",
+     "of": "$contrib_msft",
+     "factor": 0.5
+    }
+   ],
+   [
+    "contrib_sum",
+    {
+     "fn": "sum",
+     "of": "$contrib"
+    }
+   ],
+   [
+    "msft_share_of_fall",
+    {
+     "fn": "div",
+     "a": "$contrib_msft",
+     "b": "$contrib_sum"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "contrib_msft",
+  "half_size_saves"
+ ],
+ "note": "the worst per-point name is MSFT (-26.0% over the window): at its 16.1% weight its fixed-window contribution is about -4.2 points (37% of the summed contributions), so half the size would have removed about 2.1 points of the hole — first-order, ignoring renormalisation of the other weights and the path dependence of depth, both said."
+}

@@ -1,0 +1,103 @@
+{
+ "tag": "FQ06-same-risk-in-four-filings#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "order",
+    {
+     "fn": "rank",
+     "of": "$w",
+     "direction": "highest"
+    }
+   ],
+   [
+    "w_aapl",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "AAPL"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "w_googl",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "GOOGL"
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "share",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "add",
+      "a": {
+       "fn": "add",
+       "a": "$w_aapl",
+       "b": "$w_msft"
+      },
+      "b": "$w_googl"
+     },
+     "b": "$w_nvda"
+    }
+   ],
+   [
+    "top5",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "share",
+  "order"
+ ],
+ "note": "The issuer set is t1's text finding (Item 1A sweep: export-control / China-Taiwan language is the one theme that crosses sectors — AAPL, MSFT, GOOGL, NVDA; a different t1 reading re-points the four picks). share = their combined weight by chained add (no label-subset primitive); order ranks the whole book biggest first and top5 says whether they are the top of the book."
+}

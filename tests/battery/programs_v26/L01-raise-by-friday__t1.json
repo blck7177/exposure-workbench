@@ -1,0 +1,108 @@
+{
+ "tag": "L01-raise-by-friday#t1",
+ "program": {
+  "let": [
+   [
+    "participation",
+    0.25
+   ],
+   [
+    "adv_window_days",
+    20
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_mv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "raise",
+    {
+     "fn": "scale",
+     "of": "$book_mv",
+     "factor": 0.1
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "cap_per_day",
+    {
+     "fn": "scale",
+     "of": "$adv",
+     "factor": 0.25
+    }
+   ],
+   [
+    "days",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": "$cap_per_day"
+    }
+   ],
+   [
+    "easy_first",
+    {
+     "fn": "rank",
+     "of": "$days",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "raise_share_of_mv",
+    {
+     "fn": "div",
+     "a": "$raise",
+     "b": "$mv"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "raise",
+  "days",
+  "easy_first"
+ ],
+ "note": "the parameters as literal bindings (25% of 20-session dollar ADV), the raise as 10% of the run's book market value ($1.086m), every position's days-to-exit at that participation and the lowest-first ranking (NVDA, AMZN, AAPL, MSFT, GOOGL the easy end; JPM, LLY, HYG, TLT the hard end). On a $10.9m book every line exits in a fraction of one session, so the 'by Friday' constraint binds nothing and the choice of route is about what is left, not about time; raise_share_of_mv says how much of each single name the raise would consume."
+}

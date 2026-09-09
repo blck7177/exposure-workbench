@@ -588,13 +588,19 @@ async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
     grid = None
     for leaf in leaves:
         candidates = (leaf,) + tuple(f.alternatives.get(leaf, ()))
+        # the candidate whose facts reach the latest period, not the first with
+        # any: NVDA's `revenue` has three facts to 2022-01-30 and `total_revenues`
+        # runs to 2026-07-26, and a days_sales_outstanding grid on the first
+        # stopped four years short of the present (V30 C2, N02)
+        best, best_facts = None, []
         for cand in candidates:
             facts = await fs._flow_facts(db, company_id, cand)
-            if facts:
-                for w in ia.consecutive_windows(facts, months=months, last_n=int(last_n)):
-                    slots.append({"start": w.start, "end": w.end})
-                grid = f"{cand}'s {months}-month windows"
-                break
+            if facts and (best is None or max(x.period_end for x in facts) > max(x.period_end for x in best_facts)):
+                best, best_facts = cand, facts
+        if best is not None:
+            for w in ia.consecutive_windows(best_facts, months=months, last_n=int(last_n)):
+                slots.append({"start": w.start, "end": w.end})
+            grid = f"{best}'s {months}-month windows"
         if slots:
             break
     if not slots:

@@ -1,0 +1,160 @@
+{
+ "tag": "W01-xom-payout-plug#t2",
+ "program": {
+  "let": [
+   [
+    "div",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 12
+    }
+   ],
+   [
+    "ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "XOM"
+    }
+   ],
+   [
+    "div_to_ocf",
+    {
+     "fn": "div",
+     "a": "$div",
+     "b": "$ocf"
+    }
+   ],
+   [
+    "div_to_fcf",
+    {
+     "fn": "div",
+     "a": "$div",
+     "b": "$fcf"
+    }
+   ],
+   [
+    "div_prior",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "start": "2024-04-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "ocf_prior",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "start": "2024-04-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "capex_prior",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "capex",
+     "start": "2024-04-01",
+     "end": "2025-03-31"
+    }
+   ],
+   [
+    "fcf_prior",
+    {
+     "fn": "sub",
+     "a": "$ocf_prior",
+     "b": "$capex_prior"
+    }
+   ],
+   [
+    "div_to_ocf_prior",
+    {
+     "fn": "div",
+     "a": "$div_prior",
+     "b": "$ocf_prior"
+    }
+   ],
+   [
+    "div_to_fcf_prior",
+    {
+     "fn": "div",
+     "a": "$div_prior",
+     "b": "$fcf_prior"
+    }
+   ],
+   [
+    "div_to_ocf_chg",
+    {
+     "fn": "sub",
+     "a": "$div_to_ocf",
+     "b": "$div_to_ocf_prior"
+    }
+   ],
+   [
+    "div_to_fcf_chg",
+    {
+     "fn": "sub",
+     "a": "$div_to_fcf",
+     "b": "$div_to_fcf_prior"
+    }
+   ],
+   [
+    "div_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "dividends_paid",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "div_yoy",
+    {
+     "fn": "yoy",
+     "of": "$div_q"
+    }
+   ],
+   [
+    "ocf_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "ocf_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ocf_q"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "div_to_ocf",
+  "div_to_fcf",
+  "div_to_ocf_chg",
+  "div_to_fcf_chg"
+ ],
+ "note": "Dividend cushion as a share of operating cash flow and of free cash flow over the trailing year, the same shares one year earlier, and the change; dividend and OCF quarterly yoy show which side is moving the share."
+}

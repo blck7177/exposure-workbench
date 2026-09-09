@@ -1,0 +1,200 @@
+{
+ "tag": "W01-back-to-flat#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "worst_contrib",
+    {
+     "fn": "rank",
+     "of": "$contrib",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_fall",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-03-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "down_capture",
+    {
+     "fn": "div",
+     "a": "$book_fall",
+     "b": "$spy_fall"
+    }
+   ],
+   [
+    "an",
+    {
+     "fn": "method",
+     "name": "book.analysis",
+     "subject": "$r"
+    }
+   ],
+   [
+    "net_beta_equity",
+    {
+     "fn": "pick",
+     "of": "$an",
+     "key": "portfolio.integration.net_beta.equity_down"
+    }
+   ],
+   [
+    "r2",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.model_r_squared"
+    }
+   ],
+   [
+    "book_vol_60d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "spy_vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "SPY",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "net_beta_equity",
+  "down_capture",
+  "worst_contrib"
+ ],
+ "note": "structure or bad days: the book fell 1.53x what SPY fell over the same dates against a netted equity beta of 0.86 — so most of the excess is not the market leg — and the contribution ranking shows the fall concentrated in MSFT, LLY, JPM, GOOGL and AMZN (five of the eight equities each cost 1.8-4.2 points) rather than one bad name: that is how the book is built (large, correlated growth/quality positions), not a handful of days. The factor R² and the book-vs-SPY vol give the standing level of that concentration; the desk cannot attribute the episode to factors over its window (book.reconcile is one day)."
+}

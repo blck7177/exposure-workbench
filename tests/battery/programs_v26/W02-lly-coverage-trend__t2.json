@@ -1,0 +1,87 @@
+{
+ "tag": "W02-lly-coverage-trend#t2",
+ "program": {
+  "let": [
+   [
+    "cov_now",
+    {
+     "fn": "method",
+     "name": "ebit_interest_coverage",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "cov_s",
+    {
+     "fn": "method",
+     "name": "ebit_interest_coverage",
+     "subject": "LLY",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "cov_yoy",
+    {
+     "fn": "yoy",
+     "of": "$cov_s"
+    }
+   ],
+   [
+    "d2ocf",
+    {
+     "fn": "method",
+     "name": "debt_to_operating_cash_flow",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "fcf_to_debt",
+    {
+     "fn": "method",
+     "name": "fcf_to_debt",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "ie_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "interest_expense_nonoperating",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "ie_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ie_s"
+    }
+   ],
+   [
+    "ltd_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "long_term_debt_noncurrent",
+     "last_n": 8
+    }
+   ],
+   [
+    "ltd_pct",
+    {
+     "fn": "pct",
+     "of": "$ltd_s"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "cov_now",
+  "cov_s"
+ ],
+ "note": "The level is a convention the answer names against the held figures: coverage now and its five-year path, debt to operating cash flow, and the two things that move coverage (interest expense growth, debt growth). fcf_to_debt is expected to refuse for LLY (capex not filed after 2022-09-30) and is recorded as such."
+}

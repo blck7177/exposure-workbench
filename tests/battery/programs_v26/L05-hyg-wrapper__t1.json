@@ -1,0 +1,99 @@
+{
+ "tag": "L05-hyg-wrapper#t1",
+ "program": {
+  "let": [
+   [
+    "participation",
+    0.25
+   ],
+   [
+    "adv_window_days",
+    20
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv_hyg",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "HYG"
+    }
+   ],
+   [
+    "adv_hyg",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": "HYG",
+     "params": {
+      "window_days": 20
+     }
+    }
+   ],
+   [
+    "adv_hyg_dollars",
+    {
+     "fn": "pick",
+     "of": "$adv_hyg",
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "adv_hyg_shares",
+    {
+     "fn": "pick",
+     "of": "$adv_hyg",
+     "key": "adv_shares"
+    }
+   ],
+   [
+    "days_hyg",
+    {
+     "fn": "div",
+     "a": "$mv_hyg",
+     "b": {
+      "fn": "scale",
+      "of": "$adv_hyg_dollars",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "share_of_a_day",
+    {
+     "fn": "div",
+     "a": "$mv_hyg",
+     "b": "$adv_hyg_dollars"
+    }
+   ],
+   [
+    "vol_hyg_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "HYG",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "mv_hyg",
+  "adv_hyg_dollars",
+  "days_hyg"
+ ],
+ "note": "the arithmetic confirmed with the real figures: HYG's position ($791.6k), its 20-session dollar ADV ($2.4bn a day, 30.2m shares), the resulting days at 25% (0.0013) and the position as a share of one day's volume. What the number measures is the ETF wrapper's secondary-market volume; the desk holds no data on the underlying bonds' liquidity, NAV discount, or creation/redemption flows, so the 'is it real' half is a conceded absence."
+}

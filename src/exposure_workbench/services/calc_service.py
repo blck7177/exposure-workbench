@@ -186,7 +186,10 @@ async def window_return(
               "benchmark": benchmark,
               # A return is a ratio whatever it was a return on; stating it here
               # is what lets the V16 refusal in _record pass this row.
-              "result_type": {"unit_class": "ratio", "quantity": res.operation}}
+              # dated by its window (the typed resolver reads basis.interval): an
+              # undated return could not be placed in an answer (V30 C2, N04 t2)
+              "result_type": {"unit_class": "ratio", "quantity": res.operation,
+                              "basis": {"interval": [start.isoformat(), end.isoformat()]}}}
     refs = [f"price:{ticker}:{start.isoformat()}:{end.isoformat()}"]
     if benchmark:
         refs.append(f"price:{benchmark}:{start.isoformat()}:{end.isoformat()}")

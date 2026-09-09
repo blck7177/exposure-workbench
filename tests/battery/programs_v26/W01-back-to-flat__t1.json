@@ -1,0 +1,152 @@
+{
+ "tag": "W01-back-to-flat#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "depth_1y",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "trough_days",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_days"
+    }
+   ],
+   [
+    "recovery_days",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_days"
+    }
+   ],
+   [
+    "one",
+    {
+     "fn": "div",
+     "a": "$depth_1y",
+     "b": "$depth_1y"
+    }
+   ],
+   [
+    "gain_to_flat_1y_hole",
+    {
+     "fn": "div",
+     "a": "$depth_1y",
+     "b": {
+      "fn": "sub",
+      "a": "$one",
+      "b": "$depth_1y"
+     }
+    }
+   ],
+   [
+    "episodes_3m",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "3m"
+     }
+    }
+   ],
+   [
+    "depth_3m",
+    {
+     "fn": "pick",
+     "of": "$episodes_3m",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "gain_to_flat_3m_hole",
+    {
+     "fn": "div",
+     "a": "$depth_3m",
+     "b": {
+      "fn": "sub",
+      "a": "$one",
+      "b": "$depth_3m"
+     }
+    }
+   ],
+   [
+    "max_dd_run",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.max_drawdown"
+    }
+   ],
+   [
+    "gain_to_flat_max_dd",
+    {
+     "fn": "div",
+     "a": "$max_dd_run",
+     "b": {
+      "fn": "sub",
+      "a": "$one",
+      "b": "$max_dd_run"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "depth_3m",
+  "gain_to_flat_3m_hole",
+  "depth_1y",
+  "gain_to_flat_1y_hole",
+  "recovery_days"
+ ],
+ "note": "the eight percent is checked against the desk's drawdown path: every ≥5% episode of the last year is recovered (the deepest, 11.96%, peak 2026-01-07, trough 03-27, regained 05-01: 55 sessions down, 24 back) and the deepest fall inside the last three months is 4.62%, so the book is at most ~4.6% off its high, not 8%. The required gain is the desk's own number d/(1-d): 4.85% for the 3-month hole, 13.6% for the January hole, 21.5% for the run's 750-session max drawdown (17.7%) — and 8.7% for the asserted 8%, arithmetic the answer can show. 'Last time in a hole this size' = the January episode's 24 sessions to climb out."
+}

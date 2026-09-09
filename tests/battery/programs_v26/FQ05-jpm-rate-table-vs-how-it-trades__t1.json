@@ -1,0 +1,48 @@
+{
+ "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+ "program": {
+  "let": [
+   [
+    "jb_1y",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": "JPM",
+     "params": {
+      "benchmark": "TLT",
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "beta_1y",
+    {
+     "fn": "pick",
+     "of": "$jb_1y",
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_1y",
+    {
+     "fn": "pick",
+     "of": "$jb_1y",
+     "key": "r2"
+    }
+   ],
+   [
+    "alpha_1y",
+    {
+     "fn": "pick",
+     "of": "$jb_1y",
+     "key": "alpha"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "beta_1y",
+  "r2_1y"
+ ],
+ "note": "The Item 7A rate table itself is filings text (no program); the tape side is JPM's beta and r-squared against TLT over 1y, which is what the disclosure is set beside — r2 ~0.004 says the tape shows almost no TLT relationship."
+}

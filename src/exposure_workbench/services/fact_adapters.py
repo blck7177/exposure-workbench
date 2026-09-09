@@ -665,6 +665,15 @@ def start(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return [f], {**result, "fact": f.id}
 
 
+def run_program(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    """V30. The executor births its Facts itself (every node is typed at the
+    boundary it crossed); the adapter only lifts them out of the payload. No
+    walk, no unit table: a unit here comes from the node's type."""
+    recs = result.get("_facts") or []
+    note = {k: v for k, v in result.items() if k != "_facts"}
+    return [F.from_record(r) for r in recs], note
+
+
 def no_facts(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return [], _strip(result, Ctx("none"))
 
@@ -676,6 +685,7 @@ ADAPTERS: dict[str, Adapter] = {
     "read_prices": read_prices,
     "read_book": read_book,
     "compute": compute,
+    "run": run_program,
     "search_web": search_web,
     "start": start,
     "think": no_facts,
@@ -688,6 +698,7 @@ READ_BY_NAME = {
     "describe": "read_book(ref, names=[…]) for a run or scenario; read_fundamentals(ticker, metric) for an issuer",
     "read_book": "read_book(ref, names=[…]) with fewer names",
     "compute": "read_book(<calc_id>, names=[…]) reads a scenario's figures by name",
+    "run": "return fewer nodes, or pick the figures you need with fn pick / column",
     "read_prices": "read_prices(ticker, as_of=YYYY-MM-DD) reads one session",
 }
 

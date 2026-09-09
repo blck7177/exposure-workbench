@@ -31,9 +31,11 @@ def _names(rel: str) -> set[str]:
 def test_both_exits_resolve_through_the_one_resolver():
     """V24: the one resolver is services/gate.check; both exits call it and
     both hand its verdict to gate.accepted."""
-    for rel in ("tools/meta_tools.py", "tools/research_tools.py"):
+    # V30: the chat exit checks CLAIMS (services/claims); the brief keeps the V24
+    # gate until D5 migrates it. Each exit goes through exactly one checker.
+    for rel, mod in (("tools/meta_tools.py", "claims_mod"), ("tools/research_tools.py", "gate")):
         src = _src(rel)
-        assert "gate.check(" in src and "gate.accepted(" in src, f"{rel} does not go through the gate"
+        assert f"{mod}.check(" in src and f"{mod}.accepted(" in src, f"{rel} does not go through the gate"
         assert "resolver." not in src, f"{rel} still reaches the V15 resolver"
         assert "numeric_verification" not in src, f"{rel} still reads figures out of prose"
         assert "validate_citations" not in src, f"{rel} still checks citations against the old trail"

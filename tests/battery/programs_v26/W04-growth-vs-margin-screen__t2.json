@@ -1,0 +1,196 @@
+{
+ "tag": "W04-growth-vs-margin-screen#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "MSFT_w",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "MSFT_mv",
+    {
+     "fn": "pick",
+     "of": "$mv",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "w_rank",
+    {
+     "fn": "rank",
+     "of": "$w",
+     "direction": "highest"
+    }
+   ],
+   [
+    "room_to_warning",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.analysis",
+      "subject": "$r"
+     },
+     "key": "portfolio.integration.room_to_warning.issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "gm_s",
+    {
+     "fn": "method",
+     "name": "gross_margin",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "gm_now",
+    {
+     "fn": "latest",
+     "of": "$gm_s"
+    }
+   ],
+   [
+    "gm_yago",
+    {
+     "fn": "at",
+     "of": "$gm_s",
+     "period": "2025-03-31"
+    }
+   ],
+   [
+    "gm_chg",
+    {
+     "fn": "sub",
+     "a": "$gm_now",
+     "b": "$gm_yago"
+    }
+   ],
+   [
+    "rev_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "rev_yoy",
+    {
+     "fn": "yoy",
+     "of": "$rev_q"
+    }
+   ],
+   [
+    "dist_52w_high",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "ret_3m_rel",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "MSFT",
+     "params": {
+      "window": "3m",
+      "benchmark": "SPY"
+     },
+     "key": "relative"
+    }
+   ],
+   [
+    "ret_6m_rel",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "MSFT",
+     "params": {
+      "window": "6m",
+      "benchmark": "SPY"
+     },
+     "key": "relative"
+    }
+   ],
+   [
+    "ret_1y_rel",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": "MSFT",
+     "params": {
+      "window": "1y",
+      "benchmark": "SPY"
+     },
+     "key": "relative"
+    }
+   ],
+   [
+    "momentum",
+    {
+     "fn": "method",
+     "name": "price.momentum_12_1",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "drawdown_6m",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "MSFT",
+     "params": {
+      "window": "6m"
+     },
+     "key": "depth"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "MSFT_w",
+  "MSFT_mv",
+  "w_rank",
+  "dist_52w_high",
+  "ret_3m_rel",
+  "ret_6m_rel"
+ ],
+ "note": "The worst hit on t1's screen by margin points is MSFT (revenue yoy back up to 18.3% while gross margin is 1.1 points below a year ago; LLY is the other hit, -0.6 points). How big for us: MSFT's weight and market value on the latest run, its rank among positions and its room to the issuer-concentration warning. Whether the market has noticed: distance from the 52-week high, 3m/6m/1y returns relative to SPY, 12-1 momentum and the six-month drawdown depth. Carries t1's margin change and revenue yoy for MSFT so the follow-on stands alone."
+}

@@ -1,0 +1,221 @@
+{
+ "tag": "F06-down-capture#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "episodes_1y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "1y"
+     }
+    }
+   ],
+   [
+    "peak",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "recovery",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_date"
+    }
+   ],
+   [
+    "depth",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "deepest_depth"
+    }
+   ],
+   [
+    "explain",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak",
+      "trough": "$trough"
+     }
+    }
+   ],
+   [
+    "book_fall",
+    {
+     "fn": "pick",
+     "of": "$explain",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret",
+    {
+     "fn": "column",
+     "run": "$explain",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "contrib",
+    {
+     "fn": "mul",
+     "a": "$w",
+     "b": "$holding_ret"
+    }
+   ],
+   [
+    "trough_days",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].trough_days"
+    }
+   ],
+   [
+    "recovery_days",
+    {
+     "fn": "pick",
+     "of": "$episodes_1y",
+     "key": "episodes[0].recovery_days"
+    }
+   ],
+   [
+    "explain_recovery",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$trough",
+      "trough": "$recovery"
+     }
+    }
+   ],
+   [
+    "book_recovery",
+    {
+     "fn": "pick",
+     "of": "$explain_recovery",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_recovery",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-05-01"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-03-27"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-03-27"
+     }
+    }
+   ],
+   [
+    "up_capture",
+    {
+     "fn": "div",
+     "a": "$book_recovery",
+     "b": "$spy_recovery"
+    }
+   ],
+   [
+    "spy_on_our_recovery_vs_our_peak",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-05-01"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-01-07"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-01-07"
+     }
+    }
+   ],
+   [
+    "spy_dd_1y",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "SPY",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "book_recovery",
+  "spy_recovery",
+  "up_capture",
+  "recovery_days"
+ ],
+ "note": "did we come back as fast: the book regained its 01-07 peak on 2026-05-01, 24 sessions after the trough (55 down, 24 back — literals from the episodes payload), the book's and SPY's return over that recovery leg with their ratio, and SPY's level on the day we recovered against its own 01-07 level (+4.8%: the index was already past its old high while we were just getting back to ours — it recovered faster). SPY's own 1y drawdown table gives its peak/trough/depth for the same comparison."
+}

@@ -1,0 +1,96 @@
+{
+ "tag": "L05-hyg-wrapper#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "slowest",
+    {
+     "fn": "rank",
+     "of": "$days",
+     "direction": "highest"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_etf",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "TLT"
+     },
+     "b": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "HYG"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "days",
+  "w_etf"
+ ],
+ "note": "the day count for all ten lines with the ranking; it means what it says for the eight single-name equities (one instrument, one market), and for the two ETF lines (TLT, HYG — 13.3% of the book together) it measures the wrapper, not the bonds beneath."
+}

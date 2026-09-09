@@ -1,0 +1,1147 @@
+{
+ "N01-earnings-quality#t1": {
+  "figures": [
+   {
+    "key": "accruals_ratio_ttm",
+    "value": 0.18271656591896887,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": true,
+    "note": "evaluate_formula('NVDA','accruals_ratio', months=12): (net income − operating cash flow) ÷ total assets; basis 2025-07-28..2026-07-26 divide 2026-07-26"
+   },
+   {
+    "key": "accruals_ttm",
+    "value": 58519000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula('NVDA','accruals', months=12): net income − operating cash flow; basis 2025-07-28..2026-07-26 subtract 2025-07-28..2026-07-26"
+   },
+   {
+    "key": "net_income_ttm",
+    "value": 192879000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "read_fundamentals flow 2025-07-28..2026-07-26: −2025-04-28..2025-07-27 − 2025-01-27..2025-04-27 + 2025-01-27..2026-01-25 + 2026-01-26..2026-04-26 + 2026-04-27..2026-07-26"
+   },
+   {
+    "key": "operating_cash_flow_ttm",
+    "value": 134360000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "read_fundamentals flow 2025-07-28..2026-07-26: −2025-01-27..2025-07-27 + 2025-01-27..2026-01-25 + 2026-01-26..2026-07-26"
+   },
+   {
+    "key": "ocf_to_net_income_ttm",
+    "value": 0.6966025331943861,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "typed_calculator.divide(operating_cash_flow TTM, net_income TTM) — cash conversion, not a registry formula"
+   }
+  ],
+  "identity": [
+   "2025-07-28..2026-07-26 divide 2026-07-26",
+   "2025-07-28",
+   "2026-07-26"
+  ],
+  "derived_by": "gold.v24:n01_t1",
+  "skip": null
+ },
+ "N01-earnings-quality#t2": {
+  "figures": [
+   {
+    "key": "accruals_ratio_q_2026-07-26",
+    "value": 0.11118986361592646,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": true,
+    "note": "evaluate_formula_series('NVDA','accruals_ratio', months=3, last_n=8) point 2026-04-27..2026-07-26 — the latest quarter, the one the question is about"
+   },
+   {
+    "key": "accruals_ratio_q_2026-04-26",
+    "value": 0.030742964613024813,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series('NVDA','accruals_ratio', months=3, last_n=8) point 2026-01-26..2026-04-26"
+   },
+   {
+    "key": "accruals_ratio_q_2026-01-25",
+    "value": 0.03274614004632428,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series('NVDA','accruals_ratio', months=3, last_n=8) point 2025-10-27..2026-01-25"
+   },
+   {
+    "key": "accruals_ratio_q_2025-10-26",
+    "value": 0.050630476332315634,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series('NVDA','accruals_ratio', months=3, last_n=8) point 2025-07-28..2025-10-26"
+   },
+   {
+    "key": "accruals_q_2026-07-26",
+    "value": 35611000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series('NVDA','accruals', months=3) latest point 2026-04-27..2026-07-26"
+   }
+  ],
+  "identity": [
+   "2025-10-26",
+   "2026-01-25",
+   "2026-04-26",
+   "2026-07-26"
+  ],
+  "derived_by": "gold.v24:n01_t2",
+  "skip": null
+ },
+ "N02-working-capital#t1": {
+  "figures": [
+   {
+    "key": "total_revenues_yoy_latest_q",
+    "value": 1.0585114348672529,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": true,
+    "note": "series yoy over read_fundamentals('NVDA','total_revenues', months=3, last_n=8), point 2026-07-26 against the same quarter a year earlier"
+   },
+   {
+    "key": "accounts_receivable_yoy_latest",
+    "value": 1.2676567894131185,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": true,
+    "note": "series yoy over the accounts_receivable balance series, point 2026-07-26"
+   },
+   {
+    "key": "inventory_yoy_latest",
+    "value": 1.1103462103996793,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": true,
+    "note": "series yoy over the inventory balance series, point 2026-07-26"
+   },
+   {
+    "key": "total_revenues_latest_q",
+    "value": 96221000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "quarter 2026-04-27..2026-07-26"
+   },
+   {
+    "key": "accounts_receivable_latest",
+    "value": 63059000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "balance at 2026-07-26"
+   },
+   {
+    "key": "inventory_latest",
+    "value": 31575000000.0,
+    "unit": "MONEY",
+    "subject": "NVDA",
+    "must": false,
+    "note": "balance at 2026-07-26"
+   },
+   {
+    "key": "total_revenues_ttm_over_prior_ttm",
+    "value": 1.8337529809100703,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "typed_calculator.divide: 2025-07-28..2026-07-26 divide 2024-07-29..2025-07-27 (a ratio of levels, not a growth rate — subtract 1 for growth)"
+   },
+   {
+    "key": "days_sales_outstanding_ttm",
+    "value": 75.96993421769224,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula('NVDA','days_sales_outstanding', months=12): basis 2026-07-26 divide 2025-07-28..2026-07-26"
+   }
+  ],
+  "identity": [
+   "2026-07-26",
+   "2026-07-26",
+   "2026-07-26"
+  ],
+  "derived_by": "gold.v24:n02_t1",
+  "skip": null
+ },
+ "N02-working-capital#t2": {
+  "figures": [
+   {
+    "key": "days_inventory_ttm_now",
+    "value": 150.2042930872693,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": true,
+    "note": "evaluate_formula('NVDA','days_inventory', months=12): inventory ÷ cost of revenue × 365; basis 2026-07-26 divide 2025-07-28..2026-07-26"
+   },
+   {
+    "key": "days_inventory_ttm_year_ago",
+    "value": 109.6194223087577,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula pinned to the TTM window 2024-07-29..2025-07-27 at 2025-07-27: basis 2025-07-27 divide 2024-07-29..2025-07-27"
+   },
+   {
+    "key": "days_inventory_fy_2024-01-28",
+    "value": 115.99362252572048,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series months=12 last_n=3, fiscal year 2023-01-30..2024-01-28"
+   },
+   {
+    "key": "days_inventory_fy_2025-01-26",
+    "value": 112.72404179049603,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series months=12 last_n=3, fiscal year 2024-01-29..2025-01-26"
+   },
+   {
+    "key": "days_inventory_fy_2026-01-25",
+    "value": 125.043537414966,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "evaluate_formula_series months=12 last_n=3, fiscal year 2025-01-27..2026-01-25"
+   }
+  ],
+  "identity": [
+   "2026-07-26 divide 2025-07-28..2026-07-26",
+   "2025-07-27 divide 2024-07-29..2025-07-27",
+   "2024-01-28",
+   "2025-01-26",
+   "2026-01-25"
+  ],
+  "derived_by": "gold.v24:n02_t2",
+  "skip": null
+ },
+ "N03-liquidity#t1": {
+  "figures": [
+   {
+    "key": "days_to_exit_at_full_adv_JPM",
+    "value": 0.0008262593074226659,
+    "unit": "COUNT",
+    "subject": "JPM",
+    "must": true,
+    "note": "rank 1: issuer_exposures.JPM.market_value on run_34042d64f60c ÷ JPM dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_LLY",
+    "value": 0.0004577155720986698,
+    "unit": "COUNT",
+    "subject": "LLY",
+    "must": false,
+    "note": "rank 2: issuer_exposures.LLY.market_value on run_34042d64f60c ÷ LLY dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_HYG",
+    "value": 0.00032915390974194963,
+    "unit": "COUNT",
+    "subject": "HYG",
+    "must": false,
+    "note": "rank 3: issuer_exposures.HYG.market_value on run_34042d64f60c ÷ HYG dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_TLT",
+    "value": 0.00028084020230023866,
+    "unit": "COUNT",
+    "subject": "TLT",
+    "must": false,
+    "note": "rank 4: issuer_exposures.TLT.market_value on run_34042d64f60c ÷ TLT dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_XOM",
+    "value": 0.00021100395135708645,
+    "unit": "COUNT",
+    "subject": "XOM",
+    "must": false,
+    "note": "rank 5: issuer_exposures.XOM.market_value on run_34042d64f60c ÷ XOM dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_GOOGL",
+    "value": 0.00017723932328925888,
+    "unit": "COUNT",
+    "subject": "GOOGL",
+    "must": false,
+    "note": "rank 6: issuer_exposures.GOOGL.market_value on run_34042d64f60c ÷ GOOGL dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_MSFT",
+    "value": 0.0001532308780141622,
+    "unit": "COUNT",
+    "subject": "MSFT",
+    "must": false,
+    "note": "rank 7: issuer_exposures.MSFT.market_value on run_34042d64f60c ÷ MSFT dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_AAPL",
+    "value": 0.00012877776046243036,
+    "unit": "COUNT",
+    "subject": "AAPL",
+    "must": false,
+    "note": "rank 8: issuer_exposures.AAPL.market_value on run_34042d64f60c ÷ AAPL dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_AMZN",
+    "value": 9.037433069325805e-05,
+    "unit": "COUNT",
+    "subject": "AMZN",
+    "must": false,
+    "note": "rank 9: issuer_exposures.AMZN.market_value on run_34042d64f60c ÷ AMZN dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_NVDA",
+    "value": 1.6220832486378722e-05,
+    "unit": "COUNT",
+    "subject": "NVDA",
+    "must": false,
+    "note": "rank 10: issuer_exposures.NVDA.market_value on run_34042d64f60c ÷ NVDA dollar ADV (2026-08-10..2026-09-04, n=20); the worst name is must"
+   },
+   {
+    "key": "adv_dollars_20d_JPM",
+    "value": 1953236696.4,
+    "unit": "MONEY_PER_DAY",
+    "subject": "JPM",
+    "must": false,
+    "note": "price_analytics_service.adv(window_days=20).adv_dollars"
+   },
+   {
+    "key": "adv_shares_20d_JPM",
+    "value": 5456605.0,
+    "unit": "COUNT_PER_DAY",
+    "subject": "JPM",
+    "must": false,
+    "note": "price_analytics_service.adv(window_days=20).adv_shares"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c"
+  ],
+  "derived_by": "gold.v24:n03_t1",
+  "skip": null
+ },
+ "N03-liquidity#t2": {
+  "figures": [
+   {
+    "key": "days_to_exit_at_quarter_adv_JPM",
+    "value": 0.0033050372296906634,
+    "unit": "COUNT",
+    "subject": "JPM",
+    "must": true,
+    "note": "JPM is the worst name from t1; issuer_exposures.JPM.market_value on run_34042d64f60c ÷ (0.25 × dollar ADV 20d) via typed_calculator.scale then divide"
+   },
+   {
+    "key": "quarter_adv_dollars_JPM",
+    "value": 488309174.1,
+    "unit": "MONEY_PER_DAY",
+    "subject": "JPM",
+    "must": false,
+    "note": "typed_calculator.scale(adv_dollars, 0.25)"
+   },
+   {
+    "key": "quarter_adv_shares_JPM",
+    "value": 1364151.25,
+    "unit": "COUNT_PER_DAY",
+    "subject": "JPM",
+    "must": false,
+    "note": "typed_calculator.scale(adv_shares, 0.25)"
+   },
+   {
+    "key": "days_to_exit_at_full_adv_JPM",
+    "value": 0.0008262593074226659,
+    "unit": "COUNT",
+    "subject": "JPM",
+    "must": false,
+    "note": "from t1"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c"
+  ],
+  "derived_by": "gold.v24:n03_t2",
+  "skip": null
+ },
+ "N04-drawdown-anatomy#t1": {
+  "figures": [
+   {
+    "key": "worst_drawdown_depth",
+    "value": 0.11956829486211608,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": true,
+    "note": "drawdown_service.get_drawdown_episodes('port_001', span='1y'), window 2025-09-04..2026-09-04, episode peak 2026-01-07 trough 2026-03-27 — depth as a ratio of the peak"
+   },
+   {
+    "key": "worst_drawdown_trough_days",
+    "value": 55.0,
+    "unit": "COUNT",
+    "subject": "port_001",
+    "must": true,
+    "note": "drawdown_service.get_drawdown_episodes('port_001', span='1y'), window 2025-09-04..2026-09-04, episode peak 2026-01-07 trough 2026-03-27 — sessions from peak to trough (how fast)"
+   },
+   {
+    "key": "worst_drawdown_recovery_days",
+    "value": 24.0,
+    "unit": "COUNT",
+    "subject": "port_001",
+    "must": false,
+    "note": "drawdown_service.get_drawdown_episodes('port_001', span='1y'), window 2025-09-04..2026-09-04, episode peak 2026-01-07 trough 2026-03-27 — sessions from trough to recovery on 2026-05-01 (recovered=True)"
+   },
+   {
+    "key": "drawdown_depth_2026-05-29",
+    "value": 0.06239404939744266,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "the next episode, peak 2026-05-29 trough 2026-06-25"
+   }
+  ],
+  "identity": [
+   "2026-01-07",
+   "2026-03-27",
+   "2026-05-01",
+   "2025-09-04",
+   "2026-09-04"
+  ],
+  "derived_by": "gold.v24:n04_t1",
+  "skip": null
+ },
+ "N04-drawdown-anatomy#t2": {
+  "figures": [
+   {
+    "key": "benchmark_window_return",
+    "value": -0.07795813829535984,
+    "unit": "RATIO",
+    "subject": "SPY",
+    "must": true,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — SPY cumulative return over the fixed window (the market half)"
+   },
+   {
+    "key": "book_window_return",
+    "value": -0.11956829486211584,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — the book's cumulative return over the same window"
+   },
+   {
+    "key": "holding_window_return_MSFT",
+    "value": -0.2603795703819621,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": true,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 1 of 10 by window return (most negative first); the holding that fell most is must"
+   },
+   {
+    "key": "holding_window_return_LLY",
+    "value": -0.20610615723805586,
+    "unit": "RATIO",
+    "subject": "LLY",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 2 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_AMZN",
+    "value": -0.17478059281337968,
+    "unit": "RATIO",
+    "subject": "AMZN",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 3 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_GOOGL",
+    "value": -0.1473598193150315,
+    "unit": "RATIO",
+    "subject": "GOOGL",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 4 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_JPM",
+    "value": -0.13501937992275206,
+    "unit": "RATIO",
+    "subject": "JPM",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 5 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_NVDA",
+    "value": -0.11411820016560825,
+    "unit": "RATIO",
+    "subject": "NVDA",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 6 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_AAPL",
+    "value": -0.04339556580630467,
+    "unit": "RATIO",
+    "subject": "AAPL",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 7 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_TLT",
+    "value": -0.017503281571773166,
+    "unit": "RATIO",
+    "subject": "TLT",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 8 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_HYG",
+    "value": -0.017097239504183886,
+    "unit": "RATIO",
+    "subject": "HYG",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 9 of 10 by window return (most negative first)"
+   },
+   {
+    "key": "holding_window_return_XOM",
+    "value": 0.45269361689672316,
+    "unit": "RATIO",
+    "subject": "XOM",
+    "must": false,
+    "note": "drawdown_service.explain_episode('port_001', 2026-01-07, 2026-03-27), window 2026-01-08..2026-03-27 — rank 10 of 10 by window return (most negative first)"
+   }
+  ],
+  "identity": [
+   "2026-01-08",
+   "2026-03-27",
+   "SPY"
+  ],
+  "derived_by": "gold.v24:n04_t2",
+  "skip": null
+ },
+ "N05-market-or-us#t1": {
+  "figures": [
+   {
+    "key": "factor_share",
+    "value": 0.5114217163604916,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": true,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04: sum of factor contributions ÷ attribution_portfolio_return (the market/factor half)"
+   },
+   {
+    "key": "unexplained_share",
+    "value": 0.4885782836395084,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": true,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04: (alpha + residual) ÷ attribution_portfolio_return (the 'us' half)"
+   },
+   {
+    "key": "sum_of_factor_contributions",
+    "value": -0.0058426300000000006,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04"
+   },
+   {
+    "key": "alpha_plus_residual",
+    "value": -0.00558166,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04"
+   },
+   {
+    "key": "attribution_portfolio_return",
+    "value": -0.01142429,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04"
+   },
+   {
+    "key": "daily_return",
+    "value": -0.01142426,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04"
+   },
+   {
+    "key": "largest_factor_contribution_market",
+    "value": -0.00481713,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "reconcile_service.reconcile('run_34042d64f60c') — one-day attribution as of 2026-09-04 — collinear: not quotable individually, the sum is"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c"
+  ],
+  "derived_by": "gold.v24:n05_t1",
+  "skip": null
+ },
+ "N07-capex-cycle#t1": {
+  "figures": [
+   {
+    "key": "capex_ttm_MSFT",
+    "value": 97225000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": false,
+    "note": "read_fundamentals flow 2025-04-01..2026-03-31: −2025-01-01..2025-03-31 − 2024-10-01..2024-12-31 − 2024-07-01..2024-09-30 + 2024-07-01..2025-06-30 + 2025-07-01..2025-09-30 + 2025-10-01..2025-12-31 + 2026-01-01..2026-03-31; depreciation_amortization for MSFT is NOT held (not_reported: This desk holds no depreciation_amortization for MSFT over any period. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item.)"
+   },
+   {
+    "key": "depreciation_ttm_MSFT",
+    "value": 30300000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": false,
+    "note": "read_fundamentals flow 2025-04-01..2026-03-31: −2025-01-01..2025-03-31 − 2024-10-01..2024-12-31 − 2024-07-01..2024-09-30 + 2024-07-01..2025-06-30 + 2025-07-01..2025-09-30 + 2025-10-01..2025-12-31 + 2026-01-01..2026-03-31 — depreciation alone, not D&A"
+   },
+   {
+    "key": "capex_over_depreciation_MSFT",
+    "value": 3.208745874587459,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "typed_calculator.divide(capex TTM, depreciation TTM) — over depreciation ALONE, since the issuer's D&A is not held"
+   },
+   {
+    "key": "amortization_of_intangibles_ttm_MSFT",
+    "value": 5400000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": false,
+    "note": "read_fundamentals flow 2025-04-01..2026-03-31: −2025-01-01..2025-03-31 − 2024-10-01..2024-12-31 − 2024-07-01..2024-09-30 + 2024-07-01..2025-06-30 + 2025-07-01..2025-09-30 + 2025-10-01..2025-12-31 + 2026-01-01..2026-03-31"
+   },
+   {
+    "key": "capex_intensity_ttm_MSFT",
+    "value": 0.305476744807131,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "evaluate_formula('MSFT','capex_intensity', months=12): basis 2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "capex_ttm_AMZN",
+    "value": 151003000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "read_fundamentals flow 2025-04-01..2026-03-31: −2025-01-01..2025-03-31 + 2025-01-01..2025-12-31 + 2026-01-01..2026-03-31"
+   },
+   {
+    "key": "depreciation_amortization_ttm_AMZN",
+    "value": 70439000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "read_fundamentals flow 2025-04-01..2026-03-31: −2025-01-01..2025-03-31 + 2025-01-01..2025-12-31 + 2026-01-01..2026-03-31"
+   },
+   {
+    "key": "capex_over_depreciation_amortization_AMZN",
+    "value": 2.143741393262255,
+    "unit": "RATIO",
+    "subject": "AMZN",
+    "must": true,
+    "note": "typed_calculator.divide(capex TTM, depreciation_amortization TTM) — the over-investment ratio the question asks for; must for the issuer whose D&A is held"
+   },
+   {
+    "key": "capex_intensity_ttm_AMZN",
+    "value": 0.20329547535192305,
+    "unit": "RATIO",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','capex_intensity', months=12): basis 2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31"
+   }
+  ],
+  "identity": [
+   "2025-04-01",
+   "2026-03-31"
+  ],
+  "derived_by": "gold.v24:n07_t1",
+  "skip": null
+ },
+ "N07-capex-cycle#t2": {
+  "figures": [
+   {
+    "key": "free_cash_flow_ttm_MSFT",
+    "value": 72916000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": true,
+    "note": "evaluate_formula('MSFT','free_cash_flow', months=12): operating cash flow − capital expenditures; basis 2025-04-01..2026-03-31 subtract 2025-04-01..2026-03-31. REFUSED by the desk (honest absence): MSFT total_debt: incomplete_cover — total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself. | MSFT net_debt: input_unavailable — net_debt cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: cash_and_equivalents through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item. | MSFT debt_to_ebitda: input_unavailable — debt_to_ebitda cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: net_income through 2026-03-31; interest_expense through 2024-06-30; income_tax_expense through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item. | MSFT net_debt_to_ebitda: input_unavailable — net_debt cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: cash_and_equivalents through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item. | MSFT fcf_to_debt: input_unavailable — fcf_to_debt cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: operating_cash_flow through 2026-03-31; capex through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item. | MSFT debt_to_operating_cash_flow: input_unavailable — debt_to_operating_cash_flow cannot be produced for MSFT: total_debt could not be assembled: total_debt is not produced for MSFT as of 2026-03-31: the widest non-overlapping set of components reported at that date is long_term_debt_total, and commercial_paper — which MSFT does file — was not reported there and was not reached through anything that is. Their sum would be short of a total by an amount this desk cannot state, so it is not offered as one. Last reported: commercial_paper at 2025-06-30. The components reported at this date are on the balance sheet under their own names, and each may be quoted and cited as itself.. What this desk does hold: operating_cash_flow through 2026-03-31. MSFT's most recent filed period ends 2026-03-31. This is a statement about this desk's coverage, not a statement that the issuer does not disclose the item."
+   },
+   {
+    "key": "current_ratio_MSFT",
+    "value": 1.2829483173692569,
+    "unit": "MULTIPLE",
+    "subject": "MSFT",
+    "must": false,
+    "note": "evaluate_formula('MSFT','current_ratio', months=12): basis 2026-03-31 divide 2026-03-31"
+   },
+   {
+    "key": "ebit_interest_coverage_MSFT",
+    "value": 55.65263530244075,
+    "unit": "MULTIPLE",
+    "subject": "MSFT",
+    "must": false,
+    "note": "evaluate_formula('MSFT','ebit_interest_coverage', months=12): basis 2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "cash_and_equivalents_MSFT",
+    "value": 32105000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": false,
+    "note": "get_balance_sheet('MSFT') at 2026-03-31"
+   },
+   {
+    "key": "long_term_debt_total_MSFT",
+    "value": 40262000000.0,
+    "unit": "MONEY",
+    "subject": "MSFT",
+    "must": false,
+    "note": "get_balance_sheet('MSFT') at 2026-03-31"
+   },
+   {
+    "key": "free_cash_flow_ttm_AMZN",
+    "value": -2472000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": true,
+    "note": "evaluate_formula('AMZN','free_cash_flow', months=12): operating cash flow − capital expenditures; basis 2025-04-01..2026-03-31 subtract 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "total_debt_AMZN",
+    "value": 122784000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','total_debt', months=12): basis as of 2026-03-31"
+   },
+   {
+    "key": "net_debt_AMZN",
+    "value": 20968000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','net_debt', months=12): basis 2026-03-31 subtract 2026-03-31"
+   },
+   {
+    "key": "debt_to_ebitda_AMZN",
+    "value": 0.6535791849422987,
+    "unit": "MULTIPLE",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','debt_to_ebitda', months=12): basis 2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "net_debt_to_ebitda_AMZN",
+    "value": 0.11161265596388877,
+    "unit": "MULTIPLE",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','net_debt_to_ebitda', months=12): basis 2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "fcf_to_debt_AMZN",
+    "value": -0.020132916340891323,
+    "unit": "RATIO",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','fcf_to_debt', months=12): basis 2025-04-01..2026-03-31 divide 2026-03-31"
+   },
+   {
+    "key": "debt_to_operating_cash_flow_AMZN",
+    "value": 0.8266557149685925,
+    "unit": "MULTIPLE",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','debt_to_operating_cash_flow', months=12): basis 2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "current_ratio_AMZN",
+    "value": 1.1771531122552548,
+    "unit": "MULTIPLE",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','current_ratio', months=12): basis 2026-03-31 divide 2026-03-31"
+   },
+   {
+    "key": "ebit_interest_coverage_AMZN",
+    "value": 46.35807343071457,
+    "unit": "MULTIPLE",
+    "subject": "AMZN",
+    "must": false,
+    "note": "evaluate_formula('AMZN','ebit_interest_coverage', months=12): basis 2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "cash_and_equivalents_AMZN",
+    "value": 101816000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "get_balance_sheet('AMZN') at 2026-03-31"
+   },
+   {
+    "key": "long_term_debt_total_AMZN",
+    "value": 122632000000.0,
+    "unit": "MONEY",
+    "subject": "AMZN",
+    "must": false,
+    "note": "get_balance_sheet('AMZN') at 2026-03-31"
+   }
+  ],
+  "identity": [
+   "2025-04-01..2026-03-31 subtract 2025-04-01..2026-03-31",
+   "2026-03-31"
+  ],
+  "derived_by": "gold.v24:n07_t2",
+  "skip": null
+ },
+ "N08-whats-in-the-price#t1": {
+  "figures": [
+   {
+    "key": "distance_from_52w_high",
+    "value": -0.057607835559156384,
+    "unit": "RATIO",
+    "subject": "XOM",
+    "must": true,
+    "note": "price_analytics_service.distance_from_52w_high('XOM'): adj_close at 2026-09-04 against its high of the trailing 252 sessions, set 2026-03-30"
+   }
+  ],
+  "identity": [
+   "2026-03-30",
+   "2026-09-04"
+  ],
+  "derived_by": "gold.v24:n08_t1",
+  "skip": null
+ },
+ "N08-whats-in-the-price#t2": {
+  "figures": [
+   {
+    "key": "momentum_12_1",
+    "value": 0.44925927949552236,
+    "unit": "RATIO",
+    "subject": "XOM",
+    "must": true,
+    "note": "price_analytics_service.momentum_12_1('XOM'): adj_close return 2025-09-05..2026-08-06; the most recent 21 sessions are excluded (short-term reversal)"
+   }
+  ],
+  "identity": [
+   "2025-09-05",
+   "2026-08-06"
+  ],
+  "derived_by": "gold.v24:n08_t2",
+  "skip": null
+ },
+ "N09-no-forecast#t1": {
+  "figures": [],
+  "identity": [],
+  "derived_by": "gold.v24:n09_t1",
+  "skip": "a forward estimate of next year's revenue growth is not a figure this desk holds or computes; the turn tests honest abstention"
+ },
+ "N09-no-forecast#t2": {
+  "figures": [],
+  "identity": [],
+  "derived_by": "gold.v24:n09_t2",
+  "skip": "what LLY's filings say would move revenue is passage evidence (filing text), not a computable figure"
+ },
+ "N10-margin-debate#t1": {
+  "figures": [
+   {
+    "key": "gross_margin_ttm_AAPL",
+    "value": 0.47862405358827936,
+    "unit": "RATIO",
+    "subject": "AAPL",
+    "must": true,
+    "note": "evaluate_formula('AAPL','gross_margin', months=12): gross profit ÷ revenue; basis 2025-03-30..2026-03-28 divide 2025-03-30..2026-03-28; the mix-versus-price split is NOT held as figures on this desk — the honest answer says so"
+   },
+   {
+    "key": "gross_margin_latest_q_AAPL",
+    "value": 0.4927057850050367,
+    "unit": "RATIO",
+    "subject": "AAPL",
+    "must": false,
+    "note": "evaluate_formula_series months=3 last_n=8, quarter 2025-12-28..2026-03-28"
+   },
+   {
+    "key": "gross_margin_yoy_latest_q_AAPL",
+    "value": 0.04718236013763558,
+    "unit": "RATIO",
+    "subject": "AAPL",
+    "must": false,
+    "note": "series yoy over the quarterly gross_margin series, point 2026-03-28 — relative change in the margin against the same quarter a year earlier"
+   },
+   {
+    "key": "gross_margin_ttm_MSFT",
+    "value": 0.6830928165442874,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": true,
+    "note": "evaluate_formula('MSFT','gross_margin', months=12): gross profit ÷ revenue; basis 2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31"
+   },
+   {
+    "key": "gross_margin_latest_q_MSFT",
+    "value": 0.6763265207634582,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "evaluate_formula_series months=3 last_n=8, quarter 2026-01-01..2026-03-31"
+   },
+   {
+    "key": "gross_margin_yoy_latest_q_MSFT",
+    "value": -0.01577473147210708,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "series yoy over the quarterly gross_margin series, point 2026-03-31 — relative change in the margin against the same quarter a year earlier"
+   }
+  ],
+  "identity": [
+   "2025-03-30..2026-03-28 divide 2025-03-30..2026-03-28",
+   "2026-03-28",
+   "2025-04-01..2026-03-31 divide 2025-04-01..2026-03-31",
+   "2026-03-31"
+  ],
+  "derived_by": "gold.v24:n10_t1",
+  "skip": null
+ },
+ "N11-one-question#t1": {
+  "figures": [],
+  "identity": [],
+  "derived_by": "gold.v24:n11_t1",
+  "skip": "a synthesis turn: which line of XOM's numbers deserves the one question is the analyst's judgement, not a computable figure"
+ },
+ "N12-sector-drift#t2": {
+  "figures": [
+   {
+    "key": "weight_MSFT",
+    "value": 0.16104969,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "the biggest position on run_34042d64f60c, which the question keeps"
+   },
+   {
+    "key": "sector_weight_Technology_after_selling_100pct_AAPL",
+    "value": 0.23862934162375557,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "scenario_service.hypothetical_book('run_34042d64f60c', sell 1 of AAPL): Technology weight of the resulting book"
+   },
+   {
+    "key": "sector_weight_Technology_after_selling_50pct_AAPL",
+    "value": 0.2991714420423455,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "scenario_service.hypothetical_book('run_34042d64f60c', sell 0.5 of AAPL): Technology weight of the resulting book"
+   },
+   {
+    "key": "sector_weight_Technology_after_selling_100pct_NVDA",
+    "value": 0.3220318316079705,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "scenario_service.hypothetical_book('run_34042d64f60c', sell 1 of NVDA): Technology weight of the resulting book"
+   },
+   {
+    "key": "sector_weight_Technology_after_selling_50pct_NVDA",
+    "value": 0.3367248289920759,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "scenario_service.hypothetical_book('run_34042d64f60c', sell 0.5 of NVDA): Technology weight of the resulting book"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c",
+   "Technology",
+   "MSFT"
+  ],
+  "derived_by": "gold.v24:n12_t2",
+  "skip": null
+ },
+ "N06-top-five#t1": {
+  "figures": [
+   {
+    "key": "top_five_share",
+    "value": 0.70865289,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": true,
+    "note": "sum of the five largest issuer_exposures.weight on run_34042d64f60c (as_of 2026-09-04): MSFT 0.16104969, JPM 0.14861195, AAPL 0.14732002, LLY 0.12700471, GOOGL 0.12466652"
+   },
+   {
+    "key": "weight_MSFT",
+    "value": 0.16104969,
+    "unit": "RATIO",
+    "subject": "MSFT",
+    "must": false,
+    "note": "issuer_exposures.MSFT.weight on run_34042d64f60c"
+   },
+   {
+    "key": "weight_JPM",
+    "value": 0.14861195,
+    "unit": "RATIO",
+    "subject": "JPM",
+    "must": false,
+    "note": "issuer_exposures.JPM.weight on run_34042d64f60c"
+   },
+   {
+    "key": "weight_AAPL",
+    "value": 0.14732002,
+    "unit": "RATIO",
+    "subject": "AAPL",
+    "must": false,
+    "note": "issuer_exposures.AAPL.weight on run_34042d64f60c"
+   },
+   {
+    "key": "weight_LLY",
+    "value": 0.12700471,
+    "unit": "RATIO",
+    "subject": "LLY",
+    "must": false,
+    "note": "issuer_exposures.LLY.weight on run_34042d64f60c"
+   },
+   {
+    "key": "weight_GOOGL",
+    "value": 0.12466652,
+    "unit": "RATIO",
+    "subject": "GOOGL",
+    "must": false,
+    "note": "issuer_exposures.GOOGL.weight on run_34042d64f60c"
+   },
+   {
+    "key": "top_five_share_prior_run",
+    "value": 0.7115538100000001,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "the same sum on run_c1b54faaf60f (as_of 2026-09-03), the latest completed run with an earlier as_of: MSFT 0.16251671, AAPL 0.14937553, JPM 0.14830326, LLY 0.12666222, GOOGL 0.12469609. must=False because 'the run before this one' is ambiguous: the fixture also holds earlier-completed runs with the SAME as_of and identical weights, against which the share is unchanged"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c",
+   "2026-09-03",
+   "run_c1b54faaf60f"
+  ],
+  "derived_by": "gold.v24:n06_t1",
+  "skip": null
+ },
+ "N12-sector-drift#t1": {
+  "figures": [
+   {
+    "key": "sector_weight_Technology",
+    "value": 0.35079448,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": true,
+    "note": "sector_exposures.Technology.weight on run_34042d64f60c (as_of 2026-09-04) — the largest sector, the 'one trade' the question is about"
+   },
+   {
+    "key": "sector_weight_Financials",
+    "value": 0.14861195,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Financials.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_weight_Fixed_Income",
+    "value": 0.13345498,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Fixed_Income.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_weight_Healthcare",
+    "value": 0.12700471,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Healthcare.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_weight_Communication_Services",
+    "value": 0.12466652,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Communication_Services.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_weight_Consumer_Discretionary",
+    "value": 0.07141363,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Consumer_Discretionary.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_weight_Energy",
+    "value": 0.04405374,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Energy.weight on run_34042d64f60c"
+   },
+   {
+    "key": "sector_warning_level_Technology",
+    "value": 0.4,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "limit_checks.sector_concentration:Technology.warning_level on run_34042d64f60c — the mandate's line"
+   },
+   {
+    "key": "sector_weight_Technology_prior_run",
+    "value": 0.35348127,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Technology.weight on run_c1b54faaf60f (as_of 2026-09-03), the latest run with an earlier as_of"
+   },
+   {
+    "key": "sector_weight_Technology_earliest_run",
+    "value": 0.31745923,
+    "unit": "RATIO",
+    "subject": "port_001",
+    "must": false,
+    "note": "sector_exposures.Technology.weight on run_a74cb53b4eb9 (as_of 2026-06-17), the earliest completed run the fixture holds — the drift over the whole run history"
+   }
+  ],
+  "identity": [
+   "2026-09-04",
+   "run_34042d64f60c",
+   "2026-09-03",
+   "run_c1b54faaf60f",
+   "2026-06-17",
+   "run_a74cb53b4eb9"
+  ],
+  "derived_by": "gold.v24:n12_t1",
+  "skip": null
+ }
+}

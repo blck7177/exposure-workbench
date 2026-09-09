@@ -1,0 +1,168 @@
+{
+ "tag": "W05-paid-for-the-vol#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "book_vol_60d",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.rolling_vol_60d"
+    }
+   ],
+   [
+    "book_ret_60d",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2026-06-10",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "book_ret_per_vol",
+    {
+     "fn": "div",
+     "a": "$book_ret_60d",
+     "b": "$book_vol_60d"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "1y"
+    }
+   ],
+   [
+    "spy_ret_60d",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-09-04"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-06-10"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-06-10"
+     }
+    }
+   ],
+   [
+    "spy_vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": "SPY",
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "spy_ret_per_vol",
+    {
+     "fn": "div",
+     "a": "$spy_ret_60d",
+     "b": "$spy_vol_63d"
+    }
+   ],
+   [
+    "ret_per_vol_ratio",
+    {
+     "fn": "div",
+     "a": "$book_ret_per_vol",
+     "b": "$spy_ret_per_vol"
+    }
+   ],
+   [
+    "ret_ratio_60d",
+    {
+     "fn": "div",
+     "a": "$book_ret_60d",
+     "b": "$spy_ret_60d"
+    }
+   ],
+   [
+    "book_ret_1y",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2025-09-04",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "spy_ret_1y",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-09-04"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2025-09-04"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2025-09-04"
+     }
+    }
+   ],
+   [
+    "ret_ratio_1y",
+    {
+     "fn": "div",
+     "a": "$book_ret_1y",
+     "b": "$spy_ret_1y"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "spy_ret_60d",
+  "spy_ret_per_vol",
+  "ret_per_vol_ratio",
+  "ret_ratio_60d"
+ ],
+ "note": "the market's side of t1 over the same sessions: SPY's return 2026-06-10..09-04 from its own closes, its 63d vol (the nearest window to the run's 60d), its return per unit of vol, and the book's ratio over the market's (about 1.24x: the book earned more per unit of vol than owning the market over the stretch) plus the plain return ratio (book minus market is refused as mixed_worlds, so the excess is read off the two figures, _GAPS_A); the 1y pair as well."
+}

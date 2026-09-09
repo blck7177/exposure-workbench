@@ -1,0 +1,151 @@
+{
+ "tag": "B05-etf-instrument-class#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w_tlt",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "TLT"
+    }
+   ],
+   [
+    "w_hyg",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "HYG"
+    }
+   ],
+   [
+    "mv_tlt",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "TLT"
+    }
+   ],
+   [
+    "mv_hyg",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "HYG"
+    }
+   ],
+   [
+    "vol63",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "TLT",
+      "HYG"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "beta_spy",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "TLT",
+      "HYG"
+     ],
+     "params": {
+      "benchmark": "SPY"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_spy",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "TLT",
+      "HYG"
+     ],
+     "params": {
+      "benchmark": "SPY"
+     },
+     "key": "r2"
+    }
+   ],
+   [
+    "tlt_dd",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "TLT",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "hyg_dd",
+    {
+     "fn": "method",
+     "name": "price.drawdown",
+     "subject": "HYG",
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "ret_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": [
+      "TLT",
+      "HYG"
+     ],
+     "params": {
+      "window": "1y"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "vol63",
+  "beta_spy"
+ ],
+ "note": "Duration and holdings credit quality are fund characteristics, not a data source here (no companyfacts panel, no filing) — no node can produce them. What the desk holds for two funds is price and volume, so the program gives the position sizes and the price-derived measures that stand in: realised vol, beta/r2 to SPY, 1y drawdown and return."
+}

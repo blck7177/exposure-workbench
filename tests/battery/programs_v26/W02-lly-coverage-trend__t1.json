@@ -1,0 +1,193 @@
+{
+ "tag": "W02-lly-coverage-trend#t1",
+ "program": {
+  "let": [
+   [
+    "td",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "bs",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY"
+    }
+   ],
+   [
+    "cash",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "cash_and_equivalents"
+    }
+   ],
+   [
+    "nd",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "nd2e",
+    {
+     "fn": "method",
+     "name": "net_debt_to_ebitda",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "d2e",
+    {
+     "fn": "method",
+     "name": "debt_to_ebitda",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "d2ocf",
+    {
+     "fn": "method",
+     "name": "debt_to_operating_cash_flow",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "pretax_2025",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "pretax_income",
+     "start": "2025-01-01",
+     "end": "2025-12-31"
+    }
+   ],
+   [
+    "ie_2025",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "interest_expense_nonoperating",
+     "start": "2025-01-01",
+     "end": "2025-12-31"
+    }
+   ],
+   [
+    "da_2025",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "depreciation_amortization",
+     "start": "2025-01-01",
+     "end": "2025-12-31"
+    }
+   ],
+   [
+    "ebitda_2025",
+    {
+     "fn": "add",
+     "a": {
+      "fn": "add",
+      "a": "$pretax_2025",
+      "b": "$ie_2025"
+     },
+     "b": "$da_2025"
+    }
+   ],
+   [
+    "td_2025",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "LLY",
+     "params": {
+      "at": "2025-12-31"
+     }
+    }
+   ],
+   [
+    "nd_2025",
+    {
+     "fn": "method",
+     "name": "net_debt",
+     "subject": "LLY",
+     "params": {
+      "at": "2025-12-31"
+     }
+    }
+   ],
+   [
+    "nd2e_2025",
+    {
+     "fn": "div",
+     "a": "$nd_2025",
+     "b": "$ebitda_2025"
+    }
+   ],
+   [
+    "cov_now",
+    {
+     "fn": "method",
+     "name": "ebit_interest_coverage",
+     "subject": "LLY"
+    }
+   ],
+   [
+    "cov_s",
+    {
+     "fn": "method",
+     "name": "ebit_interest_coverage",
+     "subject": "LLY",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "cov_yoy",
+    {
+     "fn": "yoy",
+     "of": "$cov_s"
+    }
+   ],
+   [
+    "ie_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "interest_expense_nonoperating",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "ie_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ie_s"
+    }
+   ],
+   [
+    "ltd_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "long_term_debt_noncurrent",
+     "last_n": 8
+    }
+   ]
+  ]
+ },
+ "must": [
+  "td",
+  "nd2e_2025",
+  "cov_now",
+  "cov_s"
+ ],
+ "note": "Tests the 'barely any debt' premise with LLY total_debt, net debt and the leverage multiples, then EBIT interest coverage now and over five years with its yoy for the direction. The desk's net_debt_to_ebitda and debt_to_ebitda refuse at the latest window (input_unavailable: ebit needs interest_expense, which LLY stops filing after 2024-03-31; only interest_expense_nonoperating continues) and that refusal is part of the answer, so a calendar-2025 net-debt-to-EBITDA is rebuilt from pretax income + interest + D&A; the coverage method itself accepts the nonoperating line and settles."
+}

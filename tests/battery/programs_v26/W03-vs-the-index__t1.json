@@ -1,0 +1,4 @@
+{
+ "tag": "W03-vs-the-index#t1",
+ "skip": "active weight, active share and sector over/underweights need the index's constituents and weights; the desk holds the market only as SPY's return/price series and factor ETF series, never as a list of constituents, so nothing here is computable — the right answer says exactly that and offers t2's nearest thing."
+}

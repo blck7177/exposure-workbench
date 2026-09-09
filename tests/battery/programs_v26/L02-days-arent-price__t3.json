@@ -1,0 +1,102 @@
+{
+ "tag": "L02-days-arent-price#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "GOOGL",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days_pair",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "vol_pair",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "GOOGL",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "vol_ratio",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "pick",
+      "of": "$vol_pair",
+      "key": "GOOGL"
+     },
+     "b": {
+      "fn": "pick",
+      "of": "$vol_pair",
+      "key": "XOM"
+     }
+    }
+   ],
+   [
+    "days_ratio",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "pick",
+      "of": "$days_pair",
+      "key": "GOOGL"
+     },
+     "b": {
+      "fn": "pick",
+      "of": "$days_pair",
+      "key": "XOM"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "days_pair",
+  "vol_pair",
+  "vol_ratio"
+ ],
+ "note": "the pair that comes out at about the same day count but with different jumpiness: GOOGL and XOM (days differ by ~16%, 63d vol by ~37%, GOOGL the jumpier). The desk can show the vol gap and agree that equal days do not mean equal cost, but it cannot price it — no impact model, so the square-root-law point stays qualitative."
+}

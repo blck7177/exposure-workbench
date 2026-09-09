@@ -1,0 +1,151 @@
+{
+ "tag": "W05-half-taken-back#t2",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "limit_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "limit_checks",
+      "col": "warning_level"
+     },
+     "key": "issuer_concentration:MSFT"
+    }
+   ],
+   [
+    "target",
+    {
+     "fn": "scale",
+     "of": "$limit_msft",
+     "factor": 0.5
+    }
+   ],
+   [
+    "excess",
+    {
+     "fn": "sub",
+     "a": "$w_msft",
+     "b": "$target"
+    }
+   ],
+   [
+    "top5_before",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "after",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "MSFT",
+       "fraction": 0.5776273
+      }
+     ]
+    }
+   ],
+   [
+    "sold",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "trade.proceeds"
+    }
+   ],
+   [
+    "w_after",
+    {
+     "fn": "column",
+     "run": "$after",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_msft_after",
+    {
+     "fn": "pick",
+     "of": "$w_after",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "top5_after",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "top",
+      "of": "$w_after",
+      "n": 5
+     }
+    }
+   ],
+   [
+    "check_msft_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "limit_checks.issuer_concentration:MSFT.current_value"
+    }
+   ],
+   [
+    "pmv_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "alerts_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "count.alerts"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "target",
+  "w_msft_after",
+  "sold",
+  "top5_after"
+ ],
+ "note": "Scenario B replaces A (not compounded): target = half the 15% single-name warning = 7.5%; the after-book lands MSFT at 7.50% with $1.01m sold (vs $874k in A). The sale fraction 0.5776 = (w - t)/(w(1 - t)) is a literal: `sell` has no target-weight form and the language has no constant operand for (1 - t) — see _GAPS_C.md; w_msft_after verifies it."
+}

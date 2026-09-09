@@ -1,0 +1,173 @@
+{
+ "tag": "W06-aapl-net-cash-buybacks#t3",
+ "program": {
+  "let": [
+   [
+    "ltd_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "long_term_debt_total",
+     "last_n": 8
+    }
+   ],
+   [
+    "ltd_pct",
+    {
+     "fn": "pct",
+     "of": "$ltd_s"
+    }
+   ],
+   [
+    "cp_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "commercial_paper",
+     "last_n": 8
+    }
+   ],
+   [
+    "td_now",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "td_yago",
+    {
+     "fn": "method",
+     "name": "total_debt",
+     "subject": "AAPL",
+     "params": {
+      "at": "2025-03-29"
+     }
+    }
+   ],
+   [
+    "debt_chg",
+    {
+     "fn": "sub",
+     "a": "$td_now",
+     "b": "$td_yago"
+    }
+   ],
+   [
+    "cash_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "cash_and_equivalents"
+    }
+   ],
+   [
+    "cash_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "cash_and_equivalents",
+     "at": "2025-03-29"
+    }
+   ],
+   [
+    "cash_chg",
+    {
+     "fn": "sub",
+     "a": "$cash_now",
+     "b": "$cash_yago"
+    }
+   ],
+   [
+    "bb_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "buybacks",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "div_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "dividends_paid",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "fcf_q",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "AAPL",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "AAPL"
+    }
+   ],
+   [
+    "bb",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "buybacks",
+     "months": 12
+    }
+   ],
+   [
+    "div",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "dividends_paid",
+     "months": 12
+    }
+   ],
+   [
+    "distributions",
+    {
+     "fn": "add",
+     "a": "$bb",
+     "b": "$div"
+    }
+   ],
+   [
+    "self_funding_gap",
+    {
+     "fn": "sub",
+     "a": "$fcf",
+     "b": "$distributions"
+    }
+   ],
+   [
+    "bb_to_fcf",
+    {
+     "fn": "div",
+     "a": "$bb",
+     "b": "$fcf"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "distributions",
+  "fcf",
+  "self_funding_gap",
+  "debt_chg"
+ ],
+ "note": "Tests 'borrowing to buy back' at the level co-movement can support: debt over eight quarters and its change over a year, cash's change, buybacks and dividends beside free cash flow quarterly and over the trailing year, and the self-funding gap (FCF minus distributions). A gap covered by cash drawdown or new debt is shown, but which dollar funded which is not a claim the figures license."
+}

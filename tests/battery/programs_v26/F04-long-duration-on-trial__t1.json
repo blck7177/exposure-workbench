@@ -1,0 +1,81 @@
+{
+ "tag": "F04-long-duration-on-trial#t1",
+ "program": {
+  "let": [
+   [
+    "beta_tlt",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "JPM",
+      "LLY",
+      "GOOGL",
+      "AMZN",
+      "XOM",
+      "NVDA"
+     ],
+     "params": {
+      "benchmark": "TLT",
+      "window": "1y"
+     },
+     "key": "beta"
+    }
+   ],
+   [
+    "r2_tlt",
+    {
+     "fn": "method",
+     "name": "price.beta",
+     "subject": [
+      "MSFT",
+      "AAPL",
+      "JPM",
+      "LLY",
+      "GOOGL",
+      "AMZN",
+      "XOM",
+      "NVDA"
+     ],
+     "params": {
+      "benchmark": "TLT",
+      "window": "1y"
+     },
+     "key": "r2"
+    }
+   ],
+   [
+    "most_rate_sensitive",
+    {
+     "fn": "rank",
+     "of": "$beta_tlt",
+     "direction": "highest"
+    }
+   ],
+   [
+    "beta_nvda_tlt",
+    {
+     "fn": "pick",
+     "of": "$beta_tlt",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "r2_nvda_tlt",
+    {
+     "fn": "pick",
+     "of": "$r2_tlt",
+     "key": "NVDA"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "beta_tlt",
+  "most_rate_sensitive",
+  "beta_nvda_tlt"
+ ],
+ "note": "all eight equities' 1y OLS beta to TLT (a positive beta = moves with bond prices = falls when yields rise = 'long duration'), ranked highest-first, with R² so the answer can say how little of any name the rates factor explains. GOOGL is the highest at 0.44, NVDA is 0.21 with R² near zero — not the rate trade; XOM is -0.98, the one name that rises when yields rise, so the received story is half right (energy) and half wrong (which growth name)."
+}

@@ -1,0 +1,135 @@
+{
+ "tag": "NEW05-your-numbers-disagree#t2",
+ "program": {
+  "let": [
+   [
+    "accruals_ratio_q",
+    {
+     "fn": "method",
+     "name": "accruals_ratio",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "accruals_latest",
+    {
+     "fn": "latest",
+     "of": "$accruals_ratio_q"
+    }
+   ],
+   [
+    "dso_q",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "dso_latest",
+    {
+     "fn": "latest",
+     "of": "$dso_q"
+    }
+   ],
+   [
+    "receivables",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "accounts_receivable",
+     "last_n": 8
+    }
+   ],
+   [
+    "receivables_yoy",
+    {
+     "fn": "yoy",
+     "of": "$receivables"
+    }
+   ],
+   [
+    "revenue_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "revenue_yoy",
+    {
+     "fn": "yoy",
+     "of": "$revenue_q"
+    }
+   ],
+   [
+    "fcf_margin_q",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "capex_intensity_q",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "ni",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "ocf_to_ni",
+    {
+     "fn": "div",
+     "a": "$ocf",
+     "b": "$ni"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "accruals_ratio_q",
+  "dso_q",
+  "receivables_yoy",
+  "revenue_yoy"
+ ],
+ "note": "Which reading to believe rests on direction, not level: the 8-quarter accruals-ratio and DSO paths, receivables growth against revenue growth (the working-capital tell), and the FCF-margin / capex-intensity paths that carry the one dissenting reading forward from t1. Per-quarter OCF/NI as a series is not expressible (series arithmetic — see _GAPS_C.md); the TTM figure is carried instead."
+}

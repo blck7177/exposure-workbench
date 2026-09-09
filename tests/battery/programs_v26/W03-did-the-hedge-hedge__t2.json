@@ -1,0 +1,441 @@
+{
+ "tag": "W03-did-the-hedge-hedge#t2",
+ "program": {
+  "let": [
+   [
+    "episodes_3y",
+    {
+     "fn": "method",
+     "name": "book.drawdown_episodes",
+     "subject": "port_001",
+     "params": {
+      "span": "3y"
+     }
+    }
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "spy_px",
+    {
+     "fn": "prices",
+     "ticker": "SPY",
+     "window": "3y"
+    }
+   ],
+   [
+    "peak_20250219",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[0].peak_date"
+    }
+   ],
+   [
+    "trough_20250219",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[0].trough_date"
+    }
+   ],
+   [
+    "explain_20250219",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak_20250219",
+      "trough": "$trough_20250219"
+     }
+    }
+   ],
+   [
+    "book_fall_20250219",
+    {
+     "fn": "pick",
+     "of": "$explain_20250219",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret_20250219",
+    {
+     "fn": "column",
+     "run": "$explain_20250219",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "ret_tlt_20250219",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20250219",
+     "key": "TLT"
+    }
+   ],
+   [
+    "ret_hyg_20250219",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20250219",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_tlt_20250219",
+    {
+     "fn": "mul",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "TLT"
+     },
+     "b": "$ret_tlt_20250219"
+    }
+   ],
+   [
+    "spy_fall_20250219",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2025-04-08"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2025-02-19"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2025-02-19"
+     }
+    }
+   ],
+   [
+    "peak_20240710",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[2].peak_date"
+    }
+   ],
+   [
+    "trough_20240710",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[2].trough_date"
+    }
+   ],
+   [
+    "explain_20240710",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak_20240710",
+      "trough": "$trough_20240710"
+     }
+    }
+   ],
+   [
+    "book_fall_20240710",
+    {
+     "fn": "pick",
+     "of": "$explain_20240710",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret_20240710",
+    {
+     "fn": "column",
+     "run": "$explain_20240710",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "ret_tlt_20240710",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20240710",
+     "key": "TLT"
+    }
+   ],
+   [
+    "ret_hyg_20240710",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20240710",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_tlt_20240710",
+    {
+     "fn": "mul",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "TLT"
+     },
+     "b": "$ret_tlt_20240710"
+    }
+   ],
+   [
+    "spy_fall_20240710",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2024-08-05"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2024-07-10"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2024-07-10"
+     }
+    }
+   ],
+   [
+    "peak_20230914",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[3].peak_date"
+    }
+   ],
+   [
+    "trough_20230914",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[3].trough_date"
+    }
+   ],
+   [
+    "explain_20230914",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak_20230914",
+      "trough": "$trough_20230914"
+     }
+    }
+   ],
+   [
+    "book_fall_20230914",
+    {
+     "fn": "pick",
+     "of": "$explain_20230914",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret_20230914",
+    {
+     "fn": "column",
+     "run": "$explain_20230914",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "ret_tlt_20230914",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20230914",
+     "key": "TLT"
+    }
+   ],
+   [
+    "ret_hyg_20230914",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20230914",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_tlt_20230914",
+    {
+     "fn": "mul",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "TLT"
+     },
+     "b": "$ret_tlt_20230914"
+    }
+   ],
+   [
+    "spy_fall_20230914",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2023-10-27"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2023-09-14"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2023-09-14"
+     }
+    }
+   ],
+   [
+    "peak_20260529",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[4].peak_date"
+    }
+   ],
+   [
+    "trough_20260529",
+    {
+     "fn": "pick",
+     "of": "$episodes_3y",
+     "key": "episodes[4].trough_date"
+    }
+   ],
+   [
+    "explain_20260529",
+    {
+     "fn": "method",
+     "name": "book.explain_episode",
+     "subject": "port_001",
+     "params": {
+      "peak": "$peak_20260529",
+      "trough": "$trough_20260529"
+     }
+    }
+   ],
+   [
+    "book_fall_20260529",
+    {
+     "fn": "pick",
+     "of": "$explain_20260529",
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "holding_ret_20260529",
+    {
+     "fn": "column",
+     "run": "$explain_20260529",
+     "table": "holdings",
+     "col": "window_return"
+    }
+   ],
+   [
+    "ret_tlt_20260529",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20260529",
+     "key": "TLT"
+    }
+   ],
+   [
+    "ret_hyg_20260529",
+    {
+     "fn": "pick",
+     "of": "$holding_ret_20260529",
+     "key": "HYG"
+    }
+   ],
+   [
+    "contrib_tlt_20260529",
+    {
+     "fn": "mul",
+     "a": {
+      "fn": "pick",
+      "of": "$w",
+      "key": "TLT"
+     },
+     "b": "$ret_tlt_20260529"
+    }
+   ],
+   [
+    "spy_fall_20260529",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sub",
+      "a": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-06-25"
+      },
+      "b": {
+       "fn": "at",
+       "of": "$spy_px",
+       "period": "2026-05-29"
+      }
+     },
+     "b": {
+      "fn": "at",
+      "of": "$spy_px",
+      "period": "2026-05-29"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ret_tlt_20250219",
+  "contrib_tlt_20250219",
+  "ret_tlt_20240710",
+  "contrib_tlt_20240710",
+  "ret_tlt_20230914",
+  "contrib_tlt_20230914",
+  "ret_tlt_20260529",
+  "contrib_tlt_20260529"
+ ],
+ "note": "every other ≥5% hole in the 3-year span, each picked from book.drawdown_episodes by index (episodes[0] 2025-02-19..04-08 17.7%; [2] 2024-07-10..08-05 10.8%; [3] 2023-09-14..10-27 6.6%; [4] 2026-05-29..06-25 6.2%; [1] is t1's hole) with the book's fall, TLT's and HYG's own return over each from the holdings column, TLT's contribution at today's weight, and SPY's fall over the same dates: the rates leg was positive in the 2024-07 hole (TLT +7.0%) and in others it fell with the book — the answer lists the sign per episode. Quantities are held at today's holdings throughout (the method's valuation assumption)."
+}

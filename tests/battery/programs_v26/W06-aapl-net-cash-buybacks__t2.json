@@ -1,0 +1,4 @@
+{
+ "tag": "W06-aapl-net-cash-buybacks#t2",
+ "skip": "filings text: where the cash sits (jurisdiction, marketable securities mix) is 10-K prose, not a filed line"
+}

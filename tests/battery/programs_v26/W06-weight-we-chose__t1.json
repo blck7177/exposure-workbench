@@ -1,0 +1,205 @@
+{
+ "tag": "W06-weight-we-chose#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "r_prev",
+    {
+     "fn": "run",
+     "portfolio": "port_001",
+     "which": "prev"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_prev",
+    {
+     "fn": "column",
+     "run": "$r_prev",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "ret_i",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "daily_return"
+    }
+   ],
+   [
+    "ret_book",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.daily_return"
+    }
+   ],
+   [
+    "one",
+    {
+     "fn": "div",
+     "a": "$ret_book",
+     "b": "$ret_book"
+    }
+   ],
+   [
+    "grow_i",
+    {
+     "fn": "add",
+     "a": "$ret_i",
+     "b": "$one"
+    }
+   ],
+   [
+    "grow_book",
+    {
+     "fn": "add",
+     "a": "$one",
+     "b": "$ret_book"
+    }
+   ],
+   [
+    "w_implied_prev",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$grow_book"
+     },
+     "b": "$grow_i"
+    }
+   ],
+   [
+    "chosen",
+    {
+     "fn": "sub",
+     "a": "$w_implied_prev",
+     "b": "$w_prev"
+    }
+   ],
+   [
+    "drift",
+    {
+     "fn": "sub",
+     "a": "$w",
+     "b": "$w_implied_prev"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "mv_prev",
+    {
+     "fn": "column",
+     "run": "$r_prev",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "pnl",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "daily_pnl"
+    }
+   ],
+   [
+    "traded_dollars",
+    {
+     "fn": "sub",
+     "a": {
+      "fn": "sub",
+      "a": "$mv",
+      "b": "$pnl"
+     },
+     "b": "$mv_prev"
+    }
+   ],
+   [
+    "w_nvda",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "w_prev_nvda",
+    {
+     "fn": "pick",
+     "of": "$w_prev",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "ret_nvda",
+    {
+     "fn": "pick",
+     "of": "$ret_i",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "drift_nvda",
+    {
+     "fn": "pick",
+     "of": "$drift",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "chosen_nvda",
+    {
+     "fn": "pick",
+     "of": "$chosen",
+     "key": "NVDA"
+    }
+   ],
+   [
+    "traded_nvda",
+    {
+     "fn": "pick",
+     "of": "$traded_dollars",
+     "key": "NVDA"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "w_nvda",
+  "w_prev_nvda",
+  "ret_nvda",
+  "ret_book",
+  "drift_nvda",
+  "chosen_nvda"
+ ],
+ "note": "NVDA's weight on the latest run (2026-09-04) and the prior run (2026-09-03, one session earlier), NVDA's own return and the book's over that span, and the split: w_implied_prev = today's weight deflated by (1+r_book)/(1+r_i) is what yesterday's weight must have been if nothing was traded; drift = w - w_implied_prev is the market's part, chosen = w_implied_prev - w_prev is the part only a trade explains (both legs sum to w - w_prev). traded_dollars = mv - pnl - mv_prev is the same test in dollars (0 for NVDA: the whole move is drift). The desk has no blotter, so 'chosen' is an inference from the two snapshots, labelled as such. Built this way because prev-run x latest-run products are refused as different_books (_GAPS_A)."
+}

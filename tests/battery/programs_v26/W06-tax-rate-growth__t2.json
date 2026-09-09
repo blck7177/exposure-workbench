@@ -1,0 +1,110 @@
+{
+ "tag": "W06-tax-rate-growth#t2",
+ "program": {
+  "let": [
+   [
+    "pretax_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "pretax_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "pretax_yoy",
+    {
+     "fn": "yoy",
+     "of": "$pretax_s"
+    }
+   ],
+   [
+    "pretax_yoy_latest",
+    {
+     "fn": "latest",
+     "of": "$pretax_yoy"
+    }
+   ],
+   [
+    "ni_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "net_income",
+     "months": 12,
+     "last_n": 5
+    }
+   ],
+   [
+    "ni_yoy",
+    {
+     "fn": "yoy",
+     "of": "$ni_s"
+    }
+   ],
+   [
+    "ni_yoy_latest",
+    {
+     "fn": "latest",
+     "of": "$ni_yoy"
+    }
+   ],
+   [
+    "tax_burden_s",
+    {
+     "fn": "method",
+     "name": "tax_burden",
+     "subject": "LLY",
+     "params": {
+      "last_n": 5
+     }
+    }
+   ],
+   [
+    "tax_burden_now",
+    {
+     "fn": "latest",
+     "of": "$tax_burden_s"
+    }
+   ],
+   [
+    "pretax_cagr",
+    {
+     "fn": "cagr",
+     "of": "$pretax_s"
+    }
+   ],
+   [
+    "ni_cagr",
+    {
+     "fn": "cagr",
+     "of": "$ni_s"
+    }
+   ],
+   [
+    "tax_rate_contribution",
+    {
+     "fn": "sub",
+     "a": "$ni_cagr",
+     "b": "$pretax_cagr"
+    }
+   ],
+   [
+    "latest_year_rate_effect",
+    {
+     "fn": "sub",
+     "a": "$ni_yoy_latest",
+     "b": "$pretax_yoy_latest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "pretax_cagr",
+  "ni_cagr",
+  "tax_rate_contribution",
+  "pretax_yoy_latest"
+ ],
+ "note": "No forecast: the counterfactual on realised years. With the tax burden held flat, net income can only grow at the pretax rate, so pretax CAGR (and the latest pretax yoy) is the growth that survives; the net-minus-pretax CAGR gap and the latest-year yoy gap are what the falling rate has been adding and would stop adding."
+}

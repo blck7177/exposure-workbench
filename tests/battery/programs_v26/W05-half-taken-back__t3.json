@@ -1,0 +1,118 @@
+{
+ "tag": "W05-half-taken-back#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w_lly_before",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "LLY"
+    }
+   ],
+   [
+    "mv_lly_before",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "LLY"
+    }
+   ],
+   [
+    "after",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "MSFT",
+       "fraction": 0.5776273
+      }
+     ]
+    }
+   ],
+   [
+    "w_lly_after",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$after",
+      "table": "issuer_exposures",
+      "col": "weight"
+     },
+     "key": "LLY"
+    }
+   ],
+   [
+    "mv_lly_after",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$after",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "LLY"
+    }
+   ],
+   [
+    "mv_lly_chg",
+    {
+     "fn": "sub",
+     "a": "$mv_lly_after",
+     "b": "$mv_lly_before"
+    }
+   ],
+   [
+    "w_lly_chg",
+    {
+     "fn": "sub",
+     "a": "$w_lly_after",
+     "b": "$w_lly_before"
+    }
+   ],
+   [
+    "lly_check_after",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "limit_checks.issuer_concentration:LLY.current_value"
+    }
+   ],
+   [
+    "lly_warn",
+    {
+     "fn": "pick",
+     "of": "$after",
+     "key": "limit_checks.issuer_concentration:LLY.warning_level"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "mv_lly_before",
+  "mv_lly_after",
+  "w_lly_before",
+  "w_lly_after"
+ ],
+ "note": "On scenario B (the one in force): LLY's shares/market value are untouched (mv_lly_chg = 0) but its weight rises from 12.7% to 14.0% under renormalisation, moving it further past its 12% warning — the subtlety the turn is testing."
+}

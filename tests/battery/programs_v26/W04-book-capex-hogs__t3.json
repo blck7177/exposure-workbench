@@ -1,0 +1,96 @@
+{
+ "tag": "W04-book-capex-hogs#t3",
+ "program": {
+  "let": [
+   [
+    "lease_now",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_lease_liability_total"
+    }
+   ],
+   [
+    "lease_yago",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_lease_liability_total",
+     "at": "2025-03-31"
+    }
+   ],
+   [
+    "lease_chg",
+    {
+     "fn": "sub",
+     "a": "$lease_now",
+     "b": "$lease_yago"
+    }
+   ],
+   [
+    "lease_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_lease_liability_total",
+     "last_n": 8
+    }
+   ],
+   [
+    "lease_pct",
+    {
+     "fn": "pct",
+     "of": "$lease_s"
+    }
+   ],
+   [
+    "capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "lease_chg_to_capex",
+    {
+     "fn": "div",
+     "a": "$lease_chg",
+     "b": "$capex"
+    }
+   ],
+   [
+    "capex_plus_lease_growth",
+    {
+     "fn": "add",
+     "a": "$capex",
+     "b": "$lease_chg"
+    }
+   ],
+   [
+    "ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "all_in_to_ocf",
+    {
+     "fn": "div",
+     "a": "$capex_plus_lease_growth",
+     "b": "$ocf"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "lease_now",
+  "lease_chg",
+  "lease_chg_to_capex"
+ ],
+ "note": "Concedes what the capex line misses: MSFT's operating lease liability now, a year ago, its change (the year's leased capacity added), that change against the cash capex line, and capex plus lease growth over OCF. Finance leases and unrecognised purchase commitments are note text and are not held as figures."
+}

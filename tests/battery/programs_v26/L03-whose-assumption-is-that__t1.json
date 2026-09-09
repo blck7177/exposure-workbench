@@ -1,0 +1,124 @@
+{
+ "tag": "L03-whose-assumption-is-that#t1",
+ "program": {
+  "let": [
+   [
+    "participation",
+    0.25
+   ],
+   [
+    "adv_window_days",
+    20
+   ],
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "mv",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "market_value"
+    }
+   ],
+   [
+    "adv_20d",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "adv_60d",
+    {
+     "fn": "method",
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 60
+     },
+     "key": "adv_dollars"
+    }
+   ],
+   [
+    "days_25pct_20d",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv_20d",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "days_25pct_60d",
+    {
+     "fn": "div",
+     "a": "$mv",
+     "b": {
+      "fn": "scale",
+      "of": "$adv_60d",
+      "factor": 0.25
+     }
+    }
+   ],
+   [
+    "window_effect",
+    {
+     "fn": "div",
+     "a": "$days_25pct_60d",
+     "b": "$days_25pct_20d"
+    }
+   ],
+   [
+    "slowest",
+    {
+     "fn": "rank",
+     "of": "$days_25pct_20d",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "participation",
+  "adv_window_days",
+  "days_25pct_20d",
+  "days_25pct_60d"
+ ],
+ "note": "the two parameters named as the desk's own choices (literal bindings: 25% participation, 20-session ADV window — the method's defaults, not a mandate), the day counts at those settings, and the same counts on a 60-session window with the per-name ratio so the PM sees how much of the number is the window choice."
+}

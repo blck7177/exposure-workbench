@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # refuses to mint or verify without it, because an unsigned internal bearer
     # is not a degraded tool face, it is an open one.
     mcp_internal_secret: str = ""
+    # V30 Phase C: push the matched domains' programs into the turn (the other
+    # arm of the measurement is pull, through describe). Env PUSH_DOMAINS.
+    push_domains: bool = True
     # A token must outlive the longest legal run and not much more, which is the
     # same interval task_lease_seconds already picks. Shorter, and a research run
     # still inside its lease loses its tool face mid-flight — every remaining

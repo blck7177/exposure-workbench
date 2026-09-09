@@ -1,0 +1,39 @@
+{
+ "tag": "W01-stop-sweep-across-book#t1",
+ "program": {
+  "let": [
+   [
+    "dist",
+    {
+     "fn": "method",
+     "name": "price.distance_from_52w_high",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ]
+    }
+   ],
+   [
+    "deepest",
+    {
+     "fn": "rank",
+     "of": "$dist",
+     "direction": "lowest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "dist",
+  "deepest"
+ ],
+ "note": "distance below the trailing-252-session high for all ten holdings (HYG and TLT included) and a lowest-first ranking (most negative = deepest); the desk has no stop policy, so any reassessment line is a chosen convention, and the vector form drops each name's date-of-high (see _GAPS_A: only the single-subject form carries it in `basis`)."
+}

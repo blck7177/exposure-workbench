@@ -1,0 +1,66 @@
+{
+ "tag": "W05-leases-in-leverage#t3",
+ "program": {
+  "let": [
+   [
+    "AMZN_ie",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "interest_expense_nonoperating",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_ie_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "interest_expense_nonoperating",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "AMZN_ie_old",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "interest_expense",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_ip",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "interest_paid",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_ip_s",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "interest_paid",
+     "months": 12,
+     "last_n": 4
+    }
+   ],
+   [
+    "AMZN_paid_minus_booked",
+    {
+     "fn": "sub",
+     "a": "$AMZN_ip",
+     "b": "$AMZN_ie"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "AMZN_ie"
+ ],
+ "note": "Cash interest paid against interest expense booked for AMZN over the trailing year. AMZN files no interest_paid line at all (metric_not_filed, a required part of the answer) and its interest_expense concept ends 2024-03-31 (only interest_expense_nonoperating runs to 2026-03-31), so the cash-versus-book gap is stated as absent and the capitalised-interest question cannot be settled from figures."
+}

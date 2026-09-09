@@ -1,0 +1,86 @@
+{
+ "tag": "W04-sectors-or-names#t2",
+ "program": {
+  "let": [
+   [
+    "book_ret_1y",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "method",
+      "name": "book.explain_episode",
+      "subject": "port_001",
+      "params": {
+       "peak": "2025-09-04",
+       "trough": "2026-09-04"
+      }
+     },
+     "key": "portfolio.window_return"
+    }
+   ],
+   [
+    "factor_etfs_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": [
+      "SPY",
+      "QQQ",
+      "IWM",
+      "GLD",
+      "USO"
+     ],
+     "params": {
+      "window": "1y"
+     }
+    }
+   ],
+   [
+    "ran_away",
+    {
+     "fn": "rank",
+     "of": "$factor_etfs_1y",
+     "direction": "highest"
+    }
+   ],
+   [
+    "held_rel_spy_1y",
+    {
+     "fn": "method",
+     "name": "price.window_return",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window": "1y",
+      "benchmark": "SPY"
+     },
+     "key": "relative"
+    }
+   ],
+   [
+    "held_vs_market",
+    {
+     "fn": "rank",
+     "of": "$held_rel_spy_1y",
+     "direction": "highest"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "factor_etfs_1y",
+  "ran_away",
+  "book_ret_1y"
+ ],
+ "note": "what we did not own: the desk has no universe of names it passed on, only the factor ETFs it prices — SPY, QQQ, IWM, GLD, USO — so the honest version is at the factor level: their 1y returns ranked (oil +91% ran away; gold, small caps and growth all beat SPY's +20%), beside the book's 1y (+21.8%) and each held name's 1y return relative to SPY. Any single stock not held is an absence, said plainly."
+}

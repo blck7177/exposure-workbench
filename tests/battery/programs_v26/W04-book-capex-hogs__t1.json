@@ -1,0 +1,259 @@
+{
+ "tag": "W04-book-capex-hogs#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "ci",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "LLY",
+      "XOM",
+      "TLT",
+      "HYG"
+     ]
+    }
+   ],
+   [
+    "ci_rank",
+    {
+     "fn": "rank",
+     "of": "$ci",
+     "direction": "highest"
+    }
+   ],
+   [
+    "fcf_margin",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "LLY",
+      "XOM"
+     ]
+    }
+   ],
+   [
+    "fcf_margin_rank",
+    {
+     "fn": "rank",
+     "of": "$fcf_margin",
+     "direction": "lowest"
+    }
+   ],
+   [
+    "LLY_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "LLY",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "JPM_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "JPM",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "AAPL_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "AAPL_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "AAPL",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "AAPL_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$AAPL_capex",
+     "b": "$AAPL_ocf"
+    }
+   ],
+   [
+    "MSFT_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "MSFT_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$MSFT_capex",
+     "b": "$MSFT_ocf"
+    }
+   ],
+   [
+    "GOOGL_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "GOOGL",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "GOOGL_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$GOOGL_capex",
+     "b": "$GOOGL_ocf"
+    }
+   ],
+   [
+    "NVDA_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "NVDA_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "NVDA",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "NVDA_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$NVDA_capex",
+     "b": "$NVDA_ocf"
+    }
+   ],
+   [
+    "AMZN_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "AMZN",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "AMZN_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$AMZN_capex",
+     "b": "$AMZN_ocf"
+    }
+   ],
+   [
+    "XOM_capex",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "capex",
+     "months": 12
+    }
+   ],
+   [
+    "XOM_ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "XOM",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "XOM_capex_to_ocf",
+    {
+     "fn": "div",
+     "a": "$XOM_capex",
+     "b": "$XOM_ocf"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ci_rank",
+  "AAPL_capex_to_ocf",
+  "MSFT_capex_to_ocf",
+  "GOOGL_capex_to_ocf",
+  "NVDA_capex_to_ocf",
+  "AMZN_capex_to_ocf",
+  "XOM_capex_to_ocf"
+ ],
+ "note": "Capex intensity across all ten holdings as one vector ranked heaviest first (JPM not_applicable, LLY input_unavailable after 2022-09-30, TLT/HYG file nothing), capex as a share of operating cash flow per screenable issuer, FCF margin ranked lowest-first as the 'before anything comes back' view, and the book weights so the answer can size the hog. capex-to-OCF has no method, so it is six scalars, not a ranked vector."
+}

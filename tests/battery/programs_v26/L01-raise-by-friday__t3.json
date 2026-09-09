@@ -1,0 +1,276 @@
+{
+ "tag": "L01-raise-by-friday#t3",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "after",
+    {
+     "fn": "sell",
+     "run": "$r",
+     "sales": [
+      {
+       "ticker": "NVDA"
+      },
+      {
+       "ticker": "AMZN",
+       "fraction": 0.806
+      }
+     ]
+    }
+   ],
+   [
+    "w_after",
+    {
+     "fn": "column",
+     "run": "$after",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "om",
+    {
+     "fn": "method",
+     "name": "operating_margin",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "om_book_before",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w",
+       "b": "$om"
+      }
+     },
+     "b": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w",
+       "b": {
+        "fn": "div",
+        "a": "$om",
+        "b": "$om"
+       }
+      }
+     }
+    }
+   ],
+   [
+    "om_book_after",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w_after",
+       "b": "$om"
+      }
+     },
+     "b": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w_after",
+       "b": {
+        "fn": "div",
+        "a": "$om",
+        "b": "$om"
+       }
+      }
+     }
+    }
+   ],
+   [
+    "fcf_m",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "fcf_book_before",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w",
+       "b": "$fcf_m"
+      }
+     },
+     "b": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w",
+       "b": {
+        "fn": "div",
+        "a": "$fcf_m",
+        "b": "$fcf_m"
+       }
+      }
+     }
+    }
+   ],
+   [
+    "fcf_book_after",
+    {
+     "fn": "div",
+     "a": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w_after",
+       "b": "$fcf_m"
+      }
+     },
+     "b": {
+      "fn": "sum",
+      "of": {
+       "fn": "mul",
+       "a": "$w_after",
+       "b": {
+        "fn": "div",
+        "a": "$fcf_m",
+        "b": "$fcf_m"
+       }
+      }
+     }
+    }
+   ],
+   [
+    "roe",
+    {
+     "fn": "method",
+     "name": "roe",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "months": 12
+     }
+    }
+   ],
+   [
+    "roe_rank",
+    {
+     "fn": "rank",
+     "of": "$roe",
+     "direction": "highest"
+    }
+   ],
+   [
+    "vol_63d",
+    {
+     "fn": "method",
+     "name": "price.volatility",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "GOOGL",
+      "NVDA",
+      "JPM",
+      "AMZN",
+      "TLT",
+      "HYG",
+      "LLY",
+      "XOM"
+     ],
+     "params": {
+      "window_days": 63
+     }
+    }
+   ],
+   [
+    "book_vol_after_undiversified",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w_after",
+      "b": "$vol_63d"
+     }
+    }
+   ],
+   [
+    "book_vol_before_undiversified",
+    {
+     "fn": "sum",
+     "of": {
+      "fn": "mul",
+      "a": "$w",
+      "b": "$vol_63d"
+     }
+    }
+   ]
+  ]
+ },
+ "must": [
+  "om_book_after",
+  "om_book_before",
+  "fcf_book_after"
+ ],
+ "note": "is the residual a book worth owning: the weight-weighted operating margin and FCF margin of the residual book (t2's scenario weights) against the original, renormalised over the names each measure covers; ROE across the survivors ranked; and the weight x 63d-vol sum before/after as the risk side. Coverage refusals inside the vectors are genuine: JPM (bank), LLY/XOM (no operating_income line), TLT/HYG (no issuer accounts) — so the margin figures describe the five tech names, and the answer says the residual's quality judgement rests on a partial view."
+}

@@ -1,0 +1,153 @@
+{
+ "tag": "NEW05-your-numbers-disagree#t1",
+ "program": {
+  "let": [
+   [
+    "ocf",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "operating_cash_flow",
+     "months": 12
+    }
+   ],
+   [
+    "ni",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "net_income",
+     "months": 12
+    }
+   ],
+   [
+    "ocf_to_ni",
+    {
+     "fn": "div",
+     "a": "$ocf",
+     "b": "$ni"
+    }
+   ],
+   [
+    "accruals",
+    {
+     "fn": "method",
+     "name": "accruals",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "accruals_ratio",
+    {
+     "fn": "method",
+     "name": "accruals_ratio",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "fcf",
+    {
+     "fn": "method",
+     "name": "free_cash_flow",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "fcf_margin",
+    {
+     "fn": "method",
+     "name": "fcf_margin",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "net_margin",
+    {
+     "fn": "method",
+     "name": "net_margin",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "dso",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "capex_intensity",
+    {
+     "fn": "method",
+     "name": "capex_intensity",
+     "subject": "MSFT"
+    }
+   ],
+   [
+    "accruals_ratio_q",
+    {
+     "fn": "method",
+     "name": "accruals_ratio",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "dso_q",
+    {
+     "fn": "method",
+     "name": "days_sales_outstanding",
+     "subject": "MSFT",
+     "params": {
+      "months": 3,
+      "last_n": 8
+     }
+    }
+   ],
+   [
+    "receivables",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "accounts_receivable",
+     "last_n": 8
+    }
+   ],
+   [
+    "receivables_yoy",
+    {
+     "fn": "yoy",
+     "of": "$receivables"
+    }
+   ],
+   [
+    "revenue_q",
+    {
+     "fn": "fundamentals",
+     "ticker": "MSFT",
+     "metric": "revenue",
+     "months": 3,
+     "last_n": 8
+    }
+   ],
+   [
+    "revenue_yoy",
+    {
+     "fn": "yoy",
+     "of": "$revenue_q"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "ocf_to_ni",
+  "accruals_ratio",
+  "dso",
+  "fcf_margin"
+ ],
+ "note": "The earnings-quality panel on one window (TTM to 2026-03-31): OCF/NI 1.36 and accruals ratio -6.5% corroborate (cash ahead of earnings); FCF margin 22.9% vs net margin 39.3% and capex intensity 30.5% is the reading that says something different (cash is being spent, not retained); DSO 68.9 days with the 8-quarter DSO and accruals paths and receivables vs revenue growth to see which way each is moving."
+}

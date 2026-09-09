@@ -1,0 +1,58 @@
+{
+ "tag": "W03-which-run-was-that#t1",
+ "program": {
+  "let": [
+   [
+    "r",
+    {
+     "fn": "run",
+     "portfolio": "port_001"
+    }
+   ],
+   [
+    "pmv",
+    {
+     "fn": "pick",
+     "of": "$r",
+     "key": "exposure_metrics.portfolio_market_value"
+    }
+   ],
+   [
+    "w",
+    {
+     "fn": "column",
+     "run": "$r",
+     "table": "issuer_exposures",
+     "col": "weight"
+    }
+   ],
+   [
+    "w_msft",
+    {
+     "fn": "pick",
+     "of": "$w",
+     "key": "MSFT"
+    }
+   ],
+   [
+    "mv_msft",
+    {
+     "fn": "pick",
+     "of": {
+      "fn": "column",
+      "run": "$r",
+      "table": "issuer_exposures",
+      "col": "market_value"
+     },
+     "key": "MSFT"
+    }
+   ]
+  ]
+ },
+ "must": [
+  "pmv",
+  "w_msft",
+  "mv_msft"
+ ],
+ "note": "Book market value ($10.86m) and MSFT's weight (16.1%) with its market value ($1.75m), all off the latest completed run."
+}
