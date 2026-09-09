@@ -115,6 +115,17 @@ value (Phase A's deliverable, and the battery's gold); (c) the live provider acc
 
 ### §2.2 The result table (tool → LLM, and tool → validation)
 
+**A binding name is a variable, never a measure.** Today `as_quantity` lets the model mint
+a row under a name that asserts a relation the operands do not stand in — V29 §6.2:
+`days_at_100pct_adv` was book market value ÷ MSFT market value (6.21×, no ADV in the turn),
+shipped as "620.9% days"; the review's AWS case (Q1 ÷ TTM named `aws_share`) is the same
+defect. In V30 the measure of a derived node is DERIVED from its operation and operands
+(`portfolio_market_value ÷ issuer_exposures.MSFT.market_value`, unit RATIO) by the
+calculator's own `_derived_name`; the program's `$name` is recorded as `node`, shown to the
+model as its handle, and never printed beside the figure. The renderer prints the derived
+measure and unit. A "days" figure can then only exist as MONEY ÷ MONEY_PER_DAY = COUNT, which
+is the algebra's answer, not the model's word. `as_quantity` is removed from the language.
+
 Each returned node is a Fact as V24 defines it (id, kind, subject, measure, unit, value|
 points|vector, as_of, window, params, sources) plus `node` (its binding name) and `deps`.
 Vectors are one Fact with `entries: [[label, value], …]`. Absences are Absence Facts with

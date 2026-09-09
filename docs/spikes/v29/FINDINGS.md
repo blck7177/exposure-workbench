@@ -366,6 +366,34 @@ MINT a figure under a name that describes an operation it did not perform. A day
 figure has one shape — MONEY ÷ MONEY_PER_DAY — and the desk knows it (`book_liquidity` says so).
 Nothing connects the name to the shape.
 
+### 6.3 A unit class the run could not declare, and the 100x figure it shipped
+
+`W01-back-to-flat#t3` (replicate 1) shipped:
+
+> *"Also, the factor model is collinear, with **max VIF 1661**."*
+
+The run's `max_vif` is **16.619**. It was declared RATIO because `analytics/resources` had no way
+to say MULTIPLE for a run column, so `display_conventions` printed it as a percentage — "1661.9%"
+— and the model copied the digits into a sentence about a variance inflation factor. A VIF of 16.6
+says the factor legs are badly collinear; a VIF of 1661 says nothing, because no such reading
+exists.
+
+Fixed in `952e046`: `resources` gained a `MULTIPLE` class and `_multiple()`, `max_vif` declares it,
+and the figure now renders `16.62x`. The half that had to come with it: `quantities._RUN_CHILDREN`
+grouped a run child's columns into three hand-written unit tuples, so declaring a fourth class made
+`max_vif` **unresolvable under `run_` entirely** — the model could no longer read it by name at all.
+Columns are now grouped by the unit they declare, derived from the resource, and three guards were
+widened from a list of three unit names to the set `analytics/units` declares.
+
+Scope, measured across all six trace files (382 turns): `max_vif` is named in a tool call **0**
+times and reaches an answer in **4** turns. Small, but not cosmetic — one of those four is the
+wrong figure above.
+
+**The shape, in the four-role frame:** the desk knew the answer. `analytics/units` has declared
+MULTIPLE since V17 and says the registry decides which of RATIO/MULTIPLE a named measure is. The
+run's own declaration table could not express it, so a measure with a known unit was recorded under
+the wrong one — and every layer downstream was then correct about a wrong premise.
+
 ## 7. Still open
 
 - Reader-visible defects: `620.9% days` (a ratio called days, the X15 role-error class, unchanged

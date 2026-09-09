@@ -69,6 +69,11 @@ SYSTEM = {"tool_error", "fact_adapter_error", "tool_transport_error", "budget_ex
 _ERR = re.compile(r"^error: ([a-z_]+)")
 _ARTIFACT = re.compile(r"(?:%|\d)=-?\d[\d.,]*|\b\d[\d.,]*%?, \d[\d.,]*%?\b")   # "16.1%=0.161", "16.1%, 16.1%"
 _MARK = re.compile(r"\[10-[KQ][^\]]*\]")
+# A superlative or top-N claim in the answer, against a successful rank in the
+# same turn (V29 §6.1: 47/55, 47/58, 51/60 claims with no ordering computed).
+# The WIDE definition the V29 findings use (§6.1), so the two sessions publish one
+# number: "nearest to tripping" is an ordering claim too.
+_SUPERLATIVE = re.compile(r"\b(largest|biggest|highest|lowest|smallest|worst|best|nearest|closest|most concentrated|top\s+(?:\d+|five|three|ten))\b", re.I)
 
 
 def classify(summary: str, status: str) -> str | None:
@@ -93,6 +98,7 @@ def tally(paths: list[str]) -> dict:
     turns_with: dict[str, set] = collections.defaultdict(set)
     rt, calls, resp, elapsed, ptok, figs = [], [], [], [], [], []
     artifacts = marks = zero = exhausted = 0
+    superl = superl_no_rank = 0
     n = 0
     for p in paths:
         for conv in json.loads(Path(p).read_text()):
@@ -116,6 +122,13 @@ def tally(paths: list[str]) -> dict:
                     artifacts += 1
                 if _MARK.search(a):
                     marks += 1
+                if _SUPERLATIVE.search(a):
+                    superl += 1
+                    ranked = any(s.get("tool_name") == "compute" and s.get("status") == "completed"
+                                 and '"op": "rank"' in (s.get("args") or "").replace("'", '"').replace('"op":"rank"', '"op": "rank"')
+                                 and not (s.get("result") or "").startswith("error") for s in steps)
+                    if not ranked:
+                        superl_no_rank += 1
                 for s in steps:
                     if s.get("step_type") not in ("tool_call", "delegation", "respond"):
                         continue
@@ -135,6 +148,7 @@ def tally(paths: list[str]) -> dict:
         "figures_median": med(figs),
         "answers_with_double_figure_artifact": artifacts,
         "answers_with_passage_mark_as_figure": marks,
+        "superlative_claims": superl, "superlative_without_rank": superl_no_rank,
         "refusals": {k: {"count": v, "turns": len(turns_with[k]),
                          "per_turn": round(v / n, 2) if n else 0} for k, v in sorted(c.items())},
     }
