@@ -17,6 +17,7 @@ History is persisted as agent_messages so a session survives across turns.
 from __future__ import annotations
 
 import logging
+from typing import Sequence
 
 from sqlalchemy import update
 
@@ -117,8 +118,16 @@ async def handle_message(
     session_id: str,
     user_text: str,
     max_turns: int = 16,
+    deny: Sequence[str] = (),
 ) -> dict:
-    """Run one user turn. Persists the user + assistant messages; returns the reply."""
+    """Run one user turn. Persists the user + assistant messages; returns the reply.
+
+    `deny` narrows the face for this turn alone, the way a research run's skip
+    flags do (tool_session): the names are absent from the tools the model is
+    offered, not present and refused. V30 Phase 0 uses it to take `start` off
+    the battery's face, so a measurement cannot change the book it measures
+    (X26). A route never passes it; the product face is the full face.
+    """
     message_id = new_id("msg_")
     async with db_factory() as db:
         db.add(AgentMessage(id=new_id("msg_"), session_id=session_id, role="user", content=user_text))
@@ -152,7 +161,7 @@ async def handle_message(
     # schedules a handler in — the door binds it per request instead.
     async with tool_session(
         faces.FACE_NAME_META, session_id=session_id,
-        user_id=current_user_id(), message_id=message_id,
+        user_id=current_user_id(), message_id=message_id, deny=deny,
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
         tools = tools_session.tools
         held_recorder = batch.trace_recorder(db_factory, session_id, message_id)

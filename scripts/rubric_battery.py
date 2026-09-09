@@ -177,9 +177,48 @@ def flatten_conversations(convos: list[dict]) -> list[dict]:
             tag = f"{c['tag']}#t{t.get('turn', len(history) + 1)}"
             out.append({"tag": tag, "question_tag": tag, "session_id": c.get("session_id"),
                         "question": t.get("q"), "answer": t.get("answer"), "error": t.get("error"),
+                        "meta": t.get("meta") or {},
                         "steps": t.get("steps", []), "context": "\n\n".join(history)})
             history.append(f"USER: {t.get('q')}\nDESK: {(t.get('answer') or '')[:1500]}")
     return out
+
+
+# V30 Phase 0. The figures an accepted answer rendered are in meta.verified.matches
+# at full precision (what the gate matched, at the moment it decided). A gold
+# figure is present when one rendered figure equals it within a millionth of
+# itself — the same services produced both, so equality is exact in practice.
+_TOL = 1e-6
+
+
+def _rendered_values(rec: dict) -> list[float]:
+    meta = rec.get("meta") or {}
+    out = []
+    for m in (meta.get("verified") or {}).get("matches") or []:
+        v = m.get("value")
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out.append(float(v))
+    return out
+
+
+def _score_figures(rec: dict, g: dict) -> dict:
+    """figures_present: every `must` gold figure appears among the rendered
+    figures. figures_foreign (informational, never scored): rendered figures
+    that match no gold figure — an answer's supporting figures are legitimate,
+    so this is a count for the reader, not a verdict."""
+    rendered = _rendered_values(rec)
+    musts = [f for f in g.get("figures", []) if f.get("must", True)]
+    if not musts:
+        return {}
+    def hit(v: float) -> bool:
+        return any(abs(r - v) <= _TOL * max(1.0, abs(v)) for r in rendered)
+    missing = [f["key"] for f in musts if not hit(float(f["value"]))]
+    golds = [float(f["value"]) for f in g.get("figures", [])]
+    foreign = sum(1 for r in rendered if not any(abs(r - v) <= _TOL * max(1.0, abs(v)) for v in golds))
+    return {"figures_present": {
+        "met": not missing,
+        "why": ("every gold figure rendered" if not missing else
+                f"missing: {', '.join(missing)} (rendered {len(rendered)} figures, {foreign} not in gold)"),
+        "foreign": foreign, "rendered": len(rendered)}}
 
 
 def _score_structural(rec: dict, holdings: int) -> dict:
@@ -255,7 +294,14 @@ async def main(argv: list[str]) -> int:
     ap.add_argument("--estimate", action="store_true", help="print the semantic cost and stop")
     ap.add_argument("--judge-model", default=os.getenv("RUBRIC_JUDGE_MODEL") or None)
     ap.add_argument("--holdings", type=int, default=10, help="positions in the book under test")
+    # V30 Phase 0: the judge is a distribution, so it is asked N times and the
+    # spread is reported; gold figures make `precision`'s job deterministic.
+    ap.add_argument("--replicates", type=int, default=1, help="judge passes per criterion (report the spread)")
+    ap.add_argument("--criteria", default="", help="comma list: only these semantic criteria are judged")
+    ap.add_argument("--gold", default="", help="tests/battery/gold_<set>.json: deterministic figure checks")
     args = ap.parse_args(argv)
+    only = {c for c in args.criteria.split(",") if c}
+    gold = json.load(open(args.gold)) if args.gold else {}
 
     raw = json.load(open(args.traces))
     records = flatten_conversations(raw) if raw and "turns" in raw[0] else raw
@@ -280,16 +326,31 @@ async def main(argv: list[str]) -> int:
                 criteria[name] = structural[name]
 
         answered = bool(rec.get("answer")) and not rec.get("error")
+        g = gold.get(tag)
+        if g and not g.get("skip"):
+            criteria.update(_score_figures(rec, g))
+        wanted = [n for n in q["criteria"] if n in SEMANTIC and (not only or n in only)]
         if args.semantic and answered:
-            for name in q["criteria"]:
-                if name in SEMANTIC:
-                    criteria[name] = await _judge_one(
+            for name in wanted:
+                votes = []
+                for _ in range(max(1, args.replicates)):
+                    votes.append(await _judge_one(
                         name, rec.get("question") or q["q"], rec["answer"], args.judge_model,
-                        context=rec.get("context", "") if name == "follows_on" else "")
+                        context=rec.get("context", "") if name == "follows_on" else ""))
+                real = [v for v in votes if v["met"] is not None]
+                if not real:
+                    criteria[name] = votes[0]
+                else:
+                    yes = sum(1 for v in real if v["met"])
+                    # majority of the replicates; an exact split is None (unresolved),
+                    # never a verdict pretending to be one
+                    met = None if yes * 2 == len(real) else yes * 2 > len(real)
+                    criteria[name] = {"met": met, "why": real[0]["why"], "votes": [v["met"] for v in votes]}
+                    if criteria[name]["met"] is None:
+                        criteria[name]["why"] = f"split {yes}/{len(real)}: " + real[0]["why"]
         elif not answered:
-            for name in q["criteria"]:
-                if name in SEMANTIC:
-                    criteria[name] = {"met": False, "why": "no answer to score"}
+            for name in wanted:
+                criteria[name] = {"met": False, "why": "no answer to score"}
 
         refusals = sum(1 for s in rec.get("steps", [])
                        if s["step_type"] == "respond" and "error" in (s.get("result") or ""))
@@ -308,9 +369,21 @@ async def main(argv: list[str]) -> int:
             if c["met"] is not None:
                 by_criterion[name].append(c["met"])
     print("\n--- by criterion ---")
+    spread: dict[str, list[int]] = {}
+    if args.replicates > 1:
+        # per replicate k: the total over turns of vote k — the spread the judge
+        # produces on identical answers, which is the noise floor of any delta
+        for s in scored:
+            for name, c in s["criteria"].items():
+                votes = c.get("votes")
+                if votes:
+                    tot = spread.setdefault(name, [0] * len(votes))
+                    for k, v in enumerate(votes):
+                        tot[k] += 1 if v else 0
     for name in sorted(by_criterion):
         hits = by_criterion[name]
-        print(f"  {name:24s} {sum(hits)}/{len(hits)}")
+        sp = f"   replicates {min(spread[name])}..{max(spread[name])}" if name in spread else ""
+        print(f"  {name:24s} {sum(hits)}/{len(hits)}{sp}")
     total_met = sum(s["met"] for s in scored)
     total_judged = sum(s["judged"] for s in scored)
     print(f"  {'TOTAL':24s} {total_met}/{total_judged}")

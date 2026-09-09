@@ -42,6 +42,13 @@ from exposure_workbench.db.models import (
 MONEY = "MONEY"
 RATIO = "RATIO"
 COUNT = "COUNT"
+# A dimensionless run figure read as "so many times", not as a share of a
+# whole — units.py declares the class and says who may use it: "the algebra
+# cannot tell RATIO and MULTIPLE apart... the registry declares which one a
+# named measure is." A run column had no helper to make that declaration
+# (V29): max_vif was forced through `_ratio()` for lack of one, and a VIF of
+# 16.6 rendered as "1661.9%" instead of "16.6x".
+MULTIPLE = "MULTIPLE"
 
 
 @dataclass(frozen=True)
@@ -84,6 +91,10 @@ def _money(*names: tuple[str, str]) -> tuple[Column, ...]:
 
 def _ratio(*names: tuple[str, str]) -> tuple[Column, ...]:
     return tuple(Column(n, RATIO, d) for n, d in names)
+
+
+def _multiple(*names: tuple[str, str]) -> tuple[Column, ...]:
+    return tuple(Column(n, MULTIPLE, d) for n, d in names)
 
 
 def _count(*names: tuple[str, str]) -> tuple[Column, ...]:
@@ -136,7 +147,8 @@ _DECLARED: tuple[Resource, ...] = (
                  ("stress_loss_market", "stress loss, market"),
                  ("attribution_portfolio_return", "attribution return"), ("alpha", "alpha"),
                  ("residual", "residual"), ("model_r_squared", "model R²"),
-                 ("max_vif", "max VIF"))
+                 )
+        + _multiple(("max_vif", "max VIF"))
         # V20. A count of observations is a COUNT: declared RATIO since V8-P1 it
         # rendered as 75000.0% in a default question's answer.
         + _count(("observations", "observations"),

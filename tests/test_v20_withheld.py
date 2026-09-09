@@ -175,5 +175,5 @@ def test_a_count_of_observations_is_a_count_not_a_ratio():
     from exposure_workbench.analytics import display_conventions as dc
     assert R.column_unit("exposure_metrics", "observations") == R.COUNT
     assert R.column_unit("exposure_metrics", "regression_window_days") == R.COUNT
-    assert any(cols for _m, _a, _r, cols, _l, _q in qn._RUN_CHILDREN), "count columns reach the table"
+    assert any(by_unit.get("COUNT") for _m, by_unit, _l, _q in qn._RUN_CHILDREN), "count columns reach the table"
     assert dc.display(750.0, "COUNT") == "750"

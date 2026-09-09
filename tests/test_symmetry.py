@@ -52,7 +52,8 @@ def test_every_resource_column_has_a_display_name_and_a_unit():
     for r in resources.RUN_CHILDREN:
         for c in r.columns:
             assert c.display.strip(), f"{r.table}.{c.name} has no display name"
-            assert c.unit in (resources.MONEY, resources.RATIO, resources.COUNT), f"{r.table}.{c.name}: {c.unit!r}"
+            assert c.unit in (resources.MONEY, resources.RATIO, resources.COUNT, resources.MULTIPLE), \
+                f"{r.table}.{c.name}: {c.unit!r}"
 
 
 def test_describe_run_and_read_quantities_are_meta_only():

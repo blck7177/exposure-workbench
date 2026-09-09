@@ -103,7 +103,10 @@ async def test_every_label_of_a_real_run_is_unique_and_every_quantity_has_a_unit
     # (twelve losses) and the seven stress_loss limit-check rows (three
     # columns each, plus a count) off the table (analytics/withheld.py).
     assert len(labels) == 193, len(labels)
-    assert {q.unit_class for q in r.quantities} <= {qn.MONEY, qn.RATIO, qn.COUNT}
+    # V29: a run figure may declare any unit class analytics/units declares —
+    # max_vif is a MULTIPLE so it reads "16.62x" and not "1661.9%". Derived from
+    # the declaration, so the next unit class needs no edit here.
+    assert {q.unit_class for q in r.quantities} <= {u.upper() for u in units.UNIT_CLASSES}
     assert all(q.table in qn.RUN_TABLES for q in r.quantities), (
         sorted({q.table for q in r.quantities} - set(qn.RUN_TABLES)))
 

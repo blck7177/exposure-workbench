@@ -84,13 +84,16 @@ def test_the_numeric_metadata_is_citable_under_the_run():
     """
     # V20: a count of observations is a COUNT column now (it rendered as
     # 75000.0% under RATIO); either kind is resolvable under run_.
-    ratio_cols, count_cols = next(
-        (ratio, count) for model, _money, ratio, count, _label, _qual in qn._RUN_CHILDREN
-        if model is ExposureMetrics
+    # V29: grouped by declared unit, so a column of ANY unit class the resources
+    # declare is resolvable — the check is that it is readable, not that it is
+    # one of three kinds (max_vif is a MULTIPLE now).
+    by_unit = next(
+        cols for model, cols, _label, _qual in qn._RUN_CHILDREN if model is ExposureMetrics
     )
+    readable = {c for cols in by_unit.values() for c in cols}
     for column, numeric in NEW_COLUMNS:
         if numeric:
-            assert column in ratio_cols or column in count_cols, f"{column} is not resolvable under run_"
+            assert column in readable, f"{column} is not resolvable under run_"
 
 
 def test_the_result_object_carries_the_window_it_was_fitted_over():

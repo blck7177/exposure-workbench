@@ -134,11 +134,15 @@ _CALC_RESULT_KEYS: dict[str, dict[str, str]] = resources.CALC_RESULTS
 # run_ resolves through its children: exposure_runs itself has no numeric column.
 # Derived from analytics/resources.py (V15-S1), where "these columns carry values,
 # in these units" is written once.
+# V29: the columns GROUPED BY THE UNIT THEY DECLARE, derived rather than listed.
+# Three hand-written tuples (money, ratio, count) meant a fourth unit class was
+# silently unreadable: `max_vif` became a MULTIPLE so it would render "16.62x"
+# instead of "1661.9%", and under the old shape it stopped resolving under run_
+# at all. A unit class added to resources is readable by having been declared.
 _RUN_CHILDREN = tuple(
     (r.model,
-     tuple(c.name for c in r.columns if c.unit == MONEY),
-     tuple(c.name for c in r.columns if c.unit == RATIO),
-     tuple(c.name for c in r.columns if c.unit == COUNT),   # V20: counts are a third kind
+     {unit: tuple(c.name for c in r.columns if c.unit == unit)
+      for unit in dict.fromkeys(c.unit for c in r.columns)},
      r.label_column,
      r.qualifier_column)
     for r in resources.RUN_CHILDREN
@@ -414,7 +418,7 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
     """exposure_runs has no numeric columns — every number lives on a child."""
     out: list[Quantity] = []
     by_model: dict[type, list] = {}
-    for model, abs_cols, ratio_cols, count_cols, name_col, qual_col in _RUN_CHILDREN:
+    for model, cols_by_unit, name_col, qual_col in _RUN_CHILDREN:
         rows = (await db.execute(select(model).where(model.run_id == rid))).scalars().all()
         # V20. An alert or a check a withheld check raised (on a run before the
         # check stopped running) is not on the table either — the twelfth
@@ -428,7 +432,7 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
         table = model.__tablename__
         for row in rows:
             who = _row_label(row, name_col, qual_col)
-            for cols, unit in ((abs_cols, MONEY), (ratio_cols, RATIO), (count_cols, COUNT)):
+            for unit, cols in cols_by_unit.items():
                 for col in cols:
                     v = getattr(row, col, None)
                     if v is not None:

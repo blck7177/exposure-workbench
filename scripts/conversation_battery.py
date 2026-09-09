@@ -45,6 +45,11 @@ from exposure_workbench.services import agent_session_service as sess   # noqa: 
 
 URL = os.getenv("DATABASE_URL_RLS",
                 "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
+# V30 Phase 0: the frozen fixture (scripts/battery_fixture.sh). `--fixture` points
+# the battery's own engine at exposure_battery and its tool calls at the fixture
+# face on :8105; nothing then reads or writes the production book.
+FIXTURE_URL = URL.replace("/exposure_workbench", "/exposure_battery")
+FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 
 _STEPS = text(
     "SELECT seq, step_type, tool_name, status, left(result_summary, 200) AS result, "
@@ -54,7 +59,7 @@ _STEPS = text(
 _RELEASE = text("UPDATE agent_sessions SET turn_started_at = NULL WHERE id = :s")
 
 
-async def _run_conversation(mk, owner: str, tag: str, turns: list[str]) -> dict:
+async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tuple[str, ...] = ()) -> dict:
     current_user_ctx.set(owner)
     async with mk() as db:
         session = await sess.create_session(db, kind="meta", owner_id=owner)
@@ -71,7 +76,7 @@ async def _run_conversation(mk, owner: str, tag: str, turns: list[str]) -> dict:
             break
         started = time.time()
         try:
-            res = await handle_message(lambda: mk(), sid, q)
+            res = await handle_message(lambda: mk(), sid, q, deny=deny)
             error = None
         except Exception as exc:                    # noqa: BLE001 — recorded, not raised
             res, error = {}, f"{type(exc).__name__}: {exc}"
@@ -106,7 +111,22 @@ async def main(argv: list[str]) -> int:
     ap.add_argument("--owner", default=os.getenv("BATTERY_OWNER_ID", ""))
     ap.add_argument("--concurrency", type=int, default=3)
     ap.add_argument("--only", action="append", default=[], help="run only these tags")
+    ap.add_argument("--fixture", action="store_true",
+                    help="run against exposure_battery and the fixture face (scripts/battery_fixture.sh)")
+    ap.add_argument("--deny", action="append", default=[],
+                    help="tool names taken off the face for every turn (Phase 0: start)")
     args = ap.parse_args(argv)
+    url = URL
+    if args.fixture:
+        url = FIXTURE_URL
+        os.environ["MCP_URL"] = FIXTURE_MCP
+        # settings is a lazily built module global; anything that read it before
+        # this line would keep the production face, so it is reset here.
+        from exposure_workbench.app_state import settings as _settings_mod
+        _settings_mod._settings = None
+        if not args.deny:
+            args.deny = ["start"]
+    deny = tuple(args.deny)
     if not args.owner:
         print("no owner: pass --owner or set BATTERY_OWNER_ID", file=sys.stderr)
         return 2
@@ -115,16 +135,17 @@ async def main(argv: list[str]) -> int:
     if args.only:
         convos = [c for c in convos if c["tag"] in args.only]
     print(f"{len(convos)} conversation(s), {sum(len(c['turns']) for c in convos)} turn(s), "
-          f"concurrency {args.concurrency}")
+          f"concurrency {args.concurrency}, model {os.getenv('OPENAI_MODEL') or 'settings default'}, "
+          f"db {url.rsplit('/', 1)[-1]}, mcp {os.environ.get('MCP_URL') or 'settings default'}, deny {list(deny) or '-'}")
 
-    engine = create_async_engine(URL)
+    engine = create_async_engine(url)
     mk = async_sessionmaker(engine, expire_on_commit=False)
     gate = asyncio.Semaphore(args.concurrency)
     results: list[dict] = []
 
     async def _one(c):
         async with gate:
-            r = await _run_conversation(mk, args.owner, c["tag"], c["turns"])
+            r = await _run_conversation(mk, args.owner, c["tag"], c["turns"], deny)
         results.append(r)
         json.dump(results, open(args.out, "w"), indent=1, default=str)
 

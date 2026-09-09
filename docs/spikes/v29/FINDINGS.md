@@ -299,7 +299,74 @@ behind"*) while 7–16 tool calls in that turn had succeeded — read_filings it
 get an answer through the gate. **Worth its own investigation: whether the gate's refusals were
 correct and the model failed to adapt, or the loop ran out of rounds after the gate refused.**
 
-## 6. Still open
+## 6. What the fixes did NOT touch, measured
+
+An adversarial sweep over replicate 1 (six lenses, one verifier per finding) claimed 84
+reader-visible false statements in 191 turns. That number is NOT quotable yet — the verifiers
+refuted only 14 of 185, a pass rate high enough to distrust — so what follows is the part
+**verified by hand against the database**, plus the part that is countable without any agent.
+
+### 6.1 The ordering class is unchanged, and it is the largest source of wrong figures
+
+Ground truth on `run_72e6617afeb7`: MSFT .161050, JPM .148612, AAPL .147320, LLY .127005,
+GOOGL .124667, HYG .072893, AMZN .071414, TLT .060562, XOM .044054, NVDA .042425.
+**The top five carry 70.87%.**
+
+| turn | shipped | what it actually summed | error |
+|---|---|---|---|
+| `W03-which-run-was-that#1` | *"those five names carry 65.31% of the book"* | MSFT+JPM+AAPL+GOOGL+**AMZN** — drops LLY (4th, 12.70%), adds AMZN (7th) | 5.6 pts |
+| `N06-top-five#1` | *"the top five names carry 45.3%"* | JPM+LLY+HYG+TLT+XOM — not the top five at all | **25.6 pts** |
+
+Counted mechanically over every turn (a superlative or top-N claim in the answer, against a
+successful `compute(op='rank')` in the same turn):
+
+| run | superlative claimed | ordering computed | claimed with no ordering |
+|---|---|---|---|
+| 09-07 | 55 | 8 | **47 (85%)** |
+| 09-08 R1 | 58 | 11 | **47 (81%)** |
+| 09-08 R2 | 60 | 9 | **51 (85%)** |
+
+Unchanged, exactly as scoped: V27/V28 addressed classes 1 and 2 (finding the door, fetching a
+whole fact). This is class 3 — the sentence — which `ROOT_CAUSES.md` records as a contract
+question for the boss, not a fix. The run confirms its prediction: *closing a capability gap
+without the matching constraint converts a visible failure into an invisible one.*
+
+Two more hand-verified statements of the same class, about the book's risk state:
+- `W01-stop-sweep#1`: *"the nearest thing to a trip is daily loss … 0.86% away from its warning
+  tier"* — while `issuer_concentration:MSFT` sat at 16.105% against a 15.0% warning and
+  `issuer_concentration:LLY` at 12.70% against 12.0%. **Two checks were already in warning.**
+- `L03-whose-assumption-is-that#3`: *"the worst single-name concentration I can see is XOM: it is
+  at 4.41% … already inside warning"* — XOM is 9th of 10 and 10.6 points BELOW its warning.
+
+### 6.2 `as_quantity` names a figure and nothing checks the name
+
+`L06-fix-takes-how-long#1` shipped:
+
+> *"if you mean the entire MSFT position sold at its average daily trading value, that is
+> **620.9% days** based on the book's current MSFT market value $1.75M"*
+
+Traced to the ledger: `calc_d3fd5393b20a`, `divide(f_c0dba0e9f786, f_27ee2e222abe)`,
+`as_quantity="days_at_100pct_adv"`, result 6.209263844, unit RATIO. The operands are
+
+| fact | measure | unit | value |
+|---|---|---|---|
+| `f_c0dba0e9f786` | `exposure_metrics.portfolio_market_value` | MONEY | 10,859,692 |
+| `f_27ee2e222abe` | `issuer_exposures.market_value` (MSFT) | MONEY | 1,748,950 |
+
+The quotient is **how many times the book is bigger than the MSFT position** — 6.21×. The turn
+**never called `price.adv`**; no daily volume appears anywhere in it.
+
+Every layer kept its contract. The unit algebra allows MONEY ÷ MONEY = RATIO. The gate verified
+the pointer. `display_conventions` printed a RATIO as a percent, giving `620.9%`. What is false
+is the NAME the model chose and the sentence around it — and `as_quantity` lets the model name a
+result anything, with nothing checking that the name matches what was divided by what.
+
+So the class-3 surface is wider than "a true figure given the wrong role": the model can also
+MINT a figure under a name that describes an operation it did not perform. A days-to-liquidate
+figure has one shape — MONEY ÷ MONEY_PER_DAY — and the desk knows it (`book_liquidity` says so).
+Nothing connects the name to the shape.
+
+## 7. Still open
 
 - Reader-visible defects: `620.9% days` (a ratio called days, the X15 role-error class, unchanged
   by this batch — it was deliberately out of scope) and `$$10.86M × 3.90%` (an arithmetic
