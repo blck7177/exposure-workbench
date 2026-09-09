@@ -63,22 +63,35 @@ async def test_an_absence_names_the_metric_that_superseded_the_one_asked_for():
     """NVDA's revenue moved to total_revenues in 2022. Asked for four quarters of
     revenue, the battery's agent reported that the filings cannot support a
     quarterly series; get_flow on total_revenues returns four."""
+    from sqlalchemy import select
+
+    from exposure_workbench.db.models import Company
+    from exposure_workbench.services import lineage_service as ln
+
     engine, mk = await _mk()
     try:
         async with mk() as db:
+            # the lineage is derived from this desk's own filings, so the test
+            # derives it rather than assuming a maintenance script has run here
+            cid = (await db.execute(select(Company.id).where(Company.ticker == "NVDA"))).scalar_one()
+            derived = {l.from_metric: l for l in await ln.derive(db, cid)}
             got = await fs.get_flow(db, "NVDA", "revenue", months=3, last_n=4)
             alt = await fs.get_flow(db, "NVDA", "total_revenues", months=3, last_n=4)
-            await db.commit()
+            await db.rollback()
     finally:
         await engine.dispose()
 
-    # V30: the retired line is refused as superseded, not as underivable — the
-    # three facts it holds (to 2022-01-30) could derive a series that would read
-    # as the present (C2, N02: DSO "latest" at 2022-01-30)
-    assert got["error"] == "line_superseded"
-    assert "total_revenues" in got["statement"], "the stand-in the registry knows about"
-    assert "2022-01-30" in got["statement"], "and where the asked-for line ends"
-    assert len(alt["points"]) == 4, "and it really does answer the question"
+    # V31: the desk derived that the two tags are one line — NVDA filed the same
+    # dollar under each for the year they overlap — so a read anchored on "the
+    # latest" follows it and says which line it read. Before this the same call
+    # settled on three facts ending 2022-01-30 and the answer read them as the
+    # present (C2, N02; live, 26.9bn against a 303.0bn top line).
+    lin = derived["revenue"]
+    assert lin.to_metric == "total_revenues" and lin.agrees and lin.overlap_max_rel_diff == 0.0
+    assert len(got["points"]) == 4
+    assert got["requested"] == "revenue" and got["via"]["line"] == "total_revenues"
+    assert "one line" in got["via"]["because"]
+    assert len(alt["points"]) == 4, "and it is the same answer as asking for the line directly"
 
 
 async def test_an_absence_supports_no_number_at_all():

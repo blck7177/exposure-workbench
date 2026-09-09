@@ -40,6 +40,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.services import concept_mapping as cm
 from exposure_workbench.services import calc_service as cs
 
 OP_ABSENCE = "absence"
@@ -48,13 +49,18 @@ OP_ABSENCE = "absence"
 def superseded_by(metric: str) -> tuple[str, ...]:
     """Metrics the registry names as stand-ins for this one, deduped in order.
 
-    The knowledge already exists as data — Formula.alternatives, added when
-    NVDA's revenue moved to total_revenues and LLY's interest expense to its
-    non-operating tag. It was readable only by evaluate_formula, so a direct
-    get_flow refusal could not mention it and the model reported an absence that
-    was one argument away from an answer.
+    V31: the one home for "these two names can be one line" is
+    concept_mapping.SUPERSESSION_CANDIDATES. Whether they ARE one line for an
+    issuer is not a property of the names and is not decided here — that is
+    lineage_service, from the overlap the filings show. This function answers the
+    weaker question an absence needs: what could stand in, so a refusal is not a
+    dead end. Formula.alternatives is still read for the pairs it knows that are
+    not supersessions.
     """
     out: list[str] = []
+    for frm, to in cm.SUPERSESSION_CANDIDATES:
+        if frm == metric and to not in out:
+            out.append(to)
     for f in fm.FORMULAS.values():
         for alt in f.alternatives.get(metric, ()):
             if alt not in out:

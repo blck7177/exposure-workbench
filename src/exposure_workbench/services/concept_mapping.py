@@ -336,6 +336,28 @@ for _metric, _concepts in _METRIC_CONCEPTS.items():
 SUPPORTED_METRICS: tuple[str, ...] = tuple(_METRIC_CONCEPTS)
 
 
+# ── supersession candidates (V31) ────────────────────────────────────────────
+# Pairs of names that MAY be one line under two tags for a given issuer. This is
+# a hypothesis about the taxonomy, never a statement about an issuer: whether a
+# pair IS one line is decided per issuer by services/lineage_service.derive from
+# the overlap the filings show, and recorded in metric_lineage.
+#
+# Before V31 the same knowledge lived in analytics/formulas.Formula.alternatives,
+# where only evaluate_formula could read it. That is why describe drew a map with
+# no per-metric coverage and get_flow settled "the latest twelve months" on
+# NVDA's revenue line, four years after it stopped.
+#
+# A pair belongs here when the two tags can express the SAME quantity for some
+# issuer. `revenue`/`total_revenues` do (NVDA moved between them; the overlap
+# year agrees to the dollar) even though for another issuer they are genuinely
+# two quantities (XOM files both, 5.2% apart) — which is exactly why the
+# decision is per issuer and made from the data.
+SUPERSESSION_CANDIDATES: tuple[tuple[str, str], ...] = (
+    ("revenue", "total_revenues"),
+    ("interest_expense", "interest_expense_nonoperating"),
+)
+
+
 def normalize_concept(raw_concept: str) -> str | None:
     """'us-gaap:Revenues' -> 'revenue'. Unknown/other taxonomies -> None."""
     if not raw_concept:

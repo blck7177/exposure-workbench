@@ -127,26 +127,41 @@ async def _metric_absence(db: AsyncSession, error: str, kind: str, ticker: str, 
         invoked_by=invoked_by, metric=metric, **extra)
 
 
-async def _superseded_line(db: AsyncSession, ticker: str, metric: str, facts: list, invoked_by: str) -> dict | None:
-    """A refusal when another line the registry names continues past this one:
-    the metric's last period against each alternative's coverage. None when the
-    metric reaches as far as any stand-in does."""
-    from exposure_workbench.services import absence_service as ab
-    alts = ab.superseded_by(metric)
-    if not alts:
+async def _follow_lineage(db: AsyncSession, ticker: str, metric: str, invoked_by: str,
+                          *, months=None, last_n=None) -> dict | None:
+    """What a latest-anchored read of a retired line does instead (V31).
+
+    An AGREEING lineage is read on the continuing line and says so: the figure is
+    that line's, the Fact carries that line's name (never renamed — the reader is
+    told which tag it came from), and `via` records why. This is not a fallback:
+    the desk derived from the issuer's own filings that the two tags are one line
+    and recorded the overlap that decided it (services/lineage_service).
+
+    A lineage the overlap does NOT support is a refusal that names it, so the
+    reader learns the two are separate quantities rather than getting either
+    silently. XOM files both top lines and they differ by 4.96%.
+
+    None when the metric has no lineage at all: the ordinary read proceeds.
+    """
+    from exposure_workbench.services import lineage_service as ln
+    lin = await ln.continuation(db, ticker, metric, only_agreeing=False)
+    if lin is None:
         return None
-    mine = max(f.period_end for f in facts).isoformat()
-    covers = await ab.coverage(db, ticker, alts)
-    later = [a for a in alts if covers.get(a) and str(covers[a]["through"]) > mine]
-    if not later:
-        return None
-    return await _metric_absence(
-        db, "line_superseded", "line_superseded", ticker, metric,
-        why=(f"{ticker}'s {metric} line ends {mine}, and this desk holds a later top line for it under "
-             f"{' and '.join(later)}; the latest window of {metric} is not the latest reading."),
-        invoked_by=invoked_by, ends=mine,
-        detail=(f"{metric} for {ticker} ends {mine}; the line continues as {', '.join(later)} — ask for that "
-                f"metric, or give start and end to read {metric} as filed"))
+    if not lin.agrees:
+        return await _metric_absence(
+            db, "line_superseded", "line_superseded", ticker, metric,
+            why=(f"{ticker}'s {metric} line ends {lin.from_last_period_end}, and {lin.to_metric} "
+                 f"continues past it, but {lin.statement}."),
+            invoked_by=invoked_by, ends=lin.from_last_period_end.isoformat(),
+            detail=(f"{metric} for {ticker} ends {lin.from_last_period_end}; {lin.to_metric} runs to "
+                    f"{lin.to_last_period_end} and is not the same quantity — ask for {lin.to_metric} "
+                    f"if that is what you want, or give start and end to read {metric} as filed"))
+    out = await get_flow(db, ticker, lin.to_metric, months=months, last_n=last_n, invoked_by=invoked_by)
+    if isinstance(out, dict) and not out.get("error"):
+        out["requested"] = metric
+        out["via"] = {"line": lin.to_metric, "switched_at": lin.switched_at.isoformat() if lin.switched_at else None,
+                      "because": lin.statement}
+    return out
 
 
 async def get_flow(
@@ -194,15 +209,16 @@ async def get_flow(
                    f"a related line instead — call describe")
 
     if not (start and end):
-        # V30 C2 (N02): NVDA's `revenue` holds three facts to 2022-01-30 while
-        # `total_revenues` runs to 2026-07-26; "the latest window" and "the last
-        # five" of the retired line settled silently, four years short of the
-        # present, and the answer read them as the present. A dated start/end
-        # reads the old line as asked; a latest-anchored request is refused and
-        # the continuing line named.
-        stale = await _superseded_line(db, ticker, metric, facts, invoked_by)
-        if stale:
-            return stale
+        # V31. A window anchored on "the latest" must be the latest the issuer
+        # reports, and for a line it moved off, that is the line that continues.
+        # NVDA's `revenue` holds three facts to 2022-01-30 while `total_revenues`
+        # runs to 2026-07-26, and this read settled on the dead one — 26.9bn
+        # against a 303.0bn top line, four and a half years old, unmarked
+        # (production, 2026-09-09). A dated start/end still reads the tag as
+        # asked; only "the latest" follows.
+        moved = await _follow_lineage(db, ticker, metric, invoked_by, months=months, last_n=last_n)
+        if moved is not None:
+            return moved
 
     if last_n is not None and last_n > 1:
         if start or end:

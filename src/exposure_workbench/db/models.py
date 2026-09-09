@@ -656,6 +656,29 @@ class FilingChunk(Base):
 
 # ─── Normalized: Financial Facts (APPEND-ONLY) ──────────────────────────────────
 
+class MetricLineage(Base):
+    """One metric line superseding another, for one issuer — derived, never authored.
+
+    `agrees` is what the overlap says: the periods both tags were filed for, and
+    the largest relative difference across them. A consumer follows only an
+    agreeing row, and `services/lineage_service` is the only writer and the only
+    reader. See infra/migrations/v31_metric_lineage.sql."""
+
+    __tablename__ = "metric_lineage"
+
+    company_id: Mapped[str] = mapped_column(String(64), ForeignKey("companies.id", ondelete="CASCADE"), primary_key=True)
+    from_metric: Mapped[str] = mapped_column(String(64), primary_key=True)
+    to_metric: Mapped[str] = mapped_column(String(64), primary_key=True)
+    from_last_period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    to_last_period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    switched_at: Mapped[date | None] = mapped_column(Date)
+    overlap_periods: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    overlap_max_rel_diff: Mapped[float | None] = mapped_column(Float)
+    agrees: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mapping_version: Mapped[str | None] = mapped_column(String(16))
+    derived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class FinancialFact(Base):
     __tablename__ = "financial_facts"
     # source_accession is in the key on purpose — restatements must append a new

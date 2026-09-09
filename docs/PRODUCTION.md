@@ -389,7 +389,22 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v25_recipe_multiple.sql
 
+# v31_metric_lineage.sql adds the table that says which metric line continues one
+# an issuer stopped filing — derived from the filings, never authored. Empty until
+# `python scripts/derive_lineage.py --apply` runs (below); until then every read
+# behaves exactly as before, so the migration is safe to apply ahead of the code.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v31_metric_lineage.sql
+
 docker compose up -d
+
+# Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry
+# run prints the evidence for every pair — the overlap periods and the largest
+# difference across them — and is worth reading: on 2026-09-09 it found seven
+# lines the desk should follow and one it must not (XOM's two top lines overlap
+# nine periods and differ by 4.96%, so they are two quantities, not one line).
+python scripts/derive_lineage.py --dry-run
+python scripts/derive_lineage.py --apply
 
 # proxy: see infra/Caddyfile.example. DNS must resolve BEFORE reloading Caddy.
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy

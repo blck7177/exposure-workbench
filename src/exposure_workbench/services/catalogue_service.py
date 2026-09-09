@@ -256,7 +256,7 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
 
 
 async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
-    from exposure_workbench.services import formula_service, period_semantics
+    from exposure_workbench.services import formula_service, lineage_service, period_semantics
     metrics = await cs.list_available_metrics(db, tk)
     rows = metrics["metrics"]
     have = {m["metric"] for m in rows}
@@ -281,8 +281,30 @@ async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
             not_computable[name] = f"missing {', '.join(missing)}"
         else:
             computable.append(name)
+    # V31. `names` plus one issuer date said, by omission, that every name reached
+    # that date. NVDA's `revenue` stops 2022-01-30 and that string did not occur
+    # anywhere in describe's 22.5 KB, so a model asking for it read a map that was
+    # wrong. Every exception is listed; a name absent from `lines` reaches
+    # `latest_period_end` by construction, which is the whole point.
+    lineage = await lineage_service.for_issuer(db, tk)
+    lines: dict[str, dict] = {}
+    for m in rows:
+        lp, name = m.get("latest_period_end"), m["metric"]
+        if not lp or not latest or str(lp) >= str(latest):
+            continue
+        entry: dict = {"ends": str(lp)}
+        lin = lineage.get(name)
+        if lin:
+            entry["continues_as"] = lin.to_metric
+            entry["through"] = lin.to_last_period_end.isoformat()
+            entry["read_as_one_line"] = lin.agrees
+            entry["because"] = lin.statement
+        lines[name] = entry
+
     out = {
         "metrics": len(rows), "latest_period_end": latest, "kinds": kinds,
+        # what a name covers, wherever that is not the issuer's own latest period
+        **({"lines": lines} if lines else {}),
         # The NAMES, always: thirty-odd short strings. Without them the first
         # live V23 turn guessed `capital_expenditures` and was refused eight
         # times over; a catalogue that makes the reader guess the key is not

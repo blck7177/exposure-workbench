@@ -29,6 +29,7 @@ from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import interval_algebra as ia
 from exposure_workbench.analytics import units as u
 from exposure_workbench.db.models import Position
+from exposure_workbench.services import lineage_service
 from exposure_workbench.services import absence_service as ab
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import fundamentals_service as fs
@@ -587,11 +588,13 @@ async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
     slots: list[dict] = []          # {start?, end, at?}
     grid = None
     for leaf in leaves:
-        candidates = (leaf,) + tuple(f.alternatives.get(leaf, ()))
-        # the candidate whose facts reach the latest period, not the first with
-        # any: NVDA's `revenue` has three facts to 2022-01-30 and `total_revenues`
-        # runs to 2026-07-26, and a days_sales_outstanding grid on the first
-        # stopped four years short of the present (V30 C2, N02)
+        # V31: the line the desk DERIVED as this issuer's continuation of `leaf`
+        # comes first, then the registry's alternatives. A grid anchored on the
+        # first candidate with any facts put days_sales_outstanding on NVDA's dead
+        # revenue line and stopped four years short of the present (V30 C2, N02).
+        lin = await lineage_service.continuation(db, ticker, leaf)
+        candidates = ((leaf, lin.to_metric) if lin else (leaf,)) + tuple(f.alternatives.get(leaf, ()))
+        # of those, the one whose facts reach the latest period
         best, best_facts = None, []
         for cand in candidates:
             facts = await fs._flow_facts(db, company_id, cand)

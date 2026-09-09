@@ -229,5 +229,10 @@ async def ingest_financial_facts(
             },
         )
         await db.execute(stmt)
+    # V31: whether a metric line this issuer stopped is continued by another is a
+    # fact about its filings, so it is derived where the filings land and nowhere
+    # else. Same transaction as the facts it reads.
+    from exposure_workbench.services import lineage_service
+    await lineage_service.derive(db, company_id)
     logger.info("ingested %d facts for company %s", len(rows), company_id)
     return len(rows)
