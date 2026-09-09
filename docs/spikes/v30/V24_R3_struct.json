@@ -1,0 +1,570 @@
+{
+ "scored": [
+  {
+   "tag": "N01-earnings-quality#t1",
+   "question_tag": "N01-earnings-quality#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_ttm (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N01-earnings-quality#t2",
+   "question_tag": "N01-earnings-quality#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_q_2026-07-26 (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t1",
+   "question_tag": "N02-working-capital#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: total_revenues_yoy_latest_q, accounts_receivable_yoy_latest, inventory_yoy_latest (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "trigger": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t2",
+   "question_tag": "N02-working-capital#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_inventory_ttm_now (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t1",
+   "question_tag": "N03-liquidity#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_full_adv_JPM (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t2",
+   "question_tag": "N03-liquidity#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_quarter_adv_JPM (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t1",
+   "question_tag": "N04-drawdown-anatomy#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_drawdown_depth, worst_drawdown_trough_days (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t2",
+   "question_tag": "N04-drawdown-anatomy#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: benchmark_window_return, holding_window_return_MSFT (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N05-market-or-us#t1",
+   "question_tag": "N05-market-or-us#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: factor_share, unexplained_share (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "netting": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N06-top-five#t1",
+   "question_tag": "N06-top-five#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: top_five_share (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t1",
+   "question_tag": "N07-capex-cycle#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_over_depreciation_amortization_AMZN (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t2",
+   "question_tag": "N07-capex-cycle#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: free_cash_flow_ttm_MSFT, free_cash_flow_ttm_AMZN (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "trigger": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t1",
+   "question_tag": "N08-whats-in-the-price#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: distance_from_52w_high (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t2",
+   "question_tag": "N08-whats-in-the-price#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: momentum_12_1 (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t1",
+   "question_tag": "N09-no-forecast#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "honest_absence": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t2",
+   "question_tag": "N09-no-forecast#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N10-margin-debate#t1",
+   "question_tag": "N10-margin-debate#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: gross_margin_ttm_AAPL, gross_margin_ttm_MSFT (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N11-one-question#t1",
+   "question_tag": "N11-one-question#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 3,
+   "criteria": {
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "precision": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t1",
+   "question_tag": "N12-sector-drift#t1",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 4,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: sector_weight_Technology (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "ranking": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "grounded_claims": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "trigger": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t2",
+   "question_tag": "N12-sector-drift#t2",
+   "answered": false,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "no answer to score"
+    },
+    "so_what": {
+     "met": false,
+     "why": "no answer to score"
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "figures_present": [
+   0,
+   16
+  ],
+  "grounded_claims": [
+   0,
+   13
+  ],
+  "precision": [
+   0,
+   9
+  ],
+  "so_what": [
+   0,
+   9
+  ],
+  "follows_on": [
+   0,
+   8
+  ],
+  "ranking": [
+   0,
+   7
+  ],
+  "trigger": [
+   0,
+   3
+  ],
+  "netting": [
+   0,
+   1
+  ],
+  "honest_absence": [
+   0,
+   3
+  ]
+ }
+}

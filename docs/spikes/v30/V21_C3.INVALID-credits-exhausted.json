@@ -1,0 +1,242 @@
+[
+ {
+  "tag": "C01-trim-one",
+  "session_id": "sess_56b67da6a85d",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "we're carrying ten names and I want to take the book down to nine. which one goes?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 10.9,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "ok, but you're leaning on the risk side of it. does the fundamental picture agree, or is one of them just expensive rather than actually a worse business?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 24.0,
+    "steps": []
+   },
+   {
+    "turn": 3,
+    "q": "say I sell the one you landed on. where does that leave concentration \u2014 anything get tight, anything get better?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 9.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C02-nvda-bear",
+  "session_id": "sess_bcc15ae500b7",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "make me the bear case on nvidia. I only want what's actually in their own filings, not the internet's opinion",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "of those, which one would show up in the reported numbers first? and what exactly would I be watching for it",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.5,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C03-smoke",
+  "session_id": "sess_e8295d8ce867",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "if you were doing the diligence on this book, is there anything in the numbers that would bother you? I'm not asking for a specific ratio, just where the smoke is",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "take the one that worries you most and show me the actual figures behind it",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.4,
+    "steps": []
+   },
+   {
+    "turn": 3,
+    "q": "is that a one-off or has it been building for a while?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.8,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C04-rates-100bp",
+  "session_id": "sess_3ef34d48a17a",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "rates back up 100bp from here. walk me through what that does to this book \u2014 where it actually bites, name by name",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "how much of that is just us owning TLT, versus the equities being long duration in disguise?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.5,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C05-amzn-capital",
+  "session_id": "sess_3c2eab93969b",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "where is amazon's cash actually going these days? capex, buybacks, paying down debt \u2014 I want the shape of it",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "that capex \u2014 is it growing faster than the revenue it's supposed to be supporting?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 3.6,
+    "steps": []
+   },
+   {
+    "turn": 3,
+    "q": "how does that compare with what microsoft is doing on the same front",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.6,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C06-new-name-ko",
+  "session_id": "sess_42e812561462",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "we're thinking about adding coca-cola to this book. can you even look at it properly, or is it outside what you cover?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 5.2,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "how does its balance sheet compare with what we already own \u2014 is it more or less levered than the average name in here?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   },
+   {
+    "turn": 3,
+    "q": "if we put 5% into it, does anything in the mandate get tight?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.3,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "C07-vol-rising",
+  "session_id": "sess_a36744318e17",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "feels like the book's been jumpier the last month or so. has our volatility actually gone up or am I imagining it?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.5,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "if it has \u2014 is that the market being jumpy generally, or something specific we're holding?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   }
+  ]
+ }
+]

@@ -30,6 +30,17 @@ fail-loud) is unchanged and is what the program executes over.
 What this plan does NOT decide: the model (§8 D4), whether the brief path migrates in the
 same batch (§8 D5), the exact claim relation set (§8 D2).
 
+## §0.1 Status (2026-09-09, same day; nothing committed yet)
+
+| phase | state |
+|---|---|
+| 0 instrument | built: fixture db + face (`scripts/battery_fixture.sh`), `--fixture --deny start`, gold for V21/V24 (`scripts/gold/*`) and V26 (from programs), `figures_present`, judge replicates, counters split by role. Baseline R2/R3 + gpt-5.5 running from a worktree pinned at `e6c290b` (R1 kept as a pre-`952e046` record; one mixed-code replicate discarded). Record: `docs/spikes/v30/PHASE0.md` |
+| A language + executor | built: `services/program_service.py` (28 primitives incl. `pick`/`select`, literal picks, computed params), `scripts/program_run.py`, `docs/PROGRAM_LANGUAGE.md`, tests (16, incl. live on the gold snapshot and provider acceptance of the schema). V26 ideal programs authored per turn by three agents (93 files so far; `_GAPS_*.md` record what the language could not say) |
+| B claims + gate | built: `services/claims.py` (ten relations incl. `tier`, G1/G2/G3 with digits allowed when accounted for, renderer in the V24 block shape), `respond` takes claims + prose, meta face = describe/run/read_filings/read_book/search_web/start/respond/think, research face gains `run` bound to issuer kinds. First live rounds: top-five correct (X8 class closed), MSFT wrong-premise correct; the checkpoint battery B1 (V24+V21) ran before the symbol table and push |
+| C skill delivery | built: static symbol table inside `run`'s description (resident 3,624 tokens for the whole face, down from 3,985), `Procedure.programs` (23 snippets, all execute on the fixture), lexical `match_domains` + per-turn push behind `PUSH_DOMAINS`. C1 (V24+V21) queued behind B1 |
+| D deletion | re-ordered: most of §3 (batch dispatch, the payload-walking adapters, the read tools, `compute`, `Shapes`) still serves the research face, so D follows D5 (the brief on claims + programs). What D can do before D5: nothing worth a cutover. |
+| E replay + wording | C2 scored (PHASE0 §C2: seven desk defects found and fixed in this tree, four pinned by tests); C3 on the fixed tree is BLOCKED — OpenAI credits exhausted 04:12Z, rerun recipe in PHASE0 §Results; wording review regenerated after the fixes at `docs/spikes/v30/V30_WORDING_REVIEW.md` (needs the boss's read before any commit) |
+
 ## §1 Measured today (2026-09-09, live DB and V29 traces)
 
 | surface | now |
@@ -293,6 +304,21 @@ boss before commit (the standing discipline).
 - **D6 push**: build the trigger push in Phase C or measure pull first (V27's card-opening rate is now 127/140, so pull works; the question is whether push improves recall). Recommended: build behind a flag and measure both arms in the same battery.
 - **D7 MCP**: keep the resident face (one `run` tool over MCP) or fold to in-process. Recommended keep; nothing in this plan depends on transport.
 
+### Decisions surfaced by the program authoring (2026-09-09, for the boss)
+
+- **D8 — book minus market.** The book algebra refuses `book window return − SPY window return`
+  (`mixed_worlds`): an excess return over the market is a legitimate desk quantity that the V22
+  world rule cannot express; the ratio goes through. Allow a `versus`-typed difference of two
+  RATIO figures across worlds (a relative return), or keep the refusal and state the two figures.
+  Recommended: allow for RATIO − RATIO only (returns, margins), never MONEY.
+- **D9 — a stock minus a scaled flow.** `2 × EBITDA − net debt` (capacity to a leverage handle)
+  refused as `incompatible_bases`. Recommended: keep the refusal; the two figures answer it.
+- **D10 — episode durations and dates as figures.** Drawdown episodes expose depth as a figure but
+  `trough_days` / `recovery_days` / the dates only as payload literals; a program cannot sum sessions
+  under water. Recommended: the drawdown service records per-episode rows (a service change).
+- **D11 — `units.QUOTIENTS` lacks RATIO ÷ MULTIPLE.** A coverage weight over a multiple-unit measure
+  cannot be built. Recommended: add the row (dimensionless ÷ dimensionless = RATIO).
+
 ## §9 Risks
 
 - A rewrite of the model-facing layer (~5k lines): V23's 44→10 was the same size and closed in a day, but this touches the answer grammar; the renderer's output shape is preserved deliberately so apps/web is untouched.
@@ -303,3 +329,39 @@ boss before commit (the standing discipline).
 ## §10 Out of scope
 
 New measures (valuation multiples, peers, benchmark constituents), VaR/stress release, ingest cover (`total_debt` on 4 of 9), the daily report gate, production ops (Clerk prod instance, spend cap, rate limit).
+
+**D12 (surfaced by C2, for the boss).** NVDA and GOOGL report the top line under `total_revenues` after a
+date and under `revenue` before it; the desk keeps both lines and the catalogue calls the metric
+`revenue`. This tree makes the tool honest (a latest-anchored `revenue` on such an issuer refuses
+`line_superseded` and names the continuing line) at the cost of one extra round trip on every such
+question. The alternative is one top-line concept at ingest (a `revenue` that is whichever line the
+issuer files, with the tag recorded per period), which removes the round trip and the second name from
+the model's vocabulary. Recommendation: the ingest change; it is a data-model decision, not a skill one.
+
+**D13 (surfaced by C3, for the boss).** `describe(expand=<domain>)` with no subject is refused, and in
+C3 that refusal fires 23 times in the first 40 turns — every one of them the model's FIRST call of the
+turn, before it has opened the desk. The V27 decision that created the refusal was right about its
+cause (the model used to believe a subject-free `expand='book'` had opened the book, then read runs by
+guessed names), and the C2 fix already cuts the recovery from two calls to one by putting the desk's
+ids on the refusal. The remaining option is to answer the call as asked: a subject-free domain view
+returns the domain's knowledge — its question, evidence, desk rules, compare and close lines, and its
+programs with `<port>` / `<T>` still in place — beside the list of portfolios, and picks nothing. The
+model substitutes placeholders reliably (5 unsubstituted calls in 459 across the whole history, 0 of
+109 in C3), and a literal `<port>` is now refused by `run` as an unknown portfolio. This would remove
+roughly one call from more than half the book-side turns. It reverses part of V27, so it is the boss's
+call, not mine.
+
+**D14 (surfaced by C3, for the boss).** `run`'s json_schema constrains nothing inside a program: `let`
+items are typed array-or-object with no item schema, so a nonsense method name, a nonsense primitive and
+a wrong argument shape are all accepted by the provider and refused at run time. V29 had closed the
+method-name class by construction — `compute`'s `method` was a schema enum, and `unknown_method` went
+from 32 occurrences to 0 across the 09-08 replicates — and V30 reopened it by moving names into the
+program JSON. Replaying the 09-07 battery's 25 wrong names through V30's node
+(`docs/spikes/v30/METHOD_NAME_REPLAY.md`) shows the class is not what it looked like: none of the 25 is a
+misspelled method, 18 are filed lines and 4 are primitives, so an enum would have made them
+unrepresentable without saying where the figure lives. `_p_method` now routes 23 of 25 (74 of 76 sends) to
+their own door. What is still unguarded is a genuine misspelling (`grosss_margin`), which stays a runtime
+refusal. Enumerating method names inside the program schema's `method` node would restore the
+provider-side guarantee; the cost is a schema that has to track the registry and a refusal that says less.
+Recommendation: leave it runtime, and revisit if C4 shows misspellings that the routing does not catch.
+

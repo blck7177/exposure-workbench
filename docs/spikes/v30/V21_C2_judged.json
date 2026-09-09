@@ -1,0 +1,778 @@
+{
+ "scored": [
+  {
+   "tag": "C01-trim-one#t1",
+   "question_tag": "C01-trim-one#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "2 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "so_what": {
+     "met": false,
+     "why": "It only restates the holdings and ranks; it never gives an actionable implication like which name to cut.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t2",
+   "question_tag": "C01-trim-one#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 10,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"It answers the carryover: whether the removed name is 'just expensive rather than actually a worse business,' not merely risk.\"",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can next compare...\u201d rather than a portfolio manager action or implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t3",
+   "question_tag": "C01-trim-one#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It refuses to answer the sale scenario, citing missing base/run data instead of saying what concentration gets tighter or better after selling the one you landed on.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want... I\u2019ll run the sale scenario,\u201d not an actionable implication for the book.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t1",
+   "question_tag": "C02-nvda-bear#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "\u201cThe filing\u2019s own story\u2026 comes with more complex product transitions, larger commitments, and more working capital tied up in inventory and buildout\u201d gives an actionable implication.",
+     "votes": [
+      true,
+      false,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t2",
+   "question_tag": "C02-nvda-bear#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt is gross margin and inventory provisions\u201d directly answers what would show up first, and \u201cnext quarter\u2019s gross margin, inventory balance\u201d addresses what to watch.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe first things I\u2019d watch are the next quarter\u2019s gross margin, inventory balance,\u201d is an actionable implication a portfolio manager could use.",
+     "votes": [
+      true,
+      true,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t1",
+   "question_tag": "C03-smoke#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable implication: \u201cmy focus would be on single-name concentration drift first, then the daily-loss trigger second.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t2",
+   "question_tag": "C03-smoke#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe name that worries me most is MSFT\u201d directly answers the prior \u2018what worries you most\u2019 and provides figures behind it.",
+     "votes": [
+      true,
+      false,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t3",
+   "question_tag": "C03-smoke#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It refuses the build-vs-one-off question and says \u201cI can\u2019t tell you whether it\u2019s a one-off or a build.\u201d",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t1",
+   "question_tag": "C04-rates-100bp#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_net_beta_rates_up (rendered 46 figures, 38 not in gold)",
+     "foreign": 38,
+     "rendered": 46
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating missing book-level beta data: \u201cI cannot give you a single book-wide rates beta\u2026\u201d rather than a portfolio-manager action.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t2",
+   "question_tag": "C04-rates-100bp#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: tlt_weight (rendered 8 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 8
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe equity book also carries meaningful duration\u201d directly answers whether it\u2019s TLT or equities long duration in disguise.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"book-level rates beta is absent: book was not computed\" and \"that piece cannot be stated as a book number\"; it gives the nearest held figure as equity-name rates beta.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t1",
+   "question_tag": "C05-amzn-capital#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t2",
+   "question_tag": "C05-amzn-capital#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 5 figures, 5 not in gold)",
+     "foreign": 5,
+     "rendered": 5
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201ccapex growth is 58.8% ... while revenue growth is 12.4%\u201d directly answers whether capex is growing faster than revenue.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t3",
+   "question_tag": "C05-amzn-capital#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 7 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 7
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cVersus the trend question\u201d and \u201cMicrosoft\u2019s capex is accelerating faster than revenue\u201d directly answer the comparison asked.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t1",
+   "question_tag": "C06-new-name-ko#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can still assess KO...\u201d, which offers more work instead of a portfolio-manager implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t2",
+   "question_tag": "C06-new-name-ko#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It changes the measure to \u201cEBIT interest coverage\u201d and \u201ccurrent ratio\u201d instead of answering the requested leverage comparison.",
+     "votes": [
+      false,
+      false,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t3",
+   "question_tag": "C06-new-name-ko#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 6,
+     "rendered": 16
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over question by checking \u201cadd KO at 5%\u201d against mandate limits, e.g. \u201cthe gross-exposure check still sits at 100.0% against 110.0%.\u201d",
+     "votes": [
+      true,
+      true,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cit does not refit risk metrics or create new stress figures,\u201d not a concrete portfolio-manager action.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t1",
+   "question_tag": "C07-vol-rising#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rolling_vol_30d, rolling_vol_60d (rendered 14 figures, 14 not in gold)",
+     "foreign": 14,
+     "rendered": 14
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t2",
+   "question_tag": "C07-vol-rising#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer directly addresses \u201cmarket being jumpy generally, or something specific we\u2019re holding?\u201d by saying \u201cmore like a holdings-driven jumpiness story than a pure market-wide one.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with \u201ca holdings-driven jumpiness story than a pure market-wide one,\u201d which is an actionable implication for a portfolio manager.",
+     "votes": [
+      true,
+      true,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t1",
+   "question_tag": "C08-wrong-premise#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 0,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t2",
+   "question_tag": "C08-wrong-premise#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: largest_weight, room_to_breach (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It refuses to answer and says it \u201ccannot currently name the biggest holding or compute how much room is left,\u201d instead of resolving the carryover.",
+     "votes": [
+      false,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t1",
+   "question_tag": "C09-lly-concentration#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with an actionable implication: \u201ca business whose current growth and risk are heavily anchored in a small set of key products.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t2",
+   "question_tag": "C09-lly-concentration#t2",
+   "answered": true,
+   "gate_refusals": 6,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt does not tabulate their share of top line\u201d still answers the requested concentration measure carried over from context.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"the exact share is not held there as a scalar figure\" and \"it does not tabulate their share of top line\" plainly states the gap and nearest holding.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C10-news-to-position#t1",
+   "question_tag": "C10-news-to-position#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C10-news-to-position#t2",
+   "question_tag": "C10-news-to-position#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe recent item I flagged that clearly touches a held position is Apple, and the position size is 14.7% of the book\u201d resolves the carried-over holding and size.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with a list of holdings and sizes, not an implication for the book a portfolio manager could act on.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t1",
+   "question_tag": "C11-ellipsis#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 4,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t2",
+   "question_tag": "C11-ellipsis#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "follows_on": {
+     "met": false,
+     "why": "The answer shifts to holdings and concentration, then says it \u201ccannot compare the other two megacaps on [operating_margin].\u201d",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t3",
+   "question_tag": "C11-ellipsis#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts from \u201cthe other two megacaps\u201d to a new four-name ranking and partial ROIC discussion, not resolving the prior entities/measure.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cthe evidence is partial\u201d rather than an actionable implication a portfolio manager could use.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t1",
+   "question_tag": "C12-trigger-levels#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: issuer_concentration_warning (rendered 3 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 3
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with an actionable implication: \u201cMSFT the nearest name-level concentration trigger.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t2",
+   "question_tag": "C12-trigger-levels#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: room_to_breach (rendered 29 figures, 28 not in gold)",
+     "foreign": 28,
+     "rendered": 29
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It changed the trigger from the stated MSFT 15.0% breach/warning to \u201c20.0%\u201d and added LLY, so it didn\u2019t answer the carried-over levels.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t1",
+   "question_tag": "C13-xom-still-oil#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "\u201cnot yet a business that has changed enough to stop being primarily driven by hydrocarbons\u201d plus \u201cwhat would change that reading\u201d gives an actable implication.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t2",
+   "question_tag": "C13-xom-still-oil#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201clook for capex intensity, asset turnover, gross margin, and inventory\u201d directly answers how to see it in the numbers rather than the narrative.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "\u201cgross margin is not held\u2026 and inventory is not filed on this desk\u2026 Those gaps matter because\u2026\u201d",
+     "votes": [
+      true,
+      false,
+      false
+     ]
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "no_linear_locating": [
+   4,
+   4
+  ],
+  "so_what": [
+   7,
+   15
+  ],
+  "follows_on": [
+   12,
+   18
+  ],
+  "figures_present": [
+   3,
+   12
+  ],
+  "honest_absence": [
+   2,
+   3
+  ]
+ }
+}

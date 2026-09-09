@@ -1,0 +1,518 @@
+{
+ "scored": [
+  {
+   "tag": "N01-earnings-quality#t1",
+   "question_tag": "N01-earnings-quality#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 6,
+     "rendered": 10
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"Cash is there, yet the accruals and working-capital build mean I would not read these as purely cash-converting earnings without caveat.\"",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N01-earnings-quality#t2",
+   "question_tag": "N01-earnings-quality#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_q_2026-07-26 (rendered 2 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 2
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt does not look like one odd quarter\u201d directly answers the user\u2019s \u201cgetting worse or is it one odd quarter\u201d by judging persistence versus a one-off.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t1",
+   "question_tag": "N02-working-capital#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: total_revenues_yoy_latest_q, accounts_receivable_yoy_latest, inventory_yoy_latest (rendered 46 figures, 40 not in gold)",
+     "foreign": 40,
+     "rendered": 46
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t2",
+   "question_tag": "N02-working-capital#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_inventory_ttm_now (rendered 36 figures, 36 not in gold)",
+     "foreign": 36,
+     "rendered": 36
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It answers with inventory turns and \u201ccan\u2019t convert,\u201d not the requested days now versus a year ago.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t1",
+   "question_tag": "N03-liquidity#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_full_adv_JPM (rendered 8 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 8
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating \u201cthe missing piece is market depth, not book size\u201d and \u201cI cannot honestly tell you which position is hardest to dump,\u201d with no actionable implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t2",
+   "question_tag": "N03-liquidity#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 10,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_quarter_adv_JPM (rendered 52 figures, 52 not in gold)",
+     "foreign": 52,
+     "rendered": 52
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It deflects to \u201cI can\u2019t give you the days-to-exit figure yet\u201d and never answers the asked quarter-volume days calculation.",
+     "votes": [
+      false,
+      false,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t1",
+   "question_tag": "N04-drawdown-anatomy#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_drawdown_trough_days (rendered 49 figures, 46 not in gold)",
+     "foreign": 46,
+     "rendered": 49
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating recovery status and data: \u201cthe exact break-even date is absent from the ledger,\u201d not an actionable implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t2",
+   "question_tag": "N04-drawdown-anatomy#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: benchmark_window_return, holding_window_return_MSFT (rendered 4 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 4
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cabout 51.1% of the book\u2019s drawdown was explained by factor moves\u201d and \u201c48.9% was unexplained / idiosyncratic\u201d directly answers what was driving it.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N05-market-or-us#t1",
+   "question_tag": "N05-market-or-us#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 2,
+     "rendered": 5
+    }
+   }
+  },
+  {
+   "tag": "N06-top-five#t1",
+   "question_tag": "N06-top-five#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 1,
+     "rendered": 3
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It is slightly looser, not tighter\" gives an actionable implication for the book a portfolio manager could act on.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t1",
+   "question_tag": "N07-capex-cycle#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_over_depreciation_amortization_AMZN (rendered 84 figures, 79 not in gold)",
+     "foreign": 79,
+     "rendered": 84
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating ratios and \u201cthe desk does not have... call either one definitively over-investing,\u201d not a portfolio-manager action or implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t2",
+   "question_tag": "N07-capex-cycle#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 1,
+     "rendered": 9
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It answers balance-sheet room and cash flow, not whether either is \u201cover-investing relative to what they are depreciating.\u201d",
+     "votes": [
+      false,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cMicrosoft\u2026 has more balance-sheet room to keep doing this,\u201d which gives a portfolio-manager-actionable implication.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t1",
+   "question_tag": "N08-whats-in-the-price#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 2,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t2",
+   "question_tag": "N08-whats-in-the-price#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 2,
+     "rendered": 4
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\"The stock's return over the last twelve months excluding the most recent month\" directly answers the user's \"leaving the last month out.\"",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t1",
+   "question_tag": "N09-no-forecast#t1",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cI can\u2019t give you a next-year revenue growth estimate for Lilly because this desk does not forecast; that figure is absent by policy\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cIf you want, I can now turn that into a non-forecast driver summary,\u201d not an implication a portfolio manager could act on.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t2",
+   "question_tag": "N09-no-forecast#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer names the specific drivers \u201cvolume, access, pricing, competition\u201d and directly says \u201cin Lilly\u2019s own filings, revenue goes up if... it goes down if...\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "The answer plainly quotes filings on what moves revenue up and down, naming access, volume, pricing, and competition as the drivers.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N10-margin-debate#t1",
+   "question_tag": "N10-margin-debate#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: gross_margin_ttm_AAPL, gross_margin_ttm_MSFT (rendered 2 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 2
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\u201cI do not have a desk-held clean split of how much ... is pricing versus mix; that breakdown is absent,\u201d and it names the nearest held figures and filing basis.",
+     "votes": [
+      true,
+      false,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N11-one-question#t1",
+   "question_tag": "N11-one-question#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "\"what, specifically, would you cut or slow first\" gives a portfolio-manager actionable implication tied to cash allocation.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t1",
+   "question_tag": "N12-sector-drift#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 4,
+     "rendered": 12
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t2",
+   "question_tag": "N12-sector-drift#t2",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 7,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"sell down the next-largest names, especially the other Technology exposure, before you touch the biggest position\" answers the user's option question while keeping the same concentration issue.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cIt lowers the sector shape more efficiently than slicing the leader first\u201d is a clear actionable implication a portfolio manager could act on.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "figures_present": [
+   7,
+   16
+  ],
+  "so_what": [
+   5,
+   9
+  ],
+  "follows_on": [
+   6,
+   8
+  ],
+  "honest_absence": [
+   3,
+   3
+  ]
+ }
+}

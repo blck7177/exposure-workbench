@@ -1,0 +1,2173 @@
+{
+ "scored": [
+  {
+   "tag": "W01-stop-sweep-across-book#t1",
+   "question_tag": "W01-stop-sweep-across-book#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: dist.AAPL, dist.MSFT, dist.GOOGL, dist.NVDA, dist.JPM, dist.AMZN, dist.TLT, dist.HYG, dist.LLY, dist.XOM, deepest.GOOGL, deepest.LLY, deepest.AMZN, deepest.MSFT, deepest.TLT, deepest.AAPL, deepest.XOM, deepest.NVDA, deepest.JPM, deepest.HYG (rendered 9 figures, 9 not in gold)",
+     "foreign": 9,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "W01-stop-sweep-across-book#t2",
+   "question_tag": "W01-stop-sweep-across-book#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W01-stop-sweep-across-book#t3",
+   "question_tag": "W01-stop-sweep-across-book#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: dist_googl, trough_1y, to_trough (rendered 45 figures, 45 not in gold)",
+     "foreign": 45,
+     "rendered": 45
+    }
+   }
+  },
+  {
+   "tag": "W02-book-as-one-company#t1",
+   "question_tag": "W02-book-as-one-company#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: om_book, nde_book (rendered 205 figures, 169 not in gold)",
+     "foreign": 169,
+     "rendered": 205
+    }
+   }
+  },
+  {
+   "tag": "W02-book-as-one-company#t2",
+   "question_tag": "W02-book-as-one-company#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: om_lowest.AMZN, om_lowest.AAPL, om_lowest.GOOGL, om_lowest.MSFT, om_lowest.NVDA, om_pts.AMZN, om_pts.NVDA, om_pts.GOOGL, om_pts.AAPL, om_pts.MSFT (rendered 9 figures, 9 not in gold)",
+     "foreign": 9,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "W03-vs-the-index#t1",
+   "question_tag": "W03-vs-the-index#t1",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W03-vs-the-index#t2",
+   "question_tag": "W03-vs-the-index#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: net_beta_equity, vol_ratio, ret_ratio_1y (rendered 22 figures, 15 not in gold)",
+     "foreign": 15,
+     "rendered": 22
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t1",
+   "question_tag": "W05-paid-for-the-vol#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_ret_60d, ret_per_vol_60d (rendered 10 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 10
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t2",
+   "question_tag": "W05-paid-for-the-vol#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: spy_ret_60d, spy_ret_per_vol, ret_per_vol_ratio, ret_ratio_60d (rendered 10 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 10
+    }
+   }
+  },
+  {
+   "tag": "W05-paid-for-the-vol#t3",
+   "question_tag": "W05-paid-for-the-vol#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ret_per_vol.AAPL, ret_per_vol.MSFT, ret_per_vol.GOOGL, ret_per_vol.NVDA, ret_per_vol.JPM, ret_per_vol.AMZN, ret_per_vol.TLT, ret_per_vol.HYG, ret_per_vol.LLY, ret_per_vol.XOM, worst.TLT, worst.MSFT, worst.AMZN, worst.NVDA, worst.JPM, worst.HYG, worst.AAPL, worst.GOOGL, worst.LLY, worst.XOM (rendered 9 figures, 9 not in gold)",
+     "foreign": 9,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t1",
+   "question_tag": "W06-weight-we-chose#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ret_book, w_prev_nvda, ret_nvda, drift_nvda, chosen_nvda (rendered 37 figures, 13 not in gold)",
+     "foreign": 13,
+     "rendered": 37
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t2",
+   "question_tag": "W06-weight-we-chose#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: drift.AAPL, drift.JPM, drift.LLY, drift.MSFT, drift.GOOGL, drift.HYG, drift.AMZN, drift.TLT, drift.XOM, drift.NVDA, drift_rank.NVDA, drift_rank.TLT, drift_rank.HYG, drift_rank.AMZN, drift_rank.LLY, drift_rank.JPM, drift_rank.GOOGL, drift_rank.XOM, drift_rank.MSFT, drift_rank.AAPL (rendered 7 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "W06-weight-we-chose#t3",
+   "question_tag": "W06-weight-we-chose#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 103,
+     "rendered": 107
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t1",
+   "question_tag": "L01-raise-by-friday#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: raise, days.AAPL, days.JPM, days.LLY, days.MSFT, days.GOOGL, days.HYG, days.AMZN, days.TLT, days.XOM, days.NVDA, easy_first.NVDA, easy_first.AMZN, easy_first.AAPL, easy_first.MSFT, easy_first.GOOGL, easy_first.XOM, easy_first.TLT, easy_first.HYG, easy_first.LLY, easy_first.JPM (rendered 15 figures, 15 not in gold)",
+     "foreign": 15,
+     "rendered": 15
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t2",
+   "question_tag": "L01-raise-by-friday#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 15,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: proceeds, wavg_days_before, wavg_days_after, harder (rendered 8 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 8
+    }
+   }
+  },
+  {
+   "tag": "L01-raise-by-friday#t3",
+   "question_tag": "L01-raise-by-friday#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: om_book_before, om_book_after, fcf_book_after (rendered 13 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "L02-days-arent-price#t1",
+   "question_tag": "L02-days-arent-price#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "L02-days-arent-price#t2",
+   "question_tag": "L02-days-arent-price#t2",
+   "answered": true,
+   "gate_refusals": 7,
+   "tool_calls": 12,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days.AAPL, days.JPM, days.LLY, days.MSFT, days.GOOGL, days.HYG, days.AMZN, days.TLT, days.XOM, days.NVDA, worst_days.JPM, worst_days.LLY, worst_days.HYG, worst_days.TLT, worst_days.XOM, worst_days.GOOGL, worst_days.MSFT, worst_days.AAPL, worst_days.AMZN, worst_days.NVDA, vol_63d.AAPL, vol_63d.MSFT, vol_63d.GOOGL, vol_63d.NVDA, vol_63d.JPM, vol_63d.AMZN, vol_63d.TLT, vol_63d.HYG, vol_63d.LLY, vol_63d.XOM (rendered 19 figures, 19 not in gold)",
+     "foreign": 19,
+     "rendered": 19
+    }
+   }
+  },
+  {
+   "tag": "L02-days-arent-price#t3",
+   "question_tag": "L02-days-arent-price#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_pair.GOOGL, days_pair.XOM, vol_pair.GOOGL, vol_pair.XOM, vol_ratio (rendered 27 figures, 27 not in gold)",
+     "foreign": 27,
+     "rendered": 27
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t1",
+   "question_tag": "L03-whose-assumption-is-that#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_25pct_20d.AAPL, days_25pct_20d.JPM, days_25pct_20d.LLY, days_25pct_20d.MSFT, days_25pct_20d.GOOGL, days_25pct_20d.HYG, days_25pct_20d.AMZN, days_25pct_20d.TLT, days_25pct_20d.XOM, days_25pct_20d.NVDA, days_25pct_60d.AAPL, days_25pct_60d.JPM, days_25pct_60d.LLY, days_25pct_60d.MSFT, days_25pct_60d.GOOGL, days_25pct_60d.HYG, days_25pct_60d.AMZN, days_25pct_60d.TLT, days_25pct_60d.XOM, days_25pct_60d.NVDA (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t2",
+   "question_tag": "L03-whose-assumption-is-that#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_12_5pct.AAPL, days_12_5pct.JPM, days_12_5pct.LLY, days_12_5pct.MSFT, days_12_5pct.GOOGL, days_12_5pct.HYG, days_12_5pct.AMZN, days_12_5pct.TLT, days_12_5pct.XOM, days_12_5pct.NVDA (rendered 7 figures, 6 not in gold)",
+     "foreign": 6,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "L03-whose-assumption-is-that#t3",
+   "question_tag": "L03-whose-assumption-is-that#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_rate.JPM, worst_name.JPM, worst_name.LLY, worst_name.HYG, worst_name.TLT, worst_name.XOM, worst_name.GOOGL, worst_name.MSFT, worst_name.AAPL, worst_name.AMZN, worst_name.NVDA (rendered 137 figures, 111 not in gold)",
+     "foreign": 111,
+     "rendered": 137
+    }
+   }
+  },
+  {
+   "tag": "L04-cash-by-when-ladder#t1",
+   "question_tag": "L04-cash-by-when-ladder#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days.AAPL, days.JPM, days.LLY, days.MSFT, days.GOOGL, days.HYG, days.AMZN, days.TLT, days.XOM, days.NVDA, cap_tomorrow_1d.AAPL, cap_tomorrow_1d.MSFT, cap_tomorrow_1d.GOOGL, cap_tomorrow_1d.NVDA, cap_tomorrow_1d.JPM, cap_tomorrow_1d.AMZN, cap_tomorrow_1d.TLT, cap_tomorrow_1d.HYG, cap_tomorrow_1d.LLY, cap_tomorrow_1d.XOM (rendered 3 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "L04-cash-by-when-ladder#t2",
+   "question_tag": "L04-cash-by-when-ladder#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "L05-hyg-wrapper#t1",
+   "question_tag": "L05-hyg-wrapper#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: mv_hyg, adv_hyg_dollars, days_hyg (rendered 8 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 8
+    }
+   }
+  },
+  {
+   "tag": "L05-hyg-wrapper#t2",
+   "question_tag": "L05-hyg-wrapper#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days.AAPL, days.JPM, days.LLY, days.MSFT, days.GOOGL, days.HYG, days.AMZN, days.TLT, days.XOM, days.NVDA, w_etf (rendered 12 figures, 12 not in gold)",
+     "foreign": 12,
+     "rendered": 12
+    }
+   }
+  },
+  {
+   "tag": "L06-fix-takes-how-long#t1",
+   "question_tag": "L06-fix-takes-how-long#t1",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: mv_msft, tier_warning, to_sell, days_to_fix (rendered 4 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "L06-fix-takes-how-long#t2",
+   "question_tag": "L06-fix-takes-how-long#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "F01-risk-not-dollars#t1",
+   "question_tag": "F01-risk-not-dollars#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: risk_share.AAPL, risk_share.JPM, risk_share.LLY, risk_share.MSFT, risk_share.GOOGL, risk_share.HYG, risk_share.AMZN, risk_share.TLT, risk_share.XOM, risk_share.NVDA, risk_rank.MSFT, risk_rank.AAPL, risk_rank.GOOGL, risk_rank.LLY, risk_rank.AMZN, risk_rank.JPM, risk_rank.NVDA, risk_rank.XOM, risk_rank.TLT, risk_rank.HYG (rendered 9 figures, 9 not in gold)",
+     "foreign": 9,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "F01-risk-not-dollars#t2",
+   "question_tag": "F01-risk-not-dollars#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: undiversified_vol, diversification_ratio (rendered 367 figures, 240 not in gold)",
+     "foreign": 240,
+     "rendered": 367
+    }
+   }
+  },
+  {
+   "tag": "F01-risk-not-dollars#t3",
+   "question_tag": "F01-risk-not-dollars#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: risk_share_nvda, w_nvda, risk_per_weight_nvda (rendered 39 figures, 33 not in gold)",
+     "foreign": 33,
+     "rendered": 39
+    }
+   }
+  },
+  {
+   "tag": "F02-ten-down-in-dollars#t1",
+   "question_tag": "F02-ten-down-in-dollars#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: net_beta_equity, book_mv, pct_hit, dollar_hit (rendered 7 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "F02-ten-down-in-dollars#t2",
+   "question_tag": "F02-ten-down-in-dollars#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: hit_tlt, hit_hyg, hit_hedges, hit_equities (rendered 81 figures, 59 not in gold)",
+     "foreign": 59,
+     "rendered": 81
+    }
+   }
+  },
+  {
+   "tag": "F04-long-duration-on-trial#t1",
+   "question_tag": "F04-long-duration-on-trial#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: beta_tlt.JPM, beta_tlt.AMZN, beta_tlt.XOM, most_rate_sensitive.AMZN, most_rate_sensitive.JPM, most_rate_sensitive.XOM (rendered 29 figures, 22 not in gold)",
+     "foreign": 22,
+     "rendered": 29
+    }
+   }
+  },
+  {
+   "tag": "F04-long-duration-on-trial#t2",
+   "question_tag": "F04-long-duration-on-trial#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: w_beta_tlt.AAPL, w_beta_tlt.JPM, w_beta_tlt.LLY, w_beta_tlt.MSFT, w_beta_tlt.GOOGL, w_beta_tlt.HYG, w_beta_tlt.AMZN, w_beta_tlt.XOM, w_beta_tlt.NVDA, rate_exposure_pts.GOOGL, rate_exposure_pts.AAPL, rate_exposure_pts.LLY, rate_exposure_pts.JPM, rate_exposure_pts.AMZN, rate_exposure_pts.HYG, rate_exposure_pts.NVDA, rate_exposure_pts.MSFT, rate_exposure_pts.XOM, mv_tlt (rendered 13 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "F06-down-capture#t1",
+   "question_tag": "F06-down-capture#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_fall, book_recovery, spy_fall, spy_recovery, down_capture, up_capture (rendered 28 figures, 27 not in gold)",
+     "foreign": 27,
+     "rendered": 28
+    }
+   }
+  },
+  {
+   "tag": "F06-down-capture#t2",
+   "question_tag": "F06-down-capture#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_recovery, spy_recovery, up_capture (rendered 48 figures, 37 not in gold)",
+     "foreign": 37,
+     "rendered": 48
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t1",
+   "question_tag": "W01-back-to-flat#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: depth_1y, gain_to_flat_1y_hole, depth_3m, gain_to_flat_3m_hole (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t2",
+   "question_tag": "W01-back-to-flat#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: n_episodes_1y (rendered 17 figures, 11 not in gold)",
+     "foreign": 11,
+     "rendered": 17
+    }
+   }
+  },
+  {
+   "tag": "W01-back-to-flat#t3",
+   "question_tag": "W01-back-to-flat#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_contrib.MSFT, worst_contrib.LLY, worst_contrib.JPM, worst_contrib.GOOGL, worst_contrib.AMZN, worst_contrib.AAPL, worst_contrib.NVDA, worst_contrib.HYG, worst_contrib.TLT, worst_contrib.XOM, down_capture, net_beta_equity (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t1",
+   "question_tag": "W02-per-point-of-weight#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: contrib.AAPL, contrib.JPM, contrib.LLY, contrib.MSFT, contrib.GOOGL, contrib.HYG, contrib.AMZN, contrib.TLT, contrib.XOM, contrib.NVDA (rendered 24 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 24
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t2",
+   "question_tag": "W02-per-point-of-weight#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: contrib_msft, half_size_saves (rendered 30 figures, 6 not in gold)",
+     "foreign": 6,
+     "rendered": 30
+    }
+   }
+  },
+  {
+   "tag": "W02-per-point-of-weight#t3",
+   "question_tag": "W02-per-point-of-weight#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: contrib_lly, half_size_saves (rendered 3 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t1",
+   "question_tag": "W03-did-the-hedge-hedge#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: contrib_tlt, contrib_hyg, contrib_hedges, contrib_equities (rendered 24 figures, 9 not in gold)",
+     "foreign": 9,
+     "rendered": 24
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t2",
+   "question_tag": "W03-did-the-hedge-hedge#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ret_tlt_20250219, contrib_tlt_20250219, ret_tlt_20240710, contrib_tlt_20240710, ret_tlt_20230914, contrib_tlt_20230914, ret_tlt_20260529, contrib_tlt_20260529 (rendered 34 figures, 30 not in gold)",
+     "foreign": 30,
+     "rendered": 34
+    }
+   }
+  },
+  {
+   "tag": "W03-did-the-hedge-hedge#t3",
+   "question_tag": "W03-did-the-hedge-hedge#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 11,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: beta_tlt_spy_1y, beta_tlt_spy_3m (rendered 30 figures, 30 not in gold)",
+     "foreign": 30,
+     "rendered": 30
+    }
+   }
+  },
+  {
+   "tag": "W04-sectors-or-names#t1",
+   "question_tag": "W04-sectors-or-names#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: xom_rel_spy, spy_ret_1y (rendered 49 figures, 48 not in gold)",
+     "foreign": 48,
+     "rendered": 49
+    }
+   }
+  },
+  {
+   "tag": "W04-sectors-or-names#t2",
+   "question_tag": "W04-sectors-or-names#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_ret_1y, factor_etfs_1y.SPY, factor_etfs_1y.QQQ, factor_etfs_1y.IWM, factor_etfs_1y.GLD, factor_etfs_1y.USO, ran_away.USO, ran_away.IWM, ran_away.QQQ, ran_away.GLD, ran_away.SPY (rendered 69 figures, 69 not in gold)",
+     "foreign": 69,
+     "rendered": 69
+    }
+   }
+  },
+  {
+   "tag": "W05-explain-the-day#t1",
+   "question_tag": "W05-explain-the-day#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: mkt_ret, factor_share, unexplained_share (rendered 18 figures, 16 not in gold)",
+     "foreign": 16,
+     "rendered": 18
+    }
+   }
+  },
+  {
+   "tag": "W05-explain-the-day#t2",
+   "question_tag": "W05-explain-the-day#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: residual_d0904, residual_d0903, residual_d0902, residual_d0901, residual_d0831 (rendered 4 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t1",
+   "question_tag": "W01-useful-life-policy#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 35,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: MSFT_dep_to_oi, AMZN_dep_to_oi, GOOGL_dep_to_oi (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t2",
+   "question_tag": "W01-useful-life-policy#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 22,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: MSFT_om_reverted, AMZN_om_reverted, GOOGL_om_reverted (rendered 83 figures, 83 not in gold)",
+     "foreign": 83,
+     "rendered": 83
+    }
+   }
+  },
+  {
+   "tag": "W01-useful-life-policy#t3",
+   "question_tag": "W01-useful-life-policy#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 15,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: MSFT_capex_to_dep, AMZN_capex_to_dep, GOOGL_capex_to_dep (rendered 88 figures, 88 not in gold)",
+     "foreign": 88,
+     "rendered": 88
+    }
+   }
+  },
+  {
+   "tag": "W04-growth-vs-margin-screen#t1",
+   "question_tag": "W04-growth-vs-margin-screen#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: AAPL_gm_chg, MSFT_gm_chg, NVDA_gm_chg, GOOGL_gm_chg, AMZN_gm_chg, LLY_gm_chg (rendered 13 figures, 13 not in gold)",
+     "foreign": 13,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "W04-growth-vs-margin-screen#t2",
+   "question_tag": "W04-growth-vs-margin-screen#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: dist_52w_high, ret_3m_rel, ret_6m_rel (rendered 46 figures, 24 not in gold)",
+     "foreign": 24,
+     "rendered": 46
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t1",
+   "question_tag": "W05-leases-in-leverage#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: AMZN_d2e_with_lease (rendered 4 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t2",
+   "question_tag": "W05-leases-in-leverage#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 10,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: AMZN_d2e, AMZN_d2e_lease, MSFT_d2e, MSFT_d2e_lease, AAPL_d2e, AAPL_d2e_lease (rendered 7 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "W05-leases-in-leverage#t3",
+   "question_tag": "W05-leases-in-leverage#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: AMZN_ie (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W06-tax-rate-growth#t1",
+   "question_tag": "W06-tax-rate-growth#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W06-tax-rate-growth#t2",
+   "question_tag": "W06-tax-rate-growth#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: pretax_yoy_latest, pretax_cagr, ni_cagr, tax_rate_contribution (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t1",
+   "question_tag": "W01-xom-maturity-wall#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t2",
+   "question_tag": "W01-xom-maturity-wall#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W01-xom-maturity-wall#t3",
+   "question_tag": "W01-xom-maturity-wall#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ie_ttm, ie_ttm_prior, ie_ttm_chg (rendered 6 figures, 6 not in gold)",
+     "foreign": 6,
+     "rendered": 6
+    }
+   }
+  },
+  {
+   "tag": "W02-lly-coverage-trend#t1",
+   "question_tag": "W02-lly-coverage-trend#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 12,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: nd2e_2025 (rendered 27 figures, 21 not in gold)",
+     "foreign": 21,
+     "rendered": 27
+    }
+   }
+  },
+  {
+   "tag": "W02-lly-coverage-trend#t2",
+   "question_tag": "W02-lly-coverage-trend#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 29,
+     "rendered": 31
+    }
+   }
+  },
+  {
+   "tag": "W03-xom-trough-relever#t1",
+   "question_tag": "W03-xom-trough-relever#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: nd2e_now, ebitda_trough, nd2e_at_trough (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W03-xom-trough-relever#t2",
+   "question_tag": "W03-xom-trough-relever#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 15,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t1",
+   "question_tag": "W06-aapl-net-cash-buybacks#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: cash (rendered 6 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 6
+    }
+   }
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t2",
+   "question_tag": "W06-aapl-net-cash-buybacks#t2",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W06-aapl-net-cash-buybacks#t3",
+   "question_tag": "W06-aapl-net-cash-buybacks#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: debt_chg, fcf, distributions, self_funding_gap (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t1",
+   "question_tag": "W01-xom-payout-plug#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: fcf, distributions, gap (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t2",
+   "question_tag": "W01-xom-payout-plug#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: div_to_ocf, div_to_fcf, div_to_ocf_chg, div_to_fcf_chg (rendered 3 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-payout-plug#t3",
+   "question_tag": "W01-xom-payout-plug#t3",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 15,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: div_to_fcf_q (rendered 1 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 1
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t1",
+   "question_tag": "W02-buyback-vs-dilution#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: sh_chg_3y_pct, bb, sbc, net_buyback (rendered 1 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 1
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t2",
+   "question_tag": "W02-buyback-vs-dilution#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: AAPL_sbc_to_bb, MSFT_sbc_to_bb, GOOGL_sbc_to_bb, NVDA_sbc_to_bb, JPM_sbc_to_bb, LLY_sbc_to_bb (rendered 10 figures, 10 not in gold)",
+     "foreign": 10,
+     "rendered": 10
+    }
+   }
+  },
+  {
+   "tag": "W02-buyback-vs-dilution#t3",
+   "question_tag": "W02-buyback-vs-dilution#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: sbc_to_bb (rendered 20 figures, 20 not in gold)",
+     "foreign": 20,
+     "rendered": 20
+    }
+   }
+  },
+  {
+   "tag": "W04-book-capex-hogs#t1",
+   "question_tag": "W04-book-capex-hogs#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ci_rank.MSFT, ci_rank.GOOGL, ci_rank.AMZN, ci_rank.XOM, ci_rank.AAPL, ci_rank.NVDA, AAPL_capex_to_ocf, MSFT_capex_to_ocf, GOOGL_capex_to_ocf, NVDA_capex_to_ocf, AMZN_capex_to_ocf, XOM_capex_to_ocf (rendered 8 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 8
+    }
+   }
+  },
+  {
+   "tag": "W04-book-capex-hogs#t2",
+   "question_tag": "W04-book-capex-hogs#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 10,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W04-book-capex-hogs#t3",
+   "question_tag": "W04-book-capex-hogs#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: lease_now, lease_chg, lease_chg_to_capex (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W05-jpm-frame-breaks#t1",
+   "question_tag": "W05-jpm-frame-breaks#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: payout (rendered 9 figures, 5 not in gold)",
+     "foreign": 5,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "W05-jpm-frame-breaks#t2",
+   "question_tag": "W05-jpm-frame-breaks#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: roe, eq_mult, payout, equity_to_assets (rendered 13 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "W06-nvda-buyback-timing#t1",
+   "question_tag": "W06-nvda-buyback-timing#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 18,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ret_q_20250427, ret_q_20250727, ret_q_20251026, ret_q_20260125, ret_q_20260426, ret_q_20260726 (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W06-nvda-buyback-timing#t2",
+   "question_tag": "W06-nvda-buyback-timing#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 12,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ret_q_20241228, ret_q_20250329, ret_q_20250628, ret_q_20250927, ret_q_20251227, ret_q_20260328 (rendered 4 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t1",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t2",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ01-what-changed-in-the-risk-section#t3",
+   "question_tag": "FQ01-what-changed-in-the-risk-section#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t1",
+   "question_tag": "FQ02-who-actually-buys-nvda#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t2",
+   "question_tag": "FQ02-who-actually-buys-nvda#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 10,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ02-who-actually-buys-nvda#t3",
+   "question_tag": "FQ02-who-actually-buys-nvda#t3",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t1",
+   "question_tag": "FQ03-is-aws-carrying-it#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rev, oi (rendered 2 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t2",
+   "question_tag": "FQ03-is-aws-carrying-it#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ03-is-aws-carrying-it#t3",
+   "question_tag": "FQ03-is-aws-carrying-it#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: om_chg_2y, om_q_chg (rendered 2 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t1",
+   "question_tag": "FQ04-their-story-against-my-line#t1",
+   "answered": true,
+   "gate_refusals": 7,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: gm_chg_qoq_pts, gm_chg_yoy_pts (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t2",
+   "question_tag": "FQ04-their-story-against-my-line#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: gm_chg_qoq_pts, cor_chg, cor_ratio_chg_pts (rendered 2 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "FQ04-their-story-against-my-line#t3",
+   "question_tag": "FQ04-their-story-against-my-line#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: one_pct_reserve_in_margin_pts (rendered 126 figures, 126 not in gold)",
+     "foreign": 126,
+     "rendered": 126
+    }
+   }
+  },
+  {
+   "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+   "question_tag": "FQ05-jpm-rate-table-vs-how-it-trades#t1",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 15,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: beta_1y, r2_1y (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+   "question_tag": "FQ05-jpm-rate-table-vs-how-it-trades#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: beta_1y, r2_1y, r2_3y, r2_3m (rendered 17 figures, 17 not in gold)",
+     "foreign": 17,
+     "rendered": 17
+    }
+   }
+  },
+  {
+   "tag": "FQ06-same-risk-in-four-filings#t1",
+   "question_tag": "FQ06-same-risk-in-four-filings#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 19,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "FQ06-same-risk-in-four-filings#t2",
+   "question_tag": "FQ06-same-risk-in-four-filings#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: share (rendered 62 figures, 34 not in gold)",
+     "foreign": 34,
+     "rendered": 62
+    }
+   }
+  },
+  {
+   "tag": "B02-var-ballpark#t1",
+   "question_tag": "B02-var-ballpark#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "B02-var-ballpark#t2",
+   "question_tag": "B02-var-ballpark#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "B03-jpm-leverage-rank#t1",
+   "question_tag": "B03-jpm-leverage-rank#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rk.AMZN, rk.XOM, rk_ocf.LLY, rk_ocf.AMZN, rk_ocf.AAPL, rk_ocf.GOOGL, rk_ocf.XOM (rendered 30 figures, 30 not in gold)",
+     "foreign": 30,
+     "rendered": 30
+    }
+   }
+  },
+  {
+   "tag": "B03-jpm-leverage-rank#t2",
+   "question_tag": "B03-jpm-leverage-rank#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: jem_now, jem_ago, roe_fy25, jroa (rendered 39 figures, 39 not in gold)",
+     "foreign": 39,
+     "rendered": 39
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t1",
+   "question_tag": "B05-etf-instrument-class#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 18,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: vol63.TLT, vol63.HYG, beta_spy.TLT, beta_spy.HYG (rendered 13 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t2",
+   "question_tag": "B05-etf-instrument-class#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: hyg_beta, hyg_r2, book_dd.portfolio.window_return, hyg_dd_ret (rendered 2 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "B05-etf-instrument-class#t3",
+   "question_tag": "B05-etf-instrument-class#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: eq_net_beta, fi, equity_share (rendered 88 figures, 73 not in gold)",
+     "foreign": 73,
+     "rendered": 88
+    }
+   }
+  },
+  {
+   "tag": "B06-positioning-blind#t1",
+   "question_tag": "B06-positioning-blind#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "B06-positioning-blind#t2",
+   "question_tag": "B06-positioning-blind#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rel_1m, rel_3m (rendered 82 figures, 72 not in gold)",
+     "foreign": 72,
+     "rendered": 82
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-borrow-headroom#t1",
+   "question_tag": "W01-xom-borrow-headroom#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ebitda, net_debt, total_debt, cash (rendered 1 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 1
+    }
+   }
+  },
+  {
+   "tag": "W01-xom-borrow-headroom#t2",
+   "question_tag": "W01-xom-borrow-headroom#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capacity_2x (rendered 3 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t1",
+   "question_tag": "W02-ccc-carried-to-jpm#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ccc_fy24, ccc_fy25, ccc_chg, dso_fy25, dio_fy25, dpo_fy25 (rendered 3 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t2",
+   "question_tag": "W02-ccc-carried-to-jpm#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W02-ccc-carried-to-jpm#t3",
+   "question_tag": "W02-ccc-carried-to-jpm#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: jem_now, jem_ago, roe_fy24, roe_fy25, roa (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t1",
+   "question_tag": "W03-which-run-was-that#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: mv_msft (rendered 15 figures, 5 not in gold)",
+     "foreign": 5,
+     "rendered": 15
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t2",
+   "question_tag": "W03-which-run-was-that#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 1,
+     "rendered": 6
+    }
+   }
+  },
+  {
+   "tag": "W03-which-run-was-that#t3",
+   "question_tag": "W03-which-run-was-that#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 182,
+     "rendered": 196
+    }
+   }
+  },
+  {
+   "tag": "W04-just-divide-them#t1",
+   "question_tag": "W04-just-divide-them#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W04-just-divide-them#t2",
+   "question_tag": "W04-just-divide-them#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W04-just-divide-them#t3",
+   "question_tag": "W04-just-divide-them#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rel_1y (rendered 19 figures, 13 not in gold)",
+     "foreign": 13,
+     "rendered": 19
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t1",
+   "question_tag": "W05-half-taken-back#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: top5_before, sold, top5_after (rendered 17 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 17
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t2",
+   "question_tag": "W05-half-taken-back#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: target, sold, w_msft_after, top5_after (rendered 6 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 6
+    }
+   }
+  },
+  {
+   "tag": "W05-half-taken-back#t3",
+   "question_tag": "W05-half-taken-back#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 0,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: w_lly_before, mv_lly_before, w_lly_after, mv_lly_after (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "W06-is-that-all-of-them#t1",
+   "question_tag": "W06-is-that-all-of-them#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 11,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "W06-is-that-all-of-them#t2",
+   "question_tag": "W06-is-that-all-of-them#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t1",
+   "question_tag": "NEW01-whats-coming-up#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t2",
+   "question_tag": "NEW01-whats-coming-up#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: move_pct, rel_1m, l52 (rendered 202 figures, 199 not in gold)",
+     "foreign": 199,
+     "rendered": 202
+    }
+   }
+  },
+  {
+   "tag": "NEW01-whats-coming-up#t3",
+   "question_tag": "NEW01-whats-coming-up#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t1",
+   "question_tag": "NEW02-does-the-story-still-hold#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 16,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_ttm, capex_to_ocf (rendered 4 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t2",
+   "question_tag": "NEW02-does-the-story-still-hold#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "NEW02-does-the-story-still-hold#t3",
+   "question_tag": "NEW02-does-the-story-still-hold#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_to_ocf (rendered 3 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t1",
+   "question_tag": "NEW03-what-flagged-on-the-run#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: nearest.issuer_concentration:MSFT, nearest.issuer_concentration:LLY, nearest.issuer_concentration:JPM, nearest.issuer_concentration:AAPL, nearest.gross_exposure, nearest.sector_concentration:Technology (rendered 21 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 21
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t2",
+   "question_tag": "NEW03-what-flagged-on-the-run#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: order.issuer_concentration:MSFT, order.issuer_concentration:LLY, order.issuer_concentration:JPM, order.issuer_concentration:AAPL, order.gross_exposure, order.sector_concentration:Technology, order.issuer_concentration:GOOGL, order.sector_concentration:Financials, order.rolling_volatility_30d, order.sector_concentration:Fixed_Income, order.daily_loss, order.issuer_concentration:HYG, order.issuer_concentration:AMZN, order.sector_concentration:Consumer_Discretionary, order.issuer_concentration:TLT, order.sector_concentration:Healthcare, order.sector_concentration:Communication_Services, order.issuer_concentration:XOM, order.issuer_concentration:NVDA, order.sector_concentration:Energy (rendered 28 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 28
+    }
+   }
+  },
+  {
+   "tag": "NEW03-what-flagged-on-the-run#t3",
+   "question_tag": "NEW03-what-flagged-on-the-run#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 1,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: top5, eq_net_beta (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "NEW04-swap-not-a-sale#t1",
+   "question_tag": "NEW04-swap-not-a-sale#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: move_dollars, nvda_fraction, w_lly_after, room_lly_breach (rendered 14 figures, 11 not in gold)",
+     "foreign": 11,
+     "rendered": 14
+    }
+   }
+  },
+  {
+   "tag": "NEW04-swap-not-a-sale#t2",
+   "question_tag": "NEW04-swap-not-a-sale#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 8,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: w_lly_after, betas.NVDA, betas.LLY, vols.NVDA, vols.LLY, room_lly_breach (rendered 9 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t1",
+   "question_tag": "NEW05-your-numbers-disagree#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 9,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: ocf_to_ni, accruals_ratio, fcf_margin, dso (rendered 3 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t2",
+   "question_tag": "NEW05-your-numbers-disagree#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "NEW05-your-numbers-disagree#t3",
+   "question_tag": "NEW05-your-numbers-disagree#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 13,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_latest, dso_latest (rendered 13 figures, 13 not in gold)",
+     "foreign": 13,
+     "rendered": 13
+    }
+   }
+  },
+  {
+   "tag": "NEW06-what-you-havent-got#t1",
+   "question_tag": "NEW06-what-you-havent-got#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: w.AAPL, w.MSFT, w.GOOGL, w.AMZN, w.NVDA, fixed_income, top5 (rendered 9 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 9
+    }
+   }
+  },
+  {
+   "tag": "NEW06-what-you-havent-got#t2",
+   "question_tag": "NEW06-what-you-havent-got#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: vif, model_r2, unexplained_share (rendered 68 figures, 65 not in gold)",
+     "foreign": 65,
+     "rendered": 68
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "figures_present": [
+   4,
+   109
+  ]
+ }
+}

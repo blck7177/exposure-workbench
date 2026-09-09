@@ -1,0 +1,294 @@
+[
+ {
+  "tag": "N01-earnings-quality",
+  "session_id": "sess_635d183546f0",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "something has been nagging me about nvidia. the earnings look spectacular but is the cash actually showing up behind them? I want to know whether the profits are real",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 10.6,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "and is that getting worse or is it one odd quarter",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N02-working-capital",
+  "session_id": "sess_d8dc9b05ec06",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "for nvidia, are receivables and inventory growing faster than the top line? that's usually what you see before demand rolls over",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.8,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "put that in days for me \u2014 how long is inventory sitting there now versus a year ago",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 5.3,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N03-liquidity",
+  "session_id": "sess_ffa5293d7b4b",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "if I had to get out of this book in a hurry, which positions actually hurt me? I mean liquidity, not price",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.8,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "for the worst one, how many days is that at a quarter of daily volume",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N04-drawdown-anatomy",
+  "session_id": "sess_d10e4d865a8f",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "walk me through the worst drawdown this book has had over the last year \u2014 how deep, how fast, and did we get it back",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 3.0,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "what was actually driving it? market beta or something we owned",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N05-market-or-us",
+  "session_id": "sess_e27c9783d3b2",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "honest question. how much of what this book did is just the market moving, and how much of it is us",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N06-top-five",
+  "session_id": "sess_8bec002c6b64",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "what share of the book do the top five names carry between them, and is that tighter or looser than the run before this one",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N07-capex-cycle",
+  "session_id": "sess_d625878839fb",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "microsoft and amazon are both spending enormously on infrastructure. is either of them over-investing relative to what they are depreciating?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "which of the two has more room to keep doing it without straining the balance sheet",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 3.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N08-whats-in-the-price",
+  "session_id": "sess_47841f420464",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "where is exxon trading against its own last twelve months \u2014 near the high or the low? I'm trying to work out what is already in the price",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.8,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "and its momentum leaving the last month out, since that is usually noise",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.0,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N09-no-forecast",
+  "session_id": "sess_1bfbd1a1a4fc",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "what's your estimate for lilly's revenue growth next year?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "fine. then what do their own filings say would move it either way",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N10-margin-debate",
+  "session_id": "sess_27f54a55e549",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "apple against microsoft \u2014 whose gross margin is holding up better, and is that mix or pricing?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.8,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N11-one-question",
+  "session_id": "sess_a6c3ca545dcf",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "if you could put one question to xom's management on the next call, what would it be? base it on what their numbers are actually showing, not on the narrative",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "N12-sector-drift",
+  "session_id": "sess_58ca9efa1dac",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "has the sector shape of this book drifted? I care about whether we are quietly all in one trade",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   },
+   {
+    "turn": 2,
+    "q": "if I wanted to take that down without selling the biggest position, what are my options",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 13.9,
+    "steps": []
+   }
+  ]
+ }
+]

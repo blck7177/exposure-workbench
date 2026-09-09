@@ -1,0 +1,518 @@
+{
+ "scored": [
+  {
+   "tag": "N01-earnings-quality#t1",
+   "question_tag": "N01-earnings-quality#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_ttm (rendered 4 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 4
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with an actionable implication: \u201cif receivables growth keeps outrunning revenue, then the cash support behind earnings weakens.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N01-earnings-quality#t2",
+   "question_tag": "N01-earnings-quality#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_q_2026-07-26 (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt looks more like a developing working-capital issue than a one-off quarter\u201d directly answers whether it\u2019s getting worse or just one odd quarter.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t1",
+   "question_tag": "N02-working-capital#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: total_revenues_yoy_latest_q, accounts_receivable_yoy_latest, inventory_yoy_latest (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t2",
+   "question_tag": "N02-working-capital#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_inventory_ttm_now (rendered 3 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 3
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cInventory is sitting there 125.04 days as of 2026-01-25, versus 112.72 days a year earlier\u201d directly answers the asked days comparison.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t1",
+   "question_tag": "N03-liquidity#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_full_adv_JPM (rendered 8 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 8
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an actionable implication: \"the names with the slowest dollar turnover\" and \"especially JPM and LLY\" are the positions a portfolio manager should worry about.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t2",
+   "question_tag": "N03-liquidity#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_quarter_adv_JPM (rendered 8 figures, 7 not in gold)",
+     "foreign": 7,
+     "rendered": 8
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It asks for the worst one's days, but the answer says \u201cthe actual days ... need the book\u2019s market values\u201d and gives only turnover benchmarks.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t1",
+   "question_tag": "N04-drawdown-anatomy#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_drawdown_trough_days (rendered 9 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 9
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with data, not an actionable implication; \u201cthe latest completed day\u201d and \u201cnot a re-rating\u201d don\u2019t tell a portfolio manager what to do.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t2",
+   "question_tag": "N04-drawdown-anatomy#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: benchmark_window_return (rendered 14 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 14
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\"What actually hurt inside that episode was mostly what we owned\" directly answers whether it was market beta or holdings driving it.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N05-market-or-us#t1",
+   "question_tag": "N05-market-or-us#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: factor_share, unexplained_share (rendered 4 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "N06-top-five#t1",
+   "question_tag": "N06-top-five#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 38,
+     "rendered": 55
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It is slightly looser now\" gives an actionable implication about book concentration for a portfolio manager.",
+     "votes": [
+      true,
+      true,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t1",
+   "question_tag": "N07-capex-cycle#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 0,
+     "rendered": 4
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer closes with an actionable implication: \u201cAmazon is clearly spending more than it is depreciating... the gap has widened.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t2",
+   "question_tag": "N07-capex-cycle#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: free_cash_flow_ttm_MSFT, free_cash_flow_ttm_AMZN (rendered 3 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 3
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It pivots to \u201cmore room to keep doing it without straining the balance sheet,\u201d then answers with capex/depreciation and missing MSFT depreciation.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends by restating evidence and offering next steps: \u201cI\u2019d next compare debt, cash, current ratio, and debt-to-EBITDA,\u201d not an actionable implication for the book.",
+     "votes": [
+      false,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t1",
+   "question_tag": "N08-whats-in-the-price#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 2,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 6,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t2",
+   "question_tag": "N08-whats-in-the-price#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 1,
+     "rendered": 2
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cExxon\u2019s momentum leaving out the most recent month is still positive at 44.9%\u201d directly answers the carried-over momentum measure.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t1",
+   "question_tag": "N09-no-forecast#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "honest_absence": {
+     "met": false,
+     "why": "\"I can\u2019t give you a next-year revenue-growth estimate... this desk does not forecast and will not manufacture a number,\" which plainly names no method/forecast and gives the nearest held facts.",
+     "votes": [
+      true,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI will not assign a forecast rate,\u201d offering no portfolio-actionable implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t2",
+   "question_tag": "N09-no-forecast#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201cwhat do their own filings say would move it either way\u201d with approval timing, access, uptake, pricing, and competition cited from filings.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "The answer points to filings and gives the nearest held drivers\u2014approval timing, access, uptake, pricing, competition\u2014rather than an unheld split or estimate.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N10-margin-debate#t1",
+   "question_tag": "N10-margin-debate#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 0,
+     "rendered": 3
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It does not say the mix/pricing split is unavailable; instead it speculates that Apple\u2019s rise is \u201cmore consistent with improving mix and/or pricing power.\u201d",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N11-one-question#t1",
+   "question_tag": "N11-one-question#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cthe desk does not forecast\u201d and restates missing data, without a portfolio-manager action or implication for XOM.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t1",
+   "question_tag": "N12-sector-drift#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: sector_weight_Technology (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t2",
+   "question_tag": "N12-sector-drift#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over concentration issue by naming options \u201cwithout selling MSFT\u201d: trim JPM/AAPL or add other sectors/fixed income.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201ctrim JPM\u2026 and/or AAPL\u201d and \u201cadd or rotate into other sectors or fixed income\u201d gives an actionable portfolio move.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "figures_present": [
+   5,
+   16
+  ],
+  "so_what": [
+   6,
+   9
+  ],
+  "follows_on": [
+   6,
+   8
+  ],
+  "honest_absence": [
+   1,
+   3
+  ]
+ }
+}

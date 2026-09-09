@@ -1,0 +1,427 @@
+{
+ "scored": [
+  {
+   "tag": "C01-trim-one#t1",
+   "question_tag": "C01-trim-one#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "2 locating calls against a ceiling of 5 for 10 holdings"
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t2",
+   "question_tag": "C01-trim-one#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 10,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C01-trim-one#t3",
+   "question_tag": "C01-trim-one#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C02-nvda-bear#t1",
+   "question_tag": "C02-nvda-bear#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C02-nvda-bear#t2",
+   "question_tag": "C02-nvda-bear#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C03-smoke#t1",
+   "question_tag": "C03-smoke#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 5,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t2",
+   "question_tag": "C03-smoke#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C03-smoke#t3",
+   "question_tag": "C03-smoke#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C04-rates-100bp#t1",
+   "question_tag": "C04-rates-100bp#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_net_beta_rates_up (rendered 46 figures, 38 not in gold)",
+     "foreign": 38,
+     "rendered": 46
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t2",
+   "question_tag": "C04-rates-100bp#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: tlt_weight (rendered 8 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 8
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t1",
+   "question_tag": "C05-amzn-capital#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t2",
+   "question_tag": "C05-amzn-capital#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 5 figures, 5 not in gold)",
+     "foreign": 5,
+     "rendered": 5
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t3",
+   "question_tag": "C05-amzn-capital#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "1 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 7 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t1",
+   "question_tag": "C06-new-name-ko#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C06-new-name-ko#t2",
+   "question_tag": "C06-new-name-ko#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C06-new-name-ko#t3",
+   "question_tag": "C06-new-name-ko#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 6,
+     "rendered": 16
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t1",
+   "question_tag": "C07-vol-rising#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rolling_vol_30d, rolling_vol_60d (rendered 14 figures, 14 not in gold)",
+     "foreign": 14,
+     "rendered": 14
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t2",
+   "question_tag": "C07-vol-rising#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C08-wrong-premise#t1",
+   "question_tag": "C08-wrong-premise#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 0,
+     "rendered": 2
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t2",
+   "question_tag": "C08-wrong-premise#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: largest_weight, room_to_breach (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t1",
+   "question_tag": "C09-lly-concentration#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C09-lly-concentration#t2",
+   "question_tag": "C09-lly-concentration#t2",
+   "answered": true,
+   "gate_refusals": 6,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C10-news-to-position#t1",
+   "question_tag": "C10-news-to-position#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C10-news-to-position#t2",
+   "question_tag": "C10-news-to-position#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C11-ellipsis#t1",
+   "question_tag": "C11-ellipsis#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 4,
+     "rendered": 7
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t2",
+   "question_tag": "C11-ellipsis#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t3",
+   "question_tag": "C11-ellipsis#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C12-trigger-levels#t1",
+   "question_tag": "C12-trigger-levels#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: issuer_concentration_warning (rendered 3 figures, 2 not in gold)",
+     "foreign": 2,
+     "rendered": 3
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t2",
+   "question_tag": "C12-trigger-levels#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: room_to_breach (rendered 29 figures, 28 not in gold)",
+     "foreign": 28,
+     "rendered": 29
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t1",
+   "question_tag": "C13-xom-still-oil#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C13-xom-still-oil#t2",
+   "question_tag": "C13-xom-still-oil#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 7,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  }
+ ],
+ "by_criterion": {
+  "no_linear_locating": [
+   4,
+   4
+  ],
+  "figures_present": [
+   3,
+   12
+  ]
+ }
+}

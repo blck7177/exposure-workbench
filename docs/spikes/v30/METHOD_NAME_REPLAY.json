@@ -1,0 +1,243 @@
+{
+ "distinct": 25,
+ "sends": 76,
+ "schema_refused": 0,
+ "executor_refused": 25,
+ "names_an_alternative": 2,
+ "routed_to_own_door": 23,
+ "routed_sends": 74,
+ "rows": [
+  {
+   "name": "capex",
+   "sent": 10,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'capex' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"capex\"} (add months and last_n for a window or a "
+  },
+  {
+   "name": "revenue",
+   "sent": 9,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'revenue' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"revenue\"} (add months and last_n for a window o"
+  },
+  {
+   "name": "operating_cash_flow",
+   "sent": 6,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'operating_cash_flow' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"operating_cash_flow\"} (add months a"
+  },
+  {
+   "name": "yoy",
+   "sent": 5,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'yoy' is a primitive of this language, not a method: write it as {\"fn\": \"yoy\", \"of\": \u2026}"
+  },
+  {
+   "name": "latest",
+   "sent": 4,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'latest' is a primitive of this language, not a method: write it as {\"fn\": \"latest\", \"of\": \u2026}"
+  },
+  {
+   "name": "net_income",
+   "sent": 4,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'net_income' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"net_income\"} (add months and last_n for a wi"
+  },
+  {
+   "name": "depreciation",
+   "sent": 4,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'depreciation' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"depreciation\"} (add months and last_n for "
+  },
+  {
+   "name": "interest_expense",
+   "sent": 4,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'interest_expense' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"interest_expense\"} (add months and las"
+  },
+  {
+   "name": "rank",
+   "sent": 3,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'rank' is a primitive of this language, not a method: write it as {\"fn\": \"rank\", \"of\": \u2026}"
+  },
+  {
+   "name": "depreciation_amortization",
+   "sent": 3,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'depreciation_amortization' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"depreciation_amortization\"} ("
+  },
+  {
+   "name": "operating_lease_liability_total",
+   "sent": 3,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'operating_lease_liability_total' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"operating_lease_liabili"
+  },
+  {
+   "name": "issuer_exposures.weight",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'issuer_exposures.weight' is a figure of a run, not a method: one name is {\"fn\": \"pick\", \"of\": <run>, \"key\": \"issuer_exposures.weight\"} and the whole "
+  },
+  {
+   "name": "interest_paid",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'interest_paid' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"interest_paid\"} (add months and last_n fo"
+  },
+  {
+   "name": "issuer_capital_allocation",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'issuer_capital_allocation' is a domain, not a method: open it with describe(<subject>, expand='issuer_capital_allocation'); its methods and its progr"
+  },
+  {
+   "name": "cash_and_equivalents",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'cash_and_equivalents' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"cash_and_equivalents\"} (add months"
+  },
+  {
+   "name": "total_revenues",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'total_revenues' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"total_revenues\"} (add months and last_n "
+  },
+  {
+   "name": "accounts_receivable",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'accounts_receivable' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"accounts_receivable\"} (add months a"
+  },
+  {
+   "name": "inventory",
+   "sent": 2,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'inventory' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"inventory\"} (add months and last_n for a wind"
+  },
+  {
+   "name": "attribution.attribution_portfolio_return",
+   "sent": 1,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'attribution.attribution_portfolio_return' is a figure of a run, not a method: one name is {\"fn\": \"pick\", \"of\": <run>, \"key\": \"attribution.attribution"
+  },
+  {
+   "name": "stockholders_equity",
+   "sent": 1,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'stockholders_equity' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"stockholders_equity\"} (add months a"
+  },
+  {
+   "name": "total_liabilities",
+   "sent": 1,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'total_liabilities' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"total_liabilities\"} (add months and l"
+  },
+  {
+   "name": "divide",
+   "sent": 1,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'divide' is written 'div' here: {\"fn\": \"div\", \"a\": \u2026, \"b\": \u2026}"
+  },
+  {
+   "name": "dividends_paid",
+   "sent": 1,
+   "error": "wrong_door",
+   "nearest": [],
+   "names_a_method": false,
+   "routed": true,
+   "detail": "'dividends_paid' is a filed line, not a method: read it with {\"fn\": \"fundamentals\", \"ticker\": <T>, \"metric\": \"dividends_paid\"} (add months and last_n "
+  },
+  {
+   "name": "share_count",
+   "sent": 1,
+   "error": "unknown_method",
+   "nearest": [
+    "free_cash_flow",
+    "book.reconcile"
+   ],
+   "names_a_method": true,
+   "routed": false,
+   "detail": "'share_count' is not a method this desk has"
+  },
+  {
+   "name": "price.duration",
+   "sent": 1,
+   "error": "unknown_method",
+   "nearest": [
+    "price.drawdown",
+    "price.adv",
+    "price.window_return"
+   ],
+   "names_a_method": true,
+   "routed": false,
+   "detail": "'price.duration' is not a method this desk has"
+  }
+ ]
+}

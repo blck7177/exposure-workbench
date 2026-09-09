@@ -1,0 +1,41 @@
+{
+ "turns": 31,
+ "no_answer": 0,
+ "gate_exhausted": 2,
+ "round_trips_median": 6,
+ "round_trips_p90": 12,
+ "tool_calls_median": 5,
+ "tool_calls_p90": 7,
+ "respond_attempts_mean": 2.65,
+ "prompt_tokens_median": 49345,
+ "prompt_tokens_p90": 211932,
+ "elapsed_s_median": 12.3,
+ "elapsed_s_p90": 26.9,
+ "figures_median": 6,
+ "answers_with_double_figure_artifact": 0,
+ "answers_with_passage_mark_as_figure": 5,
+ "superlative_claims": 13,
+ "superlative_without_rank": 7,
+ "refusals": {
+  "data": {
+   "count": 2,
+   "turns": 2,
+   "per_turn": 0.06
+  },
+  "gate": {
+   "count": 36,
+   "turns": 16,
+   "per_turn": 1.16
+  },
+  "other:relation_does_not_fit": {
+   "count": 17,
+   "turns": 12,
+   "per_turn": 0.55
+  },
+  "spelling": {
+   "count": 35,
+   "turns": 22,
+   "per_turn": 1.13
+  }
+ }
+}

@@ -541,3 +541,27 @@ person to touch this — including me — does not have to rediscover them.
   and the reverse proxy bounds body size, but nothing bounds request *frequency*.
   For a demo behind a personal domain that is a considered trade; it would not be
   for anything larger.
+
+## V30 (2026-09-09): a build reads the working tree, and the tree is in flight
+
+`docker compose build` in `/home/ubuntu/exposure-workbench` builds whatever the working tree holds,
+committed or not. While V30 is uncommitted there, a rebuild would ship a changed chat surface
+(the meta face becomes describe/run/read_filings/read_book/…; `respond` expects claims). Until V30
+lands, **do not build from the main tree**. An emergency rebuild goes through a worktree pinned at
+the deployed commit, with the compose project pinned so it replaces the live stack rather than
+starting a second one (compose names the project after the directory):
+
+```
+git worktree add /home/ubuntu/exposure-workbench-deploy e6c290b
+cp /home/ubuntu/exposure-workbench/.env /home/ubuntu/exposure-workbench-deploy/.env
+cd /home/ubuntu/exposure-workbench-deploy
+docker compose -p exposure-workbench build exposure-api exposure-mcp exposure-worker
+docker compose -p exposure-workbench up -d exposure-api exposure-mcp exposure-worker
+```
+
+Two failure modes seen the same day: `up -d` for `exposure-mcp` refusing with "Conflict. The container
+name /<hash>_exposure-mcp is already in use" (a renamed container holds the name — `docker rm -f <id>`,
+then `up -d --force-recreate`); and a build stopping at the export stage for lack of disk (~4 GB
+needed; `docker builder prune -af` reclaims ~3 GB; the old images keep serving, which is the good
+failure). The battery's fixture faces (`scripts/battery_fixture.sh`) are plain uvicorn processes on
+loopback ports 8105/8106 over `exposure_battery` / `exposure_gold`; they never build or deploy.

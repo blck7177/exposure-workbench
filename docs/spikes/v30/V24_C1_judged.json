@@ -1,0 +1,518 @@
+{
+ "scored": [
+  {
+   "tag": "N01-earnings-quality#t1",
+   "question_tag": "N01-earnings-quality#t1",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_ttm (rendered 3 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 3
+    },
+    "so_what": {
+     "met": true,
+     "why": "The answer ends with an actionable implication: \u201cthe quality is not pristine\u201d and \u201ca bit more accounting profit than cash\u201d for a portfolio manager to act on.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N01-earnings-quality#t2",
+   "question_tag": "N01-earnings-quality#t2",
+   "answered": true,
+   "gate_refusals": 3,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: accruals_ratio_q_2026-07-26 (rendered 6 figures, 6 not in gold)",
+     "foreign": 6,
+     "rendered": 6
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt looks more like a gradual weakening than one odd quarter\u201d directly answers whether the deterioration is persistent or just a one-off.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t1",
+   "question_tag": "N02-working-capital#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: total_revenues_yoy_latest_q, accounts_receivable_yoy_latest, inventory_yoy_latest (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "N02-working-capital#t2",
+   "question_tag": "N02-working-capital#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_inventory_ttm_now (rendered 3 figures, 1 not in gold)",
+     "foreign": 1,
+     "rendered": 3
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt was 125.04 days now\u2026 A year ago, it was 112.72 days,\u201d directly answers \u201chow long is inventory sitting there now versus a year ago.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t1",
+   "question_tag": "N03-liquidity#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: days_to_exit_at_full_adv_JPM (rendered 8 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 8
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating measurement limits and \u201cnot part of the measured name-by-name liquidity answer,\u201d not a portfolio-manager action.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N03-liquidity#t2",
+   "question_tag": "N03-liquidity#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 0,
+     "rendered": 1
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It names the worst but gives \u201c0.0033\u201d instead of answering \u201chow many days is that at a quarter of daily volume.\u201d",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t1",
+   "question_tag": "N04-drawdown-anatomy#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: worst_drawdown_trough_days (rendered 9 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 9
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating attribution data, not with an actionable implication for a portfolio manager.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N04-drawdown-anatomy#t2",
+   "question_tag": "N04-drawdown-anatomy#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: benchmark_window_return, holding_window_return_MSFT (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It refused to answer \u201cmarket beta or something we owned,\u201d saying it \u201ccould not state a market contribution\u201d and lacked attribution.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N05-market-or-us#t1",
+   "question_tag": "N05-market-or-us#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 9,
+     "rendered": 12
+    }
+   }
+  },
+  {
+   "tag": "N06-top-five#t1",
+   "question_tag": "N06-top-five#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 13,
+     "rendered": 30
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"tighter, not looser\" gives an actionable implication for a portfolio manager.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t1",
+   "question_tag": "N07-capex-cycle#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_over_depreciation_amortization_AMZN (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "so_what": {
+     "met": false,
+     "why": "It \u201coffers only to do more work\u201d and does not close with any actionable implication for a portfolio manager.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N07-capex-cycle#t2",
+   "question_tag": "N07-capex-cycle#t2",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 5,
+   "met": 3,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 5,
+     "rendered": 7
+    },
+    "follows_on": {
+     "met": true,
+     "why": "The answer compares Microsoft and Amazon on \u201cmore room to keep spending without straining the balance sheet,\u201d which directly follows the prior infrastructure/depreciation question.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cAmazon has more room to keep spending without straining the balance sheet\u201d gives a portfolio-manager actionable implication.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t1",
+   "question_tag": "N08-whats-in-the-price#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 5,
+     "rendered": 6
+    }
+   }
+  },
+  {
+   "tag": "N08-whats-in-the-price#t2",
+   "question_tag": "N08-whats-in-the-price#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 3,
+     "rendered": 5
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe 12-1 momentum, which skips the last month, is 44.9%\u201d directly answers the carried-over momentum measure.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t1",
+   "question_tag": "N09-no-forecast#t1",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "honest_absence": {
+     "met": false,
+     "why": "It says \u201cI don\u2019t give a next-year revenue estimate,\u201d but does not name a nearest held figure as such.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with background on drivers and risks, but no \u201cimplication for this book\u201d a portfolio manager could act on.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N09-no-forecast#t2",
+   "question_tag": "N09-no-forecast#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 2,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers the carried-over swing factors: \u201cwhat would move it either way\u201d via volume, pricing, access, reimbursement, and IRA policy.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "It plainly names the upsides and downsides from filings and quotes them, including volume growth, pricing pressure, and IRA effects.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N10-margin-debate#t1",
+   "question_tag": "N10-margin-debate#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: gross_margin_ttm_AAPL (rendered 2 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 2
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives a nearby figure and interpretation, but never says the split is not held, nor names a missing method or nearest held field.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N11-one-question#t1",
+   "question_tag": "N11-one-question#t1",
+   "answered": true,
+   "gate_refusals": 8,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cAsk again, or narrow the question,\u201d which is only an offer to do more work, not an actionable implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t1",
+   "question_tag": "N12-sector-drift#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 8,
+     "rendered": 10
+    }
+   }
+  },
+  {
+   "tag": "N12-sector-drift#t2",
+   "question_tag": "N12-sector-drift#t2",
+   "answered": true,
+   "gate_refusals": 4,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer addresses the prior concentration concern with \u201cwithout selling the biggest position,\u201d pointing to trimming other large names instead.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\u201cthe practical options are a targeted trim in MSFT or LLY, or a broader trim across AAPL/GOOGL\u201d gives an actionable implication for the portfolio manager.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "figures_present": [
+   7,
+   16
+  ],
+  "so_what": [
+   4,
+   9
+  ],
+  "follows_on": [
+   6,
+   8
+  ],
+  "honest_absence": [
+   1,
+   3
+  ]
+ }
+}

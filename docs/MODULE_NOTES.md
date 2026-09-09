@@ -1125,3 +1125,34 @@ V28 A2 的顶层 JSON Schema `not`:jsonschema 接受、2191 条离线绿、**供
 ### 仪器(X26 补两条)
 
 电池必须跑在**冻结的书或自己的组合**上:`port_001` 是线上 demo 账本,①调度器 10:30 会自己起 run,②复现 2 里有一轮电池自己调了 `start`(freshness 明明是 0 sessions_behind——X2 未变:没有东西告诉模型它要的新 run 已经在那儿)。本轮三个 run 数值完全一致,故图层面比较未受影响,但 `latest_completed_run` 指向已变。**单轮分数永不可跨轮比较**:先测同代码的复现方差,再谈差异。
+
+## M30 — 分析是一段程序、回答是论断（V30，2026-09-09，本地未提交，进行中）
+
+### 起因
+
+9/9 架构复审（artifact「Exposure Workbench 架构复审」）：模型与桌子之间是一套逐调用、靠 id 穿模型上下文的寻址协议——中位 7 次往返、67k prompt tokens、111 个拒绝码多数在教拼写；门只核指向，V26 五条读者可见错误陈述全部过门。boss 拍板 V30（`docs/IMPLEMENTATION_PLAN_V30.md`）：工作单位改为程序，回答单位改为论断；表达式树、九种关系、正文允许数字、Phase 0 做模型对照、推送建 flag 双臂测、MCP 保留；brief 路径先记录后迁移。
+
+### 形状
+
+- **程序**（`services/program_service.py`）：`{let: [[name, expr]…], return?}`；28 个原语（读：fundamentals/prices/price/run/column/pick/method；算：add/sub/mul/div/scale；集合：sum/avg/min/max/std/abs/rank/top/select；序列：yoy/qoq/pct/cagr/latest/at；情景：sell/buy）。每个节点解析成账本 id，由现有 `typed_calculator._resolve` 定型，算子原样走现有 executor；一次 `program.run` 账本行记录整段程序与节点→id 映射。**绑定名是变量不是度量**：派生节点的 measure 由 `_structural`（操作+操作数度量）给出，`as_quantity` 不在语言里。节点可拒绝，依赖它的节点带根因拒绝；vector（按标签）、ranking、table、run、absence 五种形；`pick` 取表的一个图或一个字面量（日期）供 params；`method` 接受列表得 vector；`column` 可读 run、情景、explain 表的行。
+- **论断**（`services/claims.py`）：`{claims:[{id, relation, of, against?, rows?, span?, text?}], prose:[…{cN}…]}`；关系 level/tier/change/versus/ratio/rank/room/absent/quote/series/table；G1 事实在账本（含 `f_…@period` 点地址）、G2 关系与事实身份相符（阈值不作读数、change 需同度量两期或 yoy 节点、rank 需 rank 节点、room 需自己的阈值、quote 逐字允许 … 与 [插入]）、G3 正文数字对账到账本/所引段落/用户问题；渲染输出 V24 的块形状，前端零改动。
+- **面**：meta = describe/run/read_filings/read_book/search_web/start/respond/think；research 面加 `run`（按 kind 限制），保留 compute/read_* 与 submit_brief 的 V24 门（D5）。
+- **skill 交付**：静态符号表（~900 tokens）进 `run` 描述（面常驻 3,624 tokens）；`Procedure.programs` 23 段可执行片段；`skill.match_domains` 词法匹配 + 循环内推送（`PUSH_DOMAINS`），`meta.pushed` 记录。
+- **仪器**（Phase 0）：`scripts/battery_fixture.sh` 冻结库与本地面；`--fixture --deny start`；金标准 `scripts/gold/*`、`gold_from_programs.py`；`rubric_battery --gold --replicates`；`battery_counters.py` 五类拒绝；基线从 `e6c290b` 的 worktree 跑。记录 `docs/spikes/v30/PHASE0.md`。
+
+### 实证（9/9，进行中）
+
+首轮 live：top five 70.9%/71.2% 一次程序算对（X8 类关闭）；C1（符号表+推送）V24：工具调用 4（基线 8.5）、10.3 s、拼写拒绝 0.70/轮；但 respond 尝试 2.85、门拒 1.30/轮、金标准 7/16（基线 9/16）——门成了瓶颈，重放拒绝后放宽六种文法（序列作 level/ratio、点地址、省略号引文、versus、无事实的政策缺席、未放置的论断作 cites）。C2 排队中。
+
+### 待办
+
+Phase D 删除（预算池、批次截断、旧 adapters、read_book 收窄）待 C2 数字；E 回放与措辞过目；brief 迁移（D5）；服务缺陷清单见 PHASE0.md。
+
+**M30, C2 addendum (2026-09-09).** The second claims round found seven desk defects behind the missed
+figures (PHASE0 §C2): a superseded fundamentals line settling as "latest" (`get_flow` now refuses
+`line_superseded`; the formula series grid follows the line that reaches the present), a one-point series
+rendering as its label, a guessed portfolio id opening a domain view and refusing as a data absence (now
+`unknown_portfolio` with the ids, and the root `expand` refusal carries them), an absence claim with no fact
+(now `claim_without_of`; an absence born of a spelling-class refusal is `refused_not_absent`, with
+`claims.SPELLING_REFUSALS` the one list the counters also read), a change claim against itself
+(`same_figure`), run-addressed book methods refusing a portfolio subject, and undated window returns.

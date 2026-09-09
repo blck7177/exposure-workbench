@@ -1,0 +1,20 @@
+{
+ "turns": 20,
+ "no_answer": 20,
+ "gate_exhausted": 0,
+ "round_trips_median": 0.0,
+ "round_trips_p90": 0,
+ "tool_calls_median": 0.0,
+ "tool_calls_p90": 0,
+ "respond_attempts_mean": 0,
+ "prompt_tokens_median": 0.0,
+ "prompt_tokens_p90": 0,
+ "elapsed_s_median": 1.8,
+ "elapsed_s_p90": 5.3,
+ "figures_median": 0.0,
+ "answers_with_double_figure_artifact": 0,
+ "answers_with_passage_mark_as_figure": 0,
+ "superlative_claims": 0,
+ "superlative_without_rank": 0,
+ "refusals": {}
+}

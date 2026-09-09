@@ -1,0 +1,778 @@
+{
+ "scored": [
+  {
+   "tag": "C01-trim-one#t1",
+   "question_tag": "C01-trim-one#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"It ends with an actionable implication: 'that is the cleanest name to take out if the only goal is to move from ten names to nine.'\"",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t2",
+   "question_tag": "C01-trim-one#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\"It resolves the prior 'which one goes' by separating 'risk-driven exit candidate' from 'weakest business' and answering whether fundamentals agree.\"",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"If you want to drop a name because it is merely expensive rather than fundamentally worse, the evidence points away from NVDA and toward the lower-return, lower-margin end of the book \u2014 especially AM",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C01-trim-one#t3",
+   "question_tag": "C01-trim-one#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI can\u2019t tell you what concentration looks like after selling NVDA,\u201d so it doesn\u2019t answer the carry-over concentration question.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by offering more work: \u201cIf you want, I can first surface the current portfolio run and then re-run the sale,\u201d with no actionable implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t1",
+   "question_tag": "C02-nvda-bear#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 8,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "It ends by restating risks and data\u2014\u201cthose things can hit revenue, gross margin, inventory, cash flows\u201d\u2014not with a portfolio-manager action.",
+     "votes": [
+      false,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C02-nvda-bear#t2",
+   "question_tag": "C02-nvda-bear#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201cwhich one would show up in the reported numbers first\u201d and specifies \u201cinventory and accounts receivable\u201d as the first watch item.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "It ends with a portfolio-manager action signal: \u201ccontinued step-up in inventory and receivables without a matching acceleration in revenue or cash conversion.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t1",
+   "question_tag": "C03-smoke#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "2 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "so_what": {
+     "met": true,
+     "why": "It closes with an action: \u201cI would treat it as an unverified book until the first completed run lands.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t2",
+   "question_tag": "C03-smoke#t2",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "\u201cThe number that worries me most is the MSFT concentration\u201d directly answers the user\u2019s request for the specific thing that worries them most.",
+     "votes": [
+      true,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C03-smoke#t3",
+   "question_tag": "C03-smoke#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 2,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It answers \u201chas it been building\u201d by saying \u201cthe book has no completed run to compare,\u201d tying the answer to the carried-over MSFT concentration.",
+     "votes": [
+      true,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t1",
+   "question_tag": "C04-rates-100bp#t1",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: book_net_beta_rates_up (rendered 6 figures, 5 not in gold)",
+     "foreign": 5,
+     "rendered": 6
+    },
+    "so_what": {
+     "met": true,
+     "why": "GOOGL\u2019s TLT beta is 0.44\u00d7, so a 100bp rates backup would bite there first among the held names by this fitted measure.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C04-rates-100bp#t2",
+   "question_tag": "C04-rates-100bp#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 7,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 3,
+     "rendered": 5
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201chow much of that is just us owning TLT\u201d by comparing explicit TLT+HYG weight to equity rates exposure.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "The answer gives estimates and a ratio instead of saying the desk doesn\u2019t hold that split or naming the nearest held figure as such.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t1",
+   "question_tag": "C05-amzn-capital#t1",
+   "answered": true,
+   "gate_refusals": 6,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t2",
+   "question_tag": "C05-amzn-capital#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 4 figures, 4 not in gold)",
+     "foreign": 4,
+     "rendered": 4
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cIt answers \u2018capex is outrunning revenue growth\u2019 directly, instead of changing subject or asking for restatement.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C05-amzn-capital#t3",
+   "question_tag": "C05-amzn-capital#t3",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 3,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "2 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "figures_present": {
+     "met": false,
+     "why": "missing: capex_yoy_annual, revenue_yoy_annual (rendered 11 figures, 8 not in gold)",
+     "foreign": 8,
+     "rendered": 11
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It compares Microsoft\u2019s capex, OCF, buybacks, and dividends against Amazon\u2019s \u201csame front.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t1",
+   "question_tag": "C06-new-name-ko#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": false,
+     "why": "The answer ends with \u201cKO itself is within scope,\u201d which lets a portfolio manager act on adding Coca-Cola.",
+     "votes": [
+      true,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t2",
+   "question_tag": "C06-new-name-ko#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "The answer stays on KO and the book\u2019s leverage comparison, explicitly saying \u201cI cannot say whether KO is more or less levered than the average name in the book\u201d because KO\u2019s figure is absent.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C06-new-name-ko#t3",
+   "question_tag": "C06-new-name-ko#t3",
+   "answered": true,
+   "gate_refusals": 2,
+   "tool_calls": 7,
+   "met": 1,
+   "judged": 3,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: weight_after_buy, weight_after_buy (rendered 21 figures, 21 not in gold)",
+     "foreign": 21,
+     "rendered": 21
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\"It checks the KO-at-5% scenario\" and answers whether \"the mandate is not tight\" from that carried-over addition question.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends with \u201cI can inspect the nearest checks one by one,\u201d not an actionable portfolio implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t1",
+   "question_tag": "C07-vol-rising#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: rolling_vol_30d, rolling_vol_60d (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    }
+   }
+  },
+  {
+   "tag": "C07-vol-rising#t2",
+   "question_tag": "C07-vol-rising#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": false,
+     "why": "It shifts to \u201cthe market side\u201d and quotes TLT/HYG/SPY, not the book-specific \u201csomething specific we\u2019re holding?\u201d",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating vol figures and a table, without an actionable implication for the book.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t1",
+   "question_tag": "C08-wrong-premise#t1",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 4,
+   "met": 0,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: largest_weight (rendered 5 figures, 3 not in gold)",
+     "foreign": 3,
+     "rendered": 5
+    }
+   }
+  },
+  {
+   "tag": "C08-wrong-premise#t2",
+   "question_tag": "C08-wrong-premise#t2",
+   "answered": true,
+   "gate_refusals": 6,
+   "tool_calls": 6,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 10,
+     "rendered": 39
+    },
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe biggest position is 16.1% (#1) MSFT\u201d and \u201c3.90 percentage points away from tripping that check\u201d directly answers the biggest and remaining room.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t1",
+   "question_tag": "C09-lly-concentration#t1",
+   "answered": true,
+   "gate_refusals": 5,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "\"It is more concentrated in a few big franchises than spread across many unrelated lines\" gives a portfolio-manager-relevant implication.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C09-lly-concentration#t2",
+   "question_tag": "C09-lly-concentration#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201chow much\u201d with \u201c82 percent of our total revenues in 2025\u201d and gives company revenue \u201c$65,179.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": false,
+     "why": "It gives 82% and revenue figures, but never says the desk lacks the exact split or that it\u2019s the nearest held figure.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C10-news-to-position#t1",
+   "question_tag": "C10-news-to-position#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 5,
+   "met": 0,
+   "judged": 0,
+   "criteria": {}
+  },
+  {
+   "tag": "C10-news-to-position#t2",
+   "question_tag": "C10-news-to-position#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "It identifies held positions and sizes them: \"MSFT at 16.1%, AAPL at 14.7%, and LLY at 12.7%\" and dollar amounts.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating position sizes \u2014 \u201cMSFT at 16.1%\u2026 AAPL at 14.7%\u2026 LLY at 12.7%\u201d \u2014 with no action-oriented implication.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t1",
+   "question_tag": "C11-ellipsis#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 1,
+     "rendered": 4
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t2",
+   "question_tag": "C11-ellipsis#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 5,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "no_linear_locating": {
+     "met": true,
+     "why": "3 locating calls against a ceiling of 5 for 10 holdings"
+    },
+    "follows_on": {
+     "met": true,
+     "why": "It answers \u201cthe other two megacaps in the book\u201d by naming Apple and Alphabet and giving their percentages.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C11-ellipsis#t3",
+   "question_tag": "C11-ellipsis#t3",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 3,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cBy operating margin, Microsoft is the best...\u201d answers that measure, and \u201cIf you switch to return on capital\u201d addresses the second part.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "so_what": {
+     "met": true,
+     "why": "\"Apple takes the top spot at 84.0% (#1)\" is a portfolio-usable implication that changes the ranking under return on capital.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t1",
+   "question_tag": "C12-trigger-levels#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 6,
+   "met": 1,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": true,
+     "why": "every gold figure rendered",
+     "foreign": 128,
+     "rendered": 135
+    },
+    "so_what": {
+     "met": false,
+     "why": "It ends by restating concentration buffers and warning status, with no portfolio-manager action or implication.",
+     "votes": [
+      false,
+      true,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C12-trigger-levels#t2",
+   "question_tag": "C12-trigger-levels#t2",
+   "answered": true,
+   "gate_refusals": 0,
+   "tool_calls": 3,
+   "met": 0,
+   "judged": 2,
+   "criteria": {
+    "figures_present": {
+     "met": false,
+     "why": "missing: room_to_breach, room_to_breach (rendered 0 figures, 0 not in gold)",
+     "foreign": 0,
+     "rendered": 0
+    },
+    "follows_on": {
+     "met": false,
+     "why": "It says \u201cI can\u2019t give you the flip levels\u2026 because\u2026 no completed run,\u201d instead of answering the concentration flip levels carried over from the prior turn.",
+     "votes": [
+      false,
+      false,
+      false
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t1",
+   "question_tag": "C13-xom-still-oil#t1",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 1,
+   "judged": 1,
+   "criteria": {
+    "so_what": {
+     "met": true,
+     "why": "\u201cThe business has changed at the margin and in option value, not enough to make the core exposure stop being driven by oil, gas, and petrochemical economics.\u201d",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    }
+   }
+  },
+  {
+   "tag": "C13-xom-still-oil#t2",
+   "question_tag": "C13-xom-still-oil#t2",
+   "answered": true,
+   "gate_refusals": 1,
+   "tool_calls": 4,
+   "met": 2,
+   "judged": 2,
+   "criteria": {
+    "follows_on": {
+     "met": true,
+     "why": "\u201cThe numbers still read like a capital-intensive hydrocarbons business: capex intensity\u2026 Asset turnover\u2026\u201d directly answers the \u201cnumbers rather than narrative\u201d ask.",
+     "votes": [
+      true,
+      true,
+      true
+     ]
+    },
+    "honest_absence": {
+     "met": true,
+     "why": "\"What I do not have on this desk is a filed inventory series... gross margin could not be derived... So for Exxon, the easiest 'business changed' numbers here are not margin or working-capital lines; ",
+     "votes": [
+      true,
+      false,
+      true
+     ]
+    }
+   }
+  }
+ ],
+ "by_criterion": {
+  "no_linear_locating": [
+   4,
+   4
+  ],
+  "so_what": [
+   9,
+   15
+  ],
+  "follows_on": [
+   13,
+   18
+  ],
+  "figures_present": [
+   4,
+   12
+  ],
+  "honest_absence": [
+   1,
+   3
+  ]
+ }
+}
