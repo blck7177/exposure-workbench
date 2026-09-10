@@ -146,9 +146,26 @@ def test_the_new_tools_are_on_both_faces():
 
 
 def test_describe_issuer_names_the_missing_input_not_a_hole():
+    """V31: the rule moved to `_computability` and the payload keys stayed. It
+    moved because the issuer view and the domain view both read it now, and a
+    domain that says which of its methods refuse for a subject must agree with
+    the same domain opened for that subject."""
     from exposure_workbench.services import catalogue_service
-    src = inspect.getsource(catalogue_service._fundamentals)
-    assert '"methods_computable"' in src and '"methods_not_computable"' in src and "missing" in src
+    rule = inspect.getsource(catalogue_service._computability)
+    assert "missing" in rule and "not for a financial issuer" in rule
+    emits = inspect.getsource(catalogue_service._fundamentals)
+    assert '"methods_computable"' in emits and '"methods_not_computable"' in emits
+    assert "_computability" in emits, "the view reads the rule, it does not restate it"
+
+
+def test_the_refusals_a_domain_reports_are_the_ones_the_issuer_view_reports():
+    """One home. Both callers reach `_computability`; neither has its own copy
+    of "not for a financial issuer"."""
+    from exposure_workbench.services import catalogue_service as cat
+    src = inspect.getsource(cat)
+    assert src.count('"not for a financial issuer"') == 1
+    assert "_computability" in inspect.getsource(cat._refuses_for)
+    assert "_refuses_for" in inspect.getsource(cat._domain)
 
 
 # ── the calculator over series ───────────────────────────────────────────────

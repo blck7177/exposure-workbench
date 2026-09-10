@@ -182,7 +182,9 @@ _HOW_TO_READ = (
     "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain "
     "carries `open`. `methods` are what compute produces for this subject. `procedures` are the "
     "analyst's domains for this kind of subject, each with its question, the words it is asked in, its "
-    "methods and what it reads — open one with expand=<domain>. `desk_rules` are this desk's own "
+    "methods and what it reads — open one with expand=<domain>. `methods_that_refuse_here` are that "
+    "domain's methods this subject's own filings cannot feed, with why: do not spend a call on them. "
+    "`desk_rules` are this desk's own "
     "conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not "
     "substitute. `next` lists the calls that open the next level."
 )
@@ -246,7 +248,10 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
     out["not_held"] = NOT_HELD
     out["cannot"] = {k: v for k, v in CANNOT.items() if k == "per_name_factor_sensitivity"}
     out["methods"] = _methods("issuer", expand == "methods", tk) | _methods("price", expand == "methods", tk)
-    out["procedures"] = _procedures("issuer", expand == "procedures", tk)
+    # the domains know what this issuer's filings cannot feed, because the
+    # fundamentals view has already worked it out for this very payload
+    out["procedures"] = _procedures("issuer", expand == "procedures", tk,
+                                    refuses=out["fundamentals"].get("methods_not_computable") or {})
     out["desk_rules"] = _rules("issuer")
     if expand == "readings":
         out["readings"] = _readings()
@@ -255,8 +260,39 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
     return out
 
 
+async def _computability(db: AsyncSession, tk: str, have: set[str]) -> tuple[list, dict]:
+    """(computable, {name: why not}) for this issuer — the check
+    `evaluate_formula` applies, in ONE place.
+
+    V31: it was inline in `_fundamentals`, which is why the issuer view and the
+    domain view could disagree about the same issuer. Both read it here now:
+    a domain that says which of its methods refuse for this subject, and a
+    domain OPENED for that subject, are the same statement or they are a defect.
+    """
+    from exposure_workbench.services import formula_service
+    sector = await formula_service._sector(db, tk)
+    is_financial = sector in formula_service.FINANCIAL_SECTORS
+    computable, not_computable = [], {}
+    for name, f in fm.FORMULAS.items():
+        missing = sorted(_leaves(name) - have)
+        if is_financial and f.not_for_financials is not None:
+            not_computable[name] = "not for a financial issuer"
+        elif missing:
+            not_computable[name] = f"missing {', '.join(missing)}"
+        else:
+            computable.append(name)
+    return computable, not_computable
+
+
+async def _refuses_for(db: AsyncSession, tk: str) -> dict[str, str]:
+    """The refusal reasons alone, for a caller that holds no metric list."""
+    metrics = await cs.list_available_metrics(db, tk)
+    have = {m["metric"] for m in metrics["metrics"]}
+    return (await _computability(db, tk, have))[1]
+
+
 async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
-    from exposure_workbench.services import formula_service, lineage_service, period_semantics
+    from exposure_workbench.services import lineage_service, period_semantics
     metrics = await cs.list_available_metrics(db, tk)
     rows = metrics["metrics"]
     have = {m["metric"] for m in rows}
@@ -270,17 +306,7 @@ async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
             latest = lp
     periods = await period_semantics.describe_periods(db, tk)
     # which methods this issuer's filings can feed — the check evaluate_formula applies
-    sector = await formula_service._sector(db, tk)
-    is_financial = sector in formula_service.FINANCIAL_SECTORS
-    computable, not_computable = [], {}
-    for name, f in fm.FORMULAS.items():
-        missing = sorted(_leaves(name) - have)
-        if is_financial and f.not_for_financials is not None:
-            not_computable[name] = "not for a financial issuer"
-        elif missing:
-            not_computable[name] = f"missing {', '.join(missing)}"
-        else:
-            computable.append(name)
+    computable, not_computable = await _computability(db, tk, have)
     # V31. `names` plus one issuer date said, by omission, that every name reached
     # that date. NVDA's `revenue` stops 2022-01-30 and that string did not occur
     # anywhere in describe's 22.5 KB, so a model asking for it read a map that was
@@ -582,11 +608,17 @@ async def _domain(db: AsyncSession, kind: str, subject: str, name: str) -> dict:
     else:
         run_id = subject          # a scenario row reads like a run
     by_kind = {"issuer": ticker, "price": ticker, "run": run_id, "portfolio": pid}
+    # V31: the same per-subject refusals the level-1 domain entry carries. A
+    # domain listed for an issuer and the same domain OPENED for that issuer are
+    # one statement or they are a defect, so both read `_computability`.
+    refuses = await _refuses_for(db, ticker) if kind == "issuer" and ticker else {}
     methods = []
     for m in p.methods:
         spec = skill.METHODS[m]
         r = nt.row(nt.TABLE[m], subject=by_kind.get(spec.subject_kind))
         r.update({"procedure": spec.procedure, "fails_when": spec.fails_when})
+        if m in refuses:
+            r["refuses_here"] = refuses[m]
         methods.append(r)
     groups = {key: (q, pats) for key, q, pats in resources.RUN_GROUPS}
     reads = []
@@ -608,17 +640,33 @@ async def _domain(db: AsyncSession, kind: str, subject: str, name: str) -> dict:
             "next": [f"describe('{subject}')"] + [x["call"] for x in methods + reads]}
 
 
-def _procedures(kind: str, full: bool, subject: str | None = None) -> list:
+def _procedures(kind: str, full: bool, subject: str | None = None,
+                refuses: dict[str, str] | None = None) -> list:
     """The analyst's domains that fit a kind of subject. Level 1 is the name,
     the question and the words a user asks it in — enough to know which one
     fits; level 2 (expand=procedures) is the whole domain in the analyst's
     words. No tool is named at either level: the evidence is named as the
-    method cards name it, and the model chooses the call."""
+    method cards name it, and the model chooses the call.
+
+    V31: a domain also says which of ITS OWN methods will refuse for THIS
+    subject. The knowledge existed and was in the wrong place — the reasons
+    are `fundamentals.methods_not_computable`, a second section of the same
+    payload, so a model reading a domain had to cross-reference to learn that
+    the domain it was about to work through does not apply. It did not: the
+    desk's own seven issuer domains run over JPM produce 50 figures and 32
+    refusals, 18 of them `not_applicable` — days sales outstanding, days
+    inventory and the cash conversion cycle asked of a bank
+    (`tests/battery/gold_brief.json`). Knowledge that has to be pulled is not
+    read (ROOT_CAUSES §1e); this one is pushed, in the place the choice is
+    made."""
     ps = skill.procedures_for(kind)
+    refuses = refuses or {}
 
     def base(p) -> dict:
+        blocked = {m: refuses[m] for m in p.methods if m in refuses}
         return {"name": p.name, "is": "domain", "subject": p.subject_kind, "question": p.question,
                 "asked_as": list(p.triggers[:2]), "methods": list(p.methods), "reads": list(p.reads),
+                **({"methods_that_refuse_here": blocked} if blocked else {}),
                 "open": nt.call(nt.TABLE[p.name], subject=subject)}
     if not full:
         return [base(p) for p in ps]

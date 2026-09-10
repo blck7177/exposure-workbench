@@ -50,6 +50,7 @@ from dataclasses import dataclass, field
 from exposure_workbench.services import answer as A
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.gate import _core, quoted_spans, verify_quotes   # the lookups, unchanged
+from exposure_workbench.services.gate import _normalise                          # one spelling of "the same words"
 from exposure_workbench.services.ledger import Ledger
 
 RELATIONS = ("level", "tier", "change", "versus", "ratio", "rank", "room", "absent", "quote", "series", "table")
@@ -446,7 +447,8 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
                                **_where_it_lives(led, tok, cited_passages),
                                "detail": "a number the ledger cannot account for: state it through a claim, quote the passage that says it, or drop it"})
         for q in verify_quotes(text, [led.passages[p] for p in cited_passages if p in led.passages]):
-            v.problems.append({"at": f"prose[{i}]", **q, "reason": "unverified_quote"})
+            v.problems.append({"at": f"prose[{i}]", **q, "reason": "unverified_quote",
+                               **_where_the_words_live(led, q.get("quote") or "", cited_passages)})
     if v.problems:
         reasons = {p["reason"] for p in v.problems}
         v.error = "unsourced_figure" if "unsourced_figure" in reasons else "id_in_prose" if "id_in_prose" in reasons else "unverified_quote"
@@ -456,9 +458,10 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
         # The route belongs on the line the model certainly reads. `problems`
         # has carried the offending token since V30 and three baseline turns
         # re-sent the same prose eight times anyway.
-        routed = [p for p in v.problems if p.get("route")]
-        if routed and v.error == "unsourced_figure":
-            v.detail += f" — {routed[0]['figure']}: {routed[0]['route']}"
+        routed = [p for p in v.problems if p.get("route") and p["reason"] == v.error]
+        if routed:
+            what = routed[0].get("figure") or repr(routed[0].get("quote"))
+            v.detail += f" — {what}: {routed[0]['route']}"
     return v
 
 
@@ -493,6 +496,35 @@ def _where_it_lives(led: Ledger, tok: str, cited: list) -> dict:
     return {"in_passages": found[:3],
             "route": (f"this session retrieved {names}, which states it — cite that passage in a "
                       f"quote claim and the figure is accounted for")}
+
+
+def _where_the_words_live(led: Ledger, span: str, cited: list) -> dict:
+    """`unverified_quote`, routed (V31, 2026-09-10) — the same move as
+    `_where_it_lives`, on the second commonest refusal this desk issues (31 of
+    the 143 the V26 baseline collected, behind `unsourced_figure`'s 69).
+
+    A quotation is checked against the passages a `quote` claim cites, and
+    nothing else. So a model that ran `read_filings`, read the words, and
+    reproduced them EXACTLY is told its quotation is unverified — while the
+    passage it copied them from sits on the same ledger, uncited. The desk knew
+    where the words were and said only that it did not believe them.
+
+    Precision costs nothing here, which is why this needs no guard of its own:
+    a quoted span is already several words long (`gate._MIN_QUOTED_WORDS`), and
+    a several-word verbatim match is not something a filing produces by
+    accident — the danger `resolve_in_passages` guards against is a bare
+    integer, and there are no bare integers in this check.
+    """
+    want = _normalise(span)
+    if not want:
+        return {}
+    found = [pid for pid, text in led.passages.items()
+             if pid not in cited and want in _normalise(text)]
+    if not found:
+        return {}
+    return {"in_passages": found[:3],
+            "route": (f"this session retrieved {', '.join(found[:3])}, which says exactly that — "
+                      f"cite it in a quote claim and the quotation stands")}
 
 
 def _blank_placeholders(text: str) -> str:

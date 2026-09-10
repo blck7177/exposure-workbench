@@ -378,3 +378,88 @@ def test_every_script_compiles_on_the_declared_minimum_python():
         finally:
             pathlib.Path(str(path) + "c").unlink(missing_ok=True)
     assert broken == [], "scripts that do not compile:\n  " + "\n  ".join(broken)
+
+
+# ── 2. a quotation is routed to the passage that holds the words ─────────────
+
+_HEDGE = ("The Corporation maintains a fixed-rate debt hedging program using "
+          "fixed-for-floating interest rate swaps to manage its exposure.")
+
+
+def test_a_verbatim_quotation_is_routed_to_the_uncited_passage_it_came_from():
+    """`unverified_quote` is the second commonest refusal this desk issues (31
+    of 143). A model that ran read_filings, read the words and reproduced them
+    EXACTLY was told its quotation was unverified, while the passage it copied
+    them from sat on the same ledger, uncited."""
+    from exposure_workbench.services import claims
+
+    led = _ledger_with(_HEDGE)
+    v = claims.check({"claims": [],
+                      "prose": ['The filing describes a "fixed-rate debt hedging program".']},
+                     led, question="is that fixed or floating")
+
+    assert v.ok is False and v.error == "unverified_quote", "acceptance is unchanged"
+    problem = next(p for p in v.problems if p["reason"] == "unverified_quote")
+    assert problem["in_passages"] == ["chunk_7a3f"]
+    assert "quote claim" in problem["route"]
+    assert "chunk_7a3f" in v.detail
+
+
+def test_a_quotation_in_no_passage_at_all_is_refused_with_nothing_invented():
+    from exposure_workbench.services import claims
+    led = _ledger_with(_HEDGE)
+    v = claims.check({"claims": [], "prose": ['It calls itself "the largest refiner in Texas".']},
+                     led, question="q")
+    problem = next(p for p in v.problems if p["reason"] == "unverified_quote")
+    assert "route" not in problem and "in_passages" not in problem
+
+
+def test_the_quotation_route_reads_the_words_the_way_the_check_does():
+    """One spelling of "the same words": the route imports `gate._normalise`,
+    the same function `verify_quotes` uses, so curly quotes, dashes and case
+    cannot make the check and the hint disagree."""
+    from exposure_workbench.services import claims
+    led = _ledger_with(_HEDGE)
+    v = claims.check({"claims": [],
+                      "prose": ['It runs a “FIXED-RATE debt hedging   program” today.']},
+                     led, question="q")
+    problem = next(p for p in v.problems if p["reason"] == "unverified_quote")
+    assert problem.get("in_passages") == ["chunk_7a3f"], "normalised the same way on both sides"
+
+
+# ── 3. a domain says which of its methods refuse for THIS subject ────────────
+
+def test_a_domain_names_the_methods_this_issuer_cannot_feed():
+    """The desk's own seven issuer domains run over JPM produce 50 figures and
+    32 refusals, 18 of them `not_applicable` — days sales outstanding, days
+    inventory and the cash conversion cycle asked of a bank
+    (tests/battery/gold_brief.json). The reasons existed, in
+    `fundamentals.methods_not_computable`, a different section of the same
+    payload; a model reading a domain had to cross-reference to learn the
+    domain did not apply, and did not."""
+    from exposure_workbench.services import catalogue_service as cat
+    from exposure_workbench.analytics import formulas as fm
+
+    refuses = {n: "not for a financial issuer"
+               for n, f in fm.FORMULAS.items() if f.not_for_financials is not None}
+    domains = {d["name"]: d for d in cat._procedures("issuer", False, "JPM", refuses=refuses)}
+
+    credit = domains["issuer_credit_and_balance_sheet"]
+    assert set(credit["methods_that_refuse_here"]) == set(credit["methods"]), \
+        "every method of the credit domain refuses for a bank, and the domain says so once"
+    quality = domains["issuer_earnings_quality"]
+    assert {"days_sales_outstanding", "days_inventory", "cash_conversion_cycle"} <= set(
+        quality["methods_that_refuse_here"])
+
+
+def test_a_domain_with_nothing_to_warn_about_says_nothing():
+    """The payload grows only where there is something to say — the rule the
+    catalogue's `lines` follows too."""
+    from exposure_workbench.services import catalogue_service as cat
+    for d in cat._procedures("issuer", False, "AAPL", refuses={}):
+        assert "methods_that_refuse_here" not in d
+
+
+def test_the_key_the_payload_gained_is_explained_where_the_keys_are_explained():
+    from exposure_workbench.services import catalogue_service as cat
+    assert "methods_that_refuse_here" in cat._HOW_TO_READ
