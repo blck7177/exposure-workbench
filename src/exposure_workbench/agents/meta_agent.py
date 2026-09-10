@@ -21,7 +21,7 @@ from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import batch
+from exposure_workbench.agents import batch, repeats as rp
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import skill
@@ -184,6 +184,9 @@ async def handle_message(
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
         tools = tools_session.tools
         held_recorder = batch.trace_recorder(db_factory, session_id, message_id)
+        # V31: the exit payloads this turn has already been refused.
+        repeated = rp.Repeats()
+        say_it_repeated: str | None = None
 
         for turn in range(max_turns):
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
@@ -215,6 +218,7 @@ async def handle_message(
             # rather than after nine repeats of it.
             dispatched = await batch.dispatch(
                 tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
+            stop_repeating = False
             for tc, args, result in dispatched:
                 name = tc["function"]["name"]
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
@@ -257,9 +261,25 @@ async def handle_message(
                         # the marker recorded that the gate never opened and
                         # never what it said.
                         gate_refusals.append(str(result["error"]))
+                        # V31 (agents/repeats.py): the same payload again is not
+                        # a second attempt. Say so once, then stop — three
+                        # baseline turns spent eight identical submissions each
+                        # and ended where they would have ended at two.
+                        seen = repeated.record(args)
+                        if seen > rp.STOP:
+                            stop_repeating = True
+                        elif seen == rp.STOP:
+                            say_it_repeated = rp.nudge("respond", result)
 
             if reply_text is not None:
                 break
+            if stop_repeating:
+                # Out on the same path an exhausted gate takes: no answer is
+                # published that the gate did not accept.
+                break
+            if say_it_repeated:
+                messages.append({"role": "user", "content": say_it_repeated})
+                say_it_repeated = None
 
     # The single convergence point for both ungated paths. The turn is still a
     # 200 and the message is still persisted: the chat_turn quota was charged and

@@ -127,37 +127,37 @@ METRICS: dict[str, MetricSemantics] = {
         note="All term debt, current maturities INCLUDED — a component of what the "
              "issuer owes, NOT the total. Which components an issuer files varies, "
              "so a total is composed rather than read off a line.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
     "long_term_debt_noncurrent": MetricSemantics(
         note="Term debt due beyond twelve months, excluding the current maturities. "
              "A component, so a total that adds it to a line already containing it "
              "counts the same debt twice.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
     "current_portion_long_term_debt": MetricSemantics(
         note="The current maturities of long-term debt on their own. Already inside "
              "long_term_debt_total, so adding the two is a double count rather than "
              "a total.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
     "debt_current_total": MetricSemantics(
         note="Every debt the issuer classifies as current, whatever its origin — a "
              "wider line than the current maturities of term debt, so the two are "
              "not interchangeable.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
     "short_term_borrowings": MetricSemantics(
         note="Short-dated borrowings such as commercial paper and revolver draws. A "
              "component of debt_current_total rather than a synonym for it: an "
              "issuer filing both files two different numbers.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
     "commercial_paper": MetricSemantics(
         note="Short-dated debt outside the term structure — a component, NOT a "
              "synonym for the current debt total. A filed zero is a reported value "
              "rather than an absence.",
-        for_a_total_call="compute(method=name='total_debt')",
+        for_a_total_call="method(name='total_debt')",
     ),
 
     # ── interest: an accrual, a cash payment, and a bank's revenue ────────────

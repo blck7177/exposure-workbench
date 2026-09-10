@@ -227,9 +227,18 @@ def test_cap_holds_back_whole_facts():
     assert 0 < len(kept2) < 100 and held2 and len(json.dumps(F.block_for_model(kept2))) <= 2_000
 
 
-def test_unknown_numeric_key_is_an_error_not_a_guess():
-    with pytest.raises(fa.UnknownUnit):
-        fa.harvest({"as_of": "2026-01-01", "frobnication": 3.2}, fa.Ctx("t", subject="X"))
+def test_unknown_numeric_key_is_not_a_guess_and_does_not_cost_the_call():
+    """V31 §4.3. The rule that mattered is unchanged: a key the desk cannot name
+    a unit for is never guessed and never reaches the model as a number. What
+    changed is what it costs — the leaf is marked, and the figures that DID
+    type survive, where before `UnknownUnit` discarded the whole result."""
+    facts, note = fa.harvest({"as_of": "2026-01-01", "frobnication": 3.2,
+                              "weight": {"value": 0.1, "unit_class": "RATIO"}},
+                             fa.Ctx("t", subject="X"))
+    assert note["frobnication"] == "untyped:frobnication"
+    assert not any(f.measure.endswith("frobnication") for f in facts), "never minted"
+    assert fa.numeric_leaves(note) == [], "and never a bare number (I1)"
+    assert [f.value for f in facts] == [0.1], "the sibling that typed is kept"
 
 
 def test_a_refusals_schema_and_problems_pass_through_untouched():

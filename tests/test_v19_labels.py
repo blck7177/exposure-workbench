@@ -139,7 +139,8 @@ async def test_evaluate_formula_names_the_tool_that_holds_a_filed_metric():
     from exposure_workbench.services import formula_service as fsvc
     out = await fsvc.evaluate_formula(None, "NVDA", "net_income", invoked_by="test")
     assert out["error"] == "unknown_formula"
-    assert "read_fundamentals(metric='net_income'" in out["detail"]
+    assert "fundamentals(ticker, metric='net_income'" in out["detail"]
+    assert "read_fundamentals" not in out["detail"]
     out = await fsvc.evaluate_formula(None, "NVDA", "not_a_thing", invoked_by="test")
     assert out["error"] == "unknown_formula" and "detail" not in out
 

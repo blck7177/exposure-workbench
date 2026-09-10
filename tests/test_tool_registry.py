@@ -177,11 +177,14 @@ async def test_an_adapter_that_cannot_name_a_unit_is_the_tools_own_structured_fa
     nothing is recorded — loud, not a guess."""
     log = _wire(monkeypatch)
     tool = Tool(name="read_prices", description="", json_schema={"type": "object"},
-                fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2}),
+                fn=_returning({"ticker": "MSFT", "as_of": "2026-09-03", "frobnication": 3.2,
+                               "close": {"value": 417.2, "unit_class": "MONEY"}}),
                 tool_class=READ)
     out = await R.invoke(_registry(tool), _Db(), "sess_1", "read_prices", {"ticker": "MSFT"})
-    assert out["error"] == "fact_adapter_error" and "frobnication" in out["detail"]
-    assert log["recorded"] == [[]]
+    assert "error" not in out, "V31 §4.3: one key the adapter cannot name no longer costs the call"
+    assert out["frobnication"] == "untyped:frobnication"
+    assert "frobnication" in out["untyped"], "and the model is told which number it cannot point at"
+    assert [f["value"] for f in log["recorded"][0][0]["facts"]] == [417.2], "the figure that typed was recorded"
 
 
 async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(monkeypatch):

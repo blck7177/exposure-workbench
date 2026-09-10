@@ -239,9 +239,12 @@ def test_a_container_that_declares_its_numeric_unit_is_minted_not_crashed():
     assert minted["Item 1A"].unit == COUNT.upper() and minted["Item 1A"].value == 3.0
     assert minted["Item 1A"].measure == "filings.items_detail.Item 1A"
     assert note["filings"]["items_detail"]["Item 7"] == minted["Item 7"].id
-    with pytest.raises(fa.UnknownUnit):
-        fa.describe({"subject": "MSFT"}, {"subject": "MSFT", "kind": "issuer", "catalogue_as_of": "2026-09-08",
-                                          "filings": {"items_detail": {"Item 1A": 3}}})
+    # Undeclared is still never guessed — but since V31 §4.3 it costs the leaf,
+    # not the call: no fact, no number, and the key named in the note.
+    bare, note2 = fa.describe({"subject": "MSFT"}, {"subject": "MSFT", "kind": "issuer",
+                                                    "catalogue_as_of": "2026-09-08",
+                                                    "filings": {"items_detail": {"Item 1A": 3}}})
+    assert bare == [] and note2["filings"]["items_detail"]["Item 1A"] == "untyped:Item 1A"
 
 
 def test_a_methods_declared_unit_is_what_its_leaves_carry():
@@ -259,10 +262,11 @@ def test_a_methods_declared_unit_is_what_its_leaves_carry():
     assert by["portfolio_window_return"].unit == RATIO.upper()
     assert by["window_return"].unit == RATIO.upper() and by["window_return"].subject == "MSFT"
     assert by["sessions"].unit == COUNT.upper(), "a declared key beats the method's default"
-    # A method with no declared unit still refuses an undeclared leaf: the rule
-    # is a declaration, not a fallback.
-    with pytest.raises(fa.UnknownUnit):
-        fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
+    # A method with no declared unit still does not TYPE an undeclared leaf: the
+    # rule is a declaration, not a fallback. Since V31 §4.3 the leaf is marked
+    # rather than the call discarded.
+    none, n = fa.compute({"method": "nonesuch"}, {"method": "nonesuch", "subject": "MSFT", "whatsit": 3})
+    assert none == [] and n["whatsit"] == "untyped:whatsit"
 
 
 def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
@@ -280,10 +284,13 @@ def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
     facts, _ = fa.compute({"op": "rank"}, ratio)
     assert next(f for f in facts if f.measure == "spread").unit == RATIO.upper()
 
-    # No declaration is a refusal, not a default: the guess is what caused this.
-    with pytest.raises(fa.UnknownUnit, match="computed over"):
-        fa.compute({"op": "rank"}, {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04",
-                                    "spread": 1135470.0})
+    # No declaration is still not a default — the guess is what put
+    # "113547000.0%" in front of a reader. V31 §4.3: the undeclared leaf is
+    # marked and unciteable instead of taking the whole result with it.
+    facts, note = fa.compute({"op": "rank"}, {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04",
+                                              "spread": 1135470.0})
+    assert note["spread"] == "untyped:spread" and facts == []
+    assert fa.numeric_leaves(note) == [], "no bare number reaches the reader either way"
     assert "spread" not in fa.UNIT_BY_KEY and "spread" in fa.POLYMORPHIC_KEYS
 
 

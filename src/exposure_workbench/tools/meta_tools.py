@@ -222,7 +222,7 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "issuer — any listed SEC filer, prepared in a couple of minutes), research (an Issuer Risk "
             "Brief), exposure_run (a portfolio run on the book AS IT IS, on the last completed session "
             "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is "
-            "compute(method='book.sell' | 'book.buy', subject=run_…), which answers at once). "
+            "a sell / buy node in run(program) over the run id, which answers at once). "
             "Never blocks; tell the user it is being prepared. A started run's figures are readable "
             "once its status is completed; read_book(task_…, names=['state']) reports its progress."
         ),

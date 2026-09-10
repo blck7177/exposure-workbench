@@ -172,6 +172,9 @@ def test_alignment_tolerance_is_the_engines_not_a_new_number():
     assert tc._ALIGN_DAYS == ia.BOUNDARY_TOLERANCE_DAYS
 
 
-def test_an_untyped_series_is_refused_with_the_tool_that_makes_a_typed_one():
+def test_an_untyped_series_is_refused_with_the_node_that_makes_a_typed_one():
+    """The refusal routes the model to a door it can open. `read_fundamentals`
+    is on neither face since V31 Phase 2; the door is a `fundamentals` node."""
     out = tc._resolve_series("calc_old", "series", {}, [{"end": "2025-01-01", "value": 1.0}])
-    assert out["error"] == "untyped_operand" and "read_fundamentals" in out["detail"]
+    assert out["error"] == "untyped_operand" and "fundamentals(…, last_n=…)" in out["detail"]
+    assert "read_fundamentals" not in out["detail"]

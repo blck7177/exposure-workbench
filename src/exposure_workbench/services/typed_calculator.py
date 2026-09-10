@@ -493,12 +493,12 @@ def _resolve_series(ref: str, operation: str, params: dict, points: list,
     if not rt:
         return _err("untyped_operand",
                     f"{ref} is a series recorded before series carried their type. "
-                    f"Recompute it with read_fundamentals(last_n=…).")
+                    f"Recompute it with a fundamentals(…, last_n=…) node.")
     unit = rt.get("unit_class")
     if unit is None:
         return _err("untyped_operand",
                     f"{ref} is a series whose recorded type has no unit_class; "
-                    f"recompute it with read_fundamentals(last_n=…).")
+                    f"recompute it with a fundamentals(…, last_n=…) node.")
     kind = rt.get("kind", "series")
     quantity = rt.get("quantity")
     typed: list[tuple[date, Typed]] = []
@@ -693,7 +693,7 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
                     f"Components of one period may be added when they cover the SAME "
                     f"window, and consecutive periods may be added when they meet; these "
                     f"do neither, so their sum belongs to no period. Fetch both over one "
-                    f"window with read_fundamentals(start=..., end=...).")
+                    f"window with fundamentals(ticker, metric, start=…, end=…) nodes.")
     return None
 
 
@@ -1311,7 +1311,7 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
         return _err("too_few_operands",
                     f"a statistic over a set needs at least two figures; got {len(refs)}. "
                     f"For a statistic over one figure's history, take the series "
-                    f"(read_fundamentals(last_n=…) or compute(method=…, params={{'last_n': …}}))")
+                    f"(fundamentals(…, last_n=…) or method(name, subject, params={{'last_n': …}}))")
     if len(set(refs)) != len(refs):
         dupes = sorted({r for r in refs if refs.count(r) > 1})
         return _err("duplicate_operand", f"{', '.join(dupes)} appears more than once in the set")
@@ -1323,8 +1323,8 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
             return t
         if isinstance(t, TypedSeries):
             return _err("series_in_set",
-                        f"{ref} is a series. A statistic over ONE series is compute(op={op!r}, "
-                        f"operands=[{ref!r}]); a set statistic takes scalar figures only.")
+                        f"{ref} is a series. A statistic over ONE series is that fn over the series "
+                        f"itself ({{'fn': {op!r}, 'of': {ref!r}}}); a set statistic takes scalar figures only.")
         typed.append(t)
 
     units_seen = {t.unit_class for t in typed}

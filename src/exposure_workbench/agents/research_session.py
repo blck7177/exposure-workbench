@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Sequence
 
-from exposure_workbench.agents import batch
+from exposure_workbench.agents import batch, repeats as rp
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.agents.tool_session import tool_session
@@ -107,6 +107,13 @@ async def run_research_session(
     ) as tools_session, llm_session(db_factory, session_id) as llm:
         tools = tools_session.tools
         held_recorder = batch.trace_recorder(db_factory, session_id)
+        # V31: the brief payloads this run has already been refused. The brief's
+        # six sections are checked in order and the first refusal returns, so a
+        # brief wrong in section six is refused six times while the model walks
+        # forward one section at a time — which is progress and must not be
+        # stopped. What is stopped is the SAME six sections sent again.
+        repeated = rp.Repeats()
+        say_it_repeated: str | None = None
 
         for turn in range(max_turns):
             # No message_id: a research run has no message to hang a cost on. The
@@ -133,6 +140,7 @@ async def run_research_session(
             # stops at the first call-shaped refusal per tool.
             dispatched = await batch.dispatch(
                 tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
+            stop_repeating = False
             for tc, args, result in dispatched:
                 name = tc["function"]["name"]
                 # The same cap the meta-agent reads under: the table slice rides
@@ -143,10 +151,22 @@ async def run_research_session(
                     "role": "tool", "tool_call_id": tc["id"],
                     "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT),
                 })
-                if name == "submit_brief" and result.get("accepted"):
-                    brief_id = result["brief_id"]
+                if name == "submit_brief":
+                    if result.get("accepted"):
+                        brief_id = result["brief_id"]
+                    elif result.get("error"):
+                        seen = repeated.record(args)
+                        if seen > rp.STOP:
+                            stop_repeating = True
+                        elif seen == rp.STOP:
+                            say_it_repeated = rp.nudge("submit_brief", result)
 
             if brief_id:
                 break
+            if stop_repeating:
+                break
+            if say_it_repeated:
+                messages.append({"role": "user", "content": say_it_repeated})
+                say_it_repeated = None
 
     return {"brief_id": brief_id, "turns_used": turn + 1, "submitted": brief_id is not None}

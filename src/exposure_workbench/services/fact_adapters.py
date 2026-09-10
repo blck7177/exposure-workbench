@@ -37,6 +37,8 @@ service means adding its unit here, and I3 says so at the first test.
 from __future__ import annotations
 
 import copy
+import contextvars
+import logging
 import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
@@ -45,6 +47,8 @@ from exposure_workbench.analytics import resources as rs
 from exposure_workbench.analytics import skill
 from exposure_workbench.services import facts as F
 from exposure_workbench.utils import json as ejson
+
+logger = logging.getLogger(__name__)
 
 # ── units ─────────────────────────────────────────────────────────────────────
 
@@ -103,8 +107,13 @@ DROP_KEYS = frozenset({"score", "char_span"})
 # params it wanted, its list of problems, the names it knows — kept in the note
 # verbatim. The first live V24 round hit `minItems` inside `params_schema` and
 # the refusal the model needed became an adapter error.
+# `quality_flags` is diagnostics the resolver already excludes from a row's
+# figures (typed_calculator._is_single_valued), so the adapter walking it for
+# figures was the adapter doing the producer's job: `unmatched_periods` lives
+# under it, is in none of the five key tables, and raised UnknownUnit — which
+# discarded every figure in the result. V31 §4.3.
 PASSTHROUGH_KEYS = frozenset({"params_schema", "problems", "known", "nearest", "available", "held_on",
-                              "expected", "supported", "allowed"})
+                              "expected", "supported", "allowed", "quality_flags"})
 
 # Numbers that are identity, not figures: kept in the note as they are (they
 # are parameters the model may write, and G3 resolves them from the Fact's
@@ -131,6 +140,36 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 class UnknownUnit(ValueError):
     """A numeric key the adapters have no unit for (I3)."""
+
+
+# The untyped leaves of the adapt() call in flight. A ContextVar rather than a
+# parameter because every adapter builds its own Ctx and none of them should
+# have to carry a channel they do not use.
+_UNTYPED: contextvars.ContextVar[list | None] = contextvars.ContextVar("fact_adapters_untyped", default=None)
+
+
+def _untyped_leaf(key: str, exc: "UnknownUnit") -> str:
+    """A numeric leaf the desk cannot name a unit for: it does not become a
+    Fact, and it does not stay a number either.
+
+    I1 holds — no number reaches the model without an identity — and so does
+    the reason the raise existed: nothing is guessed. What changes is the
+    blast radius. `compute` raised UnknownUnit on `unmatched_periods` and the
+    wrapper turned the whole result into `fact_adapter_error`, discarding every
+    figure that HAD typed: three times in 191 baseline turns, and once in
+    L02-days-arent-price t1 where the model had asked for one honest `abs`.
+    The producer knows what its numbers are; when the adapter does not, that is
+    the adapter's failure on ONE key, and it fails there. V31 §4.3.
+    """
+    seen = _UNTYPED.get()
+    if seen is not None and not any(u["key"] == key for u in seen):
+        seen.append({"key": key, "reason": str(exc)})
+    # Still loud, in the place loudness costs nothing: the desk's log. The
+    # producer's missing declaration is a defect to fix, and the raise was how
+    # V28 and V29 found four of them; what it must not go on doing is billing
+    # the model for it.
+    logger.warning("untyped numeric leaf %r: %s", key, exc)
+    return f"untyped:{key}"
 
 
 def _is_num(v: Any) -> bool:
@@ -373,7 +412,11 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
         if key in PARAM_KEYS:
             return node
         measure = f"{ctx.table}.{key}" if ctx.table else MEASURE_ALIAS.get(key, path or key)
-        f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=_unit_for(key, ctx), value=float(node),
+        try:
+            unit = _unit_for(key, ctx)
+        except UnknownUnit as exc:
+            return _untyped_leaf(key, exc)
+        f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit, value=float(node),
                    as_of=ctx.as_of, window=ctx.window, params=dict(ctx.params), standalone=ctx.standalone,
                    sources=ctx.sources, group=ctx.group)
         facts.append(f)
@@ -396,7 +439,12 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
             continue
         if _is_num(v) and k not in PARAM_KEYS:
             table = ctx.table or MEASURE_TABLE.get(key) or key
-            f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=_unit_for(k, sub.child(table=ctx.table), row),
+            try:
+                unit = _unit_for(k, sub.child(table=ctx.table), row)
+            except UnknownUnit as exc:
+                out[k] = _untyped_leaf(k, exc)
+                continue
+            f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=unit,
                        value=float(v), as_of=sub.as_of, window=sub.window, params=dict(sub.params),
                        standalone=sub.standalone, sources=sub.sources, group=ctx.group)
             facts.append(f)
@@ -695,11 +743,11 @@ ADAPTERS: dict[str, Adapter] = {
 
 # How the held-back facts of a tool are read by name, for the `held_back` note.
 READ_BY_NAME = {
-    "describe": "read_book(ref, names=[…]) for a run or scenario; read_fundamentals(ticker, metric) for an issuer",
+    "describe": "read_book(ref, names=[…]) for a run or scenario; a fundamentals(ticker, metric) node for an issuer",
     "read_book": "read_book(ref, names=[…]) with fewer names",
     "compute": "read_book(<calc_id>, names=[…]) reads a scenario's figures by name",
     "run": "return fewer nodes, or pick the figures you need with fn pick / column",
-    "read_prices": "read_prices(ticker, as_of=YYYY-MM-DD) reads one session",
+    "read_prices": "a price(ticker, as_of=YYYY-MM-DD) node reads one session",
 }
 
 
@@ -717,7 +765,16 @@ def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict
     round-trip here, and no adapter needs to know what a service returns.
     """
     adapter = ADAPTERS[tool]
-    facts, note = adapter(args or {}, ejson.loads(ejson.dumps(result)))
+    token = _UNTYPED.set([])
+    try:
+        facts, note = adapter(args or {}, ejson.loads(ejson.dumps(result)))
+        untyped = _UNTYPED.get() or []
+    finally:
+        _UNTYPED.reset(token)
+    if untyped and isinstance(note, dict):
+        # Said, not swallowed: the model is told which numbers it cannot point
+        # at and why, in the same note that carries the ones it can.
+        note = {**note, "untyped": {u["key"]: u["reason"] for u in untyped}}
     kept, held = F.cap(facts)
     if held:
         held["how"] = READ_BY_NAME.get(tool, "ask for fewer names")

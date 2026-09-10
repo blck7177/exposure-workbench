@@ -91,7 +91,20 @@ def is_pool_empty(result: Any) -> bool:
             and result.get("kind") in _EVIDENCE_POOLS)
 
 
-def holds(refusal: dict, args: dict) -> bool:
+# Refusals about the arguments of THIS call, not about a name, a subject or a
+# face that the next call would repeat. V31 (2026-09-10), read off L02-days-arent-price
+# t1 of the V26 baseline: `compute(price.volatility, window_days=20)` was refused
+# `invalid_params`, and the three calls behind it in the same message —
+# volatility(252), window_return(3m), drawdown(1y) — were held. All three were
+# correct, and all three succeeded unchanged on the next round trip. The batch
+# rule exists to stop a wrong BELIEF being repeated ten times; "20 is not a
+# window this method takes" is not a belief any of those three held. A refusal
+# that rejected the arguments it was given says nothing about a call made with
+# different ones, so it holds only a call that repeats them exactly.
+ARGUMENT_REFUSALS = frozenset({"invalid_params", "invalid_arguments"})
+
+
+def holds(refusal: dict, args: dict, refused_args: dict | None = None) -> bool:
     """Whether a refusal holds a later call to the same tool.
 
     V23 (the V21 §7 residual, met on the first live turn): a refusal that
@@ -99,11 +112,16 @@ def holds(refusal: dict, args: dict) -> bool:
     — holds only later calls that repeat that value; a call for another
     metric is a different question and goes out. A refusal that names no
     argument is about the call itself and holds by tool, as V21 did.
+
+    V31: unless the refusal was about the arguments themselves, in which case
+    the call it holds is the one that sends them again.
     """
     on = refusal.get("held_on")
-    if not isinstance(on, dict) or not on:
-        return True
-    return all(args.get(k) == v for k, v in on.items())
+    if isinstance(on, dict) and on:
+        return all(args.get(k) == v for k, v in on.items())
+    if refusal.get("error") in ARGUMENT_REFUSALS:
+        return args == refused_args
+    return True
 
 
 def parse_args(tc: dict) -> dict:
@@ -156,13 +174,13 @@ async def dispatch(
     reaches the wrapper, and a turn whose steps were fewer than its calls with
     nothing saying why is the audit gap V7-Q2 was diagnosed through.
     """
-    refused: dict[str, list[dict]] = {}
+    refused: dict[str, list[tuple[dict, dict]]] = {}
     pool_empty: dict | None = None
     out: list[tuple[dict, dict, dict]] = []
     for tc in tool_calls:
         name = tc["function"]["name"]
         args = parse_args(tc)
-        behind = next((r for r in refused.get(name, ()) if holds(r, args)), None)
+        behind = next((r for r, ra in refused.get(name, ()) if holds(r, args, ra)), None)
         if name in free:
             result = await tools_session.call(name, args)
         elif pool_empty is not None:
@@ -174,7 +192,7 @@ async def dispatch(
             if is_pool_empty(result):
                 pool_empty = result
             elif is_call_refusal(result):
-                refused.setdefault(name, []).append(result)
+                refused.setdefault(name, []).append((result, args))
         if result.get("error") == NOT_ATTEMPTED and record is not None:
             try:
                 await record(name, args, result)
