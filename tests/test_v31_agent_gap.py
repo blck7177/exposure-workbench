@@ -224,3 +224,157 @@ def test_no_refusal_on_the_run_path_routes_the_model_to_a_retired_tool():
                     offenders.append(f"{path.relative_to(root)}:{lineno}: …{text[:90]}…")
     assert offenders == [], (
         "these strings route a model to a tool no face carries:\n  " + "\n  ".join(offenders))
+
+
+# ── A. a refusal that says WHERE the figure lives ────────────────────────────
+
+def _ledger_with(passage: str, pid: str = "chunk_7a3f"):
+    """A ledger holding one passage and nothing else — the shape a turn has
+    after `read_filings` and before it has filed a single claim."""
+    from exposure_workbench.services import ledger as L
+    led = L.Ledger()
+    led.passages[pid] = passage
+    return led
+
+
+_XOM = ("The Corporation's debt portfolio is predominantly fixed-rate. At year-end, "
+        "$22,965 million of long-term debt was outstanding, of which 4.2% carried "
+        "floating-rate terms under the commercial paper program.")
+
+
+def test_a_number_the_session_retrieved_is_routed_to_the_passage_that_states_it():
+    """W01-xom-maturity-wall t2's class. `read_filings` put the debt note on the
+    table, the model wrote a correct sentence about it, and every digit in that
+    sentence was refused eight times — while the passage holding them sat on the
+    same ledger, one quote claim away. The rule does not move; what the model is
+    told does."""
+    from exposure_workbench.services import claims
+
+    led = _ledger_with(_XOM)
+    v = claims.check({"claims": [], "prose": ["The debt is mostly fixed: only 4.2% floats."]},
+                     led, question="is that fixed or floating")
+
+    assert v.ok is False, "the figure is still not accounted for — acceptance is unchanged"
+    assert v.error == "unsourced_figure"
+    problem = next(p for p in v.problems if p["reason"] == "unsourced_figure")
+    assert problem["in_passages"] == ["chunk_7a3f"]
+    assert "quote claim" in problem["route"]
+    assert "chunk_7a3f" in v.detail, "the route is on the line the model certainly reads"
+
+
+def test_a_number_nowhere_on_the_ledger_is_refused_with_no_route_invented():
+    from exposure_workbench.services import claims
+    led = _ledger_with(_XOM)
+    v = claims.check({"claims": [], "prose": ["Leverage is 3.7x."]}, led, question="q")
+    problem = next(p for p in v.problems if p["reason"] == "unsourced_figure")
+    assert "in_passages" not in problem and "route" not in problem
+
+
+def test_the_route_is_exactly_as_precise_as_acceptance_would_be():
+    """The guard `resolve_in_passages` carries: a bare short integer matches
+    nearly any filing, and the 2026-09-05 battery linked an invented "low-20s
+    percent" to a 10-K that happened to contain the digits 20. A hint is never
+    offered where accepting would have manufactured a source."""
+    from exposure_workbench.services import claims
+    led = _ledger_with("There were 22 board meetings and 965 employees at four sites.")
+    v = claims.check({"claims": [], "prose": ["It runs 22 sites."]}, led, question="q")
+    problem = next(p for p in v.problems if p["reason"] == "unsourced_figure")
+    assert "route" not in problem, "a bare short integer is not a source"
+
+
+def test_a_passage_a_quote_claim_already_cites_is_not_offered_as_news():
+    """The route names passages NOT already cited: one that is cited was
+    searched by acceptance itself, and if the figure still failed, the passage
+    is not the answer."""
+    from exposure_workbench.services import claims
+    led = _ledger_with(_XOM)
+    v = claims.check({"claims": [], "prose": ["The rate is 9.9%."]}, led, question="q")
+    problem = next(p for p in v.problems if p["reason"] == "unsourced_figure")
+    assert "route" not in problem, "9.9% is in no passage at all"
+
+
+# ── C. the rubric can see a reading, and a number off its basis ──────────────
+
+def _rubric():
+    import importlib.util
+    path = pathlib.Path(fa.__file__).resolve().parents[3] / "scripts" / "rubric_battery.py"
+    spec = importlib.util.spec_from_file_location("rubric_under_test", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_rubric_asks_whether_the_reading_holds_on_every_answered_turn():
+    """Every criterion before V31 scored sourcing, coverage or form. None asked
+    whether the conclusion follows from the figures, which is why V30 could
+    halve the cost of a turn and report correctness "a dead heat"."""
+    rb = _rubric()
+    assert "reading_holds" in rb.SEMANTIC
+    assert rb.ALWAYS_SEMANTIC == ("reading_holds",)
+    d = rb.SEMANTIC["reading_holds"]
+    assert "not whether the claim is true in the world" in d, "bounded to internal entailment"
+
+
+def test_the_new_criterion_stays_out_of_the_totals_every_earlier_score_used():
+    """A criterion applied to every turn would move every score line on
+    unchanged code. This desk has already withdrawn one conclusion that was
+    replicate noise; a second one that was a denominator change would be worse."""
+    rb = _rubric()
+    src = pathlib.Path(rb.__file__).read_text()
+    assert "scored_now = {n: c for n, c in criteria.items() if n not in ALWAYS_SEMANTIC}" in src
+
+
+def test_the_basis_detector_fires_on_the_two_defects_the_rounds_produced():
+    """0 hits is only worth reporting if the instrument has teeth. These are the
+    two documented cases: a days measure on a quarter grid (PHASE0 defect 1,
+    days_inventory at 424–479 where annualised is ~106) and a ratio rendered as
+    a percent (V29, a $1,135,470 spread shown as 113547000.0%)."""
+    rb = _rubric()
+    gold = [{"key": "dinv.MSFT", "value": 106.0, "unit": "COUNT", "subject": "MSFT",
+             "note": "days_inventory"}]
+    not_annualised = {"label": "days_inventory", "subject": "MSFT", "unit_class": "COUNT", "value": 429.9}
+    assert "not annualised" in (rb._off_by_a_basis(not_annualised, gold) or "")
+
+    gold_pct = [{"key": "spread", "value": 1135470.0, "unit": "MONEY", "subject": "port_001",
+                 "note": "rank.spread"}]
+    as_percent = {"label": "rank.spread", "subject": "port_001", "unit_class": "MONEY", "value": 113547000.0}
+    assert "percent" in (rb._off_by_a_basis(as_percent, gold_pct) or "")
+
+
+def test_two_different_quantities_a_round_multiple_apart_are_not_a_finding():
+    """What the name constraint buys. Without it the detector fired 637 times on
+    V26_R2; the five that survived subject+unit were `daily_return` against
+    `window_return` and `contribution ÷ weight` against `contribution` — real
+    figures, different quantities, a round multiple apart by chance."""
+    rb = _rubric()
+    gold = [{"key": "hr.AAPL", "value": -0.101768, "unit": "RATIO", "subject": "AAPL",
+             "note": "holdings.window_return"}]
+    other = {"label": "issuer_exposures.daily_return", "subject": "AAPL",
+             "unit_class": "RATIO", "value": -0.0251059}
+    assert rb._off_by_a_basis(other, gold) is None
+
+
+# ── the scripts compile on the Python this project declares ─────────────────
+
+def test_every_script_compiles_on_the_declared_minimum_python():
+    """Found while building C. `scripts/brief_battery.py` — the instrument V31
+    Phase 2 exists to build — could not be imported at all on Python 3.11: it
+    put an implicit string concatenation inside an f-string replacement field,
+    which is PEP 701 and needs 3.12, while pyproject declares >=3.11. The
+    offline suite never imported it, so 2,254 tests were green over a script
+    that could not start.
+
+    The same shape as V28-R's `not`, one layer down: green tests over a thing
+    nobody executed."""
+    import py_compile
+
+    root = pathlib.Path(fa.__file__).resolve().parents[3]
+    broken = []
+    for path in sorted((root / "scripts").rglob("*.py")):
+        try:
+            py_compile.compile(str(path), doraise=True, cfile=str(path) + "c")
+        except py_compile.PyCompileError as exc:
+            broken.append(f"{path.relative_to(root)}: {exc.msg.splitlines()[-1][:120]}")
+        finally:
+            pathlib.Path(str(path) + "c").unlink(missing_ok=True)
+    assert broken == [], "scripts that do not compile:\n  " + "\n  ".join(broken)

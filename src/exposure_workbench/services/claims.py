@@ -443,6 +443,7 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
                 v.links[(i, t["start"])] = {"to": "question", "ids": [], "as_written": tok}
                 continue
             v.problems.append({"at": f"prose[{i}]", "reason": "unsourced_figure", "figure": tok,
+                               **_where_it_lives(led, tok, cited_passages),
                                "detail": "a number the ledger cannot account for: state it through a claim, quote the passage that says it, or drop it"})
         for q in verify_quotes(text, [led.passages[p] for p in cited_passages if p in led.passages]):
             v.problems.append({"at": f"prose[{i}]", **q, "reason": "unverified_quote"})
@@ -452,7 +453,46 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
         v.detail = {"unsourced_figure": "every number in the prose is a fact's value or date on the ledger, a quoted passage's words, or the user's own figure",
                     "id_in_prose": "write {cN} where a figure goes; the id belongs in the claim",
                     "unverified_quote": "quotation marks say these words are verbatim in a passage a quote claim cites"}[v.error]
+        # The route belongs on the line the model certainly reads. `problems`
+        # has carried the offending token since V30 and three baseline turns
+        # re-sent the same prose eight times anyway.
+        routed = [p for p in v.problems if p.get("route")]
+        if routed and v.error == "unsourced_figure":
+            v.detail += f" — {routed[0]['figure']}: {routed[0]['route']}"
     return v
+
+
+def _where_it_lives(led: Ledger, tok: str, cited: list) -> dict:
+    """A refusal that ROUTES rather than only refuses (V31, 2026-09-10).
+
+    The commonest refusal on this desk is `unsourced_figure` — 69 of the 143
+    the V26 baseline collected — and the commonest shape behind it is a number
+    the session HAS retrieved, in a passage no `quote` claim cites. Only cited
+    passages are searched for acceptance, and that restriction is right: this
+    module's own note records the round where an invented "low-20s percent" was
+    linked to a 10-K that happened to contain the digits 20. So the rule does
+    not move. What moves is what the model is told.
+
+    W01-xom-maturity-wall t2 is the class: `read_filings` put ExxonMobil's debt
+    note on the table, the model wrote a correct sentence about it, and the
+    digits in that sentence were refused eight times over — while the passage
+    holding them sat on the same ledger, one `quote` claim away. The desk knew
+    where the figure lived and said only that it did not like it.
+
+    Searched with `resolve_in_passages`, so the hint is exactly as precise as
+    acceptance would be: a bare short integer never matches, and a hint is
+    never offered where accepting would have manufactured a source.
+    """
+    uncited = [pid for pid in led.passages if pid not in cited]
+    if not uncited:
+        return {}
+    found = led.resolve_in_passages(tok, uncited)
+    if not found:
+        return {}
+    names = ", ".join(found[:3]) + (f" (+{len(found) - 3} more)" if len(found) > 3 else "")
+    return {"in_passages": found[:3],
+            "route": (f"this session retrieved {names}, which states it — cite that passage in a "
+                      f"quote claim and the figure is accounted for")}
 
 
 def _blank_placeholders(text: str) -> str:

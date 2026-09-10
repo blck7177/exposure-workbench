@@ -116,7 +116,35 @@ SEMANTIC = {
         "is reproduced in prose (33.878625%, 0.5556454228194568) where two or three "
         "significant figures is what the sentence needs."
     ),
+    # V31 (2026-09-10). Every criterion above this one scores SOURCING, COVERAGE
+    # or FORM: grounded_claims asks where a figure came from, honest_absence what
+    # was said about a missing one, precision how it was written, so_what whether
+    # the answer closed on something actionable — a presence check, not a
+    # correctness one. Nothing asked whether the READING is right, and the gap is
+    # not academic: V30 halved the cost of a turn and reported correctness "a dead
+    # heat", which is what an instrument says when it cannot see the thing.
+    #
+    # Deliberately bounded to what an answer can be judged on WITHOUT re-deriving
+    # the finance: internal entailment. The judge is not asked whether ExxonMobil's
+    # debt really is fixed-rate; it is asked whether the sentence follows from the
+    # figures printed beside it.
+    "reading_holds": (
+        "The conclusion follows from the figures the answer itself presents. FALSE if a "
+        "figure's direction or magnitude contradicts the sentence it is offered as support "
+        "for; if two figures are compared across different periods, bases or units without "
+        "saying so; or if the conclusion needs a quantity the answer never states. Judge "
+        "only the step from the stated figures to the stated conclusion — not whether the "
+        "figures are the right ones to have fetched, and not whether the claim is true in "
+        "the world."
+    ),
 }
+
+# Criteria that apply to every answered turn rather than to the questions that
+# name them. `reading_holds` is the only one: a question does not have to ASK for
+# a sound reading for an unsound one to be a defect. Reported on its own line
+# rather than folded into met/judged, so every score printed before this change
+# stays comparable with every score printed after it.
+ALWAYS_SEMANTIC = ("reading_holds",)
 
 LOCATING_TOOLS = {"describe"}
 
@@ -200,11 +228,88 @@ def _rendered_values(rec: dict) -> list[float]:
     return out
 
 
+# V31. The bases this desk actually confuses, as the ratio a wrong one leaves
+# behind — and only the ones a round has actually produced:
+#   ×365/90  a days measure on a quarter grid instead of annualised
+#            (PHASE0 defect 1: days_inventory read 424–479 days)
+#   ×4       a quarter where the trailing twelve months was asked for
+#            (PHASE0 defect 1, second half: last year's balance over a TTM flow)
+#   ×100     a ratio rendered as a percent (V29: a $1,135,470 spread reached a
+#            reader as "113547000.0%")
+#   ×1000    thousands against units
+# A recall metric cannot see any of them: it reports the gold figure missing and
+# says nothing about the number printed in its place.
+_BASIS_RATIOS = ((365.0 / 90.0, "a days measure on a quarter grid, not annualised"),
+                 (4.0, "a quarter against the trailing twelve months"),
+                 (100.0, "a ratio rendered as a percent, or the reverse"),
+                 (1000.0, "thousands against units"))
+_BASIS_TOL = 0.005   # a basis error is exact up to display rounding, not approximate
+
+# THE PAIR MUST BE THE SAME QUANTITY, and that is the whole difficulty. Measured
+# on V26_R2 while this was written:
+#
+#   subject+unit only        637 hits, every one a coincidence — with ~700 gold
+#                            figures and ~20 rendered per turn, some pair lands
+#                            on one of the ratios by chance. `breach_level =
+#                            0.03` was reported as a basis error because a
+#                            weight somewhere in gold is 0.01.
+#   + same measure NAME      the five survivors were `issuer_exposures.
+#                            daily_return` against `holdings.window_return`,
+#                            `contribution ÷ weight` against `contribution` —
+#                            different quantities a round multiple apart. None
+#                            shares a name.
+#
+# So the name is required. It costs recall — a basis error that also renamed the
+# measure is invisible here — and it is the only thing that makes a hit mean
+# something. Manufacturing a signal is a failure this desk already knows by
+# name (ledger.resolve_in_passages, and the "low-20s percent" it linked to a
+# 10-K containing the digits 20).
+
+
+def _measure_of(name: str) -> str:
+    """The quantity a name states, for comparison across the two vocabularies:
+    gold says `holdings.window_return` in its `note`, a rendered figure says it
+    in `label`. A wrapped expression (`multiply(a, b)`) is not a bare measure
+    and never matches one."""
+    return (name or "").strip()
+
+
+def _off_by_a_basis(m: dict, golds: list[dict]) -> str | None:
+    """Which basis confusion would turn a gold figure into this rendered one.
+
+    Same subject, same unit AND the same measure name, or it is a coincidence
+    and not a finding."""
+    rv, subj, unit = m.get("value"), m.get("subject"), (m.get("unit_class") or "").upper()
+    label = _measure_of(m.get("label"))
+    if not isinstance(rv, (int, float)) or not rv or not subj or not label:
+        return None
+    for gf in golds:
+        gv = gf.get("value")
+        if not isinstance(gv, (int, float)) or not gv:
+            continue
+        if gf.get("subject") != subj or (gf.get("unit") or "").upper() != unit:
+            continue
+        if _measure_of(gf.get("note")) != label:
+            continue
+        r = abs(rv / gv)
+        for ratio, name in _BASIS_RATIOS:
+            for cand in (ratio, 1.0 / ratio):
+                if abs(r - cand) <= _BASIS_TOL * cand:
+                    return f"{name} (×{r:.3g} of {gf.get('key')})"
+    return None
+
+
 def _score_figures(rec: dict, g: dict) -> dict:
     """figures_present: every `must` gold figure appears among the rendered
     figures. figures_foreign (informational, never scored): rendered figures
     that match no gold figure — an answer's supporting figures are legitimate,
-    so this is a count for the reader, not a verdict."""
+    so this is a count for the reader, not a verdict.
+
+    figures_off_basis (informational, never scored, V31): of those foreign
+    figures, the ones that are a gold figure times a basis this desk is known to
+    confuse. A figure that is nearly right is worse for a reader than one that
+    is absent, and `figures_present` is blind to it by construction — it asks
+    only whether the gold value appeared."""
     rendered = _rendered_values(rec)
     musts = [f for f in g.get("figures", []) if f.get("must", True)]
     if not musts:
@@ -213,12 +318,18 @@ def _score_figures(rec: dict, g: dict) -> dict:
         return any(abs(r - v) <= _TOL * max(1.0, abs(v)) for r in rendered)
     missing = [f["key"] for f in musts if not hit(float(f["value"]))]
     golds = [float(f["value"]) for f in g.get("figures", [])]
-    foreign = sum(1 for r in rendered if not any(abs(r - v) <= _TOL * max(1.0, abs(v)) for v in golds))
+    strangers = [r for r in rendered if not any(abs(r - v) <= _TOL * max(1.0, abs(v)) for v in golds)]
+    matches = (rec.get("meta") or {}).get("verified", {}).get("matches") or []
+    stranger_set = {round(s, 12) for s in strangers}
+    off = [(m.get("value"), why) for m in matches
+           if isinstance(m.get("value"), (int, float)) and round(float(m["value"]), 12) in stranger_set
+           and (why := _off_by_a_basis(m, g.get("figures", [])))]
     return {"figures_present": {
         "met": not missing,
         "why": ("every gold figure rendered" if not missing else
-                f"missing: {', '.join(missing)} (rendered {len(rendered)} figures, {foreign} not in gold)"),
-        "foreign": foreign, "rendered": len(rendered)}}
+                f"missing: {', '.join(missing)} (rendered {len(rendered)} figures, {len(strangers)} not in gold)"),
+        "foreign": len(strangers), "rendered": len(rendered),
+        "off_basis": [{"value": r, "looks_like": why} for r, why in off]}}
 
 
 def _score_structural(rec: dict, holdings: int) -> dict:
@@ -274,7 +385,11 @@ def _estimate(records: list[dict], questions: dict) -> None:
         q = questions.get(tag)
         if not q or not rec.get("answer"):
             continue
-        for name in q["criteria"]:
+        # ALWAYS_SEMANTIC is judged on every answered turn, so it is billed on
+        # every answered turn. An estimate that undercounts the pass is the one
+        # kind of wrong an estimate must not be — this is what a spend is
+        # decided on, and the account has run dry twice already.
+        for name in list(q["criteria"]) + [n for n in ALWAYS_SEMANTIC if n not in q["criteria"]]:
             if name in SEMANTIC:
                 calls += 1
                 chars += len(_JUDGE_PROMPT.format(name=name, definition=SEMANTIC[name],
@@ -330,6 +445,8 @@ async def main(argv: list[str]) -> int:
         if g and not g.get("skip"):
             criteria.update(_score_figures(rec, g))
         wanted = [n for n in q["criteria"] if n in SEMANTIC and (not only or n in only)]
+        wanted += [n for n in ALWAYS_SEMANTIC
+                   if n not in wanted and n in SEMANTIC and (not only or n in only)]
         if args.semantic and answered:
             for name in wanted:
                 votes = []
@@ -354,8 +471,13 @@ async def main(argv: list[str]) -> int:
 
         refusals = sum(1 for s in rec.get("steps", [])
                        if s["step_type"] == "respond" and "error" in (s.get("result") or ""))
-        met = sum(1 for c in criteria.values() if c["met"] is True)
-        judged = sum(1 for c in criteria.values() if c["met"] is not None)
+        # ALWAYS_SEMANTIC stays OUT of met/judged. Folding a new criterion into
+        # the totals would move every score line on the same code, and this desk
+        # has already withdrawn one conclusion that was replicate noise; a second
+        # one that was a denominator change would be worse.
+        scored_now = {n: c for n, c in criteria.items() if n not in ALWAYS_SEMANTIC}
+        met = sum(1 for c in scored_now.values() if c["met"] is True)
+        judged = sum(1 for c in scored_now.values() if c["met"] is not None)
         scored.append({"tag": rec["tag"], "question_tag": tag, "answered": answered,
                        "gate_refusals": refusals, "tool_calls": len(_tools_called(rec.get("steps", []))),
                        "met": met, "judged": judged, "criteria": criteria})
@@ -386,7 +508,14 @@ async def main(argv: list[str]) -> int:
         print(f"  {name:24s} {sum(hits)}/{len(hits)}{sp}")
     total_met = sum(s["met"] for s in scored)
     total_judged = sum(s["judged"] for s in scored)
-    print(f"  {'TOTAL':24s} {total_met}/{total_judged}")
+    print(f"  {'TOTAL':24s} {total_met}/{total_judged}   (ALWAYS_SEMANTIC excluded — see below)")
+    for name in ALWAYS_SEMANTIC:
+        hits = by_criterion.get(name) or []
+        print(f"  {name:24s} {sum(hits)}/{len(hits)}   every answered turn, not in TOTAL")
+    off = [(s["tag"], o) for s in scored
+           for o in (s["criteria"].get("figures_present") or {}).get("off_basis") or []]
+    print(f"  {'figures off a basis':24s} {len(off)}"
+          + (f"   e.g. {off[0][0]}: {off[0][1]['value']:g} — {off[0][1]['looks_like']}" if off else ""))
     print(f"  {'answered':24s} {sum(1 for s in scored if s['answered'])}/{len(scored)}")
     print(f"  {'gate refusals (median)':24s} "
           f"{sorted(s['gate_refusals'] for s in scored)[len(scored) // 2] if scored else 0}")

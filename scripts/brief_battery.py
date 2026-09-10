@@ -175,9 +175,12 @@ async def main(argv: list[str]) -> int:
             text_ = str(exc)
             account = any(k in text_ for k in ("insufficient_quota", "credit_balance", "rate_limit",
                                                "invalid_api_key", "billing"))
-            print(f"PREFLIGHT FAILED — {'the account cannot call the provider at all, so this says NOTHING '
-                                        'about the schema; add credit and run again' if account else
-                                        'the provider REJECTED this face as written, so no brief could have run'}:"
+            # Built outside the f-string: an implicit concatenation inside a
+            # replacement field is PEP 701, and this project declares 3.11.
+            why = ("the account cannot call the provider at all, so this says NOTHING "
+                   "about the schema; add credit and run again" if account else
+                   "the provider REJECTED this face as written, so no brief could have run")
+            print(f"PREFLIGHT FAILED — {why}:"
                   f"\n  {type(exc).__name__}: {text_[:400]}", flush=True)
             await engine.dispose()
             return 2 if account else 3
