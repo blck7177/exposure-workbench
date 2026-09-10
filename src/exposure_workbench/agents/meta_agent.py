@@ -59,6 +59,8 @@ A figure the desk does not hold is an absence fact: claim it as absent and say w
 (not filed; not held as a figure; no method) — never a nearby figure wearing the \
 asked-for name, never an estimate.
 
+A sentence that orders a figure against others — largest, worst, closest — rests on a rank claim over a rank/top node: the gate reads the sentence, not only the claim.
+
 Finish every turn by calling respond. If respond refuses, it names the claim or the \
 number and the reason: fix that claim, run the program that produces the figure, or drop it."""
 

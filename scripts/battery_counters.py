@@ -84,7 +84,10 @@ _MARK = re.compile(r"\[10-[KQ][^\]]*\]")
 # same turn (V29 §6.1: 47/55, 47/58, 51/60 claims with no ordering computed).
 # The WIDE definition the V29 findings use (§6.1), so the two sessions publish one
 # number: "nearest to tripping" is an ordering claim too.
-_SUPERLATIVE = re.compile(r"\b(largest|biggest|highest|lowest|smallest|worst|best|nearest|closest|most concentrated|top\s+(?:\d+|five|three|ten))\b", re.I)
+# V32: ONE home. The gate refuses a sentence on this list (services/claims.
+# ORDERING_WORDS); the counter reports on the same list, so the number the desk
+# publishes and the sentence the desk refuses cannot drift apart.
+from exposure_workbench.services.claims import ORDERING_WORDS as _SUPERLATIVE
 
 
 def classify(summary: str, status: str) -> str | None:

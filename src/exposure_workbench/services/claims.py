@@ -97,6 +97,42 @@ SPELLING_REFUSALS = frozenset({
 
 PLACEHOLDER = re.compile(r"\{(c\d+)\}")
 
+# V32. A word that asserts an ordering. One home: scripts/battery_counters.py
+# imports it, so the sentence the gate refuses and the number the desk reports
+# are the same definition. The list is the wide one V29 §6.1 settled on —
+# "nearest to tripping" orders as surely as "largest".
+ORDERING_WORDS = re.compile(
+    r"\b(largest|biggest|highest|lowest|smallest|worst|best|nearest|closest"
+    r"|most concentrated|top\s+(?:\d+|five|three|ten))\b", re.I)
+
+# A sentence, near enough. The unit the reader reads, and the unit two claims
+# have to be in before one can contradict the other.
+#
+# The terminator must be FOLLOWED BY SPACE OR END, because this desk's sentences
+# are full of decimal points: `[^.!?]+` cut "-26.0%" into "-26" and "0%", which
+# made every rule below look at fragments and fire on nothing. Caught by an
+# estimate that reported 0 where the answers plainly ordered figures.
+_SENTENCE_END = re.compile(r"[.!?]+(?=\s|$)")
+
+
+def sentences_of(para: str) -> list[str]:
+    out, start = [], 0
+    for m in _SENTENCE_END.finditer(para or ""):
+        out.append((para[start:m.end()]).strip())
+        start = m.end()
+    tail = (para or "")[start:].strip()
+    if tail:
+        out.append(tail)
+    return [s for s in out if s]
+
+
+def placed_by_paragraph(prose: list, ids) -> list[list[str]]:
+    """The claim ids each paragraph places, in order. Computed once and kept:
+    it was computed inside validate_shape and thrown away, which is why nothing
+    in this module could ever see two claims of one sentence together."""
+    return [[m.group(1) for m in PLACEHOLDER.finditer(para) if m.group(1) in ids]
+            for para in (prose or []) if isinstance(para, str)]
+
 _CLAIM = {"type": "object", "properties": {
     "id": {"type": "string", "description": "c1, c2, … — written into the prose as {c1}"},
     "relation": {"type": "string", "enum": list(RELATIONS)},
@@ -177,12 +213,10 @@ def validate_shape(answer) -> list[dict]:
             p.append({"at": at, "reason": "room_without_tier", "detail": "room: against = the tier fact (warning or breach)"})
         if rel == "quote" and not (isinstance(c.get("span"), str) and len(c["span"].split()) >= 1):
             p.append({"at": at, "reason": "quote_without_span"})
-    used: set[str] = set()
     for i, para in enumerate(prose):
         for m in PLACEHOLDER.finditer(para):
             if m.group(1) not in ids:
                 p.append({"at": f"prose[{i}]", "reason": "unknown_placeholder", "id": m.group(1)})
-            used.add(m.group(1))
     # a claim the prose does not place is not refused: it stands as what the
     # answer rests on (the V24 `cites`) and is recorded in the citations
     return p
@@ -365,6 +399,118 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
     return None
 
 
+_HANDLE = ("calc_", "run_")
+
+
+def _one_quantity_twice(a: dict, b: dict) -> bool:
+    """One quantity, one period, one value — written twice.
+
+    `_same_measure` cannot be reused: it requires one subject, and the case this
+    exists for has two. W05-half-taken-back pointed "before" and "after" at
+    `limit_checks.issuer_concentration:MSFT.current_value` on two SCENARIO rows,
+    so the measure names the issuer and the subject is the run handle. Both
+    subjects being handles is what makes this the same quantity rather than two
+    holders that happen to be level: "MSFT is 10.0% and JPM is 10.0%" is a true
+    sentence and must stay one.
+
+    NOT COVERED, and deliberately: two different holders equal to each other,
+    compared. Separating that from a conjunction needs the comparative word, and
+    reading the English is a second change with its own false-positive rate; this
+    one is structural and has none.
+    """
+    if a.get("measure") != b.get("measure") or a.get("unit") != b.get("unit"):
+        return False
+    if _period_key(a) != _period_key(b):
+        return False
+    if a.get("value") is None or a.get("value") != b.get("value"):
+        return False
+    sa, sb = str(a.get("subject") or ""), str(b.get("subject") or "")
+    return sa == sb or (sa.startswith(_HANDLE) and sb.startswith(_HANDLE))
+
+
+def _vector_siblings(led: Ledger, rec: dict) -> int:
+    """How many facts share this one's node — the size of the set an ordering
+    over it would order. An entry of a vector has siblings; a lone reading has
+    none, and nothing about it can be `the largest`."""
+    node = ((rec or {}).get("params") or {}).get("node")
+    if not node:
+        return 0
+    return sum(1 for r in led.by_id.values()
+               if ((r.get("params") or {}).get("node") == node) and r.get("kind") == F.SCALAR)
+
+
+def _paragraph_problems(answer: dict, led: Ledger, claims: dict) -> list[dict]:
+    """The checks whose unit is a SENTENCE, not a claim (V32).
+
+    `_check_relation` takes one claim and `check` runs it over the claims
+    independently, so an answer whose claims are each impeccable and which
+    together say something false has never been reachable by this module. Two
+    such sentences were accepted in the V26 C3 round; one of them read
+    "concentration at 8.76%, down from 8.76%", two `level` claims on two
+    scenario rows holding one value.
+
+    Two rules, both over the facts and never over the English:
+
+    ORDERING. A sentence that asserts an ordering about a figure must rest on a
+    computed one. Only fired where an ordering is POSSIBLE — the figure is an
+    entry of a node with siblings, so `rank` over that node is a program the
+    model can write — which is what keeps "the best read of this" out of it.
+
+    THE SAME READING TWICE. Two claims in one sentence whose facts are one
+    measure, one period and one value are the same reading written twice; a
+    sentence that puts them side by side is comparing a figure with itself.
+    """
+    out: list[dict] = []
+    for i, para in enumerate(answer.get("prose") or []):
+        if not isinstance(para, str):
+            continue
+        for sent in sentences_of(para):
+            here = [claims[c] for c in PLACEHOLDER.findall(sent) if c in claims]
+            if not here:
+                continue
+            at = f"prose[{i}]"
+
+            if ORDERING_WORDS.search(sent) and not any(c["relation"] == "rank" for c in here):
+                # PRECISION OVER RECALL, and the reason is that this refuses a
+                # reader's answer. Fired only where the sentence itself puts TWO
+                # OR MORE figures of one measure side by side: name two weights
+                # and call one the largest and you have ordered them. One figure
+                # and an ordering word is left alone — "the closest thing I have
+                # is {c1}" orders nothing, and on the C3 answers the looser rule
+                # (one figure that is an entry of a vector) fired on 30% of
+                # accepted answers, several of them that shape.
+                # The cost is a miss: an ordering over figures the model computed
+                # and did not cite stays unchecked, as it is today.
+                grouped: dict = {}
+                for c in here:
+                    r = _rec(led, c.get("of"))
+                    if r and r.get("kind") == F.SCALAR:
+                        grouped.setdefault(r.get("measure"), []).append((c, r))
+                ordered = next((v for v in grouped.values() if len(v) > 1), None)
+                if ordered:
+                    c, r = ordered[0]
+                    node = (r.get("params") or {}).get("node")
+                    how = (f'add {{"fn": "rank", "of": "${node}"}} (or "top" with n) to the program and claim its '
+                           f"entry with relation 'rank'" if node else
+                           "compute the ordering with a rank / top node and claim its entry")
+                    out.append({"at": at, "reason": "ordering_not_computed", "claim": c["id"],
+                                "detail": f"this sentence puts {len(ordered)} readings of {r.get('measure')} side by "
+                                          f"side and orders them, and no claim in it is a rank: {how}; or say it "
+                                          f"without the ordering."})
+
+            for a, b in ((x, y) for n, x in enumerate(here) for y in here[n + 1:]):
+                ra, rb = _rec(led, a.get("of")), _rec(led, b.get("of"))
+                if not ra or not rb or ra["id"] == rb["id"]:
+                    continue
+                if _one_quantity_twice(ra, rb):
+                    out.append({"at": at, "reason": "same_figure_twice", "claim": a["id"], "against": b["id"],
+                                "detail": f"{a['id']} and {b['id']} are one measure at one period holding one value "
+                                          f"({ra.get('measure')} at {ra.get('as_of')}); a sentence that states both is "
+                                          f"comparing a figure with itself. Point one of them at the other reading, or "
+                                          f"state the figure once."})
+    return out
+
+
 def _absence_candidates(led: Ledger, n: int = 8) -> list[dict]:
     """The absence facts on the ledger a claim may point at, newest last: id,
     the node or name, the refusal it was born of, and whether it can back an
@@ -449,6 +595,16 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
         for q in verify_quotes(text, [led.passages[p] for p in cited_passages if p in led.passages]):
             v.problems.append({"at": f"prose[{i}]", **q, "reason": "unverified_quote",
                                **_where_the_words_live(led, q.get("quote") or "", cited_passages)})
+    # G4 — what the SENTENCE asserts over several figures (V32). Runs only once
+    # every figure in it is accounted for, so the model fixes one thing at a time.
+    if not v.problems:
+        para = _paragraph_problems(answer, led, claims)
+        if para:
+            v.problems = para
+            v.error = para[0]["reason"]
+            v.detail = ("a sentence says something its claims do not: "
+                        + "; ".join(f"{x['at']}: {x['reason']}" for x in para))
+            return v
     if v.problems:
         reasons = {p["reason"] for p in v.problems}
         v.error = "unsourced_figure" if "unsourced_figure" in reasons else "id_in_prose" if "id_in_prose" in reasons else "unverified_quote"

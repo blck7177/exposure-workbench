@@ -243,7 +243,10 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "node, or one series), versus (one measure on two subjects, of against against), ratio (a divided or ratio-method figure), rank (an entry of a rank/top node), room (a check's "
             "current_value against its warning or breach tier), absent (an absence fact), quote (a passage + the "
             "verbatim span), series (a chart), table (rows of scalar facts). " + claims.PROSE_RULE + " "
-            "A claim whose relation its facts do not fit is refused with the reason; a number the ledger cannot account for is refused."
+            "A claim whose relation its facts do not fit is refused with the reason; a number the ledger cannot account for is refused. "
+            "The SENTENCE is read too: one that calls a figure the largest, the worst, the closest — any ordering — "
+            "must carry a rank claim, so compute the ordering (fn rank / top) before you say it; and one figure "
+            "stated twice in a sentence is not a comparison."
         ),
         json_schema=RESPOND_SCHEMA,
         fn=_respond_claims, tool_class=GATE,
