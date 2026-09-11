@@ -85,6 +85,13 @@ _MARK = re.compile(r"\[10-[KQ][^\]]*\]")
 # The WIDE definition the V29 findings use (§6.1), so the two sessions publish one
 # number: "nearest to tripping" is an ordering claim too.
 _SUPERLATIVE = re.compile(r"\b(largest|biggest|highest|lowest|smallest|worst|best|nearest|closest|most concentrated|top\s+(?:\d+|five|three|ten))\b", re.I)
+# The producer's declaration, as tools/registry._declared_nodes writes it, and
+# the one call that is its own declaration. Structure, not spelling: a node's
+# kind is `ranking` because program_service typed it, not because the program
+# text happened to contain a word.
+_NODES = re.compile(r"\| nodes: ")
+_RANK_NODE = re.compile(r"\| nodes: [^|]*\b=ranking\b")
+_RANK_OP = re.compile(r'"op":\s*"(?:rank|top)"')
 
 
 def classify(summary: str, status: str) -> str | None:
@@ -109,7 +116,7 @@ def tally(paths: list[str]) -> dict:
     turns_with: dict[str, set] = collections.defaultdict(set)
     rt, calls, resp, elapsed, ptok, figs = [], [], [], [], [], []
     artifacts = marks = zero = exhausted = 0
-    superl = superl_no_rank = 0
+    superl = superl_no_rank = superl_undeclared = 0
     n = 0
     for p in paths:
         for conv in json.loads(Path(p).read_text()):
@@ -147,12 +154,34 @@ def tally(paths: list[str]) -> dict:
                     marks += 1
                 if _SUPERLATIVE.search(a):
                     superl += 1
-                    # a computed ordering: compute(op=rank) before V30, or a program with a rank/top node after
-                    ranked = any(s.get("status") == "completed" and not (s.get("result") or "").startswith("error")
-                                 and ((s.get("tool_name") == "compute" and '"op": "rank"' in (s.get("args") or "").replace("'", '"').replace('"op":"rank"', '"op": "rank"'))
-                                      or (s.get("tool_name") == "run" and ('"fn": "rank"' in (s.get("args") or "") or '"fn": "top"' in (s.get("args") or ""))))
-                                 for s in steps)
-                    if not ranked:
+                    # DID THIS TURN COMPUTE AN ORDERING? Asked of each producer in
+                    # the terms that producer declares, never of a serialised
+                    # program read as a string:
+                    #   run     — the executor types every node at birth and the
+                    #             step records `| nodes: name=kind`
+                    #             (tools/registry._declared_nodes).
+                    #   compute — one call is one op and the call IS the
+                    #             declaration; its longest argument list across
+                    #             both V26 rounds is 298 characters, so this
+                    #             protocol never met the battery's cut.
+                    # A `run` step recorded before the declaration existed is
+                    # neither ranked nor unranked. It is UNDECLARED and is kept
+                    # out of superlative_without_rank, because the reading it
+                    # would otherwise get — grepping the program for '"fn": "rank"'
+                    # — is what reported 37 of 52 on V26_C3 where the full
+                    # arguments say 14. An instrument that cannot see says so.
+                    done = [s for s in steps if s.get("status") == "completed"
+                            and not (s.get("result") or "").startswith("error")]
+                    runs = [s for s in done if s.get("tool_name") == "run"]
+                    declared = [s for s in runs if _NODES.search(s.get("result") or "")]
+                    ranked = (any(_RANK_NODE.search(s.get("result") or "") for s in declared)
+                              or any(_RANK_OP.search((s.get("args") or "").replace("'", '"'))
+                                     for s in done if s.get("tool_name") == "compute"))
+                    if ranked:
+                        pass
+                    elif len(declared) < len(runs):
+                        superl_undeclared += 1
+                    else:
                         superl_no_rank += 1
                 for s in steps:
                     if s.get("step_type") not in ("tool_call", "delegation", "respond"):
@@ -174,6 +203,10 @@ def tally(paths: list[str]) -> dict:
         "answers_with_double_figure_artifact": artifacts,
         "answers_with_passage_mark_as_figure": marks,
         "superlative_claims": superl, "superlative_without_rank": superl_no_rank,
+        # turns this instrument cannot answer for: a `run` step from a round
+        # recorded before the node declaration existed. Not zero and not a miss —
+        # the coverage of the number above.
+        "superlative_rank_undeclared": superl_undeclared,
         "refusals": {k: {"count": v, "turns": len(turns_with[k]),
                          "per_turn": round(v / n, 2) if n else 0} for k, v in sorted(c.items())},
     }

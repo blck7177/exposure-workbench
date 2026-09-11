@@ -154,12 +154,40 @@ class ToolRegistry:
 
 
 
+def _declared_nodes(result: dict) -> str:
+    """What the producer DECLARED it built, appended to the step's summary.
+
+    `run` types every node at birth and returns `nodes: {name: {kind}}`
+    (`program_service._note_of`). Recording the kinds means a later reading of
+    the trace — the desk's counters, an eval, a replay — asks the producer what
+    it made, instead of grepping the serialised program for a spelling like
+    '"fn": "rank"'.
+
+    That guess is how the question WAS asked, and it stopped being answerable
+    the moment V30 made one program per question: the battery stored `args` to
+    300 characters, which is past the end of 179 of 202 `run` calls and of 0 of
+    342 `compute` calls, and a rank node comes after the vector it orders. The
+    one counter it fed, `superlative_without_rank`, read 37 of 52 on V26_C3
+    where the full arguments — still in `agent_steps`, never truncated at the
+    write — say 14.
+
+    The summary keeps `keys: …` as its prefix: `classify()` and
+    `is_pool_empty()` read the front of this string.
+    """
+    nodes = result.get("nodes")
+    if not isinstance(nodes, dict):
+        return ""
+    kinds = [f"{n}={nd['kind']}" for n, nd in nodes.items()
+             if isinstance(nd, dict) and nd.get("kind") and not str(n).startswith("_")]
+    return " | nodes: " + ", ".join(kinds) if kinds else ""
+
+
 def _summarize(result: Any) -> str:
     if isinstance(result, dict):
         if result.get("error"):
             return f"error: {result.get('error')}"
         keys = [k for k in result if not k.startswith("_")]
-        return "keys: " + ", ".join(keys[:8])
+        return "keys: " + ", ".join(keys[:8]) + _declared_nodes(result)
     return str(result)[:200]
 
 

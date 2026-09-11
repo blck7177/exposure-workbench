@@ -51,9 +51,34 @@ URL = os.getenv("DATABASE_URL_RLS",
 FIXTURE_URL = URL.replace("/exposure_workbench", "/" + os.getenv("BATTERY_DB", "exposure_battery"))
 FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 
+# A BOUND AGAINST A RUNAWAY ROW, not a display convenience — and the previous
+# caps were neither. `left(args, 300)` was sized when one question was many short
+# addressed calls: `compute`'s longest argument list across both V26 rounds is
+# 298 characters, so the per-call protocol never met the cut. V30 replaced it
+# with ONE program per question, 179 of 202 `run` calls run past 300, and a rank
+# node comes after the vector it orders — so the cut removed exactly what the
+# counters read. It broke two of them silently:
+#
+#   superlative_without_rank   reported 37 of 52 on V26_C3 where the full
+#                              arguments, still in `agent_steps` and never
+#                              truncated at the write, say 14.
+#   the answer-mark counter    json.loads of a truncated `respond` payload
+#                              raised on 273 of 280 turns and fell back to the
+#                              rendered text its own comment says not to read.
+#
+# Cost of the wider cap, measured over the 110 sessions of both rounds: 1119 kB
+# of arguments against 361 kB, on spike files that are already 3.4 MB and 4.6 MB.
+# The cap is not what makes the ordering question answerable — `run` now records
+# the kinds it declared (tools/registry._declared_nodes), and battery_counters
+# reads that instead of the program text. What the cap buys is every OTHER reading
+# of a trace: the mark counter's payload, a replay, a forensic recount. Rounds
+# already on disk keep the cut they were written with; a round before the
+# declaration existed is reported as undeclared, never guessed.
+_ARGS_CAP, _RESULT_CAP = 4000, 1000
+
 _STEPS = text(
-    "SELECT seq, step_type, tool_name, status, left(result_summary, 200) AS result, "
-    "       left(args::text, 300) AS args, prompt_tokens, completion_tokens "
+    f"SELECT seq, step_type, tool_name, status, left(result_summary, {_RESULT_CAP}) AS result, "
+    f"       left(args::text, {_ARGS_CAP}) AS args, prompt_tokens, completion_tokens "
     "FROM agent_steps WHERE session_id = :s AND message_id = :m ORDER BY seq")
 
 _RELEASE = text("UPDATE agent_sessions SET turn_started_at = NULL WHERE id = :s")
