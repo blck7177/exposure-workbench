@@ -188,6 +188,14 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         return v
     asked = {_core(t["token"]) for t in A.tokens_in(question or "")}
     all_passages = list(ledger.passages)
+    # THE TEXTS THIS TURN HOLDS, which quotation marks may claim: a passage the
+    # desk read, the desk's own words for what it could not do, and the question
+    # the user asked. All three exist, all three are checked the same way.
+    turn_texts = [(pid, _quoted(txt)) for pid, txt in ledger.passages.items()]
+    turn_texts += [(r["id"], _quoted(str(r.get("value") or r.get("text") or "")))
+                   for r in ledger.by_id.values() if r.get("kind") == F.ABSENCE and (r.get("value") or r.get("text"))]
+    if question:
+        turn_texts.append((None, _quoted(question)))
     subjects_on_ledger = {s for s in (_short_subject(r.get("subject")) for r in ledger.by_id.values()) if s}
     # every phrase a measure on the ledger reads as, and the measures that read so
     phrases: dict[str, set[str]] = {}
@@ -225,15 +233,17 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         # G4 — quotations: verified spans exempt their digits
         quoted_ok: list[tuple[int, int]] = []
         for span in quoted_spans(blanked):
-            hit = [pid for pid in all_passages if _quoted(span) in _quoted(ledger.passages[pid])]
+            want = _quoted(span)
+            hit = [tid for tid, txt in turn_texts if want and want in txt]
             start = blanked.find(span)
             if hit:
                 quoted_ok.append((start, start + len(span)))
-                v.refs += hit[:1]
+                v.refs += [t for t in hit[:1] if t]
             else:
                 v.problems.append({"at": f"prose[{i}]", "reason": "unverified_quote", "quote": span[:120],
-                                   "fix": "quotation marks say these words are verbatim in a passage read this turn: "
-                                          "reproduce the source wording, or drop the marks"})
+                                   "fix": "quotation marks say these words are verbatim in a text this turn holds — a passage "
+                                          "the desk read, the desk's own words for what it could not do, or the question: "
+                                          "reproduce the wording, or drop the marks"})
 
         sentences = _sentences(blanked)
         tokens = A.tokens_in(blanked)
@@ -259,6 +269,13 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             found = ledger.readings(tok) if kind == "num" else []
             if pinned:
                 mine = [(fid, per) for fid, per in found if fid == pinned]
+                if not mine and ledger.kind(pinned) == F.PASSAGE and ledger.resolve_in_passages(tok, [pinned]):
+                    # the mark names the passage that STATES this figure — the desk
+                    # showed the words, not a computed reading (V33E Q19 marked each
+                    # segment revenue with the filing it came from, 25 refusals)
+                    v.links[(i, start)] = {"to": "passage", "ids": [pinned], "as_written": tok}
+                    v.refs.append(pinned)
+                    continue
                 if not mine and pinned not in ledger.resolve_identity(tok):
                     rec = ledger.by_id[pinned]
                     v.problems.append({"at": f"prose[{i}]", "reason": "mark_mismatch", "figure": tok, "id": pinned,

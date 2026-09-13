@@ -266,16 +266,6 @@ def test_a_comparison_across_units_is_prose_and_a_change_across_units_is_not():
     assert "change_conflict" in {p["reason"] for p in v.problems}
 
 
-def test_quotation_marks_hold_a_passages_words_and_nothing_else():
-    """What the desk could not do is said in the analyst's own words; quotation
-    marks claim a passage read this turn. Trying the absence texts and the
-    question when a passage misses was a fallback, and it let a paraphrase of the
-    desk's refusal read as a quotation."""
-    v = ac.check("The desk said it \"does not compute liquidation days\", so I give the inputs.", _C_LEDGER)
-    assert {p["reason"] for p in v.problems} == {"unverified_quote"}
-    assert ac.check("The desk does not compute liquidation days, so I give the inputs.", _C_LEDGER).ok
-
-
 def test_a_quotation_is_its_words_and_the_nesting_marks_may_change():
     """V33D Q09: 381 verbatim characters refused because the source's inner `"`
     had to become `'` to sit inside the analyst's own quotation."""
@@ -338,3 +328,25 @@ def test_an_identity_link_keeps_the_words_as_written():
 def test_a_measure_phrase_may_name_an_operand_of_the_figure():
     """V33D Q03: 'dividends paid were 12% of operating cash flow' beside the share fact."""
     assert ac.check("Dividends paid took 12.0% of operating cash flow.", _D_LEDGER).ok
+
+
+def test_a_quotation_may_come_from_any_text_the_turn_holds():
+    """V33E: the desk's own words for what it could not do, and the question's own
+    words, are texts of this turn and verbatim-checkable like a passage. Refusing
+    them cost 50 of the round's 63 unverified_quote refusals."""
+    led = Ledger.of([*_C_LEDGER.by_id.values()])
+    assert ac.check('The desk says it "does not compute liquidation days", so I give the inputs.', led).ok
+    assert ac.check('You asked for "days to liquidate at 20% of ADV"; the desk does not hold it.', led,
+                    question="days to liquidate at 20% of ADV, which names take longest").ok
+    v = ac.check('The desk said "liquidation here is a matter of weeks".', led)
+    assert {p["reason"] for p in v.problems} == {"unverified_quote"}
+
+
+def test_a_mark_may_name_the_passage_that_states_the_figure():
+    """V33E Q19: the analyst marked each segment revenue with the filing it came
+    from; the pinned path never consulted passages and refused all 25."""
+    led = Ledger.of([*_C_LEDGER.by_id.values(),
+                     _passage("f_seg01", "AMZN", "Net sales: AWS 90,757 and 107,556 in the two years shown.")])
+    assert ac.check("Amazon's filings show AWS net sales of $90,757 [f_seg01].", led).ok
+    v = ac.check("Amazon's filings show AWS net sales of $91,999 [f_seg01].", led)
+    assert {p["reason"] for p in v.problems} == {"mark_mismatch"}
