@@ -117,6 +117,8 @@
 
 被整体删除的(V24):`quantities` 的门角色、`table.py`(声明→切片→砍范围)、`resolver.py`、`answer_blocks.py`(六种块、九类数字豁免、槽 `{ref, name}`)、`prose_critic.py`、`Tool.evidence` 声明。留下的 `quantities.py` 只为 run 子表命名(compute 的 `ref:name` 操作数、read_book 按名读);compute 的操作数也接受 `f_` id。
 
+**★ V33(2026-09-13)chat 出口 = 自然语言 + 数字/关系词核对**(`services/answer_check.py`)。分析师的回复是散文;核对器把每个数字/日期解析到本 session 账本上的 fact(按值与身份:主体、measure、日期、measure 名里的数字;序列的点也是 fact,链到该序列在该点日期上)、所引段落或用户问题;一值多 fact 时按句内主体 → measure → 日期收窄,或由紧随的 `[f_…]` 指定。关系词对照 fact,不由模型声明:最高级旁的读数须是 rank/top 节点的条目;升降词须与两个读数一致;变化须是同一 measure 的两个读数或 yoy/qoq/pct/cagr/sub 节点;档位词须是句中所指的档;日期词后须是日期。`[table: node]`/`[chart: node]` 指向程序节点,渲染成块。问题一次全报、各带修法;两次机会,之后本轮以门槛收场。`accepted()` 的块形状与 V24 一致。brief 路径(`submit_brief`)仍走 claims/gate。
+
 ## 8. Agent 层
 
 **拓扑 1 + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ research 子会话(worker 内,产 brief)。
@@ -126,6 +128,8 @@
 **research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief`(六节 × 同一块文法,同一解析器;五节各须指向证据)→ `issuer_briefs`(文本列 + `blocks` JSONB)。
 
 **ExposureWorkflow**(`workflow/exposure_workflow.py`,确定性,worker 执行):加载 → 校验 → 行情 → `calculate_exposure` → `calculate_attribution`(8 因子回归)→ `calculate_risk`(VaR/ES/压力/限额)→ `generate_report`;每步 `workflow_events`,run 三切片(metrics / attributions / alerts)。
+
+**★ V33(2026-09-13)分析师 + 证据 broker。** meta-agent 循环只剩一个进程内工具 `request_evidence(items)`(主体、目录里的名字、窗口、比较),出口是纯文本;系统提示只有角色与一条规则;第一次 completion 之前推入 BRIEFING(`services/briefing.py`:问题主体的目录——持仓的 sector、检查的档位、已 filed 的行、可算/不可算方法、就绪与在备的发行人、边界;不含任何数字)与 skill 的领域知识。`agents/evidence_broker.py` 在**同一 session、同一 message、共享本轮 tool_session** 下把请求编成 program(`services/program_builder.py` 确定性构造;不可表达时由 program 作者 LLM 读 `signature_text()` 与静态类型报告来写,最多三次),或映射为 read_filings / search_web / start;返回摘要:每个图形带 id/主体/measure/显示值/as_of/window,边界带类别(type / data_absent / budget / held_back)。**摘要里的每个值都在账本上。** 新增 step:request、digest、answer(被拒时 status=rejected)。research 子会话形状未变(列入后续);其工具结果的截断现在保留被 expand 打开的那一节(`dumps_capped(keep=)`)。
 
 ## 9. 用户能做什么(F1–F6 对照 TARGET §1)
 

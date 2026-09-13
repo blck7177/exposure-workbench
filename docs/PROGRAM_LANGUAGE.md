@@ -1,4 +1,4 @@
-# The program language (V30)
+# The program language (V30; V33 types, constants and filter, 2026-09-13)
 
 What the model writes when a question needs figures. One program per
 quantitative intent; the desk executes it, every node becomes a ledger row
@@ -39,13 +39,42 @@ whole language; the same text (abridged) is the `run` tool's description.
 A table is not an arithmetic operand: `pick` one figure of it, or read a
 `column` of it (scenarios read like runs).
 
+## Types (V33)
+
+Every primitive has a signature: the kinds its arguments take and the kind it
+returns, which may depend on the arguments (`fundamentals` with `last_n` is a
+series and with no `metric` a table; `method` over a list is a vector;
+arithmetic follows its operands). `program_service.SIGNATURES` holds them as
+data, `signature_text()` renders them for the program writer, and
+`typecheck(program)` infers every node's kind in binding order and reports
+**every** problem at once, each with its fix:
+
+```json
+{"error": "type_errors", "problems": [
+  {"at": "tbl", "reason": "type_mismatch", "arg": "entries.ocf", "expected": ["scalar", "number"], "got": "series",
+   "fix": "vector.entries.ocf takes one figure and a series has many: latest(of=…) is its last point, or drop last_n"}]}
+```
+
+`run` typechecks before it executes anything: a type problem makes no absence
+fact and no ledger row; a node that depends on a refused node is not reported
+twice. What the check cannot know statically — whether a filed line is a flow
+or a balance, whether a date exists — is refused at run time by that node
+(`invalid_params`), never by a crash and never by dropping the argument.
+
+`BOUNDARIES` (same module) is what no program can say, as data the writer and
+the analyst both read: price methods take a window, never an as-of date; a
+scenario re-prices the book and re-runs the limit checks but does not re-fit
+betas, volatility, VaR or stress; the only condition over a vector is `filter`;
+figures stated only in filing prose are not filed facts; the desk does not
+forecast; an unprepared ticker refuses every read.
+
 ## Primitives
 
 **Reads**
 
 | fn | args | yields |
 |---|---|---|
-| `fundamentals` | `ticker`, `metric?`, `months?` (3/6/9/12), `start?`,`end?`, `at?`, `last_n?` | a flow over a window (scalar); with `last_n` a series; a balance at `at` (scalar); with no `metric` the whole balance sheet (table) |
+| `fundamentals` | `ticker`, `metric?`, `months?` (3/6/9/12), `start?`,`end?`, `at?`, `last_n?` | a flow over a window (scalar); with `last_n` a series; a balance at `at` (scalar; instants only — a flow with `at` is refused, V33); with no `metric` the whole balance sheet (table) |
 | `prices` | `ticker`, `window?` (1m/3m/6m/1y/3y) | series of adjusted closes |
 | `window_return` | `ticker`, `start`, `end`, `benchmark?` | total return between two dates (a picked episode date may be named as `"$peak"`) |
 | `price` | `ticker`, `as_of?` | table: close, adj_close |
@@ -57,11 +86,15 @@ A table is not an arithmetic operand: `pick` one figure of it, or read a
 **Arithmetic** — `add`, `sub`, `mul`, `div` (`a`, `b`): scalar∘scalar; vector∘scalar
 broadcasts; vector∘vector aligns by label. `scale` (`of`, `factor`, `unit?`): a
 figure or a vector times a constant. The typed calculator's refusals apply
-unchanged (units, periods, books, containment).
+unchanged (units, periods, books, containment). **A number is an operand**
+(V33): `{"fn": "sub", "a": "$m", "b": 0.08}` records the constant as a
+`calc.scalar.constant` row typed like its partner, and the result's measure
+names it — `subtract(max[10](issuer_exposures.weight), 0.08)`; `mul`/`div` by
+a number is `scale`. Two constants alone are refused.
 
 **Sets** — `sum`, `avg`, `min`, `max`, `std` (`of`: a vector, or a series for
 its own history); `abs` (`of`); `rank` (`of`, `direction?` highest/lowest);
-`top` (`of`, `n`, `direction?`) = rank, then the first n as a vector; `select` (`of`, `labels`): the entries named, as a vector; `vector` (`entries`: `{label: $scalar, …}`, one unit): named scalars gathered so rank/top/avg apply.
+`top` (`of`, `n`, `direction?`) = rank, then the first n as a vector; `select` (`of`, `labels`): the entries named, as a vector; `vector` (`entries`: `{label: $scalar, …}`, one unit): named scalars gathered so rank/top/avg apply — an entry may be a number (V33; constants alone are refused). `filter` (`of`: a vector or ranking, `op`: one of `> >= < <= == !=`, `level`: a number or a scalar; V33): the entries that satisfy, as a vector; none → the absence `no_entry_satisfies`, listing the entries.
 
 **Series** — `yoy`, `qoq`, `pct`, `cagr`, `latest` (`of`: a series); `at`
 (`of`, `period` YYYY-MM-DD): one point as a scalar.
@@ -83,6 +116,15 @@ its own history); `abs` (`of`); `rank` (`of`, `direction?` highest/lowest);
    `sub` of two readings — never one point written twice.
 5. **The prior run is explicit**: `run(portfolio, which="prev")`; no prior run
    → refused, never assumed.
+6. **A type problem stops the program before it runs** (`type_errors`, every
+   node at once); a value a service cannot read stops only its node
+   (`invalid_params`). Nothing is dropped on the floor: `at` on a flow is a
+   refusal that names the window to ask for. (V33)
+7. **A node's declared dates reach its facts.** `peak`, `trough`, `at`, `start`,
+   `end`, `as_of`, `period` in a node's arguments are in its facts' `params`,
+   and start/end make a `window` — so "the drawdown started on 2026-01-07" cites
+   the explanation that carries that date. A picked date is a `literal` node,
+   shown as one, citable through the node that used it. (V33)
 
 ## Examples
 
@@ -115,6 +157,15 @@ Revenue growth, and a margin compared across issuers:
   ["best", {"fn": "rank", "of": "$gm", "direction": "highest"}]]}
 ```
 
+Who is over 8%, and the room from the largest to that line (V33):
+```json
+{"let": [
+  ["r",    {"fn": "run", "portfolio": "port_001"}],
+  ["w",    {"fn": "column", "run": "$r", "table": "issuer_exposures", "col": "weight"}],
+  ["over", {"fn": "filter", "of": "$w", "op": ">", "level": 0.08}],
+  ["room", {"fn": "sub", "a": {"fn": "max", "of": "$w"}, "b": 0.08}]]}
+```
+
 Rate sensitivity per name, and a hypothetical sale:
 ```json
 {"let": [
@@ -125,9 +176,27 @@ Rate sensitivity per name, and a hypothetical sale:
   ["mv_after", {"fn": "pick", "of": "$after", "key": "exposure_metrics.portfolio_market_value"}]]}
 ```
 
-## Claims the answer makes over nodes
+## The answer over nodes
 
-`respond` states each figure as a claim over facts: `level` (a reading; a
+**Chat (V33).** The exit is prose (`agents/meta_agent.py`, checked by
+`services/answer_check.py`). The analyst writes each figure as the desk showed
+it; the check resolves every number and date in the prose to a ledger fact by
+value and identity (subject, measure, date, the numbers in a measure's name),
+to a quoted passage, or to the question. A point of a series is a figure the
+ledger holds (the digest shows a series as its points): it is linked to the
+series on the point's own date. A number under several facts is
+pinned by the sentence's subject, then its measure words, then its date, or by
+a trailing `[f_…]`. Relation words are checked against the facts, not declared
+by the model: a superlative next to a figure needs that figure to be an entry
+of a `rank`/`top` node (`superlative_without_rank`); "rose"/"fell" need the two
+readings to agree (`direction_conflict`); a change needs two readings of one
+measure or a `yoy`/`qoq`/`pct`/`cagr`/`sub` node (`change_conflict`); a tier
+word needs the tier the sentence names (`tier_mismatch`); "started/peaked/as
+of" need a date (`date_expected`). `[table: node]` / `[chart: node]` name
+program nodes and render as blocks. Every problem is reported at once with its
+fix; the analyst has two attempts, then the turn ends on the bar.
+
+**Research (`submit_brief`) still states claims over nodes.** It states each figure as a claim over facts: `level` (a reading; a
 series stands for its latest point), `tier` (a warning/breach/limit level,
 said as one), `change` (of = the later reading or a yoy/qoq/sub node or a
 series, against = the earlier; `f_…@period` addresses one point), `versus`
@@ -152,9 +221,16 @@ change, a superlative with no rank node, a MONEY figure called days — refused.
 Every figure in `nodes` is a Fact in `facts` with its full identity; the
 answer points at facts (`f_…`) or at nodes by name through claims.
 
+V33 additions: a program with a type problem comes back as
+`{"error": "type_errors", "problems": [...]}` and nothing ran; a picked date is
+a node `{"kind": "literal", "value": "2026-01-07", "deps": [...]}`; a method's
+facts carry `params` with the dates it was asked with and, given start/end, a
+`window`.
+
 ## Boundaries (recorded from the V26 program authoring, 2026-09-09)
 
-Things a program cannot say, and why — algebra policy, not language:
+V33: `program_service.BOUNDARIES` is the list the program writer and the
+analyst read (see Types). Below, the algebra boundaries — policy, not language:
 
 - **Book minus market.** The book's window return minus SPY's is refused (`mixed_worlds`): a book figure
   and an issuer's account are two worlds; the ratio goes through. An excess return is read off the two

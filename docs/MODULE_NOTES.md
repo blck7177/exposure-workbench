@@ -265,7 +265,7 @@ Tavily → `research_sources` 的唯一生产者。补全证据宇宙第四类�
 
 ### Brief Agent = 分析 subagent 会话的收尾,不是独立实体
 
-每个 research run 只有一个 agent 会话:探索者就是写作者,无交接物。
+每个 research run 只有一个 agent 会话:探索者就是写作者,无交接物。★ V33(2026-09-13):chat 路径已拆成分析师与证据 broker(见 M10 的 V33 注),取到 ≠ 写对,保证正确的是门与共享账本;research run 仍是这个形状,列入后续。
 
 ```
 workflow 确定性步(摄取→索引→行情→recipe 基线)全绿后:
@@ -425,6 +425,8 @@ skip 参数裁剪作用于 face;"agent 能干什么"的答案在一处配置,审
 - MVP 单活跃会话,无跨会话记忆,无自主定时行为
 
 ### ★ 已定:respond 也是工具(选项 1)
+
+★ V33(2026-09-13):**chat 出口不再是 `respond` 工具。** 分析师(`agents/meta_agent.py`)只有一个进程内工具 `request_evidence`,回复是自然语言,由 `services/answer_check.py` 对本 session 账本核数字与关系词(≤2 次);证据由 `agents/evidence_broker.py` 在同一 session 下取。"但凡引了,必须是真的"不变——只是现在**引用是核对器对出来的,不是模型写出来的**。`respond`/claims/gate 留给 research 路径的 `submit_brief`(同形改造列入后续)。
 
 `respond(text, citations[])` 是会话唯一出口:citations 结构化提交,wrapper 校验每个 id ∈ 本轮 Evidence Trail。**但凡引了,必须是真的**。一套门机制服务 chat 消息与 Brief 两种产物。
 
