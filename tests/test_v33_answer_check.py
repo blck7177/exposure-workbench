@@ -141,7 +141,8 @@ def test_q14_a_date_word_followed_by_a_percentage_is_refused_and_by_a_date_passe
 
 
 def test_q13_a_change_between_two_units_is_refused():
-    _refused("Selling half of NVDA lowers gross exposure from $10.63M to 100.0%.", "unit_conflict")
+    # not because the units differ — because they are two different quantities
+    _refused("Selling half of NVDA lowers gross exposure from $10.63M to 100.0%.", "change_conflict")
     _accepted("Technology concentration moves from 35.3% before the sale to 34.0% after the sale.")
 
 
@@ -184,14 +185,20 @@ def test_table_and_chart_marks_name_program_nodes_and_render_as_blocks():
 
 # ── the render ────────────────────────────────────────────────────────────────
 
-def test_a_linked_number_is_rendered_as_the_ledgers_fact():
+def test_the_reader_sees_the_words_the_analyst_wrote_and_the_fact_behind_them():
+    """The render annotates, never substitutes: the run carries the text as written
+    and the ids it opens. Substituting the fact's display was the placeholder
+    grammar's job and V33 deleted the placeholders; it only made true sentences
+    false (V33D: "1-year" came out "$251.89 (2026-09-10)-year")."""
     text = "MSFT weighs 16.0% of the book [f_wmsft]; the warning tier is 15.0% [f_warnmsft]."
     v = _accepted(text)
     out = ac.accepted(text, v, LEDGER)
     runs = out["blocks"][0]["runs"]
-    facts = [r["fact"] for r in runs if isinstance(r, dict) and "fact" in r]
-    assert [f["id"] for f in facts] == ["f_wmsft", "f_warnmsft"]
-    assert "[f_" not in out["text"] and "16.0%" in out["text"]
+    links = [r["link"] for r in runs if isinstance(r, dict) and "link" in r]
+    assert [l["as_written"] for l in links] == ["16.0%", "15.0%"]
+    assert [l["ids"][0] for l in links] == ["f_wmsft", "f_warnmsft"]
+    assert not any("fact" in r for r in runs if isinstance(r, dict))
+    assert out["text"] == "MSFT weighs 16.0% of the book; the warning tier is 15.0%."
     assert out["verified"]["figures"] == 2 and set(out["citations"]) == {"f_wmsft", "f_warnmsft"}
 
 
@@ -200,3 +207,134 @@ def test_all_problems_are_reported_at_once():
     reasons = [p["reason"] for p in v.problems]
     assert {"unsourced_figure", "subject_mismatch", "date_expected"} <= set(reasons)
     assert v.detail.startswith("3 problem(s)") or v.detail.startswith(f"{len(v.problems)} problem(s)")
+
+
+# ── V33C: what the first acceptance round refused that the ledger held ───────
+
+_C_LEDGER = Ledger.of([
+    *LEDGER.by_id.values(),
+    {**_series("f_ni001", "net_income", "AMZN", [["2021-12-31", 33.36e9], ["2025-12-31", 77.67e9]], unit="MONEY"), "params": {"node": "s_ni"}},
+    {**_series("f_fcf001", "free_cash_flow", "AMZN", [["2021-12-31", -9.07e9], ["2025-12-31", 77.67e9]], unit="MONEY"), "params": {"node": "s_fcf"}},
+    _f("f_advmsft", "price.adv", "MSFT", 13.27e9, unit="MONEY_PER_DAY", node="adv"),
+    {"id": "f_abs001", "kind": "absence", "measure": "book.liquidation_days", "subject": "port_001", "unit": None,
+     "value": "the desk does not compute liquidation days; days to liquidate is market value over a share of ADV",
+     "as_of": "n/a", "window": None, "params": {"error": "no_such_method"}, "standalone": False, "sources": [], "group": "x"},
+])
+
+
+def test_a_point_of_a_series_is_a_figure_the_ledger_holds_and_renders_on_its_date():
+    """V33C: 329 of 421 refused figures were points of series the digest had shown."""
+    v = ac.check("Operating cash flow was $46.3B in 2021 and $140.0B in 2025.", _C_LEDGER)
+    assert v.ok, v.problems
+    # the two money figures are points; the years resolve as identity (a series' own dates)
+    points = sorted((l for l in v.links.values() if l.get("period")), key=lambda l: l["as_written"])
+    assert [l["period"] for l in points] == ["2025-12-31", "2021-12-31"]
+    assert all(l["ids"] == ["f_ocf001"] for l in points)
+    out = ac.accepted("Operating cash flow was $46.3B in 2021 and $140.0B in 2025.", v, _C_LEDGER)
+    assert out["text"] == "Operating cash flow was $46.3B in 2021 and $140.0B in 2025."
+    assert "f_ocf001" in out["citations"]
+
+
+def test_a_series_marked_after_its_point_is_the_source_and_a_wrong_mark_is_not():
+    assert ac.check("Operating cash flow reached $140.0B [f_ocf001].", _C_LEDGER).ok
+    v = ac.check("Operating cash flow reached $140.0B [f_wmsft].", _C_LEDGER)
+    assert {p["reason"] for p in v.problems} == {"mark_mismatch"}
+
+
+def test_two_series_sharing_a_point_are_one_reading_and_the_measure_named_leads():
+    """One subject, one date, one number: whichever fact the reader opens, the
+    sentence says the same thing. The page shows a chooser for the two ids and
+    never guesses; the measure the sentence names leads the list."""
+    v = ac.check("Amazon made $77.67B last year.", _C_LEDGER)
+    assert v.ok, v.problems
+    assert set(next(iter(v.links.values()))["ids"]) == {"f_ni001", "f_fcf001"}
+    v = ac.check("Net income was $77.67B in 2025.", _C_LEDGER)
+    assert v.ok and next(iter(v.links.values()))["primary"] == "f_ni001"
+
+
+def test_a_flows_dollars_a_day_match_with_or_without_the_day():
+    """V33C Q15: every ADV figure was refused because the display is "$13.27B/day"."""
+    assert ac.check("MSFT trades $13.27B a day.", _C_LEDGER).ok
+    assert ac.check("MSFT trades $13.27B/day.", _C_LEDGER).ok
+
+
+def test_a_comparison_across_units_is_prose_and_a_change_across_units_is_not():
+    """V33D refused 15 comparisons for holding two units. A comparison is prose; a
+    CHANGE across units is two different quantities, which the measure test refuses."""
+    assert ac.check("MSFT weighs 16.0% of the book against $13.27B of daily volume.", _C_LEDGER).ok
+    v = ac.check("MSFT rose from $13.27B to 16.0%.", _C_LEDGER)
+    assert "change_conflict" in {p["reason"] for p in v.problems}
+
+
+def test_quotation_marks_hold_a_passages_words_and_nothing_else():
+    """What the desk could not do is said in the analyst's own words; quotation
+    marks claim a passage read this turn. Trying the absence texts and the
+    question when a passage misses was a fallback, and it let a paraphrase of the
+    desk's refusal read as a quotation."""
+    v = ac.check("The desk said it \"does not compute liquidation days\", so I give the inputs.", _C_LEDGER)
+    assert {p["reason"] for p in v.problems} == {"unverified_quote"}
+    assert ac.check("The desk does not compute liquidation days, so I give the inputs.", _C_LEDGER).ok
+
+
+def test_a_quotation_is_its_words_and_the_nesting_marks_may_change():
+    """V33D Q09: 381 verbatim characters refused because the source's inner `"`
+    had to become `'` to sit inside the analyst's own quotation."""
+    led = Ledger.of([*_C_LEDGER.by_id.values(),
+                     _passage("f_q9", "AAPL", 'can be found in "Management\u2019s Discussion and Analysis" in Part II')])
+    assert ac.check('The filing says it \u201ccan be found in \u2018Management\u2019s Discussion and Analysis\u2019 in Part II\u201d.', led).ok
+
+
+def test_one_series_fetched_twice_is_one_reading_not_an_ambiguity():
+    """V33D: the analyst asked twice, the ledger held the same series under two ids,
+    and 240 figures were refused as ambiguous."""
+    twice = Ledger.of([*_C_LEDGER.by_id.values(),
+                       {**_series("f_ocf002", "operating_cash_flow", "AMZN", [["2021-12-31", 46.3e9], ["2025-12-31", 140.0e9]], unit="MONEY"),
+                        "params": {"node": "ocf_again"}}])
+    v = ac.check("Operating cash flow reached $140.0B in 2025.", twice)
+    assert v.ok, v.problems
+    (link,) = [l for l in v.links.values() if l.get("period")]
+    assert link["period"] == "2025-12-31" and set(link["ids"]) == {"f_ocf001", "f_ocf002"}
+
+
+def test_a_measure_named_in_the_sentence_may_be_the_series_point_beside_it():
+    """V33D: 'operating cash flow' named, the figure a point of that series, and the
+    check compared the phrase against the sentence's scalars only."""
+    assert ac.check("Amazon's operating cash flow was $140.0B beside a capex intensity of 18.4%.", _C_LEDGER).ok
+
+
+# ── V33D ─────────────────────────────────────────────────────────────────────
+
+_D_LEDGER = Ledger.of([
+    *_C_LEDGER.by_id.values(),
+    _f("f_hygret", "price.window_return", "HYG", 0.0107, node="ret1y", window="1y"),
+    {**_f("f_ddhyg", "price.drawdown", "HYG", 0.0234, unit="RATIO", node="dd"), "window": {"start": "2026-02-20", "end": "2026-03-27"}},
+    _f("f_divshare", "divide(dividends_paid, operating_cash_flow)", "AMZN", 0.12, node="div_share"),
+])
+
+
+def test_a_bare_integer_is_not_a_percentage():
+    """V33D Q18: '1y window return' rendered as '1.07%y' — the 1 matched 0.0107."""
+    v = ac.check("HYG's 1-year window return is 1.07%, and 2 episodes were found.", _D_LEDGER, question="two episodes?")
+    assert v.ok, v.problems
+    figures = [l for l in v.links.values() if l["to"] == "fact" and l.get("how") != "identity"]
+    assert [l["as_written"] for l in figures] == ["1.07%"]
+    # the desk showed that figure as "1.07%": a bare "1" is not a rounding of it at
+    # the precision the desk used, and the hyphenated "1-year" is not a figure at all
+    assert "f_hygret" not in _D_LEDGER.resolve_number("1")
+    assert _D_LEDGER.readings("1.07%") == [("f_hygret", None)]
+
+
+def test_an_identity_link_keeps_the_words_as_written():
+    """V33D Q19: 'in 2023' rendered as 'in $717B (2025-12-31)'; Q18: 'over 2026-02-20 to
+    2026-03-27' rendered as 'over 2.34% to 2.34%'."""
+    text = "HYG drew down 2.34% over 2026-02-20 to 2026-03-27. Amazon's operating cash flow was $140.0B in 2025."
+    v = ac.check(text, _D_LEDGER)
+    assert v.ok, v.problems
+    out = ac.accepted(text, v, _D_LEDGER)
+    prose = out["text"]
+    assert prose == text, prose
+
+
+def test_a_measure_phrase_may_name_an_operand_of_the_figure():
+    """V33D Q03: 'dividends paid were 12% of operating cash flow' beside the share fact."""
+    assert ac.check("Dividends paid took 12.0% of operating cash flow.", _D_LEDGER).ok

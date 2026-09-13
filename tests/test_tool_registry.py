@@ -200,8 +200,12 @@ async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(
     assert 0 < shown <= F.FACTS_PER_RESULT < total, "whole facts came off the tail until the result fit"
     assert out["held_back"]["count"] == total - shown and "read_book(" in out["held_back"]["how"]
     assert sum(1 for v in out["figures"].values() if v == "held_back") == total - shown
+    # V33: the cap bounds the PAYLOAD, not the session's knowledge. A figure held
+    # back was still computed and is still evidence; the answer check must be able
+    # to resolve it (Q15's rank was capped out of the ledger and the answer refused
+    # for having no ordering behind its superlative).
     [(recorded)] = _facts_recorded(log)
-    assert len(recorded) == shown, "what is recorded is what was shown"
+    assert len(recorded) == total, "the ledger records every fact the call made"
 
 
 def test_every_tool_on_a_face_has_a_fact_adapter():

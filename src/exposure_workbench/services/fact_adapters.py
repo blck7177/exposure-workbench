@@ -753,6 +753,10 @@ READ_BY_NAME = {
 
 def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None]:
     """(facts shown, note, held_back) for one tool result — the wrapper's call.
+    `adapt_all` is the same call with the facts it HELD BACK as well: they are
+    evidence either way, and the ledger records them (V33: a cap sized for a
+    model's context was trimming the ledger, and a rank the analyst asked for
+    never reached it).
 
     The adapter reads the payload in the form the model reads it: serialized
     once with the encoder the agent loop uses, and loaded back. In process a
@@ -780,7 +784,24 @@ def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict
         held["how"] = READ_BY_NAME.get(tool, "ask for fewer names")
         dropped = {f.id for f in facts[len(kept):]}
         note = _blank_ids(note, dropped)
+    _ALL.set(facts)
     return kept, note, held
+
+
+# The facts one `adapt` made, held-back ones included: `adapt` returns what the
+# model may READ, this is what the session KNOWS. Set by the call above and read
+# by the wrapper right after it, in the same task.
+_ALL: contextvars.ContextVar[list] = contextvars.ContextVar("adapt_all_facts", default=[])
+
+
+def adapt_all(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None, list[F.Fact]]:
+    """`adapt`, plus every fact it made — the ledger's share."""
+    token = _ALL.set([])
+    try:
+        kept, note, held = adapt(tool, args, result)
+        return kept, note, held, list(_ALL.get())
+    finally:
+        _ALL.reset(token)
 
 
 def _blank_ids(node: Any, ids: set[str]) -> Any:

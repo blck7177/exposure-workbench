@@ -11,6 +11,7 @@ import pytest
 
 import tests.test_fact_adapters as A
 from exposure_workbench.services import fact_adapters as fa
+from exposure_workbench.analytics import display_conventions as dc
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import ledger as L
 
@@ -62,13 +63,19 @@ def test_G3_money_under_a_scale(led):
     assert mv["id"] in led.resolve_number(f"${v:,.0f}")
     assert mv["id"] in led.resolve_number(f"${v/1e6:.2f}M")
     assert mv["id"] in led.resolve_number(f"{v/1e6:.2f} million")
-    assert mv["id"] in led.resolve_number(f"${v/1e6:.1f}m")
 
 
-def test_G3_a_ratio_written_as_bare_percent_number(led):
+def test_G3_the_desks_own_precision_decides(led):
+    """V33: the writer was shown one form of the figure and told to write it as
+    shown, so the match is at the DESK's precision, not the writer's. At the
+    writer's, a bare "1" is a correct rounding of 0.78 — which is how "1-year"
+    reached a MULTIPLE and came out of the renderer as its value."""
+    mv = next(r for r in led.by_id.values() if r["measure"] == "issuer_exposures.market_value" and r["subject"] == "MSFT")
     weight = next(r for r in led.by_id.values() if r["measure"] == "issuer_exposures.weight" and r["subject"] == "MSFT")
-    assert weight["id"] in led.resolve_number(f"{weight['value']*100:.1f}")   # "16.3" — plainly a percentage
-    # but a bare small number does not turn a count into a ratio
+    assert mv["id"] in led.resolve_number(dc.display(mv["value"], "MONEY"))          # "$1.79M"
+    assert mv["id"] not in led.resolve_number(f"${mv['value']/1e6:.1f}m")            # "$1.8m" — coarser than shown
+    assert weight["id"] in led.resolve_number(dc.display(weight["value"], "RATIO"))  # "16.3%"
+    assert weight["id"] not in led.resolve_number(f"{weight['value']*100:.1f}")      # "16.3" — the desk showed a percent
     assert led.resolve_number("0.5") == [] or all(led.by_id[i]["unit"] != "COUNT" for i in led.resolve_number("0.5"))
 
 

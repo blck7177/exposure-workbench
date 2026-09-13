@@ -422,6 +422,43 @@ def _static_ref(kinds: dict, v: Any, position: str | None) -> tuple[str | None, 
     return _lit_kind(v), None
 
 
+def _tool_names() -> tuple[str, ...]:
+    """The desk's tools, from the faces themselves — a program computes, and a
+    name that belongs to a tool is sent to that tool, not misspelled here."""
+    from exposure_workbench.tools import faces
+    names: set[str] = set()
+    for face in (getattr(faces, n) for n in dir(faces) if n.startswith("FACE_") and isinstance(getattr(faces, n), list)):
+        names.update(face)
+    return tuple(sorted(names - set(PRIMITIVES)))
+
+
+def _unknown_fn_fix(fn: str) -> str:
+    """What to write instead of a name that is not a primitive. V33C: 16 of the
+    writer's 39 type problems were a METHOD written as fn ('book.reconcile',
+    'price.window_return'), and the fix said 'call it as a tool'."""
+    spec = skill.METHODS.get(fn) if isinstance(fn, str) else None
+    if spec is not None:
+        subj = {"issuer": "'<ticker>'", "price": "'<ticker>'", "run": "$<run node>", "portfolio": "'<port_…>'"}.get(spec.subject_kind, "…")
+        return f"{fn!r} is a METHOD, not a primitive: {{fn: 'method', name: {fn!r}, subject: {subj}}}"
+    if fn in _tool_names():
+        return f"{fn!r} is a tool, not a primitive: a program computes; filings and the web are read through the desk's tools (a request's filings:/news: wants)"
+    import difflib
+    near = difflib.get_close_matches(str(fn), list(PRIMITIVES), n=3, cutoff=0.5)
+    return ("did you mean " + ", ".join(near) + "?") if near else "the primitives are listed; a desk method is {fn: 'method', name: …}"
+
+
+def _unknown_method_fix(mname) -> str:
+    from exposure_workbench.services import concept_mapping as _cm
+    if isinstance(mname, str) and mname in getattr(_cm, "SUPPORTED_METRICS", ()):
+        return f"{mname!r} is a FILED LINE, not a method: {{fn: 'fundamentals', ticker: '<ticker>', metric: {mname!r}}}"
+    if mname in _tool_names():
+        return f"{mname!r} is a tool, not a method: a program computes; filings and the web are read through the desk's tools (a request's filings:/news: wants)"
+    if isinstance(mname, str) and mname in PRIMITIVES:
+        return f"{mname!r} is a primitive: write {{fn: {mname!r}, …}} directly"
+    near = skill.nearest(str(mname)) if isinstance(mname, str) else []
+    return ("did you mean " + ", ".join(near[:3]) + "?") if near else "the methods are listed under METHODS"
+
+
 def _accepts(expected: tuple, got: str) -> bool:
     """Whether a kind fits a position. A union kind ("scalar|table": a method
     the executor may type either way) fits if any of its parts does — the
@@ -448,6 +485,10 @@ def _fix(fn: str, arg: str, expected: tuple, got: str) -> str:
         return f"{fn} takes a series: add params.last_n to the method, or last_n to fundamentals"
     if fn == "fundamentals" and arg == "ticker" and got == T_LABELS:
         return "fundamentals reads one ticker; several tickers are a method over [tickers], or one fundamentals node per ticker"
+    if fn == "figure" and arg == "run" and got == TABLE:
+        return "figure reads a RUN; a scenario's figure is pick(of=$after, key='exposure_metrics.<name>')"
+    if fn == "pick" and arg == "of" and got in (SCALAR, T_OBJECT, T_NUMBER, T_STRING):
+        return "pick reads one figure of a TABLE, RUN or VECTOR node; a scalar is already a figure — use it directly"
     if T_DATE in expected:
         return f"{arg} is a date, YYYY-MM-DD; the prior run is run(which='prev'); a prior period is last_n"
     if T_NUMBER in expected and T_STRING not in expected:
@@ -489,7 +530,7 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
     fn = expr["fn"]
     if fn not in PRIMITIVES:
         bad("unknown_primitive", detail=f"{fn!r} is not a primitive of this desk", primitives=sorted(PRIMITIVES),
-            fix="a tool (read_filings, search_web, start) is not a primitive: call it as a tool")
+            fix=_unknown_fn_fix(fn))
         return None
     req, opt = PRIMITIVES[fn]
     given = {k: v for k, v in expr.items() if k != "fn"}
@@ -542,6 +583,12 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
         if not (isinstance(n, int) and not isinstance(n, bool) and n >= 1):
             bad("type_mismatch", arg="n", detail="top: n is a positive integer")
             ok = False
+    elif fn == "fundamentals" and isinstance(given.get("metric"), str) and given["metric"] in skill.METHODS:
+        # V33C Q04: the writer read gross_margin as a filed line; the desk said
+        # "no filed facts under gross_margin" and the analyst told the reader so
+        bad("metric_is_a_method", arg="metric", got=given["metric"],
+            fix=f"{given['metric']!r} is a METHOD, not a filed line: {{fn: 'method', name: {given['metric']!r}, subject: {given.get('ticker')!r}}}")
+        ok = False
     if not ok:
         return None
     ret = sig.returns
@@ -565,6 +612,7 @@ def _check_method(name: str, given: dict, arg_kinds: dict, problems: list) -> bo
     spec = skill.METHODS.get(mname) if isinstance(mname, str) else None
     if spec is None:
         problems.append({"at": name, "reason": "unknown_method", "detail": f"{mname!r} is not a method this desk has",
+                         "fix": _unknown_method_fix(mname),
                          "nearest": skill.nearest(str(mname)) if isinstance(mname, str) else [],
                          **({"door": _other_door(mname)} if isinstance(mname, str) and _other_door(mname) else {})})
         return False
@@ -840,6 +888,11 @@ async def _p_fundamentals(ctx: _Ctx, node: Node, ticker: str, metric: str | None
             if isinstance(b, dict) and _is_num(b.get("value")) and isinstance(b.get("fact_id"), str):
                 node.entries.append((m, b["fact_id"], float(b["value"]), str(b.get("unit_class") or "MONEY").upper()))
         node.ref = node.entries[0][1] if node.entries else None
+        return node
+    if metric in skill.METHODS:
+        # a method's name at the filed-line door is the writer's error, not an absence of data
+        node.kind, node.refusal = ABSENCE, _err("not_a_filed_line", f"{metric!r} is a method of this desk, not a filed line: "
+                                                                    f"{{fn: 'method', name: {metric!r}, subject: {tk!r}}}", ticker=tk, metric=metric)
         return node
     instant = await _metric_is_instant(ctx.db, tk, metric)
     if instant is None:
@@ -1586,7 +1639,7 @@ async def _evaluate(ctx: _Ctx, name: str, expr: Any) -> Node:
         return node
     fn = expr["fn"]
     if fn not in PRIMITIVES:
-        node.refusal = _err("unknown_primitive", f"{fn!r} is not a primitive of this desk", primitives=sorted(PRIMITIVES))
+        node.refusal = _err("unknown_primitive", f"{fn!r} is not a primitive of this desk", primitives=sorted(PRIMITIVES), fix=_unknown_fn_fix(fn))
         return node
     req, opt = PRIMITIVES[fn]
     given = {k: v for k, v in expr.items() if k != "fn"}

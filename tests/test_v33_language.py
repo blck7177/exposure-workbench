@@ -125,3 +125,12 @@ async def test_a_date_the_service_cannot_read_is_that_nodes_refusal_not_the_prog
     assert out["refused"] == ["x"]
     assert out["nodes"]["x"]["refusal"]["error"] == "invalid_params"
     assert out["nodes"]["ok"]["kind"] == "scalar" and out["nodes"]["ok"]["value"] > 0
+
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_a_methods_name_at_the_filed_line_door_is_refused_as_the_writers_error_not_absent_data():
+    """V33C Q04: `fundamentals(metric='gross_margin')` came back metric_not_filed and
+    the analyst told the reader Lilly has no filed facts under gross margin."""
+    out = await _run({"let": [["gm", {"fn": "fundamentals", "ticker": "LLY", "metric": "gross_margin"}]]})
+    assert out["error"] == "type_errors" and out["problems"][0]["reason"] == "metric_is_a_method"

@@ -34,7 +34,12 @@ logger = logging.getLogger(__name__)
 
 PASSAGE_CHARS = 6_000          # of a passage's text the digest carries; the fact holds it whole
 WRITER_ATTEMPTS = 3
-DIGEST_CHAR_LIMIT = 28_000
+# The digest is the only thing the analyst reads, so the digest owns the budget:
+# `_fit` trims rows and says what it held back. It must stay UNDER the loop's
+# message cap (meta_agent.TOOL_RESULT_LIMIT, 28 000), or that cap drops a whole
+# request's answer with no idea which — V33D lost the 30 betas a question asked
+# for and the analyst wrote "the desk truncated both requests".
+DIGEST_CHAR_LIMIT = 24_000
 
 WRITER_SYSTEM = ("You write programs for a portfolio risk desk's calculator. You are given one evidence request and the "
                  "language below; call run_program once with a program that produces exactly the figures asked for, "
@@ -47,6 +52,8 @@ WRITER_TOOL = {"type": "function", "function": {
     "parameters": {"type": "object", "properties": {"program": ps.schema()}, "required": ["program"], "additionalProperties": False}}}
 
 HOW_TO_CITE = ("Write each figure as its `value` reads here; when one value stands under two ids, put [id] after it. "
+               "A series shows its points as [date, value]: write a point's value as shown and name its date in the sentence "
+               "or put the series' [id] after it. "
                "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks. "
                "A boundary is something the desk could not do or does not hold: say so in your own words.")
 
@@ -62,6 +69,74 @@ def _kind_of(item: dict) -> str:
     return "program"
 
 
+def _want_kind(w: str) -> str:
+    lw = str(w).strip().lower()
+    if lw == "prepare":
+        return "prepare"
+    if lw.startswith("filings:"):
+        return "filings"
+    if lw.startswith("news:"):
+        return "news"
+    return "program"
+
+
+def _split(item: dict) -> list[tuple[str, dict]]:
+    """One request item by the kind of each want: the analyst asks for margins
+    and the Item 7 passage in one breath (V33C Q04), and each kind has its
+    own door. Order: what the tools read first, then the program."""
+    groups: dict[str, list[str]] = {}
+    for w in item.get("want") or []:
+        groups.setdefault(_want_kind(w), []).append(w)
+    order = ("prepare", "filings", "news", "program")
+    # a derivation is arithmetic over the program's own names; the tool doors take none
+    return [(k, {**item, "want": groups[k], **({} if k == "program" else {"derive": None})}) for k in order if k in groups]
+
+
+def _fit(digest: dict, limit: int) -> dict:
+    """The digest within its cap by holding back the TAIL ROWS of the largest
+    figure list, then trimming passage texts — never a whole item. V33D: two
+    items of 96 and 30 figures ran past the cap, dumps_capped dropped an item
+    whole, and the analyst wrote 'the desk truncated both requests'."""
+    def size() -> int:
+        return len(ejson.dumps(digest))
+    items = digest.get("items") or []
+    guard = 0
+    while size() > limit and guard < 200:
+        guard += 1
+        biggest = max(items, key=lambda e: len(e.get("figures") or []), default=None)
+        if biggest is None or len(biggest.get("figures") or []) <= 5:
+            break
+        figs = biggest["figures"]
+        cut = max(1, len(figs) // 10)
+        dropped, biggest["figures"] = figs[-cut:], figs[:-cut]
+        note = next((b for b in biggest["boundaries"] if b.get("class") == "held_back" and b.get("by") == "digest"), None)
+        if note is None:
+            note = {"class": "held_back", "by": "digest", "count": 0, "measures": [],
+                    "text": "figures computed and on the ledger but not shown here: the request was too wide for one "
+                            "digest; ask again for the names you need"}
+            biggest["boundaries"].append(note)
+        note["count"] += len(dropped)
+        note["measures"] = sorted({f"{f.get('subject')}:{f.get('measure')}" for f in dropped} | set(note["measures"]))[:30]
+    guard = 0
+    while size() > limit and guard < 50:
+        guard += 1
+        longest = max((p for e in items for p in (e.get("passages") or [])), key=lambda p: len(p.get("text") or ""), default=None)
+        if longest is None or len(longest.get("text") or "") <= 800:
+            break
+        longest["text"] = longest["text"][: max(800, len(longest["text"]) // 2)]
+        longest["shown_chars"] = len(longest["text"])
+    return digest
+
+
+def _merge(into: dict, part: dict) -> dict:
+    for k in ("figures", "series", "passages", "started", "boundaries"):
+        into[k] = list(into.get(k) or []) + list(part.get(k) or [])
+    for k in ("program", "nodes"):
+        if part.get(k) is not None:
+            into[k] = part[k]
+    return into
+
+
 def _display(value: Any, unit: str | None) -> Any:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         try:
@@ -72,13 +147,18 @@ def _display(value: Any, unit: str | None) -> Any:
 
 
 class Broker:
-    def __init__(self, tools_session, llm, db_factory, session_id: str, message_id: str | None, briefing: dict | None):
+    def __init__(self, tools_session, llm, db_factory, session_id: str, message_id: str | None, briefing: dict | None,
+                 examples: list | None = None):
         self._tools = tools_session
         self._llm = llm
         self._db_factory = db_factory
         self._session_id = session_id
         self._message_id = message_id
         self._briefing = briefing or {}
+        # the skill's worked programs for the question's domains: the writer's
+        # reference for a shape the builder cannot compile (V33D Q14 wrote
+        # explain_episode seven ways; the skill has the program)
+        self._examples = list(examples or [])[:4]
         self._pool_empty = False
         self.writer_calls = 0
 
@@ -91,22 +171,24 @@ class Broker:
                 out.append({"i": i, "request": item, "figures": [], "series": [], "passages": [], "started": [],
                             "boundaries": [{"class": "budget", "text": "this turn's evidence budget is spent; answer with what you have"}]})
                 continue
-            kind = _kind_of(item)
-            try:
-                if kind == "prepare":
-                    entry = await self._prepare(item)
-                elif kind == "filings":
-                    entry = await self._filings(item)
-                elif kind == "news":
-                    entry = await self._news(item)
-                else:
-                    entry = await self._program(item)
-            except Exception as exc:  # noqa: BLE001 — one item's failure is one boundary, never a lost turn
-                logger.exception("broker item %d failed", i)
-                entry = _empty(item) | {"boundaries": [{"class": "error", "text": f"the desk could not fulfil this item ({type(exc).__name__})"}]}
+            entry = _empty(item)
+            for kind, part in _split(item):
+                try:
+                    if kind == "prepare":
+                        got = await self._prepare(part)
+                    elif kind == "filings":
+                        got = await self._filings(part)
+                    elif kind == "news":
+                        got = await self._news(part)
+                    else:
+                        got = await self._program(part)
+                except Exception as exc:  # noqa: BLE001 — one part's failure is one boundary, never a lost turn
+                    logger.exception("broker item %d (%s) failed", i, kind)
+                    got = {"boundaries": [{"class": "error", "text": f"the desk could not fulfil {', '.join(part['want'])} ({type(exc).__name__})"}]}
+                entry = _merge(entry, got)
             entry["i"] = i
             out.append(entry)
-        digest = {"items": out, "how_to_cite": HOW_TO_CITE}
+        digest = _fit({"items": out, "how_to_cite": HOW_TO_CITE}, DIGEST_CHAR_LIMIT)
         summary = "; ".join(f"item {e['i']}: {len(e.get('figures', []))} figures, {len(e.get('series', []))} series, "
                             f"{len(e.get('passages', []))} passages, {len(e.get('boundaries', []))} boundaries" for e in out)
         await self._record("digest", {"items": len(items), "writer_calls": self.writer_calls}, summary)
@@ -115,10 +197,24 @@ class Broker:
     # ── the three tool-shaped items ──────────────────────────────────────────
     async def _prepare(self, item: dict) -> dict:
         entry = _empty(item)
+        # The catalogue's own answer to "is this issuer ready", read here because
+        # `start` does not refuse a company it has already prepared. When it does,
+        # this drops (§6).
+        desk = self._briefing.get("desk") or {}
+        on_desk = {t.upper() for t in (desk.get("issuers_on_desk") or [])}
+        preparing = {t.upper() for t in (desk.get("issuers_preparing") or [])}
         for t in item["subjects"]:
-            res = await self._call("start", {"kind": "readiness", "subject": t.upper(),
+            tk = t.upper()
+            if tk in on_desk:
+                # V33C Q12: readiness was started for JPM, which was on the desk all along
+                entry["boundaries"].append({"class": "note", "subject": tk, "text": f"{tk} is already on the desk: ask for its figures by name"})
+                continue
+            if tk in preparing:
+                entry["boundaries"].append({"class": "note", "subject": tk, "text": f"{tk} is being prepared; its figures arrive in the background"})
+                continue
+            res = await self._call("start", {"kind": "readiness", "subject": tk,
                                              "reason": item.get("ask") or "the question needs this issuer on the desk"})
-            self._absorb(entry, res, subject=t.upper())
+            self._absorb(entry, res, subject=tk)
         return entry
 
     async def _filings(self, item: dict) -> dict:
@@ -150,10 +246,17 @@ class Broker:
     async def _program(self, item: dict) -> dict:
         entry = _empty(item)
         hint: dict | None = None
+        held_in = {tk: [h.get("portfolio_id") for h in (d.get("held_in") or []) if isinstance(h, dict) and h.get("portfolio_id")]
+                   for tk, d in (self._briefing.get("issuers") or {}).items() if isinstance(d, dict)}
+        skipped: list[dict] = []
         try:
-            program = pb.build(item)
+            program = pb.build(item, held_in=held_in, skipped=skipped)
         except pb.NotExpressible as e:
             program, hint = None, {"builder": e.reason, "nearest": e.nearest}
+        for sk in skipped:
+            # what the desk could not say, said — one name, not the whole request
+            entry["boundaries"].append({"class": "boundary", "want": sk["want"], "text": sk["reason"],
+                                        **({"nearest": sk["nearest"][:4]} if sk.get("nearest") else {})})
         res = None
         if program is not None:
             res = await self._call("run", {"program": program})
@@ -175,15 +278,21 @@ class Broker:
     async def _write(self, item: dict, hint: dict | None) -> tuple[dict | None, dict | None]:
         """The program writer: the request, the hint, the briefing's names for its
         subjects; the language in its system prompt; the executor's type report
-        as the tool result. Up to WRITER_ATTEMPTS programs."""
+        as the tool result. Up to WRITER_ATTEMPTS programs. Reached only when the
+        builder could compile NOTHING — a request the language can express is
+        compiled, never written twice."""
         excerpt = {s: (self._briefing.get("issuers", {}).get(s) or self._briefing.get("portfolios", {}).get(s))
                    for s in item.get("subjects", [])}
         for v in excerpt.values():
             if isinstance(v, dict):
                 v.pop("items_indexed", None)
                 v.pop("held_in", None)
+        user: dict = {"request": item, "hint": hint, "subjects": excerpt}
+        if self._examples:
+            user["worked_examples"] = [{"title": t, "program": (json.loads(pr) if isinstance(pr, str) else pr)}
+                                       for t, pr in self._examples if pr]
         messages = [{"role": "system", "content": WRITER_SYSTEM},
-                    {"role": "user", "content": json.dumps({"request": item, "hint": hint, "subjects": excerpt}, ensure_ascii=False, default=str)}]
+                    {"role": "user", "content": json.dumps(user, ensure_ascii=False, default=str)[:16_000]}]
         last: dict | None = None
         for _ in range(WRITER_ATTEMPTS):
             self.writer_calls += 1
@@ -227,7 +336,8 @@ class Broker:
         if res.get("error") and "facts" not in res:
             cls = {"budget_exceeded": "budget", "type_errors": "type", "malformed_program": "type",
                    "not_prepared": "data_absent", "company_not_found": "data_absent", "not_listed": "data_absent",
-                   "not_indexed": "data_absent", "active_run_exists": "data_absent"}.get(res["error"], "error")
+                   "not_indexed": "data_absent", "active_run_exists": "data_absent", "not_investigable": "data_absent",
+                   "not_an_sec_filer": "data_absent"}.get(res["error"], "error")
             text = res.get("detail") or res["error"]
             if res.get("problems"):
                 text += " — " + "; ".join((p.get("fix") or p.get("detail") or p.get("reason", "")) for p in res["problems"][:3] if isinstance(p, dict))
@@ -295,7 +405,7 @@ class Broker:
 
 
 def _empty(item: dict) -> dict:
-    return {"request": {k: item.get(k) for k in ("subjects", "want", "window", "compare", "ask") if item.get(k)},
+    return {"request": {k: item.get(k) for k in ("subjects", "want", "window", "compare", "derive", "ask") if item.get(k)},
             "figures": [], "series": [], "passages": [], "started": [], "boundaries": []}
 
 
@@ -310,5 +420,3 @@ def _boundary_text(item: dict, hint: dict | None) -> str:
     return f"the desk could not compute {want} as asked: {reason}.{near_txt}"
 
 
-def render_for_model(digest: dict) -> str:
-    return ejson.dumps_capped(digest, DIGEST_CHAR_LIMIT)

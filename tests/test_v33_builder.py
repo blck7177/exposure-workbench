@@ -74,9 +74,48 @@ def test_a_name_the_desk_does_not_hold_is_not_expressible_with_the_nearest():
     assert "gross_margin" in e.value.nearest
 
 
-def test_a_change_without_a_history_is_not_expressible():
+def test_a_comparison_the_request_cannot_support_costs_the_comparison_only():
+    """V33C Q15 named one unknown line beside two it knew and lost the whole item,
+    `compare: rank` included; the answer then had no ordering for its superlatives."""
+    skipped = []
+    prog = pb.build({"subjects": ["MSFT"], "want": ["net_margin"], "compare": "change"}, skipped=skipped)
+    assert ps.typecheck(prog) == [] and any(b["expr"].get("name") == "net_margin" for b in prog["let"])
+    assert [x["want"] for x in skipped] == ["compare:change"] and "history" in skipped[0]["reason"]
+
+
+def test_a_name_the_desk_does_not_hold_costs_that_name_and_nothing_else():
+    skipped = []
+    prog = pb.build({"subjects": ["port_001"],
+                     "want": ["issuer_exposures.market_value", "issuer_exposures.ticker", "issuer_exposures.weight"],
+                     "compare": "rank"}, skipped=skipped)
+    assert ps.typecheck(prog) == []
+    assert [x["want"] for x in skipped] == ["issuer_exposures.ticker"]
+    assert sum(1 for b in prog["let"] if b["expr"]["fn"] == "rank") == 2, "the ordering the analyst asked for survives"
+
+
+def test_nothing_expressible_is_still_not_expressible():
     with pytest.raises(pb.NotExpressible):
-        pb.build({"subjects": ["MSFT"], "want": ["net_margin"], "compare": "change"})
+        pb.build({"subjects": ["MSFT"], "want": ["no_such_line"]})
+
+
+def test_a_derivation_is_arithmetic_over_the_names_the_request_asked_for():
+    """V33C Q11 asked for the four limit columns and said 'the room to warning' in
+    `ask`; the room was the analyst's own subtraction in prose, and refused."""
+    prog = _ok({"subjects": ["port_001"],
+                "want": ["limit_checks.current_value", "limit_checks.warning_level"],
+                "derive": ["limit_checks.warning_level - limit_checks.current_value"]})
+    (room,) = [b for b in prog["let"] if b["expr"]["fn"] == "sub"]
+    assert room["expr"]["a"] == "$limit_checks_warning_level" and room["expr"]["b"] == "$limit_checks_current_value"
+    assert room["name"] in prog["return"]
+
+
+def test_a_derivation_may_scale_by_a_number_and_an_unknown_name_is_reported():
+    skipped = []
+    prog = pb.build({"subjects": ["port_001"], "want": ["issuer_exposures.market_value"],
+                     "derive": ["issuer_exposures.market_value * 0.2", "price.adv / nonsense"]}, skipped=skipped)
+    assert ps.typecheck(prog) == []
+    assert any(b["expr"]["fn"] == "mul" and b["expr"]["b"] == 0.2 for b in prog["let"])
+    assert [x["want"] for x in skipped] == ["derive:price.adv / nonsense"]
 
 
 @pytest.mark.parametrize("text,expect", [
@@ -92,3 +131,27 @@ def test_windows_parse(text, expect):
     w = pb.parse_window(text)
     for k, v in expect.items():
         assert getattr(w, k) == v, (text, k, getattr(w, k))
+
+
+# ── V33C ─────────────────────────────────────────────────────────────────────
+
+def test_a_name_written_with_its_domain_is_the_method():
+    prog = _ok({"subjects": ["JPM", "BAC"], "want": ["issuer_profitability: roe"], "window": "last 3 years", "compare": "rank"})
+    assert any(b["expr"].get("name") == "roe" for b in prog["let"])
+
+
+def test_a_book_want_with_only_a_ticker_reads_the_book_that_holds_it():
+    item = {"subjects": ["AMZN"], "want": ["issuer_exposures.weight", "limit_checks.current_value"]}
+    with pytest.raises(pb.NotExpressible) as e:
+        pb.build(item)
+    assert "held_in" in str(e.value.reason)
+    prog = pb.build(item, held_in={"AMZN": ["port_001"]})
+    assert ps.typecheck(prog) == []
+    runs = [b["expr"] for b in prog["let"] if b["expr"]["fn"] == "run"]
+    assert runs == [{"fn": "run", "portfolio": "port_001"}]
+
+
+def test_a_filings_want_is_not_a_program():
+    with pytest.raises(pb.NotExpressible) as e:
+        pb.build({"subjects": ["LLY"], "want": ["filings:Item 7"]})
+    assert "tools" in e.value.reason

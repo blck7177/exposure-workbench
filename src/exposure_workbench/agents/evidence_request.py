@@ -24,7 +24,10 @@ REQUEST_TOOL = {
             "'news:<query>' for the web, 'prepare' to put an issuer on the desk, 'scenario:sell <T> <fraction>' / "
             "'scenario:buy <T> <weight>' for a hypothetical book. A window says over what: 12m, last 8 quarters, "
             "last 5 years, at 2025-06-30, 1y, 30d, vs prev run, vs SPY. A comparison says how: rank, change, versus, "
-            "share_of:<name>, filter:>0.08. Put anything the fields cannot say in `ask`. The desk returns every figure "
+            "share_of:<name>, filter:>0.08. `derive` asks the desk to work a figure out from the ones you named — "
+            "'limit_checks.warning_level - limit_checks.current_value' is the room to warning, "
+            "'issuer_exposures.market_value / price.adv' is days to liquidate — one line each, + - * / over the "
+            "names in `want` or a number. Put anything the fields cannot say in `ask`. The desk returns every figure "
             "with its id and identity, passages to quote, and what it could not do."
         ),
         "parameters": {
@@ -41,6 +44,8 @@ REQUEST_TOOL = {
                                      "description": "names from the briefing, or filings:/news:/prepare/book/scenario:"},
                             "window": {"type": ["string", "null"], "description": "12m | last 8 quarters | last 5 years | at YYYY-MM-DD | 1y | 30d | vs prev run | vs SPY"},
                             "compare": {"type": ["string", "null"], "description": "rank | rank lowest | change | versus | share_of:<name> | filter:<op><level>"},
+                            "derive": {"type": ["array", "null"], "items": {"type": "string"},
+                                       "description": "figures to work out from the ones named, one line each: '<name> <+-*/> <name|number>'"},
                             "ask": {"type": ["string", "null"], "description": "what the fields cannot say, in words"},
                         },
                         "required": ["subjects", "want"],
@@ -59,7 +64,7 @@ def parse(args: dict) -> list[dict]:
     """The items of a request, each normalised; raises ValueError on a shape the
     schema would not have let through (a provider that ignores schemas)."""
     if not isinstance(args, dict) or not isinstance(args.get("items"), list) or not args["items"]:
-        raise ValueError("request_evidence takes {items: [{subjects, want, window?, compare?, ask?}]}")
+        raise ValueError("request_evidence takes {items: [{subjects, want, window?, compare?, derive?, ask?}]}")
     out = []
     for i, it in enumerate(args["items"]):
         if not isinstance(it, dict):
@@ -74,8 +79,15 @@ def parse(args: dict) -> list[dict]:
             raise ValueError(f"items[{i}].subjects is a non-empty list of names")
         if not isinstance(want, list) or not want or not all(isinstance(w, str) for w in want):
             raise ValueError(f"items[{i}].want is a non-empty list of names")
+        derive = it.get("derive")
+        if isinstance(derive, str):
+            derive = [derive]
+        if derive is not None and (not isinstance(derive, list) or not all(isinstance(d, str) for d in derive)):
+            raise ValueError(f"items[{i}].derive is a list of '<name> <+-*/> <name|number>' lines")
         out.append({"subjects": [s.strip() for s in subjects if s.strip()], "want": [w.strip() for w in want if w.strip()],
-                    "window": (it.get("window") or None), "compare": (it.get("compare") or None), "ask": (it.get("ask") or None)})
+                    "window": (it.get("window") or None), "compare": (it.get("compare") or None),
+                    "derive": [d.strip() for d in (derive or []) if d.strip()] or None,
+                    "ask": (it.get("ask") or None)})
     return out
 
 

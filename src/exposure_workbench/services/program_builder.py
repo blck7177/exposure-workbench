@@ -35,6 +35,9 @@ RUN_TABLES = {
     "risk_alerts": ("current_value", "limit_value", "utilization"),
     "factor_attributions": ("beta", "contribution", "factor_return", "r_squared"),
 }
+# the standard book read: what each name weighs and is worth, and where each check
+# stands against its tiers. Sized by what the question means, never by what fits —
+# the digest owns the budget (evidence_broker._fit).
 BOOK_DEFAULT = ("issuer_exposures.weight", "issuer_exposures.market_value", "limit_checks.current_value",
                 "limit_checks.warning_level", "limit_checks.breach_level")
 _DEFAULT_KEY = {"price.adv": "dollars", "price.drawdown": "depth", "price.beta": "beta"}
@@ -103,8 +106,14 @@ def classify(name: str) -> tuple:
     if low.startswith("scenario:"):
         return ("scenario", n.split(":", 1)[1].strip())
     base, _, key = n.partition(":")
+    base, key = base.strip(), key.strip()
     if base in skill.METHODS:
         return ("method", skill.METHODS[base], key or None)
+    if key in skill.METHODS:
+        # "issuer_profitability: roe" — the analyst wrote the domain before the name (V33C Q12)
+        return ("method", skill.METHODS[key], None)
+    if base in ("filings", "news", "prepare"):
+        raise NotExpressible(f"{n!r} is read by the desk's tools, not computed by a program", [])
     if n in cm.SUPPORTED_METRICS:
         return ("metric", n)
     parts = n.split(".")
@@ -125,7 +134,25 @@ def _name(s: str) -> str:
     return s[:60]
 
 
-def build(item: dict) -> dict:
+_OPS = {"-": "sub", "+": "add", "*": "mul", "/": "div"}
+_DERIVE = re.compile(r"^\s*(.+?)\s*([-+*/])\s*(.+?)\s*$")
+
+
+def build(item: dict, held_in: dict | None = None, skipped: list | None = None) -> dict:
+    """The program for one request.
+
+    `held_in` = {ticker: [port_…]} from the briefing: a book want with only a
+    ticker named reads the book that holds it (V33C Q01 asked AMZN's weight and
+    the compiled program said run(portfolio="AMZN")).
+
+    `skipped` receives one entry per want (or comparison, or derivation) this
+    desk cannot express. A name it does not know costs that name and nothing
+    else: V33C Q15 named `issuer_exposures.ticker` beside two it does know and
+    lost the whole item, `compare: rank` included, so the answer had no ordering
+    to rest its superlatives on. NotExpressible is raised only when NOTHING is
+    expressible.
+    """
+    skipped = skipped if skipped is not None else []
     subjects = [str(s).strip() for s in (item.get("subjects") or []) if str(s).strip()]
     want = [str(w).strip() for w in (item.get("want") or []) if str(w).strip()]
     if not subjects or not want:
@@ -166,15 +193,23 @@ def build(item: dict) -> dict:
     series: list[str] = []           # series nodes a change applies to
     scalars_by_want: dict[str, dict[str, str]] = {}   # want -> {subject -> node}
 
+    def skip(w: str, e: NotExpressible) -> None:
+        skipped.append({"want": w, "reason": e.reason, "nearest": list(e.nearest or [])})
+
     expanded: list[str] = []
     for w in want:
-        k = classify(w)
+        try:
+            k = classify(w)
+        except NotExpressible as e:
+            skip(w, e)
+            continue
         if k[0] == "book":
             expanded += list(BOOK_DEFAULT)
         elif k[0] == "scenario":
             trades = re.findall(r"(sell|buy)\s+([A-Za-z.]{1,6})\s+([0-9.]+)", k[1], flags=re.IGNORECASE)
             if not trades or not ports:
-                raise NotExpressible("a scenario is 'scenario:sell <T> <fraction>' / 'scenario:buy <T> <weight>' on a portfolio")
+                skip(w, NotExpressible("a scenario is 'scenario:sell <T> <fraction>' / 'scenario:buy <T> <weight>' on a portfolio"))
+                continue
             base = run_of(ports[0])
             cur = base
             for side, tk, amt in trades:
@@ -186,113 +221,175 @@ def build(item: dict) -> dict:
         else:
             expanded.append(w)
 
+    nodes_of_want: dict[str, list[str]] = {}
     for w in expanded:
-        k = classify(w)
-        if k[0] == "method":
-            spec, key = k[1], k[2]
-            params: dict = {}
-            if spec.subject_kind in ("issuer",):
-                if win.months:
-                    params["months"] = win.months
-                if win.at:
-                    params["at"] = win.at
-                if win.last_n:
-                    params["last_n"] = win.last_n
-                subs = tickers
-            elif spec.subject_kind == "price":
-                props = spec.params_schema.get("properties", {})
-                if "window_days" in props and win.window_days:
-                    params["window_days"] = win.window_days
-                if "window" in props and win.span:
-                    params["window"] = win.span
-                if "benchmark" in props and win.benchmark:
-                    params["benchmark"] = win.benchmark
-                key = key or _DEFAULT_KEY.get(spec.name)
-                subs = tickers
-            elif spec.subject_kind == "run":
-                subs = [f"${scenario_node}"] if scenario_node else (runs or [run_of(p) for p in ports])
-                subs = [s if s.startswith("$") or s.startswith(("run_", "calc_")) else f"${s}" for s in subs]
-            else:   # portfolio
-                if spec.name == "book.explain_episode":
-                    raise NotExpressible("book.explain_episode needs a peak and a trough: ask for the worst drawdown episode and its explanation in words (`ask`)")
-                subs = ports
-                if spec.name == "book.drawdown_episodes" and win.span:
-                    params["span"] = win.span
-            if not subs:
-                raise NotExpressible(f"{spec.name} is a {spec.subject_kind} method; name a {spec.subject_kind} in subjects")
-            if len(subs) > 1 and spec.subject_kind in ("issuer", "price"):
-                if win.last_n and spec.subject_kind == "issuer":
-                    ents = {}
-                    for t in subs:
-                        s_node = bind(f"{spec.name}_{t}", {"fn": "method", "name": spec.name, "subject": t, "params": params, **({"key": key} if key else {})})
-                        series.append(s_node)
-                        ents[t] = "$" + bind(f"{spec.name}_{t}_latest", {"fn": "latest", "of": f"${s_node}"}, ret=False)
-                    vectors.append(bind(f"{spec.name}_latest", {"fn": "vector", "entries": ents}))
-                else:
-                    expr = {"fn": "method", "name": spec.name, "subject": subs, **({"params": params} if params else {}), **({"key": key} if key else {})}
-                    vectors.append(bind(spec.name, expr))
-            else:
-                for t in subs:
-                    label = t.lstrip("$")
-                    expr = {"fn": "method", "name": spec.name, "subject": t, **({"params": params} if params else {}), **({"key": key} if key else {})}
-                    n = bind(f"{spec.name}_{label}", expr)
+        before = len(let)
+        try:
+            k = classify(w)
+            if k[0] == "method":
+                spec, key = k[1], k[2]
+                params: dict = {}
+                if spec.subject_kind in ("issuer",):
+                    if win.months:
+                        params["months"] = win.months
+                    if win.at:
+                        params["at"] = win.at
+                    if win.last_n:
+                        params["last_n"] = win.last_n
+                    subs = tickers
+                elif spec.subject_kind == "price":
+                    props = spec.params_schema.get("properties", {})
+                    if "window_days" in props and win.window_days:
+                        params["window_days"] = win.window_days
+                    if "window" in props and win.span:
+                        params["window"] = win.span
+                    if "benchmark" in props and win.benchmark:
+                        params["benchmark"] = win.benchmark
+                    key = key or _DEFAULT_KEY.get(spec.name)
+                    subs = tickers
+                elif spec.subject_kind == "run":
+                    subs = [f"${scenario_node}"] if scenario_node else (runs or [run_of(p) for p in ports])
+                    subs = [s if s.startswith("$") or s.startswith(("run_", "calc_")) else f"${s}" for s in subs]
+                else:   # portfolio
+                    if spec.name == "book.explain_episode":
+                        raise NotExpressible("book.explain_episode needs a peak and a trough: ask for the worst drawdown episode and its explanation in words (`ask`)")
+                    subs = ports
+                    if spec.name == "book.drawdown_episodes" and win.span:
+                        params["span"] = win.span
+                if not subs:
+                    raise NotExpressible(f"{spec.name} is a {spec.subject_kind} method; name a {spec.subject_kind} in subjects")
+                if len(subs) > 1 and spec.subject_kind in ("issuer", "price"):
                     if win.last_n and spec.subject_kind == "issuer":
+                        ents = {}
+                        for t in subs:
+                            s_node = bind(f"{spec.name}_{t}", {"fn": "method", "name": spec.name, "subject": t, "params": params, **({"key": key} if key else {})})
+                            series.append(s_node)
+                            ents[t] = "$" + bind(f"{spec.name}_{t}_latest", {"fn": "latest", "of": f"${s_node}"}, ret=False)
+                        vectors.append(bind(f"{spec.name}_latest", {"fn": "vector", "entries": ents}))
+                    else:
+                        expr = {"fn": "method", "name": spec.name, "subject": subs, **({"params": params} if params else {}), **({"key": key} if key else {})}
+                        vectors.append(bind(spec.name, expr))
+                else:
+                    for t in subs:
+                        label = t.lstrip("$")
+                        expr = {"fn": "method", "name": spec.name, "subject": t, **({"params": params} if params else {}), **({"key": key} if key else {})}
+                        n = bind(f"{spec.name}_{label}", expr)
+                        if win.last_n and spec.subject_kind == "issuer":
+                            series.append(n)
+                        elif spec.subject_kind in ("issuer", "price"):
+                            scalars_by_want.setdefault(spec.name, {})[t] = n
+            elif k[0] == "metric":
+                metric = k[1]
+                if not tickers:
+                    raise NotExpressible(f"{metric} is a filed line of an issuer; name a ticker in subjects")
+                ents = {}
+                for t in tickers:
+                    expr = {"fn": "fundamentals", "ticker": t, "metric": metric}
+                    if win.months:
+                        expr["months"] = win.months
+                    if win.at:
+                        expr["at"] = win.at
+                    if win.last_n:
+                        expr["last_n"] = win.last_n
+                    n = bind(f"{metric}_{t}", expr)
+                    if win.last_n:
                         series.append(n)
-                    elif spec.subject_kind in ("issuer", "price"):
-                        scalars_by_want.setdefault(spec.name, {})[t] = n
-        elif k[0] == "metric":
-            metric = k[1]
-            if not tickers:
-                raise NotExpressible(f"{metric} is a filed line of an issuer; name a ticker in subjects")
-            ents = {}
-            for t in tickers:
-                expr = {"fn": "fundamentals", "ticker": t, "metric": metric}
-                if win.months:
-                    expr["months"] = win.months
-                if win.at:
-                    expr["at"] = win.at
-                if win.last_n:
-                    expr["last_n"] = win.last_n
-                n = bind(f"{metric}_{t}", expr)
-                if win.last_n:
-                    series.append(n)
-                    if len(tickers) > 1:
-                        ents[t] = "$" + bind(f"{metric}_{t}_latest", {"fn": "latest", "of": f"${n}"}, ret=False)
-                else:
-                    scalars_by_want.setdefault(metric, {})[t] = n
-                    if len(tickers) > 1:
-                        ents[t] = f"${n}"
-            if len(tickers) > 1:
-                vectors.append(bind(f"{metric}_across", {"fn": "vector", "entries": ents}))
-        elif k[0] in ("column", "figure"):
-            if scenario_node:
-                if k[0] == "column":
-                    vectors.append(bind(f"{k[1]}_{k[2]}_after", {"fn": "column", "run": f"${scenario_node}", "table": k[1], "col": k[2]}))
-                    base = run_of(ports[0])
-                    vectors.append(bind(f"{k[1]}_{k[2]}_before", {"fn": "column", "run": f"${base}", "table": k[1], "col": k[2]}))
-                else:
-                    bind(f"{k[1]}_after", {"fn": "pick", "of": f"${scenario_node}", "key": k[1]})
-                    bind(f"{k[1]}_before", {"fn": "pick", "of": f"${run_of(ports[0])}", "key": k[1]})
-                continue
-            targets = runs or ports
-            if not targets:
-                raise NotExpressible(f"{w} is a figure of a book's run; name a port_… or run_… in subjects")
-            for tgt in targets:
-                r = tgt if tgt.startswith(("run_", "calc_")) else f"${run_of(tgt)}"
-                if k[0] == "column":
-                    n = bind(f"{k[1]}_{k[2]}", {"fn": "column", "run": r, "table": k[1], "col": k[2]})
-                    vectors.append(n)
-                    if win.vs_prev and not tgt.startswith(("run_", "calc_")):
-                        prev = bind(f"{k[1]}_{k[2]}_prev", {"fn": "column", "run": f"${run_of(tgt, 'prev')}", "table": k[1], "col": k[2]})
-                        chg = bind(f"{k[1]}_{k[2]}_change", {"fn": "sub", "a": f"${n}", "b": f"${prev}"})
-                        vectors.append(chg)
-                else:
-                    n = bind(k[1].replace(".", "_"), {"fn": "pick", "of": r, "key": k[1]})
-                    if win.vs_prev and not tgt.startswith(("run_", "calc_")):
-                        prev = bind(k[1].replace(".", "_") + "_prev", {"fn": "pick", "of": f"${run_of(tgt, 'prev')}", "key": k[1]})
-                        bind(k[1].replace(".", "_") + "_change", {"fn": "sub", "a": f"${n}", "b": f"${prev}"})
+                        if len(tickers) > 1:
+                            ents[t] = "$" + bind(f"{metric}_{t}_latest", {"fn": "latest", "of": f"${n}"}, ret=False)
+                    else:
+                        scalars_by_want.setdefault(metric, {})[t] = n
+                        if len(tickers) > 1:
+                            ents[t] = f"${n}"
+                if len(tickers) > 1:
+                    vectors.append(bind(f"{metric}_across", {"fn": "vector", "entries": ents}))
+            elif k[0] in ("column", "figure"):
+                if scenario_node:
+                    if k[0] == "column":
+                        vectors.append(bind(f"{k[1]}_{k[2]}_after", {"fn": "column", "run": f"${scenario_node}", "table": k[1], "col": k[2]}))
+                        base = run_of(ports[0])
+                        vectors.append(bind(f"{k[1]}_{k[2]}_before", {"fn": "column", "run": f"${base}", "table": k[1], "col": k[2]}))
+                    else:
+                        bind(f"{k[1]}_after", {"fn": "pick", "of": f"${scenario_node}", "key": k[1]})
+                        bind(f"{k[1]}_before", {"fn": "pick", "of": f"${run_of(ports[0])}", "key": k[1]})
+                    continue
+                targets = runs or ports
+                if not targets and tickers and held_in:
+                    targets = sorted({pid for t in tickers for pid in (held_in.get(t) or held_in.get(t.upper()) or [])})
+                if not targets:
+                    raise NotExpressible(f"{w} is a figure of a book's run; name the port_… that holds the name in subjects "
+                                         f"(the briefing's held_in says which)")
+                for tgt in targets:
+                    r = tgt if tgt.startswith(("run_", "calc_")) else f"${run_of(tgt)}"
+                    if k[0] == "column":
+                        n = bind(f"{k[1]}_{k[2]}", {"fn": "column", "run": r, "table": k[1], "col": k[2]})
+                        vectors.append(n)
+                        if win.vs_prev and not tgt.startswith(("run_", "calc_")):
+                            prev = bind(f"{k[1]}_{k[2]}_prev", {"fn": "column", "run": f"${run_of(tgt, 'prev')}", "table": k[1], "col": k[2]})
+                            chg = bind(f"{k[1]}_{k[2]}_change", {"fn": "sub", "a": f"${n}", "b": f"${prev}"})
+                            vectors.append(chg)
+                    else:
+                        n = bind(k[1].replace(".", "_"), {"fn": "pick", "of": r, "key": k[1]})
+                        if win.vs_prev and not tgt.startswith(("run_", "calc_")):
+                            prev = bind(k[1].replace(".", "_") + "_prev", {"fn": "pick", "of": f"${run_of(tgt, 'prev')}", "key": k[1]})
+                            bind(k[1].replace(".", "_") + "_change", {"fn": "sub", "a": f"${n}", "b": f"${prev}"})
+
+        except NotExpressible as e:
+            skip(w, e)
+            continue
+        nodes_of_want[w] = [b["name"] for b in let[before:]]
 
     # comparisons
+    try:
+        _compare(compare, win, tickers, bind, classify, vectors, series, scalars_by_want)
+    except NotExpressible as e:
+        skip(f"compare:{compare}", e)
+
+    # derivations: one line of arithmetic over the names already asked for
+    for line in (item.get("derive") or []):
+        try:
+            _derive(str(line), bind, nodes_of_want, let)
+        except NotExpressible as e:
+            skip(f"derive:{line}", e)
+
+    if not returns:
+        first = skipped[0] if skipped else None
+        raise NotExpressible(first["reason"] if first else "nothing in this request compiled to a program",
+                             (first or {}).get("nearest") or [])
+    program = {"let": let, "return": returns}
+    problems = ps.typecheck(program)
+    if problems:
+        raise NotExpressible("the request compiled to a program the language refuses: " + (problems[0].get("fix") or problems[0].get("detail") or problems[0]["reason"]),
+                             [p for p in problems[:3]])
+    return program
+
+
+def _operand(side: str, nodes_of_want: dict[str, list[str]], let: list[dict]):
+    """One side of a derivation: a number, or the node a named want produced."""
+    side = side.strip()
+    try:
+        return float(side)
+    except ValueError:
+        pass
+    for w, ns in nodes_of_want.items():
+        if w == side or w.split(":", 1)[0] == side:
+            settled = [n for n in ns if next(b for b in let if b["name"] == n)["expr"].get("fn") != "run"]
+            if settled:
+                return "$" + settled[-1]
+    raise NotExpressible(f"{side!r} is not one of the names this request asked for, and is not a number",
+                         sorted(nodes_of_want))
+
+
+def _derive(line: str, bind, nodes_of_want: dict[str, list[str]], let: list[dict]) -> None:
+    m = _DERIVE.match(line)
+    if not m:
+        raise NotExpressible(f"a derivation is '<name> <+-*/> <name|number>'; got {line!r}")
+    a, op, b = _operand(m.group(1), nodes_of_want, let), m.group(2), _operand(m.group(3), nodes_of_want, let)
+    if not isinstance(a, str) and not isinstance(b, str):
+        raise NotExpressible("a derivation works over the desk's figures: at least one side names a want")
+    bind(_name(line), {"fn": _OPS[op], "a": a, "b": b})
+
+
+def _compare(compare, win, tickers, bind, classify, vectors, series, scalars_by_want) -> None:
     if compare.startswith("rank"):
         direction = "lowest" if "low" in compare or "least" in compare or "smallest" in compare else "highest"
         if not vectors:
@@ -334,10 +431,3 @@ def build(item: dict) -> dict:
             bind(f"{vn}_where", {"fn": "filter", "of": f"${vn}", "op": m.group(1), "level": float(m.group(2))})
     elif compare and not compare.startswith("versus"):
         raise NotExpressible(f"compare {compare!r} is not one of rank | change | versus | share_of:<name> | filter:<op><level>")
-
-    program = {"let": let, "return": returns}
-    problems = ps.typecheck(program)
-    if problems:
-        raise NotExpressible("the request compiled to a program the language refuses: " + (problems[0].get("fix") or problems[0].get("detail") or problems[0]["reason"]),
-                             [p for p in problems[:3]])
-    return program

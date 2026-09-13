@@ -109,7 +109,11 @@ def identity_tokens(rec: dict) -> set[str]:
         elif isinstance(v, (int, float)) and not isinstance(v, bool):
             toks.add(f"{v:g}")
     for k, v in (rec.get("params") or {}).items():
-        if isinstance(v, bool):
+        if isinstance(v, bool) or k == "node":
+            # `node` is the program's BINDING NAME — a variable, never a measure
+            # and never an identity (PROGRAM_LANGUAGE rule 1). V33D: the node
+            # `amzn_rel_1y_vs_spy` put "1" among this fact's identity tokens, and
+            # the analyst's "1-year" resolved to it.
             continue
         if isinstance(v, (int, float)):
             toks.add(f"{v:g}")
@@ -136,6 +140,8 @@ class Ledger:
     passages: dict[str, str] = field(default_factory=dict)          # passage id -> text
     _tokens: dict[str, set[str]] = field(default_factory=dict)      # token -> fact ids
     _scalars: list[dict] = field(default_factory=list)
+    _series: list[dict] = field(default_factory=list)
+    _tol: dict = field(default_factory=dict)           # (value, unit) -> the desk's own precision
 
     # ── building ──
     def add(self, rec: dict) -> None:
@@ -148,6 +154,8 @@ class Ledger:
             self.passages[rec["id"]] = re.sub(r"(?<=\d),(?=\d)", "", rec["text"])
         if rec.get("kind") == F.SCALAR and isinstance(rec.get("value"), (int, float)):
             self._scalars.append(rec)
+        if rec.get("kind") == F.SERIES and isinstance(rec.get("points"), list):
+            self._series.append(rec)
         for t in identity_tokens(rec):
             self._tokens.setdefault(t, set()).add(rec["id"])
 
@@ -179,47 +187,104 @@ class Ledger:
         return {r.get("measure") for r in self.by_id.values() if isinstance(r.get("measure"), str)}
 
     # ── G3: a number written in prose ──
-    def resolve_number(self, token: str) -> list[str]:
-        """Fact ids whose value the written number equals: exactly, at the
-        precision it was written, or under a money scale. A percent sign or a
-        ratio unit compares against value×100. Empty when none."""
-        m = re.fullmatch(r"\s*([+\-−]?)\s*(\$?)\s*([\d,]*\.?\d+)\s*(%?)\s*([KkMmBb]|bn|mn|million|billion|thousand)?\s*", token or "")
+    # ONE rule, asked of the written token: did the writer use the desk's unit
+    # marker? A percent sign, a dollar, a multiple's ×, a money scale, a flow's
+    # "/day" say "this is the figure as you showed it" and the number is read in
+    # that marker's terms; a bare number is read as the stored value itself.
+    # Everything else the reader may vary — rounding, "M" vs "million", the
+    # dropped "/day" — falls out of the tolerance, which is half a unit of the
+    # last digit written (a hair more, so 0.1625 written as 16.3% does not miss
+    # by one float ulp). No other coercion: V33D's "1-year" became "1.07%" and
+    # V33B's bare "16.3" matched three unrelated ratios through the ones deleted
+    # here (a bare number guessed as a percentage, a money scale swept blind).
+    _WRITTEN = re.compile(r"\s*([+\-−]?)\s*(\$?)\s*([\d,]*\.?\d+)\s*(%|×|x|X)?\s*"
+                          r"([KkMmBb]|bn|mn|million|billion|thousand)?\s*(?:/\s*day|\s+a\s+day)?\s*")
+    _SCALES = {"k": 1e3, "thousand": 1e3, "m": 1e6, "mn": 1e6, "million": 1e6,
+               "b": 1e9, "bn": 1e9, "billion": 1e9}
+
+    @staticmethod
+    def written(token: str) -> tuple[float, float, bool, int] | None:
+        """(value, the writer's own tolerance, whether a unit marker was used,
+        decimals) of a written figure in the STORED quantity's terms, or None
+        when the token is not a figure. `16.0%` is 0.160 marked, `$10.63M` is
+        10 630 000 marked, `0.78×` is 0.78 marked, a bare `0.1625` is 0.1625."""
+        m = Ledger._WRITTEN.fullmatch(token or "")
         if not m:
-            return []
-        sign, dollar, core, pct, suffix = m.groups()
+            return None
+        sign, dollar, core, mark, suffix = m.groups()
         try:
             v = float(core.replace(",", ""))
         except ValueError:
-            return []
+            return None
         if sign in ("-", "−"):
             v = -v
         decimals = len(core.split(".")[1]) if "." in core else 0
-        # Half a unit of the last digit written, and a hair more: a figure that
-        # sits EXACTLY on the boundary (0.1625 written as 16.3%) misses by one
-        # float ulp otherwise, and the reader is looking at the same number.
         tol = 0.5 * 10 ** (-decimals) * (1 + 1e-9) + 1e-12
-        scale = {"k": 1e3, "thousand": 1e3, "m": 1e6, "mn": 1e6, "million": 1e6,
-                 "b": 1e9, "bn": 1e9, "billion": 1e9}.get((suffix or "").lower(), None)
-        hits: list[str] = []
-        for r in self._scalars:
-            val, unit = float(r["value"]), r.get("unit")
-            if pct or unit in ("RATIO", "PERCENT") and not dollar:
-                if abs(val * 100 - v) <= tol * (1 if pct else 1) and (pct or _plausible_pct(v, val)):
-                    hits.append(r["id"])
-                    continue
-            if not pct:
-                if abs(val - v) <= tol:
-                    hits.append(r["id"])
-                    continue
-                if unit == "MONEY" and (scale or dollar):
-                    for s, _n in MONEY_SCALES if scale is None else ((scale, ""),):
-                        if s != 1.0 and abs(val / s - v) <= tol:
-                            hits.append(r["id"])
-                            break
-            # the exact string a reader sees ("$10.87M", "16.3%")
-            if r["id"] not in hits and unit and dc.display(val, unit).lower() == (token or "").strip().lower():
-                hits.append(r["id"])
-        return list(dict.fromkeys(hits))
+        factor = 1.0
+        if mark == "%":
+            factor = 0.01
+        if suffix:
+            factor *= Ledger._SCALES.get(suffix.lower(), 1.0)
+        marked = bool(dollar or mark or suffix)
+        return v * factor, tol * factor, marked, decimals
+
+    def _readings_of(self, rec: dict):
+        """(period, value) for every reading one fact holds: a scalar holds one
+        on its own date, a series one per point."""
+        if rec.get("kind") == F.SCALAR and isinstance(rec.get("value"), (int, float)):
+            yield None, float(rec["value"])
+        for pt in rec.get("points") or []:
+            try:
+                yield str(pt[0]), float(pt[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+
+    def _tolerance(self, val: float, unit: str | None) -> float:
+        """Half a unit of the last digit the DESK showed. The analyst was told to
+        write the figure as it was shown, so the desk's precision is the match's:
+        at the writer's own precision a bare "1" is a correct rounding of 0.78,
+        which is how V33D's "1-year" reached a MULTIPLE."""
+        key = (val, unit)
+        if key not in self._tol:
+            shown = dc.display(val, unit) if unit else f"{val!r}"
+            parsed = self.written(shown)
+            self._tol[key] = parsed[1] if parsed else 1e-12
+        return self._tol[key]
+
+    @staticmethod
+    def _reads_as(val: float, w: tuple[float, float, bool, int], shown_tol: float) -> bool:
+        """Whether one stored value is the figure the analyst wrote."""
+        v, writer_tol, marked, decimals = w
+        if marked:
+            # the analyst copied the form the desk showed: the desk's precision decides
+            return abs(val - v) <= shown_tol
+        # a bare number is the stored quantity itself, at the precision written —
+        # and a bare WHOLE number is a whole quantity, not a coarse rounding of
+        # one (V33D: "1-year" is not a reading of 0.78×)
+        if decimals == 0 and not float(val).is_integer():
+            return False
+        return abs(val - v) <= writer_tol
+
+    def readings(self, token: str) -> list[tuple[str, str | None]]:
+        """(fact id, period) for every reading the written figure equals. The
+        period is None for a scalar and the point's own date for a series, so
+        the citation stays the series' while the figure is that point."""
+        w = self.written(token)
+        if w is None:
+            return []
+        out: list[tuple[str, str | None]] = []
+        for rec in (*self._scalars, *self._series):
+            unit = rec.get("unit")
+            for period, val in self._readings_of(rec):
+                if self._reads_as(val, w, self._tolerance(val, unit)):
+                    out.append((rec["id"], period))
+        return out
+
+    def resolve_number(self, token: str) -> list[str]:
+        """The scalar facts a written figure equals — `readings` without the
+        series. The claims grammar (brief path) addresses a series point as
+        `f_…@period` instead, so it asks only this."""
+        return list(dict.fromkeys(fid for fid, period in self.readings(token) if period is None))
 
     # ── G3: an identity field ──
     def resolve_identity(self, token: str) -> list[str]:
@@ -247,12 +312,6 @@ class Ledger:
             return []
         pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?![\d])")
         return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
-
-
-def _plausible_pct(written: float, ratio: float) -> bool:
-    """A bare '16.3' equals a ratio 0.163 only when the writer plainly meant a
-    percentage — the ratio itself is under 1 and the written number is not."""
-    return abs(ratio) < 1.0 and abs(written) >= 1.0
 
 
 # ── loading ───────────────────────────────────────────────────────────────────

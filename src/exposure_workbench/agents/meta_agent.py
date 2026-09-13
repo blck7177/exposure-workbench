@@ -159,8 +159,9 @@ async def handle_message(
                                                           "no figure here may be stated until it is requested):\n"
                                                           + json.dumps(brief, ensure_ascii=False, default=str)}]
     pushed: list[str] = []
+    matched = skill.match_domains(user_text)
+    examples = [ex for p in matched for ex in (p.programs or ())][:4]
     if get_settings().push_domains:
-        matched = skill.match_domains(user_text)
         if matched:
             pushed = [p.name for p in matched]
             messages.append({"role": "system", "content": "The desk's own knowledge for this kind of question (how it compares and "
@@ -180,7 +181,7 @@ async def handle_message(
         faces.FACE_NAME_META, session_id=session_id,
         user_id=current_user_id(), message_id=message_id, deny=deny,
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
-        broker = evidence_broker.Broker(tools_session, llm, db_factory, session_id, message_id, brief)
+        broker = evidence_broker.Broker(tools_session, llm, db_factory, session_id, message_id, brief, examples=examples)
         tools = [evidence_request.REQUEST_TOOL]
 
         for _turn in range(max_turns):

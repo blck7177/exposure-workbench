@@ -70,4 +70,4 @@ def test_the_registry_no_longer_harvests_evidence():
     assert "_harvestable" not in src
     # V24: nothing is built from a declaration; the adapter's facts are recorded as they are
     assert "tbl.declare(" not in src and "tbl.build(" not in src
-    assert "fa.adapt(" in src and "ledger_svc.step_entry(" in src
+    assert "fa.adapt_all(" in src and "ledger_svc.step_entry(" in src

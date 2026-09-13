@@ -174,3 +174,39 @@ def test_a_literal_node_is_shown_as_a_literal():
     n = ps.Node("peak", ps.TABLE, None, deps=["episodes"])
     n.payload = {"literal": "2026-01-07", "of": "calc_e", "key": "episodes[0].peak_date"}
     assert ps._note_of(n) == {"kind": "literal", "value": "2026-01-07", "deps": ["episodes"]}
+
+
+# ── V33C: the report names the door ──────────────────────────────────────────
+
+def test_a_method_written_as_a_primitive_is_told_how_to_write_it():
+    probs = ps.typecheck({"let": [["r", {"fn": "run", "portfolio": "port_001"}],
+                                  ["x", {"fn": "book.reconcile", "subject": "$r"}]]})
+    (p,) = probs
+    assert p["reason"] == "unknown_primitive"
+    assert "METHOD" in p["fix"] and "name: 'book.reconcile'" in p["fix"] and "$<run node>" in p["fix"]
+
+
+def test_a_tool_written_as_a_method_or_a_primitive_is_sent_to_the_tools():
+    probs = ps.typecheck({"let": [["a", {"fn": "read_filings", "ticker": "AMZN"}],
+                                  ["b", {"fn": "method", "name": "read_filings", "subject": "AMZN"}]]})
+    assert [p["reason"] for p in probs] == ["unknown_primitive", "unknown_method"]
+    assert all("tool" in p["fix"] and "filings:" in p["fix"] for p in probs)
+
+
+def test_a_methods_name_at_the_filed_line_door_is_refused_before_running():
+    (p,) = ps.typecheck({"let": [["gm", {"fn": "fundamentals", "ticker": "LLY", "metric": "gross_margin", "last_n": 12}]]})
+    assert p["reason"] == "metric_is_a_method"
+    assert "name: 'gross_margin'" in p["fix"] and "subject: 'LLY'" in p["fix"]
+
+
+def test_a_scenarios_figure_is_picked_not_read_like_a_run():
+    probs = ps.typecheck({"let": [["r", {"fn": "run", "portfolio": "port_001"}],
+                                  ["after", {"fn": "sell", "run": "$r", "sales": [{"ticker": "NVDA", "fraction": 0.5}]}],
+                                  ["g", {"fn": "figure", "run": "$after", "name": "exposure_metrics.gross_exposure"}]]})
+    (p,) = probs
+    assert p["at"] == "g" and "pick(of=$after" in p["fix"]
+
+
+def test_a_filed_line_written_as_a_method_is_sent_to_fundamentals():
+    (p,) = ps.typecheck({"let": [["x", {"fn": "method", "name": "operating_cash_flow", "subject": "AAPL"}]]})
+    assert p["reason"] == "unknown_method" and "FILED LINE" in p["fix"] and "fundamentals" in p["fix"]

@@ -50,7 +50,7 @@ SPELLING = set(SPELLING_REFUSALS) | {
     "unknown_company", "unknown_tool",
     # V33: the program writer's type work (a static report before anything runs)
     # and a request the analyst's one tool could not parse
-    "type_errors", "malformed_program", "invalid_request",
+    "type_errors", "malformed_program", "invalid_request", "not_a_filed_line", "metric_is_a_method",
 }
 GATE = {
     "unsourced_figure", "malformed_answer", "unverified_quote", "not_on_ledger", "id_in_prose",
@@ -60,7 +60,7 @@ GATE = {
     # V33 answer check (services/answer_check.py): numbers against the ledger,
     # relation words against the facts' rank/op/as_of/tier
     "ambiguous_figure", "mark_mismatch", "unknown_node", "subject_mismatch", "measure_mismatch",
-    "superlative_without_rank", "date_expected", "tier_mismatch", "unit_conflict", "direction_conflict",
+    "superlative_without_rank", "date_expected", "tier_mismatch", "direction_conflict",
     "change_conflict",
 }
 ALGEBRA = {

@@ -90,6 +90,8 @@ SPELLING_REFUSALS = frozenset({
     "untyped_operand", "untyped_series", "undated_operand", "not_on_this_face", "too_few_operands",
     "unrankable_operand", "invalid_as_of_date", "invalid_date", "invalid_window", "type_mismatch",
     "malformed_program", "duplicate_binding", "unbound_name",
+    # V33: a method's name read as a filed line, a method written as a primitive
+    "not_a_filed_line", "metric_is_a_method", "type_errors",
     # the desk knows the name and it belongs at another door: the call is re-made
     # there, and the reader is told nothing (V30 C3 replay)
     "wrong_door",

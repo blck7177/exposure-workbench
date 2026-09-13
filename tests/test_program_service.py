@@ -149,6 +149,17 @@ async def test_a_method_over_a_list_is_a_vector_the_rank_accepts():
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_refusals_chain_and_a_table_is_not_an_operand():
+    """V33: a name that is no primitive is a TYPE problem — reported before anything
+    runs, and it makes no absence fact. A method typed either way (price.beta with
+    no key is a table or a scalar) passes the static check and the executor
+    refuses the table as an operand at run time; that refusal still chains to
+    the nodes depending on it, as does a line the issuer never filed."""
+    typed = await _run({"let": [
+        ["beta", {"fn": "method", "name": "price.beta", "subject": "MSFT", "params": {"benchmark": "TLT"}}],
+        ["nope", {"fn": "frobnicate", "x": 1}]]})
+    assert typed["error"] == "type_errors" and "nodes" not in typed
+    assert [p["at"] for p in typed["problems"]] == ["nope"] and typed["problems"][0]["reason"] == "unknown_primitive"
+
     out = await _run({"let": [
         # total_revenues: GOOGL's `revenue` line ends 2025-03-31 and its latest-anchored
         # series is refused as line_superseded since V30 C2 (test_v11_absence_live pins it)
@@ -157,17 +168,16 @@ async def test_refusals_chain_and_a_table_is_not_an_operand():
         ["beta", {"fn": "method", "name": "price.beta", "subject": "MSFT", "params": {"benchmark": "TLT"}}],
         ["bad", {"fn": "add", "a": "$beta", "b": "$rev"}],
         ["chain", {"fn": "sum", "of": "$bad"}],
-        ["nope", {"fn": "frobnicate", "x": 1}]]})
+        ["never", {"fn": "fundamentals", "ticker": "MSFT", "metric": "total_revenues_from_mars"}]]})
     n = out["nodes"]
     assert n["rev"]["kind"] == "series" and n["g"]["kind"] == "series" and n["g"]["measure"] == "total_revenues.yoy"
     assert n["beta"]["kind"] == "table"                                     # several figures, no key
     assert n["bad"]["refusal"]["error"] == "type_mismatch"
     assert n["chain"]["refusal"]["error"] == "depends_on_refused" and n["chain"]["refusal"]["node"] == "bad"
-    assert n["nope"]["refusal"]["error"] == "unknown_primitive"
-    assert set(out["refused"]) == {"bad", "chain", "nope"}
-    facts = out["_facts"]
-    absences = [f for f in facts if f["kind"] == "absence"]
-    assert {f["params"]["node"] for f in absences} >= {"bad", "chain", "nope"}
+    assert n["never"]["refusal"]["error"] == "metric_not_filed"
+    assert set(out["refused"]) == {"bad", "chain", "never"}
+    absences = [f for f in out["_facts"] if f["kind"] == "absence"]
+    assert {f["params"]["node"] for f in absences} >= {"bad", "chain", "never"}
 
 
 @pytest.mark.live

@@ -306,7 +306,7 @@ async def invoke(
     shown: list = []
     if status == "completed" and isinstance(result, dict) and tool.name in fa.ADAPTERS:
         try:
-            shown, note, held = fa.adapt(tool.name, args, result)
+            shown, note, held, made = fa.adapt_all(tool.name, args, result)
         except Exception as exc:  # noqa: BLE001 — see docstring: fail loud, not silent
             logger.exception("fact adapter failed for %s (session %s)", tool_name, session_id)
             status = "error"
@@ -316,7 +316,12 @@ async def invoke(
                 result = {**note, "facts": fct.block_for_model(shown)}
                 if held:
                     result["held_back"] = held
-                refs = [ledger_svc.step_entry(shown)]
+                # THE LEDGER RECORDS EVERY FACT THE CALL MADE. The cap above is a
+                # bound on what one PAYLOAD shows a model; a figure it held back
+                # was still computed, is still evidence, and the answer check
+                # must be able to resolve it (V33 Q15: the rank the analyst asked
+                # for was capped out of the ledger and the answer refused for it).
+                refs = [ledger_svc.step_entry(made or shown)]
             else:
                 result = note
     try:

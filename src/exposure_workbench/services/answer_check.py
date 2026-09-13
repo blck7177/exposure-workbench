@@ -26,8 +26,8 @@ Here the model writes prose. This module reads it the way the reader will:
           a date word (started, troughed, as of) is followed by a date
           a company named in the sentence is the figure's company
                                                     superlative_without_rank / change_conflict /
-                                                    unit_conflict / tier_mismatch / date_expected /
-                                                    subject_mismatch / measure_mismatch
+                                                    tier_mismatch / date_expected / subject_mismatch /
+                                                    measure_mismatch
     G4  quotation marks hold a passage's own words   unverified_quote
     G5  `[table: node]` / `[chart: node]` name a node whose facts are on the
         ledger; `[f_…]` names a fact on it            unknown_node / not_on_ledger
@@ -89,6 +89,17 @@ class Verdict:
 
 # ── helpers over the ledger ──────────────────────────────────────────────────
 
+_QUOTE_CHARS = str.maketrans("", "", "\"'\u2018\u2019\u201c\u201d\u00ab\u00bb")
+
+
+def _quoted(text: str) -> str:
+    """A quotation is its WORDS. Quotation marks are delimiters, and nesting one
+    quote inside another forces the inner marks to change — V33D refused 381
+    verbatim characters of a 10-K because the source's inner `"` had to become
+    `'` to sit inside the analyst's own quotation."""
+    return _normalise(text).translate(_QUOTE_CHARS)
+
+
 def _short_subject(subject: str | None) -> str | None:
     """`issuer_concentration:MSFT` -> MSFT; `Technology` -> Technology; a row id -> None."""
     if not isinstance(subject, str) or not subject:
@@ -124,11 +135,13 @@ def _words(text: str) -> set[str]:
 
 
 def _measure_words(measure: str | None) -> list[str]:
-    """The last segment of a measure as words: `portfolio.reconcile.factor_share` -> 'factor share'."""
+    """A measure as words: its alphanumeric runs, in order. A derived measure
+    keeps its operands' words, so `divide(dividends_paid, operating_cash_flow)`
+    reads as both quantities the sentence may name."""
     if not measure:
         return []
-    tail = re.split(r"[.:()]", measure)[-1] if "(" not in measure else measure
-    return [w for w in tail.replace("_", " ").split() if w]
+    tail = re.split(r"[.:]", measure)[-1] if "(" not in measure else measure
+    return [w for w in re.split(r"[^A-Za-z0-9]+", tail) if w]
 
 
 def _same_check(a: str | None, b: str | None) -> bool:
@@ -150,6 +163,14 @@ def _sentences(text: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _compound_before(text: str, start: int) -> bool:
+    return start > 0 and (text[start - 1].isalpha() or (text[start - 1] == "-" and start > 1 and text[start - 2].isalnum()))
+
+
+def _compound_after(text: str, end: int) -> bool:
+    return end + 1 < len(text) and text[end] == "-" and (text[end + 1].isalpha() or text[end + 1] == "-")
+
+
 def _blank(text: str, spans: list[tuple[int, int]]) -> str:
     out = text
     for s, e in spans:
@@ -168,8 +189,12 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
     asked = {_core(t["token"]) for t in A.tokens_in(question or "")}
     all_passages = list(ledger.passages)
     subjects_on_ledger = {s for s in (_short_subject(r.get("subject")) for r in ledger.by_id.values()) if s}
-    two_word_measures = {" ".join(_measure_words(r.get("measure"))).lower(): r.get("measure")
-                         for r in ledger.by_id.values() if len(_measure_words(r.get("measure"))) >= 2}
+    # every phrase a measure on the ledger reads as, and the measures that read so
+    phrases: dict[str, set[str]] = {}
+    for r in ledger.by_id.values():
+        ws = _measure_words(r.get("measure"))
+        if len(ws) >= 2 and r.get("measure"):
+            phrases.setdefault(" ".join(ws).lower(), set()).add(r["measure"])
 
     for i, para in enumerate(paras):
         # G5 — the marks
@@ -200,14 +225,15 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         # G4 — quotations: verified spans exempt their digits
         quoted_ok: list[tuple[int, int]] = []
         for span in quoted_spans(blanked):
-            hit = [pid for pid in all_passages if _normalise(span) in _normalise(ledger.passages[pid])]
+            hit = [pid for pid in all_passages if _quoted(span) in _quoted(ledger.passages[pid])]
             start = blanked.find(span)
             if hit:
                 quoted_ok.append((start, start + len(span)))
                 v.refs += hit[:1]
             else:
                 v.problems.append({"at": f"prose[{i}]", "reason": "unverified_quote", "quote": span[:120],
-                                   "fix": "quotation marks say these words are verbatim in a passage read this turn: reproduce the source wording, or drop the marks"})
+                                   "fix": "quotation marks say these words are verbatim in a passage read this turn: "
+                                          "reproduce the source wording, or drop the marks"})
 
         sentences = _sentences(blanked)
         tokens = A.tokens_in(blanked)
@@ -218,6 +244,10 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             tok, kind, start, end = t["token"], t["kind"], t["start"], t["end"]
             if any(s <= start < e for s, e in quoted_ok):
                 continue
+            if kind == "num" and (_compound_before(blanked, start) or _compound_after(blanked, end)):
+                # "1-year", "52-week", "10-K": the digits belong to a word, not to a
+                # figure. V33D's "1-year" resolved to whatever the ledger held near 1.
+                continue
             if kind == "id":
                 v.problems.append({"at": f"prose[{i}]", "reason": "id_in_prose", "id": tok,
                                    "fix": "an id is not a word the reader sees: write the figure, and put [f_…] after it only when it is ambiguous"})
@@ -226,17 +256,18 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             sentence = blanked[sentences[si][0]:sentences[si][1]]
             swords = _words(sentence)
             pinned = next((fid for ms, fid in fact_marks.items() if end <= ms <= end + 1), None)
-            ids = ledger.resolve_number(tok) if kind == "num" else []
+            found = ledger.readings(tok) if kind == "num" else []
             if pinned:
-                if pinned not in ids and pinned not in ledger.resolve_identity(tok):
+                mine = [(fid, per) for fid, per in found if fid == pinned]
+                if not mine and pinned not in ledger.resolve_identity(tok):
                     rec = ledger.by_id[pinned]
                     v.problems.append({"at": f"prose[{i}]", "reason": "mark_mismatch", "figure": tok, "id": pinned,
                                        "fact": {"measure": rec.get("measure"), "subject": rec.get("subject"), "value": rec.get("value")},
                                        "fix": "the marked fact does not hold this number: mark the fact that does, or write its value as shown"})
                     continue
-                ids = [pinned]
-            if ids:
-                chosen, why, evidenced = _pin(ids, ledger, sentence, swords)
+                found = mine or found
+            if found:
+                chosen, why, evidenced = _pin(found, ledger, sentence, swords)
                 if chosen is not None and not evidenced and not pinned and _core(tok) in asked:
                     # the user wrote this number and nothing in the sentence ties it to
                     # the ledger's reading of it: it is the user's ("at 20% of ADV")
@@ -247,15 +278,19 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                         v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
                         continue
                     v.problems.append({"at": f"prose[{i}]", "reason": "ambiguous_figure", "figure": tok, "candidates": why,
-                                       "fix": "several facts hold this number: name the subject or measure in the sentence, or put [f_…] after the number"})
+                                       "fix": "several readings hold this figure: name the subject, the measure or the date in the "
+                                              "sentence, or put [f_…] after the number"})
                     continue
-                primary = pinned or _primary(chosen, ledger, swords)
-                v.links[(i, start)] = {"to": "fact", "ids": chosen, "primary": primary, "as_written": tok}
-                linked_by_sentence.setdefault(si, []).append((t, [ledger.by_id[f] for f in chosen]))
+                alias_ids, period = chosen
+                primary = pinned if pinned in alias_ids else _primary(alias_ids, ledger, swords)
+                v.links[(i, start)] = {"to": "fact", "ids": [primary, *[f for f in alias_ids if f != primary]],
+                                       "primary": primary, "period": period, "as_written": tok}
+                linked_by_sentence.setdefault(si, []).append((t, [_reading(ledger.by_id[f], period) for f in alias_ids]))
                 continue
             ids = ledger.resolve_identity(tok)
             if ids:
-                v.links[(i, start)] = {"to": "fact", "ids": ids, "as_written": tok}
+                # an identity field (a date, a year, a window's digits): a citation, never a figure
+                v.links[(i, start)] = {"to": "fact", "ids": ids, "as_written": tok, "how": "identity"}
                 continue
             pids = ledger.resolve_in_passages(tok, all_passages)
             if pids:
@@ -272,13 +307,13 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             sentence = blanked[s:e]
             linked = linked_by_sentence.get(si, [])
             words = _words(sentence)
-            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, two_word_measures)
+            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, phrases)
 
     v.refs = list(dict.fromkeys([*v.refs, *[l.get("primary") or fid for l in v.links.values() for fid in l["ids"][:1]]]))
     if v.problems:
         order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "ambiguous_figure",
                  "unverified_quote", "date_expected", "subject_mismatch", "measure_mismatch", "superlative_without_rank",
-                 "change_conflict", "unit_conflict", "direction_conflict", "tier_mismatch")
+                 "change_conflict", "direction_conflict", "tier_mismatch")
         reasons = {p["reason"] for p in v.problems}
         v.error = next((r for r in order if r in reasons), v.problems[0]["reason"])
         v.detail = (f"{len(v.problems)} problem(s), all listed; the first: " + _one_line(v.problems[0]))
@@ -290,39 +325,56 @@ def _one_line(p: dict) -> str:
     return f"{p['at']} {p['reason']}" + (f" ({what!r})" if what else "") + (f": {p['fix']}" if p.get("fix") else "")
 
 
-def _group_key(rec: dict) -> tuple:
-    """Facts that hold one written value and share a subject and a date are one
+def _reading(rec: dict, period: str | None) -> dict:
+    """One reading of a fact, as the sentence checks see it: a scalar as it is, a
+    series' point as a scalar on its own date. The id stays the fact's."""
+    if period is None:
+        return rec
+    value = next((float(p[1]) for p in (rec.get("points") or []) if str(p[0]) == period), None)
+    return {**rec, "kind": F.SCALAR, "value": value, "as_of": period, "window": None, "points": None}
+
+
+def _group_key(rec: dict, period: str | None) -> tuple:
+    """Facts that hold one written figure on one date for one subject are ONE
     READING under several names — a holding's weight, the concentration check's
-    current_value that reads it, the rank entry over it. They are aliases, not
-    an ambiguity; the ambiguity the reader cares about is two subjects or two
-    dates holding the same number."""
-    return (_short_subject(rec.get("subject")) or rec.get("subject"), rec.get("as_of"))
+    current_value that reads it, the rank entry over it, the same series fetched
+    twice. They are aliases, not an ambiguity; the ambiguity the reader cares
+    about is two subjects or two dates holding the same number."""
+    return (_short_subject(rec.get("subject")) or rec.get("subject"), period or rec.get("as_of"))
 
 
-def _pin(ids: list[str], ledger: Ledger, sentence: str, words: set[str]) -> tuple[list[str] | None, list[dict], bool]:
-    """(alias ids, candidates, evidenced) for a written number. One group of
-    aliases is taken as is; several are narrowed by the sentence's own words in
-    stages — its subject first, then its measure, then its date — each stage
-    keeping the groups it names and passing when it names none. `evidenced`
-    says whether the sentence named the chosen group at all, which is what lets
-    a number the user also wrote be read as the ledger's rather than the user's."""
-    groups: dict[tuple, list[str]] = {}
-    for fid in ids:
-        groups.setdefault(_group_key(ledger.by_id[fid]), []).append(fid)
+def _pin(found: list[tuple[str, str | None]], ledger: Ledger, sentence: str,
+         words: set[str]) -> tuple[tuple[list[str], str | None] | None, list[dict], bool]:
+    """((alias ids, period), candidates, evidenced) for a written figure. One
+    group of aliases is taken as is; several are narrowed by the sentence's own
+    words in stages — its subject first, then its measure, then its date — each
+    stage keeping the groups it names and passing when it names none.
+    `evidenced` says whether the sentence named the chosen group at all, which
+    is what lets a number the user also wrote be read as the ledger's rather
+    than the user's."""
+    groups: dict[tuple, tuple[list[str], str | None]] = {}
+    for fid, period in found:
+        key = _group_key(ledger.by_id[fid], period)
+        ids, _p = groups.setdefault(key, ([], period))
+        if fid not in ids:
+            ids.append(fid)
     low = sentence.lower()
 
-    def by_subject(g: list[str]) -> bool:
-        for r in (ledger.by_id[f] for f in g):
+    def by_subject(g) -> bool:
+        for r in (ledger.by_id[f] for f in g[0]):
             short = _short_subject(r.get("subject"))
             if short and (short.lower() in words or short.lower() in low):
                 return True
         return False
 
-    def by_measure(g: list[str]) -> bool:
-        return any(len(w) > 3 and w.lower() in words for f in g for w in _measure_words(ledger.by_id[f].get("measure")))
+    def by_measure(g) -> bool:
+        return any(len(w) > 3 and w.lower() in words for f in g[0] for w in _measure_words(ledger.by_id[f].get("measure")))
 
-    def by_date(g: list[str]) -> bool:
-        return any(str(ledger.by_id[f].get("as_of") or "\0") in sentence for f in g)
+    def by_date(g) -> bool:
+        period = g[1]
+        if period and (period in sentence or period[:4] in sentence):
+            return True
+        return any(str(ledger.by_id[f].get("as_of") or "\0") in sentence for f in g[0])
 
     if len(groups) == 1:
         g = next(iter(groups.values()))
@@ -336,14 +388,15 @@ def _pin(ids: list[str], ledger: Ledger, sentence: str, words: set[str]) -> tupl
         if len(groups) == 1:
             return next(iter(groups.values())), [], evidenced
     # the default tier row (`issuer_concentration`) beside issuers' own rows is one tier
-    if all(_is_tier(ledger.by_id[g[0]]) for g in groups.values()):
-        specific = {k: g for k, g in groups.items() if ":" in str(ledger.by_id[g[0]].get("subject") or "")}
+    if all(_is_tier(ledger.by_id[g[0][0]]) for g in groups.values()):
+        specific = {k: g for k, g in groups.items() if ":" in str(ledger.by_id[g[0][0]].get("subject") or "")}
         if len(specific) == 1:
             return next(iter(specific.values())), [], True
         if not specific:
             return next(iter(groups.values())), [], evidenced
-    cands = [{"id": g[0], "measure": ledger.by_id[g[0]].get("measure"), "subject": ledger.by_id[g[0]].get("subject"),
-              "as_of": ledger.by_id[g[0]].get("as_of")} for g in list(groups.values())[:6]]
+    cands = [{"id": g[0][0], "measure": ledger.by_id[g[0][0]].get("measure"),
+              "subject": ledger.by_id[g[0][0]].get("subject"), "as_of": g[1] or ledger.by_id[g[0][0]].get("as_of")}
+             for g in list(groups.values())[:6]]
     return None, cands, False
 
 
@@ -366,7 +419,7 @@ def _primary(alias_ids: list[str], ledger: Ledger, words: set[str]) -> str:
 
 
 def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[str], linked: list, tokens: list,
-                    ledger: Ledger, subjects_on_ledger: set[str], two_word_measures: dict) -> None:
+                    ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]]) -> None:
     """The sentence around its figures. `linked` is [(token, [alias records])]
     in reading order; a check that any alias satisfies is satisfied."""
     at = f"prose[{i}]"
@@ -386,12 +439,23 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                    "figure_subject": recs[0].get("subject"), "sentence_names": sorted(named)[:6],
                                    "fix": f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"})
 
-    # a measure the sentence names is the measure of a figure in it
-    for phrase, measure in two_word_measures.items():
-        if phrase and phrase in low and groups and not any(r.get("measure") == measure for recs in groups for r in recs):
-            v.problems.append({"at": at, "reason": "measure_mismatch", "phrase": phrase, "linked": [r["id"] for r in firsts][:4],
-                               "fix": f"the sentence says '{phrase}' but its figure(s) are {', '.join(sorted({str(r.get('measure')) for r in firsts})[:3])}; "
-                                      f"the ledger holds {measure} as its own fact — write that value, or drop the phrase"})
+    # A MEASURE THE SENTENCE NAMES IS THE MEASURE OF A FIGURE IN IT, or one the
+    # figure is built from. The phrase's words must be among the linked measure's
+    # words — the sentence may say "dividends paid were 12% of operating cash
+    # flow" beside divide(dividends_paid, operating_cash_flow), and may NOT say
+    # "factor share 0.85%" beside alpha_plus_residual (V33B Q18, the one reader-
+    # visible falsehood nothing else catches).
+    linked_words = [set(w.lower() for w in _measure_words(r.get("measure"))) for _t, recs in linked for r in recs]
+    for phrase, measures in phrases.items():
+        if not phrase or phrase not in low or not linked_words:
+            continue
+        want = set(phrase.split())
+        if not any(want <= have for have in linked_words):
+            v.problems.append({"at": at, "reason": "measure_mismatch", "phrase": phrase,
+                               "linked": [recs[0]["id"] for _t, recs in linked][:4],
+                               "fix": f"the sentence says '{phrase}' but the figure beside it is "
+                                      f"{', '.join(sorted({str(r.get('measure')) for _t, recs in linked for r in recs})[:3])}; "
+                                      f"the ledger holds {' / '.join(sorted(measures)[:2])} as its own fact — write that value, or drop the phrase"})
             break
 
     # a superlative rests on a place in an ordering
@@ -434,11 +498,15 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     if words & CHANGE_WORDS and len(groups) >= 2:
         ga, gb = groups[0], groups[1]
         a, b = ga[0], gb[0]
-        if a.get("unit") != b.get("unit"):
-            v.problems.append({"at": at, "reason": "unit_conflict", "ids": [a["id"], b["id"]],
-                               "fix": f"{a.get('unit')} beside {b.get('unit')}: a change or comparison joins two figures of one unit"})
-            return
-        same_group = _group_key(a) == _group_key(b)
+        # Two units in one sentence are not checked as units: a comparison
+        # ("$1.72M against $10.51B/day of volume") is prose, and a CHANGE across
+        # units is already two different measures, which the branch below refuses.
+        # Judging by unit refused 15 comparisons in V33D and caught nothing the
+        # measure test does not.
+        # one reading under two names is one subject, one date AND one value:
+        # two different quantities of one subject on one day are not a change
+        same_group = (_group_key(a, None) == _group_key(b, None)
+                      and abs(float(a["value"]) - float(b["value"])) < 1e-12)
         same_measure = a.get("measure") == b.get("measure") or same_group
         same_subject = (_short_subject(a.get("subject")) or a.get("subject")) == (_short_subject(b.get("subject")) or b.get("subject"))
         va, vb = float(a["value"]), float(b["value"])
@@ -500,11 +568,17 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
                 continue
             if s > pos:
                 runs.append(para[pos:s])
+            if kind == "drop" and runs and isinstance(runs[-1], str) and runs[-1].endswith(" ") \
+                    and (e >= len(para) or para[e] in " .,;:)]"):
+                runs[-1] = runs[-1][:-1]                     # "12.0% [f_x] ." reads "12.0%."
             if kind == "link":
-                if payload["to"] == "fact" and len(payload["ids"]) >= 1:
-                    runs.append({"fact": A.fill(ledger.by_id[payload.get("primary") or payload["ids"][0]])})
-                else:
-                    runs.append({"link": {"to": payload["to"], "ids": payload["ids"], "as_written": para[s:e]}})
+                # THE READER SEES THE WORDS THE ANALYST WROTE. A resolved figure is
+                # that text, underlined, opening the fact it equals (the page's
+                # LinkText, built for exactly this). Substituting the fact's display
+                # for the text was the placeholder grammar's job, and V33 deleted the
+                # placeholders: it now only makes true sentences false — "1-year" came
+                # out "$251.89 (2026-09-10)-year", "in 2023" came out "in $717B".
+                runs.append({"link": {"to": payload["to"], "ids": payload["ids"], "as_written": para[s:e]}})
             elif kind == "block":
                 after.append(_block_for(payload, ledger))
             pos = e
