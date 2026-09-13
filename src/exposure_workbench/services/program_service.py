@@ -1810,12 +1810,24 @@ def _facts_of(node: Node) -> list[F.Fact]:
     if node.kind in (VECTOR, RANKING, TABLE):
         out = []
         as_of = node.as_of or (win["end"] if win else "n/a")
+        # A VECTOR IS AN ORDERING. Its entries are one measure in one unit, so
+        # their places are settled the moment it is built; a ranking states the
+        # order, a vector holds it. Both carry it, so a superlative in prose is
+        # always a lookup against the figure's own place (V33F refused 12 that
+        # the evidence already ordered).
+        places: dict[str, tuple[int, int]] = {}
+        if node.kind in (VECTOR, RANKING):
+            vals = [(lab, float(val)) for lab, _r, val, _u in node.entries if val is not None]
+            for place, (lab, _v) in enumerate(sorted(vals, key=lambda x: -x[1]), start=1):
+                places[lab] = (place, len(vals))
         for i, (label, ref, value, unit) in enumerate(node.entries):
             if value is None:
                 continue
             extra = dict(p, label=label)
             if node.kind == RANKING or node.op == "top":
                 extra["rank"] = i + 1          # a top-n entry is a place in an ordering too
+            if label in places and len(places) > 1:
+                extra["place"], extra["of"] = places[label]
             measure = node.measure if node.kind in (VECTOR, RANKING) and node.measure else label
             subj = label if node.kind in (VECTOR, RANKING) else ((node.subject or node.ref) if node.kind == TABLE else None)
             if node.kind == TABLE and "." in label:

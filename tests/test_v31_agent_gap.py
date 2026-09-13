@@ -88,7 +88,10 @@ async def test_the_refusal_names_the_token_and_the_reason_not_only_the_rule(monk
     await handle_message(_factory([]), "sess_r2", "is that fixed or floating", max_turns=16)
 
     told = [m for m in prompts[1] if m["role"] == "user"][-1]["content"]
-    assert "prose[0]" in told and "92%" in told and "unsourced_figure" in told, told
+    # V34: the refusal quotes the sentence that did not pass, names its tag, the
+    # reason and the way out, and says the rest of the reply is kept
+    assert "[S1]" in told and "92%" in told and "unsourced_figure" in told, told
+    assert "ExxonMobil's debt is 92% fixed-rate." in told and "KEPT exactly as you wrote it" in told
 
 
 @pytest.mark.asyncio

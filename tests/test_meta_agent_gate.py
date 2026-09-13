@@ -320,3 +320,33 @@ def test_the_analysts_only_tool_is_not_a_registry_tool():
     assert meta_agent._BUDGET_FREE_TOOLS == (evidence_request.TOOL_NAME,)
     assert evidence_request.TOOL_NAME not in build_meta_registry().tools
     assert evidence_request.TOOL_NAME not in faces.FACE_META_AGENT
+
+
+@pytest.mark.asyncio
+async def test_a_refused_reply_is_repaired_sentence_by_sentence(monkeypatch):
+    """V34 invariant C: the second attempt replaces only the sentences that did not
+    pass; every accepted sentence is kept exactly as written, so the accepted set
+    can only grow. A whole-reply rewrite re-rolled every sentence and 17 of 20
+    questions spent both attempts without landing (V33F)."""
+    told: list = []
+    replies = iter([
+        ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]})),
+        ("MSFT weighs 23.4% of the book. The book leans on its largest names.", None),
+        ("S1: MSFT weighs 16.0% of the book.", None),
+    ])
+
+    async def _llm(**kw):
+        told.append(list(kw["messages"]))
+        return next(replies)
+
+    _stub_llm(monkeypatch, _llm)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_repair", "how big is MSFT", max_turns=8)
+
+    asked = [m for m in told[-1] if m["role"] == "user"][-1]["content"]
+    assert "[S1]" in asked and "KEPT exactly as you wrote it" in asked
+    assert "S2" not in asked, "the sentence that passed is not sent back"
+    assert out["text"] == "MSFT weighs 16.0% of the book. The book leans on its largest names."
+    assert out["meta"]["verified"]["sentences"] == {"checked": 1, "unchecked": 1,
+                                                    "judgement": ["The book leans on its largest names."]}

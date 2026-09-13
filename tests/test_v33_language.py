@@ -134,3 +134,21 @@ async def test_a_methods_name_at_the_filed_line_door_is_refused_as_the_writers_e
     the analyst told the reader Lilly has no filed facts under gross margin."""
     out = await _run({"let": [["gm", {"fn": "fundamentals", "ticker": "LLY", "metric": "gross_margin"}]]})
     assert out["error"] == "type_errors" and out["problems"][0]["reason"] == "metric_is_a_method"
+
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_invariant_B_every_vector_entry_carries_its_place_in_the_ordering():
+    """A vector is one measure in one unit per label, so its order is settled the
+    moment it is built. A superlative in prose is then always a lookup."""
+    out = await _run({"let": [["ci", {"fn": "method", "name": "capex_intensity", "subject": ["MSFT", "GOOGL", "AMZN"]}],
+                              ["w", {"fn": "column", "run": {"fn": "run", "portfolio": "port_001"},
+                                     "table": "issuer_exposures", "col": "weight"}]]})
+    assert out["refused"] == []
+    for node in ("ci", "w"):
+        facts = [f for f in out["_facts"] if (f["params"] or {}).get("node") == node]
+        assert facts, node
+        places = {f["params"]["place"]: float(f["value"]) for f in facts}
+        assert sorted(places) == list(range(1, len(facts) + 1)), node
+        assert all(f["params"]["of"] == len(facts) for f in facts), node
+        assert [places[k] for k in sorted(places)] == sorted(places.values(), reverse=True), node

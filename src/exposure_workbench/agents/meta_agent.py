@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Sequence
 
 from sqlalchemy import update
@@ -54,9 +55,10 @@ the question has one. The desk returns every figure with its id and identity, pa
 not do. Ask for everything a first pass needs in one request; ask again only for what the answer still lacks. \
 Check the question's premises against the briefing first (which holdings are in which sector, what the desk holds).
 
-Your reply is plain prose, and every number you write is one the desk showed you, written as it was shown \
-(16.0%, $10.63M, 0.78×). When one number stands under two ids, put the id after it in brackets [f_…]. A table or a \
-chart is [table: <node>] or [chart: <node>], naming a node from the evidence. Quote a passage's words verbatim \
+Your reply is plain prose, and every number you write is one the desk showed you, written exactly as it was shown \
+(16.0%, $10.63M, 0.78×) — where that form carries a date, keep the date in your sentence. A table or a \
+chart is [table: <node>] or [chart: <node>], naming a node from the evidence. Never write an id: the form the desk \
+showed a figure under is unique, so writing it is enough. Quote a passage's words verbatim \
 inside quotation marks. A superlative rests on an ordering the desk computed (compare: rank). What the desk could \
 not do or does not hold, say so in words and say what you gave instead — never an estimate, never a figure carried \
 from one company or date to another, never a nearby figure under the asked-for name.
@@ -125,18 +127,48 @@ async def _record_answer(db_factory, session_id: str, message_id: str, text: str
         logger.exception("could not record answer step for %s", session_id)
 
 
+_REPAIR_RE = re.compile(r"^\s*(S\d+)\s*:\s*(.*)$")
+
+
 def _refusal_message(verdict) -> str:
-    lines = [f"Your reply was not accepted: {len(verdict.problems)} problem(s), each with its fix. "
-             f"Rewrite the whole reply once, fixing all of them — or request the evidence you lack first."]
-    for p in verdict.problems[:20]:
-        what = p.get("figure") or p.get("id") or p.get("node") or p.get("quote") or p.get("word") or p.get("phrase") or ""
-        line = f"- {p['at']} {p['reason']}" + (f" ({what!r})" if what else "")
-        if p.get("fix"):
-            line += f": {p['fix']}"
-        if p.get("candidates"):
-            line += " candidates: " + "; ".join(f"[{c['id']}] {c.get('measure')} {c.get('subject')} {c.get('as_of')}" for c in p["candidates"][:4])
-        lines.append(line)
+    """C — SENTENCE REPAIR. Only the sentences that did not pass come back, and
+    only replacements for them are asked for; everything else is kept exactly as
+    written. A whole-reply rewrite re-rolled every sentence, and 17 of 20
+    questions spent both attempts without landing (V33F)."""
+    failed = verdict.failed
+    lines = [f"{len(failed)} sentence(s) of your reply did not pass. Everything else is KEPT exactly as you wrote it.",
+             "", "Replace only these:"]
+    for x in failed:
+        lines.append(f"[{x['tag']}] {x['text']}")
+        for p in x["problems"][:6]:
+            what = p.get("figure") or p.get("node") or p.get("quote") or p.get("word") or p.get("phrase") or ""
+            line = f"      {p['reason']}" + (f" ({what!r})" if what else "")
+            if p.get("fix"):
+                line += f": {p['fix']}"
+            if p.get("candidates"):
+                line += " — the desk showed: " + "; ".join(
+                    f"{c.get('measure')} {c.get('subject')} {c.get('as_of')}" for c in p["candidates"][:4])
+            lines.append(line)
+    other = [p for p in verdict.problems if not p.get("sentence")]
+    for p in other[:6]:
+        lines.append(f"      {p['reason']}: {p.get('fix') or p.get('detail') or ''}")
+    lines += ["", "Reply with ONLY the replacement sentences, one per line, each starting with its tag:",
+              "S1: <the sentence as it should read>",
+              "A sentence you cannot support: give its tag and nothing after the colon, and it is dropped.",
+              "Request the evidence you lack first if a fix needs a figure you were not shown."]
     return "\n".join(lines)
+
+
+def _replacements(text: str, verdict) -> dict[str, str] | None:
+    """The tagged lines of a repair reply, or None when it is not one (the model
+    rewrote the whole answer instead, which is still allowed)."""
+    tags = {x["tag"] for x in verdict.failed}
+    out: dict[str, str] = {}
+    for line in (text or "").splitlines():
+        m = _REPAIR_RE.match(line)
+        if m and m.group(1) in tags:
+            out[m.group(1)] = m.group(2)
+    return out or None
 
 
 async def handle_message(
@@ -176,6 +208,7 @@ async def handle_message(
     prompt_peak = 0
     attempts = 0
     requests = 0
+    answer, standing = "", None            # the reply being repaired, and the verdict naming its sentences
 
     async with tool_session(
         faces.FACE_NAME_META, session_id=session_id,
@@ -220,6 +253,12 @@ async def handle_message(
                 continue
 
             led = await _load_ledger(db_factory, session_id)
+            if standing is not None:
+                # C: a repair reply replaces only the sentences it names; every
+                # accepted sentence is kept as written, so the accepted set grows
+                repl = _replacements(text, standing)
+                if repl is not None:
+                    text = answer_check.repair(answer, standing, repl)
             verdict = answer_check.check(text, led, question=user_text)
             await _record_answer(db_factory, session_id, message_id, text, verdict)
             if verdict.ok:
@@ -231,6 +270,7 @@ async def handle_message(
             gate_refusals.append(verdict.error)
             if attempts >= MAX_ANSWER_ATTEMPTS:
                 break
+            answer, standing = text, verdict
             messages.append({"role": "user", "content": _refusal_message(verdict)})
 
     meta: dict = {"prompt_tokens": prompt_peak, "pushed": pushed, "requests": requests,

@@ -113,9 +113,12 @@ def test_a_number_held_by_several_facts_and_no_subject_is_ambiguous():
     assert v.problems[0]["candidates"]
 
 
-def test_a_mark_pins_a_number_and_a_wrong_mark_is_refused():
-    _accepted("The warning tier is 15.0% [f_warnnvda] for this check.")
-    _refused("The warning tier is 15.0% [f_breachmsft] for this check.", "mark_mismatch")
+def test_the_analyst_never_writes_an_id():
+    """V34: `[f_…]` is gone. The desk shows figures that can be told apart by how
+    they read, so a written figure needs no pointer; an id in prose is a word the
+    reader should never see, whatever brackets it sits in."""
+    _refused("The warning tier is 15.0% [f_warnnvda] for this check.", "id_in_prose")
+    _accepted("NVDA's warning tier is 15.0% for this check.")
 
 
 def test_a_bare_id_in_prose_is_refused():
@@ -190,7 +193,7 @@ def test_the_reader_sees_the_words_the_analyst_wrote_and_the_fact_behind_them():
     and the ids it opens. Substituting the fact's display was the placeholder
     grammar's job and V33 deleted the placeholders; it only made true sentences
     false (V33D: "1-year" came out "$251.89 (2026-09-10)-year")."""
-    text = "MSFT weighs 16.0% of the book [f_wmsft]; the warning tier is 15.0% [f_warnmsft]."
+    text = "MSFT weighs 16.0% of the book; MSFT's warning tier is 15.0%."
     v = _accepted(text)
     out = ac.accepted(text, v, LEDGER)
     runs = out["blocks"][0]["runs"]
@@ -198,7 +201,7 @@ def test_the_reader_sees_the_words_the_analyst_wrote_and_the_fact_behind_them():
     assert [l["as_written"] for l in links] == ["16.0%", "15.0%"]
     assert [l["ids"][0] for l in links] == ["f_wmsft", "f_warnmsft"]
     assert not any("fact" in r for r in runs if isinstance(r, dict))
-    assert out["text"] == "MSFT weighs 16.0% of the book; the warning tier is 15.0%."
+    assert out["text"] == text
     assert out["verified"]["figures"] == 2 and set(out["citations"]) == {"f_wmsft", "f_warnmsft"}
 
 
@@ -235,10 +238,11 @@ def test_a_point_of_a_series_is_a_figure_the_ledger_holds_and_renders_on_its_dat
     assert "f_ocf001" in out["citations"]
 
 
-def test_a_series_marked_after_its_point_is_the_source_and_a_wrong_mark_is_not():
-    assert ac.check("Operating cash flow reached $140.0B [f_ocf001].", _C_LEDGER).ok
-    v = ac.check("Operating cash flow reached $140.0B [f_wmsft].", _C_LEDGER)
-    assert {p["reason"] for p in v.problems} == {"mark_mismatch"}
+def test_a_point_of_a_series_needs_no_pointer():
+    v = ac.check("Operating cash flow reached $140.0B.", _C_LEDGER)
+    assert v.ok, v.problems
+    (link,) = [l for l in v.links.values() if l.get("period")]
+    assert link["ids"] == ["f_ocf001"] and link["period"] == "2025-12-31"
 
 
 def test_two_series_sharing_a_point_are_one_reading_and_the_measure_named_leads():
@@ -342,11 +346,72 @@ def test_a_quotation_may_come_from_any_text_the_turn_holds():
     assert {p["reason"] for p in v.problems} == {"unverified_quote"}
 
 
-def test_a_mark_may_name_the_passage_that_states_the_figure():
-    """V33E Q19: the analyst marked each segment revenue with the filing it came
-    from; the pinned path never consulted passages and refused all 25."""
+def test_a_figure_a_passage_states_resolves_through_the_passage():
+    """V33E Q19 marked each segment revenue with the filing it came from and was
+    refused 25 times. The passage states the figure; no pointer is needed."""
     led = Ledger.of([*_C_LEDGER.by_id.values(),
                      _passage("f_seg01", "AMZN", "Net sales: AWS 90,757 and 107,556 in the two years shown.")])
-    assert ac.check("Amazon's filings show AWS net sales of $90,757 [f_seg01].", led).ok
-    v = ac.check("Amazon's filings show AWS net sales of $91,999 [f_seg01].", led)
-    assert {p["reason"] for p in v.problems} == {"mark_mismatch"}
+    assert ac.check("Amazon's filings show AWS net sales of $90,757.", led).ok
+    v = ac.check("Amazon's filings show AWS net sales of $91,999.", led)
+    assert {p["reason"] for p in v.problems} == {"unsourced_figure"}
+
+
+# ── V34: the gate says what it checked, and a repair keeps what passed ───────
+
+def test_every_sentence_is_labelled_checked_or_judgement():
+    """V33F: 223 of 443 sentences in the round's answers held no figure at all and
+    the gate had nothing to say about them — silently."""
+    text = "MSFT weighs 16.0% of the book. The book looks concentrated to me."
+    v = ac.check(text, LEDGER)
+    assert v.ok, v.problems
+    assert [x["tag"] for x in v.sentences] == ["S1", "S2"]
+    assert [x["checked"] for x in v.sentences] == [True, False]
+    out = ac.accepted(text, v, LEDGER)
+    assert out["verified"]["sentences"] == {"checked": 1, "unchecked": 1,
+                                            "judgement": ["The book looks concentrated to me."]}
+
+
+def test_a_repair_replaces_only_the_sentences_it_names():
+    text = "MSFT weighs 23.4% of the book. AAPL sits -3.89% below its high. That is a concentrated book."
+    v = ac.check(text, LEDGER)
+    assert not v.ok and [x["tag"] for x in v.failed] == ["S1"]
+    fixed = ac.repair(text, v, {"S1": "MSFT weighs 16.0% of the book."})
+    assert fixed == "MSFT weighs 16.0% of the book. AAPL sits -3.89% below its high. That is a concentrated book."
+    assert ac.check(fixed, LEDGER).ok
+
+
+def test_a_sentence_the_analyst_cannot_support_is_dropped():
+    text = "MSFT weighs 23.4% of the book. AAPL sits -3.89% below its high."
+    v = ac.check(text, LEDGER)
+    assert ac.repair(text, v, {"S1": ""}) == "AAPL sits -3.89% below its high."
+
+
+def test_a_superlative_is_a_lookup_on_the_figures_own_place():
+    """V34 invariant B: a vector's entries carry their place the moment the desk
+    builds them, so the check never scans and never guesses."""
+    led = Ledger.of([
+        _f("f_ci1", "capex_intensity", "MSFT", 0.2291, node="ci", place=1, of=3),
+        _f("f_ci2", "capex_intensity", "GOOGL", 0.2210, node="ci", place=2, of=3),
+        _f("f_ci3", "capex_intensity", "AMZN", 0.1839, node="ci", place=3, of=3),
+    ])
+    assert ac.check("Microsoft has the highest capex intensity at 22.9%.", led).ok
+    assert ac.check("Amazon has the lowest capex intensity at 18.4%.", led).ok
+    v = ac.check("Alphabet has the highest capex intensity at 22.1%.", led)
+    assert "superlative_without_rank" in {p["reason"] for p in v.problems}
+
+
+def test_invariant_C_a_repair_never_shrinks_the_accepted_set():
+    """The property the sentence repair rests on: whatever the model sends back for
+    the sentences that failed, the sentences that passed still pass."""
+    text = ("MSFT weighs 23.4% of the book. AAPL sits -3.89% below its high. "
+            "NVDA weighs 99.9%. The book leans on its largest names.")
+    v = ac.check(text, LEDGER)
+    passed = {x["tag"] for x in v.sentences if not x["problems"]}
+    assert {x["tag"] for x in v.failed} == {"S1", "S3"}
+    for repl in ({"S1": "MSFT weighs 16.0% of the book.", "S3": ""},
+                 {"S1": "", "S3": "NVDA weighs 4.06%."},
+                 {"S1": "MSFT weighs 16.0%.", "S3": "NVDA weighs 23.4%."}):
+        after = ac.check(ac.repair(text, v, repl), LEDGER)
+        still = {x["text"] for x in after.sentences if not x["problems"]}
+        kept = {x["text"] for x in v.sentences if x["tag"] in passed}
+        assert kept <= still, (repl, kept - still)

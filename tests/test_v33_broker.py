@@ -234,3 +234,49 @@ async def test_the_writer_reads_the_domains_worked_programs():
     b._record = _no_record
     await b.fulfil([{"subjects": ["port_001"], "want": ["book.explain_episode"], "ask": "the worst episode explained"}])
     assert "worked_examples" in seen["user"] and "book.drawdown_episodes" in seen["user"]
+
+
+@pytest.mark.asyncio
+async def test_the_digest_shows_one_reading_once_and_never_two_that_read_alike():
+    """A — shown uniqueness. V33D refused 240 figures over one series fetched twice
+    and V33E 38 over one holding in two runs; both collisions were the desk's own."""
+    rows = [_row("f_a", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1723540.0, as_of="2026-09-10", params={"node": "mv"}),
+            _row("f_b", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1723540.0, as_of="2026-09-10", params={"node": "mv_again"}),
+            _row("f_c", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1720775.0, as_of="2026-09-09", params={"node": "mv_prev"})]
+    tools = _Tools({"run": _run_result(rows)})
+    out = await _broker(tools).fulfil([{"subjects": ["port_001"], "want": ["issuer_exposures.market_value"]}])
+    figs = out["items"][0]["figures"]
+    assert [f["id"] for f in figs] == ["f_a", "f_c"], "the same reading is shown once"
+    assert figs[0]["also"] == ["f_b"], "and names the other id it was fetched under"
+    assert figs[0]["value"] == "$1.72M (2026-09-10)" and figs[1]["value"] == "$1.72M (2026-09-09)"
+    assert "reads the same" in figs[0]["reads_alike"]
+
+
+@pytest.mark.asyncio
+async def test_figures_that_already_read_apart_are_left_alone():
+    rows = [_row("f_a", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 0.16, params={"node": "w"}),
+            _row("f_b", "scalar", "AAPL", "issuer_exposures.weight", "RATIO", 0.152, params={"node": "w"})]
+    out = await _broker(_Tools({"run": _run_result(rows)})).fulfil([{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
+    assert [f["value"] for f in out["items"][0]["figures"]] == ["16.0%", "15.2%"]
+
+
+@pytest.mark.asyncio
+async def test_invariant_A_no_two_entries_of_a_digest_read_alike():
+    """The property, not a case: whatever the desk returns, the analyst can tell
+    any two figures apart by how they read."""
+    rows = []
+    for i, (subj, meas, val, day) in enumerate([
+            ("MSFT", "issuer_exposures.weight", 0.16039, "2026-09-10"),
+            ("MSFT", "issuer_exposures.weight", 0.16041, "2026-09-09"),
+            ("AAPL", "issuer_exposures.weight", 0.16039, "2026-09-10"),
+            ("MSFT", "limit_checks.current_value", 0.16039, "2026-09-10"),
+            ("LLY", "price.adv", 2940000000.0, "2026-09-10"),
+            ("LLY", "price.adv", 2940000000.0, "2026-09-10")]):
+        rows.append(_row(f"f_{i:04d}", "scalar", subj, meas, "RATIO" if val < 1 else "MONEY", val,
+                         as_of=day, params={"node": "n"}))
+    out = await _broker(_Tools({"run": _run_result(rows)})).fulfil(
+        [{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
+    figs = out["items"][0]["figures"]
+    written = [(f.get("subject"), f.get("measure"), f["value"]) for f in figs]
+    assert len(written) == len(set(written)), written
+    assert len(figs) == 5, "the reading fetched twice is shown once"

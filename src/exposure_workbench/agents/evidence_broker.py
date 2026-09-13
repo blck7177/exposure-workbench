@@ -51,9 +51,10 @@ WRITER_TOOL = {"type": "function", "function": {
     "name": "run_program", "description": "Execute one analysis program.",
     "parameters": {"type": "object", "properties": {"program": ps.schema()}, "required": ["program"], "additionalProperties": False}}}
 
-HOW_TO_CITE = ("Write each figure as its `value` reads here; when one value stands under two ids, put [id] after it. "
-               "A series shows its points as [date, value]: write a point's value as shown and name its date in the sentence "
-               "or put the series' [id] after it. "
+HOW_TO_CITE = ("Write each figure exactly as its `value` reads here — that form is unique on this desk, so it needs no "
+               "pointer of any kind. Where a `value` carries a date in brackets, another reading of the same figure reads "
+               "the same and the date is what tells them apart: keep it in your sentence. "
+               "A series shows its points as [date, value]: write a point's value as shown and name its date. "
                "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks. "
                "A boundary is something the desk could not do or does not hold: say so in your own words.")
 
@@ -90,6 +91,45 @@ def _split(item: dict) -> list[tuple[str, dict]]:
     order = ("prepare", "filings", "news", "program")
     # a derivation is arithmetic over the program's own names; the tool doors take none
     return [(k, {**item, "want": groups[k], **({} if k == "program" else {"derive": None})}) for k in order if k in groups]
+
+
+def _reading_of(fig: dict) -> tuple:
+    return (fig.get("subject"), fig.get("measure"), fig.get("as_of"), str(fig.get("value")))
+
+
+def _tell_apart(items: list[dict]) -> None:
+    """A — SHOWN UNIQUENESS. Across the whole digest: one reading is shown once,
+    and two readings never read alike.
+
+    The analyst writes what it is shown, so what it is shown has to be enough to
+    tell apart. V33D refused 240 figures over the same series fetched twice and
+    V33E 38 over one holding in two runs; both collisions were the desk's own.
+    A duplicate reading collapses to one entry naming the other ids (they are the
+    same figure); a genuine pair that reads alike takes its date into the value,
+    so copying it puts the discriminator in the sentence."""
+    figures = [f for e in items for f in (e.get("figures") or [])]
+    seen: dict[tuple, dict] = {}
+    for e in items:
+        kept = []
+        for f in e.get("figures") or []:
+            key = _reading_of(f)
+            first = seen.get(key)
+            if first is None:
+                seen[key] = f
+                kept.append(f)
+            else:
+                first.setdefault("also", []).append(f["id"])    # the same reading, fetched twice
+        e["figures"] = kept
+    figures = [f for e in items for f in (e.get("figures") or [])]
+    by_written: dict[tuple, list[dict]] = {}
+    for f in figures:
+        by_written.setdefault((f.get("subject"), f.get("measure"), str(f.get("value"))), []).append(f)
+    for group in by_written.values():
+        if len(group) > 1 and len({f.get("as_of") for f in group}) > 1:
+            for f in group:
+                if f.get("as_of"):
+                    f["value"] = f"{f['value']} ({f['as_of']})"
+                    f["reads_alike"] = "another reading of this figure reads the same; its date tells them apart"
 
 
 def _fit(digest: dict, limit: int) -> dict:
@@ -188,6 +228,7 @@ class Broker:
                 entry = _merge(entry, got)
             entry["i"] = i
             out.append(entry)
+        _tell_apart(out)
         digest = _fit({"items": out, "how_to_cite": HOW_TO_CITE}, DIGEST_CHAR_LIMIT)
         summary = "; ".join(f"item {e['i']}: {len(e.get('figures', []))} figures, {len(e.get('series', []))} series, "
                             f"{len(e.get('passages', []))} passages, {len(e.get('boundaries', []))} boundaries" for e in out)

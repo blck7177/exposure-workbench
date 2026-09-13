@@ -14,7 +14,7 @@ Here the model writes prose. This module reads it the way the reader will:
     G1  every number resolves — to a fact it equals at the written precision,
         to a fact's date/window/parameter, to a quoted passage that states it,
         or to the user's own question               unsourced_figure
-    G2  a number that equals several different facts is pinned by the sentence
+    G2  a number that equals several different readings is pinned by the sentence
         it sits in (its subject, its measure, its date) or by a mark `[f_…]`
         after it                                    ambiguous_figure / mark_mismatch
     G3  the sentence around a figure agrees with the figure's identity:
@@ -51,7 +51,6 @@ from exposure_workbench.services.gate import _core, quoted_spans, _normalise
 from exposure_workbench.services.ledger import Ledger
 
 # ── the marks a writer may put in prose ──────────────────────────────────────
-MARK_FACT = re.compile(r"\[(f_[0-9A-Za-z]{4,})\]")
 MARK_BLOCK = re.compile(r"\[(table|chart):\s*([A-Za-z_][A-Za-z0-9_]*)\]")
 _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
 
@@ -82,6 +81,11 @@ class Verdict:
     links: dict[tuple[int, int], dict] = field(default_factory=dict)     # (para, token start) -> {to, ids, as_written}
     marks: list[dict] = field(default_factory=list)                       # block marks: {para, start, end, kind, node, ids}
     refs: list[str] = field(default_factory=list)                         # every fact id the answer rests on
+    sentences: list[dict] = field(default_factory=list)                   # {tag, para, text, span, checked, problems}
+
+    @property
+    def failed(self) -> list[dict]:
+        return [s for s in self.sentences if s["problems"]]
 
     @property
     def ok(self) -> bool:
@@ -188,7 +192,7 @@ def _blank(text: str, spans: list[tuple[int, int]]) -> str:
 
 def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
     v = Verdict()
-    paras = [p for p in re.split(r"\n\s*\n|\n", text or "") if p.strip()]
+    paras = [(m.start(), m.group(0)) for m in re.finditer(r"[^\n]+", text or "") if m.group(0).strip()]
     if not paras:
         v.error, v.detail = "empty_answer", "the answer has no text"
         return v
@@ -210,7 +214,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         if len(ws) >= 2 and r.get("measure"):
             phrases.setdefault(" ".join(ws).lower(), set()).add(r["measure"])
 
-    for i, para in enumerate(paras):
+    for i, (para_at, para) in enumerate(paras):
         # G5 — the marks
         mark_spans: list[tuple[int, int]] = []
         for m in MARK_BLOCK.finditer(para):
@@ -218,21 +222,11 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             ids = [fid for fid, r in ledger.by_id.items() if (r.get("params") or {}).get("node") == node
                    and r.get("kind") in (F.SCALAR, F.SERIES)]
             if not ids:
-                v.problems.append({"at": f"prose[{i}]", "reason": "unknown_node", "node": node,
+                v.problems.append({"at": f"prose[{i}]", "_at": m.start(), "reason": "unknown_node", "node": node,
                                    "fix": "a [table: …] or [chart: …] names a binding of a program this turn ran, and its facts are on the ledger"})
             else:
                 v.marks.append({"para": i, "start": m.start(), "end": m.end(), "kind": kind, "node": node, "ids": ids})
                 v.refs += ids
-            mark_spans.append((m.start(), m.end()))
-        fact_marks: dict[int, str] = {}                     # mark start -> fact id
-        for m in MARK_FACT.finditer(para):
-            fid = m.group(1)
-            if not ledger.holds(fid):
-                v.problems.append({"at": f"prose[{i}]", "reason": "not_on_ledger", "id": fid,
-                                   "fix": "a [f_…] names a fact a tool result showed this session"})
-            else:
-                fact_marks[m.start()] = fid
-                v.refs.append(fid)
             mark_spans.append((m.start(), m.end()))
         blanked = _blank(para, mark_spans)
 
@@ -246,7 +240,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 quoted_ok.append((start, start + len(span)))
                 v.refs += [t for t in hit[:1] if t]
             else:
-                v.problems.append({"at": f"prose[{i}]", "reason": "unverified_quote", "quote": span[:120],
+                v.problems.append({"at": f"prose[{i}]", "_at": max(start, 0), "reason": "unverified_quote", "quote": span[:120],
                                    "fix": "quotation marks say these words are verbatim in a text this turn holds — a passage "
                                           "the desk read, the desk's own words for what it could not do, or the question: "
                                           "reproduce the wording, or drop the marks"})
@@ -265,33 +259,16 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 # figure. V33D's "1-year" resolved to whatever the ledger held near 1.
                 continue
             if kind == "id":
-                v.problems.append({"at": f"prose[{i}]", "reason": "id_in_prose", "id": tok,
-                                   "fix": "an id is not a word the reader sees: write the figure, and put [f_…] after it only when it is ambiguous"})
+                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
+                                   "fix": "an id is not a word the reader sees: write the figure as the desk showed it"})
                 continue
             si = next((k for k, (s, e) in enumerate(sentences) if s <= start < e), 0)
             sentence = blanked[sentences[si][0]:sentences[si][1]]
             swords = _words(sentence)
-            pinned = next((fid for ms, fid in fact_marks.items() if end <= ms <= end + 1), None)
             found = ledger.readings(tok) if kind == "num" else []
-            if pinned:
-                mine = [(fid, per) for fid, per in found if fid == pinned]
-                if not mine and ledger.kind(pinned) == F.PASSAGE and ledger.resolve_in_passages(tok, [pinned]):
-                    # the mark names the passage that STATES this figure — the desk
-                    # showed the words, not a computed reading (V33E Q19 marked each
-                    # segment revenue with the filing it came from, 25 refusals)
-                    v.links[(i, start)] = {"to": "passage", "ids": [pinned], "as_written": tok}
-                    v.refs.append(pinned)
-                    continue
-                if not mine and pinned not in ledger.resolve_identity(tok):
-                    rec = ledger.by_id[pinned]
-                    v.problems.append({"at": f"prose[{i}]", "reason": "mark_mismatch", "figure": tok, "id": pinned,
-                                       "fact": {"measure": rec.get("measure"), "subject": rec.get("subject"), "value": rec.get("value")},
-                                       "fix": "the marked fact does not hold this number: mark the fact that does, or write its value as shown"})
-                    continue
-                found = mine or found
             if found:
                 chosen, why, evidenced = _pin(found, ledger, sentence, swords)
-                if chosen is not None and not evidenced and not pinned and _core(tok) in asked:
+                if chosen is not None and not evidenced and _core(tok) in asked:
                     # the user wrote this number and nothing in the sentence ties it to
                     # the ledger's reading of it: it is the user's ("at 20% of ADV")
                     v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
@@ -300,12 +277,12 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                     if _core(tok) in asked:
                         v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
                         continue
-                    v.problems.append({"at": f"prose[{i}]", "reason": "ambiguous_figure", "figure": tok, "candidates": why,
-                                       "fix": "several readings hold this figure: name the subject, the measure or the date in the "
-                                              "sentence, or put [f_…] after the number"})
+                    v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "ambiguous_figure", "figure": tok, "candidates": why,
+                                       "fix": "several readings hold this figure: name the subject, the measure or the date the "
+                                              "desk showed it under"})
                     continue
                 alias_ids, period = chosen
-                primary = pinned if pinned in alias_ids else _primary(alias_ids, ledger, swords)
+                primary = _primary(alias_ids, ledger, swords)
                 v.links[(i, start)] = {"to": "fact", "ids": [primary, *[f for f in alias_ids if f != primary]],
                                        "primary": primary, "period": period, "as_written": tok}
                 linked_by_sentence.setdefault(si, []).append((t, [_reading(ledger.by_id[f], period) for f in alias_ids]))
@@ -322,7 +299,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             if _core(tok) in asked:
                 v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
                 continue
-            v.problems.append({"at": f"prose[{i}]", "reason": "unsourced_figure", "figure": tok,
+            v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unsourced_figure", "figure": tok,
                                "fix": "a number the ledger cannot account for: request the figure, quote the passage that states it, or drop it"})
 
         # G3 — the sentence around the figures
@@ -330,9 +307,25 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             sentence = blanked[s:e]
             linked = linked_by_sentence.get(si, [])
             words = _words(sentence)
-            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, phrases,
-                            [pair for pairs in linked_by_sentence.values() for pair in pairs])
+            before = len(v.problems)
+            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, phrases)
+            # D — WHAT THE GATE CHECKED, SAID. A sentence with no figure and no
+            # quotation is the analyst's judgement: nothing here can settle it, and
+            # half of every answer is made of them (V33F: 223 of 443). The reader
+            # is told which half, rather than being left to assume.
+            mine = [p for p in v.problems[:before] if isinstance(p.get("_at"), int) and s <= p["_at"] < e
+                     and "sentence" not in p] + list(v.problems[before:])
+            tag = f"S{len(v.sentences) + 1}"
+            for p in mine:
+                p["sentence"] = tag
+                p.pop("_at", None)
+            quoted_here = any(s <= qs < e for qs, _qe in quoted_ok)
+            v.sentences.append({"tag": tag, "para": i, "text": para[s:e], "span": (para_at + s, para_at + e),
+                                "checked": bool(linked or quoted_here), "problems": mine,
+                                "facts": [f for _t, recs in linked for f in [recs[0]["id"]]]})
 
+    for p in v.problems:
+        p.pop("_at", None)
     v.refs = list(dict.fromkeys([*v.refs, *[l.get("primary") or fid for l in v.links.values() for fid in l["ids"][:1]]]))
     if v.problems:
         order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "ambiguous_figure",
@@ -418,16 +411,6 @@ def _pin(found: list[tuple[str, str | None]], ledger: Ledger, sentence: str,
             return next(iter(specific.values())), [], True
         if not specific:
             return next(iter(groups.values())), [], evidenced
-    # What is left may differ only in WHEN: one subject, one measure, one written
-    # figure, two dates. The sentence is true of both, so the reader is not being
-    # misled; the latest leads and the rest ride as aliases, and the page shows a
-    # chooser over them (V33E refused 38 figures of one book on this).
-    ident = {(_short_subject(ledger.by_id[g[0][0]].get("subject")) or ledger.by_id[g[0][0]].get("subject"),
-              ledger.by_id[g[0][0]].get("measure")) for g in groups.values()}
-    if len(ident) == 1:
-        ordered = sorted(groups.values(), key=lambda g: str(g[1] or ledger.by_id[g[0][0]].get("as_of") or ""), reverse=True)
-        latest = ordered[0]
-        return ([*latest[0], *[f for g in ordered[1:] for f in g[0]]], latest[1]), [], evidenced
     cands = [{"id": g[0][0], "measure": ledger.by_id[g[0][0]].get("measure"),
               "subject": ledger.by_id[g[0][0]].get("subject"), "as_of": g[1] or ledger.by_id[g[0][0]].get("as_of")}
              for g in list(groups.values())[:6]]
@@ -452,35 +435,24 @@ def _primary(alias_ids: list[str], ledger: Ledger, words: set[str]) -> str:
     return alias_ids[0]
 
 
-def _extreme_in(words: set[str], groups: list, para_linked: list) -> bool:
-    """Whether a figure this sentence calls extreme IS the extreme among the
-    paragraph's readings of its own measure. Facts, not English: the reader can
-    check it from the numbers in front of them, and so can this."""
+def _place_fits(words: set[str], rec: dict) -> bool:
+    """Whether the figure holds the place the sentence claims. A vector's entries
+    carry their place the moment the desk builds them (program_service._facts_of),
+    so this is a lookup: `highest` is first, `lowest` is last."""
+    p = rec.get("params") or {}
+    place, of = p.get("place"), p.get("of")
+    if not isinstance(place, int) or not isinstance(of, int):
+        return _ordered(rec)
     want_max, want_min = bool(words & MAX_WORDS), bool(words & MIN_WORDS)
-    for recs in groups:
-        rec = recs[0]
-        measure, subject = rec.get("measure"), rec.get("subject")
-        peers = [r for _t, rs in para_linked for r in rs
-                 if r.get("measure") == measure and r.get("subject") != subject
-                 and isinstance(r.get("value"), (int, float))]
-        if not peers or not isinstance(rec.get("value"), (int, float)):
-            continue
-        vals = [float(r["value"]) for r in peers]
-        mine = float(rec["value"])
-        if want_max and not want_min:
-            if mine >= max(vals):
-                return True
-        elif want_min and not want_max:
-            if mine <= min(vals):
-                return True
-        elif mine >= max(vals) or mine <= min(vals):
-            return True
-    return False
+    if want_max and not want_min:
+        return place == 1
+    if want_min and not want_max:
+        return place == of
+    return place in (1, of)
 
 
 def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[str], linked: list, tokens: list,
-                    ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]],
-                    para_linked: list) -> None:
+                    ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]]) -> None:
     """The sentence around its figures. `linked` is [(token, [alias records])]
     in reading order; a check that any alias satisfies is satisfied."""
     at = f"prose[{i}]"
@@ -526,10 +498,11 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     # they ordered ("Microsoft has the highest capex intensity at 22.9%. Alphabet
     # follows at 22.7%, and Amazon is lower at 18.4%").
     if words & SUPERLATIVES and groups:
-        if not any(_ordered(r) for recs in groups for r in recs) and not _extreme_in(words, groups, para_linked):
+        if not any(_place_fits(words, r) for recs in groups for r in recs):
             v.problems.append({"at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
                                "linked": [r["id"] for r in firsts][:4],
-                               "fix": "a largest/smallest/most/least rests on a rank node: request the ordering (compare: rank) and state its entry, or drop the word"})
+                               "fix": "a largest/smallest/most/least rests on the figure's own place in an ordering the desk built; "
+                                      "this figure does not hold that place — state the one that does, or drop the word"})
 
     # a date word is followed by a date
     for dw in DATE_WORDS:
@@ -617,8 +590,6 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
     blocks: list[dict] = []
     for i, para in enumerate(paras):
         cuts: list[tuple[int, int, str, Any]] = []
-        for m in MARK_FACT.finditer(para):
-            cuts.append((m.start(), m.end(), "drop", None))
         for mk in verdict.marks:
             if mk["para"] == i:
                 cuts.append((mk["start"], mk["end"], "block", mk))
@@ -634,9 +605,6 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
                 continue
             if s > pos:
                 runs.append(para[pos:s])
-            if kind == "drop" and runs and isinstance(runs[-1], str) and runs[-1].endswith(" ") \
-                    and (e >= len(para) or para[e] in " .,;:)]"):
-                runs[-1] = runs[-1][:-1]                     # "12.0% [f_x] ." reads "12.0%."
             if kind == "link":
                 # THE READER SEES THE WORDS THE ANALYST WROTE. A resolved figure is
                 # that text, underlined, opening the fact it equals (the page's
@@ -657,10 +625,33 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
     facts_used = list(dict.fromkeys(verdict.refs))
     figures = [ledger.by_id[f] for f in facts_used if f in ledger.by_id and ledger.kind(f) in (F.SCALAR, F.SERIES)]
     passages = [f for f in facts_used if ledger.kind(f) == F.PASSAGE]
+    checked = [x for x in verdict.sentences if x["checked"]]
+    unchecked = [x for x in verdict.sentences if not x["checked"]]
     return {"blocks": blocks, "text": A.prose_of(blocks), "citations": facts_used,
             "verified": {"figures": len(figures), "sources": len(passages),
+                         # D: the gate says what it settled and what it did not. A
+                         # sentence with no figure and no quotation is the analyst's
+                         # judgement; nothing here can settle it, and the reader is
+                         # told which sentences those are rather than left to assume.
+                         "sentences": {"checked": len(checked), "unchecked": len(unchecked),
+                                       "judgement": [x["text"] for x in unchecked]},
                          "matches": [{"label": r.get("measure"), "value": r.get("value"), "unit_class": r.get("unit"),
                                       "source_id": r["id"], "subject": r.get("subject"), "as_of": r.get("as_of")} for r in figures]}}
+
+
+def repair(text: str, verdict: Verdict, replacements: dict[str, str]) -> str:
+    """The answer with the refused sentences replaced and every accepted sentence
+    kept EXACTLY as written. This is what makes a second attempt converge: the
+    accepted set can only grow, where a whole-reply rewrite re-rolled every
+    sentence and 17 of 20 questions spent both attempts without landing (V33F).
+    A tag with an empty replacement drops its sentence."""
+    spans = sorted(((x["span"], replacements[x["tag"]]) for x in verdict.sentences if x["tag"] in replacements),
+                   key=lambda t: t[0][0], reverse=True)
+    out = text
+    for (start, end), new in spans:
+        new = (new or "").strip()
+        out = out[:start] + new + out[end:]
+    return re.sub(r"[ \t]{2,}", " ", out).strip()
 
 
 def _block_for(mark: dict, ledger: Ledger) -> dict | None:
