@@ -105,6 +105,11 @@ class Node:
     op: str | None = None            # the operation that made a derived node (stamped on its facts)
     method: str | None = None        # the registry method that made it
     facts: list[F.Fact] = field(default_factory=list)
+    # V33: the dates and params this node was called with (a method's peak/trough,
+    # an `at`), stamped onto its facts so what the desk computed over is on the
+    # ledger's identity and a written date resolves (Q14: the desk showed the peak
+    # date as a literal and refused the model for writing it).
+    declared: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -132,6 +137,7 @@ PRIMITIVES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "std": (("of",), ()), "abs": (("of",), ()),
     "rank": (("of",), ("direction",)), "top": (("of", "n"), ("direction",)),
     "select": (("of", "labels"), ()),
+    "filter": (("of", "op", "level"), ()),
     "vector": (("entries",), ()),
     "window_return": (("ticker", "start", "end"), ("benchmark",)),
     # series
@@ -220,6 +226,437 @@ def parse(program: dict) -> Program | dict:
 
 # ── evaluation ───────────────────────────────────────────────────────────────
 
+
+# ── static typing (V33 Phase 0): what a program means before anything runs ────
+#
+# WHY. Until V33 every type rule of this language lived in a dispatcher branch
+# and surfaced one node at a time, at execution, as a refusal that named the rule
+# and not the fix ("vector: entry 'MSFT' is not a settled scalar binding"). The
+# 20-question round (docs/spikes/v33) measured 36 run calls, 1.8 programs
+# written per program that ran, and Q08: the ordering the model asked for was
+# refused for a coercion it could not see, so it stated the ordering in prose,
+# backwards. The rules are DATA here. `typecheck` reads them before a program
+# executes and reports every problem at once, each with its fix;
+# `signature_text` renders the same table for the program writer's prompt; the
+# test pins that SIGNATURES and PRIMITIVES name the same arguments.
+
+T_NUMBER, T_DATE, T_STRING, T_LABELS, T_TRADES, T_OBJECT, T_ANY = (
+    "number", "date", "string", "labels", "trades", "object", "any")
+FIGURE_KINDS = (SCALAR, SERIES, VECTOR, RANKING)
+_OPERAND_KINDS = FIGURE_KINDS + (T_NUMBER,)
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Parameter names whose value is a date, wherever they appear (a method's params,
+# a primitive's own argument). A string here that is not YYYY-MM-DD is refused
+# before execution — Q07 sent `at: "prev"` and the whole program died in
+# date.fromisoformat.
+DATE_PARAMS = ("at", "peak", "trough", "start", "end", "as_of", "period")
+FILTER_OPS = (">", ">=", "<", "<=", "==", "!=")
+# Run tables whose figure names carry a LABEL in the middle
+# (`sector_exposures.Technology.weight`): the label is the fact's subject and
+# the measure is `table.col`, whichever producer wrote the row. Until V33 a
+# scenario's figures kept the label inside the measure and the run's did not,
+# so the same Technology weight before and after a sale were two measures to
+# the gate (Q13, refused as different_measures).
+_LABELLED_TABLES = ("issuer_exposures", "sector_exposures", "limit_checks", "risk_alerts",
+                    "factor_attributions", "holdings", "positions")
+
+
+@dataclass(frozen=True)
+class Sig:
+    """What a primitive takes and gives: argument name -> accepted kinds, and
+    the kind it returns (a kind, or a rule over the argument kinds)."""
+    args: dict
+    returns: Any
+    doc: str
+
+
+def _r_fundamentals(kinds: dict, args: dict) -> str:
+    if args.get("metric") is None:
+        return TABLE
+    return SERIES if args.get("last_n") is not None else SCALAR
+
+
+# Methods whose result is several named figures whatever the subject: the panel,
+# and every book method (an analysis, a reconciliation, a scenario, an episode
+# list, an episode's explanation). A price method that lists two yields may still
+# come back as one figure (window_return does), so it is typed as either and the
+# executor decides — a static check that refused a program the executor would
+# have run is a refusal too many.
+_TABLE_METHODS = frozenset(n for n, m in skill.METHODS.items() if n == "issuer.panel" or m.subject_kind in ("run", "portfolio"))
+
+
+def _parts(kind: str | None) -> set[str]:
+    return set((kind or "").split("|")) - {""}
+
+
+def _r_method(kinds: dict, args: dict) -> str:
+    if kinds.get("subject") == T_LABELS:
+        return VECTOR
+    params = args.get("params") if isinstance(args.get("params"), dict) else {}
+    if params.get("last_n") is not None:
+        return SERIES
+    if args.get("key"):
+        return SCALAR
+    mname = args.get("name")
+    if mname in _TABLE_METHODS:
+        return TABLE
+    spec = skill.METHODS.get(mname) if isinstance(mname, str) else None
+    if spec is not None and len(spec.yields) > 1:
+        return f"{SCALAR}|{TABLE}"
+    return SCALAR
+
+
+def _r_binary(kinds: dict, args: dict) -> str:
+    ks = _parts(kinds.get("a")) | _parts(kinds.get("b"))
+    if VECTOR in ks or RANKING in ks:
+        return VECTOR
+    if SERIES in ks:
+        return SERIES
+    return SCALAR
+
+
+def _r_scale(kinds: dict, args: dict) -> str:
+    kind = kinds.get("of")
+    return VECTOR if kind == RANKING else (kind or SCALAR)
+
+
+SIGNATURES: dict[str, Sig] = {
+    "fundamentals": Sig({"ticker": (T_STRING,), "metric": (T_STRING,), "months": (T_NUMBER,), "start": (T_DATE,),
+                         "end": (T_DATE,), "at": (T_DATE,), "last_n": (T_NUMBER,)}, _r_fundamentals,
+                        "one issuer's filed line: a flow over `months` (or start/end), a balance `at` a date "
+                        "(instants only — a flow with `at` is refused), a series over the last_n windows, or the "
+                        "whole balance sheet when metric is omitted"),
+    "prices": Sig({"ticker": (T_STRING,), "window": (T_STRING,)}, SERIES, "daily closes over a named window (1m 3m 6m 1y 3y)"),
+    "price": Sig({"ticker": (T_STRING,), "as_of": (T_DATE,)}, SCALAR, "one session's close"),
+    "run": Sig({"portfolio": (T_STRING, RUN), "which": (T_STRING,)}, RUN, "a book's completed run: which = latest | prev | a run_… id"),
+    "column": Sig({"run": (RUN, TABLE, T_STRING), "table": (T_STRING,), "col": (T_STRING,)}, VECTOR,
+                  "one figure per label of a run table: issuer_exposures.{weight,market_value,contribution}, "
+                  "sector_exposures.weight, limit_checks.{current_value,warning_level,breach_level}, factor_attributions.{beta,contribution}"),
+    "figure": Sig({"run": (RUN, T_STRING), "name": (T_STRING,)}, SCALAR, "one named figure of a run (exposure_metrics.portfolio_market_value)"),
+    "pick": Sig({"of": (TABLE, VECTOR, RANKING, RUN), "key": (T_STRING,)}, SCALAR,
+                "one figure of a table or run by its label; a date picked from a table is a literal for another node's params"),
+    "method": Sig({"name": (T_STRING,), "subject": (T_STRING, T_LABELS, RUN, TABLE), "params": (T_OBJECT,), "key": (T_STRING,)}, _r_method,
+                  "a desk method (METHODS below): subject ticker → scalar, [tickers] → vector, params.last_n → series; "
+                  "a method that yields several figures needs key="),
+    "add": Sig({"a": _OPERAND_KINDS, "b": _OPERAND_KINDS}, _r_binary,
+               "a + b; vector∘scalar broadcasts, vector∘vector aligns by label; a number is a constant typed like its partner"),
+    "sub": Sig({"a": _OPERAND_KINDS, "b": _OPERAND_KINDS}, _r_binary, "a − b (same broadcasting; a number is a constant)"),
+    "mul": Sig({"a": _OPERAND_KINDS, "b": _OPERAND_KINDS}, _r_binary, "a × b (a number scales)"),
+    "div": Sig({"a": _OPERAND_KINDS, "b": _OPERAND_KINDS}, _r_binary, "a ÷ b (a number divides)"),
+    "scale": Sig({"of": FIGURE_KINDS, "factor": (T_NUMBER,), "unit": (T_STRING,)}, _r_scale, "of × a constant, unit declared if it changes"),
+    "sum": Sig({"of": (VECTOR, RANKING, SERIES)}, SCALAR, "sum over a vector's entries or a series' points"),
+    "avg": Sig({"of": (VECTOR, RANKING, SERIES)}, SCALAR, "mean over a vector or a series"),
+    "min": Sig({"of": (VECTOR, RANKING, SERIES)}, SCALAR, "minimum over a vector or a series"),
+    "max": Sig({"of": (VECTOR, RANKING, SERIES)}, SCALAR, "maximum over a vector or a series"),
+    "std": Sig({"of": (VECTOR, RANKING, SERIES)}, SCALAR, "standard deviation over a vector or a series"),
+    "abs": Sig({"of": (SCALAR,)}, SCALAR, "absolute value of one figure"),
+    "rank": Sig({"of": (VECTOR, RANKING, TABLE), "direction": (T_STRING,)}, RANKING, "the entries in order (highest | lowest); every superlative rests on one"),
+    "top": Sig({"of": (VECTOR, RANKING, TABLE), "n": (T_NUMBER,), "direction": (T_STRING,)}, VECTOR, "the first n of the ordering"),
+    "select": Sig({"of": (VECTOR, RANKING, TABLE), "labels": (T_LABELS,)}, VECTOR, "the entries with these labels"),
+    "filter": Sig({"of": (VECTOR, RANKING), "op": (T_STRING,), "level": (T_NUMBER, SCALAR)}, VECTOR,
+                  "the entries whose value is `op level` (> >= < <= == !=); none → an absence saying so"),
+    "vector": Sig({"entries": (T_OBJECT,)}, VECTOR,
+                  "named scalars gathered into one vector: {label: $scalar | number}; a series is not a scalar — latest(of) first"),
+    "yoy": Sig({"of": (SERIES,)}, SERIES, "year-over-year change of a series"),
+    "qoq": Sig({"of": (SERIES,)}, SERIES, "quarter-over-quarter change of a series"),
+    "pct": Sig({"of": (SERIES,)}, SERIES, "period-over-period percent change"),
+    "cagr": Sig({"of": (SERIES,)}, SERIES, "compound annual growth over the series"),
+    "latest": Sig({"of": (SERIES,)}, SCALAR, "the last point of a series, as one figure"),
+    "at": Sig({"of": (SERIES,), "period": (T_DATE,)}, SCALAR, "the point of a series at a period"),
+    "window_return": Sig({"ticker": (T_STRING,), "start": (T_DATE,), "end": (T_DATE,), "benchmark": (T_STRING,)}, SCALAR,
+                         "total return between two dates, optionally relative to a benchmark"),
+    "sell": Sig({"run": (RUN, TABLE, T_STRING), "sales": (T_TRADES,)}, TABLE, "the book after sales [{ticker, fraction|quantity|weight}], checks re-run"),
+    "buy": Sig({"run": (RUN, TABLE, T_STRING), "buys": (T_TRADES,)}, TABLE, "the book after buys [{ticker, weight|quantity}], checks re-run"),
+}
+
+_RETURN_WORDS = {
+    "fundamentals": "scalar | series (last_n) | table (no metric)",
+    "method": "scalar | vector ([subjects]) | series (params.last_n) | table (several yields and no key)",
+    "add": "scalar | series | vector", "sub": "scalar | series | vector", "mul": "scalar | series | vector", "div": "scalar | series | vector",
+    "scale": "the kind of `of`",
+}
+
+# What this desk cannot express, stated once for whoever writes a program or an
+# answer. A model that knows the edge says "the desk cannot" instead of quietly
+# answering a nearby question (Q06 answered "a year ago" with a longer window).
+BOUNDARIES: tuple[str, ...] = (
+    "price methods read the latest session: they take a window (1m 3m 6m 1y 3y) or window_days, never an as-of date — "
+    "'a year ago' for a price statistic is not expressible",
+    "a scenario (sell / buy) re-prices the book and re-runs the limit checks; it does not re-fit betas, volatility, VaR or stress losses",
+    "the only condition over a vector is filter(of, op, level); there is no free-form predicate",
+    "figures stated only in filing prose (segment, product and geographic revenue; customers; backlog) are not filed facts: "
+    "read_filings quotes them, no program computes them",
+    "the desk does not forecast",
+    "a ticker the desk has not prepared refuses every read; start(kind='readiness') prepares it in the background",
+)
+
+
+def _lit_kind(v: Any) -> str:
+    if isinstance(v, bool):
+        return T_STRING
+    if _is_num(v):
+        return T_NUMBER
+    if isinstance(v, str):
+        return T_DATE if _ISO_DATE.match(v) else T_STRING
+    if isinstance(v, list):
+        if v and all(isinstance(x, dict) for x in v):
+            return T_TRADES
+        return T_LABELS
+    if isinstance(v, dict):
+        return T_OBJECT
+    return T_ANY
+
+
+def _static_ref(kinds: dict, v: Any, position: str | None) -> tuple[str | None, str | None]:
+    """(kind, reason) of one argument before execution. A reason means the
+    argument names a binding that does not exist; kind None with no reason
+    means it names a node whose own problem is already reported."""
+    if isinstance(v, str) and v.startswith("$"):
+        if v[1:] not in kinds:
+            return None, "unknown_binding"
+        return kinds[v[1:]], None
+    if isinstance(v, str) and position in _REF_POSITIONS and v in kinds:
+        return kinds[v], None
+    if isinstance(v, list) and v and all(isinstance(x, str) for x in v):
+        return T_LABELS, None
+    return _lit_kind(v), None
+
+
+def _accepts(expected: tuple, got: str) -> bool:
+    """Whether a kind fits a position. A union kind ("scalar|table": a method
+    the executor may type either way) fits if any of its parts does — the
+    static check is permissive where the language is, and the executor's own
+    refusal stands where it is not."""
+    if T_ANY in expected:
+        return True
+    for part in _parts(got) or {got}:
+        if part == T_ANY or part in expected or (T_STRING in expected and part == T_DATE):
+            return True
+    return False
+
+
+def _fix(fn: str, arg: str, expected: tuple, got: str) -> str:
+    """The sentence that turns a type problem into the next program."""
+    if got == SERIES and SCALAR in expected:
+        return f"{fn}.{arg} takes one figure and a series has many: latest(of=…) is its last point, or drop last_n"
+    if fn in ("rank", "top", "select", "filter") and got in (SCALAR, SERIES):
+        return (f"{fn} works over a VECTOR (one figure per label): a method over [tickers], a column of a run, "
+                f"or vector(entries={{label: $scalar}})")
+    if fn in ("sum", "avg", "min", "max", "std") and got == SCALAR:
+        return f"{fn} needs several figures: a vector (a method over [tickers], a run column) or a series"
+    if fn in _SERIES_OPS or fn == "at":
+        return f"{fn} takes a series: add params.last_n to the method, or last_n to fundamentals"
+    if fn == "fundamentals" and arg == "ticker" and got == T_LABELS:
+        return "fundamentals reads one ticker; several tickers are a method over [tickers], or one fundamentals node per ticker"
+    if T_DATE in expected:
+        return f"{arg} is a date, YYYY-MM-DD; the prior run is run(which='prev'); a prior period is last_n"
+    if T_NUMBER in expected and T_STRING not in expected:
+        return f"{arg} is a number"
+    if fn in _BINARY and got == TABLE:
+        return "an operand is one figure or a vector: pick one figure of the table (fn pick, key=…) or a column of it (fn column)"
+    return f"{fn}.{arg} takes {' | '.join(expected)}"
+
+
+def typecheck(program: Any) -> list[dict]:
+    """Every type problem in a program, before any of it runs.
+
+    One pass over the bindings in order; each node's static kind is inferred
+    from SIGNATURES and the kinds of what it names. A node with a problem is
+    reported once, with its fix; nodes that depend on it are not reported
+    again (their problem is upstream). Empty means the program is well typed
+    as far as the language can tell without data — a read may still refuse at
+    execution (a metric not filed), and that refusal is an absence fact."""
+    parsed = program if isinstance(program, Program) else parse(program)
+    if isinstance(parsed, dict):
+        return [{"at": "program", "reason": parsed.get("error", "malformed_program"), "detail": parsed.get("detail", "")}]
+    kinds: dict[str, str | None] = {}
+    problems: list[dict] = []
+    for name, expr in parsed.bindings:
+        kinds[name] = _infer(name, expr, kinds, problems)
+    return problems
+
+
+def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
+    def bad(reason: str, **more) -> None:
+        problems.append({"at": name, "reason": reason, **more})
+
+    if not (isinstance(expr, dict) and "fn" in expr):
+        kind, why = _static_ref(kinds, expr, None)
+        if why:
+            bad(why, detail=f"{expr!r} is not bound earlier in the program")
+            return None
+        return kind
+    fn = expr["fn"]
+    if fn not in PRIMITIVES:
+        bad("unknown_primitive", detail=f"{fn!r} is not a primitive of this desk", primitives=sorted(PRIMITIVES),
+            fix="a tool (read_filings, search_web, start) is not a primitive: call it as a tool")
+        return None
+    req, opt = PRIMITIVES[fn]
+    given = {k: v for k, v in expr.items() if k != "fn"}
+    if isinstance(given.get("args"), list) and "args" not in req + opt:
+        names = list(req + opt)
+        pos = given.pop("args")
+        if len(pos) > len(names):
+            bad("type_mismatch", detail=f"{fn} takes at most {len(names)} arguments ({', '.join(names)}); got {len(pos)}")
+            return None
+        given = {**dict(zip(names, pos)), **given}
+    missing = [k for k in req if k not in given]
+    extra = [k for k in given if k not in req + opt]
+    if missing or extra:
+        bad("type_mismatch", detail=f"{fn} takes {req}{' and optionally ' + str(opt) if opt else ''}"
+            + (f"; missing {missing}" if missing else "") + (f"; unknown {extra}" if extra else ""),
+            fix=f"{fn}({', '.join(req)}{', ' if opt else ''}{', '.join(o + '?' for o in opt)})")
+        return None
+    sig = SIGNATURES[fn]
+    arg_kinds: dict[str, str] = {}
+    blocked = ok = False
+    ok = True
+    for k, v in given.items():
+        kind, why = _static_ref(kinds, v, k)
+        if why:
+            bad(why, arg=k, detail=f"{v!r} is not bound earlier in the program")
+            ok = False
+            continue
+        if kind is None:
+            blocked = True
+            continue
+        arg_kinds[k] = kind
+        expected = sig.args.get(k, (T_ANY,))
+        if not _accepts(expected, kind):
+            bad("type_mismatch", arg=k, expected=list(expected), got=kind, fix=_fix(fn, k, expected, kind))
+            ok = False
+    if not ok or blocked:
+        return None
+    if fn == "method":
+        ok = _check_method(name, given, arg_kinds, problems)
+    elif fn == "vector":
+        ok = _check_vector(name, given, kinds, problems)
+    elif fn in _BINARY and arg_kinds.get("a") == T_NUMBER and arg_kinds.get("b") == T_NUMBER:
+        bad("type_mismatch", detail=f"{fn} of two constants is not a figure of the desk", fix="at least one operand is a binding")
+        ok = False
+    elif fn == "filter" and given.get("op") not in FILTER_OPS:
+        bad("type_mismatch", arg="op", expected=list(FILTER_OPS), got=given.get("op"), fix="op is one of > >= < <= == !=")
+        ok = False
+    elif fn == "top":
+        n = given.get("n")
+        if not (isinstance(n, int) and not isinstance(n, bool) and n >= 1):
+            bad("type_mismatch", arg="n", detail="top: n is a positive integer")
+            ok = False
+    if not ok:
+        return None
+    ret = sig.returns
+    return ret(arg_kinds, given) if callable(ret) else ret
+
+
+def _placeholder(prop: dict, key: str) -> Any:
+    """A value of the declared type standing in for a `$name` in params, so the
+    schema check sees the shape the executor will substitute."""
+    types = prop.get("type")
+    types = types if isinstance(types, list) else [types]
+    if "integer" in types or "number" in types:
+        return prop.get("minimum", 1)
+    if "string" in types:
+        return "2000-01-01" if key in DATE_PARAMS else (prop.get("enum") or ["x"])[0]
+    return None
+
+
+def _check_method(name: str, given: dict, arg_kinds: dict, problems: list) -> bool:
+    mname = given.get("name")
+    spec = skill.METHODS.get(mname) if isinstance(mname, str) else None
+    if spec is None:
+        problems.append({"at": name, "reason": "unknown_method", "detail": f"{mname!r} is not a method this desk has",
+                         "nearest": skill.nearest(str(mname)) if isinstance(mname, str) else [],
+                         **({"door": _other_door(mname)} if isinstance(mname, str) and _other_door(mname) else {})})
+        return False
+    params = given.get("params")
+    if params is not None and not isinstance(params, dict):
+        problems.append({"at": name, "reason": "type_mismatch", "arg": "params", "detail": "params is an object {name: value}"})
+        return False
+    p = {k: v for k, v in (params or {}).items() if v is not None}
+    from exposure_workbench.tools.arg_validation import validate_args   # the one pure validator, no registry
+    props = spec.params_schema.get("properties", {})
+    literal_p = {k: (_placeholder(props.get(k, {}), k) if isinstance(v, str) and v.startswith("$") else v) for k, v in p.items()}
+    literal_p = {k: v for k, v in literal_p.items() if v is not None}
+    probs = validate_args(spec.params_schema, literal_p)
+    if probs:
+        problems.append({"at": name, "reason": "invalid_params", "detail": f"{mname}: params do not fit the method's schema",
+                         "problems": probs, "params_schema": spec.params_schema})
+        return False
+    for k, v in p.items():
+        if k in DATE_PARAMS and isinstance(v, str) and not v.startswith("$") and not _ISO_DATE.match(v):
+            problems.append({"at": name, "reason": "invalid_date", "arg": k, "got": v,
+                             "fix": f"{k} is a date, YYYY-MM-DD; the prior run is run(which='prev'); a prior period is params.last_n"})
+            return False
+    if arg_kinds.get("subject") == T_LABELS and mname in _TABLE_METHODS and not given.get("key"):
+        problems.append({"at": name, "reason": "several_figures",
+                         "detail": f"{mname} yields several figures per subject ({', '.join(spec.yields[:6])}); over a list say which",
+                         "fix": "add key=<one of the yields>"})
+        return False
+    return True
+
+
+def _check_vector(name: str, given: dict, kinds: dict, problems: list) -> bool:
+    entries = given.get("entries")
+    if not isinstance(entries, dict) or not entries:
+        problems.append({"at": name, "reason": "type_mismatch", "arg": "entries", "detail": "vector takes entries: {label: $scalar | number, …}"})
+        return False
+    n_scalar = 0
+    for label, v in entries.items():
+        kind, why = _static_ref(kinds, v, "of")
+        if why:
+            problems.append({"at": name, "reason": why, "arg": f"entries.{label}", "detail": f"{v!r} is not bound earlier in the program"})
+            return False
+        if kind is None:
+            return False
+        if kind == SCALAR:
+            n_scalar += 1
+        elif kind != T_NUMBER:
+            problems.append({"at": name, "reason": "type_mismatch", "arg": f"entries.{label}", "expected": [SCALAR, T_NUMBER], "got": kind,
+                             "fix": _fix("vector", f"entries.{label}", (SCALAR,), kind)})
+            return False
+    if n_scalar == 0:
+        problems.append({"at": name, "reason": "type_mismatch", "arg": "entries", "detail": "a vector of constants alone has no unit and no subject",
+                         "fix": "compare figures against a level with filter(of, op, level) instead"})
+        return False
+    return True
+
+
+def signature_text() -> str:
+    """The language as one page, for whoever writes a program: primitives with
+    typed arguments and results, the methods by family, and the boundaries.
+    The same SIGNATURES typecheck reads, so what is promised is what is checked."""
+    lines = [
+        "PROGRAM: {let: [{name, expr}, …], return?: [names]}. expr = {fn, <named args>}; '$name' names an earlier binding; "
+        "a number or 'YYYY-MM-DD' is a literal.",
+        "KINDS: scalar = one figure · series = one figure over periods · vector = one figure per label · "
+        "ranking = a vector in order · table = several named figures · run = a book's run.",
+        "PRIMITIVES:",
+    ]
+    for fn, sig in SIGNATURES.items():
+        req, opt = PRIMITIVES[fn]
+        args = ", ".join(f"{a}{'' if a in req else '?'}: {'|'.join(sig.args.get(a, (T_ANY,)))}" for a in req + opt)
+        ret = sig.returns if isinstance(sig.returns, str) else _RETURN_WORDS[fn]
+        lines.append(f"  {fn}({args}) -> {ret}  — {sig.doc}")
+    lines.append("METHODS (fn method: name, subject, params?, key?):")
+    issuer = [m for m in skill.methods_for("issuer") if m.name != "issuer.panel"]
+    lines.append("  issuer methods, subject a ticker or [tickers], params months (3|6|9|12), at (date), last_n (2..16) -> scalar | vector | series: "
+                 + ", ".join(m.name for m in issuer))
+    panel = skill.METHODS.get("issuer.panel")
+    if panel:
+        lines.append(f"  issuer.panel -> table of {len(panel.yields)} figures (key= one of them)")
+    for kind in ("price", "run", "portfolio"):
+        for m in skill.methods_for(kind):
+            props = m.params_schema.get("properties", {})
+            ps_ = ", ".join(f"{k}{': ' + '|'.join(str(e) for e in v['enum'] if e is not None) if isinstance(v, dict) and v.get('enum') else ''}"
+                            + (" (date)" if k in DATE_PARAMS else "") for k, v in props.items())
+            ys = [y.replace("{ticker}.", "") for y in m.yields]
+            ret = ("scalar" if len(ys) <= 1 else f"table (key= {'|'.join(ys)})")
+            lines.append(f"  {m.name}({ps_}) subject {m.subject_kind} -> {ret}")
+    lines.append("BOUNDARIES:")
+    lines += [f"  - {b}" for b in BOUNDARIES]
+    return "\n".join(lines)
+
+
 class _Ctx:
     def __init__(self, db: AsyncSession, invoked_by: str):
         self.db = db
@@ -228,6 +665,9 @@ class _Ctx:
 
 
 _REF_POSITIONS = ("a", "b", "of", "run", "against")
+# The argument names whose values are stamped onto a node's facts (V33): a
+# method's params after literal substitution, and the primitives' own dates.
+_DECLARED_KEYS = ("params", "start", "end", "at", "period", "as_of", "which")
 _DIRECTIONS = {"desc": "highest", "descending": "highest", "asc": "lowest", "ascending": "lowest",
                "highest": "highest", "lowest": "lowest"}
 
@@ -333,6 +773,24 @@ async def _from_payload(ctx: _Ctx, node: Node, payload: dict) -> Node:
     cid = payload.get("calc_id")
     if isinstance(cid, str) and (_is_num(payload.get("value")) or isinstance(payload.get("points"), list)):
         return await _scalar_from_ref(ctx, node, cid, payload)
+    # V33: a panel nests its figures one level down (`lines: {name: {value, calc_id}}`);
+    # issuer.panel was registered, described and refused as untyped_result on
+    # every subject (Q07) because only the top level was read.
+    lines = payload.get("lines")
+    if isinstance(lines, dict):
+        nested = [(k, v["calc_id"]) for k, v in lines.items()
+                  if isinstance(v, dict) and isinstance(v.get("calc_id"), str) and _is_num(v.get("value"))]
+        if nested:
+            node.kind, node.payload = TABLE, payload
+            node.ref = cid if isinstance(cid, str) else nested[0][1]
+            node.subject = payload.get("ticker") if isinstance(payload.get("ticker"), str) else None
+            for k, r in nested:
+                t = await tc._resolve(ctx.db, r)
+                if isinstance(t, dict):
+                    continue
+                node.entries.append((k, r, t.value, t.unit_class.upper()))
+            node.as_of = next((payload.get(k) for k in ("as_of", "to", "period_end") if isinstance(payload.get(k), str)), None)
+            return node
     figures = [(k, v["calc_id"]) for k, v in payload.items()
                if isinstance(v, dict) and isinstance(v.get("calc_id"), str) and _is_num(v.get("value"))]
     if figures:
@@ -401,6 +859,17 @@ async def _p_fundamentals(ctx: _Ctx, node: Node, ticker: str, metric: str | None
                                                     last_reported=(sheet.get("not_reported_at_this_date") or {}).get(metric))
             return node
         return await _scalar_from_ref(ctx, node, b["fact_id"], {"metric": metric, "as_of": sheet.get("as_of")})
+    if at is not None:
+        # V33 Phase 1: `at` reads a balance at an instant. On a flow it was
+        # dropped on the floor and the latest window came back under the
+        # asked-for name — the V32 line-405 mechanism (at="AWS") in its date
+        # form, found by the Phase 1 probe on gold (at="2025-13-45" returned
+        # revenue as of 2026-03-31). A flow is asked over a window.
+        node.kind, node.refusal = ABSENCE, _err(
+            "invalid_params", f"{metric} is a flow, and `at` reads a balance at an instant; ask a flow over a "
+                              f"window — months (12 is a trailing year), start/end, or last_n for a series",
+            ticker=tk, metric=metric, at=at)
+        return node
     return await _from_payload(ctx, node, await fundamentals_service.get_flow(
         ctx.db, tk, metric, months=(int(months) if months is not None else None), start=start, end=end,
         last_n=(int(last_n) if last_n is not None else None), invoked_by=ctx.invoked_by))
@@ -765,14 +1234,62 @@ def _operand_refs(x: Any) -> list[tuple[str, str]] | dict:
     return _err("type_mismatch", f"an operand is a binding ($name) or an id; got {x!r}")
 
 
+async def _constant_ref(ctx: _Ctx, value: float, partner: Any) -> str | dict:
+    """A number the program wrote, as a ledger row typed like the figure it meets
+    (V33). Same unit, same book, same issuers, so the algebra's own checks pass
+    and the result carries a full identity — and the constant itself has an id,
+    which is what lets a written "8%" be accounted for."""
+    from exposure_workbench.analytics import units as _units
+    unit, base, issuers = _units.RATIO, None, ()
+    t = None
+    if isinstance(partner, Node):
+        if isinstance(partner.typed, tc.Typed):
+            t = partner.typed
+        elif partner.entries:
+            t = await tc._resolve(ctx.db, partner.entries[0][1])
+    elif isinstance(partner, str) and partner.startswith(_ID_PREFIXES):
+        t = await tc._resolve(ctx.db, partner)
+    if isinstance(t, tc.Typed):
+        unit, base, issuers = t.unit_class, t.base, t.issuers
+    elif isinstance(t, tc.TypedSeries):
+        unit = t.unit_class
+    elif isinstance(partner, Node) and partner.unit:
+        unit = partner.unit
+    r = await tc.constant(ctx.db, float(value), unit_class=unit, base=base, issuers=list(issuers), invoked_by=ctx.invoked_by)
+    return r if r.get("error") else r["calc_id"]
+
+
 async def _p_binary(ctx: _Ctx, node: Node, fn: str, a: Any, b: Any) -> Node:
     op = _BINARY[fn]
+    name = None
+    # V33: a number is a constant. Multiplying or dividing by one is a scale;
+    # adding or subtracting one is arithmetic against a constant row typed like
+    # its partner (weight − 0.08 is a weight-space distance, traceable to both).
+    if _is_num(a) and _is_num(b):
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", f"{fn} of two constants is not a figure of the desk")
+        return node
+    if _is_num(a) or _is_num(b):
+        const, other = (a, b) if _is_num(a) else (b, a)
+        if fn in ("mul", "div"):
+            if fn == "div" and _is_num(a):
+                node.kind, node.refusal = ABSENCE, _err("type_mismatch", "div: a constant over a figure is not expressible here; divide the figure by the constant")
+                return node
+            if fn == "div" and float(const) == 0:
+                node.kind, node.refusal = ABSENCE, _err("division_by_zero", "div: the constant is zero")
+                return node
+            return await _p_scale(ctx, node, other, float(const) if fn == "mul" else 1.0 / float(const))
+        name = _structural(op, _measure_of(a), _measure_of(b))
+        ref = await _constant_ref(ctx, float(const), other)
+        if isinstance(ref, dict):
+            node.kind, node.refusal = ABSENCE, ref
+            return node
+        a, b = (ref, b) if _is_num(a) else (a, ref)
     la, lb = _operand_refs(a), _operand_refs(b)
     for side in (la, lb):
         if isinstance(side, dict):
             node.kind, node.refusal = ABSENCE, side
             return node
-    name = _structural(op, _measure_of(a), _measure_of(b))
+    name = name or _structural(op, _measure_of(a), _measure_of(b))
     if len(la) == 1 and len(lb) == 1:
         return await _from_payload(ctx, node, await tc.calculate(ctx.db, op, la[0][1], lb[0][1], invoked_by=ctx.invoked_by, as_quantity=name))
     # broadcast: a vector against one figure, or two vectors aligned by label
@@ -889,23 +1406,40 @@ async def _p_rank(ctx: _Ctx, node: Node, of: Any, direction: str | None = None) 
 async def _p_vector(ctx: _Ctx, node: Node, entries: Any) -> Node:
     """Named scalars gathered into a vector — MSFT's margin change beside AMZN's —
     so rank/top/avg apply to figures no single method produced (slice B gap 1).
-    One unit; every entry a settled scalar."""
+    One unit; every entry a settled scalar, or a number (V33: a constant, typed
+    like the scalars beside it; a vector of constants alone is refused, the
+    comparison it was reaching for is filter)."""
     if not isinstance(entries, dict) or not entries:
-        node.kind, node.refusal = ABSENCE, _err("type_mismatch", "vector takes entries: {label: $scalar, …}")
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", "vector takes entries: {label: $scalar | number, …}")
         return node
     units = set()
+    consts: list[tuple[str, float]] = []
     for label, v in entries.items():
+        if _is_num(v):
+            consts.append((str(label), float(v)))
+            continue
         n, _ = _deref(ctx, v, position="of")
         if not (isinstance(n, Node) and n.kind == SCALAR and isinstance(n.typed, tc.Typed)):
-            node.kind, node.refusal = ABSENCE, _err("type_mismatch", f"vector: entry {label!r} is not a settled scalar binding")
+            hint = "; a series entry is many figures — latest(of=…) first" if isinstance(n, Node) and n.kind == SERIES else ""
+            node.kind, node.refusal = ABSENCE, _err("type_mismatch", f"vector: entry {label!r} is not a settled scalar binding{hint}")
             return node
         node.entries.append((str(label), n.ref, float(n.typed.value), n.typed.unit_class.upper()))
         node.deps.append(n.name)
         units.add(n.typed.unit_class.upper())
+    if consts and not node.entries:
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", "vector: a vector of constants alone has no unit and no subject; "
+                                                                 "compare figures against a level with filter(of, op, level)")
+        return node
     if len(units) > 1:
         node.kind, node.refusal = ABSENCE, _err("incompatible_units", f"vector: one unit per vector; got {sorted(units)}")
         node.entries = []
         return node
+    for label, value in consts:
+        ref = await _constant_ref(ctx, value, ctx.nodes[node.deps[0]])
+        if isinstance(ref, dict):
+            node.kind, node.refusal = ABSENCE, ref
+            return node
+        node.entries.append((label, ref, value, node.entries[0][3]))
     node.kind, node.ref, node.unit = VECTOR, node.entries[0][1], node.entries[0][3]
     node.measure = _structural("vector", *sorted({(ctx.nodes[d].measure or ctx.nodes[d].name) for d in node.deps})[:3])
     node.as_of = max((ctx.nodes[d].as_of or "" for d in node.deps), default=None) or None
@@ -957,6 +1491,38 @@ async def _p_top(ctx: _Ctx, node: Node, of: Any, n: Any, direction: str | None =
     node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, ranked.ref, ranked.unit, ranked.measure, ranked.as_of
     node.entries = ranked.entries[:n]
     node.payload = {"of": ranked.ref, "n": n, "direction": direction or "highest", "labels": [e[0] for e in node.entries]}
+    return node
+
+
+async def _p_filter(ctx: _Ctx, node: Node, of: Any, op: Any, level: Any) -> Node:
+    """The entries of a vector whose value stands in a relation to a level (V33):
+    "who is over 8%" is filter(w, ">", 0.08). Q11 asked it and the language had
+    no way to say it — sub refused the constant, vector refused the constants,
+    and the answer became a blank. No entry satisfying it is a finding, said as
+    an absence the answer may cite."""
+    if not (isinstance(of, Node) and of.kind in (VECTOR, RANKING)):
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", "filter takes a vector (or a ranking), a comparison and a level")
+        return node
+    if op not in FILTER_OPS:
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", f"filter: op is one of {' '.join(FILTER_OPS)}; got {op!r}")
+        return node
+    if _is_num(level):
+        lvl, lvl_ref = float(level), None
+    elif isinstance(level, Node) and level.kind == SCALAR and isinstance(level.typed, tc.Typed):
+        lvl, lvl_ref = float(level.typed.value), level.ref
+    else:
+        node.kind, node.refusal = ABSENCE, _err("type_mismatch", "filter: level is a number or a scalar binding")
+        return node
+    test = {">": lambda x: x > lvl, ">=": lambda x: x >= lvl, "<": lambda x: x < lvl,
+            "<=": lambda x: x <= lvl, "==": lambda x: x == lvl, "!=": lambda x: x != lvl}[op]
+    kept = [e for e in of.entries if e[2] is not None and test(float(e[2]))]
+    if not kept:
+        node.kind, node.refusal = ABSENCE, _err("no_entry_satisfies", f"no entry of ${of.name} is {op} {lvl:g}",
+                                                available=[[e[0], e[2]] for e in of.entries][:40])
+        return node
+    node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, of.ref, of.unit, of.measure, of.as_of
+    node.entries = kept
+    node.payload = {"of": of.ref, "op": op, "level": lvl, **({"level_ref": lvl_ref} if lvl_ref else {}), "labels": [e[0] for e in kept]}
     return node
 
 
@@ -1069,16 +1635,25 @@ async def _evaluate(ctx: _Ctx, name: str, expr: Any) -> Node:
             return node
     try:
         out = await _dispatch(ctx, node, fn, args)
+        # V33: what this node was called with, for its facts' identity (dates only
+        # are read out of it; see _declared_dates). Never a Node — those are deps.
+        out.declared = {k: v for k, v in args.items() if k in _DECLARED_KEYS and not isinstance(v, Node)}
         if out.kind != ABSENCE:
             if fn in _BINARY:
                 out.op = _BINARY[fn]
-            elif fn in ("scale", "sum", "rank", "top", "at", "select", "vector", "window_return") + _SET_OPS + _SERIES_OPS:
+            elif fn in ("scale", "sum", "rank", "top", "at", "select", "filter", "vector", "window_return") + _SET_OPS + _SERIES_OPS:
                 out.op = fn
             elif fn == "method":
                 out.method = args.get("name")
         return out
     except TypeError as exc:
         node.kind, node.refusal = ABSENCE, _err("type_mismatch", f"{fn}: {exc}")
+        return node
+    except ValueError as exc:
+        # V33: a service refusing a value (a date that does not parse) is this
+        # node's refusal, not the program's crash — Q07 lost a whole program to
+        # `at: "prev"` reaching date.fromisoformat, and the model read tool_error.
+        node.kind, node.refusal = ABSENCE, _err("invalid_params", f"{fn}: {exc}")
         return node
 
 
@@ -1112,6 +1687,8 @@ async def _dispatch(ctx: _Ctx, node: Node, fn: str, args: dict) -> Node:
             return await _p_top(ctx, node, **args)
         if fn == "select":
             return await _p_select(ctx, node, **args)
+        if fn == "filter":
+            return await _p_filter(ctx, node, **args)
         if fn == "vector":
             return await _p_vector(ctx, node, entries=args.get("entries"))
         if fn == "window_return":
@@ -1136,37 +1713,67 @@ def _subject_of(t, fallback: str | None) -> str | None:
     return fallback
 
 
+def _declared_dates(node: Node) -> dict[str, str]:
+    """The dates this node was called with, by parameter name — a method's peak
+    and trough, a balance's `at` — read out of what the executor substituted."""
+    out: dict[str, str] = {}
+
+    def walk(k: Any, v: Any) -> None:
+        if isinstance(v, str) and k in DATE_PARAMS and _ISO_DATE.match(v):
+            out[str(k)] = v
+        elif isinstance(v, dict):
+            for kk, vv in v.items():
+                walk(kk, vv)
+    for k, v in (node.declared or {}).items():
+        walk(k, v)
+    return out
+
+
+def _declared_window(dates: dict) -> dict | None:
+    start = dates.get("start") or dates.get("peak")
+    end = dates.get("end") or dates.get("trough")
+    return {"start": start, "end": end} if start and end else None
+
+
 def _facts_of(node: Node) -> list[F.Fact]:
     """The Facts a settled node puts on the table. A vector is one scalar Fact
-    per entry, each carrying the node it belongs to and its label."""
-    p = {"node": node.name, **({"op": node.op} if node.op else {}), **({"method": node.method} if node.method else {})}
+    per entry, each carrying the node it belongs to and its label. Every fact
+    carries the dates its node was called with (V33), so what the desk computed
+    over is on the identity the gate resolves a written date against."""
+    dates = _declared_dates(node)
+    p = {"node": node.name, **({"op": node.op} if node.op else {}), **({"method": node.method} if node.method else {}), **dates}
+    win = _declared_window(dates)
     group = "book_derived" if (node.ref or "").startswith(("run_", "calc_")) and node.kind in (VECTOR, RANKING, TABLE) else "derived"
     if node.kind == SCALAR and isinstance(node.typed, tc.Typed):
         as_of, unit, measure, window = _typed_identity(node.typed)
         return [F.fact(F.SCALAR, measure or node.name, subject=_subject_of(node.typed, node.subject), unit=unit,
-                       value=float(node.typed.value), as_of=as_of, window=window, params=p,
+                       value=float(node.typed.value), as_of=as_of or (win["end"] if win else None), window=window or win, params=p,
                        sources=(node.ref,) if node.ref else (), group=group)]
     if node.kind == SERIES and isinstance(node.typed, tc.TypedSeries):
         as_of, unit, measure, window = _typed_identity(node.typed)
         pts = tuple((d.isoformat(), float(t.value)) for d, t in node.typed.points)
         return [F.fact(F.SERIES, measure or node.name, subject=_subject_of(node.typed, node.subject), unit=unit,
-                       points=pts, as_of=as_of, window=window, params=p, sources=(node.ref,) if node.ref else (), group=group)]
+                       points=pts, as_of=as_of, window=window or win, params=p, sources=(node.ref,) if node.ref else (), group=group)]
     if node.kind in (VECTOR, RANKING, TABLE):
         out = []
+        as_of = node.as_of or (win["end"] if win else "n/a")
         for i, (label, ref, value, unit) in enumerate(node.entries):
             if value is None:
                 continue
             extra = dict(p, label=label)
-            if node.kind == RANKING:
-                extra["rank"] = i + 1
+            if node.kind == RANKING or node.op == "top":
+                extra["rank"] = i + 1          # a top-n entry is a place in an ordering too
             measure = node.measure if node.kind in (VECTOR, RANKING) and node.measure else label
-            subj = label if node.kind in (VECTOR, RANKING) else (node.ref if node.kind == TABLE else None)
-            if node.kind == TABLE and ":" not in ref and "." in label:
+            subj = label if node.kind in (VECTOR, RANKING) else ((node.subject or node.ref) if node.kind == TABLE else None)
+            if node.kind == TABLE and "." in label:
+                # `sector_exposures.Technology.weight` is the Technology row of
+                # sector_exposures.weight, whichever row produced it (V33: the
+                # same rule for a run's and a scenario's figures)
                 parts = label.split(".")
-                if len(parts) == 3:
+                if len(parts) == 3 and parts[0] in _LABELLED_TABLES:
                     measure, subj = f"{parts[0]}.{parts[2]}", parts[1]
             out.append(F.fact(F.SCALAR, measure, subject=subj, unit=unit or None, value=float(value),
-                              as_of=node.as_of or "n/a", params=extra, sources=(ref,) if ref else (), group=group))
+                              as_of=as_of, window=win, params=extra, sources=(ref,) if ref else (), group=group))
         return out
     if node.kind == ABSENCE and node.refusal:
         r = node.refusal
@@ -1195,6 +1802,14 @@ async def run(db: AsyncSession, program: dict, *, invoked_by: str = "agent") -> 
     parsed = parse(program)
     if isinstance(parsed, dict):
         return parsed
+    # V33: every type problem at once, before anything runs. A type error is not
+    # an absence of data, so it makes no absence fact; the writer fixes the
+    # program and runs it again with the whole report in hand.
+    problems = typecheck(parsed)
+    if problems:
+        return {"error": "type_errors", "problems": problems,
+                "detail": "the program did not run: every node with a type problem is listed with its fix; "
+                          "nodes that depend on one are not repeated"}
     ctx = _Ctx(db, invoked_by)
     for name, expr in parsed.bindings:
         node = await _evaluate(ctx, name, expr)
@@ -1254,6 +1869,10 @@ def _note_of(node: Node) -> dict:
         if node.payload.get("basis"):
             out["basis"] = node.payload["basis"]
         return out
+    if node.kind == TABLE and node.payload.get("literal") is not None and not node.entries:
+        # a picked date or name: shown as what it is, with the nodes it was passed to;
+        # the facts of those nodes carry it (see _declared_dates), so it is citable there
+        return {"kind": "literal", "value": node.payload["literal"], "deps": node.deps}
     if node.kind in (VECTOR, RANKING, TABLE):
         by_label = {f.params.get("label"): f for f in node.facts}
         out["entries"] = {label: {"fact": by_label[label].id, "value": by_label[label].value,

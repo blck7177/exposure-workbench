@@ -1395,3 +1395,24 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
     if "leaves" in basis:
         out["periods"] = basis["leaves"]
     return out
+
+
+async def constant(db: AsyncSession, value: float, *, unit_class: str, base: str | None = None,
+                   issuers: list[str] | None = None, invoked_by: str = "agent") -> dict:
+    """A number the program wrote, as a ledger row of its own (V33).
+
+    `scale` records a constant as a FACTOR on another row because a bare
+    constant has no basis to check. This records one as a QUANTITY, typed by
+    the caller after the figure it is about to meet — a threshold of 8% on a
+    weight is a weight-space number of that book — so `calculate` applies its
+    checks to the pair as it would to any two figures, and the result's
+    operands both have ids. The basis says what it is: a constant.
+    """
+    rt = {"unit_class": unit_class, "basis": {"constant": True}, "quantity": f"constant({value:g})",
+          "issuers": list(issuers or []), **({"base": base} if base else {})}
+    calc_id = await cs._record(
+        db, None, "calc.scalar.constant",
+        {"op": "constant", "value": value, "result_type": rt},
+        {"value": value}, [], {}, invoked_by,
+    )
+    return {"calc_id": calc_id, "op": "constant", "value": value, "type": rt}
