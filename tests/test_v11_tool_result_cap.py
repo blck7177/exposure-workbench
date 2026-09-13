@@ -69,3 +69,25 @@ def test_a_shell_too_big_to_trim_says_it_was_cut_by_bytes():
 
 def test_a_bare_list_is_cut_by_bytes_because_it_cannot_carry_the_field():
     assert dumps_capped([1, 2, 3, 4, 5], 6) == "[1, 2,"
+
+
+def test_the_section_a_call_opened_is_the_last_the_cap_drops():
+    """V33: describe(ticker, expand='methods') reached the model as `methods: {}`
+    — expanding made that section the largest, so the cap emptied exactly it.
+    With `keep`, another container gives way first."""
+    methods = {f"m{i}": {"pad": "x" * 40} for i in range(20)}
+    fundamentals = {f"l{i}": {"pad": "x" * 60} for i in range(10)}
+    obj = {"subject": "MSFT", "methods": methods, "fundamentals": fundamentals}
+    full = len(json.dumps(obj))
+    out = json.loads(dumps_capped(obj, full - 300, keep=("methods",)))
+    assert len(out["methods"]) == 20
+    assert out["truncated"]["container"] == "fundamentals"
+    assert 0 < len(out["fundamentals"]) < 10
+    # nothing else left to drop: the kept section is trimmed from its tail, not emptied
+    alone = {"subject": "MSFT", "methods": methods}
+    out2 = json.loads(dumps_capped(alone, len(json.dumps(alone)) - 200, keep=("methods",)))
+    assert out2["truncated"]["container"] == "methods"
+    assert 0 < len(out2["methods"]) < 20
+    # and without keep the behaviour is the old one: the largest container goes first
+    out3 = json.loads(dumps_capped(obj, full - 300))
+    assert out3["truncated"]["container"] == "methods"

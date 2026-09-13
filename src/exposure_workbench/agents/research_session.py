@@ -60,6 +60,14 @@ submit_brief. A refusal names the section and the claim: fix that claim, run the
 the figure, or drop it.""")
 
 
+
+def _keep_for(name: str, args) -> tuple[str, ...]:
+    """The section a describe call asked to open is the last the result cap may
+    drop (V33: `expand='methods'` came back as `methods: {}`)."""
+    if name == "describe" and isinstance(args, dict) and args.get("expand"):
+        return (str(args["expand"]),)
+    return ()
+
 async def run_research_session(
     db_factory,
     session_id: str,
@@ -149,7 +157,7 @@ async def run_research_session(
                 # model could spell one it was then refused for misspelling.
                 messages.append({
                     "role": "tool", "tool_call_id": tc["id"],
-                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT),
+                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT, keep=_keep_for(name, args)),
                 })
                 if name == "submit_brief":
                     if result.get("accepted"):

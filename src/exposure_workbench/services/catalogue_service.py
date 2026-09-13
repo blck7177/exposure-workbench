@@ -208,10 +208,16 @@ async def _desk(db: AsyncSession) -> dict:
         "open": f"describe('{sn['portfolio_id']}')",
     } for sn in snaps]
     companies = await company_service.list_companies(db, investigable_only=True)
+    # V33: `start` registers an issuer as investigable at once and its facts and
+    # chunks arrive minutes later; the B round saw MRK/BAC/GS listed as prepared
+    # in another session's catalogue and asked about. Prepared means the
+    # readiness workflow's own test passes; the rest are preparing.
+    ready = await company_service.ready_company_ids(db, [c.id for c in companies])
     return {
         "subject": None, "kind": "desk",
         "portfolios": portfolios,
-        "issuers_prepared": sorted(c.ticker for c in companies),
+        "issuers_prepared": sorted(c.ticker for c in companies if c.id in ready),
+        "issuers_preparing": sorted(c.ticker for c in companies if c.id not in ready),
         "domains": ["fundamentals (filed figures)", "filings (text)", "prices", "book (runs, positions, limits)",
                     "web (search_web)"],
         "issuer_open": "describe('<ticker>')",
@@ -235,10 +241,12 @@ async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
                                         f"no filings or facts for it. start(kind='readiness') puts it "
                                         f"on the desk; the work runs in the background", ticker=tk)
         return _err("company_not_found", f"{tk} is not a company this desk knows", ticker=tk)
+    prepared = company.id in await company_service.ready_company_ids(db, [company.id])
     out: dict = {
         "subject": tk, "kind": "issuer",
         "identity": {"ticker": tk, "name": company.name, "cik": company.cik, "sector": company.sector,
-                     "industry": company.industry, "investigable": company.is_investigable},
+                     "industry": company.industry, "investigable": company.is_investigable,
+                     "prepared": prepared},
     }
     out["fundamentals"] = await _fundamentals(db, tk, company, expand == "fundamentals")
     out["filings"] = await _filings(db, company.id, expand == "filings")
