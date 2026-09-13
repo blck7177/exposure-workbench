@@ -48,12 +48,20 @@ SPELLING = set(SPELLING_REFUSALS) | {
     "untyped_operand", "untyped_series", "undated_operand", "not_on_this_face", "too_few_operands",
     "unrankable_operand", "invalid_as_of_date", "invalid_date", "invalid_window", "unknown_job",
     "unknown_company", "unknown_tool",
+    # V33: the program writer's type work (a static report before anything runs)
+    # and a request the analyst's one tool could not parse
+    "type_errors", "malformed_program", "invalid_request",
 }
 GATE = {
     "unsourced_figure", "malformed_answer", "unverified_quote", "not_on_ledger", "id_in_prose",
     "name_in_prose", "pointer_written_as_text", "pointer_not_separated", "kind_does_not_fit",
     "unknown_point", "not_standalone", "missing_citations", "unverified_numbers", "not_on_table",
     "unresolved_slots", "invalid_citations", "unsupported_assertion",
+    # V33 answer check (services/answer_check.py): numbers against the ledger,
+    # relation words against the facts' rank/op/as_of/tier
+    "ambiguous_figure", "mark_mismatch", "unknown_node", "subject_mismatch", "measure_mismatch",
+    "superlative_without_rank", "date_expected", "tier_mismatch", "unit_conflict", "direction_conflict",
+    "change_conflict",
 }
 ALGEBRA = {
     "different_instants", "overlapping_intervals", "mismatched_windows", "overlapping_quantities",
@@ -73,11 +81,13 @@ DATA = {
     "series_not_derivable", "not_applicable", "empty_series", "no_positions", "no_limits",
     "no_sector", "no_balance_sheet_data", "not_held", "not_listed", "not_investigable",
     "not_an_sec_filer", "active_run_exists", "not_your_portfolio",
+    "no_entry_satisfies", "no_prior_run",
 }
 SYSTEM = {"tool_error", "fact_adapter_error", "tool_transport_error", "budget_exceeded",
           "quota_exceeded", "provider_unavailable", "sign_in_required", "no_research_run"}
 
-_ERR = re.compile(r"^error: ([a-z_]+)")
+# a tool step's summary is "error: <code>"; a V33 answer step's is "refused: <code>; …"
+_ERR = re.compile(r"^(?:error|refused): ([a-z_]+)")
 _ARTIFACT = re.compile(r"(?:%|\d)=-?\d[\d.,]*|\b\d[\d.,]*%?, \d[\d.,]*%?\b")   # "16.1%=0.161", "16.1%, 16.1%"
 _MARK = re.compile(r"\[10-[KQ][^\]]*\]")
 # A superlative or top-N claim in the answer, against a successful rank in the
@@ -115,6 +125,7 @@ def tally(paths: list[str]) -> dict:
     c: collections.Counter = collections.Counter()
     turns_with: dict[str, set] = collections.defaultdict(set)
     rt, calls, resp, elapsed, ptok, figs = [], [], [], [], [], []
+    reqs, terrs, writer, answer_refusals = [], 0, 0, 0
     artifacts = marks = zero = exhausted = 0
     superl = superl_no_rank = superl_undeclared = 0
     n = 0
@@ -127,10 +138,17 @@ def tally(paths: list[str]) -> dict:
                 llm = [s for s in steps if s.get("step_type") == "llm_call"]
                 rt.append(len(llm)); ptok.append(sum((s.get("prompt_tokens") or 0) for s in llm))
                 calls.append(sum(1 for s in steps if s.get("step_type") in ("tool_call", "delegation")))
-                resp.append(sum(1 for s in steps if s.get("tool_name") == "respond"))
+                # V33: the analyst's exit is an `answer` step; `respond` is the
+                # research path's and every round before. One series, both names.
+                resp.append(sum(1 for s in steps if s.get("tool_name") in ("respond", "answer")))
+                reqs.append(sum(1 for s in steps if s.get("step_type") == "request"))
+                terrs += sum(1 for s in steps if s.get("tool_name") == "run"
+                             and (s.get("result") or "").startswith("error: type_errors"))
+                answer_refusals += sum(1 for s in steps if s.get("step_type") == "answer" and s.get("status") == "rejected")
                 elapsed.append(t.get("elapsed_s") or 0)
                 meta = t.get("meta") or {}
                 figs.append((meta.get("verified") or {}).get("figures") or 0)
+                writer += int(meta.get("writer_calls") or 0)
                 if meta.get("gate") == "exhausted":
                     exhausted += 1
                 a = str(t.get("answer") or "")
@@ -142,7 +160,7 @@ def tally(paths: list[str]) -> dict:
                 # rendered text (V30 renders a quote's passage with its item in brackets)
                 written = a
                 for s in reversed(steps):
-                    if s.get("tool_name") == "respond":
+                    if s.get("tool_name") in ("respond", "answer"):
                         try:
                             arg = json.loads(s.get("args") or "{}")
                             pr = arg.get("prose") or arg.get("text") or ""
@@ -184,7 +202,7 @@ def tally(paths: list[str]) -> dict:
                     else:
                         superl_no_rank += 1
                 for s in steps:
-                    if s.get("step_type") not in ("tool_call", "delegation", "respond"):
+                    if s.get("step_type") not in ("tool_call", "delegation", "respond", "answer"):
                         continue
                     k = classify(s.get("result") or "", s.get("status") or "")
                     if k:
@@ -197,6 +215,9 @@ def tally(paths: list[str]) -> dict:
         "round_trips_median": med(rt), "round_trips_p90": q(rt, .9),
         "tool_calls_median": med(calls), "tool_calls_p90": q(calls, .9),
         "respond_attempts_mean": round(statistics.mean(resp), 2) if resp else 0,
+        # V33: what the analyst asked for, what the writer's programs were refused for, how often it wrote
+        "requests_mean": round(statistics.mean(reqs), 2) if reqs else 0,
+        "type_errors": terrs, "writer_calls": writer, "answer_refusals": answer_refusals,
         "prompt_tokens_median": med(ptok), "prompt_tokens_p90": q(ptok, .9),
         "elapsed_s_median": med(elapsed), "elapsed_s_p90": q(elapsed, .9),
         "figures_median": med(figs),

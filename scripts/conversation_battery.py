@@ -121,10 +121,18 @@ async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tu
                     "elapsed_s": elapsed, "steps": steps})
         calls = [s for s in steps if s["step_type"] in ("tool_call", "delegation")]
         held = [s for s in calls if "not attempted" in (s["result"] or "")]
-        refused = [s for s in steps if s["step_type"] == "respond" and "error" in (s["result"] or "")]
+        # V33: the analyst's answer is a step of its own (`answer`, status
+        # `rejected` when the check refused it); `respond` is the research
+        # path's exit and every round before V33.
+        refused = [s for s in steps if (s["step_type"] == "respond" and "error" in (s["result"] or ""))
+                   or (s["step_type"] == "answer" and s["status"] == "rejected")]
+        requests = [s for s in steps if s["step_type"] == "request"]
+        type_errors = [s for s in calls if s["tool_name"] == "run" and (s["result"] or "").startswith("error: type_errors")]
         print(f"[{tag} t{i}] {elapsed}s calls={len(calls)}"
+              f"{f' requests={len(requests)}' if requests else ''}"
+              f"{f' type_errors={len(type_errors)}' if type_errors else ''}"
               f"{f' held={len(held)}' if held else ''}"
-              f"{f' gate_refusals={len(refused)}' if refused else ''}  "
+              f"{f' refusals={len(refused)}' if refused else ''}  "
               f"{(error or (res.get('text') or ''))[:90]}", flush=True)
     return {"tag": tag, "session_id": sid, "turns": out}
 

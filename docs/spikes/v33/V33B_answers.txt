@@ -1,0 +1,229 @@
+===============================================================================================
+### Q01-amzn-earnings-quality  calls=3 refusals=1 ['relation_does_not_fit']
+    tool failures: []
+Amazon's cash generation still exceeds reported profit in the latest trailing twelve months: operating cash flow was the chart below and net income was the chart below, while cash conversion was 163.6%. That is not a deterioration signal on its own; cash is still ahead of earnings.
+The accruals ratio has improved over the last five annual windows, moving from the chart below at the start of the series to the chart below at the end. The trend is still negative, but it is less negative, which points to less earnings-to-cash gap, not more.
+Receivables are growing faster than revenue in the recent quarters: accounts receivable yoy was the chart below, while revenue yoy over the annual windows was the chart below. On the same comparison, inventory is not outrunning revenue: inventory yoy was the chart below and has slowed sharply versus revenue growth the chart below.
+The working-capital days view is mixed but not alarming on inventory: DSO is the chart below at the latest reading and inventory days are the chart below, with cash conversion cycle still strongly negative at the chart below. That pattern says Amazon is still collecting and turning inventory fast enough that working capital is a source of cash, even if receivables have been building.
+For the AMZN position, this does not argue for a size cut on earnings-quality grounds alone. The evidence says cash is still validating earnings, but receivables deserve watching because they are growing faster than revenue. I would keep the position size unchanged from this evidence set unless you want me to test whether the receivables build is turning into a broader balance-sheet or collections issue.
+AMZN operating cash flow, last five annual TTM windows
+[chart: operating cash flow $140B (2025-12-31)]
+AMZN net income, last five annual TTM windows
+[chart: net income $77.67B (2025-12-31)]
+AMZN accruals ratio trend, last five annual TTM windows
+[chart: accruals ratio -7.56% (2025-12-31)]
+AMZN accounts receivable yoy, last four quarters
+[chart: accounts receivable yoy 39.3% (2026-03-31)]
+AMZN inventory yoy, last four quarters
+[chart: inventory yoy 1.87% (2026-03-31)]
+AMZN revenue yoy, last four annual TTM windows
+[chart: revenue yoy 12.4% (2025-12-31)]
+AMZN days sales outstanding, last five annual TTM windows
+[chart: days sales outstanding 34.48 (2025-12-31)]
+AMZN days inventory, last five annual TTM windows
+[chart: days inventory 39.25 (2025-12-31)]
+AMZN cash conversion cycle, last five annual TTM windows
+[chart: cash conversion cycle -51.12 (2025-12-31)]
+
+===============================================================================================
+### Q02-xom-room-if-oil-falls  calls=11 refusals=4 ['relation_does_not_fit', 'unsourced_figure', 'unsourced_figure', 'unsourced_figure']
+    tool failures: []
+Exxon’s leverage room is still decent on the latest annual readings: net debt to EBITDA stayed near zero and negative the chart below, interest coverage remained very strong the chart below, and FCF to debt is still positive but much tighter than it was the chart below.
+The 10-K’s maturity ladder is not back-loaded into the near term: debt due within one year is disclosed in the filing, then the next years are spread out, and the company still had unused long-term credit lines “matures within one year and is included in current liabilities... 2027 – $2.5 billion; 2028 – $1.7 billion; 2029 – $1.7 billion; and 2030 – $5.3 billion... unused long-term lines of credit were $1.0 billion” [10-K Item 8].
+On rate risk, Exxon says the exposure is mainly short-term debt and floating-rate long-term debt, and the filing says the impact of a basis-point move would not be material to earnings or cash flow “The Corporation is exposed to changes in interest rates, primarily on its short-term debt and the portion of long-term debt that carries floating interest rates... the impact of a 100-basis-point change in interest rates affecting the Corporation’s debt would not be material to earnings or cash flow.” [10-K Item 7].
+In the book, XOM is a 4.61% weight 4.61% and its beta to USO over 1y is 0.327 0.33×, so the position does participate in oil moves but much less than a pure oil proxy.
+[chart: net debt to ebitda -0.02× (2025-12-31)]
+[chart: ebit interest coverage 67.91× (2025-12-31)]
+[chart: fcf to debt 254.0% (2025-12-31)]
+
+===============================================================================================
+### Q03-nvda-where-cash-goes  calls=3 refusals=3 ['relation_does_not_fit', 'unsourced_figure', 'unsourced_figure']
+    tool failures: []
+NVIDIA’s trailing-twelve-month cash uses as a share of operating cash flow are: capex 5.47%, buybacks 41.2%, dividends 5.01%, and SBC 5.39%. Buybacks are the largest use by far.
+Over the last five annual trailing windows, capex share has moved as the chart below; buyback share as the chart below; dividend share as the chart below; and SBC share as the chart below. The pattern says buybacks have remained the main cash sink, capex has lifted from a low base, dividends are modest, and SBC has come down from earlier highs.
+The latest filing language I found says the company had “approximately $99.0 billion remaining under its share repurchase authorization” [NVIDIA Announces Financial Results for Second Quarter Fiscal 2027] under its share repurchase authorization.
+[chart: capex divide operating cash flow 5.88% (2026-01-25)]
+[chart: buybacks divide operating cash flow 39.0% (2026-01-25)]
+[chart: dividends paid divide operating cash flow 0.95% (2026-01-25)]
+[chart: sbc divide operating cash flow 6.22% (2026-01-25)]
+
+===============================================================================================
+### Q04-lly-margin-pricing-mix-cost  calls=7 refusals=1 ['unsourced_figure']
+    tool failures: []
+I can say only this much on Lilly from the desk right now: gross margin and operating margin over the last twelve quarters are absent because the series could not be derived from the filed line items on the desk lly_gm was not computed — series_not_derivable: gross_margin could not be evaluated on any of 5 periods of total_revenues's 12-month windows; the first refusal: LLY reports no gross_profit with a period; it may report a related line instead — call describelly_om was not computed — series_not_derivable: operating_margin could not be evaluated on any of 5 periods of total_revenues's 12-month windows; the first refusal: LLY reports no operating_income with a period; it may report a related line instead — call describe. Net margin is available as a series, but only on five annual points, not twelve quarters the chart below. Because gross and operating margin are absent, the gross-minus-operating gap and its change are also absent lly_gap was not computed: lly_gm was refused — series_not_derivable: gross_margin could not be evaluated on any of 5 periods of total_revenues's 12-month windows; the first refusal: LLY reports no gross_profit with a period; it may report a related line instead — call lly_gap_chg was not computed: lly_gm was refused — series_not_derivable: gross_margin could not be evaluated on any of 5 periods of total_revenues's 12-month windows; the first refusal: LLY reports no gross_profit with a period; it may report a related line instead — call .
+What Item 7 says is that revenue increased in 2025 driven primarily by increased volume, partially offset by lower realized prices; that points to mix/volume as the main top-line driver rather than pricing “Revenue increased in 2025 driven primarily by increased volume, partially offset by lower realized prices. The increased volume and lower realized prices in 2025 were primarily driven by Mounjaro and Zepbound.” [10-K Item 7]. It also says net income increased primarily due to higher gross margin, partially offset by increased marketing, selling, and administrative expenses and research and development expenses, so the margin expansion is attributed mainly to gross margin improvement, with overhead and R&D partly offsetting it “Net income and earnings per share increased in 2025, primarily due to higher gross margin, partially offset by increased marketing, selling, and administrative expenses and research and development expenses.” [10-K Item 7].
+On the specific pricing question, Item 7 also says Lilly faces continuing cost-containment pressure from mandated discounts, price reporting, reference prices, formulary restrictions, and IP-related actions, so pricing is under pressure rather than being the clean explanation for margin expansion “Cost containment measures include the use of mandated discounts, price reporting requirements, mandated reference prices, restrictive formularies, changes to available intellectual property protections, as well as other efforts.” [10-K Item 7].
+Merck is not yet on the desk; readiness is pending, and I cannot compare Lilly against Merck on the numbers until that task completes.
+[chart: net margin 31.7% (2025-12-31)]
+
+===============================================================================================
+### Q05-aapl-risk-and-concentration  calls=7 refusals=4 ['relation_does_not_fit', 'relation_does_not_fit', 'relation_does_not_fit', 'relation_does_not_fit']
+    tool failures: []
+Apple says its biggest risks are macro demand weakness, geopolitical/trade and supply-chain disruption, and competition/technology change; those are the filing’s own words for what can hurt business, results, financial condition and stock price “The Company’s operations and performance depend significantly on global and regional economic conditions and adverse economic conditions can materially adversely affect the Company’s business, results of operations, financial condition and stock price.” [10-K Item 1A]“The Company’s business can be impacted by political events, trade and other international disputes, geopolitical tensions, conflict, terrorism, natural disasters, public health issues, industrial accidents and other business interruptions.” [10-K Item 1A]“Global markets for the Company’s products and services are highly competitive and subject to rapid technological change, and the Company may be unable to compete effectively in these markets.” [10-K Item 1A].
+Apple also says it depends heavily on timely innovation in products, services and technologies, so that is the operating lever management itself highlights “The Company’s ability to compete successfully depends heavily on ensuring the continuing and timely introduction of innovative new products, services and technologies to the marketplace.” [10-K Item 1A].
+The desk does not hold product revenue, geographic revenue, segment revenue, or customer concentration as computed figures for Apple; those are absent by policy and source structure, because this desk quotes them from the filing instead of deriving them from parts not held as figures (companyfacts carries no dimensions); stated in the 10-K's segment note and Item 7 — read_filingsnot held as figures; stated in Item 7 and the product table — read_filingsnot held as figures; stated in the segment note — read_filingsnot held as figures; stated in Item 1 / the concentration note — read_filings.
+The one concentration figure the desk can state from the filing text is distribution mix: Apple says 2025 net sales were 40% direct and 60% indirect through distribution channels “During 2025, the Company’s net sales through its direct and indirect distribution channels accounted for 40% and 60%, respectively, of total net sales.” [10-K Item 1].
+
+===============================================================================================
+### Q06-jpm-riskier-than-a-year-ago  calls=5 refusals=1 ['relation_does_not_fit']
+    tool failures: []
+JPM’s 30-day volatility is 14.2%, versus its 252-day volatility of 22.1%. The short window is below the long baseline, so recent trading has been calmer than the past year.
+Its beta to SPY over the last year is 0.78×, which is below 1 and points to lower-than-market sensitivity rather than an unusually aggressive equity profile.
+Distance from the 52-week high is -3.18%; on the same current date the desk’s 1-year reading is the same, because both facts reference the same trailing-year high from the current price context.
+Taken together, the price evidence does not say the market is treating JPM as riskier than a year ago: volatility is lower than the longer baseline 14.2% against 22.1%, beta is sub-1 0.78×, and the stock sits only a few percent below its 52-week high -3.18%.
+On the bank-specific filing side, interest expense over the latest three-year window is $136B. That line is held from the filing, but the desk’s interest-coverage and leverage methods do not apply to JPM as a financial issuer, so they are refused rather than estimated.
+The pretax-to-net-income gap over that three-year window is $44.86B. That is the amount left between pretax income and net income after taxes and below-pretax items, but it is not itself a bank-specific credit ratio on this desk.
+The only price factor I could not yet state was the R-squared from the beta run, because the method returned a different key name than requested; the ledger records that as an absence rather than a figure beta_spy_r2 was not computed — unknown_name: $beta_spy_r2 holds no figure 'r_squared'.
+
+===============================================================================================
+### Q07-tech-cash-conversion-rank  calls=3 refusals=0 []
+    tool failures: ['run:error: tool_error']
+I can’t rank the five technology holdings by cash conversion yet, because the ledger refused the needed OCF and net income inputs for all five names: the issuer panel call returned no typed figures, so the ratio conv was not computed: ocf was refused — untyped_result: issuer.panel: no subject produced a figure is absent rather than estimated.
+On the book side, the biggest increase in weight since the prior run was AAPL, with a +0.00468063 change in issuer_exposures.weight; that change ranks first among positions 0.47% (#1).
+Because the cash-conversion ratio is absent, I cannot say which of the five has the weakest conversion, and therefore I cannot test whether that weakest converter is also the name with the largest weight increase. For the weight question alone, the answer is AAPL, but the conversion comparison remains unresolved on the desk -0.11% (#10).
+
+===============================================================================================
+### Q08-capex-roic-three-way  calls=3 refusals=0 []
+    tool failures: []
+Over the last three fiscal years, Microsoft’s capex intensity rose from the chart below, while its ROIC stayed around the chart below.
+Alphabet’s capex intensity rose from the chart below, while its ROIC moved through the chart below.
+Amazon’s capex intensity rose from the chart below, while its ROIC moved through the chart below.
+On the latest readings, Amazon spends the most relative to revenue: its capex intensity is the chart below, above Microsoft’s the chart below and Alphabet’s the chart below latest points. Microsoft earns the least on that spending on the latest ROIC reading: the chart below, below Alphabet’s the chart below and Amazon’s the chart below.
+In the book, the latest run gives Microsoft a weight of 16.0%, Alphabet a weight of 12.4%, and Amazon a weight of 7.03%. That means the portfolio is more exposed to Microsoft and Alphabet than to Amazon, so the name with the heaviest capex burden and the weakest ROIC is not the book’s largest holding. The exposure to QQQ is not held as a direct figure on this desk; the book has issuer weights and sector weights, but no QQQ benchmark exposure fact to compare against, so that part is absent.
+Microsoft capex intensity, last three fiscal years
+[chart: capex intensity 22.9% (2025-06-30)]
+Microsoft ROIC, last three fiscal years
+[chart: roic 29.7% (2025-06-30)]
+Alphabet capex intensity, last three fiscal years
+[chart: capex intensity 22.7% (2025-12-31)]
+Alphabet ROIC, last three fiscal years
+[chart: roic 24.8% (2025-12-31)]
+Amazon capex intensity, last three fiscal years
+[chart: capex intensity 18.4% (2025-12-31)]
+Amazon ROIC, last three fiscal years
+[chart: roic 16.2% (2025-12-31)]
+
+===============================================================================================
+### Q09-aapl-working-capital-cycle  calls=6 refusals=4 ['not_on_ledger', 'relation_does_not_fit', 'unsourced_figure', 'unsourced_figure']
+    tool failures: ['read_filings:invalid arguments: 2 problem(s)']
+Apple’s working-capital days over the last six annual periods were: DSO the chart below, inventory days the chart below, payable days the chart below, and cash conversion cycle the chart below.
+The current cash conversion cycle is -53.94. I cannot state a ledger-backed three-year low/high position because the rank node refused and the desk did not return a low/high fact.
+On supplier financing, the latest 10-K says Apple had manufacturing purchase obligations of “manufacturing purchase obligations of $56.2 billion, with $55.4 billion payable within 12 months.” [10-K Item 7], and the filing’s supply note says it may not be able to extend or renew component supply agreements on similar terms, or at all “may not be able to extend or renew agreements for the supply of components on similar terms, or at all” [10-K Item 8]. I do not have a ledger-backed prior-10-K passage to compare line-by-line here, so a wording change versus the previous 10-K is absent on this desk for this turn.
+Apple days sales outstanding, last 6 annual readings
+[chart: days sales outstanding 34.89 (2025-09-27)]
+Apple days inventory, last 6 annual readings
+[chart: days inventory 9.45 (2025-09-27)]
+Apple days payable, last 6 annual readings
+[chart: days payable 115.40 (2025-09-27)]
+Apple cash conversion cycle, last 6 annual readings
+[chart: cash conversion cycle -71.07 (2025-09-27)]
+
+===============================================================================================
+### Q10-msft-leverage-and-rates  calls=10 refusals=5 ['relation_does_not_fit', 'relation_does_not_fit', 'relation_does_not_fit', 'relation_does_not_fit', 'id_in_prose']
+    tool failures: ['read_filings:invalid arguments: 2 problem(s)']
+Microsoft's leverage story has not worsened on the desk's credit measures: EBIT rose across the last five fiscal year-ends to 2025-06-30, and the interest-coverage series ended at the chart below. The debt stock itself is still there, but coverage improved rather than deteriorated.
+Net debt was $12.91B (2025-06-30) at 2025-06-30; the desk also has a two-point net-debt series around the latest quarter, but not a five-year net-debt series, so I can't honestly give you five year-ends for that line.
+The latest 10-K says Microsoft's fixed-income portfolio is exposed to interest-rate risk and is managed by average maturity “Securities held in our fixed-income portfolio are subject to different interest rate risks based on their maturities. We manage the average maturity of the fixed-income portfolio to achieve economic returns that correlate to certain global fixed-income indices.” [10-K Item 7A]. It also says a 100 bp rise in U.S. Treasury rates would reduce fair value by “100 basis point increase in U.S. treasury interest rates” [10-K Item 7A].
+For the book shock piece: I can't state the rates_shock_up result from the ledger. The visible book run the desk has for this portfolio is another run, but the shock run you named is not visible here, and the desk-withheld stress results are not to be rebuilt from other figures.
+[chart: ebit $126B (2025-06-30)]
+[chart: ebit interest coverage 52.84× (2025-06-30)]
+
+===============================================================================================
+### Q11-closest-to-issuer-limit  calls=6 refusals=4 ['not_on_ledger', 'relation_does_not_fit', 'relation_does_not_fit', 'relation_does_not_fit']
+    tool failures: []
+I can’t finish the answer yet because the 8% cap part is still unresolved on the ledger. The attempted computation refused for a type-mismatch, so there is no valid absence fact to cite, and I won’t guess who would be over 8%. Please fix that calculation or ask me to rerun it with a valid vector construction, and I’ll answer both parts cleanly.
+
+===============================================================================================
+### Q12-jpm-vs-peers-not-on-desk  calls=4 refusals=1 ['relation_does_not_fit']
+    tool failures: []
+I have started preparing JPMorgan, Bank of America, and Goldman Sachs for the requested comparison, but I do not yet have the three-year ROE or equity-multiplier figures on the ledger. So today I can only say the request is in progress, and I cannot yet state whether JPM is the most levered of the three without guessing.
+
+===============================================================================================
+### Q13-sell-half-nvda-into-tlt  calls=7 refusals=7 ['not_on_ledger', 'not_on_ledger', 'not_on_ledger', 'not_on_ledger', 'relation_does_not_fit', 'relation_does_not_fit', 'not_on_ledger']
+    tool failures: []
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+===============================================================================================
+### Q14-worst-drawdown-episode  calls=5 refusals=3 ['relation_does_not_fit', 'relation_does_not_fit', 'unsourced_figure']
+    tool failures: []
+The book’s worst drawdown over the last year started on 12.0% and troughed on 2026-03-27, with a depth of -12.0%.
+Over that same window, the book’s return was -12.0%, so the market against what we held in the episode is captured by that same moved book-window figure.
+The three largest detractors in the episode were MSFT at -26.0% (#1), LLY at -20.6% (#2), and AMZN at -17.5% (#3).
+MSFT has a filed 10-K Item 7 passage on the desk, titled “ITEM 7. MANAGEMENT’S DISCUSSION AND ANALYSIS OF FINANCIAL CONDITION AND RESULTS OF OPERATIONS” [10-K Item 7].
+LLY has a filed 10-K Item 7 passage on the desk, titled “Item 7.Management's Discussion and Analysis of Results of Operations and Financial Condition” [10-K Item 7].
+
+===============================================================================================
+### Q15-liquidity-and-limits  calls=4 refusals=0 []
+    tool failures: []
+The book has 10 holdings. Position value against 20-day average dollar volume is laid out in the table below; the liquidity calculation at 20% of ADV is in the table below.
+By that liquidation measure, the longest-to-sell name is JPM at 0.0032 (#1), followed by LLY at 0.0018 (#2), HYG at 0.0012 (#3), TLT at 0.0010 (#4), and XOM at 0.0009 (#5). The remaining names rank GOOGL at 0.0007 (#6), MSFT at 0.0007 (#7), AAPL at 0.0005 (#8), AMZN at 0.0004 (#9), and NVDA at 0.0001 (#10).
+The names near issuer limits are in the table below: AAPL is at 15.2% against a 15.0% warning, LLY at 12.5% against 12.0%, and MSFT at 16.0% against 15.0%; NVDA is not near its issuer limit at 4.1% against 15.0%.
+The answer to whether the slowest names are the same names near issuer limits is no. JPM is the slowest-to-liquidate name, but it is not near its issuer concentration limit; the names near limits are AAPL, LLY, and MSFT, while the other slow names such as HYG, TLT, and XOM are not near issuer concentration warnings either.
+position value and 20-day ADV
+ | issuer exposures market value | price adv
+AAPL | $1.63M | $13.27B/day
+JPM | $1.59M | $1.98B/day
+LLY | $1.35M | $2.94B/day
+MSFT | $1.72M | $10.51B/day
+GOOGL | $1.33M | $7.70B/day
+HYG | $786K | $2.56B/day
+AMZN | $756K | $8.37B/day
+TLT | $646K | $2.48B/day
+XOM | $496K | $2.24B/day
+NVDA | $437K | $28.29B/day
+days to liquidate at 20% of ADV
+ | divide(issuer exposures market value, scale(price adv, 0 25))
+AAPL | 0.0005
+JPM | 0.0032
+LLY | 0.0018
+MSFT | 0.0007
+GOOGL | 0.0007
+HYG | 0.0012
+AMZN | 0.0004
+TLT | 0.0010
+XOM | 0.0009
+NVDA | 0.0001
+issuer concentration vs warning limit
+ | limit checks current value | 
+issuer_concentration:AAPL | 15.2% | risk alerts limit value: 15.0%
+issuer_concentration:LLY | 12.5% | risk alerts limit value: 12.0%
+issuer_concentration:MSFT | 16.0% | risk alerts limit value: 15.0%
+issuer_concentration:NVDA | 4.06% | limit checks breach level: 20.0%
+
+===============================================================================================
+### Q16-book-beta-change-since-prev  calls=5 refusals=1 ['relation_does_not_fit']
+    tool failures: []
+I’m unable to complete the requested reply as written because the prior answer was refused by the ledger: the market-beta change claim was not supported by two readings of the same measure. Please let me rerun the analysis with a valid net-beta measure name if you want the book’s beta change and driver stated from the ledger.
+
+===============================================================================================
+### Q17-events-touching-holdings  calls=4 refusals=2 ['relation_does_not_fit', 'relation_does_not_fit']
+    tool failures: []
+Top five by weight are MSFT 16.0% (#1), AAPL 15.2% (#2), JPM 14.8% (#3), LLY 12.5% (#4), and GOOGL 12.4% (#5).
+The exact ten-day SPY-relative return is not held on this desk in the form requested; the attempted method call refused because this method only accepts 1m, 3m, 6m, or 1y windows. I therefore cannot give a valid 10-day number from the ledger 8.76%.
+Price is already below the 52-week high for every one of the five: AAPL -5.83%, AMZN -0.69%, JPM -5.79%, LLY -1.54%, and GOOGL -3.89%.
+Measured from the 52-week high, the gaps are AAPL -11.3%, AMZN -3.18%, JPM -12.3%, LLY -17.3%, and GOOGL -17.3%.
+I could not verify last-two-weeks material news on this desk because the web-search tool is not available here. So I can tell you the names most likely to matter by weight and whether price has already moved versus highs, but not whether a specific recent news item was the catalyst.
+
+===============================================================================================
+### Q18-attribution-reconcile  calls=5 refusals=0 []
+    tool failures: []
+On the latest run, the factor attribution does not fully add up to the portfolio return because the desk will only publish the reconciled totals, not the individual factor rows: factor contributions sum to -0.47%, alpha is 0.01%, and residual is 0.84%. The published reconciliation table also shows factor share 0.85% and unexplained share 225.5%.
+The largest and smallest individual factor contributions are absent on this desk for this run, because factor_attributions.contribution is not available name by name when the factors are collinear; the desk only gives the sum, not a per-factor ranking factor_contribs was not computed — not_alone: factor_attributions.contribution on run_e2945c5ebd5a may not be used name by name: these factors are collinear, so no single beta is determined; their sum, -0.00471605, is.
+For HYG, the drawdown over the period is $1.83. I cannot say that its own drawdown matches the sign of its contribution, because the HYG-specific contribution on this run is also absent under the same collinearity restriction factor_contribs was not computed — not_alone: factor_attributions.contribution on run_e2945c5ebd5a may not be used name by name: these factors are collinear, so no single beta is determined; their sum, -0.00471605, is.
+
+===============================================================================================
+### Q19-aws-share-explains-return  calls=6 refusals=0 []
+    tool failures: []
+AMZN returned -8.12% over the last year relative to SPY, so on that window it underperformed the benchmark.
+AWS’s share of Amazon revenue is aws was not computed — metric_not_filed: AMZN has no filed facts under 'revenue_including_assessed_tax'; the desk does not hold a filed AWS revenue figure for AMZN, so I cannot state the share or its three-year movement from the ledger, and I therefore cannot quantify how much of the AMZN-vs-SPY return that share explains.
+
+===============================================================================================
+### Q20-lly-margins-next-year  calls=2 refusals=1 ['relation_does_not_fit']
+    tool failures: []
+I can’t forecast Lilly’s margins next year; the desk does not forecast, and the filing itself flags Item 7 as forward-looking “Certain statements in this Item 7 constitute forward-looking statements.” [10-K Item 7].
+The most relevant backward-looking clue is that 2025 net income improved mainly because gross margin was higher, while marketing, selling, administrative, and R&D expenses partly offset that “Net income and earnings per share increased in 2025, primarily due to higher gross margin, partially offset by increased marketing, selling, and administrative expenses and research and development expenses.” [10-K Item 7].
+Revenue growth in 2025 was volume-led, with lower realized prices as the offset, especially from Mounjaro and Zepbound “Revenue increased in 2025 driven primarily by increased volume, partially offset by lower realized prices.” [10-K Item 7].
+For next year, the filing’s own margin headwinds are pricing pressure from the November 2025 U.S. agreements and the broader pricing/reimbursement environment “In November 2025, we announced preliminary voluntary agreements with the U.S. government in which, among other arrangements, we agreed to lower Medicaid and certain other drug prices for U.S. patients and to launch new medicines with a more balanced pricing approach across developed nations.” [10-K Item 7].
+It also says the IRA will keep influencing strategy and could significantly impact results of operations “The IRA has, and will continue to, meaningfully influence our business strategies and those of our competitors and could significantly impact our business and consolidated results of operations.” [10-K Item 7].
+So my answer is not a number forecast: the filing points to continued support from volume and product mix, but margin expansion next year would depend on whether higher gross margin can outrun pricing concessions and operating expense growth.
+
