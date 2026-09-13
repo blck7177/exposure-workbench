@@ -1,19 +1,22 @@
-"""V3-A0-2 — the loop has no ungated exit (offline: no DB, no network, no LLM).
+"""V33 — the analyst loop has no ungated exit (offline: no DB, no network, no LLM).
 
-Two paths used to hand the user something the citation gate had never accepted,
-and they are the same event wearing different clothes: the model stops calling
-tools on the last turn, or it burns every turn without a respond the gate takes.
-Both must converge on one refusal, marked so the UI can render it as one.
+The exit is plain text now, and the text goes through the answer check
+(services/answer_check) against the session ledger. Two things still hold from
+V3-A0-2 and are pinned here: nothing reaches the user that the check did not
+accept, and every path to a turn with no accepted answer converges on ONE
+wording, marked in meta so the UI can render it as a refusal.
 """
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from exposure_workbench.agents import meta_agent
+from exposure_workbench.agents import evidence_request, meta_agent
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
-from exposure_workbench.tools import faces
-from exposure_workbench.tools.registries import build_meta_registry
+from exposure_workbench.services import facts as F
+from exposure_workbench.services.ledger import Ledger
 
 
 class _FakeResult:
@@ -37,33 +40,23 @@ def _factory(store: list):
     return lambda: _FakeSession(store)
 
 
-def _stub_tools(monkeypatch, result: dict, tools: list | None = None,
-                by_name: dict | None = None):
-    """Stand in for the turn's tool session.
-
-    These tests are about what the loop does with a tool RESULT — publishing an
-    ungated answer, marking an exhausted gate — so the tools themselves are the
-    part to hold still. The seam moved out one layer when the loop stopped
-    calling invoke() directly and started calling a client (MCP_PLAN P3), and
-    out again at R4, when that client became a connection to another process
-    carrying a minted identity. It is still one substitution, and it is still
-    the whole tool face.
-
-    Every test in this file stands one in now, including the ones whose model
-    never calls a tool: the loop opens the session before its first turn, so
-    without this they would mint a token and reach for a container. That is not
-    an inconvenience to work around — it is R4's point arriving in the tests.
-    """
+def _stub_tools(monkeypatch, result: dict, tools: list | None = None, by_name: dict | None = None):
+    """Stand in for the turn's tool session — the broker's door to the face.
+    Records every call and every result it handed back, so a test can build the
+    ledger the check reads from exactly what the broker fetched."""
     from contextlib import asynccontextmanager
 
     class _Session:
         def __init__(self):
             self.tools = tools or []
             self.calls: list[tuple[str, dict]] = []
+            self.returned: list[dict] = []
 
         async def call(self, name, args):
             self.calls.append((name, args))
-            return (by_name or {}).get(name, result)
+            res = (by_name or {}).get(name, result)
+            self.returned.append(res)
+            return res
 
     session = _Session()
 
@@ -76,15 +69,6 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None,
 
 
 def _stub_llm(monkeypatch, chat):
-    """Stand in for the turn's provider session.
-
-    The same substitution as _stub_tools and for the same reason — these tests
-    are about what the loop does with an answer, not about getting one. The seam
-    moved here at V4-S2: the loop used to call chat_with_tools and drop the
-    usage, and now calls a session that returns (content, tool_calls) and writes
-    the cost row itself. Stubbing that session is what keeps these tests about
-    the gate; the row it would have written is asserted in test_llm_cost_trace.
-    """
     from contextlib import asynccontextmanager
     from types import SimpleNamespace
 
@@ -95,73 +79,90 @@ def _stub_llm(monkeypatch, chat):
     monkeypatch.setattr(meta_agent, "llm_session", _fake)
 
 
-def _BLOCKS(text: str, slot: bool = False) -> str:
-    """The arguments a V15 model sends respond: blocks, a figure as a {ref, name}
-    slot. The stubbed tool session never reads them, and they are written in the
-    real shape anyway so a reader of these tests sees the real contract."""
-    import json
-    runs = [text] + ([{"ref": "run_never_read", "name": "exposure_metrics.market_value"}] if slot else [])
-    return json.dumps({"blocks": [{"type": "paragraph", "runs": runs}]})
+def _stub_desk(monkeypatch, session):
+    """No database: the briefing is empty and the ledger is whatever facts the
+    stubbed face returned this turn — which is what the real ledger holds too."""
+    async def _no_briefing(_db_factory, _text):
+        return {"subjects": {"tickers": [], "portfolios": [], "runs": []}}
+
+    async def _ledger(_db_factory, _session_id):
+        recs = []
+        for res in session.returned:
+            block = (res or {}).get("facts") or {}
+            for row in block.get("rows") or []:
+                recs.append(F.from_model_row(row, block.get("sources")))
+        return Ledger.of(recs)
+
+    async def _no_record(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(meta_agent, "_briefing", _no_briefing)
+    monkeypatch.setattr(meta_agent, "_load_ledger", _ledger)
+    monkeypatch.setattr(meta_agent, "_record_answer", _no_record)
+    monkeypatch.setattr(meta_agent.evidence_broker.Broker, "_record", _no_record)
 
 
-def _ACCEPTED(text: str) -> dict:
-    """What respond returns when the resolver accepts: the V15 result shape the
-    loop reads `text`, `citations`, `verified` and `blocks` from."""
-    return {"responded": True, "format": "blocks",
-            "blocks": [{"type": "paragraph", "runs": [text]}],
-            "text": text, "citations": [],
-            "verified": {"figures": 0, "sources": 0, "matches": []}}
+def _request(*items):
+    return [{"id": "c1", "function": {"name": evidence_request.TOOL_NAME, "arguments": json.dumps({"items": list(items)})}}]
 
+
+def _run_result(*rows, nodes=None):
+    """A `run` result as the face returns it: the note and the facts block."""
+    return {"program_id": "calc_p", "returns": [], "settled": len(rows), "refused": [],
+            "nodes": nodes or {r[8].get("node", "n"): {"kind": "scalar", "fact": r[0]} for r in rows},
+            "facts": {"columns": list(F.COLUMNS), "rows": [list(r) for r in rows]}}
+
+
+_W_MSFT = ("f_wmsft0001", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 0.16, "2026-09-10", None, {"node": "w"}, ["run_x"])
+
+
+# ── nothing reaches the user that the check did not accept ───────────────────
 
 @pytest.mark.asyncio
-async def test_a_model_that_stops_calling_tools_does_not_get_its_text_published(monkeypatch):
-    """The path that mattered most: on the final turn the loop used to assign the
-    raw model content as the answer. It reached the user with citations=[],
-    rendered identically to a verified reply, having passed no gate at all."""
+async def test_an_invented_number_is_refused_twice_and_the_turn_ends_on_the_bar(monkeypatch):
+    """The path that mattered most in V3: raw model text reaching the user with
+    citations=[]. It still cannot: text is the exit, and the exit is checked."""
     async def _no_tools(**_kw):
         return ("NVDA revenue was $999.9B and margins are expanding.", None)
 
     _stub_llm(monkeypatch, _no_tools)
-    _stub_tools(monkeypatch, {"noted": True})
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
     store: list = []
-    out = await handle_message(_factory(store), "sess_1", "how did NVDA do?", max_turns=1)
+    out = await handle_message(_factory(store), "sess_1", "how did NVDA do?", max_turns=6)
 
     assert out["text"] == _GATE_EXHAUSTED_TEXT
     assert "999.9" not in out["text"]
     assert out["citations"] == []
     assert out["meta"]["gate"] == "exhausted"
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure"] * meta_agent.MAX_ANSWER_ATTEMPTS
 
 
 @pytest.mark.asyncio
-async def test_a_loop_that_never_reaches_respond_says_so_in_the_same_words(monkeypatch):
-    """The commoner path — turns spent on tools, or every respond refused. It
-    used to emit "(no response produced)", which reads as a crash rather than as
-    a refusal, and carried no marker at all."""
-    async def _always_thinks(**_kw):
-        return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}])
+async def test_a_loop_that_never_writes_an_answer_says_so_in_the_same_words(monkeypatch):
+    async def _always_requests(**_kw):
+        return ("", _request({"subjects": ["NVDA"], "want": ["revenue"], "window": "12m"}))
 
-    _stub_llm(monkeypatch, _always_thinks)
-    _stub_tools(monkeypatch, {"noted": True})
-    store: list = []
-    out = await handle_message(_factory(store), "sess_2", "how did NVDA do?", max_turns=2)
+    _stub_llm(monkeypatch, _always_requests)
+    session = _stub_tools(monkeypatch, _run_result())
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_2", "how did NVDA do?", max_turns=2)
 
     assert out["text"] == _GATE_EXHAUSTED_TEXT
     assert out["meta"]["gate"] == "exhausted"
+    assert out["meta"]["gate_refusals"] == []            # empty, not absent: the check never ran
 
 
 @pytest.mark.asyncio
 async def test_the_failure_is_persisted_and_marked_not_swallowed(monkeypatch):
-    """A 200 with a marked message, not a 500 and not silence. The chat_turn
-    quota was charged and committed before the loop began, the work was really
-    done, and dropping the turn would leave the user's question in the
-    transcript with no reply and nothing to explain it."""
     async def _no_tools(**_kw):
-        return ("whatever", None)
+        return ("NVDA is 42% of the book.", None)
 
     _stub_llm(monkeypatch, _no_tools)
-    _stub_tools(monkeypatch, {"noted": True})
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
     store: list = []
-    await handle_message(_factory(store), "sess_3", "hello?", max_turns=1)
+    await handle_message(_factory(store), "sess_3", "hello?", max_turns=4)
 
     assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
     assert len(assistant) == 1
@@ -171,187 +172,151 @@ async def test_the_failure_is_persisted_and_marked_not_swallowed(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_an_accepted_answer_carries_no_marker(monkeypatch):
-    """The marker must mean something, so it has to be absent on the happy path."""
-    async def _responds(**_kw):
-        return ("", [{"id": "c1", "function": {"name": "respond",
-                                               "arguments": _BLOCKS("Hello.")}}])
+    async def _greets(**_kw):
+        return ("Hello. Ask me about a holding or an issuer.", None)
 
-    _stub_llm(monkeypatch, _responds)
-    _stub_tools(monkeypatch, _ACCEPTED("Hello."))
-    store: list = []
-    out = await handle_message(_factory(store), "sess_4", "hi", max_turns=4)
+    _stub_llm(monkeypatch, _greets)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_4", "hi", max_turns=4)
 
-    assert out["text"] == "Hello."
+    assert out["text"] == "Hello. Ask me about a holding or an issuer."
     assert "gate" not in out["meta"]
-
-
-@pytest.mark.asyncio
-async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
-    """V3-B0. Measurement, not policy: B1 refuses on this number and B3's
-    go/no-go on summarisation is decided by its distribution, so it has to exist
-    before either. The count includes the tool schemas, which are sent on every
-    request and appear nowhere in `messages` — a bare system prompt already costs
-    thousands of tokens once they are counted."""
-    async def _no_tools(**_kw):
-        return ("whatever", None)
-
-    _stub_llm(monkeypatch, _no_tools)
-    # The real face, because the count is the thing under test and an empty tool
-    # list would pass the assertion below for the wrong reason — by being small
-    # enough to fail it. This is the list the mount serves for FACE_META_AGENT.
-    _stub_tools(monkeypatch, {"noted": True},
-                tools=build_meta_registry().schemas(faces.FACE_META_AGENT))
-    store: list = []
-    out = await handle_message(_factory(store), "sess_5", "hello?", max_turns=1)
-
-    assert out["meta"]["prompt_tokens"] > 1000, "tool schemas must be in the count"
-    assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
-    assert assistant[0].meta["prompt_tokens"] == out["meta"]["prompt_tokens"]
 
 
 @pytest.mark.asyncio
 async def test_the_refusal_does_not_claim_a_cause_it_did_not_see(monkeypatch):
-    """V7-Q2. The sentence asserted WHY: "every attempt either cited evidence I
-    had not actually retrieved or stated a figure I could not trace back to a
-    source." On the path this test drives, there was no attempt at all — the
-    model never reached the gate — so the user was told, confidently, about a
-    citation failure that never happened.
-
-    That is not a wording nit. It is what a reader takes away from a system whose
-    entire claim is that it does not state things it cannot support: the one
-    sentence it emits when it fails was the one sentence nothing checked. It was
-    also actively misleading in the incident that prompted this — the gate had
-    refused for an exhausted tool budget, and the user went looking at citations.
-
-    The refusal still converges on ONE wording, which is the property the rest of
-    this module pins. What changed is that the wording now describes the BAR
-    rather than diagnosing the miss, so it is true however the turn ended."""
     async def _no_tools(**_kw):
         return ("NVDA revenue was $999.9B.", None)
 
     _stub_llm(monkeypatch, _no_tools)
-    _stub_tools(monkeypatch, {"noted": True})
-    out = await handle_message(_factory([]), "sess_cause", "how did NVDA do?", max_turns=1)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_cause", "how did NVDA do?", max_turns=4)
 
     assert out["meta"]["gate"] == "exhausted"
     assert "cited evidence I had not actually retrieved" not in out["text"]
-    assert "stated a figure I could not trace" not in out["text"]
-    # And it still says the two things a person needs: it did not get there, and
-    # what to do next.
     assert "narrow the question" in out["text"]
 
 
 @pytest.mark.asyncio
-async def test_what_the_gate_actually_refused_is_recorded_for_the_desk(monkeypatch):
-    """The cause leaves the sentence and lands in meta, where it is machine
-    readable and cannot mislead anybody.
+async def test_every_turn_records_what_its_prompt_cost(monkeypatch):
+    """The count includes the one tool schema and the briefing, which appear on
+    every request; a bare system prompt already costs hundreds of tokens once
+    they are counted."""
+    async def _greets(**_kw):
+        return ("Hello.", None)
 
-    Diagnosing the incident meant reconstructing the turn from agent_steps by
-    hand, because the persisted message said only `gate: exhausted` — the marker
-    recorded THAT the gate never opened and never what it said. These codes are
-    exactly what would have answered it in one query."""
-    async def _always_responds(**_kw):
-        return ("", [{"id": "c1", "function": {"name": "respond",
-                                               "arguments": _BLOCKS("x", slot=True)}}])
+    _stub_llm(monkeypatch, _greets)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    store: list = []
+    out = await handle_message(_factory(store), "sess_5", "hello?", max_turns=1)
 
-    _stub_llm(monkeypatch, _always_responds)
-    # The shape a V15 refusal really has: the code, and one problem per pointer.
-    _stub_tools(monkeypatch, {"error": "not_on_table",
-                              "problems": [{"id": "run_never_read", "reason": "not_on_table"}],
-                              "detail": "every id an answer points at must be on the table"})
-    out = await handle_message(_factory([]), "sess_codes", "how did NVDA do?", max_turns=3)
+    assert out["meta"]["prompt_tokens"] > 500, "the request tool's schema must be in the count"
+    assistant = [m for m in store if getattr(m, "role", None) == "assistant"]
+    assert assistant[0].meta["prompt_tokens"] == out["meta"]["prompt_tokens"]
 
-    assert out["meta"]["gate"] == "exhausted"
-    assert out["meta"]["gate_refusals"] == ["not_on_table"] * 3
 
+# ── the analyst asks, the broker fetches, the check reads what was fetched ───
 
 @pytest.mark.asyncio
-async def test_a_turn_that_never_reached_the_gate_records_no_refusals(monkeypatch):
-    """Empty, not absent: "the gate said nothing" and "nobody recorded what the
-    gate said" must not look the same to whoever reads this next."""
-    async def _always_thinks(**_kw):
-        return ("", [{"id": "c1", "function": {"name": "think", "arguments": '{"thought":"hm"}'}}])
-
-    _stub_llm(monkeypatch, _always_thinks)
-    _stub_tools(monkeypatch, {"noted": True})
-    out = await handle_message(_factory([]), "sess_norefuse", "how did NVDA do?", max_turns=2)
-
-    assert out["meta"]["gate_refusals"] == []
-
-
-# ── a spent budget narrows the face (2026-08-29) ────────────────────────────────
-
-def _face(*names):
-    return [{"type": "function",
-             "function": {"name": n, "description": "", "parameters": {}}} for n in names]
-
-
-@pytest.mark.asyncio
-async def test_a_spent_budget_narrows_the_face_to_its_exits(monkeypatch):
-    """The wrapper refuses a call over budget with a structured return, and the
-    loop used to hand that to the model and go round again: sess_1c71b5fb7f79
-    made 65 refused calls after its fifteenth, each a ~12k-token round trip on
-    a state where no evidence could arrive. The budget bounds EVIDENCE, so once
-    it is spent the only tools that can still do anything are the pause and the
-    exit — and the loop now offers exactly those, which is the skip-flag rule
-    (remove the capability, do not refuse it inside) applied to the rest of a
-    turn. The model can still answer with what it gathered."""
-    offered: list[list[str]] = []
+async def test_a_request_is_fulfilled_and_the_figure_it_returned_can_be_stated(monkeypatch):
+    prompts: list[list[dict]] = []
 
     async def _chat(messages, tools, **_kw):
-        offered.append([t["function"]["name"] for t in tools])
-        if len(offered) == 1:
-            return ("", [{"id": "c1", "function": {
-                "name": "get_flow", "arguments": '{"ticker":"NVDA","metric":"revenue"}'}}])
-        return ("", [{"id": "c2", "function": {
-            "name": "respond", "arguments": _BLOCKS("Here is what I have.")}}])
+        prompts.append(list(messages))
+        assert [t["function"]["name"] for t in tools] == [evidence_request.TOOL_NAME]
+        if len(prompts) == 1:
+            return ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}))
+        return ("MSFT is 16.0% of the book.", None)
 
     _stub_llm(monkeypatch, _chat)
-    _stub_tools(
-        monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
-        by_name={"get_flow": {"error": "budget_exceeded", "kind": "turn_tool",
-                              "used": 15, "limit": 15},
-                 "respond": _ACCEPTED("Here is what I have.")})
-    out = await handle_message(_factory([]), "sess_5", "everything about NVDA", max_turns=4)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_6", "how big is MSFT in the book?", max_turns=4)
 
-    assert offered[0] == ["get_flow", "think", "respond"]
-    assert offered[1] == ["think", "respond"]
-    assert out["text"] == "Here is what I have."
+    assert [n for n, _ in session.calls] == ["run"]                      # the broker ran one program
+    assert session.calls[0][1]["program"]["let"], "a compiled program went to the face"
+    digest = json.loads([m for m in prompts[1] if m.get("role") == "tool"][0]["content"])
+    assert digest["items"][0]["figures"][0]["id"] == "f_wmsft0001"
+    assert digest["items"][0]["figures"][0]["value"] == "16.0%"           # as the reader will see it
+    assert out["text"] == "MSFT is 16.0% of the book."
+    assert out["citations"] == ["f_wmsft0001"]
+    assert out["meta"]["format"] == "blocks" and out["meta"]["verified"]["figures"] == 1
+    assert "gate" not in out["meta"]
+    assert out["meta"]["requests"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_refused_reply_is_told_every_problem_and_the_second_attempt_can_pass(monkeypatch):
+    prompts: list[list[dict]] = []
+
+    async def _chat(messages, tools, **_kw):
+        prompts.append(list(messages))
+        if len(prompts) == 1:
+            return ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}))
+        if len(prompts) == 2:
+            return ("MSFT is 16.0% of the book, up from 12.5% last year, the largest holding.", None)
+        return ("MSFT is 16.0% of the book.", None)
+
+    _stub_llm(monkeypatch, _chat)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_7", "how big is MSFT?", max_turns=6)
+
+    told = [m for m in prompts[2] if m.get("role") == "user"][-1]["content"]
+    assert "unsourced_figure" in told and "12.5%" in told
+    assert "superlative_without_rank" in told
+    assert out["text"] == "MSFT is 16.0% of the book."
     assert "gate" not in out["meta"]
 
 
 @pytest.mark.asyncio
-async def test_only_an_evidence_pool_running_dry_narrows_the_face(monkeypatch):
-    """The narrowing keys on WHICH pool is empty. A refusal of any other kind —
-    here the external-search pool, which this face does not even carry — leaves
-    the face as it was: nothing about evidence has been settled by it."""
-    offered: list[list[str]] = []
+async def test_a_call_to_a_tool_the_analyst_does_not_have_is_answered_not_dispatched(monkeypatch):
+    prompts: list[list[dict]] = []
 
     async def _chat(messages, tools, **_kw):
-        offered.append([t["function"]["name"] for t in tools])
-        if len(offered) == 1:
-            return ("", [{"id": "c1", "function": {"name": "get_flow", "arguments": "{}"}}])
-        return ("", [{"id": "c2", "function": {
-            "name": "respond", "arguments": _BLOCKS("Hi.")}}])
+        prompts.append(list(messages))
+        if len(prompts) == 1:
+            return ("", [{"id": "c9", "function": {"name": "run", "arguments": "{}"}}])
+        return ("Hello.", None)
 
     _stub_llm(monkeypatch, _chat)
-    _stub_tools(
-        monkeypatch, {"noted": True}, tools=_face("get_flow", "think", "respond"),
-        by_name={"get_flow": {"error": "budget_exceeded", "kind": "external_search",
-                              "used": 5, "limit": 5},
-                 "respond": _ACCEPTED("Hi.")})
-    await handle_message(_factory([]), "sess_6", "hi", max_turns=4)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_8", "hi", max_turns=4)
 
-    assert offered[1] == ["get_flow", "think", "respond"]
+    assert session.calls == []
+    answered = json.loads([m for m in prompts[1] if m.get("role") == "tool"][0]["content"])
+    assert answered["error"] == "unknown_tool"
+    assert out["text"] == "Hello."
 
 
-def test_the_budget_free_names_mirror_the_registry_budget_free_classes():
-    """Two spellings of one decision. The registry says which CLASSES cost no
-    budget; the loop, which cannot see classes from its side of the mount,
-    says which NAMES it keeps. If either side changes, this is where it shows."""
-    from exposure_workbench.tools.registry import BUDGET_FREE_CLASSES
+@pytest.mark.asyncio
+async def test_an_empty_completion_is_nudged_to_write_or_ask(monkeypatch):
+    prompts: list[list[dict]] = []
 
-    reg = build_meta_registry()
-    by_class = {n for n in faces.FACE_META_AGENT
-                if reg.tools[n].tool_class in BUDGET_FREE_CLASSES}
-    assert by_class == set(meta_agent._BUDGET_FREE_TOOLS)
+    async def _chat(messages, tools, **_kw):
+        prompts.append(list(messages))
+        return ("", None) if len(prompts) == 1 else ("Hello.", None)
+
+    _stub_llm(monkeypatch, _chat)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_9", "hi", max_turns=4)
+
+    assert prompts[1][-1] == {"role": "user", "content": meta_agent._WRITE_OR_ASK}
+    assert out["text"] == "Hello."
+
+
+def test_the_analysts_only_tool_is_not_a_registry_tool():
+    """The budget bounds EVIDENCE, and the analyst retrieves none itself: its one
+    tool is in-process, on no face, and every call the broker makes on its
+    behalf goes through the face and is charged there."""
+    from exposure_workbench.tools import faces
+    from exposure_workbench.tools.registries import build_meta_registry
+
+    assert meta_agent._BUDGET_FREE_TOOLS == (evidence_request.TOOL_NAME,)
+    assert evidence_request.TOOL_NAME not in build_meta_registry().tools
+    assert evidence_request.TOOL_NAME not in faces.FACE_META_AGENT

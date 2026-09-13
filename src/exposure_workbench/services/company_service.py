@@ -31,7 +31,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.db.models import Company, SecurityMaster
+from exposure_workbench.db.models import Company, FilingChunk, FinancialFact, SecurityMaster
 from exposure_workbench.services import security_master_service as sms
 from exposure_workbench.utils import cik as cik_util
 
@@ -74,6 +74,24 @@ async def get_by_ticker(db: AsyncSession, ticker: str) -> Company:
     if company is None:
         raise CompanyNotFound(ticker)
     return company
+
+
+async def ready_company_ids(db: AsyncSession, company_ids) -> set[str]:
+    """Which of these companies the desk can answer about now: at least one
+    filed fact AND at least one indexed filing chunk. This is the readiness
+    workflow's own test (issuer_research_workflow._is_ready reads it), asked of
+    many companies at once. `start` registers a company as investigable the
+    moment it is asked for; its facts and chunks arrive minutes later — until
+    they do, the company is preparing, and a catalogue that listed it as
+    prepared sent the V33 B round asking about issuers with nothing filed."""
+    ids = list(dict.fromkeys(company_ids))
+    if not ids:
+        return set()
+    with_facts = set((await db.execute(
+        select(FinancialFact.company_id).where(FinancialFact.company_id.in_(ids)).distinct())).scalars().all())
+    with_chunks = set((await db.execute(
+        select(FilingChunk.company_id).where(FilingChunk.company_id.in_(ids)).distinct())).scalars().all())
+    return with_facts & with_chunks
 
 
 async def require_investigable(db: AsyncSession, ticker: str) -> Company:

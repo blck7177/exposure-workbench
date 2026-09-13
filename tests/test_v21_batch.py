@@ -18,8 +18,6 @@ import json
 import pytest
 
 from exposure_workbench.agents import batch, meta_agent, research_session
-from exposure_workbench.agents.meta_agent import handle_message
-from tests.test_meta_agent_gate import _ACCEPTED, _BLOCKS, _face, _factory, _stub_llm, _stub_tools
 
 
 class _Session:
@@ -191,72 +189,27 @@ def test_unparseable_arguments_are_an_empty_dict_not_a_crash():
 
 # ── the loops use it ──────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
-async def test_the_meta_loop_hands_the_model_every_result_and_only_sends_the_first(monkeypatch):
-    """Through handle_message: ten calls in one message, one round trip, ten
-    tool messages in the next prompt, and the model's next turn can respond."""
-    prompts: list[list[dict]] = []
-
-    async def _chat(messages, tools, **_kw):
-        prompts.append(list(messages))
-        if len(prompts) == 1:
-            return ("", TEN)
-        return ("", [_tc(99, "respond", **json.loads(_BLOCKS("Here.")))])
-
-    _stub_llm(monkeypatch, _chat)
-    session = _stub_tools(
-        monkeypatch, {"ok": True, "table": {}}, tools=_face("evaluate_formula", "think", "respond"),
-        by_name={"evaluate_formula": UNKNOWN_FORMULA, "respond": _ACCEPTED("Here.")})
-    # The loop's recorder opens db_factory sessions; the fake store takes them.
-    out = await handle_message(_factory([]), "sess_b1", "rank by net income", max_turns=4)
-
-    sent = [n for n, _ in session.calls]
-    assert sent == ["evaluate_formula", "respond"]
-    tool_msgs = [m for m in prompts[1] if m.get("role") == "tool"]
-    assert [m["tool_call_id"] for m in tool_msgs] == [f"c{i}" for i in range(10)]
-    assert json.loads(tool_msgs[0]["content"])["error"] == "unknown_formula"
-    assert json.loads(tool_msgs[9]["content"])["error"] == batch.NOT_ATTEMPTED
-    assert out["text"] == "Here."
-
-
-@pytest.mark.asyncio
-async def test_the_meta_loop_still_narrows_the_face_when_the_pool_empties_mid_batch(monkeypatch):
-    """The V3 narrowing keyed on the wrapper's budget_exceeded; it now keys on
-    the same predicate the dispatcher uses, so the held calls after it do not
-    need to carry the wrapper's shape to keep the narrowing."""
-    offered: list[list[str]] = []
-    spent = {"error": "budget_exceeded", "kind": "turn_tool", "used": 15, "limit": 15}
-
-    async def _chat(messages, tools, **_kw):
-        offered.append([t["function"]["name"] for t in tools])
-        if len(offered) == 1:
-            return ("", [_tc(0, "get_flow", ticker="A", metric="revenue"),
-                         _tc(1, "get_flow", ticker="B", metric="revenue")])
-        return ("", [_tc(2, "respond", **json.loads(_BLOCKS("Done.")))])
-
-    _stub_llm(monkeypatch, _chat)
-    session = _stub_tools(monkeypatch, {"ok": True}, tools=_face("get_flow", "think", "respond"),
-                          by_name={"get_flow": spent, "respond": _ACCEPTED("Done.")})
-    await handle_message(_factory([]), "sess_b2", "q", max_turns=4)
-
-    assert [n for n, _ in session.calls] == ["get_flow", "respond"]
-    assert offered[1] == ["think", "respond"]
-
-
-def test_both_loops_dispatch_through_the_one_module():
-    """Two loops, one rule. A second spelling of "stop at the first refusal"
-    would agree with this one until somebody changed it."""
-    for mod in (meta_agent, research_session):
-        src = inspect.getsource(mod)
-        assert "batch.dispatch(" in src, mod.__name__
-        assert "tools_session.call(" not in src, f"{mod.__name__} still calls the face directly"
+def test_the_research_loop_dispatches_through_the_one_module_and_the_analyst_dispatches_nothing():
+    """V33: the research loop still batches its own tool calls through this
+    module. The analyst loop makes no tool calls at all — its one tool is
+    in-process — and the evidence broker that calls the face on its behalf
+    does so one call at a time, through the transport (tools_session.call),
+    never through invoke()."""
+    from exposure_workbench.agents import evidence_broker
+    src = inspect.getsource(research_session)
+    assert "batch.dispatch(" in src
+    assert "tools_session.call(" not in src
+    meta_src = inspect.getsource(meta_agent)
+    assert "batch.dispatch(" not in meta_src and "tools_session.call(" not in meta_src
+    assert "self._tools.call(" in inspect.getsource(evidence_broker)
 
 
 def test_the_free_names_each_loop_spells_are_its_faces_budget_free_classes():
     from exposure_workbench.tools import faces, registry as R
     from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
-    for reg, face, spelled in ((build_meta_registry(), faces.FACE_META_AGENT, meta_agent._BUDGET_FREE_TOOLS),
-                               (build_research_registry(), faces.FACE_RESEARCH, research_session._BUDGET_FREE_TOOLS)):
-        free = sorted(n for n in face if reg.tools[n].tool_class in R.BUDGET_FREE_CLASSES)
-        assert free == sorted(spelled)
+    reg, face, spelled = build_research_registry(), faces.FACE_RESEARCH, research_session._BUDGET_FREE_TOOLS
+    free = sorted(n for n in face if reg.tools[n].tool_class in R.BUDGET_FREE_CLASSES)
+    assert free == sorted(spelled)
+    # the analyst's one tool is on no face: nothing it calls is budgeted, because it calls nothing
+    assert meta_agent._BUDGET_FREE_TOOLS[0] not in build_meta_registry().tools

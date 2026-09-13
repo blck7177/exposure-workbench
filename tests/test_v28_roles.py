@@ -369,7 +369,10 @@ def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
     # V30: the chat exit's rule is services/claims.PROSE_RULE (digits allowed when
     # the ledger accounts for them); gate.PROSE_RULE stays the brief path's until D5.
     from exposure_workbench.services import claims
-    assert claims.PROSE_RULE in meta_agent._SYSTEM
+    # V33: the chat exit is prose checked by services/answer_check; the analyst is
+    # told the one rule that check enforces, in its own words. claims.PROSE_RULE
+    # stays the brief path's (submit_brief) and the registry's.
+    assert "every number you write is one the desk showed you" in meta_agent._SYSTEM
     assert claims.PROSE_RULE in mcp_server.INSTRUCTIONS
     assert claims.PROSE_RULE in build_meta_registry().tools["respond"].description
     assert gate._FIX.startswith(gate.PROSE_RULE)

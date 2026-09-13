@@ -1,88 +1,73 @@
-"""Meta-agent (M10) — the single conversational entity the user talks to.
+"""The analyst (V33) — the single conversational entity the user talks to.
 
-A thin tool-calling loop: it answers directly with the read tools when data is
-ready, delegates heavy/unready work (non-blocking) and reports the run id, and
-exits by calling respond. The system prompt states the role and the evidence
-discipline's WHY — it is not a rulebook, because the architecture (ids required
-to cite, wrapper-enforced budget/trace) is what actually constrains behaviour.
+Two jobs used to share this loop's context: deciding what to look at, and
+transcribing that decision into a typed program and a typed claims list. The
+20-question round (docs/spikes/v33) measured the cost — 8 completions a turn,
+68% of exits refused, and twelve of nineteen accepted answers false to a reader
+for reasons the transcription hid. Here the loop holds ONE tool, request_evidence,
+and its exit is plain text.
 
-Its tools arrive over an MCP client from the resident tool face (MCP_PLAN P3,
-R4): the same registry behind the same wrapper, reached the way this
-architecture has said the agent face is reached since M10 — which until P3 it
-was not, and which since R4 is a request to a container of its own.
+    read : the role and one rule; the briefing (the desk's map for the subjects
+           the question names — names, dates, coverage, never a figure); the
+           skill's domain knowledge for the question; the digests that come back
+    write: request_evidence(items), decision-level (subjects, the desk's names
+           for what is wanted, a window, a comparison); then prose
+
+The evidence broker (agents/evidence_broker.py) does the tools: it compiles or
+writes the program, runs it under the same session's token, and returns every
+figure with its id. The answer check (services/answer_check.py) reads the prose
+against the session ledger and refuses with every problem at once; the analyst
+gets one rewrite. Nothing reaches the user that the check did not accept.
 
 History is persisted as agent_messages so a session survives across turns.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import batch, repeats as rp
+from exposure_workbench.agents import evidence_broker, evidence_request
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import skill
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
-from exposure_workbench.services import claims, context_budget
+from exposure_workbench.services import answer_check, briefing as briefing_svc, context_budget, ledger as ledger_svc, trace_service
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = """You are the analyst for a portfolio risk & issuer-intelligence desk. The \
-analysis is your job: take the question apart, decide what to look at and what to \
-compare, get the figures, and say what the evidence shows and what it means for the \
-question asked — its implication for this book and what would change your reading. \
-describe(subject) is where you look first: what the desk holds about a ticker, a \
-portfolio, a run or a scenario, what is NOT held and why, and the methods and \
-procedures that apply; a book question starts at describe() with no subject, which \
-lists the portfolios and their ids — never guess an id.
+_SYSTEM = """You are the analyst for a portfolio risk & issuer-intelligence desk. The analysis is your job: take \
+the question apart, decide what to look at and what to compare, ask the desk for the evidence, and say what it \
+shows and what it means for the question asked — its implication for this book and what would change your reading.
 
-Figures come from ONE tool: run(program). Write the whole computation as one program \
-— the reads, the methods over lists of subjects, the arithmetic, the ranking, the \
-change, the scenario — and every node comes back typed, dated and on the ledger as a \
-fact (f_…). A superlative rests on a rank node; a change on yoy/qoq or two readings; \
-the prior run is run(which='prev'); a name in a program is a variable, never a \
-measure. A node that refuses says why; fix the program, do not guess. Filing text is \
-read_filings; what the filings cannot hold is search_web; work that is not ready is start.
+You compute and fetch nothing yourself. request_evidence(items) is how you ask: name the subjects (tickers, port_… \
+ids) and what you want about them in the desk's own names from the BRIEFING, with a window and a comparison where \
+the question has one. The desk returns every figure with its id and identity, passages to quote, and what it could \
+not do. Ask for everything a first pass needs in one request; ask again only for what the answer still lacks. \
+Check the question's premises against the briefing first (which holdings are in which sector, what the desk holds).
 
-The answer is CLAIMS and PROSE (respond). Each figure you state is a claim with a \
-relation its facts must fit — level, change, ratio, rank, room, absent, quote, series, \
-table — and the prose writes {cN} where the figure goes. """ + claims.PROSE_RULE + """ \
-A figure the desk does not hold is an absence fact: claim it as absent and say why \
-(not filed; not held as a figure; no method) — never a nearby figure wearing the \
-asked-for name, never an estimate.
+Your reply is plain prose, and every number you write is one the desk showed you, written as it was shown \
+(16.0%, $10.63M, 0.78×). When one number stands under two ids, put the id after it in brackets [f_…]. A table or a \
+chart is [table: <node>] or [chart: <node>], naming a node from the evidence. Quote a passage's words verbatim \
+inside quotation marks. A superlative rests on an ordering the desk computed (compare: rank). What the desk could \
+not do or does not hold, say so in words and say what you gave instead — never an estimate, never a figure carried \
+from one company or date to another, never a nearby figure under the asked-for name.
 
-Finish every turn by calling respond. If respond refuses, it names the claim or the \
-number and the reason: fix that claim, run the program that produces the figure, or drop it."""
+If your reply is not accepted, you are told every problem and its fix; fix them all in one rewrite. You have two."""
 
 
-# What the user is told when the loop ended without the gate ever accepting an
-# answer. TWO paths reach it and both must, because they are the same event: the
-# model stopped calling tools on the last turn, or it spent every turn without a
-# respond the gate would take. The first used to substitute the model's raw
-# content as the answer — an ungated reply, with citations=[], indistinguishable
-# from a verified one — and the second used to emit "(no response produced)",
-# which reads like a bug rather than a refusal.
-# ONE wording for both paths — that convergence is the property above, and it
-# stays. What this sentence must NOT do is diagnose: it used to end "every
-# attempt either cited evidence I had not actually retrieved or stated a figure
-# I could not trace back to a source", which is a claim about a cause, asserted
-# by the one code path nothing checks. On the first path there is no attempt to
-# describe. And in the turn that prompted this (V7-Q2) the real cause was an
-# exhausted tool budget, so the user was pointed at citations that were never
-# the problem — a system whose whole claim is that it does not say what it
-# cannot support, saying exactly that, in its failure message.
-#
-# So it states the BAR and that the turn did not clear it, which is true however
-# the turn ended. The cause is not lost, it moves to meta, where it is machine
-# readable and cannot mislead a reader.
+# What the user is told when the turn ended without an accepted answer. ONE
+# wording for every path to it (the model never wrote an answer, or every
+# answer it wrote was refused); it states the bar, not a cause, because the
+# cause is in meta where it cannot mislead a reader (V7-Q2).
 _GATE_EXHAUSTED_TEXT = (
     "I could not produce an answer I can stand behind for this turn — everything "
     "I state has to trace back to evidence I actually retrieved, and I did not "
@@ -90,24 +75,18 @@ _GATE_EXHAUSTED_TEXT = (
 )
 _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
-
-# How much of one tool result reaches the model. Entries come off the tail of the
-# largest container and are named in a `truncated` field, so a payload that does
-# not fit says so — see utils.json.dumps_capped. V24: a result is a `facts`
-# block (capped where it is built, services/facts.FACTS_CHAR_LIMIT, whole facts
-# only) beside a `note` in which each figure stands as its fact id; the note is
-# what this cap bounds. The ceiling stays where V15 derived it: the context soft
-# limit is 80k tokens over at most fifteen calls a turn, and no turn makes
-# fifteen calls this large.
+# How much of one tool result reaches the model (research_session reads this too).
 TOOL_RESULT_LIMIT = 28_000
 
+# The rewrites an answer gets: the first refusal lists every problem, the
+# second ends the turn. Decided 2026-09-13 with the natural-language exit.
+MAX_ANSWER_ATTEMPTS = 2
 
-# What a turn keeps once its evidence budget is spent: the pause and the exit.
-# The registry decides this by CLASS (BUDGET_FREE_CLASSES) and this side of the
-# mount cannot read classes — the loop holds a face name and a token, not the
-# registry — so the same decision is spelled here by name, and
-# test_meta_agent_gate pins the two spellings together.
-_BUDGET_FREE_TOOLS = ("think", "respond")
+# The only tool on the analyst's face. Kept as a tuple for the tests that pin
+# the budget-free names: the analyst's tool retrieves nothing itself.
+_BUDGET_FREE_TOOLS = (evidence_request.TOOL_NAME,)
+
+_WRITE_OR_ASK = "Write the answer, or request the evidence you still need."
 
 
 async def _load_history(db, session_id: str) -> list[dict]:
@@ -118,6 +97,48 @@ async def _load_history(db, session_id: str) -> list[dict]:
     return [{"role": m.role, "content": m.content or ""} for m in rows]
 
 
+async def _briefing(db_factory, text: str) -> dict:
+    """The desk's map for the question's subjects; a failure to build it is a
+    turn without a map, not a lost turn."""
+    try:
+        async with db_factory() as db:
+            return await briefing_svc.for_question(db, text)
+    except Exception as exc:  # noqa: BLE001 — logged; the analyst can still request evidence by name
+        logger.exception("briefing failed")
+        return {"unavailable": type(exc).__name__}
+
+
+async def _load_ledger(db_factory, session_id: str):
+    async with db_factory() as db:
+        return await ledger_svc.load(db, session_id)
+
+
+async def _record_answer(db_factory, session_id: str, message_id: str, text: str, verdict) -> None:
+    try:
+        async with db_factory() as db:
+            await trace_service.record_step(
+                db, session_id, step_type="answer", tool_name="answer", args={"text": text[:4000]},
+                result_summary=("accepted" if verdict.ok else f"refused: {verdict.error}; {verdict.detail}"),
+                evidence_refs=[], status="completed" if verdict.ok else "rejected", message_id=message_id)
+            await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("could not record answer step for %s", session_id)
+
+
+def _refusal_message(verdict) -> str:
+    lines = [f"Your reply was not accepted: {len(verdict.problems)} problem(s), each with its fix. "
+             f"Rewrite the whole reply once, fixing all of them — or request the evidence you lack first."]
+    for p in verdict.problems[:20]:
+        what = p.get("figure") or p.get("id") or p.get("node") or p.get("quote") or p.get("word") or p.get("phrase") or ""
+        line = f"- {p['at']} {p['reason']}" + (f" ({what!r})" if what else "")
+        if p.get("fix"):
+            line += f": {p['fix']}"
+        if p.get("candidates"):
+            line += " candidates: " + "; ".join(f"[{c['id']}] {c.get('measure')} {c.get('subject')} {c.get('as_of')}" for c in p["candidates"][:4])
+        lines.append(line)
+    return "\n".join(lines)
+
+
 async def handle_message(
     db_factory,
     session_id: str,
@@ -125,168 +146,95 @@ async def handle_message(
     max_turns: int = 16,
     deny: Sequence[str] = (),
 ) -> dict:
-    """Run one user turn. Persists the user + assistant messages; returns the reply.
-
-    `deny` narrows the face for this turn alone, the way a research run's skip
-    flags do (tool_session): the names are absent from the tools the model is
-    offered, not present and refused. V30 Phase 0 uses it to take `start` off
-    the battery's face, so a measurement cannot change the book it measures
-    (X26). A route never passes it; the product face is the full face.
-    """
+    """Run one user turn. Persists the user + assistant messages; returns the reply."""
     message_id = new_id("msg_")
     async with db_factory() as db:
         db.add(AgentMessage(id=new_id("msg_"), session_id=session_id, role="user", content=user_text))
         await db.commit()
         history = await _load_history(db, session_id)
 
-    messages = [{"role": "system", "content": _SYSTEM}, *history]
-    # V30 Phase C: the domains this question is about, pushed — the skill's
-    # own programs and desk lines, matched lexically to the user's words
-    # (analytics/skill.match_domains). Pull (describe expand=<domain>) stays;
-    # this is the arm that does not wait for the model to ask. Recorded on the
-    # message so the two arms can be told apart in a battery.
+    brief = await _briefing(db_factory, user_text)
+    messages: list[dict] = [{"role": "system", "content": _SYSTEM},
+                            {"role": "system", "content": "BRIEFING — the desk's map for this question (names, dates and coverage; "
+                                                          "no figure here may be stated until it is requested):\n"
+                                                          + json.dumps(brief, ensure_ascii=False, default=str)}]
     pushed: list[str] = []
     if get_settings().push_domains:
         matched = skill.match_domains(user_text)
         if matched:
             pushed = [p.name for p in matched]
-            messages.append({"role": "system",
-                             "content": "For this question, the desk's own knowledge (its programs use <port>, <T>, "
-                                        "<T1>/<T2> placeholders: substitute the ids and tickers from describe()):\n\n"
-                                        + skill.push_text(matched)})
+            messages.append({"role": "system", "content": "The desk's own knowledge for this kind of question (how it compares and "
+                                                          "closes; the example programs show which names go together — you do not "
+                                                          "write programs, you request by name):\n\n" + skill.push_text(matched)})
+    messages += history
+
     reply_text, reply_citations = None, []
-    # What the gate matched, on the turn it accepted (V13-S3). Kept beside the
-    # reply rather than recomputed later: re-running the checker over a stored
-    # answer would be a SECOND judgement of the same text, free to disagree with
-    # the one that let it through, and the honest record is what the gate
-    # actually found at the moment it decided.
     reply_verified: dict | None = None
     reply_blocks: list | None = None
-    # What the gate refused, in order. Empty is a fact, not a gap: it means the
-    # turn never reached the gate, which is a different failure from one the gate
-    # turned away, and the two must not read the same afterwards.
     gate_refusals: list[str] = []
-
-    # The PEAK, not the first: messages grow with every tool result inside the
-    # turn, so the largest request is the last one, and the largest request is
-    # what a ceiling is about. B1 reads this back to decide the next turn.
     prompt_peak = 0
+    attempts = 0
+    requests = 0
 
-    # One connection for the turn, carrying the identity the turn runs under.
-    # That identity used to be fixed when the pair was built and is now minted
-    # into a token and sent with every request, which is what a resident face
-    # requires: the server outlives the turn, so it cannot hold the turn's
-    # tenant. The tenant still does not depend on which task the transport
-    # schedules a handler in — the door binds it per request instead.
     async with tool_session(
         faces.FACE_NAME_META, session_id=session_id,
         user_id=current_user_id(), message_id=message_id, deny=deny,
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
-        tools = tools_session.tools
-        held_recorder = batch.trace_recorder(db_factory, session_id, message_id)
-        # V31: the exit payloads this turn has already been refused.
-        repeated = rp.Repeats()
-        say_it_repeated: str | None = None
+        broker = evidence_broker.Broker(tools_session, llm, db_factory, session_id, message_id, brief)
+        tools = [evidence_request.REQUEST_TOOL]
 
-        for turn in range(max_turns):
+        for _turn in range(max_turns):
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
-            # No usage comes back. It used to, under the name `_usage`, and the
-            # underscore was the whole problem: the turn's only real cost was a
-            # value this loop was free to ignore. It is an llm_call row now,
-            # written on the way through (V4-S2). prompt_peak above stays exactly
-            # as it is — a tiktoken estimate bounding the NEXT turn is a different
-            # number from what the provider says it charged for this one, and
-            # B1 refuses on the estimate.
             content, tool_calls = await llm.chat(messages=messages, tools=tools)
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:
                 assistant_msg["tool_calls"] = tool_calls
             messages.append(assistant_msg)
 
-            if not tool_calls:
-                if turn >= max_turns - 1:
-                    # Deliberately NOT `reply_text = content`. Substituting the raw
-                    # model text here handed the user an answer that had passed no
-                    # gate, with citations=[], rendered exactly like a verified one.
-                    break
-                messages.append({"role": "user", "content": "Call respond to reply to the user."})
+            if tool_calls:
+                for tc in tool_calls:
+                    name = tc["function"]["name"]
+                    try:
+                        args = json.loads(tc["function"].get("arguments") or "{}")
+                    except json.JSONDecodeError:
+                        args = {}
+                    if name == evidence_request.TOOL_NAME:
+                        try:
+                            items = evidence_request.parse(args)
+                        except ValueError as exc:
+                            result: dict = {"error": "invalid_request", "detail": str(exc)}
+                        else:
+                            requests += 1
+                            result = await broker.fulfil(items)
+                    else:
+                        result = {"error": "unknown_tool",
+                                  "detail": f"the analyst has one tool, {evidence_request.TOOL_NAME}; the answer is your reply text"}
+                    messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                     "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
                 continue
 
-            # V21-S1. The message's calls go out in order and stop at the first
-            # refusal per tool (agents/batch.py): the held ones come back as
-            # not_attempted, so the model reads the refusal in this turn
-            # rather than after nine repeats of it.
-            dispatched = await batch.dispatch(
-                tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
-            stop_repeating = False
-            for tc, args, result in dispatched:
-                name = tc["function"]["name"]
-                messages.append({"role": "tool", "tool_call_id": tc["id"],
-                                 "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
-                if batch.is_pool_empty(result):
-                    # The budget bounds EVIDENCE (registry.invoke), and it is
-                    # spent: no further call on this face can return anything
-                    # the gate will accept. Narrow what is OFFERED on the next
-                    # turn instead of refusing what is called: the skip-flag
-                    # rule (faces.py) applied to the rest of a turn. The exit
-                    # and the pause stay, so what running out means is what
-                    # the wrapper promised — answer with the evidence gathered.
-                    #
-                    # What this does and does not cover, measured 2026-08-30.
-                    # sess_1c71b5fb7f79's 65 refused calls were ONE assistant
-                    # message of 69 parallel calls in its third turn, not
-                    # sixty-five turns; a batch is dispatched whole, so this
-                    # line would not have changed that session, and its cost
-                    # (65 MCP round trips, ~5.7k tokens of refusal payloads
-                    # carried into the next two prompts) is still paid. Across
-                    # every session that ever hit the budget, none issued a
-                    # read call in a LATER turn: the case guarded here has not
-                    # been observed. It stays because the loop had no bound on
-                    # it other than max_turns.
-                    tools = [t for t in tools if t["function"]["name"] in _BUDGET_FREE_TOOLS]
-                if name == "respond":
-                    if result.get("responded"):
-                        reply_text, reply_citations = result["text"], result.get("citations", [])
-                        reply_verified = result.get("verified")
-                        # V14-C. The blocks, with every slot carrying the value
-                        # the ledger holds. `text` beside them is the prose the
-                        # model wrote, which is what the quote and trajectory
-                        # checks read and what a caller with no block renderer
-                        # can still show — the figures are simply absent from
-                        # it, because they were never written into it.
-                        reply_blocks = result.get("blocks")
-                    elif result.get("error"):
-                        # Every refusal, in order. Diagnosing V7-Q2 meant
-                        # rebuilding the turn out of agent_steps by hand, because
-                        # the marker recorded that the gate never opened and
-                        # never what it said.
-                        gate_refusals.append(str(result["error"]))
-                        # V31 (agents/repeats.py): the same payload again is not
-                        # a second attempt. Say so once, then stop — three
-                        # baseline turns spent eight identical submissions each
-                        # and ended where they would have ended at two.
-                        seen = repeated.record(args)
-                        if seen > rp.STOP:
-                            stop_repeating = True
-                        elif seen == rp.STOP:
-                            say_it_repeated = rp.nudge("respond", result)
+            text = (content or "").strip()
+            if not text:
+                messages.append({"role": "user", "content": _WRITE_OR_ASK})
+                continue
 
-            if reply_text is not None:
+            led = await _load_ledger(db_factory, session_id)
+            verdict = answer_check.check(text, led, question=user_text)
+            await _record_answer(db_factory, session_id, message_id, text, verdict)
+            if verdict.ok:
+                acc = answer_check.accepted(text, verdict, led)
+                reply_text, reply_citations = acc["text"], acc["citations"]
+                reply_verified, reply_blocks = acc["verified"], acc["blocks"]
                 break
-            if stop_repeating:
-                # Out on the same path an exhausted gate takes: no answer is
-                # published that the gate did not accept.
+            attempts += 1
+            gate_refusals.append(verdict.error)
+            if attempts >= MAX_ANSWER_ATTEMPTS:
                 break
-            if say_it_repeated:
-                messages.append({"role": "user", "content": say_it_repeated})
-                say_it_repeated = None
+            messages.append({"role": "user", "content": _refusal_message(verdict)})
 
-    # The single convergence point for both ungated paths. The turn is still a
-    # 200 and the message is still persisted: the chat_turn quota was charged and
-    # committed before the loop started (routes/agent.py), the work really was
-    # done, and hiding the failure from the transcript would leave the user's
-    # question sitting there with no reply and no explanation.
-    meta: dict = {"prompt_tokens": prompt_peak, "pushed": pushed}
+    meta: dict = {"prompt_tokens": prompt_peak, "pushed": pushed, "requests": requests,
+                  "briefing_subjects": brief.get("subjects") if isinstance(brief, dict) else None,
+                  "writer_calls": getattr(broker, "writer_calls", 0)}
     if reply_verified is not None:
         meta["verified"] = reply_verified
     if reply_blocks is not None:
@@ -299,8 +247,6 @@ async def handle_message(
     async with db_factory() as db:
         db.add(AgentMessage(id=message_id, session_id=session_id, role="assistant",
                             content=reply_text, citations=reply_citations, meta=meta))
-        # Session-level, so the next turn can be refused before it is charged
-        # without reading the whole message history back first.
         await db.execute(
             update(AgentSession).where(AgentSession.id == session_id)
             .values(last_prompt_tokens=prompt_peak)

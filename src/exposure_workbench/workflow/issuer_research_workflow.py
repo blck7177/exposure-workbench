@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import select
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.errors import BriefNotSubmitted
 from exposure_workbench.agents.research_session import run_research_session
 from exposure_workbench.auth.context import current_user_id
-from exposure_workbench.db.models import Company, EvidencePack, FilingChunk, FinancialFact
+from exposure_workbench.db.models import Company, EvidencePack
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import company_service
 from exposure_workbench.services import evidence_trail_service as trail
@@ -34,13 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 async def _is_ready(db: AsyncSession, company_id: str) -> bool:
-    has_facts = (await db.execute(
-        select(FinancialFact.id).where(FinancialFact.company_id == company_id).limit(1)
-    )).scalar_one_or_none() is not None
-    has_chunks = (await db.execute(
-        select(FilingChunk.id).where(FilingChunk.company_id == company_id).limit(1)
-    )).scalar_one_or_none() is not None
-    return has_facts and has_chunks
+    """One definition of ready, shared with the catalogue (company_service.ready_company_ids)."""
+    return company_id in await company_service.ready_company_ids(db, [company_id])
 
 
 async def run_issuer_research(

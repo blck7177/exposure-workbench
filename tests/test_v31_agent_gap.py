@@ -20,7 +20,7 @@ import pathlib
 
 import pytest
 
-from exposure_workbench.agents import batch, repeats as rp
+from exposure_workbench.agents import batch, meta_agent, repeats as rp
 from exposure_workbench.services import fact_adapters as fa
 
 from tests.test_meta_agent_gate import (  # the loop harness, unchanged
@@ -29,74 +29,85 @@ from tests.test_meta_agent_gate import (  # the loop harness, unchanged
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
 
 
-# ── 1. an unchanged resubmission is not a second attempt ─────────────────────
+# ── 1. a refused answer gets one rewrite, told every problem ─────────────────
+#
+# V33 replaced the respond exit with prose checked against the ledger. The
+# bound is no longer on REPETITION (a byte-identical resubmission) but on
+# ATTEMPTS: the first refusal lists every problem with its fix, the second ends
+# the turn. What survives from V31 is the property: a turn that cannot satisfy
+# the check does not spend sixteen round trips finding out.
 
-_SAME = json.dumps({"claims": [{"id": "c1", "relation": "level", "of": "f_1"}],
-                    "prose": ["ExxonMobil's debt is 92% fixed-rate."]})
-_REFUSED = {"error": "unsourced_figure",
-            "problems": [{"at": "prose[0]", "reason": "unsourced_figure", "figure": "92%"}],
-            "detail": "every number in the prose is a fact's value or date on the ledger"}
+def _stub_desk(monkeypatch, session):
+    from exposure_workbench.services.ledger import Ledger
 
+    async def _no_briefing(_f, _t):
+        return {"subjects": {}}
 
-def _respond_call(args: str):
-    return [{"id": "c1", "function": {"name": "respond", "arguments": args}}]
+    async def _empty_ledger(_f, _s):
+        return Ledger()
+
+    async def _no_record(*_a, **_k):
+        return None
+    monkeypatch.setattr(meta_agent, "_briefing", _no_briefing)
+    monkeypatch.setattr(meta_agent, "_load_ledger", _empty_ledger)
+    monkeypatch.setattr(meta_agent, "_record_answer", _no_record)
 
 
 @pytest.mark.asyncio
-async def test_the_same_refused_answer_sent_again_and_again_stops_costing_turns(monkeypatch):
+async def test_the_same_refused_answer_sent_again_ends_the_turn_at_two(monkeypatch):
     """W01-xom-maturity-wall t2: eight byte-identical `respond` calls, 17.3k →
     24.7k prompt tokens, ending on the gate-exhausted text. It ends on the same
-    text now — nothing is published that the gate did not accept — at three."""
-    async def _always_the_same(**_kw):
-        return ("", _respond_call(_SAME))
+    text now — nothing is published that the check did not accept — at two."""
+    prompts: list = []
+
+    async def _always_the_same(**kw):
+        prompts.append(list(kw["messages"]))
+        return ("ExxonMobil's debt is 92% fixed-rate.", None)
 
     _stub_llm(monkeypatch, _always_the_same)
-    session = _stub_tools(monkeypatch, _REFUSED)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_r1", "is that fixed or floating", max_turns=16)
 
-    sent = [c for c in session.calls if c[0] == "respond"]
-    assert len(sent) == 1 + rp.STOP, f"three submissions, not sixteen: {len(sent)}"
-    assert out["text"] == _GATE_EXHAUSTED_TEXT, "the gate still decides what is published"
+    assert len(prompts) == meta_agent.MAX_ANSWER_ATTEMPTS, f"two attempts, not sixteen: {len(prompts)}"
+    assert out["text"] == _GATE_EXHAUSTED_TEXT, "the check still decides what is published"
     assert out["meta"]["gate"] == "exhausted"
 
 
 @pytest.mark.asyncio
-async def test_the_first_repeat_is_told_it_is_one_and_which_tokens_the_gate_named(monkeypatch):
-    """The model that re-sends has, on the evidence of three turns, not read
-    `problems`. So it is handed them again, with the fact that it repeated."""
-    seen_messages: list[list[dict]] = []
+async def test_the_refusal_names_the_token_and_the_reason_not_only_the_rule(monkeypatch):
+    prompts: list = []
 
     async def _always_the_same(**kw):
-        seen_messages.append(list(kw["messages"]))
-        return ("", _respond_call(_SAME))
+        prompts.append(list(kw["messages"]))
+        return ("ExxonMobil's debt is 92% fixed-rate.", None)
 
     _stub_llm(monkeypatch, _always_the_same)
-    _stub_tools(monkeypatch, _REFUSED)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
     await handle_message(_factory([]), "sess_r2", "is that fixed or floating", max_turns=16)
 
-    nudges = [m for turn in seen_messages for m in turn
-              if m["role"] == "user" and "byte-identical" in (m.get("content") or "")]
-    assert nudges, "the repeat is named"
-    said = nudges[0]["content"]
-    assert "prose[0]" in said and "92%" in said, f"the token, not just the rule: {said}"
-    assert "unsourced_figure" in said
+    told = [m for m in prompts[1] if m["role"] == "user"][-1]["content"]
+    assert "prose[0]" in told and "92%" in told and "unsourced_figure" in told, told
 
 
 @pytest.mark.asyncio
-async def test_an_answer_that_changes_is_never_held_however_many_times_it_is_sent(monkeypatch):
-    """The bound is on repetition, never on effort. A model working through its
-    refusals gets every turn it has."""
+async def test_an_answer_that_changes_still_has_only_the_attempts_the_design_gives(monkeypatch):
+    """The bound is on attempts now, by decision (2026-09-13): the first refusal
+    carries every problem, so a second refusal is a second failure to read it."""
     n = {"i": 0}
 
     async def _different_each_time(**_kw):
         n["i"] += 1
-        return ("", _respond_call(json.dumps({"claims": [], "prose": [f"try {n['i']}"]})))
+        return (f"try {n['i']}: revenue was {n['i'] + 40}%.", None)
 
     _stub_llm(monkeypatch, _different_each_time)
-    session = _stub_tools(monkeypatch, _REFUSED)
-    await handle_message(_factory([]), "sess_r3", "q", max_turns=6)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_r3", "q", max_turns=6)
 
-    assert len([c for c in session.calls if c[0] == "respond"]) == 6
+    assert n["i"] == meta_agent.MAX_ANSWER_ATTEMPTS
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure"] * meta_agent.MAX_ANSWER_ATTEMPTS
 
 
 def test_a_payload_reserialised_in_another_key_order_is_the_same_answer():
