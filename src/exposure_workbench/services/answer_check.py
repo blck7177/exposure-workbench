@@ -62,6 +62,10 @@ narrowest fastest slowest jumpiest leads leading dominant""".split())
 UP_WORDS = frozenset("rose up increased grew higher climbed expanded improved gained widened above outperformed".split())
 DOWN_WORDS = frozenset("fell down decreased declined lower dropped shrank narrowed slipped deteriorated weakened below underperformed".split())
 CHANGE_WORDS = frozenset("from to change changed moved moving move since versus vs against compared".split()) | UP_WORDS | DOWN_WORDS
+# A CHANGE IS CLAIMED, not merely worded: "from A to B", or a verb that moves.
+# A lone preposition does not claim one — "AAPL sits 3.9% from its 52-week high"
+# put two quantities in a sentence and was refused as a change (V33F Q17).
+CHANGE_VERBS = frozenset("change changed moved moving move".split()) | UP_WORDS | DOWN_WORDS
 TIER_WORDS = frozenset("warning breach limit tier room headroom cap".split())
 DATE_WORDS = ("started", "troughed", "peaked", "bottomed", "began", "ended", "recovered", "as of", "dated")
 TIER_SUFFIXES = ("warning_level", "breach_level", "limit_value")
@@ -121,6 +125,8 @@ def _is_tier(rec: dict) -> bool:
 # ordering: the deepest episode, a max drawdown, the first of a list. Such a
 # fact backs a superlative the way a rank entry does.
 _ORDER_WORDS = frozenset("deepest largest smallest highest lowest worst best top max min first last peak trough".split())
+MAX_WORDS = frozenset("largest biggest highest most top best widest deepest worst longest".split())
+MIN_WORDS = frozenset("smallest lowest least bottom weakest narrowest shortest".split())
 
 
 def _ordered(rec: dict) -> bool:
@@ -324,7 +330,8 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             sentence = blanked[s:e]
             linked = linked_by_sentence.get(si, [])
             words = _words(sentence)
-            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, phrases)
+            _check_sentence(v, i, sentence, s, words, linked, tokens, ledger, subjects_on_ledger, phrases,
+                            [pair for pairs in linked_by_sentence.values() for pair in pairs])
 
     v.refs = list(dict.fromkeys([*v.refs, *[l.get("primary") or fid for l in v.links.values() for fid in l["ids"][:1]]]))
     if v.problems:
@@ -411,6 +418,16 @@ def _pin(found: list[tuple[str, str | None]], ledger: Ledger, sentence: str,
             return next(iter(specific.values())), [], True
         if not specific:
             return next(iter(groups.values())), [], evidenced
+    # What is left may differ only in WHEN: one subject, one measure, one written
+    # figure, two dates. The sentence is true of both, so the reader is not being
+    # misled; the latest leads and the rest ride as aliases, and the page shows a
+    # chooser over them (V33E refused 38 figures of one book on this).
+    ident = {(_short_subject(ledger.by_id[g[0][0]].get("subject")) or ledger.by_id[g[0][0]].get("subject"),
+              ledger.by_id[g[0][0]].get("measure")) for g in groups.values()}
+    if len(ident) == 1:
+        ordered = sorted(groups.values(), key=lambda g: str(g[1] or ledger.by_id[g[0][0]].get("as_of") or ""), reverse=True)
+        latest = ordered[0]
+        return ([*latest[0], *[f for g in ordered[1:] for f in g[0]]], latest[1]), [], evidenced
     cands = [{"id": g[0][0], "measure": ledger.by_id[g[0][0]].get("measure"),
               "subject": ledger.by_id[g[0][0]].get("subject"), "as_of": g[1] or ledger.by_id[g[0][0]].get("as_of")}
              for g in list(groups.values())[:6]]
@@ -435,8 +452,35 @@ def _primary(alias_ids: list[str], ledger: Ledger, words: set[str]) -> str:
     return alias_ids[0]
 
 
+def _extreme_in(words: set[str], groups: list, para_linked: list) -> bool:
+    """Whether a figure this sentence calls extreme IS the extreme among the
+    paragraph's readings of its own measure. Facts, not English: the reader can
+    check it from the numbers in front of them, and so can this."""
+    want_max, want_min = bool(words & MAX_WORDS), bool(words & MIN_WORDS)
+    for recs in groups:
+        rec = recs[0]
+        measure, subject = rec.get("measure"), rec.get("subject")
+        peers = [r for _t, rs in para_linked for r in rs
+                 if r.get("measure") == measure and r.get("subject") != subject
+                 and isinstance(r.get("value"), (int, float))]
+        if not peers or not isinstance(rec.get("value"), (int, float)):
+            continue
+        vals = [float(r["value"]) for r in peers]
+        mine = float(rec["value"])
+        if want_max and not want_min:
+            if mine >= max(vals):
+                return True
+        elif want_min and not want_max:
+            if mine <= min(vals):
+                return True
+        elif mine >= max(vals) or mine <= min(vals):
+            return True
+    return False
+
+
 def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[str], linked: list, tokens: list,
-                    ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]]) -> None:
+                    ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]],
+                    para_linked: list) -> None:
     """The sentence around its figures. `linked` is [(token, [alias records])]
     in reading order; a check that any alias satisfies is satisfied."""
     at = f"prose[{i}]"
@@ -475,9 +519,14 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                       f"the ledger holds {' / '.join(sorted(measures)[:2])} as its own fact — write that value, or drop the phrase"})
             break
 
-    # a superlative rests on a place in an ordering
+    # A SUPERLATIVE RESTS ON AN ORDERING — one the desk computed (a rank node), or
+    # one the paragraph puts in front of the reader: the same measure read for
+    # several subjects, with the figure called extreme actually extreme among
+    # them. V33F refused 12 superlatives whose own paragraph listed the readings
+    # they ordered ("Microsoft has the highest capex intensity at 22.9%. Alphabet
+    # follows at 22.7%, and Amazon is lower at 18.4%").
     if words & SUPERLATIVES and groups:
-        if not any(_ordered(r) for recs in groups for r in recs):
+        if not any(_ordered(r) for recs in groups for r in recs) and not _extreme_in(words, groups, para_linked):
             v.problems.append({"at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
                                "linked": [r["id"] for r in firsts][:4],
                                "fix": "a largest/smallest/most/least rests on a rank node: request the ordering (compare: rank) and state its entry, or drop the word"})
@@ -545,7 +594,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                 if (up and not first_higher) or (down and first_higher):
                     v.problems.append({"at": at, "reason": "direction_conflict", "ids": [a["id"], b["id"]],
                                        "fix": f"{a.get('subject')} is {'above' if first_higher else 'below'} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite"})
-        elif not same_measure and words & {"from", "to", "rose", "fell", "increased", "decreased", "grew", "declined", "change", "changed", "moved"}:
+        elif not same_measure and (("from" in words and "to" in words) or words & CHANGE_VERBS):
             if not any((r.get("params") or {}).get("op") in CHANGE_OPS for r in (a, b)):
                 v.problems.append({"at": at, "reason": "change_conflict", "ids": [a["id"], b["id"]],
                                    "fix": f"{a.get('measure')} and {b.get('measure')} are two different quantities; a change is one measure of one subject at two dates"})
