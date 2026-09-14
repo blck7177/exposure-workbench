@@ -54,10 +54,12 @@ def _stub_desk(monkeypatch, session):
 
 
 @pytest.mark.asyncio
-async def test_the_same_refused_answer_sent_again_ends_the_turn_at_two(monkeypatch):
+async def test_the_same_refused_answer_sent_again_ends_the_turn_at_three(monkeypatch):
     """W01-xom-maturity-wall t2: eight byte-identical `respond` calls, 17.3k →
     24.7k prompt tokens, ending on the gate-exhausted text. It ends on the same
-    text now — nothing is published that the check did not accept — at two."""
+    text now — nothing is published that the check did not accept. V35: after
+    the refusal the turn is a tool call (repair_answer or a request); a prose
+    reply is nudged once, the next prose reply ends the turn — three calls."""
     prompts: list = []
 
     async def _always_the_same(**kw):
@@ -69,9 +71,11 @@ async def test_the_same_refused_answer_sent_again_ends_the_turn_at_two(monkeypat
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_r1", "is that fixed or floating", max_turns=16)
 
-    assert len(prompts) == meta_agent.MAX_ANSWER_ATTEMPTS, f"two attempts, not sixteen: {len(prompts)}"
+    assert len(prompts) == 3, f"a refusal, one nudge, the bar — not sixteen: {len(prompts)}"
+    assert prompts[2][-1]["content"] == meta_agent._REPAIR_ONLY
     assert out["text"] == _GATE_EXHAUSTED_TEXT, "the check still decides what is published"
     assert out["meta"]["gate"] == "exhausted"
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure", "malformed_repair"]
 
 
 @pytest.mark.asyncio
@@ -97,7 +101,9 @@ async def test_the_refusal_names_the_token_and_the_reason_not_only_the_rule(monk
 @pytest.mark.asyncio
 async def test_an_answer_that_changes_still_has_only_the_attempts_the_design_gives(monkeypatch):
     """The bound is on attempts now, by decision (2026-09-13): the first refusal
-    carries every problem, so a second refusal is a second failure to read it."""
+    carries every problem, so a second refusal is a second failure to read it.
+    V35: a changed prose reply is not a repair either — the repair is the tool —
+    so it is nudged once and the next prose reply ends the turn."""
     n = {"i": 0}
 
     async def _different_each_time(**_kw):
@@ -109,8 +115,8 @@ async def test_an_answer_that_changes_still_has_only_the_attempts_the_design_giv
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_r3", "q", max_turns=6)
 
-    assert n["i"] == meta_agent.MAX_ANSWER_ATTEMPTS
-    assert out["meta"]["gate_refusals"] == ["unsourced_figure"] * meta_agent.MAX_ANSWER_ATTEMPTS
+    assert n["i"] == 3
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure", "malformed_repair"]
 
 
 def test_a_payload_reserialised_in_another_key_order_is_the_same_answer():

@@ -106,6 +106,11 @@ def _request(*items):
     return [{"id": "c1", "function": {"name": evidence_request.TOOL_NAME, "arguments": json.dumps({"items": list(items)})}}]
 
 
+def _repair(*replacements):
+    return [{"id": "r1", "function": {"name": meta_agent.REPAIR_TOOL_NAME,
+                                      "arguments": json.dumps({"replacements": list(replacements)})}}]
+
+
 def _run_result(*rows, nodes=None):
     """A `run` result as the face returns it: the note and the facts block."""
     return {"program_id": "calc_p", "returns": [], "settled": len(rows), "refused": [],
@@ -119,10 +124,15 @@ _W_MSFT = ("f_wmsft0001", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 
 # ── nothing reaches the user that the check did not accept ───────────────────
 
 @pytest.mark.asyncio
-async def test_an_invented_number_is_refused_twice_and_the_turn_ends_on_the_bar(monkeypatch):
+async def test_an_invented_number_is_refused_and_the_turn_ends_on_the_bar(monkeypatch):
     """The path that mattered most in V3: raw model text reaching the user with
-    citations=[]. It still cannot: text is the exit, and the exit is checked."""
-    async def _no_tools(**_kw):
+    citations=[]. It still cannot: text is the exit, and the exit is checked.
+    V35: after the refusal the turn is a tool call by construction; a provider
+    that keeps writing prose is told so once, and the turn ends on the bar."""
+    seen: list[dict] = []
+
+    async def _no_tools(**kw):
+        seen.append({"tools": [t["function"]["name"] for t in kw["tools"]], "tool_choice": kw.get("tool_choice")})
         return ("NVDA revenue was $999.9B and margins are expanding.", None)
 
     _stub_llm(monkeypatch, _no_tools)
@@ -135,7 +145,10 @@ async def test_an_invented_number_is_refused_twice_and_the_turn_ends_on_the_bar(
     assert "999.9" not in out["text"]
     assert out["citations"] == []
     assert out["meta"]["gate"] == "exhausted"
-    assert out["meta"]["gate_refusals"] == ["unsourced_figure"] * meta_agent.MAX_ANSWER_ATTEMPTS
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure", "malformed_repair"]
+    assert seen[0] == {"tools": [evidence_request.TOOL_NAME], "tool_choice": None}
+    assert seen[1] == {"tools": [evidence_request.TOOL_NAME, meta_agent.REPAIR_TOOL_NAME], "tool_choice": "required"}
+    assert len(seen) == 3, "one nudge, then the bar"
 
 
 @pytest.mark.asyncio
@@ -229,7 +242,7 @@ async def test_a_request_is_fulfilled_and_the_figure_it_returned_can_be_stated(m
         assert [t["function"]["name"] for t in tools] == [evidence_request.TOOL_NAME]
         if len(prompts) == 1:
             return ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}))
-        return ("MSFT is 16.0% of the book.", None)
+        return ("MSFT is 16.0% [f_wmsft0001] of the book.", None)
 
     _stub_llm(monkeypatch, _chat)
     session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
@@ -240,8 +253,8 @@ async def test_a_request_is_fulfilled_and_the_figure_it_returned_can_be_stated(m
     assert session.calls[0][1]["program"]["let"], "a compiled program went to the face"
     digest = json.loads([m for m in prompts[1] if m.get("role") == "tool"][0]["content"])
     assert digest["items"][0]["figures"][0]["id"] == "f_wmsft0001"
-    assert digest["items"][0]["figures"][0]["value"] == "16.0%"           # as the reader will see it
-    assert out["text"] == "MSFT is 16.0% of the book."
+    assert digest["items"][0]["figures"][0]["value"] == "16.0% [f_wmsft0001]"   # as the analyst copies it
+    assert out["text"] == "MSFT is 16.0% of the book."                        # as the reader sees it
     assert out["citations"] == ["f_wmsft0001"]
     assert out["meta"]["format"] == "blocks" and out["meta"]["verified"]["figures"] == 1
     assert "gate" not in out["meta"]
@@ -258,7 +271,7 @@ async def test_a_refused_reply_is_told_every_problem_and_the_second_attempt_can_
             return ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}))
         if len(prompts) == 2:
             return ("MSFT is 16.0% of the book, up from 12.5% last year, the largest holding.", None)
-        return ("MSFT is 16.0% of the book.", None)
+        return ("", _repair({"tag": "S1", "text": "MSFT is 16.0% [f_wmsft0001] of the book."}))
 
     _stub_llm(monkeypatch, _chat)
     session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
@@ -267,7 +280,11 @@ async def test_a_refused_reply_is_told_every_problem_and_the_second_attempt_can_
 
     told = [m for m in prompts[2] if m.get("role") == "user"][-1]["content"]
     assert "unsourced_figure" in told and "12.5%" in told
-    assert "superlative_without_rank" in told
+    assert "unpointed_figure" in told and "f_wmsft0001" in told, "a bare figure the desk showed comes back with its id"
+    # the relation checks read pointed figures: a superlative over a bare one is
+    # judged once the figure points (nothing here infers which fact "16.0%" meant)
+    assert "superlative_without_rank" not in told
+    assert "repair_answer" in told
     assert out["text"] == "MSFT is 16.0% of the book."
     assert "gate" not in out["meta"]
 
@@ -317,26 +334,28 @@ def test_the_analysts_only_tool_is_not_a_registry_tool():
     from exposure_workbench.tools import faces
     from exposure_workbench.tools.registries import build_meta_registry
 
-    assert meta_agent._BUDGET_FREE_TOOLS == (evidence_request.TOOL_NAME,)
-    assert evidence_request.TOOL_NAME not in build_meta_registry().tools
-    assert evidence_request.TOOL_NAME not in faces.FACE_META_AGENT
+    assert meta_agent._BUDGET_FREE_TOOLS == (evidence_request.TOOL_NAME, meta_agent.REPAIR_TOOL_NAME)
+    for name in meta_agent._BUDGET_FREE_TOOLS:
+        assert name not in build_meta_registry().tools
+        assert name not in faces.FACE_META_AGENT
 
 
 @pytest.mark.asyncio
-async def test_a_refused_reply_is_repaired_sentence_by_sentence(monkeypatch):
+async def test_a_refused_reply_is_repaired_sentence_by_sentence_through_the_tool(monkeypatch):
     """V34 invariant C: the second attempt replaces only the sentences that did not
     pass; every accepted sentence is kept exactly as written, so the accepted set
-    can only grow. A whole-reply rewrite re-rolled every sentence and 17 of 20
-    questions spent both attempts without landing (V33F)."""
+    can only grow. V35: the replacements come through repair_answer — round G
+    showed a text protocol is not one (1 of 18 second attempts used it, 4 re-sent
+    the refused text byte for byte)."""
     told: list = []
     replies = iter([
         ("", _request({"subjects": ["port_001"], "want": ["issuer_exposures.weight"]})),
         ("MSFT weighs 23.4% of the book. The book leans on its largest names.", None),
-        ("S1: MSFT weighs 16.0% of the book.", None),
+        ("", _repair({"tag": "S1", "text": "MSFT weighs 16.0% [f_wmsft0001] of the book."})),
     ])
 
     async def _llm(**kw):
-        told.append(list(kw["messages"]))
+        told.append({**kw, "messages": list(kw["messages"])})
         return next(replies)
 
     _stub_llm(monkeypatch, _llm)
@@ -344,9 +363,54 @@ async def test_a_refused_reply_is_repaired_sentence_by_sentence(monkeypatch):
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_repair", "how big is MSFT", max_turns=8)
 
-    asked = [m for m in told[-1] if m["role"] == "user"][-1]["content"]
-    assert "[S1]" in asked and "KEPT exactly as you wrote it" in asked
-    assert "S2" not in asked, "the sentence that passed is not sent back"
     assert out["text"] == "MSFT weighs 16.0% of the book. The book leans on its largest names."
+    assert "gate" not in out["meta"]
+    assert told[2]["tool_choice"] == "required"
+    refusal = [m for m in told[2]["messages"] if m.get("role") == "user"][-1]["content"]
+    assert "[S1] MSFT weighs 23.4% of the book." in refusal and "[S2]" not in refusal
     assert out["meta"]["verified"]["sentences"] == {"checked": 1, "unchecked": 1,
-                                                    "judgement": ["The book leans on its largest names."]}
+                                                   "judgement": ["The book leans on its largest names."]}
+
+
+@pytest.mark.asyncio
+async def test_a_whole_new_reply_while_a_verdict_stands_is_not_read(monkeypatch):
+    """Even a correct one: the repair is the tool. A provider that ignores
+    tool_choice is told so once; the next prose reply ends the turn."""
+    told: list = []
+    replies = iter([
+        ("MSFT weighs 23.4% of the book.", None),
+        ("MSFT weighs 16.0% [f_wmsft0001] of the book.", None),          # a rewrite, not a repair
+        ("", _repair({"tag": "S1", "text": "MSFT weighs 16.0% [f_wmsft0001] of the book."})),
+    ])
+
+    async def _llm(**kw):
+        told.append({**kw, "messages": list(kw["messages"])})      # a snapshot: the loop appends to the live list
+        return next(replies)
+
+    _stub_llm(monkeypatch, _llm)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT), by_name={"run": _run_result(_W_MSFT)})
+    _stub_desk(monkeypatch, session)
+    session.returned.append(_run_result(_W_MSFT))          # the ledger holds the weight this turn
+    out = await handle_message(_factory([]), "sess_nudge", "how big is MSFT", max_turns=8)
+
+    assert told[2]["messages"][-1] == {"role": "user", "content": meta_agent._REPAIR_ONLY}
+    assert out["text"] == "MSFT weighs 16.0% of the book."
+    assert "gate" not in out["meta"]
+
+
+@pytest.mark.asyncio
+async def test_a_repair_that_still_fails_spends_the_second_attempt(monkeypatch):
+    replies = iter([
+        ("MSFT weighs 23.4% of the book.", None),
+        ("", _repair({"tag": "S1", "text": "MSFT weighs 24.4% of the book."})),
+    ])
+
+    async def _llm(**kw):
+        return next(replies)
+
+    _stub_llm(monkeypatch, _llm)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    out = await handle_message(_factory([]), "sess_twice", "how big is MSFT", max_turns=8)
+    assert out["text"] == _GATE_EXHAUSTED_TEXT
+    assert out["meta"]["gate_refusals"] == ["unsourced_figure", "unsourced_figure"]

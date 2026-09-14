@@ -135,7 +135,11 @@ def _name(s: str) -> str:
 
 
 _OPS = {"-": "sub", "+": "add", "*": "mul", "/": "div"}
-_DERIVE = re.compile(r"^\s*(.+?)\s*([-+*/])\s*(.+?)\s*$")
+# `room = limit_checks.warning_level - limit_checks.current_value`: an optional
+# name, then one operator over two operands. Round G's Q11 wrote the name and the
+# whole left side was read as an operand; Q15 needed mv / (adv × 0.2) and one
+# operator per line could not say it — a named line, used by the next, can.
+_DERIVE = re.compile(r"^\s*(?:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*)?(.+?)\s*([-+*/])\s*(.+?)\s*$")
 
 
 def build(item: dict, held_in: dict | None = None, skipped: list | None = None) -> dict:
@@ -375,18 +379,24 @@ def _operand(side: str, nodes_of_want: dict[str, list[str]], let: list[dict]):
             settled = [n for n in ns if next(b for b in let if b["name"] == n)["expr"].get("fn") != "run"]
             if settled:
                 return "$" + settled[-1]
-    raise NotExpressible(f"{side!r} is not one of the names this request asked for, and is not a number",
+    hint = ""
+    if any(op in side for op in "+-*/") and not side.replace(".", "").replace("-", "").isdigit():
+        hint = " — one operator per line: name a line (`adv20 = price.adv * 0.2`) and use its name in the next"
+    raise NotExpressible(f"{side!r} is not one of the names this request asked for or derived above, and is not a number{hint}",
                          sorted(nodes_of_want))
 
 
 def _derive(line: str, bind, nodes_of_want: dict[str, list[str]], let: list[dict]) -> None:
     m = _DERIVE.match(line)
     if not m:
-        raise NotExpressible(f"a derivation is '<name> <+-*/> <name|number>'; got {line!r}")
-    a, op, b = _operand(m.group(1), nodes_of_want, let), m.group(2), _operand(m.group(3), nodes_of_want, let)
+        raise NotExpressible(f"a derivation is '<name> = <name> <+-*/> <name|number>'; got {line!r}")
+    given, left, op, right = m.groups()
+    a, b = _operand(left, nodes_of_want, let), _operand(right, nodes_of_want, let)
     if not isinstance(a, str) and not isinstance(b, str):
         raise NotExpressible("a derivation works over the desk's figures: at least one side names a want")
-    bind(_name(line), {"fn": _OPS[op], "a": a, "b": b})
+    node = bind(_name(given) if given else _name(line), {"fn": _OPS[op], "a": a, "b": b})
+    # the line's name is a name the next line may use
+    nodes_of_want[given or line] = [node]
 
 
 def _compare(compare, win, tickers, bind, classify, vectors, series, scalars_by_want) -> None:

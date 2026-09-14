@@ -155,3 +155,39 @@ def test_a_filings_want_is_not_a_program():
     with pytest.raises(pb.NotExpressible) as e:
         pb.build({"subjects": ["LLY"], "want": ["filings:Item 7"]})
     assert "tools" in e.value.reason
+
+
+# ── V35: a derivation may be named, and a later line may use the name ────────
+
+_HELD = {"MSFT": ["port_001"], "AAPL": ["port_001"]}
+
+
+def test_a_derivation_may_be_named_and_a_later_line_may_use_the_name():
+    """Round G Q15: days to liquidate at 20% of ADV is mv / (adv × 0.2) — two
+    operators, which one line cannot say. A named line, used by the next, can."""
+    prog = pb.build({"subjects": ["port_001", "MSFT", "AAPL"], "want": ["issuer_exposures.market_value", "price.adv"],
+                     "window": "20d", "derive": ["adv20 = price.adv * 0.2", "days = issuer_exposures.market_value / adv20"]},
+                    held_in=_HELD, skipped=[])
+    by = {b["name"]: b["expr"] for b in prog["let"]}
+    assert by["adv20"]["fn"] == "mul" and by["adv20"]["b"] == 0.2
+    assert by["days"]["fn"] == "div" and by["days"]["b"] == "$adv20"
+    assert "days" in prog["return"]
+    assert ps.typecheck(prog) == []
+
+
+def test_the_name_before_the_equals_is_the_lines_name_not_an_operand():
+    """Round G Q11 wrote `room_to_warning = a - b` and the whole left side was read
+    as an operand; the room was then the analyst's own subtraction, refused."""
+    skipped = []
+    prog = pb.build({"subjects": ["port_001"], "want": ["limit_checks.current_value", "limit_checks.warning_level"],
+                     "derive": ["room_to_warning = limit_checks.warning_level - limit_checks.current_value"]}, skipped=skipped)
+    assert skipped == []
+    (room,) = [b for b in prog["let"] if b["expr"]["fn"] == "sub"]
+    assert room["name"] == "room_to_warning" and room["expr"]["a"] == "$limit_checks_warning_level"
+
+
+def test_two_operators_on_one_line_are_refused_with_the_way_to_write_them():
+    skipped = []
+    pb.build({"subjects": ["port_001", "MSFT"], "want": ["issuer_exposures.market_value", "price.adv"], "window": "20d",
+              "derive": ["issuer_exposures.market_value / price.adv / 0.2"]}, held_in=_HELD, skipped=skipped)
+    assert len(skipped) == 1 and "one operator per line" in skipped[0]["reason"], skipped

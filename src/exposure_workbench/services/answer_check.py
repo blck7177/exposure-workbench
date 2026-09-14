@@ -11,12 +11,18 @@ wrong companies when it renumbered claims; Q14 filled a date slot with a depth.
 
 Here the model writes prose. This module reads it the way the reader will:
 
-    G1  every number resolves — to a fact it equals at the written precision,
-        to a fact's date/window/parameter, to a quoted passage that states it,
-        or to the user's own question               unsourced_figure
-    G2  a number that equals several different readings is pinned by the sentence
-        it sits in (its subject, its measure, its date) or by a mark `[f_…]`
-        after it                                    ambiguous_figure / mark_mismatch
+    G1  every figure POINTS: it is written as the desk showed it, followed by
+        the id the desk showed it under — `16.0% [f_2592baab170e]` — and the
+        check is a lookup on that id: the id is on the ledger, the fact holds
+        the figure at the written precision          not_on_ledger / mark_mismatch
+    G2  a bare number is one of three things and nothing else: a fact's own
+        date/window/parameter, a figure a quoted passage states, or the user's
+        own number; a bare number the ledger holds as a figure is refused with
+        the ids it was shown under                   unpointed_figure / unsourced_figure
+        (V34 inferred which fact a bare number meant from the sentence's words;
+        round G refused 51 figures it could not place — the subject was in the
+        previous sentence, or ten subjects were in this one — and refused true
+        sentences to do it. Nothing here infers identity now: the writer points.)
     G3  the sentence around a figure agrees with the figure's identity:
           a superlative sits on a fact that carries a place in an ordering
           a change joins two readings of one measure of one subject, or one
@@ -53,6 +59,10 @@ from exposure_workbench.services.ledger import Ledger
 # ── the marks a writer may put in prose ──────────────────────────────────────
 MARK_BLOCK = re.compile(r"\[(table|chart):\s*([A-Za-z_][A-Za-z0-9_]*)\]")
 _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
+# THE POINTER A FIGURE CARRIES: the id the desk showed the figure under, in
+# brackets after it. A unit tail the desk's own display puts after the digits
+# ("$13.27B/day", "0.78×") may sit between the figure and its bracket.
+_POINTER_AFTER = re.compile(r"(?:/[A-Za-z]+|×|x|\s?pp|\s?bps)?\s*\[\s*(f_[0-9A-Za-z]{4,})\s*\]")
 
 # ── the closed word lists G3 reads ───────────────────────────────────────────
 SUPERLATIVES = frozenset("""largest smallest biggest highest lowest most least top bottom worst best weakest
@@ -80,6 +90,7 @@ class Verdict:
     detail: str | None = None
     links: dict[tuple[int, int], dict] = field(default_factory=dict)     # (para, token start) -> {to, ids, as_written}
     marks: list[dict] = field(default_factory=list)                       # block marks: {para, start, end, kind, node, ids}
+    pointers: list[dict] = field(default_factory=list)                    # `[f_…]` spans the render drops: {para, start, end, id}
     refs: list[str] = field(default_factory=list)                         # every fact id the answer rests on
     sentences: list[dict] = field(default_factory=list)                   # {tag, para, text, span, checked, problems}
 
@@ -198,12 +209,19 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         return v
     asked = {_core(t["token"]) for t in A.tokens_in(question or "")}
     all_passages = list(ledger.passages)
-    # THE TEXTS THIS TURN HOLDS, which quotation marks may claim: a passage the
-    # desk read, the desk's own words for what it could not do, and the question
-    # the user asked. All three exist, all three are checked the same way.
+    # THE TEXTS THIS TURN HOLDS, which quotation marks may claim: every text on
+    # the ledger — a passage the desk read, the desk's own words for what it
+    # could not do (a boundary is a fact, minted by the broker with the digest)
+    # — and the question the user asked. Not an enumeration of sources: V33E
+    # widened one (§8) and round G still refused the desk's own words, because
+    # they had been shown and never recorded.
     turn_texts = [(pid, _quoted(txt)) for pid, txt in ledger.passages.items()]
-    turn_texts += [(r["id"], _quoted(str(r.get("value") or r.get("text") or "")))
-                   for r in ledger.by_id.values() if r.get("kind") == F.ABSENCE and (r.get("value") or r.get("text"))]
+    for r in ledger.by_id.values():
+        if r.get("kind") in (F.SCALAR, F.SERIES, F.PASSAGE):
+            continue
+        txt = r.get("text") if isinstance(r.get("text"), str) else (r.get("value") if isinstance(r.get("value"), str) else None)
+        if txt:
+            turn_texts.append((r["id"], _quoted(txt)))
     if question:
         turn_texts.append((None, _quoted(question)))
     subjects_on_ledger = {s for s in (_short_subject(r.get("subject")) for r in ledger.by_id.values()) if s}
@@ -247,57 +265,94 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
 
         sentences = _sentences(blanked)
         tokens = A.tokens_in(blanked)
-        linked_by_sentence: dict[int, list[tuple[dict, list[dict]]]] = {}     # sentence idx -> [(token, alias records)]
+        linked_by_sentence: dict[int, list[tuple[dict, list[dict]]]] = {}     # sentence idx -> [(token, [record])]
+
+        # the pointers: a figure, then `[f_…]`
+        pointed: dict[int, str] = {}                                          # figure token start -> fact id
+        consumed: set[int] = set()                                            # id token starts that are pointers
+        for t in tokens:
+            if t["kind"] != "num":
+                continue
+            m = _POINTER_AFTER.match(blanked, t["end"])
+            if not m:
+                continue
+            pointed[t["start"]] = m.group(1)
+            consumed.add(m.start(1))
+            bracket = blanked.index("[", m.start())
+            drop_from = bracket - 1 if bracket > 0 and blanked[bracket - 1] == " " else bracket
+            v.pointers.append({"para": i, "start": drop_from, "end": m.end(), "id": m.group(1)})
 
         # G1 / G2 — every token
         for t in tokens:
             tok, kind, start, end = t["token"], t["kind"], t["start"], t["end"]
             if any(s <= start < e for s, e in quoted_ok):
                 continue
+            if kind == "id":
+                if start in consumed:
+                    continue
+                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
+                                   "fix": "an id follows the figure it points to, in brackets (16.0% [f_…]); anywhere else "
+                                          "it is a word the reader must not see"})
+                continue
             if kind == "num" and (_compound_before(blanked, start) or _compound_after(blanked, end)):
                 # "1-year", "52-week", "10-K": the digits belong to a word, not to a
                 # figure. V33D's "1-year" resolved to whatever the ledger held near 1.
                 continue
-            if kind == "id":
-                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
-                                   "fix": "an id is not a word the reader sees: write the figure as the desk showed it"})
-                continue
             si = next((k for k, (s, e) in enumerate(sentences) if s <= start < e), 0)
             sentence = blanked[sentences[si][0]:sentences[si][1]]
-            swords = _words(sentence)
-            found = ledger.readings(tok) if kind == "num" else []
-            if found:
-                chosen, why, evidenced = _pin(found, ledger, sentence, swords)
-                if chosen is not None and not evidenced and _core(tok) in asked:
-                    # the user wrote this number and nothing in the sentence ties it to
-                    # the ledger's reading of it: it is the user's ("at 20% of ADV")
-                    v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
+            fid = pointed.get(start)
+            if fid is not None:
+                # G1 — a pointed figure: the id is on the ledger and holds the figure
+                rec = ledger.by_id.get(fid)
+                if rec is None:
+                    v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "not_on_ledger", "figure": tok, "id": fid,
+                                       "fix": "the id after a figure is the one the desk showed it under: copy the figure and "
+                                              "its bracket from the evidence"})
                     continue
-                if chosen is None:
-                    if _core(tok) in asked:
-                        v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
+                hits = [period for f, period in ledger.readings(tok) if f == fid]
+                if not hits:
+                    v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
+                                       "holds": _shown(rec),
+                                       "fix": f"{fid} holds {_shown(rec)}, not this figure: write the figure as the desk showed "
+                                              f"it, or point at the fact that holds it"})
+                    continue
+                period = None
+                if rec.get("kind") == F.SERIES:
+                    periods = sorted({p for p in hits if p})
+                    named = [p for p in periods if p in sentence or p[:4] in sentence]
+                    if len(periods) == 1:
+                        period = periods[0]
+                    elif len(named) == 1:
+                        period = named[0]
+                    else:
+                        v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "ambiguous_point", "figure": tok, "id": fid,
+                                           "periods": periods[:6],
+                                           "fix": "this series holds the figure on several dates: name the point's date in the sentence"})
                         continue
-                    v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "ambiguous_figure", "figure": tok, "candidates": why,
-                                       "fix": "several readings hold this figure: name the subject, the measure or the date the "
-                                              "desk showed it under"})
-                    continue
-                alias_ids, period = chosen
-                primary = _primary(alias_ids, ledger, swords)
-                v.links[(i, start)] = {"to": "fact", "ids": [primary, *[f for f in alias_ids if f != primary]],
-                                       "primary": primary, "period": period, "as_written": tok}
-                linked_by_sentence.setdefault(si, []).append((t, [_reading(ledger.by_id[f], period) for f in alias_ids]))
+                v.links[(i, start)] = {"to": "fact", "ids": [fid], "primary": fid, "period": period, "as_written": tok}
+                linked_by_sentence.setdefault(si, []).append((t, [_reading(rec, period)]))
                 continue
+            # G2 — a bare number: an identity field, the user's own, a passage's, or refused
             ids = ledger.resolve_identity(tok)
             if ids:
                 # an identity field (a date, a year, a window's digits): a citation, never a figure
                 v.links[(i, start)] = {"to": "fact", "ids": ids, "as_written": tok, "how": "identity"}
                 continue
+            if _core(tok) in asked:
+                v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
+                continue
             pids = ledger.resolve_in_passages(tok, all_passages)
             if pids:
                 v.links[(i, start)] = {"to": "passage", "ids": pids, "as_written": tok}
                 continue
-            if _core(tok) in asked:
-                v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
+            found = ledger.readings(tok)
+            if found:
+                seen_ids: list[str] = list(dict.fromkeys(f for f, _p in found))
+                cands = [{"id": f, "measure": ledger.by_id[f].get("measure"), "subject": ledger.by_id[f].get("subject"),
+                          "as_of": ledger.by_id[f].get("as_of")} for f in seen_ids[:6]]
+                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unpointed_figure", "figure": tok, "candidates": cands,
+                                   "fix": "a figure the desk showed is written as shown, followed by its id in brackets "
+                                          "(16.0% [f_…]); the desk showed this figure under the ids listed"})
                 continue
             v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unsourced_figure", "figure": tok,
                                "fix": "a number the ledger cannot account for: request the figure, quote the passage that states it, or drop it"})
@@ -328,9 +383,9 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         p.pop("_at", None)
     v.refs = list(dict.fromkeys([*v.refs, *[l.get("primary") or fid for l in v.links.values() for fid in l["ids"][:1]]]))
     if v.problems:
-        order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "ambiguous_figure",
-                 "unverified_quote", "date_expected", "subject_mismatch", "measure_mismatch", "superlative_without_rank",
-                 "change_conflict", "direction_conflict", "tier_mismatch")
+        order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "unpointed_figure",
+                 "ambiguous_point", "unverified_quote", "date_expected", "subject_mismatch", "measure_mismatch",
+                 "superlative_without_rank", "change_conflict", "direction_conflict", "tier_mismatch")
         reasons = {p["reason"] for p in v.problems}
         v.error = next((r for r in order if r in reasons), v.problems[0]["reason"])
         v.detail = (f"{len(v.problems)} problem(s), all listed; the first: " + _one_line(v.problems[0]))
@@ -360,79 +415,14 @@ def _group_key(rec: dict, period: str | None) -> tuple:
     return (_short_subject(rec.get("subject")) or rec.get("subject"), period or rec.get("as_of"))
 
 
-def _pin(found: list[tuple[str, str | None]], ledger: Ledger, sentence: str,
-         words: set[str]) -> tuple[tuple[list[str], str | None] | None, list[dict], bool]:
-    """((alias ids, period), candidates, evidenced) for a written figure. One
-    group of aliases is taken as is; several are narrowed by the sentence's own
-    words in stages — its subject first, then its measure, then its date — each
-    stage keeping the groups it names and passing when it names none.
-    `evidenced` says whether the sentence named the chosen group at all, which
-    is what lets a number the user also wrote be read as the ledger's rather
-    than the user's."""
-    groups: dict[tuple, tuple[list[str], str | None]] = {}
-    for fid, period in found:
-        key = _group_key(ledger.by_id[fid], period)
-        ids, _p = groups.setdefault(key, ([], period))
-        if fid not in ids:
-            ids.append(fid)
-    low = sentence.lower()
-
-    def by_subject(g) -> bool:
-        for r in (ledger.by_id[f] for f in g[0]):
-            short = _short_subject(r.get("subject"))
-            if short and (short.lower() in words or short.lower() in low):
-                return True
-        return False
-
-    def by_measure(g) -> bool:
-        return any(len(w) > 3 and w.lower() in words for f in g[0] for w in _measure_words(ledger.by_id[f].get("measure")))
-
-    def by_date(g) -> bool:
-        period = g[1]
-        if period and (period in sentence or period[:4] in sentence):
-            return True
-        return any(str(ledger.by_id[f].get("as_of") or "\0") in sentence for f in g[0])
-
-    if len(groups) == 1:
-        g = next(iter(groups.values()))
-        return g, [], by_subject(g) or by_measure(g) or by_date(g)
-    evidenced = False
-    for stage in (by_subject, by_measure, by_date):
-        kept = {k: g for k, g in groups.items() if stage(g)}
-        if kept:
-            evidenced = True
-            groups = kept
-        if len(groups) == 1:
-            return next(iter(groups.values())), [], evidenced
-    # the default tier row (`issuer_concentration`) beside issuers' own rows is one tier
-    if all(_is_tier(ledger.by_id[g[0][0]]) for g in groups.values()):
-        specific = {k: g for k, g in groups.items() if ":" in str(ledger.by_id[g[0][0]].get("subject") or "")}
-        if len(specific) == 1:
-            return next(iter(specific.values())), [], True
-        if not specific:
-            return next(iter(groups.values())), [], evidenced
-    cands = [{"id": g[0][0], "measure": ledger.by_id[g[0][0]].get("measure"),
-              "subject": ledger.by_id[g[0][0]].get("subject"), "as_of": g[1] or ledger.by_id[g[0][0]].get("as_of")}
-             for g in list(groups.values())[:6]]
-    return None, cands, False
-
-
-def _primary(alias_ids: list[str], ledger: Ledger, words: set[str]) -> str:
-    """Which alias the reader is shown: the rank entry under a superlative, the
-    tier under a tier word, the measure the sentence names, else the first."""
-    recs = [ledger.by_id[f] for f in alias_ids]
-    if words & SUPERLATIVES:
-        for r in recs:
-            if "rank" in (r.get("params") or {}):
-                return r["id"]
-    if words & TIER_WORDS:
-        for r in recs:
-            if _is_tier(r):
-                return r["id"]
-    for r in recs:
-        if any(len(w) > 3 and w.lower() in words for w in _measure_words(r.get("measure"))):
-            return r["id"]
-    return alias_ids[0]
+def _shown(rec: dict) -> str:
+    """A fact's value as the desk showed it — what a mark_mismatch names."""
+    try:
+        d = A.fill(rec)
+        shown = d.get("display")
+    except Exception:  # noqa: BLE001 — a display failure must not fail the check
+        shown = None
+    return str(shown if shown else rec.get("value"))
 
 
 def _place_fits(words: set[str], rec: dict) -> bool:
@@ -513,9 +503,13 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                    "fix": f"'{dw}' introduces a date; this figure is not one — the date is on the facts' window (start/end) or as_of"})
 
     # tier words sit beside the tier they name
+    # A TIER WORD NAMES THE TIER'S KIND — a lookup on each pointed tier fact. Which
+    # reading a tier sits "against" is not judged here: round G paired every tier
+    # in a sentence with every reading in it and refused a true sentence 12 times
+    # (four issuers' checks listed in one breath); with the writer pointing, the
+    # reader opens the tier and sees whose it is.
     tier_words = words & TIER_WORDS
     tiers = [r for recs in groups for r in recs if _is_tier(r)]
-    readings = [recs[0] for recs in groups if not any(_is_tier(r) for r in recs)]
     if tier_words and tiers:
         kinds = {("warning" if t["measure"].endswith("warning_level") else "breach" if t["measure"].endswith("breach_level") else "limit") for t in tiers}
         if "warning" in words and "warning" not in kinds and kinds:
@@ -524,14 +518,6 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         if "breach" in words and "breach" not in kinds and kinds:
             v.problems.append({"at": at, "reason": "tier_mismatch", "id": tiers[0]["id"],
                                "fix": f"the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier"})
-        for tier in tiers:
-            for rd in readings:
-                if "room" in (rd.get("measure") or "") or (rd.get("measure") or "").startswith("subtract("):
-                    continue
-                if not _same_check(tier.get("subject"), rd.get("subject")):
-                    v.problems.append({"at": at, "reason": "tier_mismatch", "id": tier["id"], "reading": rd["id"],
-                                       "fix": f"{tier.get('subject')}'s tier beside {rd.get('subject')}'s reading: a tier sits beside its own check's reading"})
-
     # a change or a comparison joins the right two figures, and points the way they moved
     up, down = words & UP_WORDS, words & DOWN_WORDS
     if words & CHANGE_WORDS and len(groups) >= 2:
@@ -596,6 +582,11 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
         for (pi, start), link in verdict.links.items():
             if pi == i and link["to"] != "question":
                 cuts.append((start, start + len(link["as_written"]), "link", link))
+        for pt in verdict.pointers:
+            if pt["para"] == i:
+                # the bracket is the writer's pointing, not the reader's text: the
+                # figure before it carries the link the bracket named
+                cuts.append((pt["start"], pt["end"], "drop", pt))
         cuts.sort(key=lambda c: c[0])
         runs: list = []
         pos = 0

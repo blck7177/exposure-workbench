@@ -24,10 +24,12 @@ REQUEST_TOOL = {
             "'news:<query>' for the web, 'prepare' to put an issuer on the desk, 'scenario:sell <T> <fraction>' / "
             "'scenario:buy <T> <weight>' for a hypothetical book. A window says over what: 12m, last 8 quarters, "
             "last 5 years, at 2025-06-30, 1y, 30d, vs prev run, vs SPY. A comparison says how: rank, change, versus, "
-            "share_of:<name>, filter:>0.08. `derive` asks the desk to work a figure out from the ones you named — "
-            "'limit_checks.warning_level - limit_checks.current_value' is the room to warning, "
-            "'issuer_exposures.market_value / price.adv' is days to liquidate — one line each, + - * / over the "
-            "names in `want` or a number. Put anything the fields cannot say in `ask`. The desk returns every figure "
+            "share_of:<name>, filter:>0.08. `derive` is a field beside `want`, not a name in it: lines of arithmetic the desk "
+            "works out from the names in `want`, one operator per line, each line may be named and a later line may use "
+            "that name — 'room = limit_checks.warning_level - limit_checks.current_value'; 'adv20 = price.adv * 0.2' then "
+            "'days = issuer_exposures.market_value / adv20' is days to liquidate at 20% of ADV. A derivation over a book "
+            "column and a per-ticker method needs both names in one item's `want`, with the port_… and the tickers together "
+            "in `subjects`. Put anything the fields cannot say in `ask`. The desk returns every figure "
             "with its id and identity, passages to quote, and what it could not do."
         ),
         "parameters": {
@@ -45,7 +47,8 @@ REQUEST_TOOL = {
                             "window": {"type": ["string", "null"], "description": "12m | last 8 quarters | last 5 years | at YYYY-MM-DD | 1y | 30d | vs prev run | vs SPY"},
                             "compare": {"type": ["string", "null"], "description": "rank | rank lowest | change | versus | share_of:<name> | filter:<op><level>"},
                             "derive": {"type": ["array", "null"], "items": {"type": "string"},
-                                       "description": "figures to work out from the ones named, one line each: '<name> <+-*/> <name|number>'"},
+                                       "description": "figures to work out from the ones named, one line each: "
+                                                      "'<result> = <name> <+-*/> <name|number>'; a later line may use <result>"},
                             "ask": {"type": ["string", "null"], "description": "what the fields cannot say, in words"},
                         },
                         "required": ["subjects", "want"],
@@ -83,7 +86,7 @@ def parse(args: dict) -> list[dict]:
         if isinstance(derive, str):
             derive = [derive]
         if derive is not None and (not isinstance(derive, list) or not all(isinstance(d, str) for d in derive)):
-            raise ValueError(f"items[{i}].derive is a list of '<name> <+-*/> <name|number>' lines")
+            raise ValueError(f"items[{i}].derive is a list of '<result> = <name> <+-*/> <name|number>' lines")
         out.append({"subjects": [s.strip() for s in subjects if s.strip()], "want": [w.strip() for w in want if w.strip()],
                     "window": (it.get("window") or None), "compare": (it.get("compare") or None),
                     "derive": [d.strip() for d in (derive or []) if d.strip()] or None,

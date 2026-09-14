@@ -58,7 +58,8 @@ async def test_a_figure_comes_back_displayed_with_its_id_and_identity():
     tools = _Tools({"run": _run_result([_row("f_a1", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 0.1604, params={"node": "w", "rank": 1})])})
     d = await _broker(tools).fulfil([{"subjects": ["port_001"], "want": ["issuer_exposures.weight"], "compare": "rank"}])
     fig = d["items"][0]["figures"][0]
-    assert fig == {"id": "f_a1", "subject": "MSFT", "measure": "issuer_exposures.weight", "value": "16.0%", "unit": "RATIO",
+    # the shown value carries the id it is shown under: writing it as shown is writing it pointed (V35)
+    assert fig == {"id": "f_a1", "subject": "MSFT", "measure": "issuer_exposures.weight", "value": "16.0% [f_a1]", "unit": "RATIO",
                    "as_of": "2026-09-10", "node": "w", "rank": 1}
     assert d["items"][0]["nodes"] == ["w"]
     assert tools.calls[0][0] == "run"
@@ -118,7 +119,7 @@ async def test_what_the_builder_cannot_say_goes_to_the_writer_with_the_type_repo
     llm = _Llm([bad, good])
     d = await _broker(tools, llm).fulfil([{"subjects": ["MSFT"], "want": ["net margin please"], "ask": "MSFT's net margin"}])
     assert llm.calls == 2 and seen == [bad, good]
-    assert d["items"][0]["figures"][0]["value"] == "39.0%"
+    assert d["items"][0]["figures"][0]["value"] == "39.0% [f_m]"
 
 
 @pytest.mark.asyncio
@@ -237,9 +238,11 @@ async def test_the_writer_reads_the_domains_worked_programs():
 
 
 @pytest.mark.asyncio
-async def test_the_digest_shows_one_reading_once_and_never_two_that_read_alike():
-    """A — shown uniqueness. V33D refused 240 figures over one series fetched twice
-    and V33E 38 over one holding in two runs; both collisions were the desk's own."""
+async def test_the_digest_shows_one_reading_once_and_the_id_tells_the_rest_apart():
+    """A — one reading shown once. V33D refused 240 figures over one series fetched
+    twice. V35: two readings that read alike are told apart by the id each is
+    shown under, not by a date pushed into the value — round G showed the
+    collision that matters is two SUBJECTS reading alike."""
     rows = [_row("f_a", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1723540.0, as_of="2026-09-10", params={"node": "mv"}),
             _row("f_b", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1723540.0, as_of="2026-09-10", params={"node": "mv_again"}),
             _row("f_c", "scalar", "MSFT", "issuer_exposures.market_value", "MONEY", 1720775.0, as_of="2026-09-09", params={"node": "mv_prev"})]
@@ -248,8 +251,8 @@ async def test_the_digest_shows_one_reading_once_and_never_two_that_read_alike()
     figs = out["items"][0]["figures"]
     assert [f["id"] for f in figs] == ["f_a", "f_c"], "the same reading is shown once"
     assert figs[0]["also"] == ["f_b"], "and names the other id it was fetched under"
-    assert figs[0]["value"] == "$1.72M (2026-09-10)" and figs[1]["value"] == "$1.72M (2026-09-09)"
-    assert "reads the same" in figs[0]["reads_alike"]
+    assert figs[0]["value"] == "$1.72M [f_a]" and figs[1]["value"] == "$1.72M [f_c]"
+    assert "reads_alike" not in figs[0]
 
 
 @pytest.mark.asyncio
@@ -257,13 +260,14 @@ async def test_figures_that_already_read_apart_are_left_alone():
     rows = [_row("f_a", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 0.16, params={"node": "w"}),
             _row("f_b", "scalar", "AAPL", "issuer_exposures.weight", "RATIO", 0.152, params={"node": "w"})]
     out = await _broker(_Tools({"run": _run_result(rows)})).fulfil([{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
-    assert [f["value"] for f in out["items"][0]["figures"]] == ["16.0%", "15.2%"]
+    assert [f["value"] for f in out["items"][0]["figures"]] == ["16.0% [f_a]", "15.2% [f_b]"]
 
 
 @pytest.mark.asyncio
-async def test_invariant_A_no_two_entries_of_a_digest_read_alike():
-    """The property, not a case: whatever the desk returns, the analyst can tell
-    any two figures apart by how they read."""
+async def test_invariant_A_every_shown_figure_carries_its_own_id_and_no_reading_is_shown_twice():
+    """The property, not a case: whatever the desk returns, every figure the
+    analyst reads ends with the id it is shown under, no two entries read alike,
+    and a reading fetched twice is shown once."""
     rows = []
     for i, (subj, meas, val, day) in enumerate([
             ("MSFT", "issuer_exposures.weight", 0.16039, "2026-09-10"),
@@ -277,6 +281,44 @@ async def test_invariant_A_no_two_entries_of_a_digest_read_alike():
     out = await _broker(_Tools({"run": _run_result(rows)})).fulfil(
         [{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
     figs = out["items"][0]["figures"]
-    written = [(f.get("subject"), f.get("measure"), f["value"]) for f in figs]
-    assert len(written) == len(set(written)), written
     assert len(figs) == 5, "the reading fetched twice is shown once"
+    assert all(f["value"].endswith(f" [{f['id']}]") for f in figs), [f["value"] for f in figs]
+    assert len({f["value"] for f in figs}) == len(figs)
+
+
+@pytest.mark.asyncio
+async def test_a_boundary_is_a_fact_minted_and_recorded_with_the_digest():
+    """V35: what the desk could not do is on the ledger like any other text this
+    turn holds. Round G refused the analyst for quoting a boundary verbatim —
+    the words had been shown and never recorded (ACCEPTANCE_V33 §14.3)."""
+    recorded: list[dict] = []
+    b = eb.Broker(_Tools({}), None, None, "sess_x", "msg_x", {"issuers": {"MSFT": {"name": "Microsoft"}}})
+
+    async def _capture(step_type, args, summary, facts=None):
+        recorded.append({"step": step_type, "facts": list(facts or [])})
+    b._record = _capture
+    d = await b.fulfil([{"subjects": ["MSFT"], "want": ["gross_margn"]}])
+    entry = d["items"][0]["boundaries"][0]
+    minted = [f for r in recorded if r["step"] == "digest" for f in r["facts"]]
+    # one boundary per want the builder skipped, one for the item nothing of which compiled
+    assert [f.kind for f in minted] == [F.ABSENCE, F.ABSENCE]
+    assert [x["fact"] for x in d["items"][0]["boundaries"]] == [f.id for f in minted]
+    assert entry["fact"] == minted[0].id and entry["text"] == minted[0].text
+    assert minted[0].params["class"] == "boundary" and minted[0].params["want"] == "gross_margn"
+    assert not minted[0].standalone and minted[0].group == "boundary"
+    assert b._minted == [], "handed to the record, not kept"
+
+
+@pytest.mark.asyncio
+async def test_a_tools_refusal_is_a_boundary_fact_too():
+    recorded: list = []
+    tools = _Tools({"run": {"error": "not_prepared", "detail": "XOM is not on the desk; prepare it first"}})
+    b = eb.Broker(tools, None, None, "sess_x", "msg_x", {"issuers": {}})
+
+    async def _capture(step_type, args, summary, facts=None):
+        recorded.extend(facts or [])
+    b._record = _capture
+    d = await b.fulfil([{"subjects": ["XOM"], "want": ["net_margin"]}])
+    entry = d["items"][0]["boundaries"][0]
+    assert entry["class"] == "data_absent" and entry["code"] == "not_prepared"
+    assert [f.id for f in recorded] == [entry["fact"]] and recorded[0].text.startswith("XOM is not on the desk")

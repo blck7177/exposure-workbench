@@ -27,7 +27,7 @@ import logging
 from typing import Any
 
 from exposure_workbench.analytics import display_conventions as dc
-from exposure_workbench.services import claims, program_builder as pb, program_service as ps, trace_service
+from exposure_workbench.services import claims, facts as F, ledger as ledger_svc, program_builder as pb, program_service as ps, trace_service
 from exposure_workbench.utils import json as ejson
 
 logger = logging.getLogger(__name__)
@@ -51,12 +51,11 @@ WRITER_TOOL = {"type": "function", "function": {
     "name": "run_program", "description": "Execute one analysis program.",
     "parameters": {"type": "object", "properties": {"program": ps.schema()}, "required": ["program"], "additionalProperties": False}}}
 
-HOW_TO_CITE = ("Write each figure exactly as its `value` reads here — that form is unique on this desk, so it needs no "
-               "pointer of any kind. Where a `value` carries a date in brackets, another reading of the same figure reads "
-               "the same and the date is what tells them apart: keep it in your sentence. "
-               "A series shows its points as [date, value]: write a point's value as shown and name its date. "
-               "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks. "
-               "A boundary is something the desk could not do or does not hold: say so in your own words.")
+HOW_TO_CITE = ("Write each figure exactly as its `value` reads here, bracket included: the bracket is the desk's id for "
+               "that reading, it is what lets the reader open the figure, and a figure written without it is refused. "
+               "A series shows its points as [date, value]: write a point's value as shown, bracket included, and name its date. "
+               "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks; "
+               "a boundary is the desk's own words for what it could not do — quote it the same way, or say it in yours.")
 
 
 def _kind_of(item: dict) -> str:
@@ -98,16 +97,15 @@ def _reading_of(fig: dict) -> tuple:
 
 
 def _tell_apart(items: list[dict]) -> None:
-    """A — SHOWN UNIQUENESS. Across the whole digest: one reading is shown once,
-    and two readings never read alike.
+    """A — ONE READING IS SHOWN ONCE. Across the whole digest, a reading fetched
+    twice (V33D: one series asked for twice, 240 refusals) collapses to one entry
+    naming the other ids: they are the same figure.
 
-    The analyst writes what it is shown, so what it is shown has to be enough to
-    tell apart. V33D refused 240 figures over the same series fetched twice and
-    V33E 38 over one holding in two runs; both collisions were the desk's own.
-    A duplicate reading collapses to one entry naming the other ids (they are the
-    same figure); a genuine pair that reads alike takes its date into the value,
-    so copying it puts the discriminator in the sentence."""
-    figures = [f for e in items for f in (e.get("figures") or [])]
+    What tells two readings apart is the id each is shown under, which the
+    analyst writes after the figure. V34 put a date into the shown value when
+    two readings of one subject read alike, and round G showed the collision
+    that matters is two SUBJECTS reading alike (nine issuers share a 15.0%
+    warning tier): no suffix short of the id itself tells those apart."""
     seen: dict[tuple, dict] = {}
     for e in items:
         kept = []
@@ -120,16 +118,6 @@ def _tell_apart(items: list[dict]) -> None:
             else:
                 first.setdefault("also", []).append(f["id"])    # the same reading, fetched twice
         e["figures"] = kept
-    figures = [f for e in items for f in (e.get("figures") or [])]
-    by_written: dict[tuple, list[dict]] = {}
-    for f in figures:
-        by_written.setdefault((f.get("subject"), f.get("measure"), str(f.get("value"))), []).append(f)
-    for group in by_written.values():
-        if len(group) > 1 and len({f.get("as_of") for f in group}) > 1:
-            for f in group:
-                if f.get("as_of"):
-                    f["value"] = f"{f['value']} ({f['as_of']})"
-                    f["reads_alike"] = "another reading of this figure reads the same; its date tells them apart"
 
 
 def _fit(digest: dict, limit: int) -> dict:
@@ -177,6 +165,27 @@ def _merge(into: dict, part: dict) -> dict:
     return into
 
 
+def _cited(shown: Any, fid: str) -> str:
+    """The form the analyst copies: the figure as displayed, then the id it is
+    shown under. One string, so writing it as shown is writing it pointed."""
+    return f"{shown} [{fid}]"
+
+
+def _stamp_ids(items: list[dict]) -> None:
+    """Every shown figure ends with the id it is shown under — a scalar's value,
+    a series' points (the series' one id on each). After the collapse, so the
+    collapse compares readings and not brackets."""
+    for e in items:
+        for f in e.get("figures") or []:
+            f["value"] = _cited(f["value"], f["id"])
+        for sr in e.get("series") or []:
+            for key in ("first", "last"):
+                if isinstance(sr.get(key), list) and len(sr[key]) == 2:
+                    sr[key] = [sr[key][0], _cited(sr[key][1], sr["id"])]
+            if sr.get("points"):
+                sr["points"] = [[p, _cited(v, sr["id"])] for p, v in sr["points"]]
+
+
 def _display(value: Any, unit: str | None) -> Any:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         try:
@@ -190,6 +199,7 @@ class Broker:
     def __init__(self, tools_session, llm, db_factory, session_id: str, message_id: str | None, briefing: dict | None,
                  examples: list | None = None):
         self._tools = tools_session
+        self._minted: list[F.Fact] = []           # the boundaries this digest states, as facts
         self._llm = llm
         self._db_factory = db_factory
         self._session_id = session_id
@@ -209,7 +219,8 @@ class Broker:
         for i, item in enumerate(items):
             if self._pool_empty:
                 out.append({"i": i, "request": item, "figures": [], "series": [], "passages": [], "started": [],
-                            "boundaries": [{"class": "budget", "text": "this turn's evidence budget is spent; answer with what you have"}]})
+                            "boundaries": [self._boundary("this turn's evidence budget is spent; answer with what you have",
+                                                          want=item.get("want"), cls="budget")]})
                 continue
             entry = _empty(item)
             for kind, part in _split(item):
@@ -224,15 +235,18 @@ class Broker:
                         got = await self._program(part)
                 except Exception as exc:  # noqa: BLE001 — one part's failure is one boundary, never a lost turn
                     logger.exception("broker item %d (%s) failed", i, kind)
-                    got = {"boundaries": [{"class": "error", "text": f"the desk could not fulfil {', '.join(part['want'])} ({type(exc).__name__})"}]}
+                    got = {"boundaries": [self._boundary(f"the desk could not fulfil {', '.join(part['want'])} ({type(exc).__name__})",
+                                                         want=part.get("want"), cls="error")]}
                 entry = _merge(entry, got)
             entry["i"] = i
             out.append(entry)
         _tell_apart(out)
+        _stamp_ids(out)
         digest = _fit({"items": out, "how_to_cite": HOW_TO_CITE}, DIGEST_CHAR_LIMIT)
         summary = "; ".join(f"item {e['i']}: {len(e.get('figures', []))} figures, {len(e.get('series', []))} series, "
                             f"{len(e.get('passages', []))} passages, {len(e.get('boundaries', []))} boundaries" for e in out)
-        await self._record("digest", {"items": len(items), "writer_calls": self.writer_calls}, summary)
+        minted, self._minted = self._minted, []
+        await self._record("digest", {"items": len(items), "writer_calls": self.writer_calls}, summary, facts=minted)
         return digest
 
     # ── the three tool-shaped items ──────────────────────────────────────────
@@ -296,8 +310,8 @@ class Broker:
             program, hint = None, {"builder": e.reason, "nearest": e.nearest}
         for sk in skipped:
             # what the desk could not say, said — one name, not the whole request
-            entry["boundaries"].append({"class": "boundary", "want": sk["want"], "text": sk["reason"],
-                                        **({"nearest": sk["nearest"][:4]} if sk.get("nearest") else {})})
+            entry["boundaries"].append(self._boundary(sk["reason"], want=sk["want"], subject=(item.get("subjects") or [None])[0],
+                                                      nearest=sk.get("nearest")))
         res = None
         if program is not None:
             res = await self._call("run", {"program": program})
@@ -306,11 +320,13 @@ class Broker:
                 res = None
         if res is None:
             if self._llm is None:
-                entry["boundaries"].append({"class": "boundary", "text": _boundary_text(item, hint)})
+                entry["boundaries"].append(self._boundary(_boundary_text(item, hint), want=item.get("want"),
+                                                          subject=(item.get("subjects") or [None])[0]))
                 return entry
             program, res = await self._write(item, hint)
             if res is None:
-                entry["boundaries"].append({"class": "boundary", "text": _boundary_text(item, hint)})
+                entry["boundaries"].append(self._boundary(_boundary_text(item, hint), want=item.get("want"),
+                                                          subject=(item.get("subjects") or [None])[0]))
                 return entry
         entry["program"] = program
         self._absorb(entry, res)
@@ -382,7 +398,7 @@ class Broker:
             text = res.get("detail") or res["error"]
             if res.get("problems"):
                 text += " — " + "; ".join((p.get("fix") or p.get("detail") or p.get("reason", "")) for p in res["problems"][:3] if isinstance(p, dict))
-            entry["boundaries"].append({"class": cls, "code": res["error"], "text": str(text)[:600], **({"subject": subject} if subject else {})})
+            entry["boundaries"].append(self._boundary(str(text), cls=cls, code=res["error"], subject=subject))
             return
         if res.get("enqueued"):
             entry["started"].append({"kind": res.get("kind"), "subject": res.get("ticker") or res.get("portfolio_id") or subject,
@@ -435,11 +451,42 @@ class Broker:
             entry["boundaries"].append({"class": "held_back", "text": f"{res['held_back'].get('count')} more figures were computed and not shown; "
                                                                       f"request fewer names, or name the ones you need", "measures": res["held_back"].get("measures", [])[:20]})
 
-    async def _record(self, step_type: str, args: dict, summary: str) -> None:
+    def _boundary(self, text: str, *, want: Any = None, subject: str | None = None, cls: str = "boundary",
+                  code: str | None = None, nearest: list | None = None) -> dict:
+        """WHAT THE DESK COULD NOT DO, AS A FACT. Minted here and recorded with the
+        digest, so the words the analyst reads are on the ledger like any other
+        text this turn holds: quotable, openable, checkable. Round G refused the
+        analyst for quoting a boundary verbatim, because the boundary had been
+        shown and never recorded (ACCEPTANCE_V33 §14.3)."""
+        measure = want if isinstance(want, str) else (", ".join(str(w) for w in (want or [])) or "request")
+        params: dict = {"reason": "cannot", "class": cls}
+        if code:
+            params["code"] = code
+        if want:
+            params["want"] = want
+        f = F.fact(F.ABSENCE, measure[:200], subject=subject, text=(text or "the desk could not fulfil this")[:600],
+                   as_of="n/a", params=params, standalone=False, group="boundary")
+        self._minted.append(f)
+        entry = {"class": cls, "fact": f.id, "text": f.text}
+        if code:
+            entry["code"] = code
+        if want:
+            entry["want"] = want
+        if nearest:
+            entry["nearest"] = nearest[:4]
+        if subject:
+            entry["subject"] = subject
+        return entry
+
+    async def _record(self, step_type: str, args: dict, summary: str, facts: list | None = None) -> None:
         try:
             async with self._db_factory() as db:
-                await trace_service.record_step(db, self._session_id, step_type=step_type, tool_name=step_type, args=args,
-                                                result_summary=summary, evidence_refs=[], message_id=self._message_id)
+                step_id = await trace_service.record_step(db, self._session_id, step_type=step_type, tool_name=step_type, args=args,
+                                                          result_summary=summary,
+                                                          evidence_refs=[ledger_svc.step_entry(facts)] if facts else [],
+                                                          message_id=self._message_id)
+                for row in ledger_svc.rows_for(facts or [], session_id=self._session_id, step_id=step_id, message_id=self._message_id):
+                    db.add(row)
                 await db.commit()
         except Exception:  # noqa: BLE001 — a hole in the audit trail beats a lost turn
             logger.exception("could not record %s step for session %s", step_type, self._session_id)

@@ -62,6 +62,9 @@ GATE = {
     "ambiguous_figure", "mark_mismatch", "unknown_node", "subject_mismatch", "measure_mismatch",
     "superlative_without_rank", "date_expected", "tier_mismatch", "direction_conflict",
     "change_conflict",
+    # V35 (the figures point): a bare figure the ledger holds, a series point on
+    # several dates, a reply written while a verdict stood
+    "unpointed_figure", "ambiguous_point", "malformed_repair",
 }
 ALGEBRA = {
     "different_instants", "overlapping_intervals", "mismatched_windows", "overlapping_quantities",

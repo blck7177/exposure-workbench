@@ -71,6 +71,7 @@ async def chat_with_tools(
     model: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 4096,
+    tool_choice: str | dict | None = None,
 ) -> tuple[str | None, list[dict] | None, dict]:
     """One tool-calling turn. Returns (content, tool_calls, usage).
 
@@ -89,6 +90,9 @@ async def chat_with_tools(
         messages=messages,          # type: ignore[arg-type]
         tools=tools,                # type: ignore[arg-type]
         max_completion_tokens=max_tokens,
+        # "required": the turn is a tool call by construction (the analyst's
+        # repair while a verdict stands); None leaves the choice to the model
+        **({"tool_choice": tool_choice} if tool_choice else {}),
     )
     choice = response.choices[0].message
     tool_calls = None

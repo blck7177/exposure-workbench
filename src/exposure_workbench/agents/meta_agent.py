@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from typing import Sequence
 
 from sqlalchemy import update
@@ -55,15 +54,16 @@ the question has one. The desk returns every figure with its id and identity, pa
 not do. Ask for everything a first pass needs in one request; ask again only for what the answer still lacks. \
 Check the question's premises against the briefing first (which holdings are in which sector, what the desk holds).
 
-Your reply is plain prose, and every number you write is one the desk showed you, written exactly as it was shown \
-(16.0%, $10.63M, 0.78×) — where that form carries a date, keep the date in your sentence. A table or a \
-chart is [table: <node>] or [chart: <node>], naming a node from the evidence. Never write an id: the form the desk \
-showed a figure under is unique, so writing it is enough. Quote a passage's words verbatim \
-inside quotation marks. A superlative rests on an ordering the desk computed (compare: rank). What the desk could \
-not do or does not hold, say so in words and say what you gave instead — never an estimate, never a figure carried \
-from one company or date to another, never a nearby figure under the asked-for name.
+Your reply is plain prose, and every number you write is one the desk showed you, written exactly as it was shown, \
+bracket included: 16.0% [f_2592baab170e]. The bracket is the desk's id for that reading; it is what lets the reader \
+open the figure, and a figure written without it is refused. A table or a chart is [table: <node>] or [chart: <node>], \
+naming a node from the evidence. Quote a passage's words, or the desk's own words for what it could not do, verbatim \
+inside quotation marks. A superlative rests on an ordering the desk computed (compare: rank). What the desk could not \
+do or does not hold, say so and say what you gave instead — never an estimate, never a figure carried from one company \
+or date to another, never a nearby figure under the asked-for name.
 
-If your reply is not accepted, you are told every problem and its fix; fix them all in one rewrite. You have two."""
+If your reply is not accepted, you are told which sentences did not pass and why. Call repair_answer with a replacement \
+for exactly those sentences (an empty replacement drops one); request the evidence a fix needs first. You have two attempts."""
 
 
 # What the user is told when the turn ended without an accepted answer. ONE
@@ -86,9 +86,30 @@ MAX_ANSWER_ATTEMPTS = 2
 
 # The only tool on the analyst's face. Kept as a tuple for the tests that pin
 # the budget-free names: the analyst's tool retrieves nothing itself.
-_BUDGET_FREE_TOOLS = (evidence_request.TOOL_NAME,)
+_BUDGET_FREE_TOOLS = (evidence_request.TOOL_NAME, "repair_answer")
 
 _WRITE_OR_ASK = "Write the answer, or request the evidence you still need."
+
+# C — THE REPAIR IS A TOOL. Round G: 18 refused replies got a second chance, one
+# used the tagged-lines protocol, four re-sent the refused text byte for byte and
+# thirteen rewrote the whole reply; a whole-reply rewrite was "still allowed" and
+# so was the path every model took. While a verdict stands, the analyst's turn is
+# a tool call by construction (tool_choice=required): replacements for the
+# sentences that failed, or an evidence request.
+REPAIR_TOOL_NAME = "repair_answer"
+REPAIR_TOOL = {"type": "function", "function": {
+    "name": REPAIR_TOOL_NAME,
+    "description": ("Replace the sentences of your reply that did not pass, by tag. Every other sentence is kept exactly "
+                    "as you wrote it. An empty text drops the sentence. Request evidence first if a fix needs a figure "
+                    "you were not shown."),
+    "parameters": {"type": "object", "properties": {
+        "replacements": {"type": "array", "minItems": 1, "items": {
+            "type": "object", "properties": {"tag": {"type": "string", "description": "S1, S2, …"},
+                                             "text": {"type": "string", "description": "the sentence as it should read; empty drops it"}},
+            "required": ["tag", "text"], "additionalProperties": False}}},
+        "required": ["replacements"], "additionalProperties": False}}}
+_REPAIR_ONLY = ("A verdict stands on your reply: call repair_answer with replacements for the sentences named, "
+                "or request_evidence for what a fix needs. A new reply is not read.")
 
 
 async def _load_history(db, session_id: str) -> list[dict]:
@@ -127,14 +148,12 @@ async def _record_answer(db_factory, session_id: str, message_id: str, text: str
         logger.exception("could not record answer step for %s", session_id)
 
 
-_REPAIR_RE = re.compile(r"^\s*(S\d+)\s*:\s*(.*)$")
-
-
 def _refusal_message(verdict) -> str:
     """C — SENTENCE REPAIR. Only the sentences that did not pass come back, and
     only replacements for them are asked for; everything else is kept exactly as
     written. A whole-reply rewrite re-rolled every sentence, and 17 of 20
-    questions spent both attempts without landing (V33F)."""
+    questions spent both attempts without landing (V33F). The replacements come
+    through repair_answer, a tool: round G showed a text protocol is not one."""
     failed = verdict.failed
     lines = [f"{len(failed)} sentence(s) of your reply did not pass. Everything else is KEPT exactly as you wrote it.",
              "", "Replace only these:"]
@@ -147,28 +166,30 @@ def _refusal_message(verdict) -> str:
                 line += f": {p['fix']}"
             if p.get("candidates"):
                 line += " — the desk showed: " + "; ".join(
-                    f"{c.get('measure')} {c.get('subject')} {c.get('as_of')}" for c in p["candidates"][:4])
+                    f"{c.get('measure')} {c.get('subject')} {c.get('as_of')} [{c.get('id')}]" for c in p["candidates"][:4])
             lines.append(line)
     other = [p for p in verdict.problems if not p.get("sentence")]
     for p in other[:6]:
         lines.append(f"      {p['reason']}: {p.get('fix') or p.get('detail') or ''}")
-    lines += ["", "Reply with ONLY the replacement sentences, one per line, each starting with its tag:",
-              "S1: <the sentence as it should read>",
-              "A sentence you cannot support: give its tag and nothing after the colon, and it is dropped.",
-              "Request the evidence you lack first if a fix needs a figure you were not shown."]
+    lines += ["", "Call repair_answer with a replacement for each tag above (an empty text drops the sentence). "
+                  "Request the evidence you lack first if a fix needs a figure you were not shown."]
     return "\n".join(lines)
 
 
-def _replacements(text: str, verdict) -> dict[str, str] | None:
-    """The tagged lines of a repair reply, or None when it is not one (the model
-    rewrote the whole answer instead, which is still allowed)."""
-    tags = {x["tag"] for x in verdict.failed}
+def _parse_replacements(args: dict, verdict) -> tuple[dict[str, str], list[str]]:
+    """({tag: text} for the failed sentences named, tags that name no failed sentence)."""
+    failed = {x["tag"] for x in verdict.failed}
     out: dict[str, str] = {}
-    for line in (text or "").splitlines():
-        m = _REPAIR_RE.match(line)
-        if m and m.group(1) in tags:
-            out[m.group(1)] = m.group(2)
-    return out or None
+    unknown: list[str] = []
+    for r in (args or {}).get("replacements") or []:
+        if not isinstance(r, dict):
+            continue
+        tag = str(r.get("tag") or "").strip().upper()
+        if tag in failed:
+            out[tag] = str(r.get("text") or "")
+        elif tag:
+            unknown.append(tag)
+    return out, unknown
 
 
 async def handle_message(
@@ -217,9 +238,13 @@ async def handle_message(
         broker = evidence_broker.Broker(tools_session, llm, db_factory, session_id, message_id, brief, examples=examples)
         tools = [evidence_request.REQUEST_TOOL]
 
+        nudges = 0
         for _turn in range(max_turns):
+            # while a verdict stands the turn is a tool call: a repair or a request
+            tools = [evidence_request.REQUEST_TOOL] + ([REPAIR_TOOL] if standing is not None else [])
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
-            content, tool_calls = await llm.chat(messages=messages, tools=tools)
+            content, tool_calls = await llm.chat(messages=messages, tools=tools,
+                                                 **({"tool_choice": "required"} if standing is not None else {}))
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:
                 assistant_msg["tool_calls"] = tool_calls
@@ -240,11 +265,33 @@ async def handle_message(
                         else:
                             requests += 1
                             result = await broker.fulfil(items)
+                    elif name == REPAIR_TOOL_NAME and standing is not None:
+                        repl, unknown = _parse_replacements(args, standing)
+                        led = await _load_ledger(db_factory, session_id)
+                        text = answer_check.repair(answer, standing, repl) if repl else answer
+                        verdict = answer_check.check(text, led, question=user_text)
+                        await _record_answer(db_factory, session_id, message_id, text, verdict)
+                        if verdict.ok:
+                            acc = answer_check.accepted(text, verdict, led)
+                            reply_text, reply_citations = acc["text"], acc["citations"]
+                            reply_verified, reply_blocks = acc["verified"], acc["blocks"]
+                            result = {"accepted": True}
+                        else:
+                            attempts += 1
+                            gate_refusals.append(verdict.error)
+                            answer, standing = text, verdict
+                            result = {"accepted": False, "refusal": _refusal_message(verdict),
+                                      **({"tags_not_among_the_failed": unknown} if unknown else {})}
+                    elif name == REPAIR_TOOL_NAME:
+                        result = {"error": "nothing_to_repair", "detail": "no verdict stands on a reply; write the answer"}
                     else:
                         result = {"error": "unknown_tool",
-                                  "detail": f"the analyst has one tool, {evidence_request.TOOL_NAME}; the answer is your reply text"}
+                                  "detail": f"the analyst's tools are {evidence_request.TOOL_NAME} and {REPAIR_TOOL_NAME}; "
+                                            f"the answer is your reply text"}
                     messages.append({"role": "tool", "tool_call_id": tc["id"],
                                      "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
+                if reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:
+                    break
                 continue
 
             text = (content or "").strip()
@@ -252,13 +299,16 @@ async def handle_message(
                 messages.append({"role": "user", "content": _WRITE_OR_ASK})
                 continue
 
-            led = await _load_ledger(db_factory, session_id)
             if standing is not None:
-                # C: a repair reply replaces only the sentences it names; every
-                # accepted sentence is kept as written, so the accepted set grows
-                repl = _replacements(text, standing)
-                if repl is not None:
-                    text = answer_check.repair(answer, standing, repl)
+                # a new reply while a verdict stands is not read: the repair is the
+                # tool, and a provider that ignores tool_choice is told so once
+                nudges += 1
+                if nudges > 1:
+                    gate_refusals.append("malformed_repair")
+                    break
+                messages.append({"role": "user", "content": _REPAIR_ONLY})
+                continue
+            led = await _load_ledger(db_factory, session_id)
             verdict = answer_check.check(text, led, question=user_text)
             await _record_answer(db_factory, session_id, message_id, text, verdict)
             if verdict.ok:
