@@ -162,10 +162,10 @@ def test_the_users_own_number_is_allowed():
     _accepted("At a 20% participation rate JPM takes longest to sell.", question="days to liquidate at 20% of ADV")
 
 
-def test_an_id_anywhere_but_after_its_figure_is_a_word_the_reader_must_not_see():
+def test_a_bare_id_is_a_word_the_reader_must_not_see_and_a_bracket_elsewhere_is_a_citation():
     _refused("MSFT weighs f_wmsft of the book.", "id_in_prose")
-    v = _refused("The tier [f_warnnvda] is 15.0%.", "id_in_prose")
-    assert "unpointed_figure" in {p["reason"] for p in v.problems}
+    v = _refused("The tier [f_warnnvda] is 15.0%.", "unpointed_figure")
+    assert v.citations == ["f_warnnvda"], "the bracket cites the tier; the bare figure after it is still bare"
 
 
 # ── G3: the sentence around the figures ───────────────────────────────────────
@@ -491,3 +491,85 @@ def test_property_a_pointed_figure_passes_or_fails_on_its_fact_alone():
         v = ac.check(text, LEDGER)
         links = [l for l in v.links.values() if l.get("how") != "identity"]
         assert links and links[0]["ids"] == ["f_wmsft"], (text, v.problems)
+
+
+# ── V35 round H: the writer's natural shapes ─────────────────────────────────
+
+def test_above_and_below_compare_and_claim_no_change():
+    """Round H Q11 twice: "16.0% against a warning level of 15.0% … above warning"
+    refused as a change between two quantities."""
+    _accepted("MSFT is at 16.0% [f_curmsft] against a warning level of 15.0% [f_warnmsft], so it is already above warning.")
+    _accepted("NVDA at 4.06% [f_wnvda] sits well below its 15.0% [f_warnnvda] warning tier.")
+    _refused("MSFT rose from 15.0% [f_warnmsft] to 16.0% [f_curmsft].", "change_conflict")
+
+
+def test_a_unit_word_may_sit_between_the_figure_and_its_bracket():
+    """Round H Q11: "1.0 percentage point [f_…]" — the bracket was read as a word and
+    the figure as bare. The pointer is read, and judged: the tier does not hold 1.0."""
+    v = _refused("So it is already 1.0 percentage point [f_breachmsft] above warning.", "mark_mismatch")
+    assert v.problems[0]["holds"] == "20.0%"
+    led = Ledger.of([*LEDGER.by_id.values(), _f("f_dso00001", "days_sales_outstanding", "AAPL", 97.36, unit="COUNT", node="dso")])
+    v = ac.check("AAPL's DSO is 97.36 days [f_dso00001] at the latest quarter.", led)
+    assert v.ok, v.problems
+    assert next(iter(v.links.values()))["ids"] == ["f_dso00001"]
+    assert ac.accepted("AAPL's DSO is 97.36 days [f_dso00001].", ac.check("AAPL's DSO is 97.36 days [f_dso00001].", led), led)["text"] == "AAPL's DSO is 97.36 days."
+
+
+def test_a_bracket_after_a_quotation_or_a_name_cites_that_fact():
+    """Round H put eleven brackets after a quotation or a noun: a citation, no
+    figure to check; the fact is on the ledger or the bracket is refused."""
+    text = "Lilly says gross margin “increased 1.7 percentage points compared with 2024, primarily driven by favorable product mix.” [f_plly] That is all."
+    v = _accepted(text)
+    assert v.citations == ["f_plly"] and "f_plly" in v.refs
+    out = ac.accepted(text, v, LEDGER)
+    assert out["text"] == "Lilly says gross margin “increased 1.7 percentage points compared with 2024, primarily driven by favorable product mix.” That is all."
+    assert "f_plly" in out["citations"]
+    _accepted("AAPL's 10-K Item 7 passage [f_plly] discusses margins.")
+    _refused("AAPL's 10-K Item 7 passage [f_nothere] discusses margins.", "not_on_ledger")
+    _refused("A figure the bracket does not follow: 16.0% of the book [f_wmsft].", "unpointed_figure")
+
+
+def test_the_punctuation_that_closes_the_writers_sentence_inside_the_marks_is_not_the_sources():
+    """Round H: nine boundary quotations refused for a full stop inside the marks."""
+    assert ac.check('The desk said "does not compute liquidation days." and stopped.', _C_LEDGER).ok
+    assert ac.check('The desk said "does not compute liquidation days," and stopped.', _C_LEDGER).ok
+    v = ac.check('The desk said "does not compute liquidation days for banks".', _C_LEDGER)
+    assert {p["reason"] for p in v.problems} == {"unverified_quote"}
+
+
+def test_a_quotation_keeps_its_thousands_separators_and_the_digests_escaped_newlines():
+    """V33E/H Q19: 'AWS net sales $90,757 …' never verified — the ledger keeps a
+    passage with separators dropped for the number lookup, and the digest shows a
+    newline JSON-escaped, which the analyst copied as two characters."""
+    led = Ledger.of([*_C_LEDGER.by_id.values(), _passage("f_seg01", "AMZN", "AWS\n\nNet sales$90,757 $107,556 $128,725\nOther")])
+    assert ac.check("The AWS passage says “Net sales$90,757 $107,556 $128,725” in the table.", led).ok
+    assert ac.check("The AWS passage says “AWS\\n\\nNet sales$90,757 $107,556 $128,725” in the table.", led).ok
+
+
+def test_a_series_bracket_names_its_point():
+    """Round H Q01: one value on two dates, both dates named in one sentence. The
+    bracket the desk shows carries the date; a bare series bracket needs the
+    date in the sentence, or is refused with the dated brackets to write."""
+    flat = Ledger.of([*_C_LEDGER.by_id.values(),
+                      {**_series("f_flat0001", "headcount", "AMZN", [["2023-12-31", 1.5e6], ["2025-12-31", 1.5e6]], unit="COUNT"), "params": {"node": "s_hc"}}])
+    v = ac.check("Headcount was 1.50M [f_flat0001@2023-12-31] and 1.50M [f_flat0001@2025-12-31].", flat)
+    assert v.ok, v.problems
+    assert sorted(l["period"] for l in v.links.values()) == ["2023-12-31", "2025-12-31"]
+    assert ac.accepted("Headcount was 1.50M [f_flat0001@2023-12-31].", ac.check("Headcount was 1.50M [f_flat0001@2023-12-31].", flat), flat)["text"] == "Headcount was 1.50M."
+    v = ac.check("Headcount was 1.50M [f_flat0001] in 2023 and 1.50M [f_flat0001] in 2025.", flat)
+    assert {p["reason"] for p in v.problems} == {"ambiguous_point"} and "[f_flat0001@2023-12-31]" in v.problems[0]["fix"]
+    v = ac.check("Operating cash flow was $46.3B [f_ocf001@2025-12-31].", _C_LEDGER)
+    assert [p["reason"] for p in v.problems] == ["mark_mismatch"] and "on 2025-12-31" in v.problems[0]["fix"]
+
+
+def test_a_refusal_names_the_ids_the_desk_showed_the_figure_under():
+    v = _refused("MSFT weighs 16.0% [f_nope] of the book.", "not_on_ledger")
+    assert {c["id"] for c in v.problems[0]["candidates"]} >= {"f_wmsft", "f_curmsft"}
+    v = _refused("MSFT weighs 16.0% [f_warnnvda] of the book.", "mark_mismatch")
+    assert {c["id"] for c in v.problems[0]["candidates"]} >= {"f_wmsft"} and "f_warnnvda" not in {c["id"] for c in v.problems[0]["candidates"]}
+    v = _refused("MSFT is the largest issuer concentration at 16.0% [f_curmsft].", "superlative_without_rank")
+    assert [c["id"] for c in v.problems[0]["candidates"]] == ["f_rmsft"] and "[f_rmsft]" in v.problems[0]["fix"]
+
+
+def test_a_filings_form_name_is_a_word_not_a_figure():
+    _accepted("The 10-K and the 10-Q say little; see the DEF 14A.")

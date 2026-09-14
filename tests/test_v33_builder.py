@@ -186,8 +186,39 @@ def test_the_name_before_the_equals_is_the_lines_name_not_an_operand():
     assert room["name"] == "room_to_warning" and room["expr"]["a"] == "$limit_checks_warning_level"
 
 
-def test_two_operators_on_one_line_are_refused_with_the_way_to_write_them():
+def test_a_derivation_is_an_expression_with_parentheses_and_the_line_carries_its_name():
+    """Round H Q15 wrote `days = mv / (adv * 0.2)`; the inner operation is a binding
+    of its own, not returned; the outer one carries the line's name."""
+    prog = pb.build({"subjects": ["port_001", "MSFT", "AAPL"], "want": ["issuer_exposures.market_value", "price.adv"], "window": "20d",
+                     "derive": ["days = issuer_exposures.market_value / (price.adv * 0.2)"]}, held_in=_HELD, skipped=[])
+    by = {b["name"]: b["expr"] for b in prog["let"]}
+    assert by["days"]["fn"] == "div" and by["days"]["b"] == "$days_1"
+    assert by["days_1"] == {"fn": "mul", "a": "$price_adv", "b": 0.2}
+    assert "days" in prog["return"] and "days_1" not in prog["return"]
+    assert ps.typecheck(prog) == []
+    three = pb.build({"subjects": ["port_001"], "want": ["limit_checks.current_value", "limit_checks.warning_level", "limit_checks.breach_level"],
+                      "derive": ["limit_checks.breach_level - limit_checks.current_value + limit_checks.warning_level * 2"]}, skipped=[])
+    assert ps.typecheck(three) == [] and sum(1 for b in three["let"] if b["expr"]["fn"] in ("add", "sub", "mul")) == 3
+
+
+def test_a_derivation_that_cannot_be_read_is_skipped_and_says_where():
     skipped = []
-    pb.build({"subjects": ["port_001", "MSFT"], "want": ["issuer_exposures.market_value", "price.adv"], "window": "20d",
-              "derive": ["issuer_exposures.market_value / price.adv / 0.2"]}, held_in=_HELD, skipped=skipped)
-    assert len(skipped) == 1 and "one operator per line" in skipped[0]["reason"], skipped
+    pb.build({"subjects": ["port_001"], "want": ["limit_checks.current_value"],
+              "derive": ["limit_checks.current_value / (nonsense", "limit_checks.current_value"]}, skipped=skipped)
+    assert [x["want"] for x in skipped] == ["derive:limit_checks.current_value / (nonsense", "derive:limit_checks.current_value"]
+    assert "nonsense" in skipped[0]["reason"] and "operator" in skipped[1]["reason"]
+
+
+def test_a_window_with_words_the_desk_does_not_read_is_said_not_trimmed():
+    """Round H Q02: "same 4 quarters a year earlier" was read as the last 4 quarters,
+    the desk returned the same series twice, and the analyst wrote that a year
+    earlier the sequence was the same — a falsehood no check can see."""
+    assert pb.unreadable_window("same 4 quarters a year earlier") == "same earlier"
+    for ok in ("last 8 quarters", "last 5 years", "12m", "at 2025-06-30", "1y vs SPY", "vs prev run", "two weeks", "latest", "20d",
+               "as of 2026-09-10", "trailing twelve months", "last 4 quarters ended 2025-12-31", "the latest run"):
+        assert pb.unreadable_window(ok) is None, ok
+    skipped = []
+    with pytest.raises(pb.NotExpressible) as exc:
+        pb.build({"subjects": ["XOM"], "want": ["net_debt_to_ebitda"], "window": "same 4 quarters a year earlier"}, skipped=skipped)
+    assert "same earlier" in exc.value.reason and "at YYYY-MM-DD" in exc.value.reason
+    assert pb.parse_window("last 4 quarters ended 2025-12-31").at == "2025-12-31"

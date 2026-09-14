@@ -322,3 +322,37 @@ async def test_a_tools_refusal_is_a_boundary_fact_too():
     entry = d["items"][0]["boundaries"][0]
     assert entry["class"] == "data_absent" and entry["code"] == "not_prepared"
     assert [f.id for f in recorded] == [entry["fact"]] and recorded[0].text.startswith("XOM is not on the desk")
+
+
+@pytest.mark.asyncio
+async def test_a_series_point_is_shown_with_its_date_in_the_bracket():
+    """Round H Q01: a series held one value on two dates and the analyst named
+    both dates in one sentence. The bracket the desk shows names the point."""
+    row = _row("f_s1", "series", "AMZN", "net_income", "MONEY", {"points": [["2025-09-30", 21.19e9], ["2025-12-31", 21.19e9]], "n": 2},
+               as_of="2025-12-31", params={"node": "ni"})
+    out = await _broker(_Tools({"run": _run_result([row])})).fulfil([{"subjects": ["AMZN"], "want": ["net_income"], "window": "last 8 quarters"}])
+    (sr,) = out["items"][0]["series"]
+    assert sr["points"] == [["2025-09-30", "$21.19B [f_s1@2025-09-30]"], ["2025-12-31", "$21.19B [f_s1@2025-12-31]"]]
+    assert sr["first"][1] == "$21.19B [f_s1@2025-09-30]" and sr["last"][1] == "$21.19B [f_s1@2025-12-31]"
+
+
+@pytest.mark.asyncio
+async def test_what_the_digest_holds_back_is_a_fact_too(monkeypatch):
+    """Round H Q14/Q15 quoted the digest's own hold-back note and were refused:
+    it had been shown and never recorded."""
+    monkeypatch.setattr(eb, "DIGEST_CHAR_LIMIT", 1500)
+    rows = [_row(f"f_{i:04d}", "scalar", f"T{i}", "issuer_exposures.weight", "RATIO", 0.01 * i, params={"node": "w"}) for i in range(40)]
+    recorded: list = []
+    b = eb.Broker(_Tools({"run": _run_result(rows)}), None, None, "sess_x", "msg_x", {"issuers": {}})
+
+    async def _capture(step_type, args, summary, facts=None):
+        recorded.extend(facts or [])
+    b._record = _capture
+    d = await b.fulfil([{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
+    note = next(x for x in d["items"][0]["boundaries"] if x.get("class") == "held_back")
+    assert note["count"] > 0 and note["fact"] in {f.id for f in recorded}
+    assert next(f for f in recorded if f.id == note["fact"]).text.startswith("figures computed and on the ledger but not shown")
+    held = await _broker(_Tools({"run": _run_result(rows[:2], held_back={"count": 38, "measures": ["issuer_exposures.weight"]})})).fulfil(
+        [{"subjects": ["port_001"], "want": ["issuer_exposures.weight"]}])
+    tool_note = next(x for x in held["items"][0]["boundaries"] if x.get("class") == "held_back")
+    assert tool_note["fact"].startswith("f_") and "38 more figures" in tool_note["text"]

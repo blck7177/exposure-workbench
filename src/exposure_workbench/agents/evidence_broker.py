@@ -53,7 +53,8 @@ WRITER_TOOL = {"type": "function", "function": {
 
 HOW_TO_CITE = ("Write each figure exactly as its `value` reads here, bracket included: the bracket is the desk's id for "
                "that reading, it is what lets the reader open the figure, and a figure written without it is refused. "
-               "A series shows its points as [date, value]: write a point's value as shown, bracket included, and name its date. "
+               "A series shows its points as [date, value]: write a point's value as shown, bracket included — the bracket names the point's date. "
+               "A bracket after a quotation or a name cites that fact. "
                "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks; "
                "a boundary is the desk's own words for what it could not do — quote it the same way, or say it in yours.")
 
@@ -120,7 +121,7 @@ def _tell_apart(items: list[dict]) -> None:
         e["figures"] = kept
 
 
-def _fit(digest: dict, limit: int) -> dict:
+def _fit(digest: dict, limit: int, mint=None) -> dict:
     """The digest within its cap by holding back the TAIL ROWS of the largest
     figure list, then trimming passage texts — never a whole item. V33D: two
     items of 96 and 30 figures ran past the cap, dumps_capped dropped an item
@@ -139,9 +140,11 @@ def _fit(digest: dict, limit: int) -> dict:
         dropped, biggest["figures"] = figs[-cut:], figs[:-cut]
         note = next((b for b in biggest["boundaries"] if b.get("class") == "held_back" and b.get("by") == "digest"), None)
         if note is None:
-            note = {"class": "held_back", "by": "digest", "count": 0, "measures": [],
-                    "text": "figures computed and on the ledger but not shown here: the request was too wide for one "
-                            "digest; ask again for the names you need"}
+            text = ("figures computed and on the ledger but not shown here: the request was too wide for one "
+                    "digest; ask again for the names you need")
+            # a fact, like every other text the analyst reads (round H refused its quotation)
+            note = mint(text, cls="held_back") if mint else {"class": "held_back", "text": text}
+            note.update({"by": "digest", "count": 0, "measures": []})
             biggest["boundaries"].append(note)
         note["count"] += len(dropped)
         note["measures"] = sorted({f"{f.get('subject')}:{f.get('measure')}" for f in dropped} | set(note["measures"]))[:30]
@@ -179,11 +182,12 @@ def _stamp_ids(items: list[dict]) -> None:
         for f in e.get("figures") or []:
             f["value"] = _cited(f["value"], f["id"])
         for sr in e.get("series") or []:
+            # a series has one id; its bracket names the point: `[f_…@2025-12-31]`
             for key in ("first", "last"):
                 if isinstance(sr.get(key), list) and len(sr[key]) == 2:
-                    sr[key] = [sr[key][0], _cited(sr[key][1], sr["id"])]
+                    sr[key] = [sr[key][0], _cited(sr[key][1], f"{sr['id']}@{sr[key][0]}")]
             if sr.get("points"):
-                sr["points"] = [[p, _cited(v, sr["id"])] for p, v in sr["points"]]
+                sr["points"] = [[p, _cited(v, f"{sr['id']}@{p}")] for p, v in sr["points"]]
 
 
 def _display(value: Any, unit: str | None) -> Any:
@@ -242,7 +246,7 @@ class Broker:
             out.append(entry)
         _tell_apart(out)
         _stamp_ids(out)
-        digest = _fit({"items": out, "how_to_cite": HOW_TO_CITE}, DIGEST_CHAR_LIMIT)
+        digest = _fit({"items": out, "how_to_cite": HOW_TO_CITE}, DIGEST_CHAR_LIMIT, mint=self._boundary)
         summary = "; ".join(f"item {e['i']}: {len(e.get('figures', []))} figures, {len(e.get('series', []))} series, "
                             f"{len(e.get('passages', []))} passages, {len(e.get('boundaries', []))} boundaries" for e in out)
         minted, self._minted = self._minted, []
@@ -448,8 +452,9 @@ class Broker:
         if isinstance(nodes, dict):
             entry["nodes"] = [n for n in nodes if not str(n).startswith("_")]
         if res.get("held_back"):
-            entry["boundaries"].append({"class": "held_back", "text": f"{res['held_back'].get('count')} more figures were computed and not shown; "
-                                                                      f"request fewer names, or name the ones you need", "measures": res["held_back"].get("measures", [])[:20]})
+            entry["boundaries"].append({**self._boundary(f"{res['held_back'].get('count')} more figures were computed and not shown; "
+                                                         f"request fewer names, or name the ones you need", cls="held_back"),
+                                        "measures": res["held_back"].get("measures", [])[:20]})
 
     def _boundary(self, text: str, *, want: Any = None, subject: str | None = None, cls: str = "boundary",
                   code: str | None = None, nearest: list | None = None) -> dict:

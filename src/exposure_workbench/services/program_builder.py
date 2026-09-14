@@ -56,6 +56,31 @@ class Window:
     days: int | None = None
 
 
+_WINDOW_FORMS = (r"\bprev(ious)?\b|prior run|last run", r"\b(at|as of|ended|ending|through)\s+\d{4}-\d{2}-\d{2}",
+                 r"\blast[_ ]?n?\s*\d+\s*(quarters?|years?|fiscal years?|periods?|windows?|annual)?",
+                 r"\b\d+\s*(quarters?|fiscal years?|years?)\b", r"\b\d+\s*m(onths?)?\b", r"\bttm\b|trailing twelve|trailing 12",
+                 r"\b(1m|3m|6m|1y|3y)\b", r"\b\d+\s*(d|days?|sessions?)\b", r"two weeks|fortnight",
+                 r"\b(vs\.?|versus|against|relative to)\s+[A-Za-z]{2,5}\b")
+_WINDOW_FILLER = frozenset("the a an of over for window windows period periods run latest current most recent now today "
+                           "and with on in to date annual fiscal quarter quarters quarter-end quarter-ends year years month months "
+                           "day days trailing ttm basis ended ending end as at vs versus against relative last".split())
+
+
+def unreadable_window(text: str | None) -> str | None:
+    """The words of a `window` the desk does not read, or None. `parse_window`
+    keeps what it recognises and drops the rest; round H's "same 4 quarters a
+    year earlier" came back as the last 4 quarters, and the analyst wrote that a
+    year earlier the sequence was the same — a falsehood no check can see.
+    What is not read is said, so the analyst can ask another way."""
+    t = (text or "").lower().strip()
+    if not t:
+        return None
+    for form in _WINDOW_FORMS:
+        t = re.sub(form, " ", t)
+    left = [w for w in re.split(r"[^a-z0-9\-]+", t) if w and w not in _WINDOW_FILLER and not w.isdigit()]
+    return " ".join(left) or None
+
+
 def parse_window(text: str | None) -> Window:
     w = Window()
     t = (text or "").lower().strip()
@@ -63,7 +88,7 @@ def parse_window(text: str | None) -> Window:
         return w
     if re.search(r"\bprev(ious)?\b|prior run|last run", t):
         w.vs_prev = True
-    m = re.search(r"\bat\s+(\d{4}-\d{2}-\d{2})", t) or re.search(r"\bas of\s+(\d{4}-\d{2}-\d{2})", t)
+    m = re.search(r"\b(?:at|as of|ended|ending|through)\s+(\d{4}-\d{2}-\d{2})", t)
     if m:
         w.at = m.group(1)
     m = re.search(r"\blast[_ ]?n?\s*(\d+)\s*(quarters?|years?|fiscal years?|periods?|windows?|annual)?", t) \
@@ -135,12 +160,32 @@ def _name(s: str) -> str:
 
 
 _OPS = {"-": "sub", "+": "add", "*": "mul", "/": "div"}
-# `room = limit_checks.warning_level - limit_checks.current_value`: an optional
-# name, then one operator over two operands. Round G's Q11 wrote the name and the
-# whole left side was read as an operand; Q15 needed mv / (adv × 0.2) and one
-# operator per line could not say it — a named line, used by the next, can.
-_DERIVE = re.compile(r"^\s*(?:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*)?(.+?)\s*([-+*/])\s*(.+?)\s*$")
+# `room = limit_checks.warning_level - limit_checks.current_value`,
+# `days = issuer_exposures.market_value / (price.adv * 0.2)`: an optional name,
+# then an expression over the request's names and numbers with + - * / and
+# parentheses. Round G's Q11 named its lines and the name was read as an
+# operand; round H's Q15 wrote the parenthesised form and one operator per
+# line could not say it. Each operation is one binding of the program.
+_DERIVE = re.compile(r"^\s*(?:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*)?(.+?)\s*$")
+_DTOKEN = re.compile(r"\s*(?:(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_.:]*)|([-+*/()]))")
 
+
+def _dtokens(expr: str) -> list[tuple[str, str]]:
+    out, pos = [], 0
+    while pos < len(expr):
+        m = _DTOKEN.match(expr, pos)
+        if not m or m.end() == pos:
+            if expr[pos:].strip():
+                raise NotExpressible(f"a derivation is names, numbers and + - * / with parentheses; could not read {expr[pos:].strip()[:30]!r}")
+            break
+        pos = m.end()
+        if m.group(1):
+            out.append(("num", m.group(1)))
+        elif m.group(2):
+            out.append(("name", m.group(2)))
+        else:
+            out.append(("op", m.group(3)))
+    return out
 
 def build(item: dict, held_in: dict | None = None, skipped: list | None = None) -> dict:
     """The program for one request.
@@ -164,6 +209,11 @@ def build(item: dict, held_in: dict | None = None, skipped: list | None = None) 
     tickers = [s.upper() for s in subjects if not s.startswith(("port_", "run_", "calc_"))]
     ports = [s for s in subjects if s.startswith("port_")]
     runs = [s for s in subjects if s.startswith(("run_", "calc_"))]
+    unread = unreadable_window(item.get("window"))
+    if unread:
+        raise NotExpressible(f"the window {item.get('window')!r} has words the desk does not read ({unread}); it reads: "
+                             f"last N quarters | last N years | Nm | at YYYY-MM-DD | 1y | 30d | vs prev run | vs SPY — "
+                             f"say the earlier period as its own window (at YYYY-MM-DD, or last 8 quarters and read the dates)", [])
     win = parse_window(f"{item.get('window') or ''} {item.get('ask') or ''}")
     compare = (item.get("compare") or "").strip().lower()
 
@@ -379,25 +429,84 @@ def _operand(side: str, nodes_of_want: dict[str, list[str]], let: list[dict]):
             settled = [n for n in ns if next(b for b in let if b["name"] == n)["expr"].get("fn") != "run"]
             if settled:
                 return "$" + settled[-1]
-    hint = ""
-    if any(op in side for op in "+-*/") and not side.replace(".", "").replace("-", "").isdigit():
-        hint = " — one operator per line: name a line (`adv20 = price.adv * 0.2`) and use its name in the next"
-    raise NotExpressible(f"{side!r} is not one of the names this request asked for or derived above, and is not a number{hint}",
+    raise NotExpressible(f"{side!r} is not one of the names this request asked for or derived above, and is not a number",
                          sorted(nodes_of_want))
 
 
 def _derive(line: str, bind, nodes_of_want: dict[str, list[str]], let: list[dict]) -> None:
     m = _DERIVE.match(line)
-    if not m:
-        raise NotExpressible(f"a derivation is '<name> = <name> <+-*/> <name|number>'; got {line!r}")
-    given, left, op, right = m.groups()
-    a, b = _operand(left, nodes_of_want, let), _operand(right, nodes_of_want, let)
-    if not isinstance(a, str) and not isinstance(b, str):
-        raise NotExpressible("a derivation works over the desk's figures: at least one side names a want")
-    node = bind(_name(given) if given else _name(line), {"fn": _OPS[op], "a": a, "b": b})
-    # the line's name is a name the next line may use
-    nodes_of_want[given or line] = [node]
+    if not m or not m.group(2).strip():
+        raise NotExpressible(f"a derivation is '<name> = <expression over the names asked for>'; got {line!r}")
+    given, expr = m.group(1), m.group(2)
+    toks = _dtokens(expr)
+    pos = [0]
 
+    def peek():
+        return toks[pos[0]] if pos[0] < len(toks) else (None, None)
+
+    def take(kind, value=None):
+        k, val = peek()
+        if k != kind or (value is not None and val != value):
+            raise NotExpressible(f"could not read the derivation {line!r} at {val!r}: names, numbers, + - * / and parentheses")
+        pos[0] += 1
+        return val
+
+    # the expression as a tree first; the bindings after, so the outermost
+    # operation carries the line's name and the inner ones are not returned
+    def factor():
+        k, val = peek()
+        if k == "num":
+            pos[0] += 1
+            return ("num", float(val))
+        if k == "name":
+            pos[0] += 1
+            return ("name", val)
+        if k == "op" and val == "(":
+            pos[0] += 1
+            inner = expression()
+            take("op", ")")
+            return inner
+        raise NotExpressible(f"could not read the derivation {line!r} at {val!r}: names, numbers, + - * / and parentheses")
+
+    def term():
+        a = factor()
+        while peek() in (("op", "*"), ("op", "/")):
+            op = take("op")
+            a = ("op", op, a, factor())
+        return a
+
+    def expression():
+        a = term()
+        while peek() in (("op", "+"), ("op", "-")):
+            op = take("op")
+            a = ("op", op, a, term())
+        return a
+
+    tree = expression()
+    if pos[0] != len(toks):
+        raise NotExpressible(f"could not read the derivation {line!r} past {toks[pos[0]][1]!r}")
+    if tree[0] != "op":
+        raise NotExpressible("a derivation is arithmetic over the desk's figures: an operator over a name")
+    top = _name(given) if given else _name(line)
+    base, k = top[:48], [0]
+
+    def emit(node, root: bool):
+        if node[0] == "num":
+            return node[1]
+        if node[0] == "name":
+            return _operand(node[1], nodes_of_want, let)
+        _, op, left, right = node
+        a, b = emit(left, False), emit(right, False)
+        if not isinstance(a, str) and not isinstance(b, str):
+            raise NotExpressible("a derivation works over the desk's figures: at least one side names a want")
+        if root:
+            return bind(top, {"fn": _OPS[op], "a": a, "b": b})
+        k[0] += 1
+        return "$" + bind(f"{base}_{k[0]}", {"fn": _OPS[op], "a": a, "b": b}, ret=False)
+
+    bound = emit(tree, True)
+    # the line's name is a name the next line may use
+    nodes_of_want[given or line] = [bound]
 
 def _compare(compare, win, tickers, bind, classify, vectors, series, scalars_by_want) -> None:
     if compare.startswith("rank"):

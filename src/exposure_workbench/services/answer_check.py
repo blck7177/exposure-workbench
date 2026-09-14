@@ -61,8 +61,15 @@ MARK_BLOCK = re.compile(r"\[(table|chart):\s*([A-Za-z_][A-Za-z0-9_]*)\]")
 _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
 # THE POINTER A FIGURE CARRIES: the id the desk showed the figure under, in
 # brackets after it. A unit tail the desk's own display puts after the digits
-# ("$13.27B/day", "0.78×") may sit between the figure and its bracket.
-_POINTER_AFTER = re.compile(r"(?:/[A-Za-z]+|×|x|\s?pp|\s?bps)?\s*\[\s*(f_[0-9A-Za-z]{4,})\s*\]")
+# ("$13.27B/day", "0.78×") or the analyst's own unit words ("4.0 percentage
+# points") may sit between the figure and its bracket; a series' bracket may
+# name the point's date (`f_…@2025-12-31`, as the desk shows it). Round H put
+# eleven brackets after a quotation or a noun ("…” [f_passage]", "Item 7
+# passage [f_…]"): those are CITATIONS — a fact named, no figure to check.
+_UNIT_TAIL = (r"(?:/[A-Za-z]+|×|\s?(?:x|times|pp|bps|basis\s+points?|percentage\s+points?|points?|days?|years?|"
+              r"quarters?|months?|shares?|sessions?))?")
+_POINTER_AFTER = re.compile(_UNIT_TAIL + r"\s*\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
+_CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\]")
 
 # ── the closed word lists G3 reads ───────────────────────────────────────────
 SUPERLATIVES = frozenset("""largest smallest biggest highest lowest most least top bottom worst best weakest
@@ -74,7 +81,11 @@ CHANGE_WORDS = frozenset("from to change changed moved moving move since versus 
 # A CHANGE IS CLAIMED, not merely worded: "from A to B", or a verb that moves.
 # A lone preposition does not claim one — "AAPL sits 3.9% from its 52-week high"
 # put two quantities in a sentence and was refused as a change (V33F Q17).
-CHANGE_VERBS = frozenset("change changed moved moving move".split()) | UP_WORDS | DOWN_WORDS
+# "above", "below", "higher", "lower" COMPARE two figures ("16.0% against a
+# warning level of 15.0% … above warning"); they claim no change. Round H
+# refused that sentence twice as a change between two quantities.
+CHANGE_VERBS = (frozenset("change changed moved moving move".split())
+                | (UP_WORDS - {"above", "higher", "outperformed"}) | (DOWN_WORDS - {"below", "lower", "underperformed"}))
 TIER_WORDS = frozenset("warning breach limit tier room headroom cap".split())
 DATE_WORDS = ("started", "troughed", "peaked", "bottomed", "began", "ended", "recovered", "as of", "dated")
 TIER_SUFFIXES = ("warning_level", "breach_level", "limit_value")
@@ -91,6 +102,7 @@ class Verdict:
     links: dict[tuple[int, int], dict] = field(default_factory=dict)     # (para, token start) -> {to, ids, as_written}
     marks: list[dict] = field(default_factory=list)                       # block marks: {para, start, end, kind, node, ids}
     pointers: list[dict] = field(default_factory=list)                    # `[f_…]` spans the render drops: {para, start, end, id}
+    citations: list[str] = field(default_factory=list)                    # facts named by a bracket that follows no figure
     refs: list[str] = field(default_factory=list)                         # every fact id the answer rests on
     sentences: list[dict] = field(default_factory=list)                   # {tag, para, text, span, checked, problems}
 
@@ -115,8 +127,12 @@ def _quoted(text: str) -> str:
     """A quotation is its WORDS. Quotation marks are delimiters, and nesting one
     quote inside another forces the inner marks to change — V33D refused 381
     verbatim characters of a 10-K because the source's inner `"` had to become
-    `'` to sit inside the analyst's own quotation."""
-    return _normalise(text).translate(_QUOTE_CHARS)
+    `'` to sit inside the analyst's own quotation. A newline the digest showed
+    JSON-escaped (`\\n`) is whitespace; the punctuation that closes the
+    writer's own sentence inside the marks ("…call describe.") is not the
+    source's (round H: nine boundary quotations refused for a full stop)."""
+    plain = re.sub(r"(?<=\d),(?=\d)", "", (text or "").replace("\\n", " "))   # "90,757" as the ledger keeps a passage: 90757
+    return _normalise(plain).translate(_QUOTE_CHARS).strip(" .,;:!?")
 
 
 def _short_subject(subject: str | None) -> str | None:
@@ -267,57 +283,85 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         tokens = A.tokens_in(blanked)
         linked_by_sentence: dict[int, list[tuple[dict, list[dict]]]] = {}     # sentence idx -> [(token, [record])]
 
-        # the pointers: a figure, then `[f_…]`
-        pointed: dict[int, str] = {}                                          # figure token start -> fact id
-        consumed: set[int] = set()                                            # id token starts that are pointers
+        # the pointers: a figure, then `[f_…]`; a bracket after anything else cites
+        pointed: dict[int, tuple[str, str | None]] = {}                       # figure token start -> (fact id, period)
+        consumed: set[int] = set()                                            # id token starts that are pointers/citations
+        spans: list[tuple[int, int]] = []                                     # every bracket span (tokens inside are not prose)
         for t in tokens:
             if t["kind"] != "num":
                 continue
             m = _POINTER_AFTER.match(blanked, t["end"])
             if not m:
                 continue
-            pointed[t["start"]] = m.group(1)
+            pointed[t["start"]] = (m.group(1), m.group(2))
             consumed.add(m.start(1))
             bracket = blanked.index("[", m.start())
             drop_from = bracket - 1 if bracket > 0 and blanked[bracket - 1] == " " else bracket
             v.pointers.append({"para": i, "start": drop_from, "end": m.end(), "id": m.group(1)})
+            spans.append((bracket, m.end()))
+        for m in _CITATION.finditer(blanked):
+            if any(s <= m.start() < e for s, e in spans):
+                continue
+            fid = m.group(1)
+            consumed.add(m.start(1))
+            drop_from = m.start() - 1 if m.start() > 0 and blanked[m.start() - 1] == " " else m.start()
+            v.pointers.append({"para": i, "start": drop_from, "end": m.end(), "id": fid})
+            spans.append((m.start(), m.end()))
+            if fid in ledger.by_id:
+                v.citations.append(fid)
+                v.refs.append(fid)
+            else:
+                v.problems.append({"at": f"prose[{i}]", "_at": m.start(), "reason": "not_on_ledger", "id": fid,
+                                   "fix": "this bracket names no fact the desk showed this turn: copy the id from the evidence, or drop the bracket"})
 
         # G1 / G2 — every token
         for t in tokens:
             tok, kind, start, end = t["token"], t["kind"], t["start"], t["end"]
             if any(s <= start < e for s, e in quoted_ok):
                 continue
+            if any(s <= start < e for s, e in spans) and start not in consumed and start not in pointed:
+                continue                                                      # a date inside a bracket: the pointer's, not prose
             if kind == "id":
                 if start in consumed:
                     continue
                 v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
-                                   "fix": "an id follows the figure it points to, in brackets (16.0% [f_…]); anywhere else "
-                                          "it is a word the reader must not see"})
+                                   "fix": "an id is written in brackets — after the figure it points to (16.0% [f_…]), or after "
+                                          "the quotation or name it cites; bare, it is a word the reader must not see"})
                 continue
+            if kind == "form":
+                continue                                                      # "10-K", "DEF 14A": a filing's name, not a figure
             if kind == "num" and (_compound_before(blanked, start) or _compound_after(blanked, end)):
                 # "1-year", "52-week", "10-K": the digits belong to a word, not to a
                 # figure. V33D's "1-year" resolved to whatever the ledger held near 1.
                 continue
             si = next((k for k, (s, e) in enumerate(sentences) if s <= start < e), 0)
             sentence = blanked[sentences[si][0]:sentences[si][1]]
-            fid = pointed.get(start)
-            if fid is not None:
+            if start in pointed:
                 # G1 — a pointed figure: the id is on the ledger and holds the figure
+                fid, period = pointed[start]
                 rec = ledger.by_id.get(fid)
+                held_by = _holders(ledger, tok)
                 if rec is None:
                     v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "not_on_ledger", "figure": tok, "id": fid,
+                                       "candidates": held_by,
                                        "fix": "the id after a figure is the one the desk showed it under: copy the figure and "
-                                              "its bracket from the evidence"})
+                                              "its bracket from the evidence" + (" — the desk showed this figure under the ids listed" if held_by else "")})
                     continue
-                hits = [period for f, period in ledger.readings(tok) if f == fid]
-                if not hits:
+                hits = [p for f, p in ledger.readings(tok) if f == fid]
+                if period is not None:
+                    if period not in hits:
+                        v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
+                                           "holds": _shown_point(rec, period), "candidates": [c for c in held_by if c["id"] != fid],
+                                           "fix": f"{fid} holds {_shown_point(rec, period)} on {period}, not this figure: write the point "
+                                                  f"as the desk showed it, or point at the fact that holds it"})
+                        continue
+                elif not hits:
                     v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
-                                       "holds": _shown(rec),
+                                       "holds": _shown(rec), "candidates": [c for c in held_by if c["id"] != fid],
                                        "fix": f"{fid} holds {_shown(rec)}, not this figure: write the figure as the desk showed "
-                                              f"it, or point at the fact that holds it"})
+                                              f"it, or point at the fact that holds it" + (" — the desk showed this figure under the ids listed" if held_by else "")})
                     continue
-                period = None
-                if rec.get("kind") == F.SERIES:
+                elif rec.get("kind") == F.SERIES:
                     periods = sorted({p for p in hits if p})
                     named = [p for p in periods if p in sentence or p[:4] in sentence]
                     if len(periods) == 1:
@@ -327,7 +371,8 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                     else:
                         v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "ambiguous_point", "figure": tok, "id": fid,
                                            "periods": periods[:6],
-                                           "fix": "this series holds the figure on several dates: name the point's date in the sentence"})
+                                           "fix": "this series holds the figure on several dates: write the point's bracket as the "
+                                                  "desk showed it, with its date — " + ", ".join(f"[{fid}@{p}]" for p in periods[:4])})
                         continue
                 v.links[(i, start)] = {"to": "fact", "ids": [fid], "primary": fid, "period": period, "as_written": tok}
                 linked_by_sentence.setdefault(si, []).append((t, [_reading(rec, period)]))
@@ -345,12 +390,9 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             if pids:
                 v.links[(i, start)] = {"to": "passage", "ids": pids, "as_written": tok}
                 continue
-            found = ledger.readings(tok)
-            if found:
-                seen_ids: list[str] = list(dict.fromkeys(f for f, _p in found))
-                cands = [{"id": f, "measure": ledger.by_id[f].get("measure"), "subject": ledger.by_id[f].get("subject"),
-                          "as_of": ledger.by_id[f].get("as_of")} for f in seen_ids[:6]]
-                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unpointed_figure", "figure": tok, "candidates": cands,
+            held_by = _holders(ledger, tok)
+            if held_by:
+                v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unpointed_figure", "figure": tok, "candidates": held_by,
                                    "fix": "a figure the desk showed is written as shown, followed by its id in brackets "
                                           "(16.0% [f_…]); the desk showed this figure under the ids listed"})
                 continue
@@ -415,6 +457,24 @@ def _group_key(rec: dict, period: str | None) -> tuple:
     return (_short_subject(rec.get("subject")) or rec.get("subject"), period or rec.get("as_of"))
 
 
+def _holders(ledger: Ledger, tok: str) -> list[dict]:
+    """The facts that hold a written figure, as candidates a refusal names —
+    a lookup, so the writer picks among what it was shown."""
+    seen = list(dict.fromkeys(f for f, _p in ledger.readings(tok)))
+    return [{"id": f, "measure": ledger.by_id[f].get("measure"), "subject": ledger.by_id[f].get("subject"),
+             "as_of": ledger.by_id[f].get("as_of")} for f in seen[:6]]
+
+
+def _shown_point(rec: dict, period: str) -> str:
+    val = next((p[1] for p in (rec.get("points") or []) if str(p[0]) == period), None)
+    if val is None:
+        return "no point"
+    try:
+        return A.fill({**rec, "kind": F.SCALAR, "value": float(val), "points": None}).get("display") or str(val)
+    except Exception:  # noqa: BLE001
+        return str(val)
+
+
 def _shown(rec: dict) -> str:
     """A fact's value as the desk showed it — what a mark_mismatch names."""
     try:
@@ -423,6 +483,29 @@ def _shown(rec: dict) -> str:
     except Exception:  # noqa: BLE001 — a display failure must not fail the check
         shown = None
     return str(shown if shown else rec.get("value"))
+
+
+def _ranked_aliases(ledger: Ledger, recs: list[dict]) -> list[dict]:
+    """The facts on the ledger that hold the same reading as `recs` AND carry a
+    place in an ordering — what a superlative can rest on. A lookup."""
+    out: list[dict] = []
+    for r in recs:
+        for cand in ledger.by_id.values():
+            if cand is r or cand.get("id") == r.get("id") or cand.get("kind") != F.SCALAR:
+                continue
+            p = cand.get("params") or {}
+            if not (isinstance(p.get("place"), int) or "rank" in p):
+                continue
+            if (_short_subject(cand.get("subject")) or cand.get("subject")) != (_short_subject(r.get("subject")) or r.get("subject")):
+                continue
+            try:
+                if abs(float(cand.get("value")) - float(r.get("value"))) > 1e-9:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            out.append({"id": cand["id"], "measure": cand.get("measure"), "subject": cand.get("subject"), "as_of": cand.get("as_of"),
+                        "place": p.get("place") or p.get("rank")})
+    return out[:6]
 
 
 def _place_fits(words: set[str], rec: dict) -> bool:
@@ -489,10 +572,14 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     # follows at 22.7%, and Amazon is lower at 18.4%").
     if words & SUPERLATIVES and groups:
         if not any(_place_fits(words, r) for recs in groups for r in recs):
+            ranked = _ranked_aliases(ledger, firsts)
             v.problems.append({"at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
-                               "linked": [r["id"] for r in firsts][:4],
+                               "linked": [r["id"] for r in firsts][:4], "candidates": ranked,
                                "fix": "a largest/smallest/most/least rests on the figure's own place in an ordering the desk built; "
-                                      "this figure does not hold that place — state the one that does, or drop the word"})
+                                      "this figure does not hold that place — "
+                                      + ("the desk's ordering holds the same reading as " + ", ".join(f"[{c['id']}]" for c in ranked[:3])
+                                         + ": point at that one, or drop the word" if ranked else
+                                         "request compare: rank over it, or drop the word")})
 
     # a date word is followed by a date
     for dw in DATE_WORDS:
