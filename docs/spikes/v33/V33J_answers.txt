@@ -1,0 +1,128 @@
+## Q01-amzn-earnings-quality
+Amazon’s earnings quality does not look broadly deteriorating from this evidence; it looks noisy, with cash still generally backing earnings, but with some quarters where the gap widened.
+Operating cash flow versus net income over the last eight quarters:
+- $25.28B versus $13.48B
+- $25.97B versus $15.33B
+- $45.64B versus $20.00B
+- $17.02B versus $17.13B
+- $32.52B versus $18.16B
+- $35.52B versus $21.19B
+- $54.46B versus $21.19B
+- $26.03B versus $30.25B
+The accruals ratio trend is mixed, not steadily worsening:
+- -2.13%
+- -1.82%
+- -4.10%
+- 0.02%
+- -2.10%
+- -1.97%
+- -4.07%
+- 0.46%
+That pattern says accrual quality has swung around zero, but it has not shown a clean drift into worse territory. The accruals ratio is still close to neutral, at 0.46%.
+On working capital, receivables have clearly grown faster than revenue across the period shown, while inventory has not:
+- Accounts receivable rose from $50.11B to $75.53B
+- Revenue rose from $148B to $182B
+- Inventory rose from $34.11B to $36.53B
+So the clearest signal here is receivables buildup, not inventory buildup. Inventory was higher in the middle of the window, but by the latest quarter it was below the mid-window peak and only modestly above the start.
+For the AMZN position, the book currently shows 7.03% of portfolio weight, and the issuer concentration check is also 7.03%, against a warning level of 15.0% and a breach level of 20.0% for issuer_concentration:AMZN. So this earnings-quality read does not by itself force a size cut, but it does argue for caution: the position is not oversized versus the limit, yet the receivables trend means I would not read AMZN as a clean cash-conversion story right now.
+In short: cash still generally supports earnings, accruals are not steadily deteriorating, but receivables growth is running ahead of revenue, which is the main yellow flag for this holding.
+
+## Q02-xom-room-if-oil-falls
+XOM still has balance-sheet room, but the cushion has narrowed over the last year. Net debt to EBITDA moved from -1.02× to 0.44×, while EBIT interest coverage fell from 50.20× to 23.64×. FCF to debt dropped from 65.3% to 15.4%. On a four-quarter basis, the latest four reads are still comfortably positive, but all three measures have clearly softened versus the same four quarters a year earlier   .
+net_debt_to_ebitda_xom
+[chart: net debt to ebitda 0.44× (2026-03-31)]
+ebit_interest_coverage_xom
+[chart: ebit interest coverage 23.64× (2026-03-31)]
+fcf_to_debt_xom
+[chart: fcf to debt 15.4% (2026-03-31)]
+On the filing side, the 10-K Item 7 says future debt levels could differ materially because of “global or regional changes or imbalances in the supply and demand for oil, natural gas, petrochemicals, and feedstocks and other market factors” and “the ability to access debt markets on favorable terms or at all”. It also flags “changes in interest and exchange rates” and “variable impacts of trading activities on our margins and results each quarter”. I did not get a quoted passage yet that specifically lists debt maturities or floating-rate exposure, so I cannot claim those details from the 10-K on the evidence in hand.
+For the book context, XOM is 4.61% of port_001. The only beta the desk returned was XOM’s beta to SPY, -0.56×; it did not provide a beta to USO. So the best supported read is: XOM is a modest book weight, and its own equity beta is not showing a strong positive equity-market sensitivity, but I cannot translate that into a direct USO oil beta from the desk’s evidence. What this means for the question is that if oil falls, the company still has some room, but the recent compression in cash generation and coverage means the book should not treat the balance sheet as infinitely insulated. The weight is meaningful but not dominant, so a severe oil drawdown would matter more through earnings and cash-flow pressure than through outright leverage strain at the current numbers.
+
+## Q03-nvda-where-cash-goes
+NVIDIA’s cash went mostly to buybacks, with capex, dividends, and SBC much smaller by comparison over the trailing twelve months.
+Over the trailing twelve months ended 2026-07-26, NVIDIA reported operating cash flow of $134B, capex of $7.35B, buybacks of $55.31B, dividends paid of $6.73B, and SBC of $7.24B.
+As shares of operating cash flow, that was:
+- capex: 5.47%
+- buybacks: 41.2%
+- dividends: 5.01%
+- SBC: 5.39%
+Over the last 5 years, those shares moved as follows:
+- capex share: 10.7% in 2022-01-30, 32.5% in 2023-01-29, 3.81% in 2024-01-28, 5.05% in 2025-01-26, and 5.88% in 2026-01-25.
+- buyback share: 0.00% in 2022-01-30, 178.0% in 2023-01-29, 33.9% in 2024-01-28, 52.6% in 2025-01-26, and 39.0% in 2026-01-25.
+- dividend share: 4.38% in 2022-01-30, 7.06% in 2023-01-29, 1.41% in 2024-01-28, 1.30% in 2025-01-26, and 0.95% in 2026-01-25.
+- SBC share: 22.0% in 2022-01-30, 48.0% in 2023-01-29, 12.6% in 2024-01-28, 7.39% in 2025-01-26, and 6.22% in 2026-01-25.
+What that means: buybacks are the dominant cash use by a wide margin, but they have come down from the extreme peak shown in 2023 and remain well above capex, dividends, and SBC. Capex has settled into a low-single-digit share after a spike in 2023. Dividends remain a modest use of cash. SBC has also fallen sharply as a share of operating cash flow from the earlier years, though it is still material.
+On authorization remaining, the desk did not return a filing passage stating how much buyback authorization remains. The latest filing passage returned instead was about other information and trading arrangements, not repurchase authorization: "The following members of our Board of Directors and/or officers adopted, modified, or terminated a trading arrangement...". If you want, I can ask the desk specifically for the repurchase-authority language from the latest 10-K or 10-Q.
+
+## Q04-lly-margin-pricing-mix-cost
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q05-aapl-risk-and-concentration
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q06-jpm-riskier-than-a-year-ago
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q07-tech-cash-conversion-rank
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q08-capex-roic-three-way
+Over the last three fiscal years, Amazon spent the most relative to revenue and also earned the least on that capital. Its capex was $132B against revenue of $717B, with ROIC of 16.2%. By comparison, Microsoft’s capex was $64.55B against revenue of $282B and ROIC of 29.7%, while Alphabet’s capex was $91.45B against revenue of $350B and ROIC of 24.8%.
+What this says on intensity and returns is:
+- Amazon is the heaviest spender in absolute capex and, on the figures shown, the weakest ROIC of the three.
+- Microsoft has the strongest ROIC and the lowest capex burden.
+- Alphabet sits in between on both spend and return.
+On the book, the exposure to QQQ is not held as a direct book figure, so I can only anchor the reading to the closest held names that map to the same mega-cap growth cohort. The book holds MSFT at 16.0%, GOOGL at 12.4%, and AMZN at 7.03%. That means the portfolio is already materially exposed to the very names that define QQQ’s capex-heavy growth complex. The desk also showed QQQ’s 1y beta as 1.42×, but it did not provide the book’s own beta to QQQ, so I can’t say the book’s factor exposure to QQQ directly.
+Implication for this book: the current mix is tilted toward the same large-cap growth businesses that are driving heavy investment cycles, especially through MSFT and GOOGL. That makes the book’s outcome more dependent on whether markets keep rewarding capex-led growth and less on whether capital intensity is a headwind.
+One caveat: the desk’s revenue figures for the three names are not all on the same fiscal year-end, so the comparison is directionally clean but not perfectly same-period.
+
+## Q09-aapl-working-capital-cycle
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q10-msft-leverage-and-rates
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q11-closest-to-issuer-limit
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q12-jpm-vs-peers-not-on-desk
+Today I can only give you JPM, not a full three-name comparison.
+For JPM, ROE was 15.1%, 17.0%, and 15.7% over the last three year-ends. JPM’s equity multiplier was 12.66×, 12.21×, and 13.46×.
+I do not have settled ROE or equity-multiplier series for Bank of America or Goldman Sachs today. The desk said, “roe_bac was not computed — series_not_derivable: no period grid for roe: none of its inputs (net_income, stockholders_equity) is filed as a series by BAC” and similarly for GS; it also said the same for equity multiplier for both names.
+On leverage, I cannot say JPM is the most levered of the three because I do not have the comparable BAC and GS equity-multiplier figures. What I can say today is that JPM’s equity multiplier is 13.46×, which is the latest JPM read, but there is no valid cross-name rank yet.
+I have started preparing Bank of America and Goldman Sachs for readout.
+
+## Q13-sell-half-nvda-into-tlt
+If we sell half of NVDA and put the proceeds into TLT, gross exposure is $10.75M. Technology sector concentration falls to 35.3% from 35.0%, so that limit gets tighter, not looser.
+The book’s beta to QQQ and the stress loss under tech_selloff were not exposed in the scenario output I got. The desk also said one requested item was unavailable: “‘sector_concentration:Technology’ is not a name this desk holds”, so for the sector limit read I used the limit-check figure instead: 35.3%.
+What this means for the book: the trade reduces the NVDA concentration check materially — NVDA falls to 2.07% from 4.18% — and it modestly increases TLT to 6.14%. But the Technology sector remains the binding direction here: it is still elevated, and the scenario data I have does not let me confirm whether the book’s QQQ beta or tech_selloff stress loss improved.
+
+## Q14-worst-drawdown-episode
+I can only state part of this from the desk’s evidence.
+The worst drawdown episode over the last year had a depth of 12.0%. The desk also returned 12.0% as the first episode depth and 6.24% as the second, with a quality flag of 2, but it did not give me the episode’s start, peak, trough, or recovery dates in a usable explanation table. It also said, “book.explain_episode needs a peak and a trough: ask for the worst drawdown episode and its explanation in words (`ask`)”. So I cannot responsibly name when the episode started or troughed from this evidence alone.
+I also could not get the market-vs-book attribution. The desk refused the reconciliation call with “book_reconcile_run_port_001 was not computed — unknown_run: no run with this id is visible to you; call describe() for the runs on your own books”. So I cannot say how much of the move was the market against what we held from the current evidence.
+On filings: for the held names, the desk returned Item 7 passages for AAPL, AMZN, GOOGL, JPM, KO, LLY, MSFT, NVDA, and XOM. That shows those issuers did have filings available, but I still do not have the episode window or the top-three contributors, so I cannot tie a filing to any specific contributor in that drawdown window.
+What would change the reading: if you want the full answer, I need the desk to expose the worst episode’s peak and trough dates and the holdings contribution table, plus a visible run for reconciliation.
+
+## Q15-liquidity-and-limits
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q16-book-beta-change-since-prev
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q17-events-touching-holdings
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q18-attribution-reconcile
+The latest run does not give a full factor-by-factor attribution table, so I can only say that the reconciliation is internally short of the portfolio return by -125.5%, with factor contributions summing to -0.47% and alpha plus residual contributing 0.85%. The desk’s reconciliation also shows position contributions of 0.38%. Because the desk returned only the totals and not each factor line, I cannot name the largest and smallest contributing factor from the evidence it showed.
+On HYG, the drawdown over the period was 2.34%. That is positive in depth, so it does not match the negative sign of HYG’s factor contribution implied by the book’s negative factor total of -0.47%.
+
+## Q19-aws-share-explains-return
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## Q20-lly-margins-next-year
+I would not call this a clean “yes” on the evidence the desk showed.
+LLY’s net margin is high and still rising on the latest read: 37.4%, versus 26.3% at the start of the 8-quarter series. The series is choppy in between — 8.48%, 32.6%, 21.7%, 36.4%, 31.7%, 34.4%, 37.4% — so the trend is upward, but not smooth.
+The filing language points to the main support: “Net income and earnings per share increased in 2025, primarily due to higher gross margin, partially offset by increased marketing, selling, and administrative expenses and research and development expenses.” It also says revenue growth was “driven primarily by increased volume, partially offset by lower realized prices,” and that those volume and price effects were “primarily driven by Mounjaro and Zepbound.” So the margin expansion story is currently tied to product mix/volume leverage and gross margin.
+What keeps me from saying this will keep expanding next year is that the desk does not forecast, and the filing itself shows the offsetting forces are real: higher marketing, selling, administrative, and R&D spending. The risk section also matters because the clinical pipeline and commercialization path can change the expense load and pricing/volume mix. The desk also could not compute gross margin or operating margin here because “LLY reports no gross_profit with a period” and “LLY reports no operating_income with a period.”
+So my read for the book is: margins are still expanding now, but the continuation case is conditional rather than assured. The evidence supports a positive current trend, not a forecast. The biggest thing that would change that reading is if next filings show gross margin pressure from price/portfolio mix or if operating expenses rise faster than revenue.

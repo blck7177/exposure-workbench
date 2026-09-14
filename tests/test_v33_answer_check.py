@@ -597,3 +597,13 @@ def test_a_trajectory_naming_both_directions_is_not_judged_for_direction():
     assert v.ok, v.problems
     v = ac.check("Capex share fell from 10.7% [f_cap0001@2023-01-29] to 32.5% [f_cap0001@2024-01-28].", led)
     assert "direction_conflict" in {p["reason"] for p in v.problems}
+
+
+def test_a_direction_verb_in_the_present_tense_is_read_too():
+    """Round J accepted "Technology sector concentration falls to 35.3% from 35.0%":
+    the reading rose between the two runs, and "falls" was not on the list."""
+    led = Ledger.of([_f("f_techcur0", "limit_checks.current_value", "sector_concentration:Technology", 0.353, as_of="2026-09-10", node="cur"),
+                     _f("f_techprv0", "limit_checks.current_value", "sector_concentration:Technology", 0.3498, as_of="2026-09-09", node="prev")])
+    v = ac.check("Technology sector concentration falls to 35.3% [f_techcur0] from 35.0% [f_techprv0].", led)
+    assert "direction_conflict" in {p["reason"] for p in v.problems}
+    assert ac.check("Technology sector concentration rises to 35.3% [f_techcur0] from 35.0% [f_techprv0].", led).ok

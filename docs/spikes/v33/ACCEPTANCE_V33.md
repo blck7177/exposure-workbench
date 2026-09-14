@@ -314,3 +314,27 @@ H 轮露出的都是 §16 设计没收干净的地方，不是新设计；按角
 ## 20. J 轮前（validation 两处）
 
 指向 passage 的数字：`resolve_in_passages(tok, [fid])` 查那一段，陈述了就链接到 passage，没陈述就 `mark_mismatch: is a passage and does not state this figure`。变化与方向只在**恰好两个图形**的句子上判：三个以上是轨迹，哪个方向词指哪一段不是门能判的。
+
+## 21. J 轮（`621115f`，树 `7592921`，2026-09-14）与三轮对照
+
+仪器同前。文件：`V33J.json`、`V33J_forensics.txt`、`V33J_answers.txt`、`V33J_counters.json`、`run_v33J.log`。
+
+| | G V34 | H V35 | I | **J** |
+|---|---|---|---|---|
+| 出答案 / 20 | 4 | 5 | 11 | **9** |
+| meta 拒绝 | 32 | 30 | 18 | 22 |
+| 重放问题总数 / 首次作答 | 153 / — | 103 / 58 | 68 / 45 | **64 / 44** |
+| 通过答案里读者可见假陈述 | 0 / 4 | 4 / 5 | 1 / 11 | **3 / 9** |
+| 第二次作答走工具 | — | 17/17 | 16/16 | 16/16 |
+
+出答案的题在 I 与 J 之间换了一半（I 有 Q05/06/07/09/16/17，J 有 Q01/03/18/20），模型自身的随机性大于两轮之间代码的差别；三轮合计 20 题里 16 题至少通过一次，从未通过的四题是 Q04、Q10、Q11、Q15。
+
+**J 轮通过答案里的三处。** Q13 "Technology sector concentration falls to 35.3% from 35.0%"：两个指向都对（本期与上期的 limit check），读数是升的，"falls" 不在方向词表里——词表只有过去式（fell/dropped），没有 falls/rises；已补现在时。Q14 "for the held names … KO"：桌子对 filings 请求返回了 KO 的 Item 7 passage（KO 不在书里，是快照里已准备的发行人），分析师把它列进持仓——tool 返回了请求之外的主体，分析师照单全收。Q18 "internally short of the portfolio return by -125.5%"：factor_share 的语义读错，数字指向正确，是 skill 层的读法问题。
+
+**J 轮没过的十一题里，门过严的只剩一类。** Q05、Q06 引用的是 **briefing 与 skill 推送里的文字**（"not held as figures; stated in Item 7 … — read_filings"、"not for a financial issuer"），这两处是仍然展示给模型却不在账本上的最后来源；其余是真错（Q11 又把 1.0% 指向 16.0% 的事实；Q16/Q17 的 0.95/27.1% 舍入；Q15 把 0.0000 指向 $497M/day；Q19 把权重与相对收益写成变化；Q07/Q13 首次的 measure 短语）。`measure_mismatch` 这条句级词法规则四轮里拦下的假陈述只有 Q18 那一种，误报却在每轮出现（I 轮 Q01/Q10、J 轮 Q07/Q13 首次），有指针之后它是门里剩下的最后一条"判断"。
+
+**留给下一步的（按角色）。**
+- tool 身份三处：price.beta 的 benchmark 静默默认 SPY 且不进事实身份（I 轮 Q16 假陈述）；派生向量无 window/as_of（Q07 的 TTM 标签不可核，H 与 I 同名不同值）；book.analysis 事实 subject 是 calc id（H 轮 Q16）。
+- tool 展示两处：briefing 与 skill 推送不在账本上（J 轮 Q05/Q06 引用被拒）；digest 超限扣下的图形模型看不见（I 轮 Q11 的 room 事实在被扣的 163 个里，模型转而自己算）——R1 的工作单位问题。
+- validation 一处待拍板：`measure_mismatch` 去留。
+- 产品：出答案 9–11/20，通过答案里 1–3 条假陈述且都可追溯到指向的事实；未通过的 9–11 题里，模型真错（舍入、指错、自己算）占多数。

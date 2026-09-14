@@ -75,8 +75,14 @@ _CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\
 SUPERLATIVES = frozenset("""largest smallest biggest highest lowest most least top bottom worst best weakest
 strongest greatest deepest longest shortest nearest closest farthest furthest heaviest lightest tightest widest
 narrowest fastest slowest jumpiest leads leading dominant""".split())
-UP_WORDS = frozenset("rose up increased grew higher climbed expanded improved gained widened above outperformed".split())
-DOWN_WORDS = frozenset("fell down decreased declined lower dropped shrank narrowed slipped deteriorated weakened below underperformed".split())
+# past and present forms both: round J accepted "Technology sector concentration
+# falls to 35.3% from 35.0%" because the list held "fell" and not "falls"
+UP_WORDS = frozenset("rose rises rising up increased increases increasing grew grows growing higher climbed climbs climbing "
+                     "expanded expands expanding improved improves improving gained gains gaining widened widens widening "
+                     "above outperformed outperforms".split())
+DOWN_WORDS = frozenset("fell falls falling down decreased decreases decreasing declined declines declining lower dropped drops "
+                       "dropping shrank shrinks shrinking narrowed narrows narrowing slipped slips slipping deteriorated "
+                       "deteriorates deteriorating weakened weakens weakening below underperformed underperforms".split())
 CHANGE_WORDS = frozenset("from to change changed moved moving move since versus vs against compared".split()) | UP_WORDS | DOWN_WORDS
 # A CHANGE IS CLAIMED, not merely worded: "from A to B", or a verb that moves.
 # A lone preposition does not claim one — "AAPL sits 3.9% from its 52-week high"
@@ -84,8 +90,9 @@ CHANGE_WORDS = frozenset("from to change changed moved moving move since versus 
 # "above", "below", "higher", "lower" COMPARE two figures ("16.0% against a
 # warning level of 15.0% … above warning"); they claim no change. Round H
 # refused that sentence twice as a change between two quantities.
-CHANGE_VERBS = (frozenset("change changed moved moving move".split())
-                | (UP_WORDS - {"above", "higher", "outperformed"}) | (DOWN_WORDS - {"below", "lower", "underperformed"}))
+CHANGE_VERBS = (frozenset("change changed moved moving move moves".split())
+                | (UP_WORDS - {"above", "higher", "outperformed", "outperforms"})
+                | (DOWN_WORDS - {"below", "lower", "underperformed", "underperforms"}))
 TIER_WORDS = frozenset("warning breach limit tier room headroom cap".split())
 DATE_WORDS = ("started", "troughed", "peaked", "bottomed", "began", "ended", "recovered", "as of", "dated")
 TIER_SUFFIXES = ("warning_level", "breach_level", "limit_value")
