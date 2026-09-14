@@ -573,3 +573,27 @@ def test_a_refusal_names_the_ids_the_desk_showed_the_figure_under():
 
 def test_a_filings_form_name_is_a_word_not_a_figure():
     _accepted("The 10-K and the 10-Q say little; see the DEF 14A.")
+
+
+def test_a_figure_a_passage_states_may_point_at_the_passage():
+    """Round I Q04/Q19: "$65,179 million [f_passage]" — the passage states it; the
+    pointer is a lookup in that passage. A figure the passage does not state is
+    a mismatch that says so."""
+    led = Ledger.of([*_C_LEDGER.by_id.values(), _passage("f_seg01", "AMZN", "Net sales: AWS 90,757 and 107,556 in the two years shown.")])
+    v = ac.check("AWS net sales were $107,556 [f_seg01] million in the later year.", led)
+    assert v.ok, v.problems
+    link = next(iter(v.links.values()))
+    assert link["to"] == "passage" and link["ids"] == ["f_seg01"] and "f_seg01" in v.refs
+    v = ac.check("AWS net sales were $91,999 [f_seg01] million.", led)
+    assert [p["reason"] for p in v.problems] == ["mark_mismatch"] and v.problems[0]["holds"] == "passage"
+
+
+def test_a_trajectory_naming_both_directions_is_not_judged_for_direction():
+    """Round I Q03, twice: "went from 10.7% to 32.5%, then down to 3.81%, then back
+    up to 5.05%" — the first two figures moved up, the sentence also says down."""
+    led = Ledger.of([*_C_LEDGER.by_id.values(),
+                     {**_series("f_cap0001", "capex_share", "NVDA", [["2023-01-29", 0.107], ["2024-01-28", 0.325], ["2025-01-26", 0.0381]]), "params": {"node": "s_cap"}}])
+    v = ac.check("Capex share went from 10.7% [f_cap0001@2023-01-29] to 32.5% [f_cap0001@2024-01-28], then down to 3.81% [f_cap0001@2025-01-26].", led)
+    assert v.ok, v.problems
+    v = ac.check("Capex share fell from 10.7% [f_cap0001@2023-01-29] to 32.5% [f_cap0001@2024-01-28].", led)
+    assert "direction_conflict" in {p["reason"] for p in v.problems}

@@ -287,3 +287,30 @@ H 轮露出的都是 §16 设计没收干净的地方，不是新设计；按角
 - 未改、记录：book.analysis 事实的 subject 是 calc id（Q16 两个 run 的同一 measure 不算同主体两日期，方向检查失效；measure 短语只取最后一段）；比较级（"further below"）无检查；这两条是事实身份与关系词的设计题，不在本轮。
 
 测试：answer_check +9、broker +2、builder 3 条改写（两运算符一行现在可表达，加窗口与表达式用例）。
+
+## 19. I 轮（`678531b`，树 `9b081a7`，2026-09-14）
+
+仪器同 H。文件：`V33I.json`、`V33I_forensics.txt`、`V33I_answers.txt`、`V33I_counters.json`、`run_v33I.log`。
+
+| | H | **I** |
+|---|---|---|
+| 出答案 / 20 | 5 | **11**（Q02、Q05、Q06、Q07、Q08、Q09、Q12、Q13、Q14、Q16、Q17） |
+| meta 拒绝 | 30 | **18** |
+| 重放问题总数 / 首次作答 | 103 / 58 | **68 / 45** |
+| `ambiguous_point` | 7 | **0** |
+| `id_in_prose` | 18 | 6（全是 Q11 自造的 `[derived from f_a and f_b]`） |
+| `unverified_quote` | 26 | **6** |
+| `unsourced_figure` | 19 | 5 |
+| `mark_mismatch`（重放） | — | 31 / 首次 17，其中 11 次是**指向 passage 的数字**（Q04 "$65,179 [f_passage]"、Q19 九个分部数字），其余是真错 |
+| 第二次作答 | 17 经工具 | 16 经工具，3 次未改句 |
+| 通过答案里读者可见假陈述 | 4 / 5 | **1 / 11**（Q16） |
+
+**命中。** 单位词括号、引文后引用、尾标点、序列日期括号、above/below 全部按预期消失；Q02 的窗口边界起作用——分析师这次写的是"A year earlier, the same quarters were not returned as an aligned series"；Q07 引用了 digest 的超限提示原话并通过；Q05、Q12、Q14 逐字引用边界。修复工具：Q06 丢符号 3.18%→-3.18%、Q08 29.6%→29.7%、Q16、Q17 各一次修好。
+
+**通过答案里的假陈述与可追溯缺口。** Q16 "Each holding's one-year beta is the same versus SPY and QQQ"：第二次请求要 QQQ，builder 把基准静默默认成 SPY，事实的 params 不带 benchmark，十个数字与 SPY 完全相同——与 Q02 的窗口同类（tool 静默默认），这是本轮唯一一条 tool 造成的假陈述。Q06 "JPM looks a bit less risky than a year ago"：没有一年前的读数，判断句无图形，D 标为 judgement，不是门的失职但读者看不出无依据。Q09 "-227.86" 与 "-75.83 / -67.83 / -71.07" 都是桌子算的 cash_conversion_cycle（季度 3 个月窗口 vs 年度窗口，量级不同），写法忠实、语义可疑，是 skill/tool 的口径问题。Q07 "trailing twelve months" 无法核：`divide(vector(ocf), vector(ni))` 的事实 as_of 为 n/a、无 window，H 轮同题同名同标签的数字不同（AAPL 97.0% vs 114.4%）——派生向量丢了窗口身份。
+
+**没过的九题按原因。** Q04、Q19：指向 passage 的数字被判 mark_mismatch（契约缺一条：passage 里陈述的数字可以指向 passage，查表即可）。Q03 两次：三段轨迹句"went from … to …, then down to …, then back up"被方向检查按前两个图形判反。Q11：derive 编出了 40 条 room 事实，但 digest 超限扣下 163 个图形，模型没看见 room，就自己减出 1.0%/4.0% 并造了 `[derived from …]` 写法——R1 的工作单位问题以另一种形态出现（一次请求 5 列 × 20 行 + 派生）。Q15：引用了 skill 推送文字当"桌子说的"（不在账本，拒绝正确）；Q18：把 quality_flags 的计数写成百分比；Q20：26.2% 代替 26.3% 又一次；Q10：37.73 代替 37.72×，"net debt"短语旁的图形是 commercial_paper；Q01：一句里同时讲 DSO 与持仓权重，measure 短语检查报错。
+
+## 20. J 轮前（validation 两处）
+
+指向 passage 的数字：`resolve_in_passages(tok, [fid])` 查那一段，陈述了就链接到 passage，没陈述就 `mark_mismatch: is a passage and does not state this figure`。变化与方向只在**恰好两个图形**的句子上判：三个以上是轨迹，哪个方向词指哪一段不是门能判的。

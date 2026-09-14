@@ -347,6 +347,18 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                                        "fix": "the id after a figure is the one the desk showed it under: copy the figure and "
                                               "its bracket from the evidence" + (" — the desk showed this figure under the ids listed" if held_by else "")})
                     continue
+                if rec.get("kind") == F.PASSAGE:
+                    # the figure a passage states, pointed at the passage (round I:
+                    # Q04 "$65,179 million [f_passage]", Q19 nine segment figures)
+                    if ledger.resolve_in_passages(tok, [fid]):
+                        v.links[(i, start)] = {"to": "passage", "ids": [fid], "as_written": tok}
+                        v.refs.append(fid)
+                    else:
+                        v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
+                                           "holds": "passage", "candidates": held_by,
+                                           "fix": f"{fid} is a passage and does not state this figure: quote the passage's own "
+                                                  f"words, or point at the fact that holds it"})
+                    continue
                 hits = [p for f, p in ledger.readings(tok) if f == fid]
                 if period is not None:
                     if period not in hits:
@@ -607,7 +619,12 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                "fix": f"the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier"})
     # a change or a comparison joins the right two figures, and points the way they moved
     up, down = words & UP_WORDS, words & DOWN_WORDS
-    if words & CHANGE_WORDS and len(groups) >= 2:
+    # A CHANGE IS TWO FIGURES. "went from 10.7% to 32.5%, then down to 3.81%, then
+    # back up to 5.05%" is a trajectory: which leg a direction word names is not
+    # the check's to decide, and the first two figures settle nothing (round I
+    # refused Q03 twice for it). With exactly two figures the sentence claims
+    # one move, and that one is judged.
+    if words & CHANGE_WORDS and len(groups) == 2:
         ga, gb = groups[0], groups[1]
         a, b = ga[0], gb[0]
         # Two units in one sentence are not checked as units: a comparison
