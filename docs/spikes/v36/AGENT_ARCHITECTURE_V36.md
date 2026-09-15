@@ -1,7 +1,7 @@
 # Agent 架构 V36:meta-agent + 按域 sub-analyst(设计稿摘要 + as-built 偏差,2026-09-15)
 
 > 正本是 9/15 的设计稿 artifact <https://claude.ai/code/artifact/eb21e96e-22b0-4bdc-9edb-ee30e265f4b7>(源 HTML 在当时的 scratchpad,未入库)。本文是它的 markdown 摘要,末尾加一节「as built 与设计稿的偏差」,按 HEAD 上的代码写。
-> 计划 `docs/IMPLEMENTATION_PLAN_V36.md`;冒烟 `SMOKE_V36.md`;A 轮验收 `ACCEPTANCE_V36.md`;措辞过目单 `WORDING.md`。承接 `docs/spikes/v33/AGENT_ARCHITECTURE.md`(9/13 讨论稿「分析师 + 证据子 agent」;broker 是它在 D1 结构化请求、D2 LLM 只在组合处 两个决定下的实现)。
+> 计划 `docs/IMPLEMENTATION_PLAN_V36.md`;冒烟 `SMOKE_V36.md`;A 轮验收 `ACCEPTANCE_V36.md`;按节点沟通读 A 轮 `COMMUNICATION_V36A.md`(§9 是据此做的 V36.1 八处修法,E8/E10 的形状因此有变:brief 是 `lines`,E10 带 `said` / `desk_said` / `made`);措辞过目单 `WORDING.md`。承接 `docs/spikes/v33/AGENT_ARCHITECTURE.md`(9/13 讨论稿「分析师 + 证据子 agent」;broker 是它在 D1 结构化请求、D2 LLM 只在组合处 两个决定下的实现)。
 > 依据:J 轮 Q11 的节点沟通表(9/15)、V33I / V33J 的 trace、9/15 五项决定;外部参照:Anthropic orchestrator-worker(子 agent 是 intelligent filter;交接四要素;telephone game 靠持久化产物解决——我们的 ledger)、Anthropic 2026-01「按上下文边界拆,不按问题类型拆」、Cognition 2026-04「写单线程,子 agent 贡献智能不贡献动作」、Magentic-One 的 facts-to-derive 账本、MAST FM-2.6 reasoning-action mismatch。
 
 ## 0. 五项决定与不变的部分

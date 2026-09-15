@@ -357,3 +357,18 @@ E12 的 `meta`（Q01）：`{"prompt_tokens": 8003, "completions": 2, "delegation
 ## 8. 一句话
 
 架构换对了主人（意图→desk 语言有人负责，run 的次数没变、覆盖率上去了），但**新加的那条边（sub ↔ meta）只运分析师的话，不运 desk 的话**；本轮 44% 的往返是空的，其中最贵的三类（空理由的拒绝、占预算的 start、退回信）都在 tool 层，两条上行通道过滤口径不一致。先动 T1、T2+T3、T4、T5、V1，都是协议与 schema 的改动，不动循环。
+
+## 9. 执行记录（2026-09-15，boss 拍板按 §8 顺序执行，tool 缺口修完再修仪器）
+
+| 缺口 | 提交 | 改了什么 | 验证 |
+|---|---|---|---|
+| T1 | `f391f80` | E10 的 not_done 带 `said`（账本上边界事实的 text），引用了边界的 finding 带 `desk_said`；工具拒绝铸的边界带上它回答的调用（"read_filings(ticker='MSFT', item='7'): not_indexed"）；主分析师的引号只给带 id 来的文字；域分析师的 why 是读法不是引文 | 离线 +5 |
+| T2+T3 | `8b25799` | `digest._problem_text` 读 registry 的 {field, problem} 与核对的 {reason, fix} 两种形状，带字段名，route 随行；read_filings 的 description 写明 EXACTLY ONE of query or item | 用 registry 自己的校验产出拒绝再渲染，断言分析师读到的句子 |
+| T4 | `b76d14d` | start 单独计数（`sub_analyst_start_calls=3`），证据预算只算 run / read_filings / search_web；同 (kind, subject) 第二次回 already_started；cost 多 starts | 离线 +1 |
+| T5 | `9336ef6` | `_note_of` 对 table 节点带 calc_ ref；digest 列 `made`；分析师收集、E10 带上；parse_tasks 接受 calc_ id，`_subjects_of` 解释它；两段 prompt 各一句 | 离线 +2 |
+| V1 | `50452ca` | SUBMIT_TOOL 的 brief 改成 `lines[]`，每条 settled（finding+facts）或 not（why+boundary）；parse_submission 在核对前拒绝既是又不是 / 什么都不是 / 同行两条；旧两列形状仍可解析，规则改名 duplicate_want | 离线 +5 |
+| T6+T7 | `b477c04` | filter 的 no_entry_satisfies 带条目范围，level 不可能被满足时说 RATIO 是分数；PROCEDURE 同句；`run(portfolio=run_…/calc_…)` 静态 type_mismatch 并给写法 | 离线 +4 |
+| T9 | `669c55d` | 报告 verified 仅当整份 brief 过了且正文过了；否则 refused，problems 全记 | 离线 +1 |
+| I1+I2 | `2aff485` | read_report 与不合形派单记步；LlmSession.chat(note) 把 completion 读进的 chars / results 写进 llm_call 行；brief 步带 verdict.problems；forensics 与 counters 读新行 | 离线 +3；两个脚本在 A 轮数据上照常 |
+
+未动：I3（tool_call 行的 actor）等"每个分析师是否自己的 tool session"的决定；validation 的 V2（superlative / subject 只在句里有图形 / ticker 时才跑）与 ACCEPTANCE §6 的 T3 / T4 / S1 未在本轮范围。离线 2490 → 2515。四段 prompt 的改动已重生成进 `WORDING.md`，仍待过目。**这些修法的效果要等下一轮实测（B 轮）才算数**，本文的数字都是 A 轮的。
