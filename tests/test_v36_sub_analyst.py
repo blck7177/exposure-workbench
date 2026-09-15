@@ -370,3 +370,33 @@ async def test_an_analyst_that_files_nothing_still_hands_the_lead_the_desks_word
     monkeypatch.setattr(st.get_settings(), "sub_analyst_max_turns", 1, raising=False)
     r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), _Llm([("thinking", None)])))
     assert r.not_done and all(d["said"] and d["said"] == d["why"] for d in r.not_done)
+
+
+# ── V36.1 (round A) · a start is not evidence ─────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_a_start_is_counted_apart_from_evidence_and_once_per_subject(monkeypatch):
+    """Q14's book_events analyst spent all eight evidence calls starting
+    readiness for eight held names and filed nothing; Q04's started MRK four
+    times. A start returns an id, not a figure: it has its own count, and the
+    same start twice is answered without a second task."""
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_start_calls", 2, raising=False)
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_evidence_calls", 1, raising=False)
+    tools = _Tools({"start": lambda a: {"enqueued": True, "task_id": f"task_{a['subject']}", "kind": a["kind"],
+                                        "ticker": a["subject"], "facts": {"columns": [], "rows": []}},
+                    "run": lambda a: _run_result([])})
+    llm = _Llm([("", [("start", {"kind": "readiness", "subject": "AAPL", "reason": "r"}),
+                      ("start", {"kind": "readiness", "subject": "aapl", "reason": "r"}),
+                      ("start", {"kind": "readiness", "subject": "MSFT", "reason": "r"}),
+                      ("start", {"kind": "readiness", "subject": "NVDA", "reason": "r"}),
+                      ("run", {"program": {}})]),
+                ("", None)])
+    r = await sa.run_sub_analyst(_task(), _ctx(tools, llm))
+    # AAPL and MSFT reach the desk; the repeat and the fourth do not; the run still has its evidence call
+    assert [n for n, _ in tools.calls] == ["start", "start", "run"]
+    replies = [json.loads(m["content"]) for m in llm.seen[1]["messages"] if m.get("role") == "tool"]
+    assert replies[1]["already_started"] == "task_AAPL"
+    assert replies[3]["error"] == "analyst_budget" and "background" in replies[3]["detail"]
+    assert replies[4].get("error") is None
+    assert r.cost["starts"] == 2 and r.cost["evidence_calls"] == 1

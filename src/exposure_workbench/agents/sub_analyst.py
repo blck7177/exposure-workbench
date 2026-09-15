@@ -50,6 +50,9 @@ logger = logging.getLogger(__name__)
 # and `submit` are in-process and are not on any face: one retrieves nothing and
 # the other is the analyst's exit.
 EVIDENCE_TOOLS = ("run", "read_filings", "search_web", "start")
+# Of those, the ones that return evidence. `start` is on the face and reachable,
+# and is counted apart (V36.1): it returns a task id, never a figure.
+_EVIDENCE_BUDGETED = ("run", "read_filings", "search_web")
 
 COMPILE_TOOL = {"type": "function", "function": {
     "name": "compile",
@@ -77,7 +80,8 @@ a brief that answers the task line by line, plus a report of your reading for th
 The figures are yours to produce and the language is yours to write. compile(request) turns names into a typed program \
 without running it — edit what it gives you and run that, or write the program yourself. run(program) executes one \
 program: every node comes back typed, dated, and on the ledger as a fact, or the type report lists every problem at once. \
-read_filings reads a filing's text, search_web the web, start puts an issuer on the desk. Every figure a tool shows you \
+read_filings reads a filing's text, search_web the web; start puts an issuer on the desk after your turn — it \
+returns a task id, never a figure, and once per name is enough. Every figure a tool shows you \
 carries the id it is shown under — 16.0% [f_2592baab170e] — and `place` of `of` is where it sits in the ordering its \
 node built: a superlative rests on that, never on reading a list. Never compute in your head: a number you worked out \
 yourself is a number no fact stands behind, and it is refused.
@@ -159,6 +163,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     minter = dg.Minter()
     seen: dict = {}                                     # one reading is shown once, across the whole session
     evidence_calls = 0
+    start_calls = 0
+    started: dict[tuple[str, str], str] = {}            # (kind, subject) -> the task it enqueued
     completions = 0
     llm = ctx.llm.for_actor(actor) if hasattr(ctx.llm, "for_actor") else ctx.llm
 
@@ -207,7 +213,35 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                               else f"{len(out['program']['let'])} binding(s), {len(out.get('skipped') or [])} skipped")
                 res = out
 
-            elif name in EVIDENCE_TOOLS:
+            elif name == "start":
+                # A START IS NOT EVIDENCE. It enqueues work that finishes after
+                # the turn and returns an id, never a figure. Round A's Q14 spent
+                # its whole evidence budget starting readiness for eight held
+                # names and filed nothing; Q04 started the same name four times.
+                # Counted apart, and once per subject: the same start twice is
+                # the same task, answered here without a second enqueue.
+                key = (str(args.get("kind") or ""), str(args.get("subject") or "").upper())
+                if key in started:
+                    res = {"already_started": started[key], "kind": key[0], "subject": key[1],
+                           "detail": "you started this already; it runs after your turn and does not return to you "
+                                     "— file your brief with what you have and put it in follow_ups"}
+                elif start_calls >= settings.sub_analyst_start_calls:
+                    res = {"error": "analyst_budget",
+                           "detail": f"you have started {settings.sub_analyst_start_calls} background tasks; none of "
+                                     f"them returns within your turn — file your brief and put the rest in follow_ups"}
+                else:
+                    start_calls += 1
+                    raw = await ctx.tools_session.call(name, args)
+                    raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
+                    res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
+                                    call={"tool": name, "args": args})
+                    started[key] = str(raw.get("task_id") or raw.get("run_id") or "")
+                    minted = minter.take()
+                    if minted:
+                        await _record(ctx, actor, "boundary", name, {"of": name},
+                                      f"{len(minted)} boundary fact(s) stated", facts=minted)
+
+            elif name in _EVIDENCE_BUDGETED:
                 if evidence_calls >= settings.sub_analyst_evidence_calls:
                     res = {"error": "analyst_budget",
                            "detail": f"you have used this analyst's {settings.sub_analyst_evidence_calls} evidence "
@@ -244,7 +278,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                                   status="completed" if verdict.ok else "rejected")
                     _fill(result, task, brief, report, verdict, led)
                     if verdict.ok or attempts >= 2:
-                        result.cost = {"completions": completions, "evidence_calls": evidence_calls}
+                        result.cost = {"completions": completions, "evidence_calls": evidence_calls,
+                                       "starts": start_calls}
                         result.report_id = await _store_report(ctx, actor, task, result)
                         done = True
                         res = {"accepted": verdict.ok, "coverage": verdict.coverage,
@@ -276,7 +311,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                            for i in range(1, len(task.want_to_know) + 1)]
         result.coverage = {"asked": len(task.want_to_know), "done": 0,
                            "not_done": len(task.want_to_know), "refused": 0}
-    result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls}
+    result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls, "starts": start_calls}
     return result
 
 

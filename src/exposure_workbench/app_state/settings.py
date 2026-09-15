@@ -68,7 +68,11 @@ class Settings(BaseSettings):
     # in this turn use", which is what these are. They are loop counters, and the
     # registry is untouched.
     sub_analyst_max_turns: int = 8          # completions one domain analyst may take
-    sub_analyst_evidence_calls: int = 8     # run / read_filings / search_web / start, per analyst
+    sub_analyst_evidence_calls: int = 8     # run / read_filings / search_web, per analyst
+    # V36.1: a start is a background task, not evidence — it returns an id and
+    # nothing the turn can use. Round A's Q14 spent all eight evidence calls
+    # starting readiness for eight held names and filed nothing; counted apart.
+    sub_analyst_start_calls: int = 3        # start, per analyst
     sub_analyst_result_chars: int = 16_000  # of one tool result it reads
     parallel_analysts: bool = False         # V36 Phase 3; serial until the three preconditions are measured
 
