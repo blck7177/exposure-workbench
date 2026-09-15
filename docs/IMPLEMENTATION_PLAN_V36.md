@@ -103,17 +103,21 @@ meta（agents/meta_agent.py）              sub-analyst（agents/sub_analyst.py�
 
 验收：`test_v36_reports.py`（store/load、跨 session 取不到、refused 形）；`test_v2_audit.py` 三条 erasure 测试与 RLS 表清单全绿；live：迁移在 `exposure_battery` 上幂等；web 手工：抽屉里每个数字点开是事实。
 
-### Phase 3 — 并行 sub-analyst
+### Phase 3 — 并行 sub-analyst（**前提已实测；推迟**，2026-09-15）
 
-文件：`services/trace_service.py`（seq 分配）、`agents/delegation.py`（`asyncio.gather`）、`app_state/settings.py`（`parallel_analysts: bool = False`）；测试：新 `tests/test_v36_parallel_live.py`（`live`）。
+文件：新 `tests/test_v36_parallel_live.py`（三个前提各一个 live 测试）；`app_state/settings.py` 的 `parallel_analysts`（默认 False）与 `sub_analyst.run_tasks` 的分支已在 Phase 1c 就位。
 
-0. **actor 进 token**（Phase 1 冒烟发现，见 `docs/spikes/v36/SMOKE_V36.md` §2）：`tool_call` 行由 registry wrapper 写，它在 MCP 门后面，bearer 只带 session 与 message，所以它不知道是哪个分析师在调。串行下取证脚本按"最后开口的那个"归属（打 `~`），并行下这个推断失效。正解：`tool_session` 为每个分析师铸带 actor 的 bearer，`registry.invoke` 照写。这是并行的**第零个前提**。
-1. **seq 分配加锁**：`record_step` 里在 `select max(seq)+1` 之前 `SELECT id FROM agent_sessions WHERE id = :s FOR UPDATE`（同一事务；每次 record_step 自己提交，锁只持有毫秒级）。live 测试：同一 session 上 `asyncio.gather` 两路各记 20 步，seq 无重号且单调。
-2. **MCP 并发**：live 测试对 fixture 面 `tools_session.call` 两路并发各 5 次，全部返回且 trace 各自完整；不通过则 Phase 3 停在这里，串行版本照常。
-3. **预算竞争**：终身 `tools_used` 是审计数不是上限（V23），无需改；每 analyst 的 `sub_analyst_evidence_calls` 已在 loop 内。
-4. **`delegation.run`**：`settings.parallel_analysts` 为真时 `asyncio.gather(*[run_sub_analyst(t, ctx) for t in tasks])`，结果按 task 顺序拼 E10；任一 analyst 抛异常只影响它自己那段（`status=refused`，一条 boundary 事实），不丢轮。
+实测结果（fixture 库 + fixture 面）：
 
-验收：三域题（Q08 三家对比 + book 段）墙钟 ≤ 单域题的 1.5 倍；`v36_forensics.py` 的表里三个 actor 的 seq 无重号；离线全绿。
+| 前提 | 结果 |
+|---|---|
+| 1 seq 分配 | **红**。两个 agent 同时记步骤，20 个位置里 18 个重号。`record_step` 的 `max(seq)+1` 在任何锁之外，(session_id, seq) 也没有唯一约束，所以冲突是静默的——而沟通表就是这一轮的全部读法。 |
+| 2 MCP 并发 | **正确性绿**：并发调用全部返回、各自落行、没有重号。**收益未测出**：这台机器上每个工具都在几十毫秒返回，重叠与排队的差别落在噪声里（8 次并发 vs 8 次串行，连续两轮的比值是 1.91 和 0.72）。在这些工具上断言一个阈值等于在测试里掷硬币。 |
+| 3 归属 | **设计上红**。tool_call 行由 MCP 门后的 registry 写，bearer 只告诉它 session 与 message。串行下取证脚本按"最后开口的那个"推断（打 `~`），并行下无从推断。 |
+
+**结论：并行推迟，而它等的不是三个修法。**一个是机械的（seq 在锁下分配）。另外两个是同一个问题：**每个域分析师是否拿自己的 tool session？**一个 session 就是一条连接加一个 token——而"每个分析师一个 token"正是 `auth/internal_token` 那句"token 不是塞 context 的地方"会从反对变成赞成的地方：actor 到那时不是上下文，是身份。它也是"并发调用到底重不重叠"第一次值得测的形状，因为一分析师一 session 就是一分析师一条流。
+
+这个决定要 boss 拍板，本轮不替他做。串行版本照常跑，它的 trace 是精确的。
 
 ### Phase 4 — 实测与验收记录
 
