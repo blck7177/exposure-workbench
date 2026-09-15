@@ -494,6 +494,12 @@ class Procedure:
     # opened 3 times in 140 turns (V26 P14b). Every snippet parses at import and
     # executes on the fixture (test_v30_skill_programs).
     programs: tuple[tuple[str, str], ...] = ()
+    # V36: what this domain's analyst can be ASKED FOR, in the words a lead
+    # analyst deciding whom to send a task to would use. `question` says what
+    # the domain is about and `close` says how its analyst finishes; neither
+    # answers "can this one tell me the room to a tier in dollars". The roster
+    # the lead reads is made of these.
+    offers: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.subject_kind not in SUBJECT_KINDS + ("desk",):
@@ -672,7 +678,13 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
                   "the position's weight, for the price move that closes the room on a single-name check"),
         desk=("room below zero is a check already in warning; the hard tier is the breach level",
               "a check that did not run because its input is withheld is listed as not run, never as clear",
-              "the tier in dollars is the book's market value × the tier; the price move that closes a single-name check's room is the room over the name's weight"),
+              "the tier in dollars is the book's market value × the tier; the price move that closes a single-name check's room is the room over the name's weight",
+              # V36: a cap the question invents is not a limit the desk has, and
+              # it is not a reason to answer in prose either. V33J Q11 asked who
+              # would be over 8%, the analyst read ten weights and listed five
+              # by eye, and the sentence had no ordering behind it. filter() is
+              # the primitive, and it puts the answer on the ledger.
+              "a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger"),
         compare=("the nearest check first, by smallest room",
                  "the same check on the prior run, for direction"),
         close=("the level for each check nearest its tier, in weight points, in dollars and as a price move",
@@ -820,7 +832,113 @@ _missing = set(PROCEDURES) - set(_LINKS)
 _extra = set(_LINKS) - set(PROCEDURES)
 if _missing or _extra:
     raise RuntimeError(f"domain links: missing {sorted(_missing)}, unknown {sorted(_extra)}")
-PROCEDURES = {name: replace(p, methods=_LINKS[name][0], reads=_LINKS[name][1], programs=_PROGRAMS[name])
+
+# V36 — WHAT EACH DOMAIN'S ANALYST CAN BE ASKED FOR.
+#
+# The lead analyst no longer reads a domain's programs; it reads this, and
+# decides whom to send the task to. So each line is a capability in the words a
+# question is asked in, not a method name and not a sentence about method: "the
+# room to each tier, in weight points and in dollars" rather than
+# `limit_checks.warning_level`. The desk's names are the domain analyst's
+# business, which is the whole point of the split.
+#
+# Where a domain is asked for something it does not do, the last line says so —
+# a lead that knows the boundary asks a different way instead of receiving a
+# `not_done` a turn later.
+_OFFERS: dict[str, tuple[str, ...]] = {
+    "issuer_earnings_quality": (
+        "operating cash flow beside net income over a window, and whether cash confirms earnings",
+        "the accruals ratio, as a level and as a trend",
+        "whether receivables, inventory or payables are growing faster than revenue",
+        "the working-capital cycle in days — days sales outstanding, days inventory, cash conversion cycle — dated, against an earlier reading",
+    ),
+    "issuer_profitability": (
+        "margins at any filed line — gross, operating, net — as a level and as a slope",
+        "return on equity, assets and invested capital, and the DuPont split behind a return on equity",
+        "several issuers on one line at once, ordered, with the runner-up and the gap",
+        "whether a margin move is mix, pricing or cost, as far as the filed lines separate them",
+    ),
+    "issuer_credit_and_balance_sheet": (
+        "leverage and coverage: net debt to EBITDA, EBIT interest coverage, FCF to debt, current ratio",
+        "the same readings a year earlier, or another issuer's, ordered",
+        "what would have to change in earnings or in debt for a reading to flip",
+        "what the filing itself says about maturities, covenants and facilities — quoted, because the desk holds no figures for them",
+    ),
+    "issuer_capital_allocation": (
+        "where the cash goes: capex, buybacks, dividends, each as a share of operating cash flow",
+        "capex intensity, and whether the spending is outrunning revenue",
+        "free cash flow, and what the spending is doing to it",
+        "no return on the capex: the filings do not support one",
+    ),
+    "issuer_business_risk_from_filings": (
+        "what the issuer's own filings say can go wrong, quoted from a named item or a search of the text",
+        "the lines a named risk shows in first, over the years, so the risks can be ordered by what the numbers say",
+        "what changed in the business and what did not, in the filing's own words",
+        "a risk with no line behind it is quoted, never estimated",
+    ),
+    "issuer_price_context": (
+        "where the price sits against its own history: distance from the 52-week high, momentum, volatility over a window",
+        "drawdown depth and the dates of the episode",
+        "return against a benchmark over a window, and beta to it",
+        "average daily volume in dollars",
+        "no view on where the price goes, and no valuation multiple: P/E, EV/EBITDA and FCF yield are not measures here",
+    ),
+    "issuer_outlook_boundary": (
+        "what the desk will and will not say about the future, and why",
+        "the drivers the filings name, each with the line it shows in and that line's recent direction",
+        "no projected figure at all: the absence is policy, not missing data",
+    ),
+    "book_composition": (
+        "what the book holds, by weight and by market value, and the sectors they add up to",
+        "the largest name, the top-N share, the largest sector — each with its change since the prior run",
+        "which single move would change the shape most",
+        "no look-through to float or crowding: not held",
+    ),
+    "book_limits_and_triggers": (
+        "every mandate check against its warning and breach tiers",
+        "the room left to each tier, in weight points and in dollars",
+        "the nearest check, by smallest room",
+        "the price move in one name that would close its own room",
+        "who would be over a cap the mandate does not define — that is a filter over the weights, and the desk can run it",
+    ),
+    "book_hypothetical_trades": (
+        "the book after a sale or a purchase, with every check re-run",
+        "what tightens and what loosens, against the before-book",
+        "the dollars to sell and the weight it lands at, with the tier named",
+        "no re-fitted beta, volatility, VaR or stress loss: a scenario re-prices and re-checks, it does not re-fit",
+    ),
+    "book_market_risk": (
+        "each name's sensitivity to the market, to rates and to credit, and the book's own factor betas",
+        "the stress losses the desk's shocks produce",
+        "whether risk has risen: a short volatility window against a long one, name by name",
+        "how much is market-wide and how much is specific, and which names",
+        "no correlation between holdings and no hidden common bet: not measures here",
+    ),
+    "book_drawdown_and_attribution": (
+        "drawdown episodes: depth, peak and trough dates, recovery",
+        "which names made a move, by contribution over the episode",
+        "how much of a day or a window was the market and how much was what was held",
+        "a day's P&L reconciled against the run",
+    ),
+    "book_liquidity": (
+        "days to liquidate each name at a stated share of its average daily volume",
+        "which names would hurt, and what the book could clear in a day",
+        "whether the problem is one name or the book",
+        "a name with too few sessions of volume is unmeasured, not liquid; no look-through into an ETF",
+    ),
+    "book_events": (
+        "recent filing items and web items for the names held",
+        "which items touch a held name, and the size of that position",
+        "whether the price has already moved on it, against the market over the window",
+        "no earnings calendar: dates are quoted from a filing or the web, never inferred",
+    ),
+}
+_missing_offers = set(PROCEDURES) ^ set(_OFFERS)
+if _missing_offers:
+    raise RuntimeError(f"domain offers: not one per domain — {sorted(_missing_offers)}")
+
+PROCEDURES = {name: replace(p, methods=_LINKS[name][0], reads=_LINKS[name][1], programs=_PROGRAMS[name],
+                            offers=_OFFERS[name])
               for name, p in PROCEDURES.items()}
 
 
@@ -851,6 +969,34 @@ def match_domains(text: str, n: int = 2) -> list[Procedure]:
             scored.append((hit / (len(pw) ** 0.5), p))
     scored.sort(key=lambda x: -x[0])
     return [p for _, p in scored[:n]]
+
+
+def roster(question: str | None = None) -> list[dict]:
+    """WHO THE LEAD ANALYST CAN SEND A TASK TO (V36).
+
+    One entry per domain, carrying what that domain's analyst can be asked for
+    and what is absent there — never a figure, never a method name, never a
+    program. The lead decides whom to ask; the desk's names are the domain
+    analyst's business.
+
+    Ordered by the lexical match when a question is given, so the two domains
+    `match_domains` would have picked are read first. The rest still follow: a
+    question the match scores badly is exactly the question whose domain the
+    lead has to find by reading."""
+    order = {p.name: i for i, p in enumerate(match_domains(question or "", n=len(PROCEDURES)))}
+    procs = sorted(PROCEDURES.values(), key=lambda p: order.get(p.name, len(PROCEDURES)))
+    return [{"domain": p.name, "subject_kind": p.subject_kind, "question": p.question,
+             "offers": list(p.offers), "absent": p.absent} for p in procs]
+
+
+def system_text(p: Procedure) -> str:
+    """One domain as its own analyst's standing knowledge: what the question is,
+    what this desk knows about it, how it compares and closes, what is absent,
+    and the programs that answer it. This is `push_text` for one domain, and it
+    is read by the analyst that will WRITE the program rather than by the one
+    that will write the answer — which is why the programs are in it and why
+    the prose that told the reader it does not write programs is not."""
+    return push_text([p])
 
 
 def push_text(procedures: list[Procedure]) -> str:
