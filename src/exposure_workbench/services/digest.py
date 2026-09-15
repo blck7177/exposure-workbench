@@ -149,6 +149,17 @@ def _call_text(call: dict | None) -> str:
     return f"{call['tool']}({inner[:140]})"
 
 
+def _problem_text(p: dict) -> str:
+    """One problem of a refusal, whichever shape wrote it. The registry's
+    argument check writes {field, problem, value}; the program typecheck and
+    the answer check write {reason, fix, detail}. Round A rendered sixteen
+    read_filings refusals as "invalid_arguments — ; " because this read only the
+    second shape, and one analyst sent the same call six times on that."""
+    what = p.get("fix") or p.get("detail") or p.get("problem") or p.get("reason") or ""
+    field = p.get("field") or p.get("arg") or p.get("at")
+    return f"{field}: {what}" if field and what else str(what or field or "")
+
+
 def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: dict | None = None) -> dict:
     """A tool result into an entry: figures, series, passages, tasks and
     boundaries — every one from the result's facts block, so every value the
@@ -163,8 +174,9 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
                "not_an_sec_filer": "data_absent"}.get(res["error"], "error")
         text = res.get("detail") or res["error"]
         if res.get("problems"):
-            text += " — " + "; ".join((p.get("fix") or p.get("detail") or p.get("reason", ""))
-                                      for p in res["problems"][:3] if isinstance(p, dict))
+            text += " — " + "; ".join(_problem_text(p) for p in res["problems"][:3] if isinstance(p, dict))
+        if isinstance(res.get("route"), dict) and res["route"]:
+            text += " — " + "; ".join(f"{k}: {ejson.dumps(v)[:120]}" for k, v in list(res["route"].items())[:2])
         # the desk's words name the call they answer, so they read as a sentence
         # and not as a code: "read_filings(ticker='MSFT', item='7'): not_indexed"
         head = _call_text(call)

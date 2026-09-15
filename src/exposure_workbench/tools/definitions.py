@@ -492,8 +492,9 @@ def build_read_registry(kinds: tuple[str, ...] = ALL_KINDS) -> ToolRegistry:
         name="read_filings",
         display="Reading {ticker}'s filings",
         description=(
-            "An issuer's filing text: query searches the indexed passages (each a chunk_ id a sentence "
-            "can cite and quote verbatim); item reads one Item of the latest filing whole ('1A', '7', '7A'). "
+            "An issuer's filing text. Give EXACTLY ONE of query or item: query searches the indexed passages (each a "
+            "chunk_ id a sentence can cite and quote verbatim); item reads one Item of the latest filing whole "
+            "('1A', '7', '7A'). A call with both, or neither, is refused. "
             "Figures stated only in prose (segments, products, customers) are quoted from here, not computed."
         ),
         json_schema={"type": "object", "properties": {
