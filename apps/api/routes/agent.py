@@ -217,6 +217,10 @@ class StepOut(BaseModel):
     seq: int
     step_type: str
     tool_name: str | None
+    # V36. Which agent of the turn took the step: null for the lead analyst,
+    # 'sub:<domain>' for a delegated domain analyst. A trace panel showing one
+    # undifferentiated column of `run` calls cannot say which of them asked.
+    actor: str | None = None
     status: str
     result_summary: str | None
     evidence_refs: list
@@ -319,7 +323,7 @@ async def get_agent_session(
                    "citations": m.citations, "meta": m.meta or {}} for m in msgs],
         steps=[
             StepOut(
-                seq=st.seq, step_type=st.step_type, tool_name=st.tool_name,
+                seq=st.seq, step_type=st.step_type, tool_name=st.tool_name, actor=st.actor,
                 status=st.status, result_summary=st.result_summary,
                 evidence_refs=st.evidence_refs, created_at=st.created_at,
                 prompt_tokens=st.prompt_tokens, completion_tokens=st.completion_tokens,

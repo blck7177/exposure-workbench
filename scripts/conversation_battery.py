@@ -77,7 +77,7 @@ FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 _ARGS_CAP, _RESULT_CAP = 4000, 1000
 
 _STEPS = text(
-    f"SELECT seq, step_type, tool_name, status, left(result_summary, {_RESULT_CAP}) AS result, "
+    f"SELECT seq, step_type, tool_name, actor, status, left(result_summary, {_RESULT_CAP}) AS result, "
     f"       left(args::text, {_ARGS_CAP}) AS args, prompt_tokens, completion_tokens "
     "FROM agent_steps WHERE session_id = :s AND message_id = :m ORDER BY seq")
 

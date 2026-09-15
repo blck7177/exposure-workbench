@@ -37,10 +37,20 @@ logger = logging.getLogger(__name__)
 class LlmSession:
     """What a loop holds for the length of a turn: one verb, returning two things."""
 
-    def __init__(self, db_factory, session_id: str, message_id: str | None):
+    def __init__(self, db_factory, session_id: str, message_id: str | None, actor: str | None = None):
         self._db_factory = db_factory
         self._session_id = session_id
         self._message_id = message_id
+        self._actor = actor
+
+    def for_actor(self, actor: str) -> "LlmSession":
+        """The same session, spending under another agent's name.
+
+        V36: a turn holds a lead analyst and a domain analyst per delegated
+        task, and both spend. They share the session (the facts have to land on
+        one ledger) so what separates their rows is this name, and handing a
+        sub-analyst a session of its own would separate the ledger with it."""
+        return LlmSession(self._db_factory, self._session_id, self._message_id, actor)
 
     async def chat(
         self,
@@ -92,6 +102,7 @@ class LlmSession:
                     message_id=self._message_id,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
+                    actor=self._actor,
                 )
                 await db.commit()
         except Exception:  # noqa: BLE001 — see below
@@ -109,7 +120,7 @@ class LlmSession:
 
 
 @asynccontextmanager
-async def llm_session(db_factory, session_id: str, message_id: str | None = None):
+async def llm_session(db_factory, session_id: str, message_id: str | None = None, actor: str | None = None):
     """The provider, bound to one session's ledger.
 
     db_factory rather than a session: the row is committed per completion, and a
@@ -120,5 +131,8 @@ async def llm_session(db_factory, session_id: str, message_id: str | None = None
     off — it is a session that IS one unit of work. A chat turn has one, and
     passing it is what lets a user's turn be costed rather than only their
     session.
+
+    actor names which agent of a turn is spending (V36); None is the loop that
+    owns the turn, and `for_actor` makes the sub-analyst's copy.
     """
-    yield LlmSession(db_factory, session_id, message_id)
+    yield LlmSession(db_factory, session_id, message_id, actor)

@@ -868,6 +868,12 @@ class AgentStep(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|think|delegation|respond|llm_call
     tool_name: Mapped[str | None] = mapped_column(String(64))
+    # V36: whose step this is. NULL is the lead analyst (every row before V36);
+    # a domain analyst writes 'sub:<domain>'. Without it a `run` call made by a
+    # delegated analyst is indistinguishable from one made by the lead, and the
+    # reading a round is judged by — which two nodes talked, how often, carrying
+    # what — cannot be recovered from the trace.
+    actor: Mapped[str | None] = mapped_column(String(64))
     args: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     result_summary: Mapped[str | None] = mapped_column(Text)
     evidence_refs: Mapped[list[Any]] = mapped_column(JSONB, default=list)

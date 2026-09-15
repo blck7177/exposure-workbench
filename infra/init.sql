@@ -670,6 +670,13 @@ CREATE TABLE IF NOT EXISTS agent_steps (
     seq                INTEGER NOT NULL,
     step_type          VARCHAR(16) NOT NULL,          -- 'tool_call' | 'think' | 'delegation' | 'respond'
     tool_name          VARCHAR(64),
+    -- V36: WHO took the step. One turn now has more than one agent in it (the
+    -- lead analyst and a domain analyst per delegated task), and a trace that
+    -- cannot say which of them called a tool cannot answer the question the
+    -- round is read with: how many times did these two talk, and about what.
+    -- NULL is the lead analyst, which is what every row before V36 was.
+    actor              VARCHAR(64),
+
     args               JSONB NOT NULL DEFAULT '{}',   -- redacted (key-class fields stripped)
     result_summary     TEXT,
     evidence_refs      JSONB NOT NULL DEFAULT '[]',   -- [{type, id}] into the four stores

@@ -1,0 +1,15 @@
+-- V36: which agent took the step.
+--
+-- A turn used to be one loop, so `agent_steps` needed no column for whose step
+-- a row was: every row was the analyst's. V36 puts a domain analyst behind each
+-- delegated task, and the reading that decides whether the architecture works —
+-- how many times did two nodes talk, with what, under what schema — is not
+-- answerable from step_type alone: a `tool_call` to `run` looks the same
+-- whoever made it.
+--
+-- NULL means the lead analyst, so every row written before this migration is
+-- already correct and nothing is backfilled. Domain analysts write
+-- 'sub:<domain>'.
+--
+-- Additive and idempotent.
+ALTER TABLE agent_steps ADD COLUMN IF NOT EXISTS actor VARCHAR(64);

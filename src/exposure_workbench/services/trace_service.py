@@ -111,6 +111,13 @@ async def record_step(
     message_id: str | None = None,
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
+    # V36. WHO took the step, when a turn holds more than one agent: the lead
+    # analyst (None, and every row written before V36) or a domain analyst
+    # ('sub:<domain>'). It is not derivable from the other columns — the lead
+    # and a domain analyst call the same tools through the same wrapper — and
+    # the question a round is read with is how often two nodes talked and with
+    # what, which is a question about who.
+    actor: str | None = None,
 ) -> str:
     """Append one immutable trace row; returns its seq-scoped id."""
     next_seq = (
@@ -126,6 +133,7 @@ async def record_step(
             seq=next_seq,
             step_type=step_type,
             tool_name=tool_name,
+            actor=actor,
             args=_jsonable(bound_args(redact_args(args))),
             result_summary=(result_summary or "")[:2000],
             evidence_refs=evidence_refs or [],

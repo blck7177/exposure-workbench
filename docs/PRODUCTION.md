@@ -396,6 +396,14 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v31_metric_lineage.sql
 
+# v36_actor.sql adds agent_steps.actor: which agent of a turn took the step, now
+# that a turn holds a lead analyst and a domain analyst per delegated task. NULL
+# is the lead, so every row already written is already correct and nothing is
+# backfilled — a row from before the column has no second agent to have been.
+# Additive and idempotent; safe well ahead of the code, which only ever writes it.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v36_actor.sql
+
 docker compose up -d
 
 # Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry
