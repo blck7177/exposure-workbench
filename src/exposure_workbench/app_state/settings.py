@@ -60,6 +60,18 @@ class Settings(BaseSettings):
     # so which regime a session is under is data, not a branch in reserve().
     turn_tool_budget: int = 15
 
+    # V36: what one domain analyst may spend inside the lead's turn. The turn
+    # budget above cannot bound this — its unit has been the assistant MESSAGE
+    # since V23, so the first evidence call of a turn charges one unit and every
+    # later call of the same message is free against it. That is the right shape
+    # for a turn and no shape at all for "how much may ONE of the three analysts
+    # in this turn use", which is what these are. They are loop counters, and the
+    # registry is untouched.
+    sub_analyst_max_turns: int = 8          # completions one domain analyst may take
+    sub_analyst_evidence_calls: int = 8     # run / read_filings / search_web / start, per analyst
+    sub_analyst_result_chars: int = 16_000  # of one tool result it reads
+    parallel_analysts: bool = False         # V36 Phase 3; serial until the three preconditions are measured
+
     # V3-B1: refuse a turn whose prompt would exceed this, BEFORE charging quota.
     # Deliberately conservative and measured before it is relaxed: B0 records the
     # real distribution (agent_sessions.last_prompt_tokens) and B3's summarisation

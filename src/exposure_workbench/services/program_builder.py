@@ -417,6 +417,29 @@ def build(item: dict, held_in: dict | None = None, skipped: list | None = None) 
     return program
 
 
+def compile_request(request: dict, held_in: dict | None = None) -> dict:
+    """The request as a program, typed, NOT run (V36).
+
+    The domain analyst's first move: say what it wants in the desk's names and
+    get back the program that says it, or the reason none does. Separating the
+    compile from the run is what lets the analyst add a node the request syntax
+    cannot express — a division over two of its own bindings, a filter at a level
+    the question named — instead of losing the whole request to the one thing
+    the fields could not say, which is what the V35 broker did with `ask`.
+
+    `skipped` still costs one name and not the request: V33C Q15 named one line
+    this desk does not hold beside two it does and lost the item, `compare: rank`
+    included, and the answer was then refused nine times for superlatives with no
+    ordering behind them."""
+    skipped: list[dict] = []
+    try:
+        program = build(request, held_in=held_in, skipped=skipped)
+    except NotExpressible as e:
+        return {"program": None, "reason": e.reason, "nearest": list(e.nearest or []), "skipped": skipped}
+    return {"program": program, "skipped": skipped,
+            "note": "this program typechecks; run it, or add the nodes it is missing and run that"}
+
+
 def _operand(side: str, nodes_of_want: dict[str, list[str]], let: list[dict]):
     """One side of a derivation: a number, or the node a named want produced."""
     side = side.strip()
