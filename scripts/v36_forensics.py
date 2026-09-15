@@ -24,6 +24,14 @@ half of the reading, taken from the round rather than from the source.
 Reads V35 rounds too: rows written before the `actor` column are the lead
 analyst's by definition, and in a V35 session the tool calls were the broker's
 (the session's own `request`/`digest` steps are what say so).
+
+ONE ATTRIBUTION IS INFERRED, and it is worth knowing which. A `tool_call` row is
+written by the registry wrapper, which lives behind the MCP door and is not told
+who is calling — the bearer carries the session and the message, not the actor.
+So an actor-less tool call in a V36 session is attributed to the analyst that
+spoke last, which is exact while analysts run one at a time and stops being
+exact the moment they run in parallel (Phase 3). The fix belongs in the token,
+not here; until it exists the inferred rows are marked with `~`.
 """
 from __future__ import annotations
 
@@ -96,16 +104,19 @@ def _short_actor(actor: str | None, legacy_caller: str) -> str:
     return actor if not actor.startswith("sub:") else "sub:" + actor[4:][:22]
 
 
-def _edge(st: dict, legacy_caller: str) -> tuple[str, str | None, str]:
+def _edge(st: dict, legacy_caller: str, speaking: str | None = None) -> tuple[str, str | None, str]:
     """(from, to, carrier). `to` is None for a completion: one node working."""
     kind, tool, actor = st["step_type"], st["tool_name"], st["actor"]
-    who = _short_actor(actor, LEAD if kind == "llm_call" else legacy_caller)
+    fallback = LEAD if kind == "llm_call" else (speaking or legacy_caller)
+    who = _short_actor(actor, fallback)
     if kind == "llm_call":
         return (CTX, None, "completion")
     if kind == "request":                       # V35: the analyst's evidence request
         return (LEAD, "broker", "request_evidence")
     if kind == "digest":                        # V35: the broker's answer to it
         return ("broker", LEAD, "digest")
+    if kind == "boundary":                      # V36: what the desk could not do, put on the ledger
+        return (who, "ledger", "boundaries")
     if kind == "delegate":                      # V36
         return (LEAD, "sub", "delegate")
     if kind == "brief":                         # V36: the sub-analyst's submission
@@ -233,8 +244,14 @@ async def main(argv: list[str]) -> int:
                 rows = [("seq", "from", "→", "to", "carrier", "status", "size", "schema keys", "content")]
                 pairs: collections.Counter = collections.Counter()
                 completions: collections.Counter = collections.Counter()
+                speaking: str | None = None          # the analyst whose turn it is; see the module docstring
                 for st in turn_steps:
-                    frm, to, carrier = _edge(st, legacy)
+                    if st["actor"]:
+                        speaking = _short_actor(st["actor"], LEAD)
+                    elif st["step_type"] in ("delegate", "answer", "respond"):
+                        speaking = None              # the lead took the floor back
+                    frm, to, carrier = _edge(st, legacy, speaking)
+                    inferred = "~" if (st["actor"] is None and speaking and st["step_type"] != "llm_call") else ""
                     a = _j(st["args"])
                     if to is None:
                         completions[_short_actor(st["actor"], LEAD)] += 1
@@ -245,7 +262,7 @@ async def main(argv: list[str]) -> int:
                         samples.setdefault(f"{frm} → {to} · {carrier}",
                                            {"tag": convo["tag"], "seq": st["seq"], "args": a,
                                             "result_summary": st["result_summary"]})
-                    rows.append((st["seq"], frm, "·" if to is None else "→",
+                    rows.append((st["seq"], inferred + frm, "·" if to is None else "→",
                                  to or _short_actor(st["actor"], LEAD), carrier, st["status"],
                                  _sizes(st, st["args"]), _keys(st["args"]), _summary(st, a)[:150]))
                 out += _table(rows)

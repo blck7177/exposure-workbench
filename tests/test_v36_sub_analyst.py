@@ -187,7 +187,7 @@ async def test_a_boundary_the_analyst_is_shown_is_recorded_as_a_fact():
     tools = _Tools({"read_filings": {"error": "not_indexed", "detail": "KO has no Item 7 indexed"}})
     llm = _Llm([("", [("read_filings", {"ticker": "KO", "item": "7"})]), ("", None)])
     await sa.run_sub_analyst(_task(), _ctx(tools, llm))
-    step = next(s for s in sa.RECORDED if s["step_type"] == "digest")
+    step = next(s for s in sa.RECORDED if s["step_type"] == "boundary")
     assert step["facts"] and step["facts"][0].kind == F.ABSENCE
     shown = json.loads(llm.seen[1]["messages"][-1]["content"])
     assert shown["boundaries"][0]["fact"] == step["facts"][0].id
@@ -307,3 +307,18 @@ async def test_tasks_run_one_after_another_until_phase_3():
         mod.run_sub_analyst = real
     assert calls == ["book_limits_and_triggers", "book_liquidity"]
     assert [r.task.domain for r in out] == calls
+
+
+@pytest.mark.asyncio
+async def test_a_brief_that_settles_nothing_is_not_called_verified():
+    """It passed the check, and it answered nothing. The smoke round called that
+    'verified', which is true of the check and false of the work — and the word
+    is what the lead reads."""
+    led = Ledger()
+    llm = _Llm([("", [("submit", {"brief": {"findings": [],
+                                            "not_done": [{"want": 1, "why": "no run on this desk"},
+                                                         {"want": 2, "why": "no run on this desk"}]},
+                                  "report": {"title": "t", "text": "The desk holds no run for this book."}})])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, led))
+    assert r.status == "absent"
+    assert r.coverage == {"asked": 2, "done": 0, "not_done": 2, "refused": 0}

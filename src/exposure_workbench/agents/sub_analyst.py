@@ -221,7 +221,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                         # SHOWN MEANS ON THE LEDGER. The desk's own words for what
                         # it could not do are quotable only if they are recorded
                         # (round G refused an analyst for quoting one).
-                        await _record(ctx, actor, "digest", "digest", {"of": name},
+                        await _record(ctx, actor, "boundary", name, {"of": name},
                                       f"{len(minted)} boundary fact(s) stated", facts=minted)
 
             elif name == dl.SUBMIT_TOOL_NAME:
@@ -289,8 +289,14 @@ def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, ve
     result.report = {**report, "status": "verified" if (rv is not None and rv.ok) else "refused",
                      "problems": [] if (rv is not None and rv.ok) else [p for p in (rv.problems if rv else [])],
                      "verdict": rv}
-    if verdict.ok:
+    # The word the lead reads has to mean what happened. The smoke round produced
+    # a brief that passed every check while answering nothing — five lines, five
+    # not_done — and called it "verified", which is true of the check and false
+    # of the work.
+    if verdict.ok and result.findings:
         result.status = "verified"
+    elif verdict.ok:
+        result.status = "absent"            # nothing settled, and properly said so
     elif result.findings or result.not_done:
         result.status = "partial"
     else:

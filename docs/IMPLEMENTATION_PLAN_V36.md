@@ -76,7 +76,7 @@ meta（agents/meta_agent.py）              sub-analyst（agents/sub_analyst.py�
   - 记 `brief` 步（completed / rejected；`evidence_refs` = 本次铸的边界事实，同时写 facts 表，沿用 `ledger_svc.step_entry` / `rows_for`）；Phase 1 的 report 只记进 `brief` 步 args 的前 4k（Phase 2 落表）；
   - `AnalystResult`：`domain / task_id / status / findings / not_done / caveats / follow_ups / refused / report{title,text,verdict} / cost{completions, evidence_calls, prompt_tokens} / minted`。
   - 空回复、无 tool call、超 max_turns：状态 `refused`，`not_done` 为全部行，`why = "the analyst did not file a brief"`，铸一条 boundary 事实。
-- 新 settings：`sub_analyst_max_turns=8`、`sub_analyst_evidence_calls=8`、`sub_analyst_result_chars=16_000`、`delegate_max_tasks=4`、`report_max_chars=6_000`。
+- 新 settings：`sub_analyst_max_turns=8`、`sub_analyst_evidence_calls=8`、`sub_analyst_result_chars=16_000`、`parallel_analysts=False`。`report_max_chars` 撤到 Phase 2：本仓库的法则是声明了没人读的旋钮比没有更糟（`test_p0_schema`），而它的读者在 Phase 2 才出现。`delegate_max_tasks` 成了 `delegation.MAX_TASKS`，因为它是协议的一部分而不是部署旋钮。
 - `tests/test_v36_sub_analyst.py`：脚本化 LLM（沿用 `test_v33_broker._Llm` 的形：按序回 tool_calls）+ 假 tools_session（沿用 `test_meta_agent_gate._stub_tools`）：compile → run → submit 通过；submit 被拒一次后修复通过；两次不过时逐条接受；证据上限；空回复的 refused 形；步骤序列与 actor。
 
 **1d · `meta_agent.py` 换工具、faces 收窄、broker 删除**
@@ -107,6 +107,7 @@ meta（agents/meta_agent.py）              sub-analyst（agents/sub_analyst.py�
 
 文件：`services/trace_service.py`（seq 分配）、`agents/delegation.py`（`asyncio.gather`）、`app_state/settings.py`（`parallel_analysts: bool = False`）；测试：新 `tests/test_v36_parallel_live.py`（`live`）。
 
+0. **actor 进 token**（Phase 1 冒烟发现，见 `docs/spikes/v36/SMOKE_V36.md` §2）：`tool_call` 行由 registry wrapper 写，它在 MCP 门后面，bearer 只带 session 与 message，所以它不知道是哪个分析师在调。串行下取证脚本按"最后开口的那个"归属（打 `~`），并行下这个推断失效。正解：`tool_session` 为每个分析师铸带 actor 的 bearer，`registry.invoke` 照写。这是并行的**第零个前提**。
 1. **seq 分配加锁**：`record_step` 里在 `select max(seq)+1` 之前 `SELECT id FROM agent_sessions WHERE id = :s FOR UPDATE`（同一事务；每次 record_step 自己提交，锁只持有毫秒级）。live 测试：同一 session 上 `asyncio.gather` 两路各记 20 步，seq 无重号且单调。
 2. **MCP 并发**：live 测试对 fixture 面 `tools_session.call` 两路并发各 5 次，全部返回且 trace 各自完整；不通过则 Phase 3 停在这里，串行版本照常。
 3. **预算竞争**：终身 `tools_used` 是审计数不是上限（V23），无需改；每 analyst 的 `sub_analyst_evidence_calls` 已在 loop 内。

@@ -311,6 +311,14 @@ def handoff_check(task: Task, brief: dict, report: dict, ledger: Ledger) -> Hand
         if not 1 <= want <= n:
             v.problems.append({"where": "coverage", "reason": "unknown_want", "want": want,
                                "fix": f"the task has {n} numbered line(s); {want} is not one of them"})
+    # A line is answered or it is not. The smoke round found an analyst filing
+    # three findings and three not_done entries for the same three lines, and
+    # the coverage read 3 of 3 done with 3 not done — a number that says two
+    # opposite things, which is worse than either.
+    for want in sorted(answered & explained):
+        v.problems.append({"where": "coverage", "reason": "answered_and_explained", "want": want,
+                           "line": task.want_to_know[want - 1] if 1 <= want <= n else None,
+                           "fix": f"line {want} has both a finding and a not_done entry: keep the one that is true"})
 
     # C2 / C3 — the findings
     for i, f in enumerate(brief.get("findings") or []):

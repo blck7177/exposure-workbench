@@ -242,3 +242,20 @@ def test_the_roster_names_no_method_and_no_program():
         if "_" in name or "." in name:
             assert name not in text, f"the roster names the method {name}"
     assert '"let"' not in text and '"fn"' not in text and "'fn'" not in text
+
+
+# ── what the smoke round found ───────────────────────────────────────────────
+
+def test_a_line_cannot_be_both_answered_and_explained():
+    """The first live round produced a brief with three findings and three
+    not_done entries over the same three lines, and its coverage read 3 done and
+    3 not done — a number saying two opposite things."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604)
+    led = _ledger(f)
+    brief = {"findings": [{"want": 1, "facts": [f.id], "finding": f"MSFT reads 16.0% [{f.id}]."},
+                          {"want": 2, "facts": [f.id], "finding": f"Its tier reads 16.0% [{f.id}]."}],
+             "not_done": [{"want": 1, "why": "the desk holds no ordering"},
+                          {"want": 2, "why": "the desk holds no ordering"}]}
+    v = dl.handoff_check(_task(), brief, {"text": f"MSFT reads 16.0% [{f.id}]."}, led)
+    assert [p["reason"] for p in v.problems] == ["answered_and_explained"] * 2
+    assert v.problems[0]["want"] == 1 and v.problems[0]["line"]
