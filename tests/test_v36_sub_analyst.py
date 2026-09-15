@@ -438,3 +438,23 @@ async def test_the_analyst_files_lines_and_the_lead_reads_findings_and_not_done(
     r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger))
     assert r.status == "verified" and r.coverage == {"asked": 2, "done": 1, "not_done": 1, "refused": 0}
     assert r.findings[0]["want"] == 1 and r.not_done[0]["said"] == b.text
+
+
+# ── V36.1 (round A) · one bar for the brief and the report ───────────────────
+
+@pytest.mark.asyncio
+async def test_a_report_is_verified_only_when_the_whole_brief_passed():
+    """Q11: the handoff refused "nearest" twice; the report said the same thing
+    without a figure, passed the text check, was stored verified, and the lead
+    read it from there into the answer. A report whose brief was refused in
+    part is on the record as refused, with the brief's problems."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="n")   # no place: "nearest" has no support
+    ledger = Ledger.of_facts([f])
+    bad = _submit([{"want": 1, "facts": [f.id], "finding": f"MSFT is nearest at 16.0% [{f.id}]."},
+                   {"want": 2, "facts": [f.id], "finding": f"It reads 16.0% [{f.id}]."}],
+                  report_text="The ranked output shows MSFT as the nearest check.")
+    llm = _Llm([("", [bad]), ("", [bad])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger))
+    assert r.status == "partial" and [x["want"] for x in r.refused] == [1]
+    assert r.report["status"] == "refused"
+    assert any(p["reason"] == "superlative_without_rank" for p in r.report["problems"])

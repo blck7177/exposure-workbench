@@ -389,7 +389,11 @@ def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, ve
     result.refused = list(verdict.rejected)
     result.coverage = verdict.coverage
     rv = verdict.report_verdict
-    ok = rv is not None and rv.ok
+    # V36.1: a report is verified only when the WHOLE brief passed. Round A's
+    # Q11 refused "nearest" twice at the handoff, the report said the same thing
+    # without a figure, was stored verified, and the lead read it from there
+    # (read_report) into the answer. One bar for both channels.
+    ok = rv is not None and rv.ok and verdict.ok
     rendered: dict = {}
     if ok and ledger is not None:
         try:
@@ -398,7 +402,7 @@ def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, ve
         except Exception:  # noqa: BLE001 — a report that will not render is a report, not a lost brief
             logger.exception("could not render the report for %s", task.domain)
     result.report = {**report, "status": "verified" if ok else "refused",
-                     "problems": [] if ok else list(rv.problems if rv else []),
+                     "problems": [] if ok else list(verdict.problems),
                      **rendered}
     # The word the lead reads has to mean what happened. The smoke round produced
     # a brief that passed every check while answering nothing — five lines, five
