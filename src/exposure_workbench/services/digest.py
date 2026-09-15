@@ -137,7 +137,19 @@ class Minter:
         return out
 
 
-def absorb(entry: dict, res: dict, subject: str | None = None, mint=None) -> dict:
+def _call_text(call: dict | None) -> str:
+    """The call a boundary answers, as a clause: `read_filings(ticker='MSFT', item='7')`.
+    The desk's words for what it could not do have to say what was asked, or
+    they are a code and not a sentence — and a sentence is what the lead is
+    allowed to quote (V36A: `not_indexed` was the whole text of one boundary)."""
+    if not isinstance(call, dict) or not call.get("tool"):
+        return ""
+    args = call.get("args") if isinstance(call.get("args"), dict) else {}
+    inner = ", ".join(f"{k}={v!r}" for k, v in args.items() if v is not None and k != "program")
+    return f"{call['tool']}({inner[:140]})"
+
+
+def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: dict | None = None) -> dict:
     """A tool result into an entry: figures, series, passages, tasks and
     boundaries — every one from the result's facts block, so every value the
     analyst reads is on the ledger."""
@@ -153,7 +165,11 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None) -> dic
         if res.get("problems"):
             text += " — " + "; ".join((p.get("fix") or p.get("detail") or p.get("reason", ""))
                                       for p in res["problems"][:3] if isinstance(p, dict))
-        entry["boundaries"].append(mint(str(text), cls=cls, code=res["error"], subject=subject))
+        # the desk's words name the call they answer, so they read as a sentence
+        # and not as a code: "read_filings(ticker='MSFT', item='7'): not_indexed"
+        head = _call_text(call)
+        entry["boundaries"].append(mint((f"{head}: {text}" if head else str(text)), cls=cls, code=res["error"],
+                                        subject=subject))
         return entry
     if res.get("enqueued"):
         entry["started"].append({"kind": res.get("kind"),
@@ -200,8 +216,13 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None) -> dic
                 cls = "data_absent"
             else:
                 cls = "type" if err in claims.SPELLING_REFUSALS else "data_absent"
+            # the fact's own sentence ("over_8pct was not computed — no_entry_satisfies:
+            # no entry of $issuer_weights is > 8"). A model-facing row carries it
+            # as the value (facts.row_for_model); a record-form row, which the
+            # forensics rebuild feeds, carries it as `text` — read both, so a
+            # rebuilt digest reads as the live one did (V36A §3.4's "" was that).
             entry["boundaries"].append({"class": cls, "fact": rec["id"], "node": params.get("node"), "code": err,
-                                        "text": str(rec.get("value") or "")[:400]})
+                                        "text": str(rec.get("text") or rec.get("value") or "")[:400]})
         elif kind == "task":
             entry["started"].append({"task": rec["id"], "text": str(rec.get("value") or "")[:200]})
     nodes = res.get("nodes")
@@ -308,10 +329,11 @@ def merge(into: dict, part: dict) -> dict:
 
 
 def render(res: dict, *, request: dict | None = None, subject: str | None = None,
-           mint=None, seen: dict | None = None, cap: int = DIGEST_CHAR_LIMIT) -> dict:
+           mint=None, seen: dict | None = None, cap: int = DIGEST_CHAR_LIMIT, call: dict | None = None) -> dict:
     """One tool result, as the analyst reads it: absorbed, collapsed, stamped
-    and fitted. The one entry point a sub-analyst needs."""
-    entry = absorb(empty(request), res, subject=subject, mint=mint)
+    and fitted. The one entry point a sub-analyst needs. `call` is the tool and
+    arguments the result answers, so a boundary can say what was asked."""
+    entry = absorb(empty(request), res, subject=subject, mint=mint, call=call)
     items = [entry]
     tell_apart(items, seen)
     stamp_ids(items)

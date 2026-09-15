@@ -135,7 +135,7 @@ Token 与时间：prompt tokens 全轮 2.85M（meta 403k / sub 2.44M），J 轮 
 
 字段：`{request, figures[]{id, subject, measure, value("16.0% [f_…]"), unit, as_of, node, place, of, label, rank?, also?}, series[], passages[], started[], boundaries[]{class, fact, text, code?, node?, count?, measures?}, how_to_cite}`。
 
-重建方法：把该 run 步 `evidence_refs` 里的 facts 摆回 `{"facts": {"columns", "rows"}}` 喂给 `digest.render(cap=16000)`；缺的只有 note 里的 `nodes / refused` 两个键。Q11 seq 4 那次 run：账本落了 163 条事实，digest 显示 49 条 figure、3 条 boundary，其余 102 条扣下：
+重建方法：把该 run 步 `evidence_refs` 里的 facts 摆回 `{"facts": {"columns", "rows"}}` 喂给 `digest.render(cap=16000)`；缺的只有 note 里的 `nodes / refused` 两个键。忠实的重建要用 `facts.row_for_model`（absence 的整句在 value 列），本样例没有，见下方更正。Q11 seq 4 那次 run：账本落了 163 条事实，digest 显示 49 条 figure、3 条 boundary，其余 102 条扣下：
 ```json
 {"figures": [
   {"id": "f_62c2e30eaf5e", "subject": "gross_exposure", "measure": "limit_checks.current_value", "value": "100.0% [f_62c2e30eaf5e]", "unit": "RATIO", "as_of": "2026-09-10", "node": "current", "place": 1, "of": 20, "label": "gross_exposure"},
@@ -146,7 +146,7 @@ Token 与时间：prompt tokens 全轮 2.85M（meta 403k / sub 2.44M），J 轮 
   {"class": "held_back", "fact": "f_03b1fdf8014f", "by": "digest", "count": 102, "text": "figures computed and on the ledger but not shown here: the request was too wide for one digest; ask again for the names you need",
    "measures": ["AAPL:issuer_exposures.weight", "…", "daily_loss:subtract(limit_checks.breach_level, limit_checks.current_value)", "…"]}]}
 ```
-渲染后 16,650 chars（上限 16,000，扣图后仍贴着上限）。两条 data_absent 的 `text` 是空串——原因只在 `code` 里。
+渲染后 16,650 chars（上限 16,000，扣图后仍贴着上限）。**更正（9/15 晚）**：样例里两条 data_absent 的 `text` 为空是重建的假象——重建喂的是账本的记录形（text 单列），而实际给模型的行形（`facts.row_for_model`）把 absence 的整句放在 `value` 里，域分析师当时读到的是 "over_8pct was not computed — no_entry_satisfies: no entry of $issuer_weights is > 8"。这让 §6 的 L2 更重：分析师看见了这句，仍把 want 4 归咎于 held_back。
 
 **同一入口渲染一次拒绝**（3.3 那次 read_filings，用 registry 的 problems 原样复现）：
 ```json
@@ -304,7 +304,7 @@ E12 的 `meta`（Q01）：`{"prompt_tokens": 8003, "completions": 2, "delegation
 
 **tool（没做自己的工作，或输出了不完整的东西）——本轮的大头。**
 
-- T1 **desk 对「做不到」的原话不上行。** 它散在三处：工具 description、skill 的 absent 行、边界事实的 text；只有第三处在账本上，而 E10 只带分析师的转述（`why`、finding）与边界 id，不带原话；边界事实的 text 又常是代码（`not_indexed`）或空串（3.4 的两条 data_absent）。结果是主分析师按规则「引 desk 原话」时手里只有分析师的话。4 题 / 8 次门拒绝。（ACCEPTANCE 的 T1 说的是 `not_done.why` 与 caveats；实测 3/4 在 finding 正文。）
+- T1 **desk 对「做不到」的原话不上行。** 它散在三处：工具 description、skill 的 absent 行、边界事实的 text；只有第三处在账本上，而 E10 只带分析师的转述（`why`、finding）与边界 id，不带原话；边界事实的 text 又常是代码（Q14 的 `not_indexed` 四个字）。结果是主分析师按规则「引 desk 原话」时手里只有分析师的话。4 题 / 8 次门拒绝。（ACCEPTANCE 的 T1 说的是 `not_done.why` 与 caveats；实测 3/4 在 finding 正文。）
 - T2 **registry 与 digest 对「一个 problem」的字段名不一致**，拒绝理由在两个 tool 层组件之间丢失。16 次往返。
 - T3 **`read_filings` 的二选一不在 schema 里**（法则 B：用 schema 消灭解析规则）。与 T2 合起来就是 W1。
 - T4 **`start` 被当证据计预算，且不幂等。** Q14 一题因此死；Q04 同一主体起 4 次。

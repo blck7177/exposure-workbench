@@ -389,7 +389,10 @@ def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
 
 HOW_TO_CITE = (
     "Every figure below is written exactly as you must write it, bracket included: the bracket is the desk's id for "
-    "that reading and a figure written without it is refused. `read_report(report_id)` opens an analyst's full report.")
+    "that reading and a figure written without it is refused. `said` beside a not_done line, and `desk_said` beside a "
+    "finding, are the desk's own words for what it could not do: those you may quote verbatim, citing their id. An "
+    "analyst's sentences are not the desk's words — say what they say in yours, without quotation marks. "
+    "`read_report(report_id)` opens an analyst's full report.")
 
 
 def for_lead(results: list[AnalystResult]) -> dict:
@@ -400,7 +403,8 @@ def for_lead(results: list[AnalystResult]) -> dict:
         "coverage": r.coverage,
         "findings": [{"want": f["want"], "asked": r.task.want_to_know[f["want"] - 1]
                       if 1 <= f["want"] <= len(r.task.want_to_know) else None,
-                      "finding": f["finding"]} for f in r.findings],
+                      "finding": f["finding"],
+                      **({"desk_said": f["desk_said"]} if f.get("desk_said") else {})} for f in r.findings],
         "not_done": r.not_done,
         **({"caveats": r.caveats} if r.caveats else {}),
         **({"follow_ups": r.follow_ups} if r.follow_ups else {}),

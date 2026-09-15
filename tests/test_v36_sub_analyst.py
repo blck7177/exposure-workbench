@@ -322,3 +322,51 @@ async def test_a_brief_that_settles_nothing_is_not_called_verified():
     r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, led))
     assert r.status == "absent"
     assert r.coverage == {"asked": 2, "done": 0, "not_done": 2, "refused": 0}
+
+
+# ── V36.1 (round A) · the desk's words travel with the id ────────────────────
+
+def _boundary(text, measure="request"):
+    return F.fact(F.ABSENCE, measure, subject=None, as_of="n/a", value=None, text=text,
+                  params={"reason": "cannot", "class": "data_absent", "code": "not_indexed"}, standalone=False,
+                  group="boundary")
+
+
+@pytest.mark.asyncio
+async def test_a_not_done_line_carries_the_desks_own_words_beside_its_id():
+    """Round A lost Q05, Q06, Q14 and Q17 to the lead quoting an analyst's
+    sentence as the desk's. The brief carried `why` and a boundary id and never
+    the boundary's text; now the text rides beside the id, read off the ledger,
+    so what the lead may quote is what the gate can look up."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="n", place=1, of=10)
+    b = _boundary("read_filings(ticker='MSFT', item='7'): not_indexed")
+    ledger = Ledger.of_facts([f, b])
+    llm = _Llm([("", [_submit([{"want": 1, "facts": [f.id], "finding": f"MSFT is nearest at 16.0% [{f.id}]."}],
+                              not_done=[{"want": 2, "why": "the desk could not read the filing", "boundary": b.id}],
+                              report_text=f"MSFT reads 16.0% [{f.id}].")])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger))
+    assert r.not_done[0]["said"] == b.text
+    handed = dl.for_lead([r])["analysts"][0]
+    assert handed["not_done"][0]["said"] == b.text
+    assert "`said`" in dl.HOW_TO_CITE
+
+
+@pytest.mark.asyncio
+async def test_a_finding_that_cites_a_boundary_carries_the_boundarys_words():
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="n", place=1, of=10)
+    b = _boundary("read_filings(ticker='MSFT', item='7'): not_indexed")
+    ledger = Ledger.of_facts([f, b])
+    llm = _Llm([("", [_submit([{"want": 1, "facts": [f.id], "finding": f"MSFT is nearest at 16.0% [{f.id}]."},
+                               {"want": 2, "facts": [b.id], "finding": "The filing could not be read on this desk."}],
+                              report_text=f"MSFT reads 16.0% [{f.id}].")])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger))
+    assert r.findings[1]["desk_said"] == [{"id": b.id, "said": b.text}]
+    assert dl.for_lead([r])["analysts"][0]["findings"][1]["desk_said"][0]["said"] == b.text
+
+
+@pytest.mark.asyncio
+async def test_an_analyst_that_files_nothing_still_hands_the_lead_the_desks_words(monkeypatch):
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_max_turns", 1, raising=False)
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), _Llm([("thinking", None)])))
+    assert r.not_done and all(d["said"] and d["said"] == d["why"] for d in r.not_done)

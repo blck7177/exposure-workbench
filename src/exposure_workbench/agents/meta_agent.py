@@ -63,12 +63,14 @@ needed for one question: send them in one call. Ask again only for what the answ
 a program or a fact id — that is the analyst's job and the reason you have one. Check the question's premises against \
 the BRIEFING first (which holdings are in which sector, what the desk holds).
 
-Each analyst comes back with a finding for each of your lines, what it could not do and why in the desk's own words, \
-and a report id. Your reply is plain prose, and every number you write is one an analyst showed you, written exactly \
+Each analyst comes back with a finding for each of your lines, what it could not do — with the desk's own words \
+for it beside the line as `said`, under an id — and a report id. Your reply is plain prose, and every number you write is one an analyst showed you, written exactly \
 as it was shown, bracket included: 16.0% [f_2592baab170e]. The bracket is the desk's id for that reading; it is what \
 lets the reader open the figure, and a figure written without it is refused. A table or a chart is [table: <node>] or \
-[chart: <node>], naming a node from the evidence. Quote a passage's words, or the desk's own words for what it could \
-not do, verbatim inside quotation marks. A superlative rests on an ordering the desk computed. What the desk could not \
+[chart: <node>], naming a node from the evidence. Quotation marks are for text that came to you under an id: a passage's words, or \
+the desk's own words for what it could not do — the `said` beside a not_done line, the `desk_said` beside a finding — \
+cited with that id. An analyst's own sentences are not the desk's words: say what they say in yours, without \
+quotation marks. A superlative rests on an ordering the desk computed. What the desk could not \
 do or does not hold, say so and say what you gave instead — never an estimate, never a figure carried from one company \
 or date to another, never a nearby figure under the asked-for name.
 

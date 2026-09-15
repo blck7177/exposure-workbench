@@ -40,7 +40,7 @@ from exposure_workbench.agents import delegation as dl
 from exposure_workbench.services import answer_check
 from exposure_workbench.analytics import skill
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import analyst_reports, digest as dg, ledger as ledger_svc, \
+from exposure_workbench.services import analyst_reports, digest as dg, facts as F, ledger as ledger_svc, \
     program_builder as pb, program_service as ps, trace_service
 from exposure_workbench.utils import json as ejson
 
@@ -83,9 +83,9 @@ node built: a superlative rests on that, never on reading a list. Never compute 
 yourself is a number no fact stands behind, and it is refused.
 
 The brief is one entry per numbered line: the line's number, the ids it rests on, and one to three sentences with every \
-figure written exactly as the desk showed it, bracket included. A line this desk cannot settle goes in not_done with the \
-desk's own words for why and the id of the boundary it stated — never an estimate, never a nearby figure under the \
-asked-for name. What you had to assume or leave out goes in caveats; the lead states those to the reader. The report is \
+figure written exactly as the desk showed it, bracket included. A line this desk cannot settle goes in not_done pointing at the id of the boundary the desk stated \
+— its own words travel with that id, so `why` is your one-line reading of it, not a quotation; never an estimate, \
+never a nearby figure under the asked-for name. What you had to assume or leave out goes in caveats; the lead states those to the reader. The report is \
 your full reading in prose, same rule for figures, and [table: <node>] or [chart: <node>] shows a node's figures.
 
 You write for the lead analyst, never for the user, and you answer the task you were given rather than the one you would \
@@ -216,7 +216,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     evidence_calls += 1
                     raw = await ctx.tools_session.call(name, args)
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
-                    res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars)
+                    res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
+                                    call={"tool": name, "args": args})
                     minted = minter.take()
                     if minted:
                         # SHOWN MEANS ON THE LEDGER. The desk's own words for what
@@ -271,7 +272,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
         entry, fact = dg.boundary(text, want=list(task.want_to_know), subject=task.subjects[0], cls="error")
         await _record(ctx, actor, "brief", "submit", {"task_id": task.task_id}, text, facts=[fact], status="rejected")
         result.status = "refused"
-        result.not_done = [{"want": i, "why": text, "boundary": fact.id} for i in range(1, len(task.want_to_know) + 1)]
+        result.not_done = [{"want": i, "why": text, "boundary": fact.id, "said": fact.text}
+                           for i in range(1, len(task.want_to_know) + 1)]
         result.coverage = {"asked": len(task.want_to_know), "done": 0,
                            "not_done": len(task.want_to_know), "refused": 0}
     result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls}
@@ -304,13 +306,38 @@ async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.
     return report_id
 
 
+def _said(ledger, fid: str | None) -> str | None:
+    """The desk's words behind a boundary id, if the ledger holds them."""
+    rec = (getattr(ledger, "by_id", None) or {}).get(fid) if fid else None
+    if not rec or rec.get("kind") != F.ABSENCE:
+        return None
+    text = rec.get("text") if isinstance(rec.get("text"), str) else None
+    return text or None
+
+
+def _with_said(entry: dict, ledger) -> dict:
+    said = _said(ledger, entry.get("boundary"))
+    return {**entry, "said": said} if said else dict(entry)
+
+
+def _with_desk_said(finding: dict, ledger) -> dict:
+    """A finding that cites a boundary carries the boundary's words beside it."""
+    said = [{"id": fid, "said": s} for fid in (finding.get("facts") or []) if (s := _said(ledger, fid))]
+    return {**finding, "desk_said": said} if said else dict(finding)
+
+
 def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, verdict: dl.HandoffVerdict,
           ledger=None) -> None:
     """What survives the check reaches the lead; what did not is named as
     refused. A brief that half passes is half a brief, not a lost one — the lead
     can still answer the lines that came back."""
-    result.findings = list(verdict.accepted)
-    result.not_done = list(brief.get("not_done") or [])
+    # THE DESK'S OWN WORDS TRAVEL WITH THE ID. Round A lost four questions to
+    # unverified_quote, every one of them the lead quoting an analyst's sentence
+    # as if it were the desk's: the brief carried the analyst's `why` and a
+    # boundary id, and never the boundary's text. `said` is that text, read off
+    # the ledger — so what the lead can quote is what the gate can look up.
+    result.findings = [_with_desk_said(f, ledger) for f in verdict.accepted]
+    result.not_done = [_with_said(d, ledger) for d in (brief.get("not_done") or [])]
     result.caveats = list(brief.get("caveats") or [])
     result.follow_ups = list(brief.get("follow_ups") or [])
     result.refused = list(verdict.rejected)

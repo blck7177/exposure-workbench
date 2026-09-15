@@ -204,15 +204,20 @@ def test_the_refusal_names_only_what_failed_and_what_to_do():
 def test_what_the_lead_reads_carries_the_line_each_finding_answers():
     task = _task()
     r = dl.AnalystResult(task=task, status="verified",
-                         findings=[{"want": 2, "facts": ["f_a"], "finding": "Room is -1.0%."}],
+                         findings=[{"want": 2, "facts": ["f_a"], "finding": "Room is -1.0%.",
+                                    "desk_said": [{"id": "f_b", "said": "rank(of=$room): no ordering"}]}],
                          coverage={"asked": 2, "done": 1, "not_done": 1, "refused": 0},
-                         not_done=[{"want": 1, "why": "no ordering"}], report_id="rep_1",
+                         not_done=[{"want": 1, "why": "no ordering", "boundary": "f_b",
+                                    "said": "rank(of=$room): no ordering"}], report_id="rep_1",
                          cost={"completions": 2})
     out = dl.for_lead([r])
     a = out["analysts"][0]
     assert a["domain"] == "book_limits_and_triggers" and a["report_id"] == "rep_1"
     assert a["findings"][0]["asked"] == "how much room is left"
-    assert "read_report" in out["how_to_cite"]
+    # V36.1: the desk's words ride beside the id, both ways they can be cited
+    assert a["findings"][0]["desk_said"][0]["said"] == "rank(of=$room): no ordering"
+    assert a["not_done"][0]["said"] == "rank(of=$room): no ordering"
+    assert "read_report" in out["how_to_cite"] and "`said`" in out["how_to_cite"]
 
 
 # ── the roster the lead picks from ───────────────────────────────────────────

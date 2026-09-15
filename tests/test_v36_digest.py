@@ -133,3 +133,34 @@ def test_a_series_point_carries_its_date_in_the_bracket():
     s = d["series"][0]
     assert s["last"] == ["2026-03-31", "$26.03B [f_s@2026-03-31]"]
     assert s["points"][0][1].endswith("[f_s@2025-12-31]")
+
+
+# ── V36.1 (round A) · the desk's words are sentences ─────────────────────────
+
+def test_an_absence_rows_own_sentence_reaches_the_analyst():
+    """Round A's Q11: the filter's level was written as 8 against weights that
+    are fractions, and the executor said so — "no entry of $issuer_weights is
+    > 8". For an absence the row's value IS that sentence; a boundary shown with
+    an empty text and a code alone is one the analyst cannot act on."""
+    a = F.fact(F.ABSENCE, "over_8pct", subject=None, as_of="n/a", value=None,
+               text="over_8pct was not computed — no_entry_satisfies: no entry of $issuer_weights is > 8",
+               params={"node": "over_8pct", "error": "no_entry_satisfies", "reason": "cannot"}, standalone=False)
+    d = dg.render({"program_id": "calc_1", "returns": [], "nodes": {"over_8pct": {"kind": "absence"}}, "settled": 0,
+                   "refused": ["over_8pct"], "facts": F.block_for_model([a])}, mint=dg.Minter())
+    b = d["boundaries"][0]
+    assert b["fact"] == a.id and b["code"] == "no_entry_satisfies"
+    assert "no entry of $issuer_weights is > 8" in b["text"]
+
+
+def test_a_tool_refusal_names_the_call_it_answers():
+    """`not_indexed` was the whole text of a boundary in round A (Q14), and the
+    lead was refused for quoting the analyst's paraphrase of it. The desk's
+    words say what was asked and what the desk answered — a sentence the lead
+    may quote, and the gate can look up."""
+    m = dg.Minter()
+    d = dg.render({"error": "not_indexed", "ticker": "MSFT"}, mint=m,
+                  call={"tool": "read_filings", "args": {"ticker": "MSFT", "item": "7", "query": None}})
+    b = d["boundaries"][0]
+    assert b["text"] == "read_filings(ticker='MSFT', item='7'): not_indexed"
+    assert b["class"] == "data_absent" and b["code"] == "not_indexed"
+    assert m.take()[0].text == b["text"]            # the same sentence is on the ledger
