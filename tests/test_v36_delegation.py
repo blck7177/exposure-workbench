@@ -198,7 +198,7 @@ def test_the_refusal_names_only_what_failed_and_what_to_do():
     msg = dl.refusal_message(_task(), v)
     assert "findings[0]" in msg and "mark_mismatch" in msg
     assert "Everything not named here is kept" in msg
-    assert "not_done" in msg           # the way out for a line the desk cannot settle
+    assert "why and its boundary" in msg      # the way out for a line the desk cannot settle
 
 
 def test_what_the_lead_reads_carries_the_line_each_finding_answers():
@@ -262,5 +262,45 @@ def test_a_line_cannot_be_both_answered_and_explained():
              "not_done": [{"want": 1, "why": "the desk holds no ordering"},
                           {"want": 2, "why": "the desk holds no ordering"}]}
     v = dl.handoff_check(_task(), brief, {"text": f"MSFT reads 16.0% [{f.id}]."}, led)
-    assert [p["reason"] for p in v.problems] == ["answered_and_explained"] * 2
+    assert [p["reason"] for p in v.problems] == ["duplicate_want"] * 2
     assert v.problems[0]["want"] == 1 and v.problems[0]["line"]
+
+
+# ── V36.1 (round A) · the brief is one list keyed by line ────────────────────
+
+def _lines(*entries):
+    return {"brief": {"lines": list(entries)}, "report": {"title": "t", "text": "ok"}}
+
+
+def test_the_brief_is_one_entry_per_line_settled_or_not():
+    """Round A refused 51 submissions, 18 of them for a line filed as both
+    answered and not — the two-list shape let it be said, a rule caught it, and
+    each catch cost a round trip. One list, one entry per line, says it."""
+    brief, _ = dl.parse_submission(_lines({"want": 1, "finding": "MSFT reads 16.0% [f_a].", "facts": ["f_a"]},
+                                          {"want": 2, "why": "no prior run on this desk", "boundary": "f_b"}))
+    assert brief["findings"] == [{"want": 1, "facts": ["f_a"], "finding": "MSFT reads 16.0% [f_a]."}]
+    assert brief["not_done"] == [{"want": 2, "why": "no prior run on this desk", "boundary": "f_b"}]
+
+
+@pytest.mark.parametrize("entries, says", [
+    (({"want": 1, "finding": "x [f_a]", "facts": ["f_a"], "why": "and also could not"},), "one or the other"),
+    (({"want": 1},), "neither a finding nor a why"),
+    (({"want": 1, "finding": "x", "facts": []}, {"want": 1, "why": "y"}), "appears twice"),
+])
+def test_an_entry_that_is_two_things_or_nothing_is_refused_before_any_check(entries, says):
+    with pytest.raises(dl.BadDelegation) as e:
+        dl.parse_submission(_lines(*entries))
+    assert says in str(e.value)
+
+
+def test_the_pre_v36_1_two_list_shape_is_still_read():
+    brief, _ = dl.parse_submission({"brief": {"findings": [{"want": 1, "facts": ["f_a"], "finding": "x [f_a]"}],
+                                              "not_done": [{"want": 2, "why": "no"}]},
+                                    "report": {"title": "t", "text": "ok"}})
+    assert [f["want"] for f in brief["findings"]] == [1] and [d["want"] for d in brief["not_done"]] == [2]
+
+
+def test_the_tool_the_analyst_reads_asks_for_lines():
+    props = dl.SUBMIT_TOOL["function"]["parameters"]["properties"]["brief"]
+    assert props["required"] == ["lines"] and "findings" not in props["properties"]
+    assert "never both" in props["properties"]["lines"]["description"]

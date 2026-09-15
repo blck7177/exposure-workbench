@@ -422,3 +422,19 @@ async def test_the_books_an_analyst_built_reach_the_lead_and_a_calc_subject_is_e
     assert dl.parse_tasks({"tasks": [{"domain": "book_limits_and_triggers", "subjects": ["calc_after1"],
                                       "want_to_know": ["re-run every check on that book"]}]},
                           {"book_limits_and_triggers"}, lambda p: p + "1")[0].subjects == ("calc_after1",)
+
+
+@pytest.mark.asyncio
+async def test_the_analyst_files_lines_and_the_lead_reads_findings_and_not_done():
+    """The canonical V36.1 brief through the loop: one list, each entry settled
+    or not; what the lead reads keeps its shape."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="n", place=1, of=10)
+    b = _boundary("run(portfolio='port_001', which='prev'): no_prior_run")
+    ledger = Ledger.of_facts([f, b])
+    llm = _Llm([("", [("submit", {"brief": {"lines": [
+        {"want": 1, "finding": f"MSFT is nearest at 16.0% [{f.id}].", "facts": [f.id]},
+        {"want": 2, "why": "the desk has no earlier run to compare with", "boundary": b.id}]},
+        "report": {"title": "t", "text": f"MSFT reads 16.0% [{f.id}]."}})])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger))
+    assert r.status == "verified" and r.coverage == {"asked": 2, "done": 1, "not_done": 1, "refused": 0}
+    assert r.findings[0]["want"] == 1 and r.not_done[0]["said"] == b.text

@@ -88,10 +88,10 @@ carries the id it is shown under — 16.0% [f_2592baab170e] — and `place` of `
 node built: a superlative rests on that, never on reading a list. Never compute in your head: a number you worked out \
 yourself is a number no fact stands behind, and it is refused.
 
-The brief is one entry per numbered line: the line's number, the ids it rests on, and one to three sentences with every \
-figure written exactly as the desk showed it, bracket included. A line this desk cannot settle goes in not_done pointing at the id of the boundary the desk stated \
-— its own words travel with that id, so `why` is your one-line reading of it, not a quotation; never an estimate, \
-never a nearby figure under the asked-for name. What you had to assume or leave out goes in caveats; the lead states those to the reader. The report is \
+The brief is one entry per numbered line, and an entry is one of two things. Settled: the ids it rests on and \
+one to three sentences with every figure written exactly as the desk showed it, bracket included. Not settled: `why`, \
+one line in your words, and the id of the boundary the desk stated — its own words travel with that id, so `why` is a \
+reading, not a quotation. Never both for one line; never an estimate, never a nearby figure under the asked-for name. What you had to assume or leave out goes in caveats; the lead states those to the reader. The report is \
 your full reading in prose, same rule for figures, and [table: <node>] or [chart: <node>] shows a node's figures.
 
 You write for the lead analyst, never for the user, and you answer the task you were given rather than the one you would \

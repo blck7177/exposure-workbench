@@ -93,27 +93,33 @@ SUBMIT_TOOL = {"type": "function", "function": {
     "description": (
         "File your brief and your report. The brief answers the task line by line and is what the lead analyst reads; "
         "the report is your full reading, kept on the record. Every figure in either is written exactly as the desk "
-        "showed it to you, bracket included. A line you could not settle goes in not_done with the desk's own words "
-        "for why and the id of the boundary it rests on."),
+        "showed it to you, bracket included. One entry per numbered line: settled (finding + facts) or not settled "
+        "(why + boundary), never both."),
     "parameters": {"type": "object", "properties": {
         "brief": {"type": "object", "properties": {
-            "findings": {"type": "array", "items": {
+            # V36.1: ONE list, one entry per line. Two lists let round A file a
+            # line as both answered and not (18 of 51 refusals, answered_and_
+            # explained); a rule caught it and cost a round trip each time. The
+            # shape now says it, and parse_submission refuses an entry that is
+            # both before any check runs.
+            "lines": {"type": "array", "minItems": 1, "items": {
                 "type": "object", "properties": {
-                    "want": {"type": "integer", "description": "which numbered line of the task this answers (1-based)"},
-                    "facts": {"type": "array", "items": {"type": "string"}, "description": "the f_… ids this finding rests on"},
-                    "finding": {"type": "string", "description": "one to three sentences, every figure written as the desk showed it"}},
-                "required": ["want", "facts", "finding"], "additionalProperties": False}},
-            "not_done": {"type": "array", "items": {
-                "type": "object", "properties": {
-                    "want": {"type": "integer"},
-                    "why": {"type": "string", "description": "the desk's own words for what stopped it"},
-                    "boundary": {"type": ["string", "null"], "description": "the f_… id of the boundary, when the desk stated one"}},
-                "required": ["want", "why"], "additionalProperties": False}},
+                    "want": {"type": "integer", "description": "the numbered line of the task this entry is about (1-based); one entry per line"},
+                    "finding": {"type": ["string", "null"],
+                                "description": "SETTLED: one to three sentences, every figure written as the desk showed it"},
+                    "facts": {"type": ["array", "null"], "items": {"type": "string"},
+                              "description": "SETTLED: the f_… ids the finding rests on"},
+                    "why": {"type": ["string", "null"],
+                            "description": "NOT SETTLED: one line in your words on what stopped it; the desk's own words travel with the boundary id"},
+                    "boundary": {"type": ["string", "null"],
+                                 "description": "NOT SETTLED: the f_… id of the boundary the desk stated, when it stated one"}},
+                "required": ["want"], "additionalProperties": False},
+                "description": "one entry per numbered line of the task: a settled line has finding and facts; a line the desk could not settle has why and its boundary; never both"},
             "caveats": {"type": "array", "items": {"type": "string"},
                         "description": "what you had to assume or leave out; the lead states these to the reader"},
             "follow_ups": {"type": "array", "items": {"type": "string"},
                            "description": "what you would ask next, if the lead wants it"}},
-            "required": ["findings"], "additionalProperties": False},
+            "required": ["lines"], "additionalProperties": False},
         "report": {"type": "object", "properties": {
             "title": {"type": "string"},
             "text": {"type": "string", "description": "your reading in prose, for the record; figures as shown, [table: node] / [chart: node] for a node's figures"}},
@@ -249,11 +255,36 @@ def parse_submission(args: dict) -> tuple[dict, dict]:
         raise BadDelegation("submit takes {brief: {findings: [...]}, report: {title, text}}")
     brief = args.get("brief")
     report = args.get("report")
-    if not isinstance(brief, dict) or not isinstance(brief.get("findings"), list):
-        raise BadDelegation("submit takes a brief with a findings list, one entry per numbered line you settled")
+    if not isinstance(brief, dict) or not (isinstance(brief.get("lines"), list) or isinstance(brief.get("findings"), list)):
+        raise BadDelegation("submit takes a brief with a lines list: one entry per numbered line of the task")
     if not isinstance(report, dict) or not str(report.get("text") or "").strip():
         raise BadDelegation("submit takes a report with a title and text; it is the record of your reading")
     findings, not_done = [], []
+    if isinstance(brief.get("lines"), list):
+        seen_wants: set[int] = set()
+        for e in brief["lines"]:
+            if not isinstance(e, dict):
+                continue
+            try:
+                want = int(e.get("want"))
+            except (TypeError, ValueError):
+                raise BadDelegation("every entry names the numbered line it is about, as an integer") from None
+            if want in seen_wants:
+                raise BadDelegation(f"line {want} appears twice; one entry per line")
+            seen_wants.add(want)
+            finding = str(e.get("finding") or "").strip()
+            why = str(e.get("why") or "").strip()
+            if finding and why:
+                raise BadDelegation(f"line {want} is filed as settled (finding) and as not settled (why): an entry is "
+                                    f"one or the other — keep the one that is true")
+            if not finding and not why:
+                raise BadDelegation(f"line {want} has neither a finding nor a why: settle it, or say what stopped you")
+            if finding:
+                findings.append({"want": want, "facts": [str(x) for x in (e.get("facts") or []) if isinstance(x, str)],
+                                 "finding": finding})
+            else:
+                not_done.append({"want": want, "why": why, **({"boundary": e["boundary"]} if e.get("boundary") else {})})
+        brief = {**brief, "findings": [], "not_done": []}      # the two lists below are the pre-V36.1 shape
     for f in brief["findings"]:
         if not isinstance(f, dict):
             continue
@@ -315,11 +346,12 @@ def handoff_check(task: Task, brief: dict, report: dict, ledger: Ledger) -> Hand
     # A line is answered or it is not. The smoke round found an analyst filing
     # three findings and three not_done entries for the same three lines, and
     # the coverage read 3 of 3 done with 3 not done — a number that says two
-    # opposite things, which is worse than either.
+    # opposite things. V36.1 made the brief one list keyed by line, so the
+    # canonical shape cannot say this; the pre-V36.1 two-list shape still can.
     for want in sorted(answered & explained):
-        v.problems.append({"where": "coverage", "reason": "answered_and_explained", "want": want,
+        v.problems.append({"where": "coverage", "reason": "duplicate_want", "want": want,
                            "line": task.want_to_know[want - 1] if 1 <= want <= n else None,
-                           "fix": f"line {want} has both a finding and a not_done entry: keep the one that is true"})
+                           "fix": f"line {want} is filed as settled and as not settled: keep the one that is true"})
 
     # C2 / C3 — the findings
     for i, f in enumerate(brief.get("findings") or []):
@@ -384,7 +416,7 @@ def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
             seen.add(line)
             lines.append(line)
     lines += ["", "Submit again with those entries replaced. Request the evidence a fix needs first if you were not "
-                  "shown the figure; a line the desk cannot settle belongs in not_done with its boundary."]
+                  "shown the figure; a line the desk cannot settle is an entry with why and its boundary, not a finding."]
     return "\n".join(lines)
 
 
