@@ -18,7 +18,7 @@ import { useEvidence } from "../evidence/Column";
 import { Activity } from "./Activity";
 import { AnswerText, idsIn } from "./AnswerText";
 import { AnswerBlocks, type Block } from "./AnswerBlocks";
-import { ReportChips, ReportPanel } from "./Reports";
+import { ReportChips, ReportPanel, panelFor } from "./Reports";
 import { VerifiedBadge } from "./Verified";
 
 /**
@@ -388,7 +388,7 @@ export function AnalystDock() {
             {m.role !== "user" && (
               <ReportChips reports={m.reports} onOpen={setOpenReport} />
             )}
-            {openReport && m.reports?.some((r) => r.report_id === openReport.report_id) && sessionId && (
+            {openReport && panelFor(openReport, m.reports) && sessionId && (
               <ReportPanel key={openReport.report_id} sessionId={sessionId} report={openReport}
                 onClose={() => setOpenReport(null)} onOpenFact={evidence.open} />
             )}

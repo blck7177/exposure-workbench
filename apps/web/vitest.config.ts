@@ -6,5 +6,5 @@ import path from "path";
 // wrong but renders fine" — the span-shift bug was the second kind.
 export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname) } },
-  test: { include: ["tests/**/*.test.ts"], environment: "node" },
+  test: { include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"], environment: "node" },
 });

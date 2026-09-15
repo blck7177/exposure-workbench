@@ -15,6 +15,18 @@ splits every refusal by whose work it was:
   data       the desk does not hold it (not filed, not prepared, no prices).
   system     an adapter or transport failure, budget, quota.
 
+V36 (2026-09-15): a turn has more than one agent in it. The lead delegates; a
+domain analyst per task takes the evidence calls and files a brief that a code
+check (delegation.handoff_check) accepts or refuses; a report lands beside the
+answer. The counters below read that: how often the lead delegated, how many
+analysts ran and how each ended, how much of what was asked came back settled
+(coverage), how often a submission was refused at the handoff and for what, how
+the reports were marked, and the completions split by who spent them. Note that
+`prompt_tokens_median` sums every completion of the turn, analysts included;
+`lead_prompt_peak_*` is the lead's own peak (meta.prompt_tokens) and is the
+series comparable with the rounds before V36. A round without analysts reads as
+zeros here and its lead completions equal its round trips.
+
     python scripts/battery_counters.py docs/spikes/v30/V26_R1.json [more.json] [--json out]
 """
 from __future__ import annotations
@@ -105,6 +117,9 @@ _SUPERLATIVE = re.compile(r"\b(largest|biggest|highest|lowest|smallest|worst|bes
 _NODES = re.compile(r"\| nodes: ")
 _RANK_NODE = re.compile(r"\| nodes: [^|]*\b=ranking\b")
 _RANK_OP = re.compile(r'"op":\s*"(?:rank|top)"')
+# V36: a refused submission's summary, as sub_analyst records the brief step —
+# the count of problems and the FIRST problem's reason.
+_HANDOFF = re.compile(r"^refused: \d+ problem\(s\); ([a-z_]+)")
 
 
 def classify(summary: str, status: str) -> str | None:
@@ -131,6 +146,13 @@ def tally(paths: list[str]) -> dict:
     reqs, terrs, writer, answer_refusals = [], 0, 0, 0
     artifacts = marks = zero = exhausted = 0
     superl = superl_no_rank = superl_undeclared = 0
+    # V36
+    lead_rt, sub_rt, delegates, lead_peak = [], [], [], []
+    analysts = submits = submits_rejected = boundaries = 0
+    analyst_status: collections.Counter = collections.Counter()
+    report_status: collections.Counter = collections.Counter()
+    handoff: collections.Counter = collections.Counter()
+    coverage: collections.Counter = collections.Counter()
     n = 0
     for p in paths:
         for conv in json.loads(Path(p).read_text()):
@@ -148,10 +170,35 @@ def tally(paths: list[str]) -> dict:
                 terrs += sum(1 for s in steps if s.get("tool_name") == "run"
                              and (s.get("result") or "").startswith("error: type_errors"))
                 answer_refusals += sum(1 for s in steps if s.get("step_type") == "answer" and s.get("status") == "rejected")
+                # V36: who spent the completions, and what the handoff saw. An
+                # actor-less llm_call is the lead's (every row before V36, and
+                # the lead's own rows after it).
+                lead = [s for s in llm if not str(s.get("actor") or "").startswith("sub:")]
+                lead_rt.append(len(lead)); sub_rt.append(len(llm) - len(lead))
+                delegates.append(sum(1 for s in steps if s.get("step_type") == "delegate"))
+                boundaries += sum(1 for s in steps if s.get("step_type") == "boundary")
+                for s in steps:
+                    if s.get("step_type") != "brief":
+                        continue
+                    submits += 1
+                    if s.get("status") == "rejected":
+                        submits_rejected += 1
+                        hm = _HANDOFF.match(s.get("result") or "")
+                        handoff[hm.group(1) if hm else "unstated"] += 1
                 elapsed.append(t.get("elapsed_s") or 0)
                 meta = t.get("meta") or {}
                 figs.append((meta.get("verified") or {}).get("figures") or 0)
                 writer += int(meta.get("writer_calls") or 0)
+                # V36: the lead's meta names every analyst it ran and every report filed
+                for d in meta.get("delegations") or []:
+                    analysts += 1
+                    analyst_status[d.get("status") or "unstated"] += 1
+                    for k in ("asked", "done", "not_done", "refused"):
+                        coverage[k] += int((d.get("coverage") or {}).get(k) or 0)
+                for r in meta.get("reports") or []:
+                    report_status[r.get("status") or "unstated"] += 1
+                if isinstance(meta.get("prompt_tokens"), (int, float)):
+                    lead_peak.append(meta["prompt_tokens"])
                 if meta.get("gate") == "exhausted":
                     exhausted += 1
                 a = str(t.get("answer") or "")
@@ -231,6 +278,20 @@ def tally(paths: list[str]) -> dict:
         # recorded before the node declaration existed. Not zero and not a miss —
         # the coverage of the number above.
         "superlative_rank_undeclared": superl_undeclared,
+        # V36: delegation, coverage, the handoff, the reports, completions by agent
+        "delegate_calls_mean": round(statistics.mean(delegates), 2) if delegates else 0,
+        "analysts": analysts,
+        "analysts_by_status": dict(sorted(analyst_status.items())),
+        "coverage": {k: coverage[k] for k in ("asked", "done", "not_done", "refused")},
+        "coverage_done_share": round(coverage["done"] / coverage["asked"], 2) if coverage["asked"] else 0,
+        "submits": submits, "submits_rejected": submits_rejected,
+        "submits_per_analyst": round(submits / analysts, 2) if analysts else 0,
+        "handoff_refusals": dict(sorted(handoff.items())),
+        "reports_by_status": dict(sorted(report_status.items())),
+        "boundaries_minted": boundaries,
+        "lead_completions_median": med(lead_rt), "sub_completions_median": med(sub_rt),
+        "sub_completions_total": sum(sub_rt),
+        "lead_prompt_peak_median": med(lead_peak), "lead_prompt_peak_p90": q(lead_peak, .9),
         "refusals": {k: {"count": v, "turns": len(turns_with[k]),
                          "per_turn": round(v / n, 2) if n else 0} for k, v in sorted(c.items())},
     }
@@ -244,7 +305,11 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
     out = tally(args.traces)
     for k, v in out.items():
-        if k != "refusals":
+        if k == "refusals":
+            continue
+        if isinstance(v, dict):
+            print(f"{k:40s} " + (", ".join(f"{kk} {vv}" for kk, vv in v.items()) or "-"))
+        else:
             print(f"{k:40s} {v}")
     print("refusals by class (count / turns / per turn):")
     for k, v in out["refusals"].items():

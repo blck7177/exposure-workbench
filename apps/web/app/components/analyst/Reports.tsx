@@ -23,6 +23,14 @@ import { AnswerBlocks, type Block } from "./AnswerBlocks";
  * wrong with it instead of its prose.
  */
 
+/** The report a message's panel shows: the open one, and only when it is one
+ *  of THIS message's. One panel is open at a time across the dock, so a chip
+ *  clicked under one answer must not open a panel under every other. */
+export function panelFor(open: ReportRef | null, reports?: ReportRef[]): ReportRef | null {
+  if (!open || !reports?.some((r) => r.report_id === open.report_id)) return null;
+  return open;
+}
+
 export function ReportChips({ reports, onOpen }: { reports?: ReportRef[]; onOpen: (r: ReportRef) => void }) {
   if (!reports?.length) return null;
   return (
@@ -71,6 +79,20 @@ export function ReportPanel({
     return () => { live = false; };
   }, [sessionId, report.report_id]);
 
+  return <ReportPanelView report={report} full={full} error={error} onClose={onClose} onOpenFact={onOpenFact} />;
+}
+
+/** The panel as drawn from what has arrived — no fetch, so it can be rendered
+ *  in a test for each of its states: opening, failed, checked, refused. */
+export function ReportPanelView({
+  report, full, error, onClose, onOpenFact,
+}: {
+  report: ReportRef;
+  full: AnalystReport | null;
+  error: string | null;
+  onClose: () => void;
+  onOpenFact: (id: string) => void;
+}) {
   const findings = (full?.brief?.findings ?? []) as { want: number; finding: string }[];
   const notDone = (full?.brief?.not_done ?? []) as { want: number; why: string }[];
   const caveats = (full?.brief?.caveats ?? []) as string[];
