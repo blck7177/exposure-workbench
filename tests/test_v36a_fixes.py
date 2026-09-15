@@ -81,3 +81,55 @@ def test_a_built_book_declares_the_id_another_program_reads():
                              "_scratch": {"kind": "table", "ref": "calc_x"}},
                    "facts": {"columns": [], "rows": []}}, mint=dg.Minter())
     assert d["made"] == [{"node": "after", "id": "calc_after1", "kind": "scenario"}]
+
+
+# ── T6 · a level in the wrong unit is told what the entries are ──────────────
+
+async def _filter(of, op, level):
+    from exposure_workbench.services import program_service as ps
+    return await ps._p_filter(None, ps.Node("out", ps.ABSENCE, {}), of, op, level)
+
+
+def _weights():
+    from exposure_workbench.services import program_service as ps
+    return ps.Node("issuer_weights", ps.VECTOR, {}, unit="RATIO", measure="issuer_exposures.weight",
+                   entries=[("MSFT", "f_1", 0.1604, "RATIO"), ("AAPL", "f_2", 0.152, "RATIO"),
+                            ("NVDA", "f_3", 0.0406, "RATIO")])
+
+
+async def test_a_filter_at_8_over_fractions_is_told_that_a_ratio_is_a_fraction():
+    """Q11 wrote filter(weights, >, 8) four times over weights that run 0.04 to
+    0.16 and read the silence as the digest holding the answer back."""
+    from exposure_workbench.services import program_service as ps
+    out = await _filter(_weights(), ">", 8)
+    assert out.kind == ps.ABSENCE and out.refusal["error"] == "no_entry_satisfies"
+    assert "its entries run 0.0406 to 0.1604" in out.refusal["detail"]
+    assert "a RATIO is a fraction here: 8% is 0.08" in out.refusal["detail"]
+    ok = await _filter(_weights(), ">", 0.08)
+    assert ok.kind == ps.VECTOR and [e[0] for e in ok.entries] == ["MSFT", "AAPL"]
+
+
+async def test_a_level_that_could_be_satisfied_gets_the_range_and_no_lecture():
+    out = await _filter(_weights(), ">", 0.5)
+    assert "its entries run 0.0406 to 0.1604" in out.refusal["detail"] and "8% is 0.08" not in out.refusal["detail"]
+
+
+def test_the_limits_procedure_says_a_level_is_a_fraction():
+    from exposure_workbench.analytics import skill
+    assert "a weight is a fraction: 8% is 0.08" in " ".join(skill.PROCEDURES["book_limits_and_triggers"].desk)
+
+
+# ── T7 · a run id where the book goes is a type problem, before anything runs ──
+
+def test_a_run_id_given_as_the_portfolio_is_refused_by_the_typecheck_with_the_fix():
+    """Q13's first program: run(portfolio="run_e2945c5ebd5a") — eight absences
+    downstream and a completion spent on each. The wrong kind of id is a type
+    problem, and a type problem is reported once, with the way to say it."""
+    from exposure_workbench.services import program_service as ps
+    problems = ps.typecheck({"let": [["base", {"fn": "run", "portfolio": "run_e2945c5ebd5a"}],
+                                     ["w", {"fn": "column", "run": "$base", "table": "issuer_exposures", "col": "weight"}]],
+                             "return": ["w"]})
+    (p,) = [p for p in problems if p.get("at") == "base"]
+    assert p["arg"] == "portfolio" and p["got"] == "run_e2945c5ebd5a"
+    assert "which: 'run_e2945c5ebd5a'" in p["fix"] and "column(run='run_e2945c5ebd5a'" in p["fix"]
+    assert not [p for p in ps.typecheck({"let": [["base", {"fn": "run", "portfolio": "port_001"}]]}) if p.get("at") == "base"]

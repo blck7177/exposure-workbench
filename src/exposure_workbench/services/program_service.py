@@ -578,6 +578,16 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
     elif fn == "filter" and given.get("op") not in FILTER_OPS:
         bad("type_mismatch", arg="op", expected=list(FILTER_OPS), got=given.get("op"), fix="op is one of > >= < <= == !=")
         ok = False
+    elif fn == "run" and isinstance(given.get("portfolio"), str) and given["portfolio"].startswith(("run_", "calc_")):
+        # V36.1: round A's Q13 passed a run id where the book goes and got
+        # eight absences, one per node downstream. The wrong kind of id is a
+        # type problem, and a type problem is reported before anything runs.
+        rid = given["portfolio"]
+        bad("type_mismatch", arg="portfolio", got=rid,
+            fix=f"portfolio is a port_… id, the book; to read {rid!r} give it as which: "
+                f"{{fn: 'run', portfolio: '<its book>', which: {rid!r}}} — or use {rid!r} itself where a run goes, "
+                f"column(run={rid!r}, …)")
+        ok = False
     elif fn == "top":
         n = given.get("n")
         if not (isinstance(n, int) and not isinstance(n, bool) and n >= 1):
@@ -1570,7 +1580,15 @@ async def _p_filter(ctx: _Ctx, node: Node, of: Any, op: Any, level: Any) -> Node
             "<=": lambda x: x <= lvl, "==": lambda x: x == lvl, "!=": lambda x: x != lvl}[op]
     kept = [e for e in of.entries if e[2] is not None and test(float(e[2]))]
     if not kept:
-        node.kind, node.refusal = ABSENCE, _err("no_entry_satisfies", f"no entry of ${of.name} is {op} {lvl:g}",
+        # V36.1: round A's Q11 compared weights that are fractions against 8,
+        # four times, and read the silence as the digest holding the answer
+        # back. The refusal says what the entries run and, when the level cannot
+        # be one of them, what a RATIO is on this desk.
+        vals = [float(e[2]) for e in of.entries if e[2] is not None]
+        span = f"; its entries run {min(vals):g} to {max(vals):g}" if vals else ""
+        hint = (" — a RATIO is a fraction here: 8% is 0.08"
+                if of.unit == "RATIO" and abs(lvl) >= 1 and vals and max(abs(v) for v in vals) < 1 else "")
+        node.kind, node.refusal = ABSENCE, _err("no_entry_satisfies", f"no entry of ${of.name} is {op} {lvl:g}{span}{hint}",
                                                 available=[[e[0], e[2]] for e in of.entries][:40])
         return node
     node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, of.ref, of.unit, of.measure, of.as_of

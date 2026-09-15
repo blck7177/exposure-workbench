@@ -684,7 +684,7 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
               # would be over 8%, the analyst read ten weights and listed five
               # by eye, and the sentence had no ordering behind it. filter() is
               # the primitive, and it puts the answer on the ledger.
-              "a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger"),
+              "a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger; the level is in the entries' own unit, and a weight is a fraction: 8% is 0.08"),
         compare=("the nearest check first, by smallest room",
                  "the same check on the prior run, for direction"),
         close=("the level for each check nearest its tier, in weight points, in dollars and as a price move",
