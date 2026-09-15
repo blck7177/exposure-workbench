@@ -421,7 +421,9 @@ def test_the_analysts_only_tool_is_not_a_registry_tool():
     from exposure_workbench.tools import faces
     from exposure_workbench.tools.registries import build_meta_registry
 
-    assert meta_agent._BUDGET_FREE_TOOLS == (delegation.DELEGATE_TOOL_NAME, meta_agent.REPAIR_TOOL_NAME)
+    assert meta_agent._BUDGET_FREE_TOOLS == (delegation.DELEGATE_TOOL_NAME,
+                                             delegation.READ_REPORT_TOOL_NAME,
+                                             meta_agent.REPAIR_TOOL_NAME)
     for name in meta_agent._BUDGET_FREE_TOOLS:
         assert name not in build_meta_registry().tools
         assert name not in faces.FACE_META_AGENT

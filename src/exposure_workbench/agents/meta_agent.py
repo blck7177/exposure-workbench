@@ -43,7 +43,8 @@ from exposure_workbench.analytics import skill
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
-from exposure_workbench.services import answer_check, briefing as briefing_svc, context_budget, ledger as ledger_svc, trace_service
+from exposure_workbench.services import analyst_reports, answer_check, briefing as briefing_svc, context_budget, \
+    ledger as ledger_svc, trace_service
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
@@ -97,7 +98,7 @@ MAX_ANSWER_ATTEMPTS = 2
 # The lead's own tools. Kept as a tuple for the tests that pin the budget-free
 # names: not one of them retrieves anything — `delegate` hands work to an
 # analyst whose evidence calls are charged where they happen.
-_BUDGET_FREE_TOOLS = (delegation.DELEGATE_TOOL_NAME, "repair_answer")
+_BUDGET_FREE_TOOLS = (delegation.DELEGATE_TOOL_NAME, delegation.READ_REPORT_TOOL_NAME, "repair_answer")
 
 _WRITE_OR_ASK = "Write the answer, or delegate for the evidence you still need."
 
@@ -145,6 +146,32 @@ async def _briefing(db_factory, text: str) -> dict:
 async def _load_ledger(db_factory, session_id: str):
     async with db_factory() as db:
         return await ledger_svc.load(db, session_id)
+
+
+async def _read_report(db_factory, session_id: str, report_id: str) -> dict:
+    """A domain analyst's full reading, when the brief was not enough.
+
+    The figures in it are already on this session's ledger — the check read them
+    there before it was stored — so the lead may copy them exactly as it copies
+    a finding's. A refused report comes back as its problems, not its prose:
+    quoting unchecked analysis is the thing the store exists to prevent."""
+    if not report_id:
+        return {"error": "no_report_id", "detail": "read_report takes the report_id a delegate result gave you"}
+    try:
+        async with db_factory() as db:
+            rep = await analyst_reports.load(db, session_id, report_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("could not read report %s", report_id)
+        return {"error": "report_unavailable", "detail": "the desk could not open that report"}
+    if rep is None:
+        return {"error": "unknown_report",
+                "detail": f"{report_id} is not a report from this conversation; the ids are in the delegate results"}
+    if rep["status"] != "verified":
+        return {"domain": rep["domain"], "status": rep["status"], "title": rep["title"],
+                "detail": "this report did not pass the check; it is on the record but it is not yours to quote",
+                "problems": [p.get("reason") for p in rep["problems"][:6]]}
+    return {"domain": rep["domain"], "status": rep["status"], "title": rep["title"],
+            "text": rep["text"], "citations": rep["citations"]}
 
 
 async def _record_delegate(db_factory, session_id: str, message_id: str, tasks) -> None:
@@ -272,7 +299,9 @@ async def handle_message(
         nudges = 0
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
-            tools = [delegation.DELEGATE_TOOL] + ([REPAIR_TOOL] if standing is not None else [])
+            tools = ([delegation.DELEGATE_TOOL]
+                     + ([delegation.READ_REPORT_TOOL] if delegated else [])
+                     + ([REPAIR_TOOL] if standing is not None else []))
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
             content, tool_calls = await llm.chat(messages=messages, tools=tools,
                                                  **({"tool_choice": "required"} if standing is not None else {}))
@@ -299,6 +328,9 @@ async def handle_message(
                             got = await sub_analyst.run_tasks(tasks, ctx)
                             delegated += got
                             result = delegation.for_lead(got)
+                    elif name == delegation.READ_REPORT_TOOL_NAME:
+                        result = await _read_report(db_factory, session_id,
+                                                    str((args or {}).get("report_id") or ""))
                     elif name == REPAIR_TOOL_NAME and standing is not None:
                         repl, unknown = _parse_replacements(args, standing)
                         led = await _load_ledger(db_factory, session_id)
@@ -360,6 +392,10 @@ async def handle_message(
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,
                                    "coverage": r.coverage, "cost": r.cost} for r in delegated],
+                  "reports": [{"domain": r.task.domain, "report_id": r.report_id,
+                               "status": (r.report or {}).get("status", r.status),
+                               "title": (r.report or {}).get("title")}
+                              for r in delegated if r.report_id],
                   "briefing_subjects": brief.get("subjects") if isinstance(brief, dict) else None}
     if reply_verified is not None:
         meta["verified"] = reply_verified

@@ -859,6 +859,39 @@ class FactRecord(Base):
 
 # ─── Runtime: Agent Steps (APPEND-ONLY audit trail) ─────────────────────────────
 
+class AnalystReport(Base):
+    """One domain analyst's full reading (V36).
+
+    The brief is what the lead reads inside the turn — short, line by line, and
+    already spent by the time the answer is written. This is what is left: the
+    analyst's own prose, checked against the same session ledger the answer is,
+    so a reader opening it is opening something that passed the same bar. A
+    report the check refused keeps its problems and not its prose, because a
+    heading that says "the analyst's reading" over unchecked text is the one
+    thing this table must never be.
+    """
+    __tablename__ = "analyst_reports"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"),
+                                            nullable=False)
+    message_id: Mapped[str | None] = mapped_column(String(64))
+    task_id: Mapped[str | None] = mapped_column(String(64))
+    domain: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)      # verified | refused
+    title: Mapped[str | None] = mapped_column(Text)
+    brief: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    text: Mapped[str | None] = mapped_column(Text)
+    blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    verified: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    problems: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    evidence_calls: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class AgentStep(Base):
     __tablename__ = "agent_steps"
 

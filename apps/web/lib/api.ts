@@ -111,3 +111,27 @@ export async function acknowledgeDisclaimer(): Promise<{ disclaimer_acknowledged
 export async function getMyUsage(): Promise<Usage> {
   return fetchJson<Usage>("/api/me/usage");
 }
+
+// ─── Analyst reports (V36) ────────────────────────────────────────────────────
+
+/** What an answer carries about the analysts behind it: enough to draw the chip
+ *  without opening anything. */
+export type ReportRef = { domain: string; report_id: string; status: string; title?: string | null };
+
+export type AnalystReport = {
+  id: string;
+  domain: string;
+  status: string;
+  title: string | null;
+  brief: Record<string, unknown>;
+  text: string | null;
+  blocks: unknown[];
+  citations: string[];
+  verified: Record<string, unknown>;
+  problems: { reason?: string }[];
+  created_at: string | null;
+};
+
+export async function getAnalystReport(sessionId: string, reportId: string): Promise<AnalystReport> {
+  return fetchJson<AnalystReport>(`/api/agent/sessions/${sessionId}/reports/${reportId}`);
+}

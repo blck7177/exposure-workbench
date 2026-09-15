@@ -20,7 +20,7 @@ from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import agent_session_service, context_budget, usage_service
+from exposure_workbench.services import agent_session_service, analyst_reports, context_budget, usage_service
 from exposure_workbench.tools import display as tool_display
 
 router = APIRouter()
@@ -296,6 +296,48 @@ async def list_agent_sessions(
                           title=(title or "").strip()[:80] or None)
         for s, title in rows
     ]
+
+
+class ReportOut(BaseModel):
+    """A domain analyst's full reading (V36).
+
+    `status` is what the answer check said about it, and the page reads it: a
+    refused report shows its problems, not its prose. `blocks` is the same shape
+    the answer uses, so the drawer renders it with the component the reply
+    already has and every figure opens the fact it equals."""
+    id: str
+    domain: str
+    status: str
+    title: str | None
+    brief: dict
+    text: str | None
+    blocks: list
+    citations: list
+    verified: dict
+    problems: list
+    created_at: str | None
+
+
+@router.get("/agent/sessions/{session_id}/reports/{report_id}", response_model=ReportOut)
+async def get_analyst_report(
+    session_id: str, report_id: str,
+    user: UserClaims = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """One report of one conversation.
+
+    404 twice for two different reasons, deliberately indistinguishable to a
+    caller: a session that is not yours (RLS makes it invisible) and a report id
+    from another conversation. Neither is a thing this user may learn exists.
+    """
+    if await agent_session_service.get_session(db, session_id) is None:
+        raise HTTPException(404, {"error": "unknown_session"})
+    rep = await analyst_reports.load(db, session_id, report_id)
+    if rep is None:
+        raise HTTPException(404, {"error": "unknown_report"})
+    return ReportOut(**{k: rep[k] for k in
+                        ("id", "domain", "status", "title", "brief", "text", "blocks",
+                         "citations", "verified", "problems", "created_at")})
 
 
 @router.get("/agent/sessions/{session_id}", response_model=SessionDetailOut)

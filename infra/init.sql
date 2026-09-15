@@ -711,6 +711,31 @@ CREATE TABLE IF NOT EXISTS facts (
 );
 CREATE INDEX IF NOT EXISTS idx_facts_session ON facts(session_id);
 
+-- V36: a domain analyst's full reading, kept for when the lead's brief is not
+-- enough. The brief is what the lead reads in the turn; this is the record
+-- behind it, and it has passed the same check the answer does — `status` says
+-- which, and a refused report keeps its problems rather than its prose.
+CREATE TABLE IF NOT EXISTS analyst_reports (
+    id                 VARCHAR(64) PRIMARY KEY,
+    session_id         VARCHAR(64) NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
+    message_id         VARCHAR(64),
+    task_id            VARCHAR(64),
+    domain             VARCHAR(64) NOT NULL,
+    status             VARCHAR(16) NOT NULL,          -- verified | refused
+    title              TEXT,
+    brief              JSONB NOT NULL DEFAULT '{}',   -- findings / not_done / caveats / follow_ups, as filed
+    text               TEXT,                          -- the report's prose, figures written as the desk showed them
+    blocks             JSONB NOT NULL DEFAULT '[]',   -- answer_check.accepted's blocks; empty when refused
+    citations          JSONB NOT NULL DEFAULT '[]',
+    verified           JSONB NOT NULL DEFAULT '{}',
+    problems           JSONB NOT NULL DEFAULT '[]',   -- non-empty only when refused
+    prompt_tokens      INTEGER,
+    completion_tokens  INTEGER,
+    evidence_calls     INTEGER,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_analyst_reports_session ON analyst_reports(session_id, message_id);
+
 -- ─── Artifact: Evidence Packs ────────────────────────────────────────────────
 -- pack is a refs LIST (not a full JSON snapshot): consistency guaranteed by the
 -- append-only immutability of the four evidence stores.
@@ -902,6 +927,9 @@ CREATE POLICY tenant ON agent_steps USING (EXISTS (SELECT 1 FROM agent_sessions 
 ALTER TABLE facts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON facts;
 CREATE POLICY tenant ON facts USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = facts.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = facts.session_id AND s.owner_id = current_setting('app.user_id', true)));
+ALTER TABLE analyst_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant ON analyst_reports;
+CREATE POLICY tenant ON analyst_reports USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analyst_reports.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analyst_reports.session_id AND s.owner_id = current_setting('app.user_id', true)));
 ALTER TABLE evidence_packs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON evidence_packs;
 CREATE POLICY tenant ON evidence_packs USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true)));

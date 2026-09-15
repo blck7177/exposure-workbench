@@ -404,6 +404,14 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v36_actor.sql
 
+# v36_analyst_reports.sql adds the table a domain analyst's full reading lands
+# in. Nothing is backfilled and nothing can be: no turn before V36 had a domain
+# analyst. Empty until the first turn after the deploy; the message footer shows
+# a report chip only for messages that have one, so an old transcript is
+# unchanged rather than newly missing something.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v36_analyst_reports.sql
+
 docker compose up -d
 
 # Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry

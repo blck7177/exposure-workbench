@@ -27,6 +27,7 @@ TENANT_TABLES = {
     "factor_attributions", "factor_residuals", "risk_alerts", "workflow_events",
     "agent_messages", "agent_steps", "evidence_packs",
     "facts",   # V24: a session's facts, tenant rule = the session's
+    "analyst_reports",   # V36: a domain analyst's reading, tenant rule = the session's
     # V8-P2/P3. Children of a run, so they carry whatever the run's portfolio
     # carries — the same reasoning as issuer_exposures beside them, and the same
     # policy. A run child left out of RLS is one tenant's stress losses readable

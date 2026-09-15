@@ -37,10 +37,11 @@ import logging
 from dataclasses import dataclass, field
 
 from exposure_workbench.agents import delegation as dl
+from exposure_workbench.services import answer_check
 from exposure_workbench.analytics import skill
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import digest as dg, ledger as ledger_svc, program_builder as pb, \
-    program_service as ps, trace_service
+from exposure_workbench.services import analyst_reports, digest as dg, ledger as ledger_svc, \
+    program_builder as pb, program_service as ps, trace_service
 from exposure_workbench.utils import json as ejson
 
 logger = logging.getLogger(__name__)
@@ -240,11 +241,13 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                                    f"refused: {len(verdict.problems)} problem(s); "
                                    f"{(verdict.problems[0] or {}).get('reason')}"),
                                   status="completed" if verdict.ok else "rejected")
-                    _fill(result, task, brief, report, verdict)
+                    _fill(result, task, brief, report, verdict, led)
                     if verdict.ok or attempts >= 2:
                         result.cost = {"completions": completions, "evidence_calls": evidence_calls}
+                        result.report_id = await _store_report(ctx, actor, task, result)
                         done = True
-                        res = {"accepted": verdict.ok, "coverage": verdict.coverage}
+                        res = {"accepted": verdict.ok, "coverage": verdict.coverage,
+                               **({"report_id": result.report_id} if result.report_id else {})}
                     else:
                         standing = verdict
                         res = {"accepted": False, "refusal": dl.refusal_message(task, verdict)}
@@ -275,7 +278,34 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     return result
 
 
-def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, verdict: dl.HandoffVerdict) -> None:
+async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.AnalystResult) -> str | None:
+    """The analyst's reading, on the record.
+
+    A refused report is stored too, marked, with its problems and without its
+    blocks: dropping it would lose what was tried, and showing its prose as if
+    it had passed is the one thing the store must not do."""
+    rep = result.report or {}
+    try:
+        async with ctx.db_factory() as db:
+            report_id = await analyst_reports.store(
+                db, ctx.session_id, message_id=ctx.message_id, task_id=task.task_id, domain=task.domain,
+                status=rep.get("status", "refused"), title=rep.get("title"),
+                brief={"findings": result.findings, "not_done": result.not_done, "caveats": result.caveats,
+                       "follow_ups": result.follow_ups, "refused": result.refused},
+                text=rep.get("text"), blocks=rep.get("blocks") or [], citations=rep.get("citations") or [],
+                verified=rep.get("verified") or {}, problems=rep.get("problems") or [],
+                evidence_calls=result.cost.get("evidence_calls"))
+            await db.commit()
+    except Exception:  # noqa: BLE001 — a lost record beats a lost turn
+        logger.exception("could not store the report for %s in session %s", task.domain, ctx.session_id)
+        return None
+    await _record(ctx, actor, "report", "report", {"report_id": report_id, "status": rep.get("status")},
+                  f"{rep.get('status')}: {str(rep.get('title') or '')[:120]}")
+    return report_id
+
+
+def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, verdict: dl.HandoffVerdict,
+          ledger=None) -> None:
     """What survives the check reaches the lead; what did not is named as
     refused. A brief that half passes is half a brief, not a lost one — the lead
     can still answer the lines that came back."""
@@ -286,9 +316,17 @@ def _fill(result: dl.AnalystResult, task: dl.Task, brief: dict, report: dict, ve
     result.refused = list(verdict.rejected)
     result.coverage = verdict.coverage
     rv = verdict.report_verdict
-    result.report = {**report, "status": "verified" if (rv is not None and rv.ok) else "refused",
-                     "problems": [] if (rv is not None and rv.ok) else [p for p in (rv.problems if rv else [])],
-                     "verdict": rv}
+    ok = rv is not None and rv.ok
+    rendered: dict = {}
+    if ok and ledger is not None:
+        try:
+            acc = answer_check.accepted(report.get("text") or "", rv, ledger)
+            rendered = {"blocks": acc["blocks"], "citations": acc["citations"], "verified": acc["verified"]}
+        except Exception:  # noqa: BLE001 — a report that will not render is a report, not a lost brief
+            logger.exception("could not render the report for %s", task.domain)
+    result.report = {**report, "status": "verified" if ok else "refused",
+                     "problems": [] if ok else list(rv.problems if rv else []),
+                     **rendered}
     # The word the lead reads has to mean what happened. The smoke round produced
     # a brief that passed every check while answering nothing — five lines, five
     # not_done — and called it "verified", which is true of the check and false
