@@ -148,7 +148,7 @@ def tally(paths: list[str]) -> dict:
     superl = superl_no_rank = superl_undeclared = 0
     # V36
     lead_rt, sub_rt, delegates, lead_peak = [], [], [], []
-    analysts = submits = submits_rejected = boundaries = 0
+    analysts = submits = submits_rejected = boundaries = delegates_rejected = read_reports = 0
     analyst_status: collections.Counter = collections.Counter()
     report_status: collections.Counter = collections.Counter()
     handoff: collections.Counter = collections.Counter()
@@ -175,7 +175,9 @@ def tally(paths: list[str]) -> dict:
                 # the lead's own rows after it).
                 lead = [s for s in llm if not str(s.get("actor") or "").startswith("sub:")]
                 lead_rt.append(len(lead)); sub_rt.append(len(llm) - len(lead))
-                delegates.append(sum(1 for s in steps if s.get("step_type") == "delegate"))
+                delegates.append(sum(1 for s in steps if s.get("step_type") == "delegate" and s.get("status") != "rejected"))
+                delegates_rejected += sum(1 for s in steps if s.get("step_type") == "delegate" and s.get("status") == "rejected")
+                read_reports += sum(1 for s in steps if s.get("step_type") == "read_report")
                 boundaries += sum(1 for s in steps if s.get("step_type") == "boundary")
                 for s in steps:
                     if s.get("step_type") != "brief":
@@ -280,6 +282,7 @@ def tally(paths: list[str]) -> dict:
         "superlative_rank_undeclared": superl_undeclared,
         # V36: delegation, coverage, the handoff, the reports, completions by agent
         "delegate_calls_mean": round(statistics.mean(delegates), 2) if delegates else 0,
+        "delegates_rejected": delegates_rejected, "read_reports": read_reports,
         "analysts": analysts,
         "analysts_by_status": dict(sorted(analyst_status.items())),
         "coverage": {k: coverage[k] for k in ("asked", "done", "not_done", "refused")},

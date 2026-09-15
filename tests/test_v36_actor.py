@@ -106,3 +106,29 @@ def test_the_column_exists_in_the_schema_and_in_a_migration():
 
     migration = (root / "infra" / "migrations" / "v36_actor.sql").read_text()
     assert "ADD COLUMN IF NOT EXISTS actor" in migration
+
+
+@pytest.mark.asyncio
+async def test_what_a_completion_read_is_on_its_row_and_never_sent_to_the_provider(monkeypatch):
+    """V36.1: round A's table had a size for every edge except the ones into a
+    completion — the digest, the delegate return, the refusal — which were the
+    largest. The loop measures them and the row carries the measure as args;
+    the provider sees the messages and nothing else."""
+    rows: list = []
+    sent: list = []
+
+    async def _fake_chat(**kw):
+        sent.append(kw)
+        return "", None, {"model": "m", "prompt_tokens": 10, "completion_tokens": 2}
+
+    async def _fake_record(_db, session_id, **kw):
+        rows.append(kw)
+        return "step_1"
+
+    monkeypatch.setattr(ls.llm_client, "chat_with_tools", _fake_chat)
+    monkeypatch.setattr(ls.trace_service, "record_step", _fake_record)
+    lead = ls.LlmSession(lambda: _FakeSession(), "sess_x", "msg_x")
+    await lead.chat(messages=[], note={"read": {"chars": 16650, "results": 1}})
+    await lead.chat(messages=[])
+    assert [r["args"] for r in rows] == [{"read": {"chars": 16650, "results": 1}}, None]
+    assert all("note" not in kw for kw in sent)

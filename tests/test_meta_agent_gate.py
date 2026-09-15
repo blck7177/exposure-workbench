@@ -116,6 +116,8 @@ def _stub_desk(monkeypatch, session):
 
     monkeypatch.setattr(meta_agent, "_record_answer", _no_record)
     monkeypatch.setattr(meta_agent, "_record_delegate", _no_record)
+    monkeypatch.setattr(meta_agent, "_record_bad_delegate", _no_record)
+    monkeypatch.setattr(meta_agent, "_record_read_report", _no_record)
     monkeypatch.setattr(sub_analyst, "_record", _no_record)
     monkeypatch.setattr(sub_analyst, "_ledger", _sub_ledger)
 
@@ -507,3 +509,39 @@ async def test_a_repair_that_still_fails_spends_the_second_attempt(monkeypatch):
     out = await handle_message(_factory([]), "sess_twice", "how big is MSFT", max_turns=8)
     assert out["text"] == _GATE_EXHAUSTED_TEXT
     assert out["meta"]["gate_refusals"] == ["unsourced_figure", "unsourced_figure"]
+
+
+# ── V36.1 (round A) · the two edges the table had to infer are recorded ──────
+
+@pytest.mark.asyncio
+async def test_a_rejected_delegation_and_a_read_report_are_steps(monkeypatch):
+    """Round A's table showed eight lead completions with one tool call and
+    nothing after: three delegations the protocol refused, five read_reports.
+    Both are steps now, so the next table needs no inference."""
+    recorded: list = []
+
+    async def _bad(_f, _s, _m, args, detail):
+        recorded.append(("delegate", "rejected", detail))
+
+    async def _read(_f, _s, _m, report_id, result):
+        recorded.append(("read_report", result.get("status") or result.get("error"), report_id))
+
+    chat, lead, _sub = _two_loops(
+        lead_replies=[("", _delegate({"domain": "no_such_desk"})),
+                      ("", _delegate()),
+                      ("", [{"id": "rr", "function": {"name": delegation.READ_REPORT_TOOL_NAME,
+                                                      "arguments": json.dumps({"report_id": "rep_missing"})}}]),
+                      ("Hello.", None)],
+        sub_replies=[("", _submit((["f_wmsft0001"], "MSFT is 16.0% [f_wmsft0001] of the book.")))])
+    _stub_llm(monkeypatch, chat)
+    session = _stub_tools(monkeypatch, {"noted": True})
+    _stub_desk(monkeypatch, session)
+    monkeypatch.setattr(meta_agent, "_record_bad_delegate", _bad)
+    monkeypatch.setattr(meta_agent, "_record_read_report", _read)
+    out = await handle_message(_factory([]), "sess_rec", "hi", max_turns=6)
+
+    assert out["text"] == "Hello."
+    assert recorded[0][:2] == ("delegate", "rejected") and "ROSTER" in recorded[0][2]
+    assert recorded[-1][0] == "read_report" and recorded[-1][2] == "rep_missing"
+    # what the lead read between completions is measured on the way in
+    assert all("note" not in m for m in lead[1])         # the note is the row's, not the prompt's

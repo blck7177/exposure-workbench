@@ -188,11 +188,18 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     standing: dl.HandoffVerdict | None = None           # a verdict on a submission, awaiting its replacement
     attempts = 0
     nudges = 0
+    read = {"chars": 0, "results": 0}                   # what the next completion reads (V36.1, recorded on its row)
+
+    def _append(msg: dict) -> None:
+        messages.append(msg)
+        read["chars"] += len(str(msg.get("content") or ""))
+        read["results"] += int(msg.get("role") == "tool")
 
     for _turn in range(settings.sub_analyst_max_turns):
         content, tool_calls = await llm.chat(
-            messages=messages, tools=tools,
+            messages=messages, tools=tools, note=({"read": dict(read)} if read["chars"] else None),
             **({"tool_choice": "required"} if standing is not None else {}))
+        read = {"chars": 0, "results": 0}
         completions += 1
         msg: dict = {"role": "assistant", "content": content or ""}
         if tool_calls:
@@ -203,7 +210,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
             nudges += 1
             if nudges > 2:
                 break
-            messages.append({"role": "user", "content": _WRITE_OR_ASK})
+            _append({"role": "user", "content": _WRITE_OR_ASK})
             continue
 
         done = False
@@ -279,9 +286,12 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     attempts += 1
                     led = await _ledger(ctx)
                     verdict = dl.handoff_check(task, brief, report, led)
+                    # the verdict rides on the step (V36.1): the retort the analyst
+                    # read is otherwise nowhere on the record and had to be replayed
                     await _record(ctx, actor, "brief", "submit",
                                   {"brief": brief, "report": {**report, "text": report["text"][:4000]},
-                                   "coverage": verdict.coverage},
+                                   "coverage": verdict.coverage,
+                                   **({"problems": verdict.problems[:20]} if verdict.problems else {})},
                                   ("accepted" if verdict.ok else
                                    f"refused: {len(verdict.problems)} problem(s); "
                                    f"{(verdict.problems[0] or {}).get('reason')}"),
@@ -302,8 +312,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                 res = {"error": "unknown_tool",
                        "detail": f"your tools are compile, {', '.join(EVIDENCE_TOOLS)} and submit"}
 
-            messages.append({"role": "tool", "tool_call_id": tc["id"],
-                             "content": ejson.dumps_capped(res, settings.sub_analyst_result_chars)})
+            _append({"role": "tool", "tool_call_id": tc["id"],
+                     "content": ejson.dumps_capped(res, settings.sub_analyst_result_chars)})
         if done:
             break
 

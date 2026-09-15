@@ -192,6 +192,38 @@ async def _record_delegate(db_factory, session_id: str, message_id: str, tasks) 
         logger.exception("could not record delegate step for %s", session_id)
 
 
+async def _record_bad_delegate(db_factory, session_id: str, message_id: str, args, detail: str) -> None:
+    """A delegation the protocol refused, as a rejected step. Round A had three
+    of these on the first completion of a turn and the trace showed a completion
+    with one tool call and nothing after it (V36.1)."""
+    try:
+        async with db_factory() as db:
+            await trace_service.record_step(
+                db, session_id, step_type="delegate", tool_name="delegate",
+                args={"raw": ejson.dumps_capped(args, 2000)}, evidence_refs=[],
+                result_summary=f"invalid_delegation: {detail[:300]}", status="rejected", message_id=message_id)
+            await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("could not record the rejected delegate step for %s", session_id)
+
+
+async def _record_read_report(db_factory, session_id: str, message_id: str, report_id: str, result: dict) -> None:
+    """The lead opening a report, as a step: the one edge of round A's table
+    that had to be inferred from a 26-token completion (V36.1)."""
+    try:
+        async with db_factory() as db:
+            await trace_service.record_step(
+                db, session_id, step_type="read_report", tool_name="read_report",
+                args={"report_id": report_id}, evidence_refs=[],
+                result_summary=(f"{result.get('error')}: {str(result.get('detail') or '')[:160]}" if result.get("error")
+                                else f"{result.get('status')}: {str(result.get('title') or '')[:120]}"
+                                     f" · {len(str(result.get('text') or ''))} chars"),
+                status="rejected" if result.get("error") else "completed", message_id=message_id)
+            await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("could not record the read_report step for %s", session_id)
+
+
 async def _record_answer(db_factory, session_id: str, message_id: str, text: str, verdict) -> None:
     try:
         async with db_factory() as db:
@@ -299,6 +331,13 @@ async def handle_message(
         domains = {d["domain"] for d in roster}
 
         nudges = 0
+        read = {"chars": 0, "results": 0}          # what the next completion reads (V36.1, recorded on its row)
+
+        def _append(msg: dict) -> None:
+            messages.append(msg)
+            read["chars"] += len(str(msg.get("content") or ""))
+            read["results"] += int(msg.get("role") == "tool")
+
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
             tools = ([delegation.DELEGATE_TOOL]
@@ -306,7 +345,9 @@ async def handle_message(
                      + ([REPAIR_TOOL] if standing is not None else []))
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
             content, tool_calls = await llm.chat(messages=messages, tools=tools,
+                                                 note=({"read": dict(read)} if read["chars"] else None),
                                                  **({"tool_choice": "required"} if standing is not None else {}))
+            read = {"chars": 0, "results": 0}
             completions += 1
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:
@@ -325,14 +366,16 @@ async def handle_message(
                             tasks = delegation.parse_tasks(args, domains, new_id)
                         except delegation.BadDelegation as exc:
                             result: dict = {"error": "invalid_delegation", "detail": str(exc)}
+                            await _record_bad_delegate(db_factory, session_id, message_id, args, str(exc))
                         else:
                             await _record_delegate(db_factory, session_id, message_id, tasks)
                             got = await sub_analyst.run_tasks(tasks, ctx)
                             delegated += got
                             result = delegation.for_lead(got)
                     elif name == delegation.READ_REPORT_TOOL_NAME:
-                        result = await _read_report(db_factory, session_id,
-                                                    str((args or {}).get("report_id") or ""))
+                        rid = str((args or {}).get("report_id") or "")
+                        result = await _read_report(db_factory, session_id, rid)
+                        await _record_read_report(db_factory, session_id, message_id, rid, result)
                     elif name == REPAIR_TOOL_NAME and standing is not None:
                         repl, unknown = _parse_replacements(args, standing)
                         led = await _load_ledger(db_factory, session_id)
@@ -356,15 +399,15 @@ async def handle_message(
                         result = {"error": "unknown_tool",
                                   "detail": f"your tools are {delegation.DELEGATE_TOOL_NAME} and {REPAIR_TOOL_NAME}; "
                                             f"the answer is your reply text"}
-                    messages.append({"role": "tool", "tool_call_id": tc["id"],
-                                     "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
+                    _append({"role": "tool", "tool_call_id": tc["id"],
+                             "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
                 if reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:
                     break
                 continue
 
             text = (content or "").strip()
             if not text:
-                messages.append({"role": "user", "content": _WRITE_OR_ASK})
+                _append({"role": "user", "content": _WRITE_OR_ASK})
                 continue
 
             if standing is not None:
@@ -374,7 +417,7 @@ async def handle_message(
                 if nudges > 1:
                     gate_refusals.append("malformed_repair")
                     break
-                messages.append({"role": "user", "content": _REPAIR_ONLY})
+                _append({"role": "user", "content": _REPAIR_ONLY})
                 continue
             led = await _load_ledger(db_factory, session_id)
             verdict = answer_check.check(text, led, question=user_text)
@@ -389,7 +432,7 @@ async def handle_message(
             if attempts >= MAX_ANSWER_ATTEMPTS:
                 break
             answer, standing = text, verdict
-            messages.append({"role": "user", "content": _refusal_message(verdict)})
+            _append({"role": "user", "content": _refusal_message(verdict)})
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,

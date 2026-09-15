@@ -37,6 +37,9 @@ def _llm(actor, prompt=1000):
 V36_TURN = {
     "turn": 1, "answer": "MSFT is nearest at 16.0% [f_1].",
     "steps": [
+        _llm(None, 5900),
+        {"step_type": "delegate", "tool_name": "delegate", "actor": None, "status": "rejected",
+         "result": "invalid_delegation: tasks[0].domain 'x' is not a domain on the ROSTER"},
         _llm(None, 6000),
         {"step_type": "delegate", "tool_name": "delegate", "actor": None, "status": "completed",
          "result": "book_limits_and_triggers [port_001] 4 line(s)"},
@@ -55,6 +58,9 @@ V36_TURN = {
          "status": "completed", "result": "accepted"},
         {"step_type": "report", "tool_name": "report", "actor": "sub:book_limits_and_triggers",
          "status": "completed", "result": "verified: Issuer-concentration room"},
+        _llm(None, 7900),
+        {"step_type": "read_report", "tool_name": "read_report", "actor": None, "status": "completed",
+         "result": "verified: Issuer-concentration room · 861 chars"},
         _llm(None, 8200),
         {"step_type": "answer", "tool_name": "answer", "actor": None, "status": "completed",
          "result": "accepted", "args": json.dumps({"text": "MSFT is nearest at 16.0% [f_1]."})},
@@ -69,7 +75,8 @@ V36_TURN = {
 
 def test_a_v36_turn_is_read_by_who_did_what(tmp_path):
     c = _tally(tmp_path, [V36_TURN])
-    assert c["delegate_calls_mean"] == 1
+    assert c["delegate_calls_mean"] == 1                 # the rejected one is not a delegation that ran
+    assert c["delegates_rejected"] == 1 and c["read_reports"] == 1
     assert c["analysts"] == 1 and c["analysts_by_status"] == {"partial": 1}
     assert c["coverage"] == {"asked": 4, "done": 3, "not_done": 1, "refused": 0}
     assert c["coverage_done_share"] == 0.75
@@ -77,14 +84,14 @@ def test_a_v36_turn_is_read_by_who_did_what(tmp_path):
     assert c["handoff_refusals"] == {"uncovered_want": 1}
     assert c["reports_by_status"] == {"verified": 1}
     assert c["boundaries_minted"] == 1
-    # completions split by actor: the lead's two, the analyst's three
-    assert c["lead_completions_median"] == 2 and c["sub_completions_median"] == 3
+    # completions split by actor: the lead's four, the analyst's three
+    assert c["lead_completions_median"] == 4 and c["sub_completions_median"] == 3
     assert c["sub_completions_total"] == 3
     # the lead's own peak, not the sum of every completion in the turn
     assert c["lead_prompt_peak_median"] == 8200
-    assert c["prompt_tokens_median"] == 6000 + 9000 + 12000 + 13000 + 8200
-    # the earlier series still read the same steps: five completions, two tool calls
-    assert c["round_trips_median"] == 5 and c["tool_calls_median"] == 2
+    assert c["prompt_tokens_median"] == 5900 + 6000 + 9000 + 12000 + 13000 + 7900 + 8200
+    # the earlier series still read the same steps: seven completions, two tool calls
+    assert c["round_trips_median"] == 7 and c["tool_calls_median"] == 2
 
 
 def test_a_round_before_v36_reads_as_zeros_and_keeps_its_series(tmp_path):
@@ -94,6 +101,7 @@ def test_a_round_before_v36_reads_as_zeros_and_keeps_its_series(tmp_path):
                       _llm(None, 15000)]}
     c = _tally(tmp_path, [turn])
     assert c["delegate_calls_mean"] == 0 and c["analysts"] == 0 and c["submits"] == 0
+    assert c["delegates_rejected"] == 0 and c["read_reports"] == 0
     assert c["analysts_by_status"] == {} and c["handoff_refusals"] == {} and c["reports_by_status"] == {}
     assert c["coverage"] == {"asked": 0, "done": 0, "not_done": 0, "refused": 0} and c["coverage_done_share"] == 0
     assert c["lead_completions_median"] == c["round_trips_median"] == 2 and c["sub_completions_total"] == 0

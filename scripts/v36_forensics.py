@@ -123,6 +123,8 @@ def _edge(st: dict, legacy_caller: str, speaking: str | None = None) -> tuple[st
         return (who, "check", "submit")
     if kind == "report":                        # V36: the verified report, stored
         return (who, "store", "report")
+    if kind == "read_report":                   # V36.1: the lead opening a report (was inferred before)
+        return (LEAD, "store", "read_report")
     if kind in ("answer", "respond"):
         return (LEAD, "gate", kind)
     if kind == "delegation":                    # a background task was registered
@@ -161,15 +163,20 @@ def _summary(st: dict, args: dict) -> str:
             for t in tasks if isinstance(t, dict))
     if kind == "brief":
         cov = args.get("coverage") or {}
+        probs = args.get("problems") or []
         return (f"coverage {cov.get('done', '?')}/{cov.get('asked', '?')}"
                 f" not_done {cov.get('not_done', 0)} refused {cov.get('refused', 0)}"
-                f" · {st['status']}")
+                f" · {st['status']}"
+                + (f" · {len(probs)} problem(s): " + ", ".join(sorted({str(p.get('reason')) for p in probs if isinstance(p, dict)})[:4])
+                   if probs else ""))
     return str(st["result_summary"] or "")
 
 
 def _sizes(st: dict, args) -> str:
     if st["step_type"] == "llm_call":
-        return f"p{st['prompt_tokens'] or 0}/c{st['completion_tokens'] or 0} tok"
+        read = (args or {}).get("read") if isinstance(args, dict) else None
+        tail = f" · read {read.get('chars')} ch/{read.get('results')} res" if isinstance(read, dict) else ""
+        return f"p{st['prompt_tokens'] or 0}/c{st['completion_tokens'] or 0} tok{tail}"
     n_args = len(args if isinstance(args, str) else json.dumps(args, ensure_ascii=False, default=str))
     n_res = len(st["result_summary"] or "")
     return f"in {n_args} · out {n_res}"

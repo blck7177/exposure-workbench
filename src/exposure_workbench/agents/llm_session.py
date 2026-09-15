@@ -56,6 +56,7 @@ class LlmSession:
         self,
         messages: list[dict],
         tools: list[dict] | None = None,
+        note: dict | None = None,
         **kw,
     ) -> tuple[str | None, list[dict] | None]:
         """One completion, recorded as an `llm_call` step.
@@ -76,6 +77,13 @@ class LlmSession:
         raising still ends the turn at the caller exactly as it always has —
         this module made the successful path unskippable, not the failed one
         survivable.
+
+        `note` (V36.1) is what this completion READ since the last one — the
+        tool results, the digest, the delegate return, the refusal — as the
+        loop measured it: {"read": {"chars", "results"}}. It is written into
+        the row's args and never sent to the provider. Round A's communication
+        table had a size for every edge except the ones into a completion,
+        which were the largest; this is where they were missing from.
         """
         content, tool_calls, usage = await llm_client.chat_with_tools(
             messages=messages, tools=tools, **kw,
@@ -96,7 +104,7 @@ class LlmSession:
                     db, self._session_id,
                     step_type="llm_call",
                     tool_name=None,          # nothing was called; this IS the call
-                    args=None,
+                    args=note,
                     result_summary=f"{model}: {calls} tool call{'' if calls == 1 else 's'}",
                     evidence_refs=[],
                     message_id=self._message_id,
