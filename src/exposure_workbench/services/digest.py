@@ -240,6 +240,13 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
     nodes = res.get("nodes")
     if isinstance(nodes, dict):
         entry["nodes"] = [n for n in nodes if not str(n).startswith("_")]
+        # the books this program built, by the id another program — another
+        # analyst's — reads where a run goes (V36.1, round A's Q13)
+        made = [{"node": n, "id": d["ref"], "kind": "scenario"} for n, d in nodes.items()
+                if isinstance(d, dict) and d.get("kind") == "table" and str(d.get("ref") or "").startswith("calc_")
+                and not str(n).startswith("_")]
+        if made:
+            entry["made"] = made
     if res.get("held_back"):
         entry["boundaries"].append({
             **mint(f"{res['held_back'].get('count')} more figures were computed and not shown; "

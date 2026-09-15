@@ -400,3 +400,25 @@ async def test_a_start_is_counted_apart_from_evidence_and_once_per_subject(monke
     assert replies[3]["error"] == "analyst_budget" and "background" in replies[3]["detail"]
     assert replies[4].get("error") is None
     assert r.cost["starts"] == 2 and r.cost["evidence_calls"] == 1
+
+
+# ── V36.1 (round A) · what an analyst built reaches the lead by id ───────────
+
+@pytest.mark.asyncio
+async def test_the_books_an_analyst_built_reach_the_lead_and_a_calc_subject_is_explained():
+    res = {**_run_result([]), "nodes": {"base": {"kind": "run", "run": "run_1"},
+                                        "after": {"kind": "table", "ref": "calc_after1"}}}
+    tools = _Tools({"run": lambda a: res})
+    llm = _Llm([("", [("run", {"program": {}})]), ("", None)])
+    r = await sa.run_sub_analyst(_task(), _ctx(tools, llm))
+    assert r.made == [{"node": "after", "id": "calc_after1", "kind": "scenario"}]
+    assert dl.for_lead([r])["analysts"][0]["made"] == r.made
+    assert "`made`" in dl.HOW_TO_CITE
+    # the next analyst, handed that id as a subject, is told what it is
+    llm2 = _Llm([("", None)])
+    await sa.run_sub_analyst(_task(subjects=("calc_after1",)), _ctx(_Tools({}), llm2))
+    user = json.loads(llm2.seen[0]["messages"][1]["content"])
+    assert user["subjects"]["calc_after1"]["kind"] == "scenario"
+    assert dl.parse_tasks({"tasks": [{"domain": "book_limits_and_triggers", "subjects": ["calc_after1"],
+                                      "want_to_know": ["re-run every check on that book"]}]},
+                          {"book_limits_and_triggers"}, lambda p: p + "1")[0].subjects == ("calc_after1",)

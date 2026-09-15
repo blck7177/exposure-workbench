@@ -59,3 +59,25 @@ def test_read_filings_tells_the_model_it_takes_exactly_one_of_query_or_item():
     tool = _read_filings_tool()
     assert "EXACTLY ONE of query or item" in tool.description
     assert tool.shapes is not None and set(tool.shapes.fields) == {"query", "item"}
+
+
+# ── T5 · a book one analyst built has a name another can read ────────────────
+
+def test_a_built_book_declares_the_id_another_program_reads():
+    """Q13: the after-book (sell half NVDA, buy TLT) lived in one analyst's
+    program; the lead re-delegated "after the same trade" to two more analysts,
+    who could only name port_001 and re-ran the base book under that label.
+    The executor already gives a scenario a calc_ ref that `_run_ref` accepts;
+    now the note says so, and the digest lists it under `made`."""
+    from exposure_workbench.services import program_service as ps
+    after = ps.Node("after", ps.TABLE, {"fn": "sell"})
+    after.ref = "calc_after1"
+    assert ps._note_of(after)["ref"] == "calc_after1"
+    base = ps.Node("base", ps.RUN, {"fn": "run"})
+    base.ref = "run_1"
+    assert "ref" not in ps._note_of(base)            # a run is not something the analyst made
+    d = dg.render({"program_id": "calc_p", "returns": ["after"], "settled": 1, "refused": [],
+                   "nodes": {"base": {"kind": "run", "run": "run_1"}, "after": {"kind": "table", "ref": "calc_after1"},
+                             "_scratch": {"kind": "table", "ref": "calc_x"}},
+                   "facts": {"columns": [], "rows": []}}, mint=dg.Minter())
+    assert d["made"] == [{"node": "after", "id": "calc_after1", "kind": "scenario"}]

@@ -81,7 +81,9 @@ The figures are yours to produce and the language is yours to write. compile(req
 without running it — edit what it gives you and run that, or write the program yourself. run(program) executes one \
 program: every node comes back typed, dated, and on the ledger as a fact, or the type report lists every problem at once. \
 read_filings reads a filing's text, search_web the web; start puts an issuer on the desk after your turn — it \
-returns a task id, never a figure, and once per name is enough. Every figure a tool shows you \
+returns a task id, never a figure, and once per name is enough. A subject written as a calc_… id is a book \
+another analyst built this turn — the scenario after a trade: read it where a run goes, never the base book in \
+its place. Every figure a tool shows you \
 carries the id it is shown under — 16.0% [f_2592baab170e] — and `place` of `of` is where it sits in the ordering its \
 node built: a superlative rests on that, never on reading a list. Never compute in your head: a number you worked out \
 yourself is a number no fact stands behind, and it is refused.
@@ -120,6 +122,11 @@ def _subjects_of(task: dl.Task, briefing: dict) -> dict:
         d = issuers.get(s) or issuers.get(s.upper()) or ports.get(s)
         if d is not None:
             out[s] = d
+        elif s.startswith("calc_"):
+            # a book another analyst built this turn (V36.1): not in the
+            # briefing, because it did not exist when the briefing was written
+            out[s] = {"kind": "scenario", "note": "a book built this turn by another analyst; read it where a "
+                                                  "run goes: column(run=id, …), figure(run=id, …), sell(run=id, …)"}
     return out
 
 
@@ -165,6 +172,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     evidence_calls = 0
     start_calls = 0
     started: dict[tuple[str, str], str] = {}            # (kind, subject) -> the task it enqueued
+    made: dict[str, dict] = {}                          # the books this analyst's programs built, by id
     completions = 0
     llm = ctx.llm.for_actor(actor) if hasattr(ctx.llm, "for_actor") else ctx.llm
 
@@ -252,6 +260,8 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
                     res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
                                     call={"tool": name, "args": args})
+                    for m in res.get("made") or []:
+                        made[m["id"]] = m
                     minted = minter.take()
                     if minted:
                         # SHOWN MEANS ON THE LEDGER. The desk's own words for what
@@ -312,6 +322,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
         result.coverage = {"asked": len(task.want_to_know), "done": 0,
                            "not_done": len(task.want_to_know), "refused": 0}
     result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls, "starts": start_calls}
+    result.made = list(made.values())
     return result
 
 

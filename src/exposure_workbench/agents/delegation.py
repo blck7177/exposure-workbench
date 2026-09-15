@@ -71,7 +71,7 @@ DELEGATE_TOOL = {"type": "function", "function": {
             "type": "object", "properties": {
                 "domain": {"type": "string", "description": "a domain name from the ROSTER"},
                 "subjects": {"type": "array", "minItems": 1, "items": {"type": "string"},
-                             "description": "tickers, port_… or run_… ids, from the BRIEFING"},
+                             "description": "tickers, port_… or run_… ids from the BRIEFING; or a calc_… id from an analyst's `made`, for a book built this turn"},
                 "want_to_know": {"type": "array", "minItems": 1, "maxItems": MAX_WANTS, "items": {"type": "string"},
                                  "description": "one thing per line, in your own words; each line comes back answered or explained"},
                 "facts_to_derive": {"type": ["array", "null"], "items": {"type": "string"},
@@ -175,6 +175,7 @@ class AnalystResult:
     refused: list[dict] = field(default_factory=list)
     report: dict | None = None                   # {title, text, status, problems, blocks, citations, verified}
     report_id: str | None = None
+    made: list[dict] = field(default_factory=list)   # books this analyst built: {node, id, kind}
     coverage: dict = field(default_factory=dict)
     cost: dict = field(default_factory=dict)
 
@@ -220,7 +221,7 @@ def parse_tasks(args: dict, domains: set[str], new_id) -> list[Task]:
             subjects = [subjects]
         subjects = [str(s).strip() for s in (subjects or []) if str(s).strip()]
         if not subjects:
-            raise BadDelegation(f"tasks[{i}].subjects names at least one ticker, port_… or run_… id")
+            raise BadDelegation(f"tasks[{i}].subjects names at least one ticker, port_… or run_… id, or a calc_… id an analyst made")
         wants = t.get("want_to_know")
         if isinstance(wants, str):
             wants = [wants]
@@ -392,6 +393,8 @@ HOW_TO_CITE = (
     "that reading and a figure written without it is refused. `said` beside a not_done line, and `desk_said` beside a "
     "finding, are the desk's own words for what it could not do: those you may quote verbatim, citing their id. An "
     "analyst's sentences are not the desk's words — say what they say in yours, without quotation marks. "
+    "`made` lists the books an analyst built this turn (a scenario after a trade) by id: to have another analyst "
+    "read that book, put the id among the subjects of its task. "
     "`read_report(report_id)` opens an analyst's full report.")
 
 
@@ -410,5 +413,6 @@ def for_lead(results: list[AnalystResult]) -> dict:
         **({"follow_ups": r.follow_ups} if r.follow_ups else {}),
         **({"refused": [{"want": x.get("want"), "reason": (x.get("problems") or [{}])[0].get("reason")}
                         for x in r.refused]} if r.refused else {}),
+        **({"made": r.made} if r.made else {}),
         "cost": r.cost,
     } for r in results], "how_to_cite": HOW_TO_CITE}

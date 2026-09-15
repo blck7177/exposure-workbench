@@ -1938,6 +1938,12 @@ def _note_of(node: Node) -> dict:
         # a picked date or name: shown as what it is, with the nodes it was passed to;
         # the facts of those nodes carry it (see _declared_dates), so it is citable there
         return {"kind": "literal", "value": node.payload["literal"], "deps": node.deps}
+    if node.kind == TABLE and node.ref and str(node.ref).startswith("calc_"):
+        # V36.1: a book an analyst built — the scenario after a trade — has an
+        # id another program can read where a run goes (`_run_ref` takes it).
+        # Round A's Q13 built the after-book in one analyst and re-ran the base
+        # book in two others, because nothing said the after-book had a name.
+        out["ref"] = node.ref
     if node.kind in (VECTOR, RANKING, TABLE):
         by_label = {f.params.get("label"): f for f in node.facts}
         out["entries"] = {label: {"fact": by_label[label].id, "value": by_label[label].value,
