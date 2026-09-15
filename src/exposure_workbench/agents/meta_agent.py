@@ -1,23 +1,29 @@
-"""The analyst (V33) — the single conversational entity the user talks to.
+"""The lead analyst (V36) — the single conversational entity the user talks to.
 
-Two jobs used to share this loop's context: deciding what to look at, and
-transcribing that decision into a typed program and a typed claims list. The
-20-question round (docs/spikes/v33) measured the cost — 8 completions a turn,
-68% of exits refused, and twelve of nineteen accepted answers false to a reader
-for reasons the transcription hid. Here the loop holds ONE tool, request_evidence,
-and its exit is plain text.
+Three jobs have shared this loop over three versions. V33 took the transcription
+out of it (the program, the claims list, the ids); V36 takes out the last one
+that was never its own — deciding, in the desk's language, what would settle the
+question. That belonged to nobody: the loop was a generalist, the domain
+knowledge was pushed to it as text, and the compiler behind it read fields. Round
+J's Q11 asked for "room to warning and breach" in a field the compiler did not
+read, subtracted the room in prose, and was refused for it, twice.
 
-    read : the role and one rule; the briefing (the desk's map for the subjects
+So the lead decides and writes, and the desk's domain analysts do the rest:
+
+    read : the role and one rule; the BRIEFING (the desk's map for the subjects
            the question names — names, dates, coverage, never a figure); the
-           skill's domain knowledge for the question; the digests that come back
-    write: request_evidence(items), decision-level (subjects, the desk's names
-           for what is wanted, a window, a comparison); then prose
+           ROSTER (which analyst can be asked what); the briefs that come back
+    write: delegate(tasks) — subjects and numbered lines of what it wants to
+           know, in its own words; then prose
 
-The evidence broker (agents/evidence_broker.py) does the tools: it compiles or
-writes the program, runs it under the same session's token, and returns every
-figure with its id. The answer check (services/answer_check.py) reads the prose
-against the session ledger and refuses with every problem at once; the analyst
-gets one rewrite. Nothing reaches the user that the check did not accept.
+agents/sub_analyst runs each domain analyst INSIDE this turn, on the same
+session and the same tool-face token, so everything they fetch is on the ledger
+the answer check reads. agents/delegation holds the protocol and the check at
+the boundary: a brief reaches this loop only if every line is accounted for and
+every figure in it points at a fact. The answer check (services/answer_check)
+then reads the prose against that ledger and refuses with every problem at once;
+the lead gets one rewrite. Nothing reaches the user that the check did not
+accept.
 
 History is persisted as agent_messages so a session survives across turns.
 """
@@ -30,7 +36,7 @@ from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import evidence_broker, evidence_request
+from exposure_workbench.agents import delegation, sub_analyst
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import skill
@@ -44,26 +50,30 @@ from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = """You are the analyst for a portfolio risk & issuer-intelligence desk. The analysis is your job: take \
-the question apart, decide what to look at and what to compare, ask the desk for the evidence, and say what it \
+_SYSTEM = """You are the lead analyst for a portfolio risk & issuer-intelligence desk. The analysis is your job: take \
+the question apart, decide what has to be known to answer it, ask the desk's domain analysts for it, and say what it \
 shows and what it means for the question asked — its implication for this book and what would change your reading.
 
-You compute and fetch nothing yourself. request_evidence(items) is how you ask: name the subjects (tickers, port_… \
-ids) and what you want about them in the desk's own names from the BRIEFING, with a window and a comparison where \
-the question has one. The desk returns every figure with its id and identity, passages to quote, and what it could \
-not do. Ask for everything a first pass needs in one request; ask again only for what the answer still lacks. \
-Check the question's premises against the briefing first (which holdings are in which sector, what the desk holds).
+You compute and fetch nothing yourself, and you do not speak the desk's language. delegate(tasks) is how you ask: pick \
+from the ROSTER the analyst whose question this is, name the subjects from the BRIEFING, and write what you want to \
+know as short, separate lines, one thing per line, in your own words. Say the arithmetic you want worked out rather \
+than doing it yourself, and say how it must be compared where the question has a comparison. Several domains may be \
+needed for one question: send them in one call. Ask again only for what the answer still lacks. Never name a measure, \
+a program or a fact id — that is the analyst's job and the reason you have one. Check the question's premises against \
+the BRIEFING first (which holdings are in which sector, what the desk holds).
 
-Your reply is plain prose, and every number you write is one the desk showed you, written exactly as it was shown, \
-bracket included: 16.0% [f_2592baab170e]. The bracket is the desk's id for that reading; it is what lets the reader \
-open the figure, and a figure written without it is refused. A table or a chart is [table: <node>] or [chart: <node>], \
-naming a node from the evidence. Quote a passage's words, or the desk's own words for what it could not do, verbatim \
-inside quotation marks. A superlative rests on an ordering the desk computed (compare: rank). What the desk could not \
+Each analyst comes back with a finding for each of your lines, what it could not do and why in the desk's own words, \
+and a report id. Your reply is plain prose, and every number you write is one an analyst showed you, written exactly \
+as it was shown, bracket included: 16.0% [f_2592baab170e]. The bracket is the desk's id for that reading; it is what \
+lets the reader open the figure, and a figure written without it is refused. A table or a chart is [table: <node>] or \
+[chart: <node>], naming a node from the evidence. Quote a passage's words, or the desk's own words for what it could \
+not do, verbatim inside quotation marks. A superlative rests on an ordering the desk computed. What the desk could not \
 do or does not hold, say so and say what you gave instead — never an estimate, never a figure carried from one company \
 or date to another, never a nearby figure under the asked-for name.
 
 If your reply is not accepted, you are told which sentences did not pass and why. Call repair_answer with a replacement \
-for exactly those sentences (an empty replacement drops one); request the evidence a fix needs first. You have two attempts."""
+for exactly those sentences (an empty replacement drops one); delegate first if a fix needs a figure you were not \
+shown. You have two attempts."""
 
 
 # What the user is told when the turn ended without an accepted answer. ONE
@@ -84,11 +94,12 @@ TOOL_RESULT_LIMIT = 28_000
 # second ends the turn. Decided 2026-09-13 with the natural-language exit.
 MAX_ANSWER_ATTEMPTS = 2
 
-# The only tool on the analyst's face. Kept as a tuple for the tests that pin
-# the budget-free names: the analyst's tool retrieves nothing itself.
-_BUDGET_FREE_TOOLS = (evidence_request.TOOL_NAME, "repair_answer")
+# The lead's own tools. Kept as a tuple for the tests that pin the budget-free
+# names: not one of them retrieves anything — `delegate` hands work to an
+# analyst whose evidence calls are charged where they happen.
+_BUDGET_FREE_TOOLS = (delegation.DELEGATE_TOOL_NAME, "repair_answer")
 
-_WRITE_OR_ASK = "Write the answer, or request the evidence you still need."
+_WRITE_OR_ASK = "Write the answer, or delegate for the evidence you still need."
 
 # C — THE REPAIR IS A TOOL. Round G: 18 refused replies got a second chance, one
 # used the tagged-lines protocol, four re-sent the refused text byte for byte and
@@ -109,7 +120,7 @@ REPAIR_TOOL = {"type": "function", "function": {
             "required": ["tag", "text"], "additionalProperties": False}}},
         "required": ["replacements"], "additionalProperties": False}}}
 _REPAIR_ONLY = ("A verdict stands on your reply: call repair_answer with replacements for the sentences named, "
-                "or request_evidence for what a fix needs. A new reply is not read.")
+                "or delegate for what a fix needs. A new reply is not read.")
 
 
 async def _load_history(db, session_id: str) -> list[dict]:
@@ -134,6 +145,22 @@ async def _briefing(db_factory, text: str) -> dict:
 async def _load_ledger(db_factory, session_id: str):
     async with db_factory() as db:
         return await ledger_svc.load(db, session_id)
+
+
+async def _record_delegate(db_factory, session_id: str, message_id: str, tasks) -> None:
+    """The lead's half of the handoff, as a step. The analysts record their own;
+    without this one the trace shows work appearing with nobody having asked."""
+    try:
+        async with db_factory() as db:
+            await trace_service.record_step(
+                db, session_id, step_type="delegate", tool_name="delegate",
+                args={"tasks": [t.as_dict() for t in tasks]}, evidence_refs=[],
+                result_summary="; ".join(f"{t.domain} [{','.join(t.subjects)}] {len(t.want_to_know)} line(s)"
+                                         for t in tasks),
+                message_id=message_id)
+            await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("could not record delegate step for %s", session_id)
 
 
 async def _record_answer(db_factory, session_id: str, message_id: str, text: str, verdict) -> None:
@@ -172,7 +199,7 @@ def _refusal_message(verdict) -> str:
     for p in other[:6]:
         lines.append(f"      {p['reason']}: {p.get('fix') or p.get('detail') or ''}")
     lines += ["", "Call repair_answer with a replacement for each tag above (an empty text drops the sentence). "
-                  "Request the evidence you lack first if a fix needs a figure you were not shown."]
+                  "Delegate for the evidence you lack first if a fix needs a figure you were not shown."]
     return "\n".join(lines)
 
 
@@ -211,15 +238,17 @@ async def handle_message(
                             {"role": "system", "content": "BRIEFING — the desk's map for this question (names, dates and coverage; "
                                                           "no figure here may be stated until it is requested):\n"
                                                           + json.dumps(brief, ensure_ascii=False, default=str)}]
-    pushed: list[str] = []
-    matched = skill.match_domains(user_text)
-    examples = [ex for p in matched for ex in (p.programs or ())][:4]
-    if get_settings().push_domains:
-        if matched:
-            pushed = [p.name for p in matched]
-            messages.append({"role": "system", "content": "The desk's own knowledge for this kind of question (how it compares and "
-                                                          "closes; the example programs show which names go together — you do not "
-                                                          "write programs, you request by name):\n\n" + skill.push_text(matched)})
+    # WHO CAN BE ASKED WHAT. Not the desk's knowledge — that is each domain
+    # analyst's, and handing the lead the vocabulary is what let V35's analyst
+    # write requests in a language it did not have to answer for. Ordered by the
+    # lexical match so the two domains the question is most likely about are
+    # read first; the other twelve still follow, because a question the match
+    # scores badly is exactly the one whose domain has to be found by reading.
+    roster = skill.roster(user_text if get_settings().push_domains else None)
+    messages.append({"role": "system", "content":
+                     "ROSTER — the desk's domain analysts: what each one can be asked for, and what is absent there. "
+                     "Pick by what you need to know, not by the words of the question:\n"
+                     + json.dumps(roster, ensure_ascii=False)})
     messages += history
 
     reply_text, reply_citations = None, []
@@ -228,23 +257,26 @@ async def handle_message(
     gate_refusals: list[str] = []
     prompt_peak = 0
     attempts = 0
-    requests = 0
+    completions = 0
+    delegated: list = []                   # every AnalystResult this turn produced
     answer, standing = "", None            # the reply being repaired, and the verdict naming its sentences
 
     async with tool_session(
         faces.FACE_NAME_META, session_id=session_id,
         user_id=current_user_id(), message_id=message_id, deny=deny,
     ) as tools_session, llm_session(db_factory, session_id, message_id) as llm:
-        broker = evidence_broker.Broker(tools_session, llm, db_factory, session_id, message_id, brief, examples=examples)
-        tools = [evidence_request.REQUEST_TOOL]
+        ctx = sub_analyst.TurnContext(tools_session=tools_session, llm=llm, db_factory=db_factory,
+                                      session_id=session_id, message_id=message_id, briefing=brief)
+        domains = {d["domain"] for d in roster}
 
         nudges = 0
         for _turn in range(max_turns):
-            # while a verdict stands the turn is a tool call: a repair or a request
-            tools = [evidence_request.REQUEST_TOOL] + ([REPAIR_TOOL] if standing is not None else [])
+            # while a verdict stands the turn is a tool call: a repair or a delegation
+            tools = [delegation.DELEGATE_TOOL] + ([REPAIR_TOOL] if standing is not None else [])
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
             content, tool_calls = await llm.chat(messages=messages, tools=tools,
                                                  **({"tool_choice": "required"} if standing is not None else {}))
+            completions += 1
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:
                 assistant_msg["tool_calls"] = tool_calls
@@ -257,14 +289,16 @@ async def handle_message(
                         args = json.loads(tc["function"].get("arguments") or "{}")
                     except json.JSONDecodeError:
                         args = {}
-                    if name == evidence_request.TOOL_NAME:
+                    if name == delegation.DELEGATE_TOOL_NAME:
                         try:
-                            items = evidence_request.parse(args)
-                        except ValueError as exc:
-                            result: dict = {"error": "invalid_request", "detail": str(exc)}
+                            tasks = delegation.parse_tasks(args, domains, new_id)
+                        except delegation.BadDelegation as exc:
+                            result: dict = {"error": "invalid_delegation", "detail": str(exc)}
                         else:
-                            requests += 1
-                            result = await broker.fulfil(items)
+                            await _record_delegate(db_factory, session_id, message_id, tasks)
+                            got = await sub_analyst.run_tasks(tasks, ctx)
+                            delegated += got
+                            result = delegation.for_lead(got)
                     elif name == REPAIR_TOOL_NAME and standing is not None:
                         repl, unknown = _parse_replacements(args, standing)
                         led = await _load_ledger(db_factory, session_id)
@@ -286,7 +320,7 @@ async def handle_message(
                         result = {"error": "nothing_to_repair", "detail": "no verdict stands on a reply; write the answer"}
                     else:
                         result = {"error": "unknown_tool",
-                                  "detail": f"the analyst's tools are {evidence_request.TOOL_NAME} and {REPAIR_TOOL_NAME}; "
+                                  "detail": f"your tools are {delegation.DELEGATE_TOOL_NAME} and {REPAIR_TOOL_NAME}; "
                                             f"the answer is your reply text"}
                     messages.append({"role": "tool", "tool_call_id": tc["id"],
                                      "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
@@ -323,9 +357,10 @@ async def handle_message(
             answer, standing = text, verdict
             messages.append({"role": "user", "content": _refusal_message(verdict)})
 
-    meta: dict = {"prompt_tokens": prompt_peak, "pushed": pushed, "requests": requests,
-                  "briefing_subjects": brief.get("subjects") if isinstance(brief, dict) else None,
-                  "writer_calls": getattr(broker, "writer_calls", 0)}
+    meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
+                  "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,
+                                   "coverage": r.coverage, "cost": r.cost} for r in delegated],
+                  "briefing_subjects": brief.get("subjects") if isinstance(brief, dict) else None}
     if reply_verified is not None:
         meta["verified"] = reply_verified
     if reply_blocks is not None:

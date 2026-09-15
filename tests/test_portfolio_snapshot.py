@@ -33,9 +33,16 @@ def test_describe_is_the_no_arg_entry_point():
 
 
 def test_the_book_read_is_meta_only_not_research():
-    assert "read_book" in faces.FACE_META_AGENT
+    """V36 narrowed the meta face to the four tools a domain analyst reaches, so
+    the separation this pins is the one that still decides anything: the book
+    read is built into the registry the meta side gets and named on no face the
+    research side has. A brief-writing agent reading the holder's weights would
+    be writing about the wrong company either way."""
+    from exposure_workbench.tools.registries import build_meta_registry
+
+    assert "read_book" in build_meta_registry().tools
     assert "read_book" not in faces.FACE_RESEARCH
-    assert "describe" in faces.FACE_RESEARCH, "the catalogue is on both faces"
+    assert "describe" in faces.FACE_RESEARCH, "the catalogue is still how a brief starts"
 
 
 # ── what the snapshot declares onto the table ─────────────────────────────────

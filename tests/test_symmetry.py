@@ -58,9 +58,13 @@ def test_every_resource_column_has_a_display_name_and_a_unit():
 
 def test_describe_run_and_read_quantities_are_meta_only():
     """They answer questions about THIS DESK's book; the research face is
-    issuer-scoped by construction (faces.py)."""
+    issuer-scoped by construction (faces.py). V36: the meta face carries only
+    what a domain analyst reaches, so the meta side's claim is about its
+    registry — read_book is buildable there and named on no research face."""
+    from exposure_workbench.tools.registries import build_meta_registry
+
     for name in ("read_book",):
-        assert name in faces.FACE_META_AGENT
+        assert name in build_meta_registry().tools
         assert name not in faces.FACE_RESEARCH
 
 

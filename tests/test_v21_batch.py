@@ -190,18 +190,18 @@ def test_unparseable_arguments_are_an_empty_dict_not_a_crash():
 # ── the loops use it ──────────────────────────────────────────────────────────
 
 def test_the_research_loop_dispatches_through_the_one_module_and_the_analyst_dispatches_nothing():
-    """V33: the research loop still batches its own tool calls through this
-    module. The analyst loop makes no tool calls at all — its one tool is
-    in-process — and the evidence broker that calls the face on its behalf
-    does so one call at a time, through the transport (tools_session.call),
-    never through invoke()."""
-    from exposure_workbench.agents import evidence_broker
+    """V36: the research loop still batches its own tool calls through this
+    module. The lead analyst makes no tool calls at all — both of its tools are
+    in-process — and the domain analyst that calls the face on its behalf does
+    so one call at a time, through the transport (tools_session.call), never
+    through invoke()."""
+    from exposure_workbench.agents import sub_analyst
     src = inspect.getsource(research_session)
     assert "batch.dispatch(" in src
     assert "tools_session.call(" not in src
     meta_src = inspect.getsource(meta_agent)
     assert "batch.dispatch(" not in meta_src and "tools_session.call(" not in meta_src
-    assert "self._tools.call(" in inspect.getsource(evidence_broker)
+    assert "tools_session.call(" in inspect.getsource(sub_analyst)
 
 
 def test_the_free_names_each_loop_spells_are_its_faces_budget_free_classes():

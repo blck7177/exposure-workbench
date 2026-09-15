@@ -85,7 +85,9 @@
 
 **运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
 
-## 6. 工具面(`tools/`,V23 起 **10 + 8**)
+## 6. 工具面(`tools/`,V36 起 **4 + 6**)
+
+**V36**:meta 面收窄到 `run` · `read_filings` · `search_web` · `start` 四个。主分析师在这条面上**一个工具都不碰**——它只 `delegate`(进程内),取证由域分析师做,面名的就是域分析师伸手能够到的东西。`describe` 随它服务的"拉目录"一起离开(BRIEFING 现在是开轮推进去的),`read_book` 随之;`respond` 与 `think` 是旧的出口与旧的暂停,V33 用散文对账本核取代了前者,后者从此没人用。四个都还**注册**着(read registry 就是这么建的),但面声明的是能被伸手够到的集合——比实际宽的面是没人能依赖的审计口径。
 
 面是声明式数据(`faces.py`),缺一个工具即构建错误。**V23**:工具按**数据域 × 动词**正交——describe / read_fundamentals / read_filings / read_prices / read_book / compute / think / start / search_web / respond,meta 面 10 个,research 面 8 个(去 read_book 与 start,加 submit_brief)。原 13 个“方法工具”成为 `analytics/skill.py` 登记表里的方法,由 compute 执行;原三个定位工具合成 describe;原七条读 run 的路合成 read_book。下表按 V23 重写。**每个工具返回值要么带 id,要么是类型化拒绝**——没有第三态。**V15 起每个工具在注册时声明它的结果把什么放上桌面**(`Tool.evidence`:结果里的 id、run 子表作用域、委派任务),关口据此构造 `result["table"]`——名字 = 读者精度值——并把声明存为该步的 evidence;没有声明的工具(`get_task_status`/`list_risk_limits`/`get_run_freshness`)不产生证据。
 

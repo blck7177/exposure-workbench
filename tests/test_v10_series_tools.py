@@ -139,8 +139,12 @@ def test_the_new_tools_are_on_both_faces():
     # compute left the research face with the brief (Phase 2); they stay
     # registered, because that is what a read registry builds, but no face
     # names them.
-    for name in ("describe", "run"):
-        assert name in meta and name in research, name
+    # V36: `run` is still how both sides compute. `describe` left the meta face
+    # with the catalogue it served — the BRIEFING is pushed into the lead's turn
+    # now, not pulled — and stayed on the research face, where a brief still
+    # starts by asking what the desk holds about an issuer.
+    assert "run" in meta and "run" in research
+    assert "describe" in research and "describe" not in meta
     for name in ("read_fundamentals", "read_prices", "compute"):
         assert name not in meta and name not in research, name
 

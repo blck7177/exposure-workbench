@@ -3,6 +3,29 @@
 > 逐模块设计讨论的记录。基准架构见 [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)。
 > 模块地图与编号(M1–M13)以及全局三规则在此固定,后续每定一个模块追加一节。
 
+## M-Agents — 三个 agent 模块的职责与红线(V36,2026-09-15)
+
+一轮对话里有两种 agent：主分析师（`agents/meta_agent.py`）和每域一个的域分析师
+（`agents/sub_analyst.py`），协议与交接处的核对在 `agents/delegation.py`。
+
+**为什么拆。** V33–V35 的一轮里，"把意图翻成 desk 语言"没有主人：loop 是通才，
+域知识作为文本推给它，后面的编译器只读字段。J 轮 Q11 把 "measure room to warning
+and breach" 写在编译器不读的字段里，然后在散文里做减法，被拒两次；I 轮同一题自己
+写了 derive，算出来的数又被 digest 扣掉。V36 把这件事交给一个手里有该域 procedure
+的分析师。
+
+**四条红线（实现时逐条可查）。**
+- 主分析师不碰 program、不碰 id、不碰 MCP：它的两个工具都在进程内，face 上一个都没有。
+- 域分析师不给读者写字：它的散文只进 `analyst_reports`，`AgentMessage.content` 只来自主分析师。
+- 两处核对都只查表：`delegation.handoff_check` 与 `services/answer_check` 做集合运算与账本查表，
+  没有任何"这个数大概是那个"的推断（V34 的教训）。
+- 展示给任一 LLM 的每个值都在账本上：digest 的 held_back 铸事实，边界铸事实。
+  ROSTER 与 BRIEFING 仍不在账本上，是已知缺口（ACCEPTANCE_V33 §21）。
+
+**为什么域分析师在主分析师的轮次里跑。** 同 session、同 message、同一个 tool-face
+token。这是它取的事实落在门读的那本账上的唯一原因；另开 session 的话，主分析师写
+的每个数字都会被拒为 not_on_ledger。
+
 ## 全局设计规则(适用所有模块)
 
 - **规则 A — Fail loud at the boundary**:外部依赖缺失(key/网络/数据)或校验失败 = 该步 failed、时间线可见、run 停止。不做 mock、不做静默降级。现有 `DirectLlmAgent._mock_output` 模式不复制到任何新代码。

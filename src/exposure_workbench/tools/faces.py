@@ -38,12 +38,18 @@ READ_CORE = [
 # weights would be writing about the holder, not the issuer.
 META_ONLY_READS = ["read_book"]
 
-# V30 (Phase B): the meta face computes through ONE tool, `run`.
+# V36: the face is the SURFACE, and a surface wider than what anything reaches
+# through it is an audit statement nobody can rely on. The lead analyst has no
+# tools on this face at all now — it delegates, in-process — and a domain
+# analyst reaches exactly four: one computes (`run`, every node typed and on the
+# ledger), two read text, one puts an issuer on the desk. `describe` went with
+# the pull-catalogue it served (the BRIEFING is pushed), `read_book` with it;
+# `respond` and `think` were the old exit and the old pause, and V33 replaced
+# the first with prose against the answer check and never needed the second.
+# They stay REGISTERED — a read registry is what it is — but a face names what
+# can actually be reached.
 FACE_META_AGENT = [
-    "describe", "run", "read_filings",
-] + META_ONLY_READS + [
-    "search_web",
-    "start", "respond", "think",
+    "run", "read_filings", "search_web", "start",
 ]
 
 # V31 (Phase 2): so does the research face, and it files its brief in the same

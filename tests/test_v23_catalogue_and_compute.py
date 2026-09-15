@@ -34,8 +34,11 @@ def test_the_meta_face_is_ten_tools_by_domain_and_verb():
     # V31: both faces compute through ONE tool (run), and both file their answer
     # in one grammar. The research face is issuer-scoped by its kinds, not by
     # carrying a different set of readers.
-    assert faces.FACE_META_AGENT == [
-        "describe", "run", "read_filings", "read_book", "search_web", "start", "respond", "think"]
+    # V36: four. The lead analyst reaches none of them — it delegates, in
+    # process — and a domain analyst reaches one that computes, two that read
+    # text, and one that puts an issuer on the desk. A face wider than what is
+    # reached through it is an audit statement nobody can rely on.
+    assert faces.FACE_META_AGENT == ["run", "read_filings", "search_web", "start"]
     assert faces.FACE_RESEARCH == [
         "describe", "run", "read_filings", "search_web", "think", "submit_brief"]
     assert faces.resolve(build_meta_registry(), faces.FACE_META_AGENT) == faces.FACE_META_AGENT

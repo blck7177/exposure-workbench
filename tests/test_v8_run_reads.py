@@ -23,10 +23,14 @@ _A_TOOLS = ["read_book"]
 # ── the face ──────────────────────────────────────────────────────────────────
 
 def test_the_new_reads_are_on_the_meta_face_only():
-    meta = set(faces.resolve(build_meta_registry(), faces.FACE_META_AGENT))
+    """V36: the meta face is the four tools a domain analyst reaches, and
+    read_book is not one of them — the book's figures come through `run`, typed
+    and on the ledger. What still has to hold is the side it is built for."""
     research = set(faces.resolve(build_research_registry(), faces.FACE_RESEARCH))
     for name in _A_TOOLS:
-        assert name in meta, f"{name} must be reachable by the agent that answers about the book"
+        assert name in build_meta_registry().tools, (
+            f"{name} must be buildable for the side that answers about the book")
+        assert name not in faces.FACE_META_AGENT, f"{name} is reached by nobody since V36"
         assert name not in research, (
             f"{name} is on the research face; a brief-writing agent reading the holder's "
             "attribution is writing about the wrong company")
