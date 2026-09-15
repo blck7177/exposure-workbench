@@ -1,13 +1,13 @@
-# Architecture As Built — 2026-09-02
+# Architecture As Built — 2026-09-15
 
 > **性质**:现状快照。不变量与目标拓扑见 [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md)(v3),逐模块设计见 [MODULE_NOTES.md](MODULE_NOTES.md)(M1–M18),部署与租户见 [PRODUCTION.md](PRODUCTION.md)。本文只回答"今天有什么、怎么连、能做什么"。
-> **规模**:`src/` ~21k 行 Python、`apps/web` ~3.3k 行 TS;**1937 offline** 测试;V15(桌面)已落地,见 §7;V16(单位代数·方法登记·价格分析)与 V17(发行人自举·读法·排序)已落地,V17 待线上复核。线上 https://desk-for-one.com。
+> **规模**:`src/` ~35k 行 Python、`apps/web` ~10k 行 TS;**2487 offline** 测试(2026-09-15);V15(桌面)已落地,见 §7;V16(单位代数·方法登记·价格分析)与 V17(发行人自举·读法·排序)已落地,V17 待线上复核。线上 https://desk-for-one.com。
 
 ---
 
 ## 1. 一句话
 
-**用户只面对一个 meta-agent;它能调 41 个工具;每一个数字都能回溯到账本里的一行;模型不写数字,只写桌面上的名字(V15);算错的类别由代码消灭,选错的类别由知识降低,指错的类别由结构消灭,剩下的交给门拒绝。**
+**用户只面对一个 meta-agent;V36 起它自己不调工具——把问题拆成任务派给 14 个域分析师,域分析师在四个工具的面上取证;每一个数字都能回溯到账本里的一行;模型不写数字,只写桌面上的名字(V15);算错的类别由代码消灭,选错的类别由知识降低,指错的类别由结构消灭,剩下的交给门拒绝。**
 
 四条设计律贯穿一切(TARGET §0):**A** 边界处大声失败,无静默降级;**B** 用 schema 消灭解析规则;**C** 正交能力替代路由规则,不写问题分类器;**D**(V9 起)世界结构进代码、方法定义进数据、分析交给智能,**不存在发行人行为规则**。
 
@@ -30,8 +30,8 @@
         │ 入队 (tasks 表)                   │ bearer + JSON-RPC (仅 compose 内网)
         ▼                                 ▼
  ┌─ exposure-worker ×3 ─┐        ┌──────────── exposure-mcp ────────────┐
- │  exposure_update      │        │  /mcp/meta      41 工具                │
- │  company_readiness    │───────▶│  /mcp/research  24 工具                │
+ │  exposure_update      │        │  /mcp/meta      4 工具(V36)            │
+ │  company_readiness    │───────▶│  /mcp/research  6 工具                 │
  │  issuer_research      │        │  中间件:验 token → 绑 user/session/face │
  │  market_data_sync     │        │  Registry wrapper:入参校验·预算·轨迹落盘 │
  │  scheduled_update     │        └──────────────────┬─────────────────────┘
@@ -39,21 +39,21 @@
                                    tools → services → analytics / providers
                                                      │
                                                      ▼
-                              Postgres 16 (+pgvector)  app_rls + RLS,35 张表
+                              Postgres 16 (+pgvector)  app_rls + RLS,38 张表
                               providers:EDGAR(edgartools)· yfinance · Tavily
 ```
 
-**LLM 调用只发生在 api(meta-agent)与 worker(research 子会话)的循环里**,MCP 门后没有 completion。模型:`gpt-5.4-mini`。
+**LLM 调用只发生在 api(meta-agent 与它派出的域分析师,V36)与 worker(research 子会话)的循环里**,MCP 门后没有 completion。模型:`gpt-5.4-mini`。
 
-## 3. 数据层(35 张表,四区 + Runtime)
+## 3. 数据层(38 张表,四区 + Runtime)
 
 | 区 | 表 | 今天的规模 | 纪律 |
 |---|---|---|---|
 | **Raw** | companies(**V17 起有第二个写入者**:`company_service.admit` 从上市宇宙建行,见 §9-F5)· filings · filing_documents · market_prices · factor_prices · security_master | 10 家(8 发行人 + HYG/TLT)· 16 份申报 · 15,776 日价 · 6,601 因子价 | append-only,带 provider/retrieved_at |
 | **Normalized 证据** | filing_sections · filing_chunks(+embedding)· financial_facts · research_sources | 3,078 chunk · **62,473 事实,其中 8,352 已映射**(`mapping v3`,39 个指标)· 25 条外部来源 | raw_concept 与 normalized_metric 并存;映射不决定存储 |
 | **Calc Ledger** | calc_ledger | **25,119 行** | 每次计算一行:操作、参数、输入 refs、原语版本;**V11 起失败也铸行**(`absence.*`) |
-| **Artifact** | daily_reports · issuer_briefs · evidence_packs | 10 份 brief | LLM 产物**只**落这一区,永不回流成证据 |
-| **Runtime** | tasks · exposure_runs · research_runs · schedules · workflow_events · agent_sessions · agent_messages · agent_steps · usage_daily · users | 26 个 run · 1,273 个会话 · 3,008 步 | 轨迹 append-only |
+| **Artifact** | daily_reports · issuer_briefs · evidence_packs · analyst_reports(**V36**:域分析师的报告,过了 `answer_check` 才存正文与 blocks;refused 只存 problems) | 10 份 brief | LLM 产物**只**落这一区,永不回流成证据 |
+| **Runtime** | tasks · exposure_runs · research_runs · schedules · workflow_events · agent_sessions · agent_messages · agent_steps(**V36** 起带 `actor`:哪个 agent 走的这一步)· usage_daily · users | 26 个 run · 1,273 个会话 · 3,008 步 | 轨迹 append-only |
 | **风控配置** | portfolios · positions · risk_limits · risk_alerts · limit_checks · stress_results · factor_attributions · factor_residuals · issuer_exposures · sector_exposures · exposure_metrics | 7 个组合 · 44 个持仓 | `risk_limits` 是 mandate 的唯一真相(M16) |
 
 铁律:证据四库禁 UPDATE/DELETE;重述走新行(`restatement_key = (filing_date, accession)`);租户隔离靠 Postgres RLS(`app_rls` 角色 + `SET LOCAL`),不靠应用层过滤。
@@ -83,7 +83,7 @@
 
 **桌面与门(V15)**:`quantities`(唯一拼名)· `table`(声明/构造/加载)· `resolver`(六不变量)· `answer_blocks`(文法与渲染)· `display_conventions`(读者精度,py/ts 双向锁);`numeric_verification` 只剩 v1 散文路径(日报门)(见 §7)
 
-**运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event`
+**运行时**:`task`(租约/回收)· `agent_session` · `trace` · `context_budget`(tiktoken 计量,80k 软上限)· `usage`(quota)· `schedule` · `workflow_event` · **V36**:`digest`(域分析师读到的工具结果——值+id+place/of;扣下的图形铸 held_back 事实)· `analyst_reports`(store / load / for_message,RLS 经 agent_sessions.owner_id)
 
 ## 6. 工具面(`tools/`,V36 起 **4 + 6**)
 
@@ -123,15 +123,17 @@
 
 ## 8. Agent 层
 
-**拓扑 1 + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ research 子会话(worker 内,产 brief)。
+**拓扑 1 + n + 1,树深封顶 2**:meta-agent(api 进程内,面向用户)+ 域分析师 ×n(**V36**:同一进程、同一 session、同一 bearer,一域一个,串行;它只能 `start` 后台任务,不能再派 agent)+ research 子会话(worker 内,产 brief)。
 
-**meta-agent 循环**(`agents/meta_agent.py`):系统提示(六条不变量 + 已验证示例,V15 起含 `describe_run → read_quantities` 路径与块出口说明)+ 43 个 schema → `llm.chat` → 工具调用经 `dumps_capped`(按条目截断并声明,28KB;`table` 切片从不在此截断,它在构造器里按整表收窄)进上下文 → 直到 `respond` 过门。**V21 起一条 assistant 消息里的多个调用按序分发、每个工具止于第一次"调用本身被拒"**(`agents/batch.py`:有 `error` 且桌上无物=调用被拒,同名其余调用不发、回 `not_attempted`、不计预算;带 absence 行的拒绝是发现,不截;预算池空则其余全部不发,pause/exit 除外),两个循环共用。每次 `llm_call` 记一行(token 用量),每步一行 `agent_steps`(被截住的调用由循环记为 `rejected`)。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——知识随定位工具返回值到达。
+**meta-agent 循环**(`agents/meta_agent.py`,**V36**):系统提示 = 角色 + 一条规则;开轮推入 BRIEFING(问题主体的目录,不含数字)与 ROSTER(`skill.roster`:14 个域各能被问什么、什么缺席,按 `match_domains` 排序)→ `llm.chat` → 三个进程内工具:`delegate(tasks)`(1–4 个域,每域 1–8 行 want_to_know,同一调用内每域至多一项;不合形状回 `invalid_delegation`)、`read_report(report_id)`(派过单后才上面,只回本 session 且 verified 的报告正文)、`repair_answer`(有拒绝信悬着时 `tool_choice=required`);出口是散文,过 `answer_check`(不变)。主分析师不 import program_builder / program_service / digest,不碰 id 拼写,不经 MCP;每次 `llm_call` 记一行(带 `actor`),每步一行 `agent_steps`。**V21 的批次规则**(`agents/batch.py`:一条消息里的多个调用按序分发、止于首次"调用本身被拒")现在只有 research 会话在用。**没有路由器、没有问题分类器、没有 SKILL.md 加载器**——域知识以 ROSTER 到主分析师,以 `skill.system_text(域)` 到域分析师。
 
 **research 会话**(`agents/research_session.py` + `workflow/issuer_research_workflow.py`):readiness 前置 → 子会话在研究面上工作 → `submit_brief`(六节 × 同一块文法,同一解析器;五节各须指向证据)→ `issuer_briefs`(文本列 + `blocks` JSONB)。
 
 **ExposureWorkflow**(`workflow/exposure_workflow.py`,确定性,worker 执行):加载 → 校验 → 行情 → `calculate_exposure` → `calculate_attribution`(8 因子回归)→ `calculate_risk`(VaR/ES/压力/限额)→ `generate_report`;每步 `workflow_events`,run 三切片(metrics / attributions / alerts)。
 
-**★ V33(2026-09-13)分析师 + 证据 broker。** meta-agent 循环只剩一个进程内工具 `request_evidence(items)`(主体、目录里的名字、窗口、比较),出口是纯文本;系统提示只有角色与一条规则;第一次 completion 之前推入 BRIEFING(`services/briefing.py`:问题主体的目录——持仓的 sector、检查的档位、已 filed 的行、可算/不可算方法、就绪与在备的发行人、边界;不含任何数字)与 skill 的领域知识。`agents/evidence_broker.py` 在**同一 session、同一 message、共享本轮 tool_session** 下把请求编成 program(`services/program_builder.py` 确定性构造;不可表达时由 program 作者 LLM 读 `signature_text()` 与静态类型报告来写,最多三次),或映射为 read_filings / search_web / start;返回摘要:每个图形带 id/主体/measure/显示值/as_of/window,边界带类别(type / data_absent / budget / held_back)。**摘要里的每个值都在账本上。** 新增 step:request、digest、answer(被拒时 status=rejected)。research 子会话形状未变(列入后续);其工具结果的截断现在保留被 expand 打开的那一节(`dumps_capped(keep=)`)。
+**★ V33(2026-09-13)分析师 + 证据 broker(V33–V35 的形状;V36 删了 broker,见下)。** meta-agent 循环只剩一个进程内工具 `request_evidence(items)`(主体、目录里的名字、窗口、比较),出口是纯文本;系统提示只有角色与一条规则;第一次 completion 之前推入 BRIEFING(`services/briefing.py`:问题主体的目录——持仓的 sector、检查的档位、已 filed 的行、可算/不可算方法、就绪与在备的发行人、边界;不含任何数字)与 skill 的领域知识。`agents/evidence_broker.py` 在**同一 session、同一 message、共享本轮 tool_session** 下把请求编成 program(`services/program_builder.py` 确定性构造;不可表达时由 program 作者 LLM 读 `signature_text()` 与静态类型报告来写,最多三次),或映射为 read_filings / search_web / start;返回摘要:每个图形带 id/主体/measure/显示值/as_of/window,边界带类别(type / data_absent / budget / held_back)。**摘要里的每个值都在账本上。** 新增 step:request、digest、answer(被拒时 status=rejected)。research 子会话形状未变(列入后续);其工具结果的截断现在保留被 expand 打开的那一节(`dumps_capped(keep=)`)。
+
+**★ V36(2026-09-15)meta-agent + 按域 sub-analyst;broker 退场。**「把意图翻成 desk 语言」这一步有了主人:`agents/sub_analyst.py` 一域一个 loop,system = 该域 PROCEDURE(`skill.system_text`)+ 语言签名,读 task、主体目录与自己取的结果,工具是进程内的 `compile`(`program_builder.compile_request`,只编不跑)+ 面上的四个 + 出口 `submit(brief, report)`;每 analyst ≤8 次 completion、≤8 次证据调用,每个工具结果经 `services/digest.render` 截到 16k(值+id+place/of;扣下的图形铸 held_back 事实)。交接核对 `agents/delegation.handoff_check`(代码,不用 LLM)五查:C1 覆盖(findings ∪ not_done = 全部行号,一行不得既答又解释)、C2 finding 文本过 answer_check、C3 facts 里的 id 在账本上、C4 not_done 带的边界是 absence 事实、C5 report 过 answer_check;不过一次修复,第二次仍不过则逐条通过的照交、其余进 refused;状态 verified / partial / absent(核对过了但一条都没答)/ refused。上行两层:brief(E10,给主分析师读,`how_to_cite` 固定文案)与 report(过门后落 `analyst_reports`;`read_report` 与 GET `/agent/sessions/{sid}/reports/{rid}` 读,web 每份一枚 chip + 抽屉,refused 只显示 problems)。新 step:delegate、brief(completed / rejected)、report、boundary(域分析师铸的边界事实);`agent_steps.actor` 记谁走的(tool_call 行在 MCP 门后写,actor 为空,沟通表按"最后开口的分析师"推断并打 `~`);`scripts/v36_forensics.py` 把一轮读成节点间的沟通表 + 当步账本重放。并行(`parallel_analysts`,默认 False)推迟:seq 分配无锁会重号、tool_call 行的归属无从判定,等「每个域分析师是否拿自己的 tool session」这一个决定。A 轮(同 J 轮 20 题、同快照、同模型):出答案 9→14,主分析师 prompt 峰值中位 20k→8.2k,Q04 / Q10 / Q11 首次通过;假陈述 3→8 条——两处核对都只查表,指向正确而语义错的句子两边都放行;最大的一处缺口是 brief 的 `not_done.why` / `caveats` 展示给主分析师却不在账本上(吃掉 4 题)。记录 `docs/spikes/v36/ACCEPTANCE_V36.md`,设计稿摘要 `docs/spikes/v36/AGENT_ARCHITECTURE_V36.md`。
 
 ## 9. 用户能做什么(F1–F6 对照 TARGET §1)
 
@@ -177,3 +179,5 @@
 V2 多用户 + 生产化 → V3 harness(Verify/Context/Memory/Evals)+ 数值门 → V4 失败可解释、开销有账 → V5 量化正确性(一种价格、一次回归)→ V6 窗口够长、报告过门 → V7 公网上线 + 配额 + 门死锁修复 → V8 产物读 + `reconcile_move` + 轨迹判据 + 回撤取证 → **V9 四公理 + 公式登记 + 只铺证据** → V10 收敛(面 36→31,一种取数一种算)→ **V11 电池驱动的六处环上修复**(传输、缺席、门的文本半边、漂移检测)→ **V12 知识层**(50%→100%)→ V13–V15 桌面与门 → V16 单位代数 + 方法登记 + 价格分析(substitution 8 题 2→0)→ **V17 三处收口**:发行人自举(封闭 8 家 → 整个上市宇宙)、无量纲的读法(`multiple` 进代数,8 条杠杆/周转比率与 beta 不再显示成百分数)、排序进类型化计算(`rank`)→ **V19 三处收口**:表格/trend 的标签由槽名派生(模型不再有格子写标签,`Peak-to-trough decline | $205.10` 这类错标在结构上消失)、联网搜索进 meta 面(chat 能搜了,能力声明改口)、证据链补两个断点(fact 卡到 SEC 原文链接、run 卡到持仓)→ **V20 算而不发**:量化审计后 VaR/ES/压力情景/共线下的单个 β 从所有读取面撤下(开关在 `analytics/withheld.py`,不在 UI),保留的度量各配一句由代码常量写成的英文方法说明(`analytics/methods.py`,页面 ⓘ),`^VIX` 退出因子集 → **V21 五条残余逐条关**:批次止于首次拒绝(十次同名错调用只花一次)、`get_drawdown` 四行(减法进工具)、股数按拆股结转到 run 日(`stock_splits`)、历史 run 重拟合到七因子的脚本(dry-run 28 个,apply 待放行)、门外 critic 离线席位(段落标签的判断在门外)。 → **V22 组合量进代数**:`ref:name` 具名操作数 + `Typed.base` 轴(两本 book 不相加、book 与申报不相加、份额不乘别人的钱),`get_portfolio_analysis` 行自述类型成为代数之上的面板(parity 活库 20/20),一个情景原语 `hypothetical_book`(卖出后的 book 是一条 run 形状的行;电池 C01#t3 那问的答案是"更紧":告警 2→4)。 → **V23 目录、一个 compute、skill 三种条目**:工具按数据域×动词 44→10 一次切;`describe(subject)` 一个跨域目录带三种“缺”;46 条方法进 `analytics/skill.py`(每条 authority + fails_when)由 compute 执行,17 条读法、13 条分析程序作为数据随 describe 到达;提示词缩到契约;预算按消息计。
 - **V25**(2026-09-05):**读端补齐、两页重画**——数据库里躺着的时间维度画出来了。八个只读端点(`run-series` 按日期收敛 33 次 run 为 12 个更新、`measures` 说清每个度量能画哪些视图、`balance-series` 复用账本行、limit-book 加 `room_*`、`contribution` 上线、两处 `spans` 由端点自报、`briefs` 列历史);`snapshot` 改为按 `?portfolio=` 读那本 book 自己的最新 run,删掉"取任意 book 最新行"的查询。书页加七件:跨更新小多图(持仓/行业)、行业按行自带阈值刻度、持仓三列(Δ/对当日贡献/离线余量)+ 排序、六面板联动高亮、价值图 span + 刷选 + episode 解释、dock 内联画 series、瀑布图下 reconcile 两条恒等式。发行人页按读者提问顺序重排:身份与四个日期 → 在本 book 的一条 strip → 价格(span/benchmark/brief 竖线)→ 一张可选指标的折线图(吸收 Margins 卡、Baseline 表、Coverage 表)→ brief 摘要带写作日期。零新度量、零迁移、零 workflow 改动。
 - **V24**(2026-09-05):事实自带身份——Fact 在工具边界造一次(adapter),账本 + facts 表双写,三种块、三查表的门(零数字豁免,正文数字按账本对账否则拒),critic 与起名器的门角色删除;前端事实芯片与链接;live 三轮四问后 compute 接受 `f_` 操作数、情景可链式。
+- **V33–V35**(2026-09-13/14):chat 出口改为散文 + 数字/关系词核对(`services/answer_check.py`),分析师只请求证据、broker 编 program(V33);展示唯一性、关系即事实、逐句修复、门声明它检查了什么(V34);图形带指针——身份归 tool、指向归作者、门只查表(V35)。四轮同 20 题:出答案 4→5→11→9。
+- **V36**(2026-09-15):meta-agent + 按域 sub-analyst,broker 与作者 LLM 退场;交接核对 C1–C5;`analyst_reports` 表、`read_report` 与报告抽屉;`agent_steps.actor` 与沟通表脚本;meta 面收窄到四个。A 轮出答案 14/20、假陈述 8 条;并行推迟,等一个决定。

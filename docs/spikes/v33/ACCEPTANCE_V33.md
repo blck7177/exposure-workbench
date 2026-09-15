@@ -338,3 +338,7 @@ H 轮露出的都是 §16 设计没收干净的地方，不是新设计；按角
 - tool 展示两处：briefing 与 skill 推送不在账本上（J 轮 Q05/Q06 引用被拒）；digest 超限扣下的图形模型看不见（I 轮 Q11 的 room 事实在被扣的 163 个里，模型转而自己算）——R1 的工作单位问题。
 - validation 一处待拍板：`measure_mismatch` 去留。
 - 产品：出答案 9–11/20，通过答案里 1–3 条假陈述且都可追溯到指向的事实；未通过的 9–11 题里，模型真错（舍入、指错、自己算）占多数。
+
+---
+
+**→ 下一版:V36(2026-09-15)。**broker 与作者 LLM 退场,主分析师把问题拆成任务派给按域的 sub-analyst,交接处由代码核对(C1–C5)。同 20 题的 A 轮与本节的对照在 `docs/spikes/v36/ACCEPTANCE_V36.md`:出答案 9→14,假陈述 3→8 条;六道未答里四道死于 brief 的 `not_done.why` / `caveats` 展示给主分析师却不在账本上——即上面「展示了却不在账本上」那条换了展示面。设计稿摘要 `docs/spikes/v36/AGENT_ARCHITECTURE_V36.md`,计划 `docs/IMPLEMENTATION_PLAN_V36.md`。

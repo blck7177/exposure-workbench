@@ -156,10 +156,13 @@ meta（agents/meta_agent.py）              sub-analyst（agents/sub_analyst.py�
 - `docs/PROGRAM_LANGUAGE.md`：不变（compile 只是包装）。
 - `docs/spikes/v33/ACCEPTANCE_V33.md`：末尾加一行指向 V36。
 
+**收尾(2026-09-15,A 轮之后)**:以上五项与 `MCP_PLAN.md` 的面清单、`ARCHITECTURE_AS_BUILT.md` §1/§2/§3/§5/§8/§12 已同步;`AGENT_ARCHITECTURE_V36.md` 含一节「as built 与设计稿的偏差」。Phase 0 第 5 条的 `battery_counters.py` 三类计数(delegations / coverage / report status;另有交接拒绝按首因、completions 按 actor 分列)与 Phase 2 的 `apps/web/tests/reports.test.tsx`(chip、`panelFor`、抽屉四态;react-dom/server 静态渲染,无 DOM,点击本身归浏览器 smoke)也在这次补上;`ReportPanel` 拆成取数壳与纯视图 `ReportPanelView`。
+
 ## 5. 执行
 
 - 顺序：Phase 0 → 1a → 1b → 1c → 1d → 2 → 3 → 4；每步一个提交；Phase 1 开始前打 tag `v35-final`。
 - 需要你过目再提交的文字：14 段 `offers`；meta 与 sub-analyst 的两段 system prompt；ROSTER 的段落文案。我先起草放在 `docs/spikes/v36/WORDING.md`，你审完我再落进代码。
+  **实际(9/15)**:为不阻塞 Phase 1,三处文字按草稿直接落进了代码并随 Phase 1b/1c/1d 提交;过目单 `docs/spikes/v36/WORDING.md` 由 `scripts/v36_wording.py` 从代码原样生成(带 `文件:行`),**仍待过目**,改一处同步一处后重跑脚本。
 - 粗估工作量：Phase 0 半天；Phase 1 两到三天（1c 最重）；Phase 2 一天；Phase 3 一天含 live 测试；Phase 4 半天跑 + 一天取证。
 - 每阶段结束报告：离线测试数、live 结果、沟通表样例各一。
 

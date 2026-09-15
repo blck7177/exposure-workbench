@@ -64,8 +64,8 @@
                │  每 turn 铸 token │──────▶│  绑 user/session/message ctx │
                └────────┬─────────┘ HTTP   │       │                      │
                         │ 入队        JSON-RPC     ▼                      │
-               ┌────────▼─────────┐        │  /mcp/meta   (20 工具,物理) │
-               │ exposure-worker   │        │  /mcp/research(研究面,物理) │
+               ┌────────▼─────────┐        │  /mcp/meta   ( 4 工具,物理) │
+               │ exposure-worker   │        │  /mcp/research(6 工具,物理) │
                │  research loop    │ Bearer │       │                      │
                │  (LLM 调用在此)   │──────▶│       ▼                      │
                │  每 run 铸 token  │ HTTP   │  invoke() 六站关口(不动)    │
@@ -78,6 +78,8 @@
 
 旁路(不变):recipe / REST wrapper / workflow 代码直调 fn(代码通路,只留台账)
 侧门(不变):stdio 调试门 = 同一构造器,进程内,MCP_STDIO_USER_ID 显式身份
+
+**面清单(V36,2026-09-15)**:面是 `tools/faces.py` 里的声明式数据,缺一个工具即构建错误;图中的工具数按此读,P5 一行的「20 工具」是当时的面。meta 面收窄为 `run · read_filings · search_web · start` 四个——主分析师本人一个都不调,它只 `delegate`(进程内);四个是它派出的域分析师在同一 turn、同一 bearer 上伸手能够到的。研究面六个:`describe · run · read_filings · search_web · think · submit_brief`。`describe` / `read_book` / `respond` / `think` 仍注册在 read registry 上,但不在 meta 面上——比实际宽的面是没人能依赖的审计口径。
 封存(不变):B2 对外 OAuth——内部 JWT ≠ 对外边界,唤醒条件依旧
 ```
 
