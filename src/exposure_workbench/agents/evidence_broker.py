@@ -26,20 +26,16 @@ import json
 import logging
 from typing import Any
 
-from exposure_workbench.analytics import display_conventions as dc
-from exposure_workbench.services import claims, facts as F, ledger as ledger_svc, program_builder as pb, program_service as ps, trace_service
+from exposure_workbench.services import digest as dg, facts as F, ledger as ledger_svc, program_builder as pb, program_service as ps, trace_service
 from exposure_workbench.utils import json as ejson
 
 logger = logging.getLogger(__name__)
 
-PASSAGE_CHARS = 6_000          # of a passage's text the digest carries; the fact holds it whole
 WRITER_ATTEMPTS = 3
-# The digest is the only thing the analyst reads, so the digest owns the budget:
-# `_fit` trims rows and says what it held back. It must stay UNDER the loop's
-# message cap (meta_agent.TOOL_RESULT_LIMIT, 28 000), or that cap drops a whole
-# request's answer with no idea which — V33D lost the 30 betas a question asked
-# for and the analyst wrote "the desk truncated both requests".
-DIGEST_CHAR_LIMIT = 24_000
+# The rendering moved to services/digest in V36, where its reader stopped being
+# the lead analyst. These names stay as they were read from here.
+PASSAGE_CHARS = dg.PASSAGE_CHARS
+DIGEST_CHAR_LIMIT = dg.DIGEST_CHAR_LIMIT
 
 WRITER_SYSTEM = ("You write programs for a portfolio risk desk's calculator. You are given one evidence request and the "
                  "language below; call run_program once with a program that produces exactly the figures asked for, "
@@ -51,12 +47,7 @@ WRITER_TOOL = {"type": "function", "function": {
     "name": "run_program", "description": "Execute one analysis program.",
     "parameters": {"type": "object", "properties": {"program": ps.schema()}, "required": ["program"], "additionalProperties": False}}}
 
-HOW_TO_CITE = ("Write each figure exactly as its `value` reads here, bracket included: the bracket is the desk's id for "
-               "that reading, it is what lets the reader open the figure, and a figure written without it is refused. "
-               "A series shows its points as [date, value]: write a point's value as shown, bracket included — the bracket names the point's date. "
-               "A bracket after a quotation or a name cites that fact. "
-               "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks; "
-               "a boundary is the desk's own words for what it could not do — quote it the same way, or say it in yours.")
+HOW_TO_CITE = dg.HOW_TO_CITE
 
 
 def _kind_of(item: dict) -> str:
@@ -93,110 +84,13 @@ def _split(item: dict) -> list[tuple[str, dict]]:
     return [(k, {**item, "want": groups[k], **({} if k == "program" else {"derive": None})}) for k in order if k in groups]
 
 
-def _reading_of(fig: dict) -> tuple:
-    return (fig.get("subject"), fig.get("measure"), fig.get("as_of"), str(fig.get("value")))
-
-
-def _tell_apart(items: list[dict]) -> None:
-    """A — ONE READING IS SHOWN ONCE. Across the whole digest, a reading fetched
-    twice (V33D: one series asked for twice, 240 refusals) collapses to one entry
-    naming the other ids: they are the same figure.
-
-    What tells two readings apart is the id each is shown under, which the
-    analyst writes after the figure. V34 put a date into the shown value when
-    two readings of one subject read alike, and round G showed the collision
-    that matters is two SUBJECTS reading alike (nine issuers share a 15.0%
-    warning tier): no suffix short of the id itself tells those apart."""
-    seen: dict[tuple, dict] = {}
-    for e in items:
-        kept = []
-        for f in e.get("figures") or []:
-            key = _reading_of(f)
-            first = seen.get(key)
-            if first is None:
-                seen[key] = f
-                kept.append(f)
-            else:
-                first.setdefault("also", []).append(f["id"])    # the same reading, fetched twice
-        e["figures"] = kept
-
-
-def _fit(digest: dict, limit: int, mint=None) -> dict:
-    """The digest within its cap by holding back the TAIL ROWS of the largest
-    figure list, then trimming passage texts — never a whole item. V33D: two
-    items of 96 and 30 figures ran past the cap, dumps_capped dropped an item
-    whole, and the analyst wrote 'the desk truncated both requests'."""
-    def size() -> int:
-        return len(ejson.dumps(digest))
-    items = digest.get("items") or []
-    guard = 0
-    while size() > limit and guard < 200:
-        guard += 1
-        biggest = max(items, key=lambda e: len(e.get("figures") or []), default=None)
-        if biggest is None or len(biggest.get("figures") or []) <= 5:
-            break
-        figs = biggest["figures"]
-        cut = max(1, len(figs) // 10)
-        dropped, biggest["figures"] = figs[-cut:], figs[:-cut]
-        note = next((b for b in biggest["boundaries"] if b.get("class") == "held_back" and b.get("by") == "digest"), None)
-        if note is None:
-            text = ("figures computed and on the ledger but not shown here: the request was too wide for one "
-                    "digest; ask again for the names you need")
-            # a fact, like every other text the analyst reads (round H refused its quotation)
-            note = mint(text, cls="held_back") if mint else {"class": "held_back", "text": text}
-            note.update({"by": "digest", "count": 0, "measures": []})
-            biggest["boundaries"].append(note)
-        note["count"] += len(dropped)
-        note["measures"] = sorted({f"{f.get('subject')}:{f.get('measure')}" for f in dropped} | set(note["measures"]))[:30]
-    guard = 0
-    while size() > limit and guard < 50:
-        guard += 1
-        longest = max((p for e in items for p in (e.get("passages") or [])), key=lambda p: len(p.get("text") or ""), default=None)
-        if longest is None or len(longest.get("text") or "") <= 800:
-            break
-        longest["text"] = longest["text"][: max(800, len(longest["text"]) // 2)]
-        longest["shown_chars"] = len(longest["text"])
-    return digest
-
-
-def _merge(into: dict, part: dict) -> dict:
-    for k in ("figures", "series", "passages", "started", "boundaries"):
-        into[k] = list(into.get(k) or []) + list(part.get(k) or [])
-    for k in ("program", "nodes"):
-        if part.get(k) is not None:
-            into[k] = part[k]
-    return into
-
-
-def _cited(shown: Any, fid: str) -> str:
-    """The form the analyst copies: the figure as displayed, then the id it is
-    shown under. One string, so writing it as shown is writing it pointed."""
-    return f"{shown} [{fid}]"
-
-
-def _stamp_ids(items: list[dict]) -> None:
-    """Every shown figure ends with the id it is shown under — a scalar's value,
-    a series' points (the series' one id on each). After the collapse, so the
-    collapse compares readings and not brackets."""
-    for e in items:
-        for f in e.get("figures") or []:
-            f["value"] = _cited(f["value"], f["id"])
-        for sr in e.get("series") or []:
-            # a series has one id; its bracket names the point: `[f_…@2025-12-31]`
-            for key in ("first", "last"):
-                if isinstance(sr.get(key), list) and len(sr[key]) == 2:
-                    sr[key] = [sr[key][0], _cited(sr[key][1], f"{sr['id']}@{sr[key][0]}")]
-            if sr.get("points"):
-                sr["points"] = [[p, _cited(v, f"{sr['id']}@{p}")] for p, v in sr["points"]]
-
-
-def _display(value: Any, unit: str | None) -> Any:
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        try:
-            return dc.display(float(value), unit) if unit else value
-        except Exception:  # noqa: BLE001 — a unit display has no business failing a digest
-            return value
-    return value
+_reading_of = dg._reading_of
+_tell_apart = dg.tell_apart
+_fit = dg.fit
+_merge = dg.merge
+_cited = dg.cited
+_stamp_ids = dg.stamp_ids
+_display = dg.display
 
 
 class Broker:
@@ -389,98 +283,13 @@ class Broker:
         return res if isinstance(res, dict) else {"error": "tool_transport_error", "detail": str(res)[:200]}
 
     def _absorb(self, entry: dict, res: dict, subject: str | None = None) -> None:
-        """A tool result into the digest: figures, series, passages, tasks and
-        boundaries — every one from the result's facts block, so every value
-        the analyst reads is on the ledger."""
-        if not isinstance(res, dict):
-            return
-        if res.get("error") and "facts" not in res:
-            cls = {"budget_exceeded": "budget", "type_errors": "type", "malformed_program": "type",
-                   "not_prepared": "data_absent", "company_not_found": "data_absent", "not_listed": "data_absent",
-                   "not_indexed": "data_absent", "active_run_exists": "data_absent", "not_investigable": "data_absent",
-                   "not_an_sec_filer": "data_absent"}.get(res["error"], "error")
-            text = res.get("detail") or res["error"]
-            if res.get("problems"):
-                text += " — " + "; ".join((p.get("fix") or p.get("detail") or p.get("reason", "")) for p in res["problems"][:3] if isinstance(p, dict))
-            entry["boundaries"].append(self._boundary(str(text), cls=cls, code=res["error"], subject=subject))
-            return
-        if res.get("enqueued"):
-            entry["started"].append({"kind": res.get("kind"), "subject": res.get("ticker") or res.get("portfolio_id") or subject,
-                                     "task": res.get("task_id") or res.get("run_id")})
-        block = res.get("facts") or {}
-        cols, rows = block.get("columns") or [], block.get("rows") or []
-        for row in rows:
-            rec = dict(zip(cols, row))
-            params = rec.get("params") or {}
-            kind = rec.get("kind")
-            if kind == "scalar":
-                fig = {"id": rec["id"], "subject": rec.get("subject"), "measure": rec.get("measure"),
-                       "value": _display(rec.get("value"), rec.get("unit")), "unit": rec.get("unit"), "as_of": rec.get("as_of")}
-                if rec.get("window"):
-                    fig["window"] = rec["window"]
-                for k in ("node", "rank", "op", "label", "method"):
-                    if params.get(k) is not None:
-                        fig[k] = params[k]
-                entry["figures"].append(fig)
-            elif kind == "series":
-                val = rec.get("value") or {}
-                pts = val.get("points") if isinstance(val, dict) else None
-                s = {"id": rec["id"], "subject": rec.get("subject"), "measure": rec.get("measure"), "unit": rec.get("unit"),
-                     "n": (val.get("n") if isinstance(val, dict) else None), "node": params.get("node")}
-                if pts:
-                    s["first"], s["last"] = [pts[0][0], _display(pts[0][1], rec.get("unit"))], [pts[-1][0], _display(pts[-1][1], rec.get("unit"))]
-                    if len(pts) <= 12:
-                        s["points"] = [[p, _display(v, rec.get("unit"))] for p, v in pts]
-                entry["series"].append(s)
-            elif kind == "passage":
-                val = rec.get("value")
-                text = val.get("text") if isinstance(val, dict) else (val if isinstance(val, str) else "")
-                entry["passages"].append({"id": rec["id"], "subject": rec.get("subject"), "title": rec.get("measure"),
-                                          "text": (text or "")[:PASSAGE_CHARS], "chars": len(text or ""),
-                                          **({k: v for k, v in params.items() if k in ("item", "form_type", "accession", "url", "source_url")})})
-            elif kind == "absence":
-                err = params.get("error") or ((params.get("root") or {}).get("error") if isinstance(params.get("root"), dict) else None)
-                if params.get("reason") in ("not_held", "cannot"):
-                    cls = "data_absent"
-                else:
-                    cls = "type" if err in claims.SPELLING_REFUSALS else "data_absent"
-                entry["boundaries"].append({"class": cls, "fact": rec["id"], "node": params.get("node"), "code": err,
-                                            "text": str(rec.get("value") or "")[:400]})
-            elif kind == "task":
-                entry["started"].append({"task": rec["id"], "text": str(rec.get("value") or "")[:200]})
-        nodes = res.get("nodes")
-        if isinstance(nodes, dict):
-            entry["nodes"] = [n for n in nodes if not str(n).startswith("_")]
-        if res.get("held_back"):
-            entry["boundaries"].append({**self._boundary(f"{res['held_back'].get('count')} more figures were computed and not shown; "
-                                                         f"request fewer names, or name the ones you need", cls="held_back"),
-                                        "measures": res["held_back"].get("measures", [])[:20]})
+        dg.absorb(entry, res, subject=subject, mint=self._boundary)
 
     def _boundary(self, text: str, *, want: Any = None, subject: str | None = None, cls: str = "boundary",
                   code: str | None = None, nearest: list | None = None) -> dict:
-        """WHAT THE DESK COULD NOT DO, AS A FACT. Minted here and recorded with the
-        digest, so the words the analyst reads are on the ledger like any other
-        text this turn holds: quotable, openable, checkable. Round G refused the
-        analyst for quoting a boundary verbatim, because the boundary had been
-        shown and never recorded (ACCEPTANCE_V33 §14.3)."""
-        measure = want if isinstance(want, str) else (", ".join(str(w) for w in (want or [])) or "request")
-        params: dict = {"reason": "cannot", "class": cls}
-        if code:
-            params["code"] = code
-        if want:
-            params["want"] = want
-        f = F.fact(F.ABSENCE, measure[:200], subject=subject, text=(text or "the desk could not fulfil this")[:600],
-                   as_of="n/a", params=params, standalone=False, group="boundary")
-        self._minted.append(f)
-        entry = {"class": cls, "fact": f.id, "text": f.text}
-        if code:
-            entry["code"] = code
-        if want:
-            entry["want"] = want
-        if nearest:
-            entry["nearest"] = nearest[:4]
-        if subject:
-            entry["subject"] = subject
+        """A boundary minted and kept, so the digest step records it (services/digest)."""
+        entry, fact = dg.boundary(text, want=want, subject=subject, cls=cls, code=code, nearest=nearest)
+        self._minted.append(fact)
         return entry
 
     async def _record(self, step_type: str, args: dict, summary: str, facts: list | None = None) -> None:
@@ -498,8 +307,7 @@ class Broker:
 
 
 def _empty(item: dict) -> dict:
-    return {"request": {k: item.get(k) for k in ("subjects", "want", "window", "compare", "derive", "ask") if item.get(k)},
-            "figures": [], "series": [], "passages": [], "started": [], "boundaries": []}
+    return dg.empty(item)
 
 
 def _boundary_text(item: dict, hint: dict | None) -> str:
