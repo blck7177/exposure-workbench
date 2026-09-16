@@ -432,7 +432,28 @@ HOW_TO_CITE = (
     "read that book, put the id among the subjects of its task. "
     "`shown` appears only when an analyst filed nothing: the figures it was shown before it ran out, on the "
     "ledger and yours to write exactly as they read there — or to ask another analyst about. "
+    "`caveats` say where a finding is not quite the line you asked — readings on other dates, another spacing, a "
+    "proxy in place of the thing you named — and each belongs beside the figure it qualifies: a finding stated "
+    "without its caveat is not what the analyst found. "
     "`read_report(report_id)` opens an analyst's full report.")
+
+
+# WHAT THE LEAD IS HANDED, AND WHICH HALF OF IT HAS TO BE EXPLAINED (V37/A3).
+#
+# `caveats` has been in this payload since V36 Phase 1 and the lead's own
+# instructions never named it. Four of round B's false statements are an analyst
+# writing the truth into that field — "came back on quarter-end dates rather than
+# three year-end dates" — and the lead writing the finding without it. A field
+# nobody is told about is a field nobody reads, and nothing in the code required
+# anybody to be told.
+#
+# So the keys are partitioned here and a test holds the halves apart: a key the
+# lead has to act on must be explained in its system text, and a key added later
+# is one or the other BY DECLARATION. `domain`, `task_id` and `cost` are the
+# turn's bookkeeping — the trace and the counters read them, the lead does not.
+FOR_THE_LEAD_TO_READ = ("status", "coverage", "findings", "not_done", "refused",
+                        "caveats", "follow_ups", "made", "shown", "report_id")
+LEADS_BOOKKEEPING = ("domain", "task_id", "cost")
 
 
 def for_lead(results: list[AnalystResult]) -> dict:

@@ -11,6 +11,7 @@ brief rather than a lost one.
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -105,6 +106,13 @@ def _run_result(facts):
                                                None, f.params, []] for f in facts]}}
 
 
+def _user_blocks(content: str) -> dict:
+    """The analyst's user message, by tag (V37/A3: each block says what it is,
+    where it came from and what to do with it)."""
+    return {tag: json.loads(body) for tag, body in
+            re.findall(r"<(\w+)[^>]*>\s*(.*?)\s*</\1>", content, re.S)}
+
+
 def _submit(findings, not_done=(), report_text="ok"):
     return ("submit", {"brief": {"findings": findings, "not_done": list(not_done)},
                        "report": {"title": "t", "text": report_text}})
@@ -117,7 +125,7 @@ async def test_the_analyst_reads_its_domain_the_language_and_the_numbered_task()
     llm = _Llm([("", None)])
     await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm))
     system = llm.seen[0]["messages"][0]["content"]
-    user = json.loads(llm.seen[0]["messages"][1]["content"])
+    user = _user_blocks(llm.seen[0]["messages"][1]["content"])
     assert "book_limits_and_triggers analyst" in system
     assert "room below zero is a check already in warning" in system      # the domain's own knowledge
     assert "SIGNATURES" in system or "fn" in system                       # the language
@@ -131,7 +139,7 @@ async def test_it_is_handed_the_desks_map_for_its_own_subjects_only():
                 "issuers": {"MSFT": {"sector": "Technology"}}}
     llm = _Llm([("", None)])
     await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, briefing=briefing))
-    user = json.loads(llm.seen[0]["messages"][1]["content"])
+    user = _user_blocks(llm.seen[0]["messages"][1]["content"])
     assert list(user["subjects"]) == ["port_001"]
     assert user["boundaries"]
 
@@ -457,7 +465,7 @@ async def test_the_books_an_analyst_built_reach_the_lead_and_a_calc_subject_is_e
     # the next analyst, handed that id as a subject, is told what it is
     llm2 = _Llm([("", None)])
     await sa.run_sub_analyst(_task(subjects=("calc_after1",)), _ctx(_Tools({}), llm2))
-    user = json.loads(llm2.seen[0]["messages"][1]["content"])
+    user = _user_blocks(llm2.seen[0]["messages"][1]["content"])
     assert user["subjects"]["calc_after1"]["kind"] == "scenario"
     assert dl.parse_tasks({"tasks": [{"domain": "book_limits_and_triggers", "subjects": ["calc_after1"],
                                       "want_to_know": ["re-run every check on that book"]}]},

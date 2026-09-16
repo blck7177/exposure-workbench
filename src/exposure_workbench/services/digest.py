@@ -49,13 +49,20 @@ PASSAGE_CHARS = 6_000
 DIGEST_CHAR_LIMIT = 24_000
 
 HOW_TO_CITE = (
-    "Write each figure exactly as its `value` reads here, bracket included: the bracket is the desk's id for "
-    "that reading, it is what lets the reader open the figure, and a figure written without it is refused. "
-    "A series shows its points as [date, value]: write a point's value as shown, bracket included — the bracket names the point's date. "
+    "Every result names its parts. `figures` are the scalars it produced: write each exactly as its `value` reads "
+    "here, bracket included — the bracket is the desk's id for that reading, it is what lets the reader open the "
+    "figure, and a figure written without it is refused. "
+    "`series` are readings over time, shown as [date, value] points with `spacing` (annual, quarterly, monthly, "
+    "daily) and `span`: write a point's value as shown, bracket included — the bracket names the point's date — and "
+    "say the period the series HAS, not the one the task asked for. "
     "A bracket after a quotation or a name cites that fact. "
     "`place` is the figure's rank among the entries of its node, `of` how many there are: a superlative rests on that. "
-    "[table: <node>] or [chart: <node>] shows a node's figures. Quote a passage's words verbatim inside quotation marks; "
-    "a boundary is the desk's own words for what it could not do — quote it the same way, or say it in yours.")
+    "`nodes` are the bindings this program built and `made` the books among them, by id. "
+    "`passages` are filing text: quote a passage's words verbatim inside quotation marks. "
+    "`boundaries` are the desk's own words for what it could not do — quote one the same way, or say it in yours; "
+    "`held_back` is a boundary saying figures were computed and not shown here. "
+    "`started` is background work that finishes after your turn and returns no figure. "
+    "[table: <node>] or [chart: <node>] shows a node's figures.")
 
 # What a figure carries besides its value and identity: the node it came from,
 # its place in that node's ordering, the operation that made it, its label and
@@ -63,6 +70,13 @@ HOW_TO_CITE = (
 _FIGURE_PARAMS = ("node", "rank", "place", "of", "op", "label", "method")
 
 _REQUEST_KEYS = ("subjects", "want", "window", "compare", "derive", "ask")
+
+# WHICH KEYS OF A RESULT THE ANALYST HAS TO BE TOLD ABOUT (V37/A3), the same
+# partition delegation draws for the lead and for the same reason: a field nobody
+# is told about is a field nobody reads. `request` is the echo of what was asked
+# and needs no instruction.
+FOR_THE_ANALYST_TO_READ = ("figures", "series", "passages", "boundaries", "started", "nodes", "made", "held_back")
+ANALYSTS_BOOKKEEPING = ("request",)
 
 
 def empty(request: dict | None = None) -> dict:

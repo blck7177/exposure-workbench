@@ -63,8 +63,15 @@ needed for one question: send them in one call. Ask again only for what the answ
 a program or a fact id — that is the analyst's job and the reason you have one. Check the question's premises against \
 the BRIEFING first (which holdings are in which sector, what the desk holds).
 
-Each analyst comes back with a finding for each of your lines, what it could not do — with the desk's own words \
-for it beside the line as `said`, under an id — and a report id. Your reply is plain prose, and every number you write is one an analyst showed you, written exactly \
+Each analyst comes back under a `<analysts>` tag, and every part of it is named: `coverage` counts the lines it \
+settled, `findings` holds one finding per line it settled, `not_done` says what stopped each line it could not — with the \
+desk's own words for it beside the line as `said`, under an id — `refused` names a line whose figures did not pass \
+the desk's check, `caveats` say where a finding is not quite the line you asked (readings on other dates, another \
+spacing, a proxy in place of the thing you named), `follow_ups` are what it would ask next, `made` is a book it built \
+this turn, `shown` appears only when it filed nothing and lists the figures it was shown anyway, and `status` and \
+`report_id` say how it ended and where its full reading is. A CAVEAT BELONGS BESIDE THE FIGURE IT QUALIFIES: a \
+finding stated without its caveat is not what the analyst found, and saying so is not a hedge — it is the reading. \
+Your reply is plain prose, and every number you write is one an analyst showed you, written exactly \
 as it was shown, bracket included: 16.0% [f_2592baab170e]. The bracket is the desk's id for that reading; it is what \
 lets the reader open the figure, and a figure written without it is refused. A table or a chart is [table: <node>] or \
 [chart: <node>], naming a node from the evidence. Quotation marks are for text that came to you under an id: a passage's words, or \
@@ -103,6 +110,18 @@ MAX_ANSWER_ATTEMPTS = 2
 _BUDGET_FREE_TOOLS = (delegation.DELEGATE_TOOL_NAME, delegation.READ_REPORT_TOOL_NAME, "repair_answer")
 
 _WRITE_OR_ASK = "Write the answer, or delegate for the evidence you still need."
+
+# THE TWO BLOCKS PUSHED TO THE LEAD (V37/A3). Each was a one-line heading over raw
+# JSON, which leaves the reading of a block to the field names inside it — and a
+# field nobody is told about is a field nobody reads (delegation.FOR_THE_LEAD_TO_
+# READ). A tag with `source` and `use` is what the current prompting guidance asks
+# for when one prompt mixes instructions, context and variable input, which this
+# one does. Named rather than inlined so the wording sheet reads the same object
+# the turn sends (scripts/v36_wording.py), and so a reviewer has one thing to read.
+BRIEFING_TAG = ('<briefing source="the desk\'s catalogue" trust="names, dates and coverage only — no figure here may '
+                'be stated until an analyst returns it" use="pick the subjects; check the question\'s premises">')
+ROSTER_TAG = ('<roster source="the desk\'s own knowledge, by domain" use="pick the analyst by what you need to know, '
+              'not by the words of the question; each entry says what it can be asked for and what is absent there">')
 
 # C — THE REPAIR IS A TOOL. Round G: 18 refused replies got a second chance, one
 # used the tagged-lines protocol, four re-sent the refused text byte for byte and
@@ -295,10 +314,18 @@ async def handle_message(
         history = await _load_history(db, session_id)
 
     brief = await _briefing(db_factory, user_text)
+    # EVERY BLOCK SAYS WHAT IT IS, WHO IT CAME FROM AND WHAT TO DO WITH IT
+    # (V37/A3). Each was a one-line heading over raw JSON, which leaves the
+    # reading of a block to the field names inside it — and a field nobody is told
+    # about is a field nobody reads (see delegation.FOR_THE_LEAD_TO_READ). A tag
+    # with `source` and `use` is what the current prompting guidance asks for when
+    # one prompt mixes instructions, context and variable input, which this one
+    # does; no template engine, because the thing to fix is what is said about a
+    # block, not how the string is built.
     messages: list[dict] = [{"role": "system", "content": _SYSTEM},
-                            {"role": "system", "content": "BRIEFING — the desk's map for this question (names, dates and coverage; "
-                                                          "no figure here may be stated until it is requested):\n"
-                                                          + json.dumps(brief, ensure_ascii=False, default=str)}]
+                            {"role": "system", "content":
+                             BRIEFING_TAG + "\n" + json.dumps(brief, ensure_ascii=False, default=str)
+                             + "\n</briefing>"}]
     # WHO CAN BE ASKED WHAT. Not the desk's knowledge — that is each domain
     # analyst's, and handing the lead the vocabulary is what let V35's analyst
     # write requests in a language it did not have to answer for. Ordered by the
@@ -307,9 +334,7 @@ async def handle_message(
     # scores badly is exactly the one whose domain has to be found by reading.
     roster = skill.roster(user_text if get_settings().push_domains else None)
     messages.append({"role": "system", "content":
-                     "ROSTER — the desk's domain analysts: what each one can be asked for, and what is absent there. "
-                     "Pick by what you need to know, not by the words of the question:\n"
-                     + json.dumps(roster, ensure_ascii=False)})
+                     ROSTER_TAG + "\n" + json.dumps(roster, ensure_ascii=False) + "\n</roster>"})
     messages += history
 
     reply_text, reply_citations = None, []
@@ -418,6 +443,12 @@ async def handle_message(
                         result = {"error": "unknown_tool",
                                   "detail": f"your tools are {delegation.DELEGATE_TOOL_NAME} and {REPAIR_TOOL_NAME}; "
                                             f"the answer is your reply text"}
+                    # A TOOL RESULT KEEPS ITS OWN SHAPE. The two system blocks are
+                    # prose and take a tag; this is JSON, and the thing that says
+                    # what to do with it is a field IN it — `how_to_cite`, which
+                    # E10 has carried since V36 and which now names `caveats` and
+                    # `shown`. Wrapping it in a tag would make every reader of a
+                    # tool result unwrap one, to say what the payload can say.
                     _append({"role": "tool", "tool_call_id": tc["id"],
                              "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
                 if reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:

@@ -100,6 +100,16 @@ request the evidence a fix needs first if you were not shown the figure."""
 
 _WRITE_OR_ASK = "File your brief with submit, or get the evidence you still need."
 
+# THE THREE BLOCKS HANDED TO ONE ANALYST (V37/A3), each saying what it is, where
+# it came from and what to do with it. Named for the same reason the lead's are
+# (agents/meta_agent): the wording sheet reads the object the turn sends.
+TASK_TAG = ('<task source="the desk\'s lead analyst" use="answer every numbered line of want_to_know, or say what '
+            'stopped it">')
+SUBJECTS_TAG = ('<subjects source="the desk\'s catalogue" trust="names, dates and coverage only — no figure here" '
+                'use="the names and dates your programs may use">')
+BOUNDARIES_TAG = ('<boundaries source="the desk\'s own limits" use="what this desk will not do, whatever the task '
+                  'says">')
+
 
 @dataclass
 class TurnContext:
@@ -186,9 +196,11 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
          # turn of round B — which dilutes the reading and breaks the prompt's
          # stable prefix without saying anything new.
          + "\n\nHOW EVERY RESULT IS READ\n" + dg.HOW_TO_CITE},
-        {"role": "user", "content": json.dumps(
-            {"task": task.as_dict(), "subjects": _subjects_of(task, ctx.briefing),
-             "boundaries": list(ps.BOUNDARIES)}, ensure_ascii=False, default=str)},
+        {"role": "user", "content":
+         TASK_TAG + "\n" + json.dumps(task.as_dict(), ensure_ascii=False, default=str) + "\n</task>\n"
+         + SUBJECTS_TAG + "\n" + json.dumps(_subjects_of(task, ctx.briefing), ensure_ascii=False, default=str)
+         + "\n</subjects>\n"
+         + BOUNDARIES_TAG + "\n" + json.dumps(list(ps.BOUNDARIES), ensure_ascii=False) + "\n</boundaries>"},
     ]
     tools = [COMPILE_TOOL] + _face_tools(ctx.tools_session) + [dl.SUBMIT_TOOL]
     standing: dl.HandoffVerdict | None = None           # a verdict on a submission, awaiting its replacement

@@ -76,10 +76,17 @@ def build() -> str:
     assert cite == delegation.HOW_TO_CITE and woa == sub_analyst._WRITE_OR_ASK
     assert offers == skill._OFFERS and set(offers) == set(skill.PROCEDURES)
 
-    src = (ROOT / "src/exposure_workbench/agents/meta_agent.py").read_text(encoding="utf-8")
-    m = re.search(r'"ROSTER — [^"\n]*"\s*\n\s*"[^"\n]*"', src)
-    roster_head = "".join(ast.literal_eval(s) for s in re.findall(r'"[^"\n]*"', m.group(0)))
-    roster_ln = _line_of("src/exposure_workbench/agents/meta_agent.py", '"ROSTER — ')
+    # V37/A3: the pushed blocks are tagged now — each says where it came from and
+    # what to do with it — and the tags are named constants, so this reads the same
+    # objects the turn sends instead of scraping the assembly.
+    brief_ln, brief_tag = _const("src/exposure_workbench/agents/meta_agent.py", "BRIEFING_TAG")
+    roster_ln, roster_tag = _const("src/exposure_workbench/agents/meta_agent.py", "ROSTER_TAG")
+    tags = [("meta_agent.BRIEFING_TAG", brief_ln, brief_tag), ("meta_agent.ROSTER_TAG", roster_ln, roster_tag)]
+    for name in ("TASK_TAG", "SUBJECTS_TAG", "BOUNDARIES_TAG"):
+        ln, text = _const("src/exposure_workbench/agents/sub_analyst.py", name)
+        tags.append((f"sub_analyst.{name}", ln, text))
+    assert brief_tag == meta_agent.BRIEFING_TAG and roster_tag == meta_agent.ROSTER_TAG
+    roster_head = "\n\n".join(f"{n}  (…:{ln})\n{t}" for n, ln, t in tags)
     cap_needle = "a cap the mandate does not define has no check and no room"
     cap_ln = _line_of("src/exposure_workbench/analytics/skill.py", cap_needle)
     cap_line = (ROOT / "src/exposure_workbench/analytics/skill.py").read_text(encoding="utf-8").splitlines()[cap_ln - 1]
@@ -98,7 +105,7 @@ def build() -> str:
     L.append("---\n")
     L.append(f"## A. 主分析师(meta)的 system prompt — `src/exposure_workbench/agents/meta_agent.py:{meta_ln}`\n")
     L.append("```text\n" + meta_sys + "\n```\n")
-    L.append(f"### A2. ROSTER 段落的引语 — `meta_agent.py:{roster_ln}`(其后接 `skill.roster()` 的 JSON)\n")
+    L.append(f"### A2. 两块推送上下文的标签(V37/A3:每块说清它是什么、来自谁、拿它做什么)— `meta_agent.py:{roster_ln}` 一带\n")
     L.append("```text\n" + roster_head + "\n```\n")
     L.append("ROSTER 里一条的实际形状(`skill.roster()`,以 book_limits_and_triggers 为例):\n")
     L.append("```json\n" + json.dumps(roster_sample, ensure_ascii=False, indent=1) + "\n```\n")
