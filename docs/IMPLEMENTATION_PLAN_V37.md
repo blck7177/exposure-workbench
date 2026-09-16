@@ -257,7 +257,7 @@
 | **D** ✅ 组装层 | T5 → T2 → A2 → A1 → A3 | `digest.py`、`sub_analyst.py`、`delegation.py`、`meta_agent.py`、`v36_wording.py`、`tests/test_v37_context_labels.py` | 已完成 `32f9ee6`…`1d81118` |
 | **E** ✅ skill | K1（测试先红后绿）→ K3 → K4 → K2 | `skill.py`、`tests/test_v37_offers.py`、`test_v30_skill_programs.py`（live） | 已完成 `b7600cb` |
 | **过目门** | `WORDING.md` 一次过目：A1 三句、K1 十四域 offers、K3 两条 Reading、K4 三句；改一处同步一处后重跑脚本 | `docs/spikes/v36/WORDING.md` | 一次 |
-| **F** C 轮实测 | 同 B 轮条件（fixture、20 题、gpt-5.4-mini、并发 5、deny submit_brief），冻结代码；产出 ACCEPTANCE_V37 + 按域表 + 沟通表 | `docs/spikes/v37/` | 半天跑 + 一天读 |
+| **F** ✅ C 轮实测 | 同 B 轮条件（fixture、20 题、gpt-5.4-mini、并发 5、deny submit_brief），冻结代码；产出 ACCEPTANCE_V37 + 按域表 + 沟通表；另按用户指示同码跑 gpt-5.6-sol 对照 | `docs/spikes/v37/` | 已跑（2026-09-16），见 §3.4 |
 
 顺序的理由：A 是四处一行级且证据最硬（两题、抽屉、归属）；B 是唯一能压假陈述条数的一层，且有回归语料可以离线证明不误伤；C 决定 book 域的交付率（B 轮 13/20 题的后半句派到 book 域）；D、E 按草稿推进、离线测试全绿即提交，措辞的过目门只设一道，在 F 之前。每阶段一个或几个提交，离线全绿；Phase A 前给 `8834583` 打 tag `v36.1-final`。
 
@@ -326,6 +326,18 @@ credit_spreads_widen / equity_down——Q16 用三种拼法要的 "market" 从�
 `docs/spikes/v36/WORDING.md` 已重生成（新增 A2 五个标签、B4 digest 读法两节，状态行
 写明 V37 动了哪四处、新增哪两处）。待过目：主分析师那段（A1）、`HOW_TO_CITE` 两处、
 五个标签、14 段 offers 中改动的两域、两条 Reading 与三句知识。过目之后才跑 Phase F。
+
+## 3.4 Phase F 的实测（2026-09-16）
+
+过目门未过：用户指示 push 之后直接跑 F，本轮用的是 `WORDING.md` 里的草稿措辞。第一次尝试因 OpenAI 余额为零全部失败，充值后重跑；同一套代码又按用户指示用 gpt-5.6-sol 跑了一遍对照。记录在 `docs/spikes/v37/ACCEPTANCE_V37.md`。
+
+| | B | C mini | C sol |
+|---|---|---|---|
+| 出答案 | 15 | 13 | 18 |
+| 假陈述 条 / 题 | 12 / 10（含本次更正） | 10 / 5 | 5 / 3 |
+| 轮内崩溃 | 0 | 1 | 0 |
+
+mini 不过线，不回滚。查表与协议类修法在各自瞄准的题上成立（T1、T2、T4、T6、M1、K1、K3、K4、V3、V5）；V1 不成立，V4、V6 各有一处误报；**A2 在修复分支上有一处回归，第二次原样重发让本轮崩溃**（Q13）。mini 七道未答题里五道的首要死因是门的误报，误报分八类、漏报分五类，清单与下一步在验收记录 §8、§9。
 
 ## 4. C 轮验收线（对照 B）
 

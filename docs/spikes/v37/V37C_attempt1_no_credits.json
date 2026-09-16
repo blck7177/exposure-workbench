@@ -1,0 +1,342 @@
+[
+ {
+  "tag": "Q01-amzn-earnings-quality",
+  "session_id": "sess_b1b5996a3917",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Is Amazon's earnings quality deteriorating? Put operating cash flow beside net income for the last eight quarters, show the accruals ratio trend, tell me whether receivables and inventory are growing faster than revenue over the same windows, and say what that means for the size of our AMZN position.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 6.4,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q02-xom-room-if-oil-falls",
+  "session_id": "sess_c3eba2fad448",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "How much room does Exxon have if oil falls? Give net debt to EBITDA, EBIT interest coverage and FCF to debt for the latest four quarters against the same four a year earlier, read what the 10-K says about debt maturities and floating-rate exposure, and relate that to our XOM weight and the book's beta to USO.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 6.6,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q03-nvda-where-cash-goes",
+  "session_id": "sess_1cbf6c1cd4a6",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Where does NVIDIA's cash go? Capex, buybacks, dividends and SBC over the trailing twelve months, each as a share of operating cash flow, how each share has moved over three years, and whether the filing states how much buyback authorization remains.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 6.3,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q04-lly-margin-pricing-mix-cost",
+  "session_id": "sess_647cca9851d7",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Is Lilly's margin expansion pricing, mix or cost? Gross, operating and net margin over the last twelve quarters, the gap between gross and operating margin, and what Item 7 attributes the change to. Then compare against Merck, and if Merck is not on the desk, get it ready and tell me what you can say now.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 7.1,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q05-aapl-risk-and-concentration",
+  "session_id": "sess_3d691c8b0a26",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 7.4,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q06-jpm-riskier-than-a-year-ago",
+  "session_id": "sess_a2552b14bd0d",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Is the market treating JPMorgan as riskier than a year ago? Thirty-day volatility, beta to SPY and distance from the 52-week high now and twelve months ago, beside interest expense and the pretax-to-net-income gap over three years. Note where the desk's issuer methods do not apply to a bank.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.0,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q07-tech-cash-conversion-rank",
+  "session_id": "sess_ab7469aea2d6",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Rank our five technology holdings by cash conversion, operating cash flow over net income, for the trailing twelve months and by the change in that ratio against the prior twelve months. Which name has the weakest conversion, and is it also the one whose weight in the book grew most since the previous run?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 2.0,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q08-capex-roic-three-way",
+  "session_id": "sess_cb8d82ed1da2",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Compare the capex intensity and ROIC of Microsoft, Alphabet and Amazon over the last three fiscal years. Who spends the most relative to revenue and earns the least on it, and how does that sit with the book's exposure to QQQ?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q09-aapl-working-capital-cycle",
+  "session_id": "sess_0ffb730ed367",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Track Apple's days sales outstanding, days inventory, days payable and cash conversion cycle over the last twelve quarters. Where is the cycle now against its three-year low and high, and did the latest 10-K change its wording on supplier financing compared with the previous 10-K?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q10-msft-leverage-and-rates",
+  "session_id": "sess_42bd5d5fe71f",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Has Microsoft's leverage story changed? Total debt, net debt and net debt to EBITDA at each of the last five fiscal year-ends, interest coverage, and what the latest 10-K says about commercial paper. Then: if rates rose 100bp, what does the rates_shock_up scenario say happens to the book?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q11-closest-to-issuer-limit",
+  "session_id": "sess_628118d9d03e",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Which position is closest to its issuer-concentration warning, how much room is left, and what percentage move in that name alone would take it to the breach tier with everything else fixed? If we capped any single issuer at 8%, who would be over?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q12-jpm-vs-peers-not-on-desk",
+  "session_id": "sess_8736c8c27c27",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "How does JPMorgan's ROE and equity multiplier compare with Bank of America and Goldman Sachs over the last three years, and is JPM the most levered of the three? If you do not have them, start preparing them and tell me what you can say today.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q13-sell-half-nvda-into-tlt",
+  "session_id": "sess_ec6961ad333a",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "If we sell half our NVIDIA and put the proceeds into TLT, what happens to gross exposure, Technology sector concentration, the book's beta to QQQ and the stress loss under tech_selloff? Which limit gets tighter and which gets better?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.8,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q14-worst-drawdown-episode",
+  "session_id": "sess_bf5483c4d603",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Explain our worst drawdown episode of the last year: when it started and troughed, how deep, how much was the market against what we held, and which three names contributed most. Did any of those three have a filing in that window?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q15-liquidity-and-limits",
+  "session_id": "sess_774be6569130",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "How liquid is the book? For each holding, position value against 20-day average dollar volume, days to liquidate at 20% of ADV, which names take longest, and whether those are the same names sitting near their issuer limits.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q16-book-beta-change-since-prev",
+  "session_id": "sess_43e2da8353fc",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "What is the book exposed to, name by name: each holding's beta to SPY and to QQQ over one year, the book's net beta, and how the net beta changed since the previous run. Is the book riskier now, and which name drove the change?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.6,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q17-events-touching-holdings",
+  "session_id": "sess_96141d8ddb4e",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Anything in the last two weeks that touches something we hold? Search for material news on our top five by weight, and for each say whether the price already moved: ten-day window return against SPY and distance from the 52-week high.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.7,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q18-attribution-reconcile",
+  "session_id": "sess_77f3325f7749",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Does the book's attribution add up? Reconcile factor contributions plus alpha and residual to the portfolio return on the latest run, state the gap, name the largest and smallest contributing factor, and say whether HYG's own drawdown over the period matches the sign of its contribution.",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q19-aws-share-explains-return",
+  "session_id": "sess_f1a6a668be6f",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "What share of Amazon's revenue is AWS, how has that share moved over three years, and how much of our AMZN return over the last year relative to SPY does that explain?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   }
+  ]
+ },
+ {
+  "tag": "Q20-lly-margins-next-year",
+  "session_id": "sess_66ad21bbd872",
+  "turns": [
+   {
+    "turn": 1,
+    "q": "Will Lilly's margins keep expanding next year?",
+    "error": "ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)",
+    "answer": null,
+    "citations": [],
+    "blocks": null,
+    "meta": {},
+    "elapsed_s": 1.9,
+    "steps": []
+   }
+  ]
+ }
+]
