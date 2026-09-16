@@ -56,6 +56,7 @@ goes through, as R2 lets a balance's two readings be differenced.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
@@ -114,8 +115,10 @@ class Typed:
                 **({"base": self.base} if self.base else {})}
 
 
-def _err(code: str, detail: str) -> dict:
-    return {"error": code, "detail": detail}
+def _err(code: str, detail: str, **more) -> dict:
+    """A refusal, and whatever else the reader needs to act on it — a `route`
+    naming the program node that would produce what was asked for (V37)."""
+    return {"error": code, "detail": detail, **more}
 
 
 # The gate's unit names (services/quantities.py) to the algebra's. The inverse
@@ -223,11 +226,23 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
     if name not in held:
         import difflib
         near = difflib.get_close_matches(name, list(held), n=5, cutoff=0.5)
+        # V37/T3: a refusal names a verb the reader HAS. `describe` is not on the
+        # domain analyst's face (tools/faces.FACE_META_AGENT is run, read_filings,
+        # search_web, start), so "listed by describe(run_id)" was advice it could
+        # not take — and when the name is what a book METHOD yields rather than a
+        # figure on a table, the way to it is a program node, which the refusal
+        # can simply show. Round B's Q16 asked a run four times for
+        # `portfolio.integration.net_beta.market` and told the reader the book's
+        # net beta was unavailable; `book.analysis` computes it.
+        from exposure_workbench.analytics import skill as _skill
+        route = _skill.call_for_yield(name, subject=f"'{rid}'")
         return _err("unknown_name",
                     f"{rid} holds no figure named {name!r}."
                     + (f" Nearest names it holds: {', '.join(near)}." if near else "")
-                    + f" A run's names are listed by describe(run_id); an analysis or scenario "
-                      f"row's names are on its table.")
+                    + (f" That name is what {route['name']} yields, not a figure on a table: "
+                       f"compute it with {json.dumps(route)}." if route else
+                       " A run's tables are read with column(run, table, col) and pick(of, key)."),
+                    **({"route": route} if route else {}))
     if resolved.kind == "series" and "@" in name:
         # A point of a series row — `capex@2025-12-31` — as an operand: its own
         # period, its row's issuer, no base. Live turn 3 wrote exactly this and

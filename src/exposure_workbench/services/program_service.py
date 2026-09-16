@@ -45,6 +45,7 @@ Imports services and analytics only — never tools. `invoked_by` is a parameter
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -1048,8 +1049,12 @@ async def _p_column(ctx: _Ctx, node: Node, run: Any, table: str, col: str) -> No
     if not node.entries:
         tables = sorted({q.label.split(".")[0] for q in resolved.quantities})
         cols = sorted({q.label.rsplit(".", 1)[-1] for q in resolved.quantities if q.label.startswith(prefix)})
-        node.kind, node.refusal = ABSENCE, _err("unknown_name", f"{rid} holds no column {table}.<label>.{col}",
-                                                tables=tables, columns_of_table=cols)
+        route = skill.call_for_yield(f"{table}.{col}", subject=f"'{rid}'")
+        node.kind, node.refusal = ABSENCE, _err("unknown_name", f"{rid} holds no column {table}.<label>.{col}"
+                                                + (f"; that name is what {route['name']} yields — compute it with "
+                                                   f"{json.dumps(route)}" if route else ""),
+                                                tables=tables, columns_of_table=cols,
+                                                **({"route": route} if route else {}))
         return node
     node.kind, node.ref = VECTOR, rid
     node.unit = node.entries[0][3]
@@ -1067,6 +1072,13 @@ async def _p_figure(ctx: _Ctx, node: Node, run: Any, name: str) -> Node:
     return await _scalar_from_ref(ctx, node, f"{rid}:{name}", {"run": rid, "name": name})
 
 
+def _pick_route(key: str, ref: str | None) -> dict | None:
+    """The program node that produces a figure by that name, when no table holds
+    it: `portfolio.integration.net_beta.market` is what `book.analysis` yields
+    (V37/T3, round B's Q16)."""
+    return skill.call_for_yield(key, subject=f"'{ref}'" if ref else "$<the run>")
+
+
 def _pick_entry(src: Node, key: str) -> tuple[str, str, float | None, str | None] | dict:
     """One figure of a table node by its label — exactly, or by the label's last
     segment when that is unique (`dollars` picks `adv_dollars`; the catalogue
@@ -1077,7 +1089,10 @@ def _pick_entry(src: Node, key: str) -> tuple[str, str, float | None, str | None
     tail = [e for e in src.entries if e[0].replace(".", "_").split("_")[-1] == key or e[0].endswith(("." + key, "_" + key))]
     if len(tail) == 1:
         return tail[0]
-    return _err("unknown_name", f"${src.name} holds no figure {key!r}", available=[e[0] for e in src.entries][:40])
+    route = _pick_route(key, src.ref)
+    return _err("unknown_name", f"${src.name} holds no figure {key!r}"
+                + (f"; that name is what {route['name']} yields — compute it with {json.dumps(route)}" if route else ""),
+                available=[e[0] for e in src.entries][:40], **({"route": route} if route else {}))
 
 
 async def _p_pick(ctx: _Ctx, node: Node, of: Any, key: str) -> Node:
@@ -1140,8 +1155,12 @@ def _other_door(name: str) -> dict | None:
                                                  f"(add months and last_n for a window or a series)",
                 "metric": name}
     if name in skill.PROCEDURES:
-        return {"error": "wrong_door", "detail": f"{name!r} is a domain, not a method: open it with describe(<subject>, expand={name!r}); "
-                                                 f"its methods and its programs are listed there", "domain": name}
+        # V37/T3: `describe` is not on the domain analyst's face, and a domain is
+        # not something it needs to open — the domain it was given is in its own
+        # instructions, with that domain's methods and programs.
+        return {"error": "wrong_door", "detail": f"{name!r} is a domain of the desk's knowledge, not a method: its "
+                                                 f"methods are named in the analyst's own instructions, and a method "
+                                                 f"is what {{fn: 'method', name: …}} takes", "domain": name}
     return None
 
 

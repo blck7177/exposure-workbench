@@ -226,7 +226,10 @@ async def test_an_incomplete_run_is_task_state_not_figures(monkeypatch):
     monkeypatch.setattr(rr, "_run_or_error", loaded)
     out = await rr.completed_run(None, "run_x")
     assert out["error"] == "run_not_completed" and out["status"] == "running"
-    assert out["read"] == "read_book('task_9', names=['state'])"
+    # V37/T3: the task is NAMED and nothing is promised about reading it —
+    # `read_book` is not on the domain analyst's face, and a run in flight
+    # finishes after the turn either way.
+    assert out["task"] == "task_9" and "read" not in out
 
 
 # ── C2: a producer declares the unit of its counts; the adapter mints them ──

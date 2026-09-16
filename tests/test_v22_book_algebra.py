@@ -169,10 +169,27 @@ async def test_the_book_market_value_is_money_of_the_book_with_no_entity(monkeyp
     assert t.unit_class == units.MONEY and t.base == RUN and t.issuers == ()
 
 
-async def test_an_unknown_name_is_refused_and_points_at_the_manifest(monkeypatch):
+async def test_an_unknown_name_is_refused_and_points_at_a_verb_the_reader_has(monkeypatch):
+    """V37/T3: the refusal used to say the names are "listed by describe(run_id)",
+    and `describe` is not on the domain analyst's face — advice it could not take.
+    A run's tables are read with the verbs it does have."""
     _desk(monkeypatch)
     r = await tc._resolve(None, f"{RUN}:issuer_exposures.MSFT.rank")
-    assert r["error"] == "unknown_name" and "describe(" in r["detail"]
+    assert r["error"] == "unknown_name" and "describe(" not in r["detail"]
+    assert "column(run, table, col)" in r["detail"] and "Nearest names it holds" in r["detail"]
+
+
+async def test_a_name_a_book_method_yields_is_refused_with_the_node_that_makes_it(monkeypatch):
+    """Round B's Q16 asked a run four times, in three spellings, for
+    `portfolio.integration.net_beta.market` and told the reader the book's net
+    beta was unavailable. It is on no table — it is what `book.analysis` yields —
+    so the refusal shows the program node that computes it."""
+    _desk(monkeypatch)
+    r = await tc._resolve(None, f"{RUN}:portfolio.integration.net_beta.market")
+    assert r["error"] == "unknown_name"
+    assert r["route"]["name"] == "book.analysis" and r["route"]["fn"] == "method"
+    assert r["route"]["key"] == "portfolio.integration.net_beta.market"
+    assert "book.analysis" in r["detail"]
 
 
 async def test_a_collinear_coefficient_may_not_be_an_operand(monkeypatch):

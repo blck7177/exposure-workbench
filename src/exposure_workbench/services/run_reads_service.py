@@ -63,8 +63,10 @@ async def _run_or_error(db: AsyncSession, run_id: str) -> ExposureRun | dict:
         # indistinguishable from one that never existed, and saying so plainly
         # is better than a bare miss the model retries.
         return {"error": "unknown_run", "run_id": run_id,
-                "detail": "no run with this id is visible to you; call describe() "
-                          "for the runs on your own books"}
+                # V37/T3: `describe` is not on the domain analyst's face; the runs of
+                # the books it was pointed at are in the briefing it was handed.
+                "detail": "no run with this id is visible to you; the runs of your own books are in the "
+                          "briefing, and run(portfolio=<port_…>) reads the latest or the previous one"}
     return row
 
 
@@ -82,7 +84,10 @@ async def completed_run(db: AsyncSession, run_id: str) -> ExposureRun | dict:
     if run.status != "completed":
         return {"error": "run_not_completed", "run_id": run_id, "status": run.status,
                 "detail": f"run {run_id} is {run.status}: its figures are not readable until it completes",
-                **({"read": f"read_book('{run.task_id}', names=['state'])"} if run.task_id else {})}
+                # V37/T3: a task's state is not readable from the analyst's face at
+                # all — `read_book` is off it — so the id is named and nothing is
+                # promised about reading it. A run in flight finishes after the turn.
+                **({"task": run.task_id} if run.task_id else {})}
     return run
 
 

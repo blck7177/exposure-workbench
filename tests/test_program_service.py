@@ -222,7 +222,9 @@ async def test_a_name_at_the_wrong_door_is_sent_to_its_own_door():
         "yoy": ("primitive", '"fn": "yoy"'),
         "divide": ("written", '"fn": "div"'),
         "issuer_exposures.weight": ("figure of a run", '"fn": "column"'),
-        "issuer_earnings_quality": ("domain", "expand="),
+        # V37/T3: a domain is not something the analyst opens — `describe` is not
+        # on its face, and the domain it was given is in its own instructions
+        "issuer_earnings_quality": ("domain of the desk's knowledge", "{fn: 'method', name: …}"),
     }
     for name, (says, shows) in cases.items():
         d = _other_door(name)

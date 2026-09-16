@@ -302,6 +302,54 @@ METHODS: dict[str, Method] = {
 }
 
 
+# The names a RUN's own tables hold, which `column` and `pick` read. A scenario
+# method yields them too, because it re-prices the book — so routing a plain table
+# name to `sell` would answer a question nobody asked.
+_RUN_TABLE_PREFIXES = ("issuer_exposures.", "sector_exposures.", "limit_checks.",
+                       "factor_attributions.", "exposure_metrics.", "risk_alerts.", "count.")
+
+
+def method_for_yield(name: str) -> Method | None:
+    """The method whose result carries a figure of this name, if one does (V37).
+
+    A run's table names are read with `column` and `pick`; a name like
+    `portfolio.integration.net_beta.market` is on no table at all — it is what
+    `book.analysis` YIELDS — so a refusal that only says the run holds no such
+    figure leaves the analyst asking the run for something no run has. Round B's
+    Q16 asked four times, in three spellings, and the answer told the reader the
+    book's net beta was unavailable while the desk's own method computes it.
+
+    A lookup over the methods' declared yields, with `<risk>` / `<check>` / `<T>`
+    standing for a name the caller fills in.
+    """
+    import fnmatch
+    import re as _re
+    if name.startswith(_RUN_TABLE_PREFIXES):
+        return None                      # a run's own table: column / pick read it
+    for m in METHODS.values():
+        if m.subject_kind not in ("run", "portfolio"):
+            continue                     # the caller asked a BOOK for this name
+        if len(m.yields) <= 1 and (not m.yields or m.yields[0] == m.name):
+            continue                     # a method that yields one figure under its own name
+        for y in m.yields:
+            pat = _re.sub(r"<[A-Za-z_]+>", "*", y)
+            if fnmatch.fnmatchcase(name, pat) or fnmatch.fnmatchcase(name, pat + ".*"):
+                return m
+    return None
+
+
+def call_for_yield(name: str, subject: str = "$<the run>") -> dict | None:
+    """The program node that produces a figure by that name — `run`-expressible,
+    because that is the only verb a domain analyst has."""
+    m = method_for_yield(name)
+    if m is None:
+        return None
+    call: dict = {"fn": "method", "name": m.name, "subject": subject}
+    if len(m.yields) > 1:
+        call["key"] = name
+    return call
+
+
 def methods_for(subject_kind: str) -> list[Method]:
     return [m for m in METHODS.values() if m.subject_kind == subject_kind]
 
