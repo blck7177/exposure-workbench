@@ -409,6 +409,18 @@ READINGS: dict[str, Reading] = {r.method: r for r in (
             "is over the BOOK's return and says nothing per name",
             "fewer than 60 aligned sessions; a benchmark whose returns are collinear with another factor's",
             "the factor model's regression record; Sharpe (1964)"),
+    Reading("book.reconcile",
+            "factor_share is the share of the move the factor model explains and unexplained is what is left: they "
+            "sum to one by construction, so a NEGATIVE factor share means the factors explain the opposite "
+            "direction — it is not a return, not a loss, and not evidence that the move was market-wide",
+            "a run that does not reconcile; a window with no position contributions",
+            "the two accounting identities of return attribution (the factor model's own decomposition)"),
+    Reading("price.adv",
+            "days to liquidate is market value divided by (the participation rate × ADV in dollars): the quotient of "
+            "market value over ADV alone is a ratio of two dollar figures and is not days, so a figure offered as "
+            "days is wrong unless the participation rate is in the divisor",
+            "fewer sessions of volume than the window asks for",
+            "CFA Program, market microstructure; this desk's own participation convention"),
     Reading("book.analysis",
             "room_to_warning below zero means the check is already in warning; room_to_breach is what remains "
             "before the hard tier; a net beta is this desk's netting of the legs, and TLT and HYG enter with "
@@ -578,10 +590,19 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
                   "receivables, inventory and revenue growth over the same windows; days sales outstanding, days inventory, days payable and the cash conversion cycle",
                   "capex and stock-based compensation where the gap between cash and earnings needs a reason"),
         desk=("days measures are built on ending balances, not averages, and the result says so",
-              "a measure over its last N periods is one series, so a trend is read from the series, not from two figures"),
+              "a measure over its last N periods is one series, so a trend is read from the series, not from two figures",
+              "a series says its own spacing and its span: say the period it HAS, not the period the question asked for"),
         compare=("cash conversion and the accruals ratio against the issuer's own prior periods: the evidence is about persistence, not one period",
                  "receivable and inventory growth against revenue growth over the same windows",
-                 "days against the same days a year earlier"),
+                 "days against the same days a year earlier",
+                 # V37/K4: all three lines above compare one issuer with its own
+                 # past, so a question that RANKS several names read as one that
+                 # ranks each against itself. Round B's Q07 opened with the word
+                 # Rank and the turn computed no ordering at all: three issuers,
+                 # three programs, one conversion each, and a superlative by eye
+                 # that the check refused five times.
+                 "several names on one window against each other: build the vector of their readings and rank it — "
+                 "an ordering is a node, never a comparison made by eye"),
         close=("say whether cash confirms earnings, and if not which line explains the gap and whether it is building",
                "give the days as days, dated, beside the prior reading"),
         absent="a quarter the issuer did not file at the window asked is unreachable and stays in place in the series, never closed over",
@@ -652,7 +673,13 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
                   "the segment, product, customer and geographic passages for concentration",
                   "for each named risk, the line where it would first appear and that line's trend: demand in gross margin and inventory, supply in capex and commitments, concentration in the customer note"),
         desk=("concentration figures are quoted from the filing and cited, never computed from parts",
-              "the defining measures of a business — capex intensity, asset turnover, gross margin — are read over the years held as series"),
+              "the defining measures of a business — capex intensity, asset turnover, gross margin — are read over the years held as series",
+              # V37/K4: round B's Q19 read "AWS sales increased 20% in 2025" as
+              # "AWS is 20% of Amazon's revenue" — that round's one reader-visible
+              # falsehood that was the model's own reading of prose, on a question
+              # that had asked for the share.
+              "a percentage in a filing's prose is whatever its own sentence says it is: 'increased 20%' is growth "
+              "and not a share, and a share the filing does not state is not available by reading one that is"),
         compare=("each named risk against the trend of the line where it shows, so the risks are ordered by what the numbers already show, not by the filing's order",
                  "the filing's stated shares across years where both years are indexed",
                  "each defining measure's direction against the thesis's claim"),
@@ -873,6 +900,36 @@ _LINKS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "book_events": (("price.window_return",), ("concentration",)),
 }
 _PROGRAMS: dict[str, tuple[tuple[str, str], ...]] = {'issuer_earnings_quality': (('cash behind earnings: the trailing twelve months, then the last five fiscal years', '{"let":[["accr_now",{"fn":"method","name":"accruals_ratio","subject":"<T>"}],["ocf_now",{"fn":"fundamentals","ticker":"<T>","metric":"operating_cash_flow","months":12}],["ni_now",{"fn":"fundamentals","ticker":"<T>","metric":"net_income","months":12}],["conversion_now",{"fn":"div","a":"$ocf_now","b":"$ni_now"}],["ocf",{"fn":"fundamentals","ticker":"<T>","metric":"operating_cash_flow","months":12,"last_n":5}],["ni",{"fn":"fundamentals","ticker":"<T>","metric":"net_income","months":12,"last_n":5}],["conversion",{"fn":"div","a":"$ocf","b":"$ni"}],["accr",{"fn":"method","name":"accruals_ratio","subject":"<T>","params":{"last_n":8}}],["accruals_trend",{"fn":"yoy","of":"$accr"}]]}'), ('working capital in days: the trailing twelve months, then the fiscal-year history', '{"let":[["dso_now",{"fn":"method","name":"days_sales_outstanding","subject":"<T>"}],["dinv_now",{"fn":"method","name":"days_inventory","subject":"<T>"}],["ccc_now",{"fn":"method","name":"cash_conversion_cycle","subject":"<T>"}],["dso",{"fn":"method","name":"days_sales_outstanding","subject":"<T>","params":{"last_n":5}}],["dinv",{"fn":"method","name":"days_inventory","subject":"<T>","params":{"last_n":5}}],["dinv_change",{"fn":"yoy","of":"$dinv"}]]}')), 'issuer_profitability': (('margins across names, then the ordering', '{"let":[["gm",{"fn":"method","name":"gross_margin","subject":["<T1>","<T2>"]}],["om",{"fn":"method","name":"operating_margin","subject":["<T1>","<T2>"]}],["nm",{"fn":"method","name":"net_margin","subject":["<T1>","<T2>"]}],["best_gm",{"fn":"rank","of":"$gm","direction":"highest"}],["ret_capital",{"fn":"method","name":"roic","subject":["<T1>","<T2>"]}],["best_roic",{"fn":"rank","of":"$ret_capital","direction":"highest"}]]}'), ('a margin over its own history', '{"let":[["gm",{"fn":"method","name":"gross_margin","subject":"<T>","params":{"last_n":8}}],["gm_change",{"fn":"yoy","of":"$gm"}]]}'), ('DuPont', '{"let":[["ret_equity",{"fn":"method","name":"roe","subject":"<T>"}],["nm",{"fn":"method","name":"net_margin","subject":"<T>"}],["turn",{"fn":"method","name":"asset_turnover","subject":"<T>"}],["lev",{"fn":"method","name":"equity_multiplier","subject":"<T>"}]]}')), 'issuer_credit_and_balance_sheet': (('leverage and coverage across names', '{"let":[["td",{"fn":"method","name":"total_debt","subject":["<T1>","<T2>"]}],["nd",{"fn":"method","name":"net_debt","subject":["<T1>","<T2>"]}],["lev",{"fn":"method","name":"net_debt_to_ebitda","subject":["<T1>","<T2>"]}],["cov",{"fn":"method","name":"ebit_interest_coverage","subject":["<T1>","<T2>"]}],["cr",{"fn":"method","name":"current_ratio","subject":["<T1>","<T2>"]}],["most_levered",{"fn":"rank","of":"$lev","direction":"highest"}]]}'), ("leverage against the issuer's own history", '{"let":[["lev",{"fn":"method","name":"debt_to_ebitda","subject":"<T>","params":{"last_n":5}}],["lev_change",{"fn":"yoy","of":"$lev"}]]}')), 'issuer_capital_allocation': (('where the cash goes, each use as a share of operating cash flow', '{"let":[["ocf",{"fn":"fundamentals","ticker":"<T>","metric":"operating_cash_flow","months":12}],["capex",{"fn":"fundamentals","ticker":"<T>","metric":"capex","months":12}],["buybacks",{"fn":"fundamentals","ticker":"<T>","metric":"buybacks","months":12}],["dividends",{"fn":"fundamentals","ticker":"<T>","metric":"dividends_paid","months":12}],["capex_share",{"fn":"div","a":"$capex","b":"$ocf"}],["buyback_share",{"fn":"div","a":"$buybacks","b":"$ocf"}],["dividend_share",{"fn":"div","a":"$dividends","b":"$ocf"}],["fcf",{"fn":"method","name":"free_cash_flow","subject":"<T>"}]]}'), ('is capex outrunning revenue', '{"let":[["capex",{"fn":"fundamentals","ticker":"<T>","metric":"capex","months":12,"last_n":5}],["rev",{"fn":"fundamentals","ticker":"<T>","metric":"revenue","months":12,"last_n":5}],["capex_g",{"fn":"yoy","of":"$capex"}],["rev_g",{"fn":"yoy","of":"$rev"}],["intensity",{"fn":"method","name":"capex_intensity","subject":"<T>","params":{"last_n":5}}]]}')), 'issuer_business_risk_from_filings': (('the lines a named risk shows in first, over the years', '{"let":[["gm",{"fn":"method","name":"gross_margin","subject":"<T>","params":{"last_n":8}}],["intensity",{"fn":"method","name":"capex_intensity","subject":"<T>","params":{"last_n":8}}],["turn",{"fn":"method","name":"asset_turnover","subject":"<T>","params":{"last_n":8}}],["inv",{"fn":"fundamentals","ticker":"<T>","metric":"inventory","last_n":8}]]}'),), 'issuer_price_context': (('where the price sits', '{"let":[["from_high",{"fn":"method","name":"price.distance_from_52w_high","subject":"<T>"}],["mom",{"fn":"method","name":"price.momentum_12_1","subject":"<T>"}],["vol_short",{"fn":"method","name":"price.volatility","subject":"<T>","params":{"window_days":30}}],["vol_long",{"fn":"method","name":"price.volatility","subject":"<T>","params":{"window_days":252}}],["ret_1y",{"fn":"method","name":"price.window_return","subject":"<T>","params":{"window":"1y","benchmark":"SPY"}}],["dd",{"fn":"method","name":"price.drawdown","subject":"<T>","params":{"window":"1y"}}]]}'),), 'issuer_outlook_boundary': (('the recent direction of the lines the narrative names', '{"let":[["rev",{"fn":"fundamentals","ticker":"<T>","metric":"revenue","months":12,"last_n":5}],["rev_g",{"fn":"yoy","of":"$rev"}]]}'),), 'book_composition': (('the shape, and its change since the prior run', '{"let":[["w",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"issuer_exposures","col":"weight"}],["ranked",{"fn":"rank","of":"$w","direction":"highest"}],["top5",{"fn":"sum","of":{"fn":"top","of":"$w","n":5}}],["top5_prev",{"fn":"sum","of":{"fn":"top","of":{"fn":"column","run":{"fn":"run","portfolio":"<port>","which":"prev"},"table":"issuer_exposures","col":"weight"},"n":5}}],["drift",{"fn":"sub","a":"$top5","b":"$top5_prev"}],["sectors",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"sector_exposures","col":"weight"}]]}'),), 'book_limits_and_triggers': (('every check against its tiers, and the room in weight and dollars', '{"let":[["current",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"current_value"}],["warning",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"warning_level"}],["breach",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"breach_level"}],["room_to_warning",{"fn":"sub","a":"$warning","b":"$current"}],["room_to_breach",{"fn":"sub","a":"$breach","b":"$current"}],["nearest",{"fn":"rank","of":"$room_to_breach","direction":"lowest"}],["mv",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"exposure_metrics.portfolio_market_value"}],["room_dollars",{"fn":"mul","a":"$room_to_breach","b":"$mv"}]]}'),), 'book_hypothetical_trades': (('the after-book of a sale, its checks re-run', '{"let":[["after",{"fn":"sell","run":{"fn":"run","portfolio":"<port>"},"sales":[{"ticker":"<T>","fraction":0.5}]}],["w_after",{"fn":"column","run":"$after","table":"issuer_exposures","col":"weight"}],["checks_after",{"fn":"column","run":"$after","table":"limit_checks","col":"current_value"}],["w_before",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"issuer_exposures","col":"weight"}],["mv_after",{"fn":"pick","of":"$after","key":"exposure_metrics.portfolio_market_value"}]]}'), ('how much to sell to land at a tier', '{"let":[["w",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"issuer_exposures.<T>.weight"}],["tier",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"limit_checks.issuer_concentration:<T>.warning_level"}],["mv",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"exposure_metrics.portfolio_market_value"}],["excess",{"fn":"sub","a":"$w","b":"$tier"}],["dollars_to_sell",{"fn":"mul","a":"$excess","b":"$mv"}]]}'), ('adding a name at a target weight', '{"let":[["after",{"fn":"buy","run":{"fn":"run","portfolio":"<port>"},"buys":[{"ticker":"<N>","weight":0.05}]}],["w_after",{"fn":"column","run":"$after","table":"issuer_exposures","col":"weight"}],["checks_after",{"fn":"column","run":"$after","table":"limit_checks","col":"current_value"}]]}')), 'book_market_risk': (("each name's own rate, credit and market sensitivity", '{"let":[["beta_rates",{"fn":"method","name":"price.beta","subject":["<T1>","<T2>"],"params":{"benchmark":"TLT"},"key":"beta"}],["beta_credit",{"fn":"method","name":"price.beta","subject":["<T1>","<T2>"],"params":{"benchmark":"HYG"},"key":"beta"}],["beta_mkt",{"fn":"method","name":"price.beta","subject":["<T1>","<T2>"],"params":{"benchmark":"SPY"},"key":"beta"}],["most_rate_sensitive",{"fn":"rank","of":"$beta_rates","direction":"highest"}],["book_betas",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"factor_attributions","col":"beta"}]]}'), ('has volatility risen: short window against long, name by name and the index', '{"let":[["vol_30",{"fn":"method","name":"price.volatility","subject":["<T1>","<T2>","SPY"],"params":{"window_days":30}}],["vol_252",{"fn":"method","name":"price.volatility","subject":["<T1>","<T2>","SPY"],"params":{"window_days":252}}],["ratio",{"fn":"div","a":"$vol_30","b":"$vol_252"}],["jumpiest",{"fn":"rank","of":"$ratio","direction":"highest"}]]}')), 'book_drawdown_and_attribution': (('the worst episode, and what made it', '{"let":[["episodes",{"fn":"method","name":"book.drawdown_episodes","subject":"<port>","params":{"span":"1y"}}],["depth",{"fn":"pick","of":"$episodes","key":"portfolio.drawdown_episodes.deepest_depth"}],["peak",{"fn":"pick","of":"$episodes","key":"episodes[0].peak_date"}],["trough",{"fn":"pick","of":"$episodes","key":"episodes[0].trough_date"}],["explain",{"fn":"method","name":"book.explain_episode","subject":"<port>","params":{"peak":"$peak","trough":"$trough"}}],["by_name",{"fn":"column","run":"$explain","table":"holdings","col":"window_return"}],["worst_names",{"fn":"rank","of":"$by_name","direction":"lowest"}],["book_return",{"fn":"pick","of":"$explain","key":"portfolio.window_return"}]]}'), ("one day's move, market against us", '{"let":[["recon",{"fn":"method","name":"book.reconcile","subject":"<run>"}],["contrib",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"issuer_exposures","col":"contribution"}],["biggest_move",{"fn":"rank","of":"$contrib","direction":"lowest"}]]}')), 'book_liquidity': (('days to liquidate at a participation rate, worst first', '{"let":[["mv",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"issuer_exposures","col":"market_value"}],["adv",{"fn":"method","name":"price.adv","subject":["<T1>","<T2>"],"params":{"window_days":20},"key":"dollars"}],["days",{"fn":"div","a":"$mv","b":{"fn":"scale","of":"$adv","factor":0.25}}],["worst",{"fn":"rank","of":"$days","direction":"highest"}]]}'),), 'book_events': (('is it already in the price: the name against the market over the window', '{"let":[["ret",{"fn":"method","name":"price.window_return","subject":["<T1>","<T2>"],"params":{"window":"1m","benchmark":"SPY"}}],["w",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"issuer_exposures","col":"weight"}]]}'),)}
+
+
+# V37/K2 — three programs round B showed missing, written here rather than into
+# the generated literal above so a reader can see them. Knowledge written as an
+# example is copied; knowledge written as prose was opened 3 times in 140 turns
+# (V26 P14b), and each of these is a thing a whole turn failed to do:
+#   · the book's netted beta — Q16 asked a run four times for a figure that is a
+#     method's yield, and the answer told the reader it was unavailable
+#   · cash conversion ACROSS names — Q07 opened with the word Rank and computed
+#     no ordering at all, because every `compare` line of that domain said
+#     "against its own past"
+#   · sell, then buy with what the sale frees — Q13's analyst wrote a fixed 5%
+#     weight where the task said "with the proceeds", and nothing sized the buy
+_ADDED_PROGRAMS: dict[str, tuple[tuple[str, str], ...]] = {
+    'book_market_risk': (
+        ("the book's netted beta per risk, and each name's own",
+         "{\"let\":[[\"book\",{\"fn\":\"run\",\"portfolio\":\"<port>\"}],[\"analysis\",{\"fn\":\"method\",\"name\":\"book.analysis\",\"subject\":\"$book\"}],[\"net_equity\",{\"fn\":\"pick\",\"of\":\"$analysis\",\"key\":\"portfolio.integration.net_beta.equity_down\"}],[\"net_rates\",{\"fn\":\"pick\",\"of\":\"$analysis\",\"key\":\"portfolio.integration.net_beta.rates_up\"}],[\"beta_mkt\",{\"fn\":\"method\",\"name\":\"price.beta\",\"subject\":[\"<T1>\",\"<T2>\"],\"params\":{\"benchmark\":\"SPY\"},\"key\":\"beta\"}]]}"),
+    ),
+    'issuer_earnings_quality': (
+        ('cash conversion across names, then the ordering',
+         "{\"let\":[[\"ocf_a\",{\"fn\":\"fundamentals\",\"ticker\":\"<T1>\",\"metric\":\"operating_cash_flow\",\"months\":12}],[\"ni_a\",{\"fn\":\"fundamentals\",\"ticker\":\"<T1>\",\"metric\":\"net_income\",\"months\":12}],[\"conv_a\",{\"fn\":\"div\",\"a\":\"$ocf_a\",\"b\":\"$ni_a\"}],[\"ocf_b\",{\"fn\":\"fundamentals\",\"ticker\":\"<T2>\",\"metric\":\"operating_cash_flow\",\"months\":12}],[\"ni_b\",{\"fn\":\"fundamentals\",\"ticker\":\"<T2>\",\"metric\":\"net_income\",\"months\":12}],[\"conv_b\",{\"fn\":\"div\",\"a\":\"$ocf_b\",\"b\":\"$ni_b\"}],[\"conversion\",{\"fn\":\"vector\",\"entries\":{\"<T1>\":\"$conv_a\",\"<T2>\":\"$conv_b\"}}],[\"weakest\",{\"fn\":\"rank\",\"of\":\"$conversion\",\"direction\":\"lowest\"}]]}"),
+    ),
+    'book_hypothetical_trades': (
+        ('sell part of a name and buy another with what it frees',
+         "{\"let\":[[\"book\",{\"fn\":\"run\",\"portfolio\":\"<port>\"}],[\"w\",{\"fn\":\"pick\",\"of\":\"$book\",\"key\":\"issuer_exposures.<T>.weight\"}],[\"freed\",{\"fn\":\"mul\",\"a\":\"$w\",\"b\":0.5}],[\"sold\",{\"fn\":\"sell\",\"run\":\"$book\",\"sales\":[{\"ticker\":\"<T>\",\"fraction\":0.5}]}],[\"after\",{\"fn\":\"buy\",\"run\":\"$sold\",\"buys\":[{\"ticker\":\"<N>\",\"weight\":\"$freed\"}]}],[\"w_after\",{\"fn\":\"column\",\"run\":\"$after\",\"table\":\"issuer_exposures\",\"col\":\"weight\"}],[\"checks_after\",{\"fn\":\"column\",\"run\":\"$after\",\"table\":\"limit_checks\",\"col\":\"current_value\"}]]}"),
+    ),
+}
+_PROGRAMS = {k: v + _ADDED_PROGRAMS.get(k, ()) for k, v in _PROGRAMS.items()}
+assert not set(_ADDED_PROGRAMS) - set(_PROGRAMS), sorted(set(_ADDED_PROGRAMS) - set(_PROGRAMS))
+
 _missing_programs = set(PROCEDURES) - set(_PROGRAMS)
 if _missing_programs:
     raise RuntimeError(f"domain programs: missing {sorted(_missing_programs)}")
@@ -929,6 +986,12 @@ _OFFERS: dict[str, tuple[str, ...]] = {
         "drawdown depth and the dates of the episode",
         "return against a benchmark over a window, and beta to it",
         "average daily volume in dollars",
+        # V37/K1: every reading here is on the LATEST window — BOUNDARIES says a
+        # price statistic takes a window and never an as-of date. Round B's Q06
+        # asked for "twelve months ago", four of its six lines died on it, and the
+        # ROSTER had not said so.
+        "every one of these is measured on the latest window — never as of a past date, so 'a year ago' is not a "
+        "reading this domain can produce",
         "no view on where the price goes, and no valuation multiple: P/E, EV/EBITDA and FCF yield are not measures here",
     ),
     "issuer_outlook_boundary": (
@@ -956,10 +1019,21 @@ _OFFERS: dict[str, tuple[str, ...]] = {
         "no re-fitted beta, volatility, VaR or stress loss: a scenario re-prices and re-checks, it does not re-fit",
     ),
     "book_market_risk": (
-        "each name's sensitivity to the market, to rates and to credit, and the book's own factor betas",
-        "the stress losses the desk's shocks produce",
-        "whether risk has risen: a short volatility window against a long one, name by name",
-        "how much is market-wide and how much is specific, and which names",
+        # V37/K1. The two offers this replaces promised what this domain's own desk
+        # lines withhold — "the stress losses the desk's shocks produce" against
+        # "stress results are withheld pending validation", and "the book's own
+        # factor betas" against a fit whose legs are collinear and not quotable one
+        # by one. The lead routes by reading these and nothing else: in round B it
+        # sent seven tasks and twenty-four lines here and got six back, and of
+        # twenty-three programs one came back clean. It routed correctly on what it
+        # was told.
+        "each name's sensitivity to the market, to rates and to credit: beta to SPY, to TLT and to HYG",
+        "the book's netted beta per risk, from the run's own factor fit — the legs are collinear, so the net is "
+        "quotable and no single name's leg is",
+        "whether risk has risen: a short volatility window against a long one, name by name and for the index",
+        "how much of a move was market-wide and how much was specific, and which names",
+        "no stress loss: the desk's stress results are withheld pending validation, and a scenario re-prices and "
+        "re-checks without re-fitting them",
         "no correlation between holdings and no hidden common bet: not measures here",
     ),
     "book_drawdown_and_attribution": (
@@ -1052,9 +1126,20 @@ def push_text(procedures: list[Procedure]) -> str:
     what this desk knows, how to compare and close, and the programs."""
     parts = []
     for p in procedures:
+        # THE READINGS COME WITH THE DOMAIN (V37/K3). `READINGS` is what this desk
+        # knows about reading a measure that a textbook does not, and its only
+        # reader was `describe` — which is not on the domain analyst's face
+        # (tools/faces.FACE_META_AGENT), so the analyst that writes the program had
+        # never seen any of it. Round B has three false statements out of that gap:
+        # a negative factor share read as "overwhelmingly a market move", a
+        # market-value-over-ADV ratio offered as days to liquidate, and a growth
+        # rate read as a share.
+        reads = [f"  {r.method}: {r.reads}; meaningless when {r.meaningless_when}"
+                 for m in p.methods if (r := READINGS.get(m))]
         parts.append(f"DOMAIN {p.name} — {p.question}\nthis desk: " + " ".join(p.desk)
                      + "\ncompare: " + " ".join(p.compare) + "\nclose: " + " ".join(p.close)
                      + f"\nabsent here: {p.absent}"
+                     + ("\nhow these read:\n" + "\n".join(reads) if reads else "")
                      + "".join(f"\nprogram — {title}:\n{prog}" for title, prog in p.programs))
     return "\n\n".join(parts)
 

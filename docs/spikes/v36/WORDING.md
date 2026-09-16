@@ -97,7 +97,7 @@ program — every check against its tiers, and the room in weight and dollars:
 {"let":[["current",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"current_value"}],["warning",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"warning_level"}],["breach",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"breach_level"}],["room_to_warning",{"fn":"sub","a":"$warning","b":"$current"}],["room_to_breach",{"fn":"sub","a":"$breach","b":"$current"}],["nearest",{"fn":"rank","of":"$room_to_breach","direction":"lowest"}],["mv",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"exposure_metrics.portfolio_market_value"}],["room_dollars",{"fn":"mul","a":"$room_to_breach","b":"$mv"}]]}
 ```
 
-### B3. V36 补进 book_limits_and_triggers 的一句 desk 知识 — `analytics/skill.py:735`
+### B3. V36 补进 book_limits_and_triggers 的一句 desk 知识 — `analytics/skill.py:762`
 
 ```text
 a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger; the level is in the entries' own unit, and a weight is a fraction: 8% is 0.08
@@ -105,7 +105,7 @@ a cap the mandate does not define has no check and no room — the names over it
 
 ---
 
-## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:896`
+## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:953`
 
 每段 3–5 行;最后一行多半是这个域**不**给的东西(与 `absent` 呼应)。导入期断言 offers 与 PROCEDURES 一一对应。
 
@@ -168,6 +168,7 @@ absent:*valuation multiples (P/E, EV/EBITDA, FCF yield) are not yet measures on 
 - drawdown depth and the dates of the episode
 - return against a benchmark over a window, and beta to it
 - average daily volume in dollars
+- every one of these is measured on the latest window — never as of a past date, so 'a year ago' is not a reading this domain can produce
 - no view on where the price goes, and no valuation multiple: P/E, EV/EBITDA and FCF yield are not measures here
 
 ### issuer_outlook_boundary(subject_kind = issuer)
@@ -215,10 +216,11 @@ absent:*a candidate with no run figure is not a candidate; a name the desk canno
 question:*what the book is exposed to, name by name, and whether it has got riskier*  
 absent:*correlations between holdings and hidden common bets are not measures on this desk; a collinear fit is stated as such*
 
-- each name's sensitivity to the market, to rates and to credit, and the book's own factor betas
-- the stress losses the desk's shocks produce
-- whether risk has risen: a short volatility window against a long one, name by name
-- how much is market-wide and how much is specific, and which names
+- each name's sensitivity to the market, to rates and to credit: beta to SPY, to TLT and to HYG
+- the book's netted beta per risk, from the run's own factor fit — the legs are collinear, so the net is quotable and no single name's leg is
+- whether risk has risen: a short volatility window against a long one, name by name and for the index
+- how much of a move was market-wide and how much was specific, and which names
+- no stress loss: the desk's stress results are withheld pending validation, and a scenario re-prices and re-checks without re-fitting them
 - no correlation between holdings and no hidden common bet: not measures here
 
 ### book_drawdown_and_attribution(subject_kind = portfolio)

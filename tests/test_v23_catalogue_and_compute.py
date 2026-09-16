@@ -181,10 +181,24 @@ def test_the_desks_rules_are_scoped_and_reach_every_describe():
 
 
 def test_a_reading_states_what_the_desk_knows_and_the_textbook_does_not():
-    """Fourteen textbook readings were removed (V25); the three that remain each
-    carry a fact about this desk — a tag the held issuers stopped filing, a
-    figure the book-level fit cannot give, a quantity the desk invented."""
-    assert set(skill.READINGS) == {"ebit_interest_coverage", "price.beta", "book.analysis"}
+    """Fourteen textbook readings were removed (V25); the ones that remain each
+    carry a fact about this desk — a tag the held issuers stopped filing, a figure
+    the book-level fit cannot give, a quantity the desk invented, a share that is
+    not a return, a ratio that is not days.
+
+    V37/K3 added the last two, from round B: a negative factor share was read as
+    "overwhelmingly a market move" and a market-value-over-ADV ratio was offered as
+    days to liquidate. Both are readings, and until V37 the only reader of this
+    table was `describe` — which is not on the domain analyst's face, so the
+    analyst that writes the program had never seen any of it."""
+    assert set(skill.READINGS) == {"ebit_interest_coverage", "price.beta", "book.analysis",
+                                   "book.reconcile", "price.adv"}
+    # and every one of them reaches the analyst that holds that domain
+    for method, reading in skill.READINGS.items():
+        domains = [p for p in skill.PROCEDURES.values() if method in p.methods]
+        assert domains, f"{method} has a reading and belongs to no domain"
+        for p in domains:
+            assert reading.reads[:60] in skill.system_text(p), (p.name, method)
 
 
 def test_an_unknown_method_is_refused_with_near_names():
