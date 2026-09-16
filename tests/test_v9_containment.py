@@ -280,3 +280,50 @@ def test_a_complete_cover_is_the_default_and_stays_quiet():
     c = ct.cover({"long_term_debt_total": 84.0}, "debt",
                  ever_reported=frozenset({"long_term_debt_total"}))
     assert c.complete and c.short_by == ()
+
+
+# ── V38/S3: a member's stand-in, used by name where the member is not reported ──
+
+def test_xoms_term_debt_is_read_under_the_line_it_files():
+    """XOM files its term debt only as debt-and-lease obligations; unread, its
+    cover was the current debt alone, and "complete"."""
+    got = ct.cover({"debt_current_total": 9.296, "current_portion_long_term_debt": 1.2,
+                    "long_term_debt_and_leases_noncurrent": 34.241},
+                   family="debt",
+                   ever_reported=frozenset({"debt_current_total", "current_portion_long_term_debt",
+                                            "long_term_debt_and_leases_noncurrent"}))
+    assert isinstance(got, ct.Cover) and got.complete
+    assert got.terms == ("long_term_debt_noncurrent", "debt_current_total")
+    assert got.value == pytest.approx(9.296 + 34.241)
+    assert got.substituted == (("long_term_debt_noncurrent", "long_term_debt_and_leases_noncurrent"),)
+    assert got.formula == ("long_term_debt_and_leases_noncurrent (for long_term_debt_noncurrent) + "
+                           "debt_current_total")
+    assert got.line_for("long_term_debt_noncurrent") == "long_term_debt_and_leases_noncurrent"
+    assert "long_term_debt_noncurrent" not in got.no_facts_for_issuer
+
+
+def test_a_reported_member_is_never_replaced_by_its_wider_stand_in():
+    got = ct.cover({"long_term_debt_noncurrent": 10.883, "long_term_debt_and_leases_noncurrent": 10.883,
+                    "current_portion_long_term_debt": 1.0},
+                   family="debt")
+    assert got.substituted == () and got.value == pytest.approx(11.883)
+
+
+def test_a_stand_in_under_a_taken_parent_is_not_summed_beside_it():
+    got = ct.cover({"long_term_debt_total": 50.0, "long_term_debt_and_leases_noncurrent": 45.0},
+                   family="debt")
+    assert got.terms == ("long_term_debt_total",) and got.value == pytest.approx(50.0)
+    assert got.substituted == ()
+
+
+def test_a_member_the_issuer_moved_off_is_read_under_the_line_it_moved_to():
+    """KO filed LongTermDebtNoncurrent until 2024 and the debt-and-lease tag since;
+    with the member only missing at the date, the cover was short and refused."""
+    got = ct.cover({"commercial_paper": 1.0, "current_portion_long_term_debt_and_leases": 4.49,
+                    "long_term_debt_and_leases_noncurrent": 44.98},
+                   family="debt",
+                   ever_reported=frozenset({"commercial_paper", "long_term_debt_noncurrent",
+                                            "current_portion_long_term_debt", "long_term_debt_total"}))
+    assert got.complete and got.value == pytest.approx(1.0 + 4.49 + 44.98)
+    assert dict(got.substituted) == {"long_term_debt_noncurrent": "long_term_debt_and_leases_noncurrent",
+                                     "current_portion_long_term_debt": "current_portion_long_term_debt_and_leases"}

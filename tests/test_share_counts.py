@@ -41,7 +41,7 @@ _CONCEPT_TO_EXPECTED = {
 
 
 def test_v4_metrics_are_all_supported():
-    assert cm.MAPPING_VERSION == "v4"
+    assert int(cm.MAPPING_VERSION.lstrip("v")) >= 4      # v5 (V38/S3) added two debt lines on top
     missing = [m for m in _V4_METRICS if m not in cm.SUPPORTED_METRICS]
     assert not missing, missing
 

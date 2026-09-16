@@ -53,6 +53,8 @@ METRIC: dict[str, str] = {
     "current_portion_long_term_debt": "Long-term debt, current portion",
     "debt_current_total": "Current debt, total",
     "short_term_borrowings": "Short-term borrowings",
+    "long_term_debt_and_leases_noncurrent": "Long-term debt and lease obligations, non-current",
+    "current_portion_long_term_debt_and_leases": "Long-term debt and lease obligations, current portion",
     "interest_expense": "Interest expense",
     "interest_expense_nonoperating": "Interest expense, non-operating",
     "interest_paid": "Interest paid in cash",

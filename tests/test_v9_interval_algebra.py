@@ -150,6 +150,22 @@ def test_latest_window_states_the_interval_it_actually_derived():
     assert got.start == date(2025, 3, 30) and got.end == date(2026, 3, 28)
 
 
+def test_a_window_asked_to_end_at_a_date_ends_there():
+    """V38/S2. `at=` on a flow-based measure read the latest window whatever the
+    date: round C's sol Q10 asked for five fiscal year-ends and read one 2026
+    coverage five times."""
+    got = ia.latest_window(AAPL, months=12, ending_at=date(2025, 9, 30))   # the FY ends 2025-09-27
+    assert isinstance(got, ia.Derived)
+    assert (got.start, got.end) == (date(2024, 9, 29), date(2025, 9, 27))
+    assert got.value == pytest.approx(111.482)
+
+
+def test_a_date_no_reported_period_ends_near_is_refused_not_served_the_latest():
+    got = ia.latest_window(AAPL, months=12, ending_at=date(2025, 8, 15))
+    assert isinstance(got, ia.Unreachable)
+    assert "2025-08-15" in got.reason
+
+
 def test_latest_window_refuses_rather_than_returning_a_shorter_period():
     """Three quarters is not a year. The old code's fallback was a different
     period wearing the same name."""

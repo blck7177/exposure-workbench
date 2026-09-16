@@ -39,6 +39,18 @@ FINANCIAL_SECTORS = {"Financials", "Financial Services"}
 DAYS_IN_YEAR = 365
 
 
+def days_in_window(months: int) -> int:
+    """The days a `months`-long flow window spans, for a days measure (V38/S1).
+
+    A days measure is a balance over a flow, scaled to days: receivables over a
+    YEAR of revenue times 365, over a QUARTER of revenue times 91. The scale was
+    365 whatever the window, so every quarterly DSO, DIO and DPO the desk
+    printed was four times the issuer's (round C, sol Q09: AAPL's 2023-09-30 DSO
+    read 120.34 against the annual 28.10). Nominal days, the convention a days
+    measure is quoted in: 12 → 365, 9 → 274, 6 → 182, 3 → 91."""
+    return int(round(DAYS_IN_YEAR * int(months) / 12))
+
+
 async def _sector(db: AsyncSession, ticker: str) -> str | None:
     """positions is the only usable sector here: companies.sector holds a SIC
     code for one issuer and NULL for the rest, and security_master has no
@@ -142,7 +154,7 @@ async def _operand(db: AsyncSession, ticker: str, name: str, months: int,
         else:
             flow = (await fs.get_flow(db, ticker, name, start=window[0], end=window[1],
                                       invoked_by=invoked_by) if window
-                    else await fs.get_flow(db, ticker, name, months=months,
+                    else await fs.get_flow(db, ticker, name, months=months, end=at,
                                            invoked_by=invoked_by))
             got = (flow if flow.get("error")
                    else {"id": flow["calc_id"], "value": flow["value"],
@@ -235,7 +247,7 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
             invoked_by=invoked_by,
             metric="total_debt", detail=statement)
 
-    ids = [bs["balances"][m]["fact_id"] for m in cover.terms]
+    ids = [bs["balances"][cover.line_for(m)]["fact_id"] for m in cover.terms]
     if len(ids) == 1:
         # A one-component cover still gets a ledger row that CARRIES THE NAME.
         # Returning the bare fact id was the audit's finding: the panel's
@@ -249,7 +261,7 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
             return named
         running_id, running_value = named["calc_id"], named["value"]
     else:
-        running_id, running_value = ids[0], bs["balances"][cover.terms[0]]["value"]
+        running_id, running_value = ids[0], bs["balances"][cover.line_for(cover.terms[0])]["value"]
         # `consumed` counts components folded in so far; the step that consumes
         # the LAST component is the final row, and the final row IS the
         # issuer's total debt — the table calls it that. (The old form's
@@ -264,13 +276,14 @@ async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by:
             running_id, running_value = step["calc_id"], step["value"]
     return {"id": running_id, "value": running_value, "as_of": bs["as_of"],
             "basis": f"as of {bs['as_of']}", "formula": cover.formula,
+            **({"substituted": dict(cover.substituted)} if cover.substituted else {}),
             "missing_at_this_date": list(cover.missing_at_this_date),
             "no_facts_for_issuer": list(cover.no_facts_for_issuer),
             "overlapping_not_added": list(cover.overlapping_not_added)}
 
 
 async def _common_window(db: AsyncSession, ticker: str, f, months: int,
-                         invoked_by: str) -> tuple[str, str] | None:
+                         invoked_by: str, ending_at: str | None = None) -> tuple[str, str] | None:
     """The most recent window EVERY flow input of a formula can reach.
 
     Anchored on the BINDING input — the one whose data runs out first — not on
@@ -281,6 +294,9 @@ async def _common_window(db: AsyncSession, ticker: str, f, months: int,
 
     Each input may satisfy the anchor through a named alternative, which is why
     the alternatives are consulted here as well as at fetch time.
+
+    `ending_at` (V38/S2): the measure is read at a date, so every flow input is
+    the window ending there — the date the balances are read at.
     """
     from exposure_workbench.analytics import formulas as _fm
     flows = [i for i in f.inputs if i not in _fm.FORMULAS and i != "total_debt"]
@@ -289,7 +305,7 @@ async def _common_window(db: AsyncSession, ticker: str, f, months: int,
         candidates = (metric,) + tuple(f.alternatives.get(metric, ()))
         reach: tuple[str, str] | None = None
         for cand in candidates:
-            got = await fs.get_flow(db, ticker, cand, months=months, invoked_by=invoked_by)
+            got = await fs.get_flow(db, ticker, cand, months=months, end=ending_at, invoked_by=invoked_by)
             if got.get("error"):
                 continue
             p_ = got["period"]
@@ -429,7 +445,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
     f = fm.FORMULAS[name]
     window = _window
     if window is None and f.basis in ("window", "mixed"):
-        window = await _common_window(db, ticker, f, months, invoked_by)
+        window = await _common_window(db, ticker, f, months, invoked_by, ending_at=at)
 
     operands, used_instead = [], {}
     for i in f.inputs:
@@ -511,8 +527,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
                 invoked_by=invoked_by,
                 formula=name, definition=f.expression, authority=fm.authority(f))
         # A divide formula whose unit_class is `count` is a days measure: the
-        # quotient is a fraction of a year and the ×365 is part of the
-        # definition (import-time validation requires the expression to say
+        # quotient is a fraction of the window and the scale to days is part of
+        # the definition (import-time validation requires the expression to say
         # so). Derived from the registry's own unit_class — this used to be a
         # separate DAYS_FORMULAS list, one edit away from disagreeing with it.
         scaled_to_days = f.unit_class == "count"
@@ -534,7 +550,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
             # The x365 gets its own ledger row. Doing it here in Python was the
             # first version, and it published a number no evidence could support:
             # the panel printed 143.67 days beside a calc_id holding 0.3936.
-            scaled = await tc.scale(db, acc["id"], DAYS_IN_YEAR,
+            scaled = await tc.scale(db, acc["id"], days_in_window(months),
                                     unit_class=tc.COUNT, quantity=name,
                                     invoked_by=invoked_by)
             if scaled.get("error"):

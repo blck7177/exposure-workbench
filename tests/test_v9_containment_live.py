@@ -96,3 +96,34 @@ async def test_the_observation_counts_beside_each_edge_are_current():
     assert not drifted, (
         "containment.EDGES counts are out of date — update them with the new "
         "numbers after confirming the edges still hold:\n  " + "\n  ".join(drifted))
+
+
+async def test_a_stand_in_is_never_narrower_than_the_member_it_stands_in_for():
+    """V38/S3. A stand-in is the member plus lease obligations: where an issuer
+    reports both on one date, the stand-in may be wider and never narrower, and the
+    counts beside each pair are re-derived here. Read through the CURRENT mapping
+    from the raw concepts, so a database not yet remapped measures the same claim."""
+    from exposure_workbench.services.concept_mapping import normalize_concept
+    engine = create_async_engine(URL)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as db:
+            rows = (await db.execute(text(
+                "SELECT c.ticker, f.raw_concept AS rc, f.period_end AS pe, max(f.value) AS v "
+                "  FROM financial_facts f JOIN companies c ON c.id = f.company_id "
+                " WHERE f.dimensions_hash = '' AND f.period_start IS NULL AND f.value IS NOT NULL "
+                " GROUP BY 1, 2, 3"
+            ))).mappings().all()
+    finally:
+        await engine.dispose()
+    at: dict[tuple[str, object], dict[str, float]] = {}
+    for r in rows:
+        m = normalize_concept(r["rc"])
+        if m:
+            at.setdefault((r["ticker"], r["pe"]), {})[m] = float(r["v"])
+    for member, line, declared, declared_equal in ct.SUBSTITUTES:
+        both = [(vals[member], vals[line], key) for key, vals in at.items() if member in vals and line in vals]
+        narrower = [f"{k}: {line} {w:,.0f} < {member} {m:,.0f}" for m, w, k in both
+                    if (m - w) / max(abs(m), 1.0) > TOLERANCE]
+        assert not narrower, narrower
+        equal = sum(1 for m, w, _k in both if abs(w - m) <= TOLERANCE * max(abs(m), 1.0))
+        assert (len(both), equal) == (declared, declared_equal), (member, len(both), equal)

@@ -153,6 +153,19 @@ METRICS: dict[str, MetricSemantics] = {
              "issuer filing both files two different numbers.",
         for_a_total_call="method(name='total_debt')",
     ),
+    "long_term_debt_and_leases_noncurrent": MetricSemantics(
+        note="Term debt due beyond twelve months together with finance-lease "
+             "obligations, so it is wider than long_term_debt_noncurrent by the "
+             "leases; a total uses it, named, only where that line is not reported.",
+        for_a_total_call="method(name='total_debt')",
+    ),
+    "current_portion_long_term_debt_and_leases": MetricSemantics(
+        note="The current maturities of term debt together with the current "
+             "finance-lease obligations, so it is wider than "
+             "current_portion_long_term_debt by the leases and is NOT added beside "
+             "debt_current_total, which holds it.",
+        for_a_total_call="method(name='total_debt')",
+    ),
     "commercial_paper": MetricSemantics(
         note="Short-dated debt outside the term structure — a component, NOT a "
              "synonym for the current debt total. A filed zero is a reported value "

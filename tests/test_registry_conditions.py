@@ -233,7 +233,7 @@ def _formula(**kw) -> fm.Formula:
     (dict(op="sum", inputs=("a", "b"), signs=(1, -1)),
      "signs on a sum would be silently ignored"),
     (dict(op="divide", unit_class="count", expression="a over b"),
-     "a count from a divide is scaled by 365 and the expression must say so"),
+     "a count from a divide is scaled by its window's days and the expression must say so"),
     (dict(op="sum", inputs=("a", "b"),
           denominator_must_be_positive="no denominator to check"),
      "the denominator condition only means something on a divide"),
@@ -248,9 +248,9 @@ def test_the_live_registry_passes_its_own_validation():
     fm.validate(fm.FORMULAS)          # raises on failure; importing already ran it
 
 
-def test_a_count_divide_that_states_its_365_is_valid():
+def test_a_count_divide_that_states_its_day_scaling_is_valid():
     fm.validate({"ok": _formula(op="divide", unit_class="count",
-                                expression="a ÷ b × 365")})
+                                expression="a ÷ b × days in the window (365 for twelve months)")})
 
 
 # ── the final row carries the name, at every operand count ───────────────────
@@ -320,7 +320,7 @@ def test_the_days_list_is_gone_the_unit_class_is_the_rule():
     assert not hasattr(fm, "DAYS_FORMULAS")
     for name, f in fm.FORMULAS.items():
         if f.op == "divide" and f.unit_class == "count":
-            assert "365" in f.expression, name
+            assert "days in the window" in f.expression, name
 
 
 async def test_a_count_divide_scales_by_365_and_the_scale_row_carries_the_name(monkeypatch):
@@ -333,6 +333,35 @@ async def test_a_count_divide_scales_by_365_and_the_scale_row_carries_the_name(m
     assert (factor, unit_class, quantity) == (365, "count", "days_sales_outstanding")
     assert out["calc_id"].startswith("calc_scale"), (
         "the value printed is the scaled row the ledger holds")
+
+
+async def test_a_quarterly_days_measure_is_scaled_by_a_quarters_days(monkeypatch):
+    """V38/S1. Round C's sol Q09: every quarterly days figure was scaled by 365,
+    four times the issuer's."""
+    desk = Desk(monkeypatch, sector="Technology",
+                balances={"accounts_receivable": 4.0e9}, flows={"revenue": 2.0e10})
+    out = await fsvc.evaluate_formula(None, "TEST", "days_sales_outstanding", months=3)
+    assert not out.get("error")
+    (_ref, factor, unit_class, quantity) = desk.scales[0]
+    assert (factor, unit_class, quantity) == (91, "count", "days_sales_outstanding")
+    assert [fsvc.days_in_window(m) for m in (3, 6, 9, 12)] == [91, 182, 274, 365]
+
+
+async def test_a_measure_read_at_a_date_reads_its_flows_over_the_window_ending_there(monkeypatch):
+    """V38/S2. `at` moved only the balances: ROE at 2023-12-31 divided 2026's
+    earnings by 2023's equity (round C, sol Q12)."""
+    asked: list = []
+    desk = Desk(monkeypatch, sector="Technology",
+                balances={"accounts_receivable": 4.0e9}, flows={"revenue": 2.0e10})
+    real = fsvc.fs.get_flow
+
+    async def spy(db, t, metric, **kw):
+        asked.append((metric, kw.get("end"), kw.get("start")))
+        return await real(db, t, metric, **kw)
+    monkeypatch.setattr(fsvc.fs, "get_flow", spy)
+    out = await fsvc.evaluate_formula(None, "TEST", "days_sales_outstanding", at="2023-12-31")
+    assert not out.get("error")
+    assert ("revenue", "2023-12-31", None) in asked, asked
 
 
 async def test_the_cash_conversion_cycle_is_a_named_difference_of_the_three_days(monkeypatch):

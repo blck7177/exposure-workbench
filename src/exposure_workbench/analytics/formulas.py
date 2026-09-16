@@ -218,7 +218,7 @@ FORMULAS: dict[str, Formula] = {
         note="The revenue line used is named in the result.",
     ),
     "days_sales_outstanding": Formula(
-        expression="accounts receivable ÷ revenue × 365",
+        expression="accounts receivable ÷ revenue × days in the window (365 for twelve months)",
         inputs=("accounts_receivable", "revenue"),
         alternatives={"revenue": ("total_revenues",)}, op="divide", basis="mixed",
         unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
@@ -226,13 +226,13 @@ FORMULAS: dict[str, Formula] = {
               "surface a missing quarter can remove. Stated in the result."),
     ),
     "days_inventory": Formula(
-        expression="inventory ÷ cost of revenue × 365",
+        expression="inventory ÷ cost of revenue × days in the window (365 for twelve months)",
         inputs=("inventory", "cost_of_revenue"), op="divide", basis="mixed",
         unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
     ),
     "days_payable": Formula(
-        expression="accounts payable ÷ cost of revenue × 365",
+        expression="accounts payable ÷ cost of revenue × days in the window (365 for twelve months)",
         inputs=("accounts_payable", "cost_of_revenue"), op="divide", basis="mixed",
         unit_class="count", family="turnover", source_url=SEC_NON_GAAP,
         note="Ending balance, stated in the result.",
@@ -484,13 +484,14 @@ def validate(formulas: dict[str, "Formula"]) -> None:
         elif f.signs:
             raise ValueError(f"{name}: signs are only read by difference; on "
                              f"{f.op} they would be silently ignored")
-        if f.op == "divide" and f.unit_class == "count" and "365" not in f.expression:
+        if f.op == "divide" and f.unit_class == "count" and "days in the window" not in f.expression:
             # A count that comes out of a division IS a days measure: the
-            # evaluator scales the quotient by 365 and the expression must say
-            # so, or the printed formula and the printed number disagree.
+            # evaluator scales the quotient by the days its window spans (V38/S1:
+            # 365 for twelve months, 91 for a quarter) and the expression must
+            # say so, or the printed formula and the printed number disagree.
             raise ValueError(f"{name}: a divide formula with unit_class 'count' "
-                             f"is scaled by 365, and its expression must state "
-                             f"the × 365")
+                             f"is scaled by the days in its window, and its "
+                             f"expression must state '× days in the window'")
         if f.denominator_must_be_positive and f.op != "divide":
             raise ValueError(f"{name}: denominator_must_be_positive only means "
                              f"something on a divide formula")

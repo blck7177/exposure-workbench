@@ -231,13 +231,22 @@ def derive(facts: list[FlowFact], start: date, end: date) -> Window:
     )
 
 
-def latest_window(facts: list[FlowFact], months: int = 12) -> Window:
-    """The most recent `months`-long window this issuer's filings can support.
+def latest_window(facts: list[FlowFact], months: int = 12, ending_at: date | None = None) -> Window:
+    """The most recent `months`-long window this issuer's filings can support —
+    or, with `ending_at`, the one that ends there.
 
     Deliberately not "TTM, or a fiscal year if that fails". A shorter period
     served under a twelve-month name is the silent convention switch this design
     exists to remove; the window that comes back is the window that was derived,
     with both its dates.
+
+    `ending_at` (V38/S2) is the date a balance is read at, for a measure that
+    divides a flow by it: the flow ends on the reported boundary nearest that
+    date (within WINDOW_SNAP_DAYS), or the read is refused. It was ignored —
+    every `at=` on a flow-based method returned the latest window under the
+    date it was asked for (round C: 18 facts dated 2021 that were 2026's), and
+    "the latest window ending before it" would serve a retired line's last year
+    as this year's.
     """
     usable = [f for f in facts if f.value is not None and f.period_start is not None]
     if not usable:
@@ -245,6 +254,14 @@ def latest_window(facts: list[FlowFact], months: int = 12) -> Window:
 
     canon = _boundary_map(usable)
     ends = sorted({c for c in canon.values()}, reverse=True)
+    if ending_at is not None:
+        at = _snap(ending_at, canon, tolerance=WINDOW_SNAP_DAYS)
+        if at is None:
+            return Unreachable(
+                reason=(f"no reported period ends at or within {WINDOW_SNAP_DAYS} days of "
+                        f"{ending_at.isoformat()}; the reported periods end as late as {ends[0].isoformat()}"),
+                nearest_end=ends[0] if ends else None)
+        ends = [at]
     span = timedelta(days=round(months * _DAYS_PER_MONTH))
     attempts: list[str] = []
     for end in ends:

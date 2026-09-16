@@ -34,7 +34,7 @@ Empirically grounded (measured against live EDGAR data):
 
 from __future__ import annotations
 
-MAPPING_VERSION = "v4"   # v4: per-share/capital-allocation layer (V16 Lane B); v3: V9-M1 splits
+MAPPING_VERSION = "v5"   # v5: long-term debt and lease obligations (V38/S3); v4: per-share/capital-allocation layer (V16 Lane B); v3: V9-M1 splits
 
 # normalized_metric -> the us-gaap concepts (without taxonomy prefix) that mean it
 _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
@@ -142,6 +142,21 @@ _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
     # AMZN when both were filed for the same date.
     "short_term_borrowings": (
         "ShortTermBorrowings",
+    ),
+    # V38/S3. Term debt AND finance-lease obligations — the tags XOM files all its
+    # long-term debt under (never LongTermDebtNoncurrent), KO since 2024 and
+    # GOOGL until 2023. Unread, XOM's "total debt" was its current debt alone and
+    # fcf_to_debt printed 254% (round C). Their own names, because they are
+    # WIDER than long_term_debt_noncurrent / current_portion_long_term_debt by the
+    # lease obligations: measured where an issuer files both on one date, 4 and 6
+    # co-occurrences, never narrower, 3 and 5 of them equal within 0.5%, the
+    # widest 11.7% over. analytics/containment uses each in its member's place,
+    # named, on a date the member is not reported.
+    "long_term_debt_and_leases_noncurrent": (
+        "LongTermDebtAndCapitalLeaseObligations",
+    ),
+    "current_portion_long_term_debt_and_leases": (
+        "LongTermDebtAndCapitalLeaseObligationsCurrent",
     ),
     # ── V9-M1b: the credit lines the corpus was already carrying ──────────────
     # Every one of these was stored with normalized_metric NULL since ingest —

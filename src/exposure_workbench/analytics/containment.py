@@ -44,6 +44,22 @@ EDGES: tuple[tuple[str, str, int], ...] = (
     ("total_assets", "current_assets", 176),
 )
 
+# A member's stand-in: (member, the wider line reported in its place, times the
+# two were reported together with the stand-in never narrower, of which equal
+# within 0.5%). V38/S3. XOM files its term debt only as debt-and-lease
+# obligations, KO moved to that tag in 2024 and GOOGL moved off it in 2023; with
+# the member missing, XOM's cover was its current debt alone and called
+# "complete", because a line the issuer never filed is not debt the sum lacks.
+# The stand-in is used only on a date the member is NOT reported and the stand-in
+# is, it takes the member's place in the graph (so nothing that contains the
+# member is summed beside it), and the cover names it — the discipline of a
+# formula's named alternative, never a silent alias. The counts are the
+# evidence, re-measured by test_v9_containment_live.
+SUBSTITUTES: tuple[tuple[str, str, int, int], ...] = (
+    ("long_term_debt_noncurrent", "long_term_debt_and_leases_noncurrent", 4, 3),
+    ("current_portion_long_term_debt", "current_portion_long_term_debt_and_leases", 6, 5),
+)
+
 # What a caller may ask to be covered. A family is a question ("what does this
 # issuer owe"), not a taxonomy node.
 FAMILIES: dict[str, tuple[str, ...]] = {
@@ -78,7 +94,7 @@ class Cover:
     statement about THIS DESK's coverage of that issuer, not about its debt.
     """
     value: float
-    terms: tuple[str, ...]
+    terms: tuple[str, ...]           # members, in family order; a stood-in member is named here
     formula: str
     missing_at_this_date: tuple[str, ...] = field(default_factory=tuple)
     no_facts_for_issuer: tuple[str, ...] = field(default_factory=tuple)
@@ -99,6 +115,13 @@ class Cover:
     # in one list, and telling them apart needed the containment graph — which
     # is in this module and not in the reader's hands. So it is answered here.
     short_by: tuple[str, ...] = field(default_factory=tuple)
+    # (member, the line reported in its place) for every member taken through
+    # its stand-in (V38/S3); the value in `available` was read under that line
+    substituted: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+
+    def line_for(self, member: str) -> str:
+        """The reported line a term was read from: its stand-in's, if it has one."""
+        return dict(self.substituted).get(member, member)
 
     @property
     def complete(self) -> bool:
@@ -178,6 +201,13 @@ def cover(available: dict[str, float], family: str,
     if members is None:
         return NoCover(reason=f"unknown family {family!r}; known: {sorted(FAMILIES)}")
 
+    available = dict(available)
+    stood_in: list[tuple[str, str]] = []
+    for member, line, _n, _eq in SUBSTITUTES:
+        if member in members and available.get(member) is None and available.get(line) is not None:
+            available[member] = available[line]
+            stood_in.append((member, line))
+
     present = [m for m in members if m in available and available[m] is not None]
     if not present:
         return NoCover(reason=f"no {family} component reported at this date",
@@ -209,10 +239,11 @@ def cover(available: dict[str, float], family: str,
     left_over = [m for m in members
                  if m not in taken and m not in covered and m not in overlapping]
     missing_now = [m for m in left_over if m in ever_reported]
+    subs = dict(stood_in)
     return Cover(
         value=sum(available[m] for m in taken_in_order),
         terms=tuple(taken_in_order),
-        formula=" + ".join(taken_in_order),
+        formula=" + ".join(f"{subs[m]} (for {m})" if m in subs else m for m in taken_in_order),
         missing_at_this_date=tuple(missing_now),
         no_facts_for_issuer=tuple(m for m in left_over if m not in ever_reported),
         overlapping_not_added=tuple(m for m in members if m in overlapping),
@@ -222,4 +253,5 @@ def cover(available: dict[str, float], family: str,
         # sum is missing, it is a concept that does not apply to it.
         short_by=tuple(m for m in missing_now
                        if not _accounted_for(m, covered, set(members))),
+        substituted=tuple((m, subs[m]) for m in taken_in_order if m in subs),
     )

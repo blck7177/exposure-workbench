@@ -243,7 +243,8 @@ analyst read (see Types). Below, the algebra boundaries — policy, not language
 - **Sums that share an issuer.** A sum across issuers minus a sum sharing one of them is refused
   (`mixed_basis_operand`); rebuild the smaller sum from its parts.
 - **Two method readings of one issuer at two dates** are differenced through the method's series and
-  `at`, not through two single readings (`at=` on a flow-based method shifts only its balances).
+  `at`, or through two single readings with `at=` (V38: `at=` on a method reads its balances at that date and every
+  flow over the `months` window ending there; a date no reported period ends near is refused).
 
 Data the fixture does not hold (the honest answer names them): `issuer_exposures.quantity` is not a
 run column; episode durations are payload literals, not figures; `factor_attributions.*` are

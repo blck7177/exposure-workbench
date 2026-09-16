@@ -208,7 +208,7 @@ async def get_flow(
             detail=f"{ticker} reports no {metric} with a period; it may report "
                    f"a related line instead — call describe")
 
-    if not (start and end):
+    if not start and not end:
         # V31. A window anchored on "the latest" must be the latest the issuer
         # reports, and for a line it moved off, that is the line that continues.
         # NVDA's `revenue` holds three facts to 2022-01-30 while `total_revenues`
@@ -230,7 +230,10 @@ async def get_flow(
     if start and end:
         window = ia.derive(facts, date.fromisoformat(start), date.fromisoformat(end))
     else:
-        window = ia.latest_window(facts, months=months or 12)
+        # an `end` alone is the date the window ends at (V38/S2): a formula read
+        # `at` a date reads its flows over the window ending there
+        window = ia.latest_window(facts, months=months or 12,
+                                  ending_at=date.fromisoformat(end) if end else None)
 
     if isinstance(window, ia.Unreachable):
         covers = {"from": window.nearest_start.isoformat() if window.nearest_start else None,

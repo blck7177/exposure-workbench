@@ -88,7 +88,7 @@ class Method:
 _ISSUER_PARAMS = {"type": "object", "properties": {
     "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None],
                "description": "window for flow-based measures (default 12)"},
-    "at": {"type": ["string", "null"], "description": "YYYY-MM-DD instant for balance-based measures; omitted = latest"},
+    "at": {"type": ["string", "null"], "description": "YYYY-MM-DD: the balances at this date and every flow over the `months` window ending there (a reported period end); omitted = latest"},
     "last_n": {"type": ["integer", "null"], "minimum": 2, "maximum": 16,
                "description": "the measure over its last N periods (months each) as ONE series, for yoy/cagr/trend; omitted = one value"},
 }, "additionalProperties": False}

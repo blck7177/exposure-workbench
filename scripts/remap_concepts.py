@@ -37,8 +37,13 @@ URL = os.getenv(
 )
 
 
-async def main(apply: bool) -> None:
-    engine = create_async_engine(URL)
+async def main(apply: bool, db_name: str | None = None) -> None:
+    # --db NAME swaps the database in the owner URL (a fixture copy, V38/S3); the
+    # production database is the default and is remapped only when a deploy is
+    # released to run it
+    url = URL.replace("/exposure_workbench", f"/{db_name}") if db_name else URL
+    print(f"database: {url.rsplit('/', 1)[-1]}")
+    engine = create_async_engine(url)
     mk = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with mk() as db:
@@ -86,5 +91,6 @@ if __name__ == "__main__":
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--dry-run", action="store_true")
     g.add_argument("--apply", action="store_true")
+    ap.add_argument("--db", help="database name to remap instead of exposure_workbench (a fixture copy)")
     a = ap.parse_args()
-    asyncio.run(main(apply=a.apply))
+    asyncio.run(main(apply=a.apply, db_name=a.db))

@@ -90,8 +90,9 @@ def test_revenue_keeps_only_the_net_of_tax_family():
 
 def test_the_version_moved():
     """Facts carry mapping_version, and a remap that does not change it leaves
-    no way to tell which reading produced a stored row."""
-    assert cm.MAPPING_VERSION == "v4"
+    no way to tell which reading produced a stored row. V38/S3 moved it to v5
+    (two debt-and-lease lines)."""
+    assert cm.MAPPING_VERSION == "v5"
 
 
 # ── the detector for everything this batch did NOT split ──────────────────────
