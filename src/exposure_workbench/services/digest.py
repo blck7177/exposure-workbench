@@ -208,6 +208,19 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
             pts = val.get("points") if isinstance(val, dict) else None
             s = {"id": rec["id"], "subject": rec.get("subject"), "measure": rec.get("measure"), "unit": rec.get("unit"),
                  "n": (val.get("n") if isinstance(val, dict) else None), "node": params.get("node")}
+            # HOW IT IS SPACED AND HOW FAR IT REACHES (V37/T5). The entry showed
+            # `n`, a first point and a last, and left the analyst to work the
+            # cadence out of the dates — which it did wrong five times in round B,
+            # calling six annual points "the last twelve quarter readings" with
+            # those six annual dates printed in its own sentence. The series
+            # carries its points, so this is a lookup (services/facts.spacing_of),
+            # and it is the same lookup the answer check now makes: the analyst
+            # reads what the gate will read.
+            if pts:
+                spacing = F.spacing_of(pts)
+                if spacing:
+                    s["spacing"] = spacing
+                s["span"] = f"{pts[0][0]}..{pts[-1][0]}"
             if pts:
                 s["first"] = [pts[0][0], display(pts[0][1], rec.get("unit"))]
                 s["last"] = [pts[-1][0], display(pts[-1][1], rec.get("unit"))]
@@ -249,8 +262,12 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
             entry["made"] = made
     if res.get("held_back"):
         entry["boundaries"].append({
-            **mint(f"{res['held_back'].get('count')} more figures were computed and not shown; "
-                   f"request fewer names, or name the ones you need", cls="held_back"),
+            # V37/T5: what to WRITE, not what to want. "Request fewer names" is
+            # not a thing a program says; `return` is. Round B held figures back
+            # fifteen times and the next program was narrower three times.
+            **mint(f"{res['held_back'].get('count')} more figures were computed and are on the ledger, not shown "
+                   f"here: run the same program again with `return` naming only the nodes you need",
+                   cls="held_back"),
             "measures": res["held_back"].get("measures", [])[:20]})
     return entry
 
@@ -348,7 +365,8 @@ def merge(into: dict, part: dict) -> dict:
 
 
 def render(res: dict, *, request: dict | None = None, subject: str | None = None,
-           mint=None, seen: dict | None = None, cap: int = DIGEST_CHAR_LIMIT, call: dict | None = None) -> dict:
+           mint=None, seen: dict | None = None, cap: int = DIGEST_CHAR_LIMIT, call: dict | None = None,
+           how_to_cite: bool = False) -> dict:
     """One tool result, as the analyst reads it: absorbed, collapsed, stamped
     and fitted. The one entry point a sub-analyst needs. `call` is the tool and
     arguments the result answers, so a boundary can say what was asked."""
@@ -357,4 +375,8 @@ def render(res: dict, *, request: dict | None = None, subject: str | None = None
     tell_apart(items, seen)
     stamp_ids(items)
     fit({"items": items}, cap, mint=mint)
-    return {**entry, "how_to_cite": HOW_TO_CITE}
+    # ONCE, IN THE SYSTEM PROMPT (V37/T5). These 726 characters rode on every
+    # result: `book_market_risk` read them nine times in one turn of round B,
+    # which dilutes the reading and breaks the prompt's stable prefix for no
+    # information at all. The caller puts them in its standing instructions.
+    return {**entry, **({"how_to_cite": HOW_TO_CITE} if how_to_cite else {})}

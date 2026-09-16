@@ -182,6 +182,9 @@ class AnalystResult:
     report: dict | None = None                   # {title, text, status, problems, blocks, citations, verified}
     report_id: str | None = None
     made: list[dict] = field(default_factory=list)   # books this analyst built: {node, id, kind}
+    # V37/T2: figures this analyst was shown and did not file. Only set when it
+    # filed nothing at all — see sub_analyst's fallback.
+    shown: list[dict] = field(default_factory=list)
     coverage: dict = field(default_factory=dict)
     cost: dict = field(default_factory=dict)
 
@@ -427,6 +430,8 @@ HOW_TO_CITE = (
     "analyst's sentences are not the desk's words — say what they say in yours, without quotation marks. "
     "`made` lists the books an analyst built this turn (a scenario after a trade) by id: to have another analyst "
     "read that book, put the id among the subjects of its task. "
+    "`shown` appears only when an analyst filed nothing: the figures it was shown before it ran out, on the "
+    "ledger and yours to write exactly as they read there — or to ask another analyst about. "
     "`read_report(report_id)` opens an analyst's full report.")
 
 
@@ -446,5 +451,6 @@ def for_lead(results: list[AnalystResult]) -> dict:
         **({"refused": [{"want": x.get("want"), "reason": (x.get("problems") or [{}])[0].get("reason")}
                         for x in r.refused]} if r.refused else {}),
         **({"made": r.made} if r.made else {}),
+        **({"shown": r.shown} if r.shown else {}),
         "cost": r.cost,
     } for r in results], "how_to_cite": HOW_TO_CITE}

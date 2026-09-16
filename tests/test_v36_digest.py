@@ -117,12 +117,33 @@ def test_the_cap_holds_back_rows_and_mints_a_fact_for_them():
 
 # ── the entry point ──────────────────────────────────────────────────────────
 
-def test_render_echoes_the_request_and_says_how_to_cite():
+def test_render_echoes_the_request_and_leaves_the_citing_rule_to_the_system_text():
+    """V37/T5: the rule is standing knowledge, not a per-result repetition. Those
+    726 characters rode on every result — `book_market_risk` read them nine times
+    in one turn of round B — which dilutes the reading and breaks the prompt's
+    stable prefix without saying anything new. The analyst's system text carries
+    them once (agents/sub_analyst), and a caller that wants them inline asks."""
     req = {"subjects": ["port_001"], "want": ["issuer_exposures.weight"], "compare": "rank lowest"}
     d = dg.render(_result([]), request=req, mint=dg.Minter())
-    assert d["request"] == req
-    assert "bracket included" in d["how_to_cite"]
-    assert "place" in d["how_to_cite"]      # V36: the support a superlative rests on
+    assert d["request"] == req and "how_to_cite" not in d
+    with_rule = dg.render(_result([]), request=req, mint=dg.Minter(), how_to_cite=True)
+    assert "bracket included" in with_rule["how_to_cite"]
+    assert "place" in with_rule["how_to_cite"]      # V36: the support a superlative rests on
+
+
+def test_a_series_says_how_it_is_spaced_and_how_far_it_reaches():
+    """The entry showed `n`, a first point and a last, and left the analyst to
+    work the cadence out of the dates — which it got wrong five times in round B,
+    calling six annual points "the last twelve quarter readings" with those six
+    annual dates printed in its own sentence. It is a lookup, and it is the same
+    lookup the answer check makes: the analyst reads what the gate will read."""
+    rows = [["f_dso0001", "series", "AAPL", "days_sales_outstanding", "COUNT",
+             {"points": [["2020-09-26", 21.43], ["2021-09-25", 26.22], ["2022-09-24", 26.09],
+                         ["2023-09-30", 28.10], ["2024-09-28", 31.19], ["2025-09-27", 34.89]], "n": 6},
+             "2025-09-27", None, {"node": "dso"}, []]]
+    d = dg.render(_result(rows), mint=dg.Minter())
+    (s_,) = d["series"]
+    assert s_["spacing"] == "annual" and s_["span"] == "2020-09-26..2025-09-27" and s_["n"] == 6
 
 
 def test_a_series_point_carries_its_date_in_the_bracket():

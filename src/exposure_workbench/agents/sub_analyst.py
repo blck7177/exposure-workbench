@@ -173,13 +173,19 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     start_calls = 0
     started: dict[tuple[str, str], str] = {}            # (kind, subject) -> the task it enqueued
     made: dict[str, dict] = {}                          # the books this analyst's programs built, by id
+    shown_series: dict[str, dict] = {}                  # the series it was shown, by id (V37/T2)
     completions = 0
     llm = ctx.llm.for_actor(actor) if hasattr(ctx.llm, "for_actor") else ctx.llm
 
     messages: list[dict] = [
         {"role": "system", "content": _SYSTEM.format(domain=task.domain)
          + "\n\nDOMAIN " + (skill.system_text(procedure) if procedure else task.domain)
-         + "\n\nTHE LANGUAGE\n" + ps.signature_text()},
+         + "\n\nTHE LANGUAGE\n" + ps.signature_text()
+         # V37/T5: the citing rule is standing knowledge. It rode on every tool
+         # result — 726 characters that `book_market_risk` read nine times in one
+         # turn of round B — which dilutes the reading and breaks the prompt's
+         # stable prefix without saying anything new.
+         + "\n\nHOW EVERY RESULT IS READ\n" + dg.HOW_TO_CITE},
         {"role": "user", "content": json.dumps(
             {"task": task.as_dict(), "subjects": _subjects_of(task, ctx.briefing),
              "boundaries": list(ps.BOUNDARIES)}, ensure_ascii=False, default=str)},
@@ -214,6 +220,13 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
             continue
 
         done = False
+        # ONE COMPLETION'S READING IS BOUNDED (V37/T5). The cap was per RESULT, so
+        # three calls in one completion could hand it 48k characters: round B did
+        # 43.5k once and answered with three tokens, and five of its empty replies
+        # came straight after a read of more than 9k. The budget is the
+        # completion's, shared by the results it will read, with a floor so a
+        # single call is never starved.
+        room = max(4_000, settings.sub_analyst_result_chars // max(1, len(tool_calls)))
         for tc in tool_calls:
             name = tc["function"]["name"]
             try:
@@ -248,7 +261,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     start_calls += 1
                     raw = await ctx.tools_session.call(name, args, actor=actor)
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
-                    res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
+                    res = dg.render(raw, mint=minter, seen=seen, cap=room,
                                     call={"tool": name, "args": args})
                     started[key] = str(raw.get("task_id") or raw.get("run_id") or "")
                     minted = minter.take()
@@ -265,10 +278,13 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     evidence_calls += 1
                     raw = await ctx.tools_session.call(name, args, actor=actor)
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
-                    res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
+                    res = dg.render(raw, mint=minter, seen=seen, cap=room,
                                     call={"tool": name, "args": args})
                     for m in res.get("made") or []:
                         made[m["id"]] = m
+                    for sr in res.get("series") or []:
+                        if sr.get("id") and sr["id"] not in shown_series:
+                            shown_series[sr["id"]] = sr
                     minted = minter.take()
                     if minted:
                         # SHOWN MEANS ON THE LEDGER. The desk's own words for what
@@ -313,7 +329,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                        "detail": f"your tools are compile, {', '.join(EVIDENCE_TOOLS)} and submit"}
 
             _append({"role": "tool", "tool_call_id": tc["id"],
-                     "content": ejson.dumps_capped(res, settings.sub_analyst_result_chars)})
+                     "content": ejson.dumps_capped(res, room)})
         if done:
             break
 
@@ -341,6 +357,18 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
         result.status = "refused"
         result.not_done = [{"want": i, "why": text, "boundary": fact.id, "said": fact.text}
                            for i in range(1, len(task.want_to_know) + 1)]
+        # WHAT IT DID GET, HANDED OVER (V37/T2). Round B had three analysts run
+        # their eight turns out and file nothing — one of them after nine tool
+        # calls — and all the lead was told is "did not file a brief within its
+        # turns". Those figures are on the ledger and the lead may write them; the
+        # most expensive part of the turn used to fall on the floor. It is not a
+        # brief and is not offered as one: no line is claimed answered.
+        result.shown = ([{k: v for k, v in f.items() if k in
+                          ("value", "subject", "measure", "as_of", "place", "of", "node", "unit")}
+                         for f in list(seen.values())[:40]]
+                        + [{k: v for k, v in sr.items() if k in
+                            ("id", "subject", "measure", "spacing", "span", "n", "first", "last")}
+                           for sr in list(shown_series.values())[:10]])
         result.coverage = {"asked": len(task.want_to_know), "done": 0,
                            "not_done": len(task.want_to_know), "refused": 0}
     result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls, "starts": start_calls}

@@ -495,3 +495,73 @@ async def test_a_report_is_verified_only_when_the_whole_brief_passed():
     assert r.status == "partial" and [x["want"] for x in r.refused] == [1]
     assert r.report["status"] == "refused"
     assert any(p["reason"] == "superlative_without_rank" for p in r.report["problems"])
+
+
+# ── V37/T5: one completion's reading is bounded, and the rule is said once ─────
+
+@pytest.mark.asyncio
+async def test_one_completions_reading_is_shared_by_the_results_it_reads(monkeypatch):
+    """The cap was per RESULT, so three calls in one completion could hand the
+    analyst three times it: round B did 43.5k characters once and answered with
+    three tokens, and five of its empty replies came straight after a read of more
+    than 9k. The budget belongs to the completion."""
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_result_chars", 9_000, raising=False)
+    wide = [_scalar("issuer_exposures.weight", f"T{i:04d}", i / 1000, node="w") for i in range(300)]
+    tools = _Tools({"run": lambda a: _run_result(wide)})
+    llm = _Llm([("", [("run", {"program": {"let": []}}) for _ in range(3)]), ("", None)])
+    await sa.run_sub_analyst(_task(), _ctx(tools, llm))
+    read = [m for m in llm.seen[1]["messages"] if m.get("role") == "tool"]
+    assert len(read) == 3
+    assert sum(len(m["content"]) for m in read) <= 9_000 * 1.05, "three results, one completion's budget"
+
+
+@pytest.mark.asyncio
+async def test_the_citing_rule_is_in_the_system_text_and_not_on_every_result():
+    """726 characters that said nothing new: `book_market_risk` read them nine
+    times in one turn of round B."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="c", place=1, of=3)
+    llm = _Llm([("", [("run", {"program": {"let": []}})]), ("", None)])
+    await sa.run_sub_analyst(_task(), _ctx(_Tools({"run": lambda a: _run_result([f])}), llm))
+    system = llm.seen[0]["messages"][0]["content"]
+    assert "bracket included" in system, "the rule is standing knowledge"
+    result = next(m for m in llm.seen[1]["messages"] if m.get("role") == "tool")
+    assert "how_to_cite" not in result["content"]
+
+
+# ── V37/T2: an analyst that files nothing still hands over what it was shown ───
+
+@pytest.mark.asyncio
+async def test_an_analyst_out_of_turns_hands_over_the_figures_it_was_shown(monkeypatch):
+    """Round B had three analysts run their eight turns out and file nothing, one
+    of them after nine tool calls, and all the lead was told is "the domain
+    analyst did not file a brief within its turns". The figures were on the
+    ledger; the most expensive part of the turn fell on the floor.
+
+    It is not a brief and is not offered as one — no line is claimed answered —
+    and every figure reads exactly as the desk showed it, so the lead may write
+    them."""
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_max_turns", 2, raising=False)
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="cur", place=1, of=3)
+    series = {"id": "f_dso001", "kind": "series", "subject": "AAPL", "measure": "days_sales_outstanding",
+              "unit": "COUNT", "value": {"points": [["2024-09-28", 31.19], ["2025-09-27", 34.89]], "n": 2},
+              "as_of": "2025-09-27", "params": {"node": "dso"}}
+    result = {"program_id": "calc_1", "returns": [], "nodes": {"cur": {"kind": "vector"}}, "settled": 2,
+              "refused": [], "facts": {"columns": list(F.COLUMNS),
+                                       "rows": [[f.id, f.kind, f.subject, f.measure, f.unit, f.value, f.as_of,
+                                                 None, f.params, []],
+                                                [series["id"], "series", series["subject"], series["measure"],
+                                                 series["unit"], series["value"], series["as_of"], None,
+                                                 series["params"], []]]}}
+    llm = _Llm([("", [("run", {"program": {"let": []}})]), ("thinking", None)])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({"run": lambda a: result}), llm))
+
+    assert r.status == "refused" and not r.findings, "nothing is claimed answered"
+    assert [d["want"] for d in r.not_done] == [1, 2]
+    values = [x.get("value") for x in r.shown if "value" in x]
+    assert any(str(v).endswith(f"[{f.id}]") for v in values), "written as the desk showed it"
+    assert any(x.get("measure") == "days_sales_outstanding" and x.get("spacing") == "annual" for x in r.shown)
+    # and it reaches the lead
+    for_lead = dl.for_lead([r])["analysts"][0]
+    assert for_lead["shown"] == r.shown and "shown" in dl.HOW_TO_CITE
