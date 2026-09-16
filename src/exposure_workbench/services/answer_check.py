@@ -53,6 +53,7 @@ from typing import Any
 
 from exposure_workbench.services import answer as A
 from exposure_workbench.services import facts as F
+from exposure_workbench.services.facts import extent_in as F_extent, spacing_of as F_spacing
 from exposure_workbench.services.gate import _core, quoted_spans, _normalise
 from exposure_workbench.services.ledger import Ledger
 
@@ -95,6 +96,48 @@ CHANGE_VERBS = (frozenset("change changed moved moving move moves".split())
                 | (DOWN_WORDS - {"below", "lower", "underperformed", "underperforms"}))
 TIER_WORDS = frozenset("warning breach limit tier room headroom cap".split())
 DATE_WORDS = ("started", "troughed", "peaked", "bottomed", "began", "ended", "recovered", "as of", "dated")
+
+# ── V37/V4: the period a sentence claims, against the dates beside it ────────
+#
+# Five of round B's eleven false statements were one class. Q04 wrote "over the
+# last twelve quarters" of five ANNUAL points and, in the same sentence, called
+# them "the intervening annual points". Q09 called a six-point annual series
+# spanning five years "the last twelve quarter readings" and its range "the
+# three-year low and the three-year high", with the six annual dates printed in
+# its own brackets. Q12's analyst wrote the truth into a caveat — "came back on
+# quarter-end dates rather than three year-end dates" — and "over the last three
+# years" into the finding, which is what the lead read.
+#
+# The series carries its points, so the period it HAS is a lookup
+# (services/facts.spacing_of / extent_in). What the sentence CLAIMS is a word
+# from a closed list. Nothing here judges meaning: it compares two periods.
+PERIOD_OF = {"quarter": "quarterly", "quarters": "quarterly", "quarterly": "quarterly",
+             "year": "annual", "years": "annual", "annual": "annual", "annually": "annual", "yearly": "annual",
+             "month": "monthly", "months": "monthly", "monthly": "monthly",
+             "week": "weekly", "weeks": "weekly", "weekly": "weekly",
+             "day": "daily", "days": "daily", "daily": "daily", "session": "daily", "sessions": "daily"}
+# A unit written as a CADENCE claims the period on its own: "quarterly", "the
+# four quarter-ends". A bare unit does not — "in the quarter" says which one, and
+# a singular "the latest year-end" names one date rather than how the readings
+# are spaced.
+CADENCE_WORDS = frozenset("quarterly annual annually yearly monthly weekly daily".split())
+_COUNT_WORDS = {w: i for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+    "sixteen seventeen eighteen nineteen twenty".split())}
+# A RELATIVE phrase claims no period of its own: "a year earlier" says which
+# series this is, not how it is spaced, and "year-over-year" is a change. Round
+# B's Q02 wrote "One year earlier, the same four quarter-ends were …" — one
+# sentence, one relative phrase and one false claim, and only the second is this
+# rule's business.
+_RELATIVE = re.compile(
+    r"\b(?:an?|one|1|the\s+(?:same|prior|previous|latest))[\s-]+(?:year|quarter|month|week|day)s?"
+    r"[\s-]+(?:earlier|ago|before|later|on|prior)\b"
+    r"|\byear[\s-]?(?:over|on)[\s-]?year\b|\bq(?:uarter)?[\s-]?o(?:n|ver)?[\s-]?q(?:uarter)?\b"
+    r"|\b(?:this|next|last|each|per|prior|previous|same)\s+(?:year|quarter|month|week|day)\b", re.I)
+_PERIOD_CLAIM = re.compile(
+    r"(?:(?P<n>\d{1,3}|" + "|".join(_COUNT_WORDS) + r")(?P<gap>-|\s)\s*(?:[A-Za-z]+\s+){0,2})?"
+    r"(?P<unit>quarter[\s-]ends?|year[\s-]ends?|" + "|".join(sorted(PERIOD_OF, key=len, reverse=True)) + r")\b",
+    re.I)
 TIER_SUFFIXES = ("warning_level", "breach_level", "limit_value")
 CHANGE_OPS = ("yoy", "qoq", "pct", "cagr", "subtract")
 _WORD = re.compile(r"[A-Za-z][A-Za-z_']*")
@@ -458,7 +501,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
     if v.problems:
         order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "unpointed_figure",
                  "ambiguous_point", "unverified_quote", "date_expected", "subject_mismatch", "measure_mismatch",
-                 "superlative_without_rank", "change_conflict", "direction_conflict", "tier_mismatch")
+                 "period_mismatch", "superlative_without_rank", "change_conflict", "direction_conflict", "tier_mismatch")
         reasons = {p["reason"] for p in v.problems}
         v.error = next((r for r in order if r in reasons), v.problems[0]["reason"])
         v.detail = (f"{len(v.problems)} problem(s), all listed; the first: " + _one_line(v.problems[0]))
@@ -555,6 +598,97 @@ def _place_fits(words: set[str], rec: dict) -> bool:
     return place in (1, of)
 
 
+def _period_claims(sentence: str) -> list[dict]:
+    """What a sentence claims about the period of the readings beside it.
+
+    `{as_written, period, n, span_only}`, in the order written. `n` is None for a
+    cadence with no count ("quarterly"); `span_only` marks the hyphenated form,
+    which claims how FAR the readings reach and not how they are spaced — a
+    "one-year beta" is a statistic over a year, not a yearly reading.
+    """
+    out: list[dict] = []
+    blanked = _RELATIVE.sub(lambda m: " " * len(m.group(0)), sentence)
+    for m in _PERIOD_CLAIM.finditer(blanked):
+        unit = m.group("unit").lower()
+        period = PERIOD_OF.get(unit) or PERIOD_OF.get(re.split(r"[\s-]", unit)[0], None)
+        if period is None:
+            continue
+        n = m.group("n")
+        if n is None and unit not in CADENCE_WORDS and not re.search(r"ends$", unit):
+            # A bare unit is not a claim about the readings, and neither is a
+            # SINGULAR year-end: "modest improvement into the latest year-end"
+            # names one date — the second of two quarterly readings, and the
+            # fiscal year's end — where "the four quarter-ends were …" claims a
+            # cadence. Round B's Q10 report said the first and was refused for it
+            # by the wider rule (measured, not imagined).
+            continue
+        count = None
+        if n is not None:
+            count = _COUNT_WORDS.get(n.lower(), None)
+            if count is None:
+                try:
+                    count = int(n)
+                except ValueError:
+                    continue
+        out.append({"as_written": m.group(0).strip(), "period": period, "n": count,
+                    "span_only": bool(n is not None and m.group("gap") == "-")})
+    return out
+
+
+def _period_holds(rec: dict, claim: dict) -> bool:
+    """Whether one series answers to the period a sentence claimed — a lookup on
+    its own points.
+
+    A cadence claim ("quarterly") is answered by the spacing. A count claim
+    ("twelve quarters") is answered EITHER by that many readings at that spacing,
+    or — when the count is not the number of readings — by reaching that far,
+    which is how "over the last three years" reads beside twelve quarterly
+    points. Both readings are a reader's, and a sentence satisfying either is not
+    what this rule is for. Round B's Q12 satisfied neither: three quarter-end
+    readings called "the last three years", where the count matched by
+    coincidence and the spacing and the span did not.
+    """
+    points = rec.get("points") or []
+    spacing, n = F_spacing(points), claim["n"]
+    count = len([p for p in points if p])
+    reach = F_extent(points, claim["period"])
+    if n is None:
+        return spacing is None or spacing == claim["period"]
+    if reach is None:
+        return True                                   # one point says nothing about a period
+    reaches = round(reach) in (n, n - 1)
+    if claim["span_only"]:
+        return reaches or count in (n, n + 1)
+    return (spacing == claim["period"] and count in (n, n + 1)) or (reaches and count != n)
+
+
+def _check_period(v: Verdict, at: str, sentence: str, linked: list, ledger: Ledger) -> None:
+    """One refusal at most, on the first claim no series beside it answers to."""
+    series: list[dict] = []
+    for _t, recs in linked:
+        rec = ledger.by_id.get((recs[0] or {}).get("id")) if recs else None
+        if rec is not None and rec.get("kind") == F.SERIES and rec not in series:
+            series.append(rec)
+    if not series:
+        # A period word beside a figure that is not a series point says nothing
+        # this rule can check: a scalar's window is its own parameter, and
+        # "the ten-day return" is the measure's name, not a claim about readings.
+        return
+    for claim in _period_claims(sentence):
+        if any(_period_holds(rec, claim) for rec in series):
+            continue
+        rec = series[0]
+        points = rec.get("points") or []
+        v.problems.append({
+            "at": at, "reason": "period_mismatch", "word": claim["as_written"], "id": rec["id"],
+            "holds": f"{len([p for p in points if p])} {F_spacing(points) or 'undated'} reading(s), "
+                     f"{str(points[0][0])[:10]}..{str(points[-1][0])[:10]}" if points else "no points",
+            "fix": f"the sentence says {claim['as_written']!r}; the readings it points at are "
+                   f"{F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request "
+                   f"the series the question asked for"})
+        return
+
+
 def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[str], linked: list, tokens: list,
                     ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]]) -> None:
     """The sentence around its figures. `linked` is [(token, [alias records])]
@@ -611,6 +745,9 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                       + ("the desk's ordering holds the same reading as " + ", ".join(f"[{c['id']}]" for c in ranked[:3])
                                          + ": point at that one, or drop the word" if ranked else
                                          "request compare: rank over it, or drop the word")})
+
+    # V37/V4: the period the sentence claims, against the readings' own dates
+    _check_period(v, at, sentence, linked, ledger)
 
     # a date word is followed by a date
     for dw in DATE_WORDS:

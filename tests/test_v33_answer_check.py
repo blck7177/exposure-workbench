@@ -648,3 +648,97 @@ def test_a_month_without_a_day_and_a_year_is_prose():
     claim a fact could settle, and a finder that called it a date would invent
     one."""
     _accepted("Operating cash flow ran through June and July at its usual seasonal shape.")
+
+
+# ── V37/V4: the period a sentence claims is the period its readings have ──────
+
+def test_a_sentence_that_names_a_period_its_readings_do_not_have_is_refused():
+    """Round B's Q04 wrote "over the last twelve quarters" of five ANNUAL points
+    and, in the same sentence, called them "the intervening annual points". The
+    dates were in its own brackets. A series carries its points, so which period
+    it has is a lookup, and the check compares two periods rather than judging
+    one."""
+    annual = Ledger.of([_series("f_lly5y", "net_margin", "LLY",
+                                [["2021-12-31", .197], ["2022-12-31", .219], ["2023-12-31", .154],
+                                 ["2024-12-31", .235], ["2025-12-31", .317]])])
+    v = ac.check("Net margin over the last twelve quarters was 19.7% [f_lly5y@2021-12-31] "
+                 "and 31.7% [f_lly5y@2025-12-31].", annual, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"period_mismatch"}
+    assert ac.check("Net margin over the last five fiscal years was 19.7% [f_lly5y@2021-12-31] "
+                    "and 31.7% [f_lly5y@2025-12-31].", annual, None).ok
+
+
+def test_quarter_end_readings_are_not_three_years():
+    """Q12's analyst wrote the truth into a caveat — "came back on quarter-end
+    dates rather than three year-end dates" — and "over the last three years"
+    into the finding, where the count matched by coincidence: three readings,
+    three claimed years, six months of dates."""
+    quarters = Ledger.of([_series("f_jpm3q", "equity_multiplier", "JPM",
+                                  [["2025-09-30", 12.66], ["2025-12-31", 12.21], ["2026-03-31", 13.46]],
+                                  unit="MULTIPLE")])
+    v = ac.check("Its equity multiplier over the last three years was 12.66× [f_jpm3q@2025-09-30], "
+                 "12.21× [f_jpm3q@2025-12-31], and 13.46× [f_jpm3q@2026-03-31].", quarters, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"period_mismatch"}
+    assert ac.check("Its equity multiplier over the last three quarters was 12.66× [f_jpm3q@2025-09-30], "
+                    "12.21× [f_jpm3q@2025-12-31], and 13.46× [f_jpm3q@2026-03-31].", quarters, None).ok
+
+
+def test_a_span_claim_reads_how_far_the_readings_reach():
+    """Q09 called a six-point annual series spanning five years "the three-year
+    low and the three-year high". The hyphenated form claims a span and not a
+    cadence — a "one-year beta" is a statistic over a year, not a yearly reading
+    — so it is answered by how far the points reach."""
+    five_years = Ledger.of([_series("f_ccc6y", "cash_conversion_cycle", "AAPL",
+                                    [["2020-09-26", -60.87], ["2021-09-25", -56.36], ["2022-09-24", -70.52],
+                                     ["2023-09-30", -67.83], ["2024-09-28", -75.83], ["2025-09-27", -71.07]],
+                                    unit="COUNT")])
+    v = ac.check("The cycle sits between the three-year low of -75.83 [f_ccc6y@2024-09-28] and the "
+                 "three-year high of -56.36 [f_ccc6y@2021-09-25].", five_years, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"period_mismatch"}
+    assert ac.check("The cycle sits between the five-year low of -75.83 [f_ccc6y@2024-09-28] and the "
+                    "five-year high of -56.36 [f_ccc6y@2021-09-25].", five_years, None).ok
+
+
+def test_a_relative_phrase_and_a_window_name_claim_no_period():
+    """"One year earlier" says which series this is, not how it is spaced;
+    "year-over-year" is a change; a period word beside a figure that is not a
+    series point has no readings to be wrong about. Round B's Q02 put a relative
+    phrase and a false claim in one sentence, and only the second is this rule's
+    business."""
+    annual = Ledger.of([_series("f_xom4y", "net_debt_to_ebitda", "XOM",
+                                [["2022-12-31", -.05], ["2023-12-31", -.29], ["2024-12-31", -.38],
+                                 ["2025-12-31", -.25]], unit="MULTIPLE")])
+    assert ac.check("One year earlier the reading was -0.05× [f_xom4y@2022-12-31].", annual, None).ok
+    assert ac.check("Receivables grew faster than revenue in the latest year-over-year comparison, "
+                    "at -0.25× [f_xom4y@2025-12-31].", annual, None).ok
+    # the same sentence with the claim round B actually wrote
+    v = ac.check("One year earlier, the same four quarter-ends were -0.05× [f_xom4y@2022-12-31] "
+                 "and -0.25× [f_xom4y@2025-12-31].", annual, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"period_mismatch"}
+    # and with no series beside it a period word has no readings to be wrong
+    # about: a scalar's window is its own parameter, and "the one-year figure" is
+    # the measure's name rather than a claim about how often it was read
+    assert ac.check("The one-year figure is 18.4% [f_ciamzn].", LEDGER, None).ok
+
+
+def test_one_point_and_an_uneven_series_say_nothing_about_a_period():
+    """A rule that fires on a guess refuses true sentences. One point has no
+    spacing; gaps that are not one cadence have none either."""
+    one = Ledger.of([_series("f_one1p", "revenue", "MSFT", [["2025-06-30", 1.0]], unit="MONEY")])
+    assert ac.check("Revenue over the last four quarters was $1 [f_one1p@2025-06-30].", one, None).ok
+
+
+def test_the_latest_year_end_names_a_date_and_not_a_cadence():
+    """Round B's Q10 report wrote "net debt at $14.05B and $12.91B, indicating
+    modest improvement into the latest year-end" over two QUARTERLY readings —
+    and the second of them is Microsoft's fiscal year-end, so the sentence is
+    true. A singular year-end names one date; "the four quarter-ends were …"
+    claims a cadence. Measured on the round, not imagined: the wider rule refused
+    this sentence twice."""
+    quarterly = Ledger.of([_series("f_msftnd", "net_debt", "MSFT",
+                                   [["2025-03-31", 14.05e9], ["2025-06-30", 12.91e9]], unit="MONEY")])
+    assert ac.check("Net debt stood at $14.05B [f_msftnd@2025-03-31] and $12.91B [f_msftnd@2025-06-30], "
+                    "the second of them the latest year-end.", quarterly, None).ok
+    v = ac.check("The same two quarter-ends were $14.05B [f_msftnd@2025-03-31] and "
+                 "$12.91B [f_msftnd@2025-06-30].", quarterly, None)
+    assert v.ok, "two quarterly readings ARE two quarter-ends"

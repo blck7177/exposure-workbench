@@ -221,3 +221,58 @@ def with_sources(f: Fact, more: Iterable[str]) -> Fact:
         if isinstance(s, str) and s and s not in seen:
             seen.append(s)
     return replace(f, sources=tuple(seen))
+
+
+# ── how a series' own dates read (V37) ────────────────────────────────────────
+#
+# Five of round B's eleven false statements were one class: a sentence naming a
+# period its evidence does not have — "the last twelve quarter readings" of a
+# six-point ANNUAL series, with the six annual dates printed in the sentence's
+# own brackets. The series carries its points, so the period it has is a lookup
+# and not a judgement. Here because a Fact's points are a Fact's business, and
+# because two readers need it: the answer check, and the digest that shows an
+# analyst what it fetched.
+
+_DAYS = {"daily": 1.0, "weekly": 7.0, "monthly": 30.44, "quarterly": 91.31, "annual": 365.25}
+# The widest gap that still reads as each spacing, in days. A quarter is 90–92
+# days and a fiscal year 363–371, so the bands are wide enough for a filer's own
+# calendar and narrow enough to keep two spacings apart.
+_BANDS = ((3.0, "daily"), (10.0, "weekly"), (45.0, "monthly"), (200.0, "quarterly"), (500.0, "annual"))
+
+
+def _dates(points) -> list[str]:
+    return sorted(str(p[0]) for p in (points or []) if p and str(p[0])[:4].isdigit())
+
+
+def _ordinal(d: str) -> int | None:
+    """A date as a day number, for a gap. `datetime` rather than a parse of our
+    own: the points are ISO by construction (program_service writes them)."""
+    from datetime import date
+    try:
+        return date.fromisoformat(d[:10]).toordinal()
+    except ValueError:
+        return None
+
+
+def spacing_of(points) -> str | None:
+    """`daily | weekly | monthly | quarterly | annual`, or None when the points
+    cannot say — fewer than two of them, or gaps that are not one cadence.
+
+    The MEDIAN gap, so one missing filing in eight quarters does not make a
+    series annual; None rather than a guess, because a rule that fires on a
+    guess refuses true sentences."""
+    days = [d for d in (_ordinal(x) for x in _dates(points)) if d is not None]
+    if len(days) < 2:
+        return None
+    gaps = sorted(b - a for a, b in zip(days, days[1:]))
+    mid = gaps[len(gaps) // 2] if len(gaps) % 2 else (gaps[len(gaps) // 2 - 1] + gaps[len(gaps) // 2]) / 2
+    return next((name for edge, name in _BANDS if mid <= edge), None)
+
+
+def extent_in(points, unit: str) -> float | None:
+    """How far the points reach, in `unit` (one of `_DAYS`). None when there is
+    nothing to measure."""
+    days = [d for d in (_ordinal(x) for x in _dates(points)) if d is not None]
+    if len(days) < 2 or unit not in _DAYS:
+        return None
+    return (days[-1] - days[0]) / _DAYS[unit]
