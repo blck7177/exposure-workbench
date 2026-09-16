@@ -816,3 +816,40 @@ def test_a_superlative_mentioned_inside_something_else_is_not_predicated_of_a_su
                     "smallest-room concentration check.", led, None).ok
     assert ac.check("The worst drawdown episode did have filings for AAPL during the relevant window.",
                     led, None).ok
+
+
+# ── V37/V2 · V3: whose figure it is, and which ids the reader may see ──────────
+
+def test_a_figure_the_sentence_calls_the_books_is_not_one_names_own():
+    """Round B's Q02 wrote "The book's beta to USO is 0.33×" over `XOM.beta.USO`,
+    and its analyst had written the truth into a caveat — "proxied by XOM's beta
+    to USO" — that the lead never read. `subject_mismatch` reads the TICKERS a
+    sentence names, so a sentence naming none escaped it.
+
+    The desk's own rows are the exception and have to be: a holding's weight and a
+    check's reading carry a name as their subject and are the book's figures."""
+    led = Ledger.of([
+        _f("f_xomuso", "XOM.beta.USO", "XOM", 0.327, unit="MULTIPLE", node="beta"),
+        _f("f_wxom2", "issuer_exposures.weight", "XOM", 0.0461, node="w"),
+    ])
+    v = ac.check("The book's beta to USO is 0.33× [f_xomuso].", led, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"subject_mismatch"}
+    assert "XOM's own" in v.problems[0]["fix"]
+    # naming the issuer is all it takes
+    assert ac.check("XOM's beta to USO is 0.33× [f_xomuso].", led, None).ok
+    # and a book row keeps its name as a subject while being the book's figure
+    assert ac.check("The book holds XOM at 4.61% [f_wxom2].", led, None).ok
+    # (that sentence's superlative has its own rule; what matters here is that
+    # V2 does not fire on a book row)
+    v2 = ac.check("The portfolio's largest position here is 4.61% [f_wxom2].", led, None)
+    assert "subject_mismatch" not in {p["reason"] for p in v2.problems}
+
+
+def test_a_report_id_is_not_something_the_reader_can_open():
+    """Round B's Q06 ended a sentence with "[rep_3d15ad4012b4]" and round A did it
+    five times in one answer. `rep_` and `tsk_` were missing from the ids the
+    finder knows, so they were not tokens at all."""
+    v = _refused("The desk cannot express that as of a past date [rep_3d15ad4012b4].", "id_in_prose")
+    [p] = [p for p in v.problems if p["reason"] == "id_in_prose"]
+    assert p["id"] == "rep_3d15ad4012b4" and "not something the reader can open" in p["fix"]
+    _refused("That is what task tsk_a5a3fb7b9b9b asked for.", "id_in_prose")

@@ -191,7 +191,12 @@ def prose_by_block(blocks) -> list[tuple[int, str, list[str]]]:
 # name is one token; a number carries its sign, currency, thousands separators,
 # decimals, percent sign and a scale word when one follows.
 
-ID_PREFIXES = ("f_", "fact_", "calc_", "chunk_", "src_", "run_", "alert_", "pos_", "task_", "rrun_", "brief_", "sess_", "msg_")
+# V37: `rep_` (a domain analyst's report) and `tsk_` (a delegated task) were
+# missing, so they were not tokens at all and reached the reader as words.
+# Round B's Q06 ended a sentence with "[rep_3d15ad4012b4]"; round A did it
+# five times in one answer.
+ID_PREFIXES = ("f_", "fact_", "calc_", "chunk_", "src_", "run_", "alert_", "pos_", "task_", "rrun_",
+               "brief_", "sess_", "msg_", "rep_", "tsk_")
 _ID = r"(?P<id>\b(?:" + "|".join(p[:-1] for p in ID_PREFIXES) + r")_[A-Za-z0-9]{4,}\b)"
 # A DATE IS ONE TOKEN, SPELLED OUT OR NOT (V37). A filing says "As of June 30,
 # 2025"; the finder read that as the numbers 30 and 2025, and 30 is a figure no

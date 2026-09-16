@@ -95,6 +95,19 @@ CHANGE_VERBS = (frozenset("change changed moved moving move moves".split())
                 | (UP_WORDS - {"above", "higher", "outperformed", "outperforms"})
                 | (DOWN_WORDS - {"below", "lower", "underperformed", "underperforms"}))
 TIER_WORDS = frozenset("warning breach limit tier room headroom cap".split())
+# ── V37/V2: whose figure it is, when the sentence says it is the book's ───────
+# `subject_mismatch` reads the TICKERS a sentence names, so a sentence that names
+# none escaped it. Round B's Q02 wrote "The book's beta to USO is 0.33×" over
+# `XOM.beta.USO` — one name's sensitivity, offered as the whole book's — and the
+# analyst had written the truth into a caveat ("proxied by XOM's beta to USO")
+# that the lead never read. An eleventh false statement the round's own audit
+# missed.
+BOOK_WORDS = frozenset("book book's portfolio portfolio's".split())
+# The desk's own rows: the subject is a name and the figure is the BOOK's — a
+# holding's weight, a check's reading, a sector's share, a factor's beta. Saying
+# "the book's largest holding" over one of these is right.
+_BOOK_MEASURES = ("issuer_exposures.", "sector_exposures.", "limit_checks.", "exposure_metrics.",
+                  "factor_attributions.", "holdings.", "portfolio.", "trade.", "count.")
 DATE_WORDS = ("started", "troughed", "peaked", "bottomed", "began", "ended", "recovered", "as of", "dated")
 
 # ── V37/V4: the period a sentence claims, against the dates beside it ────────
@@ -375,8 +388,11 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 if start in consumed:
                     continue
                 v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
-                                   "fix": "an id is written in brackets — after the figure it points to (16.0% [f_…]), or after "
-                                          "the quotation or name it cites; bare, it is a word the reader must not see"})
+                                   "fix": ("a report or a task is not something the reader can open: say what it said, "
+                                           "or cite the fact that carries it"
+                                           if tok.startswith(("rep_", "tsk_")) else
+                                           "an id is written in brackets — after the figure it points to (16.0% [f_…]), or after "
+                                           "the quotation or name it cites; bare, it is a word the reader must not see")})
                 continue
             if kind == "form":
                 continue                                                      # "10-K", "DEF 14A": a filing's name, not a figure
@@ -858,6 +874,19 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     # ordered
     if words & SUPERLATIVES and not groups:
         _check_bare_superlative(v, at, sentence, words, ledger, subjects_on_ledger)
+
+    # V37/V2: a figure the sentence calls the book's, that is one name's own
+    if words & BOOK_WORDS and not named:
+        for t, recs in linked:
+            rec = recs[0]
+            short = _short_subject(rec.get("subject"))
+            if (short in tickers and not str(rec.get("measure") or "").startswith(_BOOK_MEASURES)):
+                v.problems.append({"at": at, "reason": "subject_mismatch", "figure": t["token"], "id": rec["id"],
+                                   "figure_subject": rec.get("subject"), "sentence_names": ["the book"],
+                                   "fix": f"this figure is {rec.get('subject')}'s own ({rec.get('measure')}); the "
+                                          f"sentence says it is the book's — name the issuer, or request the "
+                                          f"book-level figure"})
+                break
 
     # a date word is followed by a date
     for dw in DATE_WORDS:

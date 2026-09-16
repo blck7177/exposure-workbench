@@ -38,9 +38,18 @@ CORPUS = Path(__file__).resolve().parent / "data" / "v36b_accepted.json.gz"
 #     Q11  "The closest issuer-concentration warning is for LLY." — LLY's room to
 #          warning is 19th of 20, the second smallest, and fifty-one placed facts
 #          for LLY hold no end place at all
+#   V2 · subject_mismatch — whose figure it is, when the sentence says the book's
+#     Q02  "The book's beta to USO is 0.33×" over `XOM.beta.USO` — one name's
+#          sensitivity offered as the whole book's, and the analyst had written the
+#          truth into a caveat the lead never read. The eleventh false statement,
+#          which the round's own audit missed.
+#   V3 · id_in_prose — a report id reaching the reader
+#     Q06  "… not as-of a past date [rep_3d15ad4012b4]" — round A did it five
+#          times in one answer
 ADDED_SINCE_THE_ROUND = {
-    "Q02": {"period_mismatch": 3},
+    "Q02": {"period_mismatch": 3, "subject_mismatch": 1},
     "Q04": {"period_mismatch": 1},
+    "Q06": {"id_in_prose": 1},
     "Q09": {"period_mismatch": 1},
     "Q11": {"superlative_without_rank": 1},
     "Q12": {"period_mismatch": 1},
