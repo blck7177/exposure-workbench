@@ -94,7 +94,7 @@ a number is `scale`. Two constants alone are refused.
 
 **Sets** — `sum`, `avg`, `min`, `max`, `std` (`of`: a vector, or a series for
 its own history); `abs` (`of`); `rank` (`of`, `direction?` highest/lowest);
-`top` (`of`, `n`, `direction?`) = rank, then the first n as a vector; `select` (`of`, `labels`): the entries named, as a vector; `vector` (`entries`: `{label: $scalar, …}`, one unit): named scalars gathered so rank/top/avg apply — an entry may be a number (V33; constants alone are refused). `filter` (`of`: a vector or ranking, `op`: one of `> >= < <= == !=`, `level`: a number or a scalar; V33): the entries that satisfy, as a vector; none → the absence `no_entry_satisfies`, listing the entries.
+`top` (`of`, `n`, `direction?`) = rank, then the first n as a vector; `select` (`of`, `labels`): the entries named, as a vector; `vector` (`entries`: `{label: $scalar | {fn: …}, …}`, one unit; an expression in an entry is hoisted like any nested expression and must yield one figure — V38): named scalars gathered so rank/top/avg apply — an entry may be a number (V33; constants alone are refused). `filter` (`of`: a vector or ranking, `op`: one of `> >= < <= == !=`, `level`: a number or a scalar; V33): the entries that satisfy, as a vector; none → the absence `no_entry_satisfies`, listing the entries.
 
 **Series** — `yoy`, `qoq`, `pct`, `cagr`, `latest` (`of`: a series); `at`
 (`of`, `period` YYYY-MM-DD): one point as a scalar.

@@ -232,7 +232,11 @@ _BOOK_METHODS: tuple[Method, ...] = (
         authority="the two accounting identities of return attribution (Brinson-style position attribution; the factor model's own decomposition)",
         fails_when="the position identity does not hold within tolerance — then no share of the move is reported at all",
         executor="book.reconcile", unit_class="ratio",
-        yields=("portfolio.reconcile.sum_of_position_contributions", "portfolio.reconcile.factor_share", "portfolio.reconcile.unexplained_share"),
+        # every figure the reconciliation records (resources.CALC_RESULTS), so the
+        # page offers the factor sum the second identity needs (V38/S5)
+        yields=("portfolio.reconcile.sum_of_position_contributions", "portfolio.reconcile.sum_of_factor_contributions",
+                "portfolio.reconcile.alpha_plus_residual", "portfolio.reconcile.factor_share",
+                "portfolio.reconcile.unexplained_share"),
     ),
     Method(
         name="book.drawdown_episodes", subject_kind="portfolio", family="risk",

@@ -56,6 +56,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import series_ops as so
+from exposure_workbench.analytics import resources
 from exposure_workbench.analytics import skill
 from exposure_workbench.db.models import ExposureRun, FinancialFact
 from exposure_workbench.services import calc_service as cs
@@ -76,6 +77,7 @@ KINDS = (SCALAR, SERIES, VECTOR, RANKING, TABLE, RUN, ABSENCE)
 
 _ID_PREFIXES = ("fact_", "calc_", "run_", "f_")
 _NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+_HOISTED_SEP = re.compile(r"[^A-Za-z0-9_]")
 
 
 def _is_num(v: Any) -> bool:
@@ -186,17 +188,28 @@ def parse(program: dict) -> Program | dict:
 
     def hoist(expr: Any, at: str) -> Any:
         """Nested {fn} expressions become their own bindings, so every node has
-        a name and the table lists every intermediate."""
+        a name and the table lists every intermediate.
+
+        WHEREVER THEY ARE WRITTEN (V38/L1). An expression inside a plain object
+        or list — a vector's `entries`, a method's `params`, a trade's `weight` —
+        is hoisted like any other. It was left as a raw object, the type check
+        read it as `object` and answered "vector.entries.AAPL takes scalar" to a
+        `latest(of=…)` that yields exactly one: round C lost eight of mini's
+        thirteen refused programs to that, while the language page said
+        "latest(of) first". A hoisted name carries its path with every
+        non-identifier character made `_`, so a node name never holds a dot."""
         nonlocal gen
         if isinstance(expr, dict) and "fn" in expr:
-            args = {k: hoist(v, f"{at}.{k}") for k, v in expr.items() if k != "fn"}
+            args = {k: hoist(v, f"{at}_{k}") for k, v in expr.items() if k != "fn"}
             if expr.get("fn") not in PRIMITIVES:
                 return {"fn": expr.get("fn"), **args}       # refused at evaluation, by name
             gen += 1
-            name = f"_{at}_{gen}"
+            name = f"_{_HOISTED_SEP.sub('_', at)}_{gen}"
             bindings.append((name, {"fn": expr["fn"], **args}))
             seen.add(name)
             return f"${name}"
+        if isinstance(expr, dict):
+            return {k: hoist(v, f"{at}_{k}") for k, v in expr.items()}
         if isinstance(expr, list):
             return [hoist(v, at) for v in expr]
         return expr
@@ -253,14 +266,6 @@ _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # date.fromisoformat.
 DATE_PARAMS = ("at", "peak", "trough", "start", "end", "as_of", "period")
 FILTER_OPS = (">", ">=", "<", "<=", "==", "!=")
-# Run tables whose figure names carry a LABEL in the middle
-# (`sector_exposures.Technology.weight`): the label is the fact's subject and
-# the measure is `table.col`, whichever producer wrote the row. Until V33 a
-# scenario's figures kept the label inside the measure and the run's did not,
-# so the same Technology weight before and after a sale were two measures to
-# the gate (Q13, refused as different_measures).
-_LABELLED_TABLES = ("issuer_exposures", "sector_exposures", "limit_checks", "risk_alerts",
-                    "factor_attributions", "holdings", "positions")
 
 
 @dataclass(frozen=True)
@@ -359,7 +364,8 @@ SIGNATURES: dict[str, Sig] = {
     "filter": Sig({"of": (VECTOR, RANKING), "op": (T_STRING,), "level": (T_NUMBER, SCALAR)}, VECTOR,
                   "the entries whose value is `op level` (> >= < <= == !=); none → an absence saying so"),
     "vector": Sig({"entries": (T_OBJECT,)}, VECTOR,
-                  "named scalars gathered into one vector: {label: $scalar | number}; a series is not a scalar — latest(of) first"),
+                  "named scalars gathered into one vector: {label: $scalar | number | {fn: …} that yields one figure}; "
+                  "a series is many figures — latest(of=…) or at(of=…, period=…) makes one"),
     "yoy": Sig({"of": (SERIES,)}, SERIES, "year-over-year change of a series"),
     "qoq": Sig({"of": (SERIES,)}, SERIES, "quarter-over-quarter change of a series"),
     "pct": Sig({"of": (SERIES,)}, SERIES, "period-over-period percent change"),
@@ -477,6 +483,11 @@ def _accepts(expected: tuple, got: str) -> bool:
 
 def _fix(fn: str, arg: str, expected: tuple, got: str) -> str:
     """The sentence that turns a type problem into the next program."""
+    if fn == "vector" and arg.startswith("entries.") and got == T_OBJECT:
+        # V38/L1: an expression in an entry is hoisted and typed like any node, so
+        # an object reaching here has no `fn` — it is not a figure of any kind
+        return (f"{fn}.{arg}: an entry is $name, a number, or an expression that yields one figure "
+                f"({{fn: 'latest', of: …}}, {{fn: 'at', of: …, period: …}}); an object with no fn is not a figure")
     if got == SERIES and SCALAR in expected:
         return f"{fn}.{arg} takes one figure and a series has many: latest(of=…) is its last point, or drop last_n"
     if fn in ("rank", "top", "select", "filter") and got in (SCALAR, SERIES):
@@ -572,7 +583,7 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
     if not ok or blocked:
         return None
     if fn == "method":
-        ok = _check_method(name, given, arg_kinds, problems)
+        ok = _check_method(name, given, arg_kinds, problems, kinds)
     elif fn == "vector":
         ok = _check_vector(name, given, kinds, problems)
     elif fn in _BINARY and arg_kinds.get("a") == T_NUMBER and arg_kinds.get("b") == T_NUMBER:
@@ -600,17 +611,68 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
 
 def _placeholder(prop: dict, key: str) -> Any:
     """A value of the declared type standing in for a `$name` in params, so the
-    schema check sees the shape the executor will substitute."""
-    types = prop.get("type")
+    schema check sees the shape the executor will substitute. Inside the
+    declared bounds and enum (V38/L2): `weight` is exclusive of 0 and 1, and a
+    stand-in of 1 was itself refused."""
+    types = prop.get("type") if isinstance(prop, dict) else None
     types = types if isinstance(types, list) else [types]
+    enum = [e for e in (prop.get("enum") or []) if e is not None] if isinstance(prop, dict) else []
+    if enum:
+        return enum[0]
     if "integer" in types or "number" in types:
-        return prop.get("minimum", 1)
+        lo = prop.get("minimum", prop.get("exclusiveMinimum"))
+        hi = prop.get("maximum", prop.get("exclusiveMaximum"))
+        if lo is not None and hi is not None:
+            v = (lo + hi) / 2
+        elif lo is not None:
+            v = lo + 1 if "minimum" not in prop else lo
+        elif hi is not None:
+            v = hi - 1 if "maximum" not in prop else hi
+        else:
+            v = 1
+        return int(v) if "number" not in types else v
     if "string" in types:
-        return "2000-01-01" if key in DATE_PARAMS else (prop.get("enum") or ["x"])[0]
+        return "2000-01-01" if key in DATE_PARAMS else "x"
     return None
 
 
-def _check_method(name: str, given: dict, arg_kinds: dict, problems: list) -> bool:
+# What a `$name` inside params may stand for: one value. The executor substitutes
+# a picked literal or a settled scalar's number (_substitute_literals) and leaves
+# anything else as the string, which the schema then refuses at run time.
+_PARAM_REF_KINDS = frozenset((SCALAR, T_NUMBER, T_DATE, T_STRING))
+
+
+def _with_placeholders(v: Any, prop: Any, key: str, path: str, kinds: dict, at: str, problems: list) -> Any:
+    """Params as the schema will see them at execution, `$name` replaced at ANY
+    depth (V38/L2). Only the top level was replaced, so `buys[0].weight: "$w"`
+    reached the schema as a string and `book.buy` was refused for a program the
+    executor — which substitutes recursively — would have run (round C sol Q13
+    seq13). A name that is not bound, or is bound to more than one value, is a
+    problem of its own, named by its path."""
+    if isinstance(v, str) and v.startswith("$"):
+        ref = v[1:]
+        if ref not in kinds:
+            problems.append({"at": at, "reason": "unknown_binding", "arg": f"params.{path}",
+                             "detail": f"{v!r} is not bound earlier in the program"})
+            return None
+        kind = kinds[ref]
+        if kind is not None and not (_parts(kind) & _PARAM_REF_KINDS):
+            problems.append({"at": at, "reason": "type_mismatch", "arg": f"params.{path}",
+                             "expected": [SCALAR, T_NUMBER], "got": kind,
+                             "fix": f"params.{path} takes one value — $name of a scalar or of a picked literal; {v} is a {kind}"
+                                    + (": latest(of=…) or at(of=…, period=…) makes one" if kind == SERIES else "")})
+            return None
+        return _placeholder(prop if isinstance(prop, dict) else {}, key)
+    if isinstance(v, dict):
+        props = prop.get("properties", {}) if isinstance(prop, dict) else {}
+        return {k: _with_placeholders(x, props.get(k, {}), k, f"{path}.{k}", kinds, at, problems) for k, x in v.items()}
+    if isinstance(v, list):
+        items = prop.get("items", {}) if isinstance(prop, dict) else {}
+        return [_with_placeholders(x, items, key, f"{path}.{i}", kinds, at, problems) for i, x in enumerate(v)]
+    return v
+
+
+def _check_method(name: str, given: dict, arg_kinds: dict, problems: list, kinds: dict | None = None) -> bool:
     mname = given.get("name")
     spec = skill.METHODS.get(mname) if isinstance(mname, str) else None
     if spec is None:
@@ -626,7 +688,11 @@ def _check_method(name: str, given: dict, arg_kinds: dict, problems: list) -> bo
     p = {k: v for k, v in (params or {}).items() if v is not None}
     from exposure_workbench.tools.arg_validation import validate_args   # the one pure validator, no registry
     props = spec.params_schema.get("properties", {})
-    literal_p = {k: (_placeholder(props.get(k, {}), k) if isinstance(v, str) and v.startswith("$") else v) for k, v in p.items()}
+    ref_problems: list = []
+    literal_p = {k: _with_placeholders(v, props.get(k, {}), k, k, kinds or {}, name, ref_problems) for k, v in p.items()}
+    if ref_problems:
+        problems.extend(ref_problems)
+        return False
     literal_p = {k: v for k, v in literal_p.items() if v is not None}
     probs = validate_args(spec.params_schema, literal_p)
     if probs:
@@ -860,6 +926,13 @@ async def _from_payload(ctx: _Ctx, node: Node, payload: dict) -> Node:
             node.kind, node.ref, node.payload = TABLE, cid, payload
             node.entries = [(q.label, f"{cid}:{q.label}", q.value, q.unit_class) for q in resolved.quantities if q.not_alone is None]
             node.as_of = (payload.get("as_of") if isinstance(payload.get("as_of"), str) else None)
+            # WHOSE FIGURES THESE ARE (V38/S4): the row's base — the run an
+            # analysis or a reconciliation read, the book a scenario is — which is
+            # what `pick` on the same row is told by the calculator. The table
+            # path said the calc id, so one net beta had two subjects.
+            named = await tc._named_context(ctx.db, cid)
+            if isinstance(named, tuple) and named[0]:
+                node.subject = named[0]
             return node
         return await _scalar_from_ref(ctx, node, cid, payload)
     node.kind, node.refusal, node.payload = ABSENCE, _err("untyped_result", f"{node.name}: the service returned no ledger row to type"), payload
@@ -1937,10 +2010,11 @@ def _facts_of(node: Node) -> list[F.Fact]:
             if node.kind == TABLE and "." in label:
                 # `sector_exposures.Technology.weight` is the Technology row of
                 # sector_exposures.weight, whichever row produced it (V33: the
-                # same rule for a run's and a scenario's figures)
-                parts = label.split(".")
-                if len(parts) == 3 and parts[0] in _LABELLED_TABLES:
-                    measure, subj = f"{parts[0]}.{parts[2]}", parts[1]
+                # same rule for a run's and a scenario's figures). The rule is
+                # resources.identity_of — the one `pick` uses (V38/S4).
+                named, entity = resources.identity_of(label)
+                if entity is not None:
+                    measure, subj = named, entity
             out.append(F.fact(F.SCALAR, measure, subject=subj, unit=unit or None, value=float(value),
                               as_of=as_of, window=win, params=extra, sources=(ref,) if ref else (), group=group))
         return out
@@ -1955,11 +2029,20 @@ def _facts_of(node: Node) -> list[F.Fact]:
 def _absence_text(node: Node, r: dict) -> str:
     """What the reader is told: the node that was not computed and the ROOT
     reason, never the chain — `depends_on_refused` carries `root` (the first
-    node that refused) and its reason."""
+    node that refused) and its reason. A schema refusal names its fields and
+    the shape it takes (V38/T3d)."""
     root = r.get("root") or {}
     if r.get("error") == "depends_on_refused" and root:
         return f"{node.name} was not computed: {root.get('node')} was refused — {root.get('error')}: {root.get('detail', '')}"
-    return f"{node.name} was not computed — {r.get('error')}: {r.get('detail', '')}"
+    text = f"{node.name} was not computed — {r.get('error')}: {r.get('detail', '')}"
+    if isinstance(r.get("problems"), list) and r["problems"]:
+        from exposure_workbench.tools.arg_validation import problems_text, schema_hint
+        said = problems_text(r["problems"])
+        if said:
+            text += f" — {said}"
+        if isinstance(r.get("params_schema"), dict):
+            text += f"; params take {schema_hint(r['params_schema'])}"
+    return text
 
 
 # ── the entry point ──────────────────────────────────────────────────────────

@@ -64,6 +64,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import containment as ct
+from exposure_workbench.analytics import resources as _resources
 from exposure_workbench.analytics import units
 from exposure_workbench.analytics.units import COUNT, MONEY, MONEY_PER_SHARE, MULTIPLE, RATIO
 from exposure_workbench.db.models import CalcLedger, Company, FinancialFact
@@ -149,18 +150,14 @@ def split_named(ref: str) -> tuple[str, str] | None:
 def _parse_book_name(name: str) -> tuple[str, str | None]:
     """(what the figure is a quantity of, the entity it belongs to).
 
-    A run child's name is `<table>.<row label>.<column>` (quantities.py); the
-    quantity is the column on its table and the entity is the row label. A
-    whole-book column (`exposure_metrics.portfolio_market_value`), a count, or
-    the regression's sum has no entity. An analysis row's name is `portfolio.
-    integration.<key>.<label>`; the entity is the label.
+    One rule for every reader of a book figure's name, written in
+    analytics/resources.identity_of (V38/S4). This used to split any
+    three-part name and any `portfolio.integration.*.*`, so `pick` read the
+    book's net beta against equities as a figure OF `equity_down`, and a
+    reconciliation's position sum as a figure of `reconcile` — while the
+    program's table path read the same names whole.
     """
-    parts = name.split(".")
-    if name.startswith("portfolio.integration.") and len(parts) == 4:
-        return ".".join(parts[:3]), parts[3]
-    if len(parts) == 3:
-        return f"{parts[0]}.{parts[2]}", parts[1]
-    return name, None
+    return _resources.identity_of(name)
 
 
 async def _resolve_fact_ref(db: AsyncSession, fid: str) -> Typed | dict:

@@ -115,7 +115,7 @@ def symbol_table() -> str:
         ms = [m for m in skill.METHODS.values() if m.subject_kind == kind]
         lines.append(label + ": " + ", ".join(m_line(m) for m in ms) + ".")
     lines.append("ops: add sub mul div(a,b) scale(of,factor) sum avg min max std abs(of) rank(of,direction) top(of,n) "
-                 "select(of,labels) vector(entries={label:$scalar}) yoy qoq pct cagr latest(of) at(of,period) "
+                 "select(of,labels) vector(entries={label:$scalar|{fn:…}}) yoy qoq pct cagr latest(of) at(of,period) "
                  "window_return(ticker,start,end,benchmark?) sell(run,sales) buy(run,buys) run(portfolio=port_|run_|calc_,which=latest|prev|run_id) "
                  "column(run,table,col) pick(of,key).")
     return "\n".join(lines)

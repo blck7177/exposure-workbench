@@ -210,3 +210,88 @@ def test_a_scenarios_figure_is_picked_not_read_like_a_run():
 def test_a_filed_line_written_as_a_method_is_sent_to_fundamentals():
     (p,) = ps.typecheck({"let": [["x", {"fn": "method", "name": "operating_cash_flow", "subject": "AAPL"}]]})
     assert p["reason"] == "unknown_method" and "FILED LINE" in p["fix"] and "fundamentals" in p["fix"]
+
+
+# ── V38/L1–L2: an expression is typed wherever it is written ──────────────────
+
+_CONV = [["ocf", {"fn": "fundamentals", "ticker": "AAPL", "metric": "operating_cash_flow", "months": 12, "last_n": 2}],
+         ["ni", {"fn": "fundamentals", "ticker": "AAPL", "metric": "net_income", "months": 12, "last_n": 2}],
+         ["conv", {"fn": "div", "a": "$ocf", "b": "$ni"}]]
+
+
+def test_round_c_q07_an_expression_in_a_vector_entry_is_hoisted_and_well_typed():
+    """mini Q07 seq10 wrote `vector(entries={AAPL: latest(of=$conv), …})` — what the
+    language page told it to — and was refused "vector.entries.AAPL takes scalar"
+    for an entry that yields exactly one figure. Eight of mini's thirteen refused
+    programs in round C were this shape."""
+    prog = {"let": _CONV + [["weakest", {"fn": "rank", "direction": "lowest", "of": {"fn": "vector", "entries": {
+        "AAPL": {"fn": "latest", "of": "$conv"}, "MSFT": {"fn": "at", "of": "$conv", "period": "2025-06-30"}}}}]]}
+    assert _problems(prog) == []
+    p = ps.parse(prog)
+    names = [n for n, _ in p.bindings]
+    assert all("." not in n for n in names), names
+    vec = next(e for n, e in p.bindings if isinstance(e, dict) and e.get("fn") == "vector")
+    assert all(isinstance(v, str) and v.startswith("$_") for v in vec["entries"].values()), vec
+
+
+def test_an_entry_that_is_an_object_with_no_fn_is_told_what_an_entry_is():
+    probs = _problems({"let": _CONV + [["v", {"fn": "vector", "entries": {"AAPL": {"value": 1.2}}}]]})
+    (p,) = probs
+    assert p["got"] == "object" and "$name, a number, or an expression" in p["fix"]
+
+
+def test_an_unbound_name_inside_an_entry_expression_is_reported_not_hidden():
+    """mini Q08 seq13 referred to bindings of an earlier program inside `at(...)`
+    in its entries; the raw object hid that behind "takes scalar"."""
+    probs = _problems({"let": [["v", {"fn": "vector", "entries": {"MSFT": {"fn": "at", "of": "$msft_capex_intensity",
+                                                                            "period": "2025-06-30"}}}]]})
+    assert [p["reason"] for p in probs] == ["unknown_binding"], probs
+
+
+def test_round_c_sol_q13_a_bound_weight_inside_a_trade_is_not_a_type_error():
+    """sol Q13 seq13: `buys[0].weight: "$freed_w"` reached the schema as a string,
+    so `book.buy` was refused for a program the executor would have run."""
+    prog = {"let": [["book", {"fn": "run", "portfolio": "port_001"}],
+                    ["w", {"fn": "pick", "of": "$book", "key": "issuer_exposures.NVDA.weight"}],
+                    ["freed_w", {"fn": "mul", "a": "$w", "b": 0.5}],
+                    ["sold", {"fn": "sell", "run": "$book", "sales": [{"ticker": "NVDA", "fraction": 0.5}]}],
+                    ["after", {"fn": "method", "name": "book.buy", "subject": "$sold", "key": "issuer_exposures.TLT.weight",
+                               "params": {"buys": [{"ticker": "TLT", "weight": "$freed_w"}]}}]]}
+    assert _problems(prog) == []
+
+
+def test_a_nested_param_name_must_be_bound_and_one_value():
+    base = [["book", {"fn": "run", "portfolio": "port_001"}],
+            ["sold", {"fn": "sell", "run": "$book", "sales": [{"ticker": "NVDA", "fraction": 0.5}]}]]
+
+    def buy(weight):
+        return {"let": base + _CONV + [["after", {"fn": "method", "name": "book.buy", "subject": "$sold",
+                                                 "params": {"buys": [{"ticker": "TLT", "weight": weight}]}}]]}
+    (p,) = _problems(buy("$nope"))
+    assert (p["reason"], p["arg"]) == ("unknown_binding", "params.buys.0.weight")
+    (p,) = _problems(buy("$conv"))
+    assert (p["reason"], p["arg"], p["got"]) == ("type_mismatch", "params.buys.0.weight", "series")
+    assert "latest(of=" in p["fix"]
+    # a misspelt field is still the schema's to refuse, with the field named
+    (p,) = _problems({"let": base + [["after", {"fn": "method", "name": "book.buy", "subject": "$sold",
+                                                 "params": {"buys": [{"ticker": "TLT", "wieght": 0.02}]}}]]})
+    assert p["reason"] == "invalid_params" and any("wieght" in str(q) for q in p["problems"])
+
+
+def test_an_expression_in_params_is_hoisted_and_substituted():
+    """`params: {peak: pick(...)}` is a nested expression like any other."""
+    prog = {"let": [["episodes", {"fn": "method", "name": "book.drawdown_episodes", "subject": "port_001"}],
+                    ["explain", {"fn": "method", "name": "book.explain_episode", "subject": "port_001",
+                                 "params": {"peak": {"fn": "pick", "of": "$episodes", "key": "episodes[0].peak_date"},
+                                            "trough": {"fn": "pick", "of": "$episodes", "key": "episodes[0].trough_date"}}}]]}
+    assert _problems(prog) == []
+    p = ps.parse(prog)
+    explain = dict(p.bindings)["explain"]
+    assert explain["params"] == {"peak": "$_explain_peak_1", "trough": "$_explain_trough_2"}, explain
+
+
+def test_a_placeholder_sits_inside_the_declared_bounds_and_enum():
+    assert ps._placeholder({"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}, "weight") == 0.5
+    assert ps._placeholder({"type": ["integer", "null"], "enum": [3, 6, 9, 12, None]}, "months") == 3
+    assert ps._placeholder({"type": ["integer", "null"], "minimum": 2, "maximum": 16}, "last_n") == 9
+    assert ps._placeholder({"type": "string"}, "peak") == "2000-01-01"

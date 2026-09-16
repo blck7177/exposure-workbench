@@ -115,7 +115,10 @@ def boundary(text: str, *, want: Any = None, subject: str | None = None, cls: st
         params["code"] = code
     if want:
         params["want"] = want
-    fact = F.fact(F.ABSENCE, measure[:200], subject=subject, text=(text or "the desk could not fulfil this")[:600],
+    # a program's type report names every node it refused (V38/T3e), so it is
+    # given the room a list needs; every other boundary is one sentence
+    limit = 1500 if cls == "type" else 600
+    fact = F.fact(F.ABSENCE, measure[:200], subject=subject, text=(text or "the desk could not fulfil this")[:limit],
                   as_of="n/a", params=params, standalone=False, group="boundary")
     entry = {"class": cls, "fact": fact.id, "text": fact.text}
     if code:
@@ -168,10 +171,32 @@ def _problem_text(p: dict) -> str:
     argument check writes {field, problem, value}; the program typecheck and
     the answer check write {reason, fix, detail}. Round A rendered sixteen
     read_filings refusals as "invalid_arguments — ; " because this read only the
-    second shape, and one analyst sent the same call six times on that."""
+    second shape, and one analyst sent the same call six times on that.
+
+    A problem that carries the schema's own problems says them, and the shape
+    the schema takes (V38/T3d): "params do not fit the method's schema" alone
+    left round C's sol Q13 rewriting a buy it could not see the fault in."""
     what = p.get("fix") or p.get("detail") or p.get("problem") or p.get("reason") or ""
     field = p.get("field") or p.get("arg") or p.get("at")
-    return f"{field}: {what}" if field and what else str(what or field or "")
+    text = f"{field}: {what}" if field and what else str(what or field or "")
+    inner = p.get("problems")
+    if isinstance(inner, list) and inner:
+        from exposure_workbench.tools.arg_validation import problems_text, schema_hint
+        said = problems_text(inner)
+        if said:
+            text += f" — {said}"
+        if isinstance(p.get("params_schema"), dict):
+            text += f"; params take {schema_hint(p['params_schema'])}"
+    return text
+
+
+def _problems_text(problems: list) -> str:
+    """Every problem of a refusal, in its order, the same sentence said once with
+    a count (V38/T3e). The first three only were shown: round C's mini Q07 seq7
+    had four, and the fourth — the one that stopped its next program — was the
+    one cut."""
+    texts = [_problem_text(p) for p in problems if isinstance(p, dict)]
+    return "; ".join(t + (f" (×{texts.count(t)})" if texts.count(t) > 1 else "") for t in dict.fromkeys(texts))
 
 
 def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: dict | None = None) -> dict:
@@ -188,7 +213,7 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
                "not_an_sec_filer": "data_absent"}.get(res["error"], "error")
         text = res.get("detail") or res["error"]
         if res.get("problems"):
-            text += " — " + "; ".join(_problem_text(p) for p in res["problems"][:3] if isinstance(p, dict))
+            text += " — " + _problems_text(res["problems"])
         if isinstance(res.get("route"), dict) and res["route"]:
             text += " — " + "; ".join(f"{k}: {ejson.dumps(v)[:120]}" for k, v in list(res["route"].items())[:2])
         # the desk's words name the call they answer, so they read as a sentence

@@ -235,6 +235,40 @@ LEGACY_RATIO_OPS: frozenset[str] = frozenset({
 })
 
 
+# ── what a figure's name says it is, and whose (V38/S4) ──────────────────────
+#
+# A book figure's name is `<table>.<row label>.<column>` on a run or scenario,
+# `<operation>.<key>.<label>` on an analysis row, `<operation>.<key>` on a
+# reconciliation. Two readers split those names, and until V38 they split them
+# differently: the program's table path kept `portfolio.integration.net_beta.
+# equity_down` whole, and `pick` read the same name as the measure
+# `portfolio.integration.net_beta` of a subject called `equity_down` — so one
+# figure had two identities, and the handoff check's phrase table took "net
+# beta" from the second (round C: 27 false `measure_mismatch 'net beta'`).
+# `portfolio.reconcile.sum_of_position_contributions` was a measure
+# `portfolio.sum_of_position_contributions` of a subject called `reconcile`.
+#
+# Written once here. A label names an ENTITY only where the entity is a thing a
+# sentence can name: a run table's row (a ticker, a sector, a check, a factor)
+# and the check a book analysis measures room to. A risk (`equity_down`) is part
+# of what the figure is, not whose it is; a result key is the figure itself.
+LABELLED_TABLES: tuple[str, ...] = tuple(r.table for r in _DECLARED if r.label_column) + ("holdings", "positions")
+ENTITY_KEYS: tuple[str, ...] = ("portfolio.integration.room_to_warning", "portfolio.integration.room_to_breach")
+
+
+def identity_of(label: str) -> tuple[str, str | None]:
+    """(measure, entity) of a book figure's name; entity None when the name
+    carries none — the caller's row (a run, a scenario) is then whose it is."""
+    parts = label.split(".")
+    if len(parts) == 3 and parts[0] in LABELLED_TABLES:
+        return f"{parts[0]}.{parts[2]}", parts[1]
+    for head in ENTITY_KEYS:
+        rest = label[len(head) + 1:] if label.startswith(head + ".") else ""
+        if rest and "." not in rest:
+            return head, rest
+    return label, None
+
+
 def column_unit(table: str, column: str) -> str | None:
     for r in RUN_CHILDREN:
         if r.table == table:

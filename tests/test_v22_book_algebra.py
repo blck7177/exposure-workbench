@@ -149,6 +149,33 @@ def test_a_book_name_parses_into_what_and_whose():
     assert tc._parse_book_name("exposure_metrics.portfolio_market_value") == \
         ("exposure_metrics.portfolio_market_value", None)
     assert tc._parse_book_name("count.positions") == ("count.positions", None)
+    # V38/S4: a risk is part of WHAT a net beta is, not whose; a result key is the figure
+    assert tc._parse_book_name("portfolio.integration.net_beta.equity_down") == \
+        ("portfolio.integration.net_beta.equity_down", None)
+    assert tc._parse_book_name("portfolio.reconcile.sum_of_position_contributions") == \
+        ("portfolio.reconcile.sum_of_position_contributions", None)
+    assert tc._parse_book_name("count.limit_checks.fired=true") == ("count.limit_checks.fired=true", None)
+
+
+@pytest.mark.parametrize("label,measure,entity", [
+    ("issuer_exposures.MSFT.weight", "issuer_exposures.weight", "MSFT"),
+    ("limit_checks.issuer_concentration:MSFT.current_value", "limit_checks.current_value", "issuer_concentration:MSFT"),
+    ("portfolio.integration.room_to_breach.issuer_concentration:MSFT", "portfolio.integration.room_to_breach",
+     "issuer_concentration:MSFT"),
+    ("portfolio.integration.net_beta.equity_down", "portfolio.integration.net_beta.equity_down", None),
+    ("portfolio.reconcile.factor_share", "portfolio.reconcile.factor_share", None),
+])
+def test_a_program_table_and_a_pick_read_one_name_as_one_identity(label, measure, entity):
+    """V38/S4. Round C: `pick(key=…net_beta.equity_down)` made a figure of
+    `equity_down` measuring `portfolio.integration.net_beta`, while the same
+    label on the program's table was the whole name — and the handoff check took
+    "net beta" out of the first, 27 times."""
+    from exposure_workbench.services import program_service as ps
+    assert tc._parse_book_name(label) == (measure, entity)
+    node = ps.Node("analysis", ps.TABLE, None, ref="calc_row", subject=RUN,
+                   entries=[(label, f"calc_row:{label}", 0.5, "RATIO")])
+    (fact,) = ps._facts_of(node)
+    assert (fact.measure, fact.subject) == (measure, entity or RUN)
 
 
 async def test_a_run_weight_resolves_typed_with_its_base_and_date(monkeypatch):

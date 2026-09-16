@@ -117,3 +117,47 @@ def validate_args(schema: dict, args: Any) -> list[dict]:
     # Stable across runs; ties broken by the message so two problems on one
     # field do not swap places either.
     return sorted(problems, key=lambda p: (p["field"], p["problem"]))
+
+
+# ── saying a refusal (V38/T3d) ────────────────────────────────────────────────
+#
+# The problems above reached the program writer as one line — "book.buy: params
+# do not fit the method's schema" — with the fields that failed, and the shape
+# that would not, dropped on the way (round C sol Q13, Q06, Q18). These are the
+# two halves of the sentence, for every reader that turns a refusal into words.
+
+def problems_text(problems: list[dict]) -> str:
+    """`field: problem` for each, in the validator's stable order."""
+    out = []
+    for p in problems or []:
+        if isinstance(p, dict) and p.get("problem"):
+            out.append(f"{p.get('field') or 'params'}: {p['problem']}")
+    return "; ".join(out)
+
+
+def schema_hint(schema: dict, depth: int = 3) -> str:
+    """The shape a schema accepts, as one line: `{buys: [{ticker: string,
+    weight: number (0..1)}, …]}`. Required names bare, optional ones with `?`."""
+    def shape(node: Any, d: int) -> str:
+        if not isinstance(node, dict):
+            return "any"
+        t = node.get("type")
+        types = [x for x in (t if isinstance(t, list) else [t]) if x and x != "null"]
+        enum = [e for e in (node.get("enum") or []) if e is not None]
+        if enum:
+            return "|".join(str(e) for e in enum)
+        if "object" in types and node.get("properties") == {}:
+            return "{}"
+        if "object" in types and isinstance(node.get("properties"), dict) and node["properties"] and d > 0:
+            req = set(node.get("required") or [])
+            inner = ", ".join(f"{k}{'' if k in req else '?'}: {shape(v, d - 1)}" for k, v in node["properties"].items())
+            return "{" + inner + "}"
+        if "array" in types:
+            return "[" + shape(node.get("items") or {}, d) + ", …]"
+        base = "|".join(types) or "any"
+        lo = node.get("minimum", node.get("exclusiveMinimum"))
+        hi = node.get("maximum", node.get("exclusiveMaximum"))
+        if lo is not None or hi is not None:
+            base += f" ({'' if lo is None else lo}..{'' if hi is None else hi})"
+        return base
+    return shape(schema, depth)

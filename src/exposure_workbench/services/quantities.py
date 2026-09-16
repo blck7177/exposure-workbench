@@ -444,8 +444,12 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
     if metrics is not None and getattr(metrics, "collinear", None):
         total = sum(float(r.contribution) for r in by_model.get(FactorAttribution) or []
                     if r.contribution is not None)
-        instead = (f"these factors are collinear, so no single beta is determined; "
-                   f"their sum, {total:.8f}, is")
+        # The sentence ends where the reader can act (V38/T3f): it used to stop
+        # at "their sum, X, is", with the sum a number in prose and no way to it
+        # named — round C's sol Q18 reconciled with the position sum instead.
+        instead = (f"these factors are collinear, so no single one is determined; their sum is determined "
+                   f"({total:.8f}) and this run holds it as factor_attributions.sum_of_contributions — "
+                   f"pick(of=$<the run>, key='factor_attributions.sum_of_contributions')")
         out = [q if not q.label.startswith(f"{fa_table}.")
                else Quantity(q.value, q.unit_class, q.label, q.source_id, instead, q.table)
                for q in out]
