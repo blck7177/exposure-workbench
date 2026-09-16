@@ -251,8 +251,8 @@
 
 | 阶段 | 内容 | 文件 | 估 |
 |---|---|---|---|
-| **A** 一行级 + 仪器 | T1、T6、M1、I1 | `sub_analyst.py`、`registry.py`、`tool_session.py`、`mcp_server.py`、`trace_service.py`、两个脚本 | 半天 |
-| **B** validation 查表 | V6 → V4 → V1 → V2 → V3 → V5（先建回归语料） | `answer.py`、`answer_check.py`、`ledger.py`、`facts.py`、`delegation.refusal_message`、`meta_agent._refusal_message`、`tests/test_v33_answer_check.py`、`tests/data/` | 一到两天 |
+| **A** ✅ 一行级 + 仪器 | T1、T6、M1、I1 | `sub_analyst.py`、`registry.py`、`tool_session.py`、`mcp_server.py`、两个脚本 | 已完成 `4e7ecbb` `98ee402` |
+| **B** ✅ validation 查表 | 语料 → V6 → V4 → V1 → V2 → V3 → V5 | `answer.py`、`answer_check.py`、`ledger.py`、`facts.py`、`tests/test_v33_answer_check.py`、`tests/data/v36b_accepted.json.gz`、`scripts/v37_corpus.py` | 已完成 `39e6a1c`…`b460a89` |
 | **C** 书侧语言 | T3 → T4 → T7 → S1 | `typed_calculator.py`、`program_service.py`、`definitions.py`、`name_table.py`、`formulas.py`、`PROGRAM_LANGUAGE.md`、`tests/test_v37_refusals_on_face.py` | 一到两天 |
 | **D** 组装层 | T5 → T2 → A2 → A1 → A3（标签 + 字段测试）→ 重生成 `WORDING.md` | `digest.py`、`sub_analyst.py`、`delegation.py`、`meta_agent.py`、`v36_wording.py`、`tests/test_v37_context_labels.py` | 一天半 |
 | **E** skill | K1（测试先红后绿）→ K3 → K4 → K2 → 重生成 `WORDING.md` | `skill.py`、`tests/test_v37_offers.py`、`test_v30_skill_programs.py`（live） | 一天 |
@@ -260,6 +260,34 @@
 | **F** C 轮实测 | 同 B 轮条件（fixture、20 题、gpt-5.4-mini、并发 5、deny submit_brief），冻结代码；产出 ACCEPTANCE_V37 + 按域表 + 沟通表 | `docs/spikes/v37/` | 半天跑 + 一天读 |
 
 顺序的理由：A 是四处一行级且证据最硬（两题、抽屉、归属）；B 是唯一能压假陈述条数的一层，且有回归语料可以离线证明不误伤；C 决定 book 域的交付率（B 轮 13/20 题的后半句派到 book 域）；D、E 按草稿推进、离线测试全绿即提交，措辞的过目门只设一道，在 F 之前。每阶段一个或几个提交，离线全绿；Phase A 前给 `8834583` 打 tag `v36.1-final`。
+
+## 3.1 已完成（2026-09-16，离线 2515 → 2553）
+
+**Phase A**（`4e7ecbb`、`98ee402`）。T1 兜底边界事实拆到 `boundary` 步（Q10/Q18
+的 `not_on_ledger` 根因）；T6 `registry.invoke` 的 facts 表写 `made or shown`
+（抽屉不再点开为空）；M1 actor 随 MCP `_meta` 走（SDK 1.28.1 的 `call_tool(meta=)`
+与 `request_context.meta`，bearer 不动，真 mount 上测），沟通表的 `~` 因此在新
+轮里消失；I1 按域一行的计数表 + 重发标记。**按域表在 B 轮上复现了手算数字**，
+并纠正 `FAILURES_V36B` §3：Q08 四次 run 里只有 seq 10 与 13 一字不差，全轮真
+重发 7 处（两次答案原样重发、四次程序、一次同一 completion 内重复的 read_filings）。
+
+**Phase B**（`39e6a1c`…`b460a89`）。先建回归语料 `scripts/v37_corpus.py` →
+`tests/data/v36b_accepted.json.gz`（15 条通过答案 + 各自当时那本账，2661 条事实，
+392 KiB），并证明它能复现该轮；此后每条规则都在它上面量过：
+
+| 规则 | 形状（与计划的差异） | B 轮上的效果 |
+|---|---|---|
+| V6 拼写日期 | 比计划更小：finder 把 "June 30, 2025" 读成一个 date 令牌并归一成 ISO，`date_expected` 自然满足，账本不动 | 去 16 次拒绝，新增 6 次都指真的缺失日期；Q10 seq 17 的 brief 变干净 |
+| V4 周期词 | 两个面（节奏对间距、计数对读数或跨度）；**按实测收窄**：单数 `year-end` 命名一个日期不是节奏 | 恰好拒分析点名的四题（Q02×3/Q04/Q09/Q12），其余十一条不动；全轮 +29，Q09 四句在交接处被拦 |
+| V1 无图形的最高级 | **三处按实测收窄**：序数命名自己的位次（"9th-largest" 是真的，顺带修了原规则与 finder 把序数读成数字）、句子要说全那个读数的名字、最高级要被 is/are 断言 | 宽版在 258 段上开火 10 次只有 2 次是目标；收窄后恰好 2 次，都在 Q11 |
+| V2 book 词对 ticker 主体 | 按计划；桌子自己的行（issuer_exposures 等）例外 | +2，其中一次在交接处；这是该轮审计漏掉的第 11 条假陈述 |
+| V3 `[rep_…]` | 比计划更小：`rep_`/`tsk_` 加进 finder 的 id 前缀表，复用已有 `id_in_prose` | +1（Q06） |
+| V5 | **计划错了**：不是"拒绝信给原话"，根因是 `resolve_in_passages` 剥掉令牌的空格而不剥段落的，带单位词的数字永远查不到 | 去 27 次拒绝、零新增；Q03 那次死锁的 finding 变干净 |
+
+全轮 258 段受门文字的拒绝条数 269 → 260，形状比总数重要：去掉约 43 次假拒绝
+（unsourced_figure 82→53、date_expected 13→2、mark_mismatch 61→58），加上 34
+次真拒绝（period_mismatch 0→29、superlative 34→36、subject_mismatch 1→3、
+id_in_prose 10→11）。
 
 ## 4. C 轮验收线（对照 B）
 
