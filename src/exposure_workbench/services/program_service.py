@@ -1978,6 +1978,24 @@ def _note_of(node: Node) -> dict:
             out["window"] = node.facts[0].window
         if node.payload.get("basis"):
             out["basis"] = node.payload["basis"]
+        # WHAT A COMPOSED TOTAL IS MADE OF (V37/S1). `total_debt` is assembled by
+        # containment cover, which refuses to wear the name when a component the
+        # issuer FILES is missing (formula_service._total_debt) — and says nothing
+        # when the issuer files nothing else at all. In the round-B fixture XOM
+        # files only `debt_current_total`, so its "total debt" is the short end:
+        # $634M at 2022-12-31 against $58.39B of free cash flow, and `fcf_to_debt`
+        # came out 92× and reached the reader as 9209.8%.
+        #
+        # The service knew and said so in its payload; this note dropped it, so
+        # neither the analyst nor the reader could see the denominator was one
+        # line. The three keys are the cover's own leftovers: what the issuer does
+        # not file at all, what it files and not at this date, and what was
+        # reported and not added because a wider line already holds it.
+        # (`formula` is not carried: an upstream wrapper overwrites it with the
+        # measure's own name, so it would only repeat `measure`.)
+        for k in ("no_facts_for_issuer", "missing_at_this_date", "overlapping_not_added"):
+            if node.payload.get(k):
+                out[k] = node.payload[k]
         return out
     if node.kind == TABLE and node.payload.get("literal") is not None and not node.entries:
         # a picked date or name: shown as what it is, with the nodes it was passed to;

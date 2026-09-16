@@ -184,3 +184,31 @@ def test_every_dimensionless_measure_is_named_in_exactly_one_of_the_two_lists():
 def test_a_share_of_a_whole_stays_a_percent(name):
     """Turning one of these into a multiple would print "0.25×" for a margin."""
     assert fm.FORMULAS[name].unit_class == "ratio", name
+
+
+# ── V37/S1: what a composed total is made of reaches the reader ────────────────
+
+def test_a_composed_totals_leftovers_are_carried_on_the_nodes_note():
+    """`total_debt` is assembled by containment cover, which refuses to wear the
+    name when a component the issuer FILES is missing — and says nothing at all
+    when the issuer files nothing else. In the round-B fixture XOM files only
+    `debt_current_total`, so its "total debt" is the short end: $634M at
+    2022-12-31 against $58.39B of free cash flow, `fcf_to_debt` came out 92× and
+    reached the reader as "9209.8%".
+
+    The arithmetic is right for the inputs this desk holds, and the unit is the
+    one the agencies use (see the two lists above — a deliberate decision, not
+    changed here). What was missing is that the denominator is one filed line:
+    the service says so in its payload and the program's note dropped it."""
+    from exposure_workbench.services.program_service import _note_of, Node, SCALAR
+    from exposure_workbench.services import facts as F
+    node = Node("td", SCALAR, {})
+    node.facts = [F.fact(F.SCALAR, "total_debt", subject="XOM", unit="MONEY", value=6.34e8, as_of="2022-12-31")]
+    node.unit, node.measure, node.as_of = "MONEY", "total_debt", "2022-12-31"
+    node.payload = {"basis": "as of 2022-12-31", "formula": "debt_current_total",
+                    "no_facts_for_issuer": ["long_term_debt_total", "short_term_borrowings"],
+                    "missing_at_this_date": [], "overlapping_not_added": []}
+    note = _note_of(node)
+    assert note["no_facts_for_issuer"] == ["long_term_debt_total", "short_term_borrowings"]
+    assert "missing_at_this_date" not in note and "overlapping_not_added" not in note, "empty says nothing"
+    assert "formula" not in note, "an upstream wrapper overwrites it with the measure's own name"
