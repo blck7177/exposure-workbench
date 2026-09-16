@@ -113,3 +113,52 @@ def test_a_refusal_the_summary_does_not_name_is_counted_as_unstated(tmp_path):
             "steps": [{"step_type": "brief", "tool_name": "submit", "actor": "sub:x", "status": "rejected",
                        "result": "refused"}]}
     assert _tally(tmp_path, [turn])["handoff_refusals"] == {"unstated": 1}
+
+
+# ── V37: one row per domain ───────────────────────────────────────────────────
+
+def test_a_domain_gets_one_row_of_what_it_was_asked_and_what_it_ran(tmp_path):
+    """Round B's headline was per round: 100 runs, 28 type errors. Per domain it
+    said what the round-level number hid — `book_market_risk` made 23 of those
+    runs, exactly one came back clean, and it settled 6 of the 24 lines asked of
+    it, because its ROSTER offers promise stress losses and per-name factor betas
+    that the desk withholds. No round-level counter can show that."""
+    c = _tally(tmp_path, [V36_TURN])["by_domain"]
+    assert set(c) == {"book_limits_and_triggers"}
+    row = c["book_limits_and_triggers"]
+    assert (row["delegations"], row["asked"], row["done"]) == (1, 4, 3)
+    assert (row["completions"], row["evidence_calls"]) == (3, 1)
+    # the run in this turn carries no actor and is attributed to the analyst that
+    # spoke last — the rule every round before V37 has to be read with
+    # a count of nothing is absent rather than zero, the way a Counter reads;
+    # the printed table fills the column
+    assert (row["runs"], row["clean"], row.get("type_errors", 0)) == (1, 1, 0)
+
+
+def test_a_program_that_refused_is_not_a_program_that_ran(tmp_path):
+    """Three outcomes, kept apart, off the producer's own declaration: a type
+    report before anything ran, a program that ran with a node refusing, and one
+    that came back whole. `book_market_risk` had 11 of the first and 11 of the
+    second out of 23."""
+    steps = [_llm("sub:book_market_risk"),
+             {"step_type": "tool_call", "tool_name": "run", "actor": "sub:book_market_risk",
+              "status": "completed", "result": "error: type_errors"},
+             {"step_type": "tool_call", "tool_name": "run", "actor": "sub:book_market_risk",
+              "status": "completed", "result": "keys: nodes, facts | nodes: b=run, qqq=absence"},
+             {"step_type": "tool_call", "tool_name": "run", "actor": "sub:book_market_risk",
+              "status": "completed", "result": "keys: nodes, facts | nodes: b=run, beta=vector"}]
+    row = _tally(tmp_path, [{"turn": 1, "answer": "", "meta": {}, "steps": steps}])["by_domain"]["book_market_risk"]
+    assert (row["runs"], row["type_errors"], row["with_absence"], row["clean"]) == (3, 1, 1, 1)
+
+
+def test_the_actor_on_the_row_and_the_analyst_that_spoke_last_read_the_same(tmp_path):
+    """V37/M1 puts the caller on the row; before it the caller was inferred from
+    whoever spoke last. Both readings have to give one number, or a round read
+    after the change is not comparable with a round read before it."""
+    def _round(actor):
+        return [_llm("sub:book_liquidity"),
+                {"step_type": "tool_call", "tool_name": "run", "actor": actor,
+                 "status": "completed", "result": "keys: nodes | nodes: d=vector"}]
+    told = _tally(tmp_path, [{"turn": 1, "answer": "", "meta": {}, "steps": _round("sub:book_liquidity")}])
+    guessed = _tally(tmp_path, [{"turn": 1, "answer": "", "meta": {}, "steps": _round(None)}])
+    assert told["by_domain"] == guessed["by_domain"] == {"book_liquidity": {"runs": 1, "clean": 1}}

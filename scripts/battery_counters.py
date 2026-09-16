@@ -122,6 +122,55 @@ _RANK_OP = re.compile(r'"op":\s*"(?:rank|top)"')
 _HANDOFF = re.compile(r"^refused: \d+ problem\(s\); ([a-z_]+)")
 
 
+# V37: what one `run` came back as, read off the producer's own declaration.
+# `| nodes: name=kind` is written by tools/registry._declared_nodes, so a node
+# that refused says `=absence` there — structure, not a spelling in the program.
+_ABSENCE_NODE = re.compile(r"\| nodes: [^|]*\b=absence\b")
+
+
+def runs_by_domain(steps: list[dict]) -> dict[str, collections.Counter]:
+    """Every `run` of one turn, attributed to the analyst that made it.
+
+    WHY THIS COUNT EXISTS. Round B's headline numbers were per round: 100 runs,
+    28 of them type errors. Per DOMAIN they said something the round-level
+    number hid — `book_market_risk` made 23 of those runs and exactly one came
+    back clean, while it was answering 6 of the 24 lines asked of it. A domain
+    the lead keeps being routed to and which cannot execute is a skill problem
+    (its offers promise what the desk withholds), and no round-level counter can
+    show that.
+
+    The actor is on the row from V37/M1 on (it rides on the call as request
+    metadata). Before that the registry wrapper sat behind the MCP door and was
+    not told, so a tool call is attributed to the analyst that spoke last —
+    exact while analysts run one at a time, which is every round to date
+    (`parallel_analysts` is off). Same rule as scripts/v36_forensics.py, so a
+    reading of an old round and a new one are the same reading.
+    """
+    out: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    speaking: str | None = None
+    for s in sorted(steps, key=lambda x: x.get("seq") or 0):
+        actor = str(s.get("actor") or "")
+        if actor.startswith("sub:"):
+            speaking = actor[4:]
+        elif s.get("step_type") in ("delegate", "answer", "respond", "read_report"):
+            speaking = None                      # the lead took the floor back
+        if s.get("tool_name") != "run" or s.get("step_type") != "tool_call":
+            continue
+        who = actor[4:] if actor.startswith("sub:") else (speaking or "meta")
+        result = s.get("result") or ""
+        c = out[who]
+        c["runs"] += 1
+        if result.startswith("error: type_errors"):
+            c["type_errors"] += 1
+        elif result.startswith("error"):
+            c["other_errors"] += 1
+        elif _ABSENCE_NODE.search(result):
+            c["with_absence"] += 1
+        else:
+            c["clean"] += 1
+    return out
+
+
 def classify(summary: str, status: str) -> str | None:
     s = summary or ""
     if s.startswith("not attempted"):
@@ -150,6 +199,9 @@ def tally(paths: list[str]) -> dict:
     lead_rt, sub_rt, delegates, lead_peak = [], [], [], []
     analysts = submits = submits_rejected = boundaries = delegates_rejected = read_reports = 0
     analyst_status: collections.Counter = collections.Counter()
+    # V37: one row per domain — what it was asked, what it settled, what it spent
+    # and how its programs came back. See runs_by_domain() for why.
+    by_domain: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     report_status: collections.Counter = collections.Counter()
     handoff: collections.Counter = collections.Counter()
     coverage: collections.Counter = collections.Counter()
@@ -197,6 +249,14 @@ def tally(paths: list[str]) -> dict:
                     analyst_status[d.get("status") or "unstated"] += 1
                     for k in ("asked", "done", "not_done", "refused"):
                         coverage[k] += int((d.get("coverage") or {}).get(k) or 0)
+                    dom = by_domain[str(d.get("domain") or "unstated")]
+                    dom["delegations"] += 1
+                    for k in ("asked", "done", "not_done", "refused"):
+                        dom[k] += int((d.get("coverage") or {}).get(k) or 0)
+                    for k in ("completions", "evidence_calls", "starts"):
+                        dom[k] += int((d.get("cost") or {}).get(k) or 0)
+                for who, counts in runs_by_domain(steps).items():
+                    by_domain[who].update(counts)
                 for r in meta.get("reports") or []:
                     report_status[r.get("status") or "unstated"] += 1
                 if isinstance(meta.get("prompt_tokens"), (int, float)):
@@ -292,6 +352,7 @@ def tally(paths: list[str]) -> dict:
         "handoff_refusals": dict(sorted(handoff.items())),
         "reports_by_status": dict(sorted(report_status.items())),
         "boundaries_minted": boundaries,
+        "by_domain": {d: dict(c) for d, c in sorted(by_domain.items())},
         "lead_completions_median": med(lead_rt), "sub_completions_median": med(sub_rt),
         "sub_completions_total": sum(sub_rt),
         "lead_prompt_peak_median": med(lead_peak), "lead_prompt_peak_p90": q(lead_peak, .9),
@@ -308,12 +369,20 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
     out = tally(args.traces)
     for k, v in out.items():
-        if k == "refusals":
+        if k in ("refusals", "by_domain"):
             continue
         if isinstance(v, dict):
             print(f"{k:40s} " + (", ".join(f"{kk} {vv}" for kk, vv in v.items()) or "-"))
         else:
             print(f"{k:40s} {v}")
+    if out["by_domain"]:
+        cols = ("delegations", "asked", "done", "not_done", "refused",
+                "completions", "evidence_calls", "starts", "runs", "clean", "type_errors",
+                "with_absence", "other_errors")
+        print("by domain (a domain the lead keeps reaching for and which cannot execute is a skill problem):")
+        print("  " + "domain".ljust(34) + "".join(c[:6].rjust(8) for c in cols))
+        for dom, c in sorted(out["by_domain"].items(), key=lambda kv: -kv[1].get("completions", 0)):
+            print("  " + dom.ljust(34) + "".join(str(c.get(k, 0)).rjust(8) for k in cols))
     print("refusals by class (count / turns / per turn):")
     for k, v in out["refusals"].items():
         print(f"  {k:28s} {v['count']:5d} {v['turns']:5d} {v['per_turn']:6.2f}")

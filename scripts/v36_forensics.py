@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import collections
+import hashlib
 import json
 import os
 import sys
@@ -203,6 +204,32 @@ def _one_line(p: dict) -> str:
     return f"- {p.get('at')} {p['reason']} {what!r}{extra}  fix={str(p.get('fix') or '')[:130]}"
 
 
+# Steps whose `args` are a LABEL and not a payload the sender composed: a
+# boundary step's args name the call it answers (`{"of": "run"}`) and its content
+# is the fact it carries, so "the same args twice" says nothing about repetition.
+# Asked of them, the marker below called 25 of round B's 48 boundaries repeats.
+_NOT_A_PAYLOAD = ("boundary",)
+
+
+def _repeat_of(st: dict, frm: str, carrier: str, seen: dict) -> str:
+    """`=<seq>` when this payload has already been sent on this edge (V37).
+
+    A load the desk has already refused, sent again unchanged, gets the same
+    refusal — and until V37's A2 it still cost a completion, a slot of the
+    analyst's evidence budget or one of the two answer attempts. Round B did it
+    with one program four times (Q08), one submission twice and two answers
+    word for word (Q03, Q18). The table said nothing about it, so the reading
+    "143 of 326 round trips pushed nothing forward" undercounted the cheapest
+    class of all. Marked, never merged: a repeat is a round trip that happened.
+    """
+    if st["step_type"] in _NOT_A_PAYLOAD:
+        return ""
+    payload = st["args"] if isinstance(st["args"], str) else json.dumps(st["args"], sort_keys=True, default=str)
+    key = (frm, carrier, hashlib.sha256((payload or "").encode()).hexdigest())
+    first = seen.setdefault(key, st["seq"])
+    return f"={first}" if first != st["seq"] else ""
+
+
 def _table(rows: list[tuple]) -> list[str]:
     if not rows:
         return ["  (no steps)"]
@@ -226,6 +253,7 @@ async def main(argv: list[str]) -> int:
     out: list[str] = []
     pairs_total: collections.Counter = collections.Counter()
     carriers_total: collections.Counter = collections.Counter()
+    repeats_total: collections.Counter = collections.Counter()   # V37: payloads re-sent unchanged, by carrier
     samples: dict[str, dict] = {}
     problem_counts: collections.Counter = collections.Counter()
 
@@ -252,10 +280,11 @@ async def main(argv: list[str]) -> int:
                 out.append(f"Q: {t['q']}")
                 out.append(f"meta: {json.dumps(meta, ensure_ascii=False)[:400]}")
                 out.append("--- 沟通表 ---")
-                rows = [("seq", "from", "→", "to", "carrier", "status", "size", "schema keys", "content")]
+                rows = [("seq", "from", "→", "to", "carrier", "status", "rep", "size", "schema keys", "content")]
                 pairs: collections.Counter = collections.Counter()
                 completions: collections.Counter = collections.Counter()
                 speaking: str | None = None          # the analyst whose turn it is; see the module docstring
+                sent: dict = {}                      # (from, carrier, payload sha) -> the seq that first sent it
                 for st in turn_steps:
                     if st["actor"]:
                         speaking = _short_actor(st["actor"], LEAD)
@@ -273,8 +302,11 @@ async def main(argv: list[str]) -> int:
                         samples.setdefault(f"{frm} → {to} · {carrier}",
                                            {"tag": convo["tag"], "seq": st["seq"], "args": a,
                                             "result_summary": st["result_summary"]})
+                    rep = "" if to is None else _repeat_of(st, frm, carrier, sent)
+                    if rep:
+                        repeats_total[carrier] += 1
                     rows.append((st["seq"], inferred + frm, "·" if to is None else "→",
-                                 to or _short_actor(st["actor"], LEAD), carrier, st["status"],
+                                 to or _short_actor(st["actor"], LEAD), carrier, st["status"], rep,
                                  _sizes(st, st["args"]), _keys(st["args"]), _summary(st, a)[:150]))
                 out += _table(rows)
 
@@ -310,7 +342,7 @@ async def main(argv: list[str]) -> int:
         out.append(f"{k:<28} {v}")
     out.append("=== 载体 ===")
     for k, v in carriers_total.most_common():
-        out.append(f"{k:<28} {v}")
+        out.append(f"{k:<28} {v}" + (f"   (其中重发 {repeats_total[k]})" if repeats_total[k] else ""))
     if problem_counts:
         out.append("=== 重放问题 ===")
         for k, v in problem_counts.most_common():

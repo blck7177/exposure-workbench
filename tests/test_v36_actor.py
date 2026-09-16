@@ -132,3 +132,50 @@ async def test_what_a_completion_read_is_on_its_row_and_never_sent_to_the_provid
     await lead.chat(messages=[])
     assert [r["args"] for r in rows] == [{"read": {"chars": 16650, "results": 1}}, None]
     assert all("note" not in kw for kw in sent)
+
+
+# ── V37: a payload re-sent unchanged is marked, never merged ──────────────────
+
+def _forensics():
+    import importlib.util
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("v36_forensics", root / "scripts" / "v36_forensics.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_communication_table_marks_a_payload_sent_twice():
+    """Round B sent one program four times (Q08, three of them byte for byte),
+    one submission twice and two answers word for word (Q03, Q18). Each cost a
+    completion and a slot of somebody's budget, and the table said nothing — so
+    the reading "143 of 326 round trips pushed nothing forward" undercounted the
+    cheapest class there is.
+
+    Marked with the seq it repeats, not merged: a repeat is a round trip that
+    happened. A payload that changed by one byte is not one — that is the same
+    rule agents/repeats.py has held since V31, and the bound is on repetition,
+    never on effort."""
+    f = _forensics()
+    prog = {"program": {"let": [{"name": "a", "expr": {"fn": "run", "portfolio": "port_001"}}]}}
+    seen: dict = {}
+    first = {"step_type": "tool_call", "seq": 4, "args": prog}
+    again = {"step_type": "tool_call", "seq": 7, "args": prog}
+    reordered = {"step_type": "tool_call", "seq": 9, "args": {"program": {"let": [{"expr": {"portfolio": "port_001", "fn": "run"}, "name": "a"}]}}}
+    changed = {"step_type": "tool_call", "seq": 11, "args": {"program": {"let": [{"name": "a", "expr": {"fn": "run", "portfolio": "port_002"}}]}}}
+
+    assert f._repeat_of(first, "sub:x", "run", seen) == ""
+    assert f._repeat_of(again, "sub:x", "run", seen) == "=4"
+    assert f._repeat_of(reordered, "sub:x", "run", seen) == "=4", "one payload, whichever key order it was written in"
+    assert f._repeat_of(changed, "sub:x", "run", seen) == ""
+    # another analyst sending the same program is not repeating anybody
+    assert f._repeat_of({"step_type": "tool_call", "seq": 13, "args": prog}, "sub:y", "run", seen) == ""
+    # and a step whose args are a LABEL is never a repeat: a boundary step's args
+    # name the call it answers (`{"of": "run"}`) and its content is the fact it
+    # carries. Asked of those, this marker called 25 of round B's 48 boundaries
+    # repeats — an instrument reporting a number about nothing.
+    seen2: dict = {}
+    for seq in (5, 8, 11):
+        assert f._repeat_of({"seq": seq, "args": {"of": "run"}, "step_type": "boundary"},
+                            "sub:x", "boundaries", seen2) == ""
