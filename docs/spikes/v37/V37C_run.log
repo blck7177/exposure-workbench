@@ -1,0 +1,176 @@
+=== FREEZE 2026-09-16T13:42:58+00:00 ===
+b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb
+--- tree hash ---
+3f11872480d669d302b8cc03c7efe8addf7e1019
+--- HEAD commit time (for find -newermt at the end) ---
+2026-09-16T04:23:00+00:00
+--- tracked changes (must be empty) ---
+--- origin ---
+b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb
+--- wording gate ---
+docs/spikes/v36/WORDING.md status line still reads 未过目; this round runs on the draft wording by the user's instruction (2026-09-16: push, then run Phase F).
+--- offline baseline ---
+......................                                                   [100%]
+2603 passed, 11 skipped, 311 deselected in 20.82s
+
+=== PRESERVE 2026-09-16T13:44:00+00:00 ===
+the fixture before restore (round B sessions + V37 development residue) dumped to /home/ubuntu/backups/battery/battery-after-V36B-2026-09-16.sql.gz
+
+=== RESTORE 2026-09-16T13:44:00+00:00 ===
+stale face: serving on :8105 (pid 298848) — started 2026-09-15 05:56 on the V36.1 tree
+stopped
+restored 50 runs, latest 2026-09-10, 21285 steps, 23 policies
+
+=== MIGRATIONS onto the restored fixture 2026-09-16T13:44:18+00:00 ===
+--- v36_actor ---
+ALTER TABLE
+--- v36_analyst_reports ---
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+DROP POLICY
+NOTICE:  policy "tenant" for relation "analyst_reports" does not exist, skipping
+CREATE POLICY
+analyst_reports rows: 0
+agent_steps.actor: character varying(64)
+app_rls on analyst_reports: INSERT,SELECT,UPDATE
+owner present: 1
+
+=== FACE 2026-09-16T13:44:27+00:00 ===
+fixture face up on :8105 over exposure_battery (pid 1326421, log /tmp/battery_mcp_8105.log)
+serving on :8105 (pid 1326421)
+fixture db: 1
+--- face log ---
+2026-09-16 13:44:31,071 [INFO] mcp-http: mcp mount /mcp/meta serving 4 tools
+2026-09-16 13:44:31,072 [INFO] mcp-http: mcp mount /mcp/research serving 6 tools
+--- process start vs HEAD commit ---
+    PID                  STARTED CMD
+1326421 Wed Sep 16 13:44:27 2026 .venv/bin/python -m uvicorn apps.mcp.http:app --host 127.0.0.1 --port 8105
+
+face constant on this tree: ['run', 'read_filings', 'search_web', 'start']
+
+=== ROUND C 2026-09-16T13:44:47+00:00 ===
+cmd: conversation_battery questions_v33.json V37C.json --fixture --concurrency 5 --deny submit_brief
+20 conversation(s), 20 turn(s), concurrency 5, model gpt-5.4-mini, db exposure_battery, mcp http://127.0.0.1:8105, deny ['submit_brief']
+[Q03-nvda-where-cash-goes t1] 6.3s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q01-amzn-earnings-quality t1] 6.4s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q02-xom-room-if-oil-falls t1] 6.6s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q04-lly-margin-pricing-mix-cost t1] 7.1s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q05-aapl-risk-and-concentration t1] 7.4s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q06-jpm-riskier-than-a-year-ago t1] 2.0s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q07-tech-cash-conversion-rank t1] 2.0s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q08-capex-roic-three-way t1] 1.9s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q09-aapl-working-capital-cycle t1] 1.6s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q10-msft-leverage-and-rates t1] 1.7s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q11-closest-to-issuer-limit t1] 1.7s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q13-sell-half-nvda-into-tlt t1] 1.8s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q14-worst-drawdown-episode t1] 1.7s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q12-jpm-vs-peers-not-on-desk t1] 1.9s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q15-liquidity-and-limits t1] 1.7s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q16-book-beta-change-since-prev t1] 1.6s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q17-events-touching-holdings t1] 1.7s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q18-attribution-reconcile t1] 1.9s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q19-aws-share-explains-return t1] 1.9s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q20-lly-margins-next-year t1] 1.9s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+
+written docs/spikes/v37/V37C.json
+exit 0
+
+=== ATTEMPT 1 ABORTED 2026-09-16T13:46:59+00:00 ===
+all 20 turns ended in 1.6–7.4 s with 'ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)', calls=0, no step recorded, no assistant message;
+the face log shows each session's initialize / notifications / ListTools answered 200/202 and no CallTool request, and holds no error.
+diagnosis (read-only, one completion through exposure_workbench.llm.client.chat_with_tools, nothing written):
+  openai RateLimitError — Error code: 429 — type insufficient_quota, code credit_balance_exhausted:
+  'You have no credits remaining. Add credits to continue using the API.'
+the provider raises inside the tool_session task group, so the battery records only the ExceptionGroup's summary.
+nothing was changed. the round file was renamed V37C_attempt1_no_credits.json so a real round can write V37C.json.
+the fixture now holds 20 sessions with only the user message each; a rerun restores it first, as every round does.
+
+=== FREEZE CHECK 2026-09-16T13:46:59+00:00 ===
+b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb
+3f11872480d669d302b8cc03c7efe8addf7e1019
+--- tracked changes (must be empty) ---
+--- files under src tests scripts newer than the HEAD commit (must be empty) ---
+--- untracked (round artefacts only) ---
+?? docs/spikes/v37/
+
+=== PREFLIGHT 2026-09-16T14:06:57+00:00 ===
+credits ok: gpt-5.4-mini-2026-03-17 12/4 tok
+
+=== FREEZE (attempt 2) 2026-09-16T14:07:00+00:00 ===
+b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb
+3f11872480d669d302b8cc03c7efe8addf7e1019
+HEAD commit time 2026-09-16T04:23:00+00:00
+--- offline baseline ---
+2603 passed, 11 skipped, 311 deselected in 21.83s
+
+=== RESTORE 2026-09-16T14:07:25+00:00 ===
+stopped
+restored 50 runs, latest 2026-09-10, 21285 steps, 23 policies
+--- migrations ---
+NOTICE:  policy "tenant" for relation "analyst_reports" does not exist, skipping
+analyst_reports 0 rows; actor column 1
+
+=== FACE 2026-09-16T14:07:42+00:00 ===
+fixture face up on :8105 over exposure_battery (pid 1340801, log /tmp/battery_mcp_8105.log)
+2026-09-16 14:07:44,122 [INFO] mcp-http: mcp mount /mcp/meta serving 4 tools
+
+=== ROUND C 2026-09-16T14:07:46+00:00 ===
+cmd: conversation_battery questions_v33.json V37C.json --fixture --concurrency 5 --deny submit_brief
+20 conversation(s), 20 turn(s), concurrency 5, model gpt-5.4-mini, db exposure_battery, mcp http://127.0.0.1:8105, deny ['submit_brief']
+[Q03-nvda-where-cash-goes t1] 25.6s calls=4 type_errors=1  NVIDIA’s cash went mostly to buybacks over the trailing twelve months: 41.2% of operating 
+[Q04-lly-margin-pricing-mix-cost t1] 28.5s calls=7  Lilly’s net margin was 19.7%, 21.9%, 15.4%, 23.5%, and 31.7%.
+I could not get Lilly’s gros
+[Q05-aapl-risk-and-concentration t1] 34.4s calls=5  Apple says its biggest business risks are macroeconomic and geopolitical exposure, supply-
+[Q02-xom-room-if-oil-falls t1] 53.4s calls=7 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q06-jpm-riskier-than-a-year-ago t1] 33.2s calls=4 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q09-aapl-working-capital-cycle t1] 17.8s calls=8  I can’t answer this fully from the analyst return I got.
+What I do have is a partial annua
+[Q07-tech-cash-conversion-rank t1] 46.1s calls=7 type_errors=5 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q08-capex-roic-three-way t1] 52.9s calls=8 type_errors=3  I can give you the book’s QQQ-style exposure, but I can’t yet answer the issuer comparison
+[Q12-jpm-vs-peers-not-on-desk t1] 21.6s calls=3 type_errors=1 refusals=1  I have partial coverage, not the full cross-issuer comparison you asked for.
+For JPMorgan,
+[Q10-msft-leverage-and-rates t1] 48.6s calls=9 type_errors=1 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q11-closest-to-issuer-limit t1] 36.5s calls=3  I can only support part of that answer from the desk as returned.
+The book is ranked by sm
+[Q01-amzn-earnings-quality t1] 121.4s calls=6  Amazon’s earnings quality does not look cleanly deteriorating from the evidence I was show
+[Q13-sell-half-nvda-into-tlt t1] 40.4s calls=0  ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[Q14-worst-drawdown-episode t1] 35.2s calls=8 refusals=1  The worst drawdown episode over the last year was a 12.0% drawdown. It ran from 2026-01-07
+[Q16-book-beta-change-since-prev t1] 46.1s calls=2  The portfolio’s holdings’ 1-year market betas are:
+AAPL 0.68×, JPM 0.78×, LLY 0.31×, MSFT 
+[Q18-attribution-reconcile t1] 28.3s calls=2 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q15-liquidity-and-limits t1] 81.7s calls=5 refusals=1  The book is highly liquid.
+By 20-day average dollar volume, the largest positions relative
+[Q20-lly-margins-next-year t1] 38.5s calls=9  No — I would not read Lilly as a next-year margin expansion call from the desk, because th
+[Q17-events-touching-holdings t1] 87.2s calls=17 refusals=2  I could not produce an answer I can stand behind for this turn — everything I state has to
+[Q19-aws-share-explains-return t1] 80.4s calls=19 type_errors=2  I can answer only part of this from the desk’s reads.
+Amazon’s AWS share of revenue is on 
+
+written docs/spikes/v37/V37C.json
+
+=== FORENSICS 2026-09-16T14:11:21+00:00 ===
+wrote docs/spikes/v37/V37C_forensics.txt  (1480 lines)
+wrote docs/spikes/v37/V37C_schema.md  (74 carriers)
+counters: docs/spikes/v37/V37C_counters.txt
+wrote docs/spikes/v37/V37C_answers.txt and docs/spikes/v37/V37C_audit.txt
+     13   ANSWERED
+      1   ERROR
+      6   EXHAUSTED
+
+=== FREEZE CHECK 2026-09-16T14:11:26+00:00 ===
+b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb
+3f11872480d669d302b8cc03c7efe8addf7e1019
+--- tracked changes (must be empty) ---
+--- src tests scripts newer than the HEAD commit (must be empty) ---
+--- untracked ---
+?? docs/spikes/v37/
+=== DONE 2026-09-16T14:11:26+00:00 ===
+
+=== NOTE ON Q13 2026-09-16T14:14:26+00:00 — recorded after the round, nothing changed ===
+Q13 (sess_b6680e5c2acd) ended after 40.4 s in 'ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)', no assistant message.
+its steps: answer rejected at seq 29, 31, 33 (change_conflict), all three texts md5 1c64db534fc3a85a9486f60a7ffd691c; 31 and 33 came through repair_answer.
+cause (read, and reproduced with one request): in meta_agent's repair branch the second repeat appends 'repeated_answer' and breaks the
+tool-call loop only; attempts is still 1 < MAX_ANSWER_ATTEMPTS, so the outer loop calls the provider again with that repair_answer
+tool_call left without a tool message, and the provider answers:
+  openai BadRequestError 400 — An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'.
+a V37/A2 regression (the plain-reply branch breaks the outer loop; the repair branch does not).
