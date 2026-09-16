@@ -1,0 +1,14 @@
+PASS  S1 quarterly DSO AAPL 2023-09-30: quarterly 30.00 (round C printed 120.34; ×91/365 = 30.00), annual 28.10
+PASS  S2 MSFT coverage at each fiscal year end = the annual series point: 2021-06-30: 31.31 vs 31.31 as_of 2021-06-30; 2022-06-30: 41.58 vs 41.58 as_of 2022-06-30; 2023-06-30: 46.38 vs 46.38 as_of 2023-06-30; 2024-06-30: 37.72 vs 37.72 as_of 2024-06-30; 2025-06-30: 52.84 vs 52.84 as_of 2025-06-30
+PASS  S2 JPM ROE at year ends = the annual series points: at 2023-12-31 0.1511 (series 0.1511; round C printed 0.1796 as of 2026-03-31)
+PASS  S2 a date no period ends near is refused: odd was not computed — input_unavailable: no reported period ends at or within 20 days of 2021-08-15; the reported periods end as late as 2026-03-31
+PASS  S3 XOM total debt 2025-12-31: 43.537bn made_of {"total_debt": {"formula": "long_term_debt_and_leases_noncurrent (for long_term_debt_noncurrent) + debt_current_total", "substituted": {"long_term_debt_noncurrent": "long_term_debt_and_leases_noncurrent"}, "no_facts_for_
+PASS  S3 XOM fcf_to_debt / debt_to_ebitda FY2025: fcf_to_debt 54.2% (round C 254.0%); points [0.756, 1.417, 0.805, 0.736, 0.542]; debt_to_ebitda [0.91, 0.41, 0.57, 0.58, 0.65]; series made_of {"total_debt": {"formula": "long_term_debt_and_leases_noncurrent (for long_term_debt_noncurrent) + debt_current_total", "substituted": {"long_term_debt_noncurre
+PASS  S4 pick and table give one identity: pick (portfolio.integration.net_beta.equity_down, run_e2945c5ebd5a) table (portfolio.integration.net_beta.equity_down, run_e2945c5ebd5a) value -0.8599
+PASS  S5 the factor sum and alpha+residual are on the page and resolve: factor sum -0.00471605, alpha+residual 0.008475, sum of both 0.003759; measure portfolio.reconcile.sum_of_factor_contributions subject run_e2945c5ebd5a
+PASS  T3f the collinear refusal says where the sum is: legs was not computed — not_alone: factor_attributions.contribution on run_e2945c5ebd5a may not be used name by name: these factors are collinear, so no single one is determined; their sum is determined (-0.00471605) and
+PASS  L2 the bound weight passes the type check; the buy meets the data refusal: after was not computed — no_sector: TLT has no sector on this desk (not prepared, or not an SEC filer), so a sector-concentration check on the book with it cann
+PASS  T1+T2 the rendered result shows the returned weight and the refusal, and counts the rest: figures ['freed_w'], boundaries ['no_sector'], nodes [('book', 'run', None), ('w', 'scalar', 1), ('freed_w', 'scalar', None), ('sold', 'table', 99), ('after', 'refused', None)]
+PASS  T1 mini Q08 seq24: both returned net betas are shown, with their runs: latest_exposure -86.0% [f_ff4b9b468198] subject run_e2945c5ebd5a; prev_exposure -85.7% [f_b83a795ce228] subject run_4ee5ca92b926; not returned {'analysis_latest': 48, 'analysis_prev': 48}; run nodes [('book_latest', 'run_e2945c5ebd5a'), ('book_prev', 'run_4ee5ca92b926')]
+
+12/12 checks pass

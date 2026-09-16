@@ -1,0 +1,10 @@
+mini Q08 seq27 sub:book_market_risk: recorded 3 (problems list capped at 20), re-checked 3, with V38 identities 0; other problems now []
+mini Q08 seq32 sub:book_market_risk: recorded 3 (problems list capped at 20), re-checked 3, with V38 identities 0; other problems now ['mark_mismatch']
+mini Q16 seq8 sub:book_market_risk: recorded 6 (problems list capped at 20), re-checked 6, with V38 identities 0; other problems now ['mark_mismatch']
+mini Q16 seq14 sub:book_market_risk: recorded 6 (problems list capped at 20), re-checked 6, with V38 identities 0; other problems now []
+mini Q19 seq34 sub:book_market_risk: recorded 1 (problems list capped at 20), re-checked 1, with V38 identities 0; other problems now ['unknown_node', 'unsourced_figure']
+mini Q19 seq38 sub:book_market_risk: recorded 1 (problems list capped at 20), re-checked 1, with V38 identities 0; other problems now ['change_conflict', 'unknown_node', 'unsourced_figure']
+mini: briefs — net-beta measure_mismatch recorded 20, re-checked as recorded 20, with V38 identities 0
+mini: answers — net-beta measure_mismatch re-checked 0, with V38 identities 0
+sol: briefs — net-beta measure_mismatch recorded 0, re-checked as recorded 0, with V38 identities 0
+sol: answers — net-beta measure_mismatch re-checked 0, with V38 identities 0
