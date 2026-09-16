@@ -245,8 +245,13 @@ _FORM = r"(?P<form>\b\d{1,2}-[KQF](?:/A)?\b|\b[SF]-[13]\b|\bDEF\s?14A\b)"
 # a clause, so "in 2024, revenue rose" offered the gate the token "2024," —
 # which no lookup can resolve, and four of the seven unsourced_figure refusals
 # in the whole stored corpus were exactly that (measured 2026-09-05).
+# AN ORDINAL IS A COUNTING WORD, NOT A FIGURE. "the 9th-largest issuer by weight"
+# and "the 3rd-largest" carry no quantity for a ledger to account for, and until
+# V37 their digits were read as one: whether "9" resolved depended on some fact
+# happening to carry a 9 in its parameters, and "3" was refused as unsourced
+# beside a claim that is about a place.
 _NUM = (r"(?P<num>(?<![\w.])[+\-−]?\$?\d(?:[\d,]*\d)?(?:\.\d+)?%?"
-        r"(?:\s?(?:bn|mn|K|M|B|million|billion|thousand|percent|per\s?cent)\b)?)")
+        r"(?:\s?(?:bn|mn|K|M|B|million|billion|thousand|percent|per\s?cent)\b)?(?!(?:st|nd|rd|th)\b)(?!\d))")
 TOKEN = re.compile("|".join((_ID, _DATE, _FORM, _NUM)))
 
 # A pointer written in the prose: the fact's id, optionally addressing one

@@ -118,6 +118,14 @@ def test_prose_by_block_blanks_the_pointers_and_keeps_the_length():
     # and a month with no day and no year is prose, not a date: nothing to resolve
     ("through June and July", []),
     ("a 12 month window in June", [("12", "num")]),
+    # V37: an ordinal is a counting word, not a figure. "the 9th-largest issuer by
+    # weight" carries no quantity for a ledger to account for, and its digits were
+    # read as one — "9" resolved only when some fact happened to carry a 9 in its
+    # parameters, and "3" was refused as unsourced beside a claim about a place.
+    ("the 9th-largest issuer by weight", []),
+    ("the 3rd-largest at 4.61%", [("4.61%", "num")]),
+    ("21st of the month", []),
+    ("31 stocks and 1st place", [("31", "num")]),
 ])
 def test_tokens_in_finds_whole_tokens_and_stops_at_the_clause(text, expected):
     assert [(t["token"], t["kind"]) for t in A.tokens_in(text)] == expected

@@ -5,20 +5,15 @@ way to find that out is another twenty-question live round. This is the cheap wa
 that works: round B's fifteen accepted answers, each with the ledger it was
 accepted on (`scripts/v37_corpus.py`, rebuilt per round), replayed offline.
 
-Two questions, and the second is the one that matters:
-
-  1. does the check still accept what it accepted — the corpus reproducing the
-     round is what makes any of this evidence
-  2. does each new rule refuse EXACTLY the sentences the analysis named, and
-     nothing else
-
-So the expectations below are per rule and by name. A rule that fires on a
-sixteenth sentence fails here, and it should: the analysis read all fifteen
-answers, and a refusal it did not predict is either a finding nobody has written
-down or a rule that is too wide.
+One table answers both questions this file exists to ask — does the corpus still
+reproduce the round, and does each new rule refuse exactly the sentences the
+analysis named. A rule that fires on a sixteenth sentence fails here, and it
+should: the analysis read all fifteen answers, so an unpredicted refusal is
+either a finding nobody has written down or a rule that is too wide.
 """
 from __future__ import annotations
 
+import collections
 import gzip
 import json
 from pathlib import Path
@@ -29,6 +24,27 @@ from exposure_workbench.services import answer_check
 from exposure_workbench.services.ledger import Ledger
 
 CORPUS = Path(__file__).resolve().parent / "data" / "v36b_accepted.json.gz"
+
+# WHAT THE RULES ADDED SINCE ROUND B REFUSE, by question and reason. Every entry
+# is a sentence `docs/spikes/v36/ACCEPTANCE_V36B.md` §4 named as false; every
+# question absent from this table was accepted then and is accepted now.
+#
+#   V4 · period_mismatch — the period a sentence claims, against its readings' dates
+#     Q02  "One year earlier, the same four quarter-ends were …" ×3 — five ANNUAL points
+#     Q04  "over the last twelve quarters: 19.7%, 21.9%, 15.4%, 23.5%, 31.7%" — five annual
+#     Q09  "the three-year low … and the three-year high" — six annual points over five years
+#     Q12  "over the last three years was 12.66×, 12.21×, 13.46×" — three QUARTER-ends
+#   V1 · superlative_without_rank — a superlative with no figure beside it
+#     Q11  "The closest issuer-concentration warning is for LLY." — LLY's room to
+#          warning is 19th of 20, the second smallest, and fifty-one placed facts
+#          for LLY hold no end place at all
+ADDED_SINCE_THE_ROUND = {
+    "Q02": {"period_mismatch": 3},
+    "Q04": {"period_mismatch": 1},
+    "Q09": {"period_mismatch": 1},
+    "Q11": {"superlative_without_rank": 1},
+    "Q12": {"period_mismatch": 1},
+}
 
 
 def _answers() -> list[dict]:
@@ -43,72 +59,38 @@ def _verdicts() -> dict[str, object]:
             for a in _answers()}
 
 
-# The rules Phase B added, by reason. The reproduce test below reads the corpus
-# WITHOUT them, so it keeps answering its own question — is this corpus faithful
-# to the round — while each rule's own test owns the refusals it introduced. A
-# rule added without a line here makes the reproduce test fail, which is the
-# point: a new refusal is either predicted or it is a finding nobody has written
-# down.
-RULES_ADDED_SINCE_THE_ROUND = ("period_mismatch",)
+def test_the_corpus_reproduces_the_round_apart_from_the_rules_added_since():
+    """The one assertion that makes everything else in this file evidence.
 
-
-def test_the_corpus_reproduces_the_round_it_was_taken_from():
-    """Fifteen answers round B accepted, accepted again offline. If this fails,
-    nothing else in this file is evidence about anything: either the ledger was
-    rebuilt differently from the way the check read it, or a rule changed without
-    its effect being written down."""
-    answers = _answers()
-    assert len(answers) == 15, "round B accepted fifteen"
-    left = {tag: sorted({p["reason"] for p in v.problems} - set(RULES_ADDED_SINCE_THE_ROUND))
-            for tag, v in _verdicts().items()}
-    assert {tag: r for tag, r in left.items() if r} == {}, \
-        "the check that accepted these still accepts them, apart from the rules added since"
-
-
-# ── V4: the period a sentence claims, against the readings' own dates ─────────
-
-# What the analysis of round B named, by question and by count of sentences. Q02
-# made the same false claim three times ("the same four quarter-ends were …" for
-# each of leverage, coverage and cash generation), which is three sentences and
-# one mistake.
-V4_EXPECTED = {"Q02": 3, "Q04": 1, "Q09": 1, "Q12": 1}
-
-
-def test_the_period_rule_refuses_exactly_the_sentences_the_analysis_named():
-    """Five of round B's eleven false statements were this class, and every one
-    of them had its own evidence's dates printed in the same sentence:
-
-      Q02  "One year earlier, the same four quarter-ends were …" — five ANNUAL points
-      Q04  "over the last twelve quarters: 19.7%, 21.9%, 15.4%, 23.5%, 31.7%" — five annual
-      Q09  "the three-year low … and the three-year high" — six annual points over five years
-      Q12  "over the last three years was 12.66×, 12.21×, 13.46×" — three QUARTER-ends
-
-    The other eleven accepted answers must come through untouched. A sixteenth
-    refusal here is not a bonus: the analysis read all fifteen, so it would mean
-    either a finding nobody wrote down or a rule that is too wide."""
-    got: dict[str, int] = {}
-    for tag, v in _verdicts().items():
-        n = len([p for p in v.problems if p["reason"] == "period_mismatch"])
-        if n:
-            got[tag] = n
-    assert got == V4_EXPECTED
-
-
-def test_the_period_rule_is_the_only_thing_that_changed_about_these_answers():
-    """Whatever else the round accepted, it still accepts: a new rule that also
-    moved an old one would make the count above unreadable."""
-    for tag, v in _verdicts().items():
-        others = sorted({p["reason"] for p in v.problems if p["reason"] != "period_mismatch"})
-        assert others == [], (tag, others)
+    Fifteen answers round B accepted; the check that accepted them still accepts
+    them, apart from the refusals named above. A failure here is one of three
+    things: the ledger was rebuilt differently from the way the check read it, a
+    new rule is wider than its author thought, or a rule was added without its
+    effect being written down."""
+    assert len(_answers()) == 15, "round B accepted fifteen"
+    got = {tag: dict(collections.Counter(p["reason"] for p in v.problems))
+           for tag, v in _verdicts().items()}
+    assert {tag: r for tag, r in got.items() if r} == ADDED_SINCE_THE_ROUND
 
 
 def test_a_refused_period_says_what_the_readings_are():
     """The analyst is told what it has, not only that it is wrong: a sentence
-    that says "twelve quarters" over five annual points cannot be fixed by
-    rewording alone, and the way out is either the period the desk showed or a
-    request for the series the question asked for."""
-    v = _verdicts()["Q04"]
-    [p] = [p for p in v.problems if p["reason"] == "period_mismatch"]
+    saying "twelve quarters" over five annual points cannot be fixed by rewording
+    alone, and the way out is either the period the desk showed or a request for
+    the series the question asked for."""
+    [p] = [p for p in _verdicts()["Q04"].problems if p["reason"] == "period_mismatch"]
     assert p["word"] == "twelve quarters"
     assert "5 annual reading(s)" in p["holds"] and "2021-12-31..2025-12-31" in p["holds"]
     assert "request the series the question asked for" in p["fix"]
+
+
+def test_a_refused_superlative_says_where_the_subject_actually_sits():
+    """Which ordering a figure-less sentence means is exactly what it does not
+    say, so the refusal names the places the subject DOES hold rather than
+    guessing who is at the end — the first draft of this rule offered
+    `daily_loss` as the answer to "closest to its issuer-concentration warning"."""
+    [p] = [p for p in _verdicts()["Q11"].problems if p["reason"] == "superlative_without_rank"]
+    assert p["word"] == "closest"
+    assert "19 of 20" in p["fix"] and "8 of 20" in p["fix"]
+    assert "Point at the figure whose place you mean" in p["fix"]
+    assert all(str(c["subject"]).endswith("LLY") for c in p["candidates"]), "its own places, not somebody else's"

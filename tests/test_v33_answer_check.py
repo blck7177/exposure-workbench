@@ -742,3 +742,77 @@ def test_the_latest_year_end_names_a_date_and_not_a_cadence():
     v = ac.check("The same two quarter-ends were $14.05B [f_msftnd@2025-03-31] and "
                  "$12.91B [f_msftnd@2025-06-30].", quarterly, None)
     assert v.ok, "two quarterly readings ARE two quarter-ends"
+
+
+# ── V37/V1: a superlative with no figure beside it ────────────────────────────
+
+def test_a_superlative_with_no_figure_is_checked_when_it_names_a_reading():
+    """Round B's Q11 opened with "The closest issuer-concentration warning is for
+    LLY." — no figure, so the sentence linked nothing, so the superlative rule did
+    not run and the render counted it as the analyst's judgement. The desk had
+    computed the ordering: LLY's room to warning is 19th of 20, which is the
+    SECOND smallest, and fifty-one placed facts for LLY hold no end place at all.
+    """
+    led = Ledger.of([
+        _f("f_roomlly", "subtract(limit_checks.warning_level, limit_checks.current_value)",
+           "issuer_concentration:LLY", -0.0054, node="room_warning", op="subtract", place=19, of=20),
+        _f("f_roommsft", "subtract(limit_checks.warning_level, limit_checks.current_value)",
+           "issuer_concentration:MSFT", -0.0104, node="room_warning", op="subtract", place=20, of=20),
+        _f("f_curlly2", "limit_checks.current_value", "issuer_concentration:LLY", 0.1254,
+           node="current", place=8, of=20),
+    ])
+    v = ac.check("The closest issuer-concentration warning is for LLY.", led, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"superlative_without_rank"}
+    # the subject that does hold the place passes, with no figure either
+    assert ac.check("The closest issuer-concentration warning is for MSFT.", led, None).ok
+
+
+def test_a_judgement_about_something_the_desk_does_not_order_is_still_a_judgement():
+    """"The most important news is already in the tape for AAPL, LLY and GOOGL"
+    names companies the desk holds placed facts for, and orders nothing that
+    sentence is about. A rule that guessed an ordering would refuse the analyst's
+    own reasoning, which is half of every answer."""
+    led = Ledger.of([
+        _f("f_waapl2", "issuer_exposures.weight", "AAPL", 0.152, node="w", place=2, of=10),
+        _f("f_wlly2", "issuer_exposures.weight", "LLY", 0.125, node="w", place=4, of=10),
+    ])
+    assert ac.check("The most important news is already in the tape for AAPL and LLY.", led, None).ok
+    assert ac.check("The best read is that nothing here forces a trade.", led, None).ok
+    # but naming the reading brings the ordering back into it
+    v = ac.check("The largest issuer exposures weight is LLY.", led, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"superlative_without_rank"}
+
+
+def test_an_ordinal_before_a_superlative_names_its_own_place():
+    """"The run also shows XOM as the 9th-largest issuer by weight" is a precise
+    claim, and the desk's ordering puts XOM 9th of ten. Round B wrote two of
+    these and both are true; a rule that reads only the superlative refuses
+    them."""
+    led = Ledger.of([
+        _f("f_wxom9", "issuer_exposures.weight", "XOM", 0.0461, node="w", place=9, of=10),
+        _f("f_wmsft1", "issuer_exposures.weight", "MSFT", 0.1604, node="w", place=1, of=10),
+    ])
+    assert ac.check("XOM is the 9th-largest issuer by weight at 4.61% [f_wxom9].", led, None).ok
+    assert ac.check("MSFT is the largest issuer by weight at 16.0% [f_wmsft1].", led, None).ok
+    # counted from the other end, and wrong either way
+    assert ac.check("XOM is the second-smallest issuer by weight at 4.61% [f_wxom9].", led, None).ok
+    v = ac.check("XOM is the 3rd-largest issuer by weight at 4.61% [f_wxom9].", led, None)
+    assert not v.ok and {p["reason"] for p in v.problems} == {"superlative_without_rank"}
+
+
+def test_a_superlative_mentioned_inside_something_else_is_not_predicated_of_a_subject():
+    """Two shapes round B wrote, both refused by the wider rule and both fine:
+    "I attempted to isolate the AMZN issuer concentration check … then determine
+    the smallest-room concentration check" describes what was tried, and "The
+    worst drawdown episode did have filings for AAPL, JPM, and LLY during the
+    relevant window" says something about an episode. Neither asserts a place of
+    the company it names."""
+    led = Ledger.of([
+        _f("f_curamzn2", "limit_checks.current_value", "issuer_concentration:AMZN", 0.0703,
+           node="current", place=14, of=20),
+        _f("f_retaapl2", "holdings.window_return", "AAPL", -0.12, node="by_name", place=4, of=10),
+    ])
+    assert ac.check("I attempted to isolate the AMZN issuer concentration check, then determine the "
+                    "smallest-room concentration check.", led, None).ok
+    assert ac.check("The worst drawdown episode did have filings for AAPL during the relevant window.",
+                    led, None).ok

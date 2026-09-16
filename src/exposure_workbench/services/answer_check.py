@@ -582,15 +582,41 @@ def _ranked_aliases(ledger: Ledger, recs: list[dict]) -> list[dict]:
     return out[:6]
 
 
-def _place_fits(words: set[str], rec: dict) -> bool:
+_ORDINAL_WORDS = {w: i for i, w in enumerate(
+    "first second third fourth fifth sixth seventh eighth ninth tenth".split(), start=1)}
+# AN ORDINAL IS A PLACE, NOT AN END. "The run shows XOM as the 9th-largest issuer
+# by weight" is a precise claim, and the desk's own ordering puts XOM 9th of ten:
+# a rule that reads only the superlative refuses it. Round B wrote two of these
+# and they are true.
+_ORDINAL_BEFORE = re.compile(
+    r"\b(?:(?P<d>\d{1,2})(?:st|nd|rd|th)|(?P<w>" + "|".join(_ORDINAL_WORDS) + r"))[\s-]+"
+    r"(?=(?:" + "|".join(sorted(SUPERLATIVES)) + r")\b)", re.I)
+
+
+def _ordinal_claimed(sentence: str) -> int | None:
+    """The place an ordinal before a superlative names, or None."""
+    m = _ORDINAL_BEFORE.search(sentence or "")
+    if not m:
+        return None
+    return int(m.group("d")) if m.group("d") else _ORDINAL_WORDS[m.group("w").lower()]
+
+
+def _place_fits(words: set[str], rec: dict, ordinal: int | None = None) -> bool:
     """Whether the figure holds the place the sentence claims. A vector's entries
     carry their place the moment the desk builds them (program_service._facts_of),
-    so this is a lookup: `highest` is first, `lowest` is last."""
+    so this is a lookup: `highest` is first, `lowest` is last, and an ordinal
+    before the superlative names its own place from whichever end it counts."""
     p = rec.get("params") or {}
     place, of = p.get("place"), p.get("of")
     if not isinstance(place, int) or not isinstance(of, int):
         return _ordered(rec)
     want_max, want_min = bool(words & MAX_WORDS), bool(words & MIN_WORDS)
+    if ordinal is not None:
+        if want_max and not want_min:
+            return place == ordinal
+        if want_min and not want_max:
+            return place == of - ordinal + 1
+        return ordinal in (place, of - place + 1)
     if want_max and not want_min:
         return place == 1
     if want_min and not want_max:
@@ -689,6 +715,86 @@ def _check_period(v: Verdict, at: str, sentence: str, linked: list, ledger: Ledg
         return
 
 
+def _subject_words(rec: dict) -> set[str]:
+    """The words of a fact's subject, less the ticker itself — what a sentence
+    says when it is talking about that reading rather than that company.
+    `issuer_concentration:LLY` -> {issuer, concentration}."""
+    subj = str(rec.get("subject") or "")
+    short = (_short_subject(subj) or "").lower()
+    return {w.lower() for w in re.split(r"[^A-Za-z]+", subj) if w} - {short}
+
+
+# A superlative is PREDICATED of a subject, or it is mentioned inside something
+# else. "The closest issuer-concentration warning IS for LLY" asserts a place;
+# "I attempted to … then determine the smallest-room concentration check"
+# describes what was tried, and "the worst drawdown episode DID HAVE filings for
+# AAPL, JPM and LLY" says something about an episode, not about three tickers.
+# Measured on round B: without this, the rule refused seven sentences of that
+# kind and one that was true.
+_COPULA = re.compile(r"\b(?:is|are|was|were)\b", re.I)
+
+
+def _check_bare_superlative(v: Verdict, at: str, sentence: str, words: set[str], ledger: Ledger,
+                            subjects_on_ledger: set[str]) -> None:
+    """A SUPERLATIVE WITH NO FIGURE BESIDE IT, about a reading the desk ordered.
+
+    Round B's Q11 opened with "The closest issuer-concentration warning is for
+    LLY." — no figure, so the sentence linked nothing, so the superlative rule
+    did not run and the render counted the sentence as the analyst's judgement.
+    The desk had computed the ordering: of the twenty issuer-concentration
+    checks, LLY's room to warning is 19th of 20, which is the SECOND smallest,
+    and the smallest belongs to somebody else. Fifty-one placed facts for LLY on
+    that ledger and not one of them at either end.
+
+    What keeps this from refusing "the most important news for AAPL" — a
+    judgement about something the desk does not order — is that the sentence has
+    to name the reading as well as the company: a word from the ordered fact's
+    own measure or subject (`issuer-concentration`, `room`, `weight`). With
+    nothing like that in the sentence there is no ordering to check it against,
+    and a rule that guessed one would refuse the analyst's own reasoning.
+    """
+    named = {s for s in subjects_on_ledger if s.upper() in {w.upper() for w in words}}
+    if not named or not _COPULA.search(sentence):
+        return
+    ordinal = _ordinal_claimed(sentence)
+    about: list[dict] = []
+    for rec in ledger.by_id.values():
+        p = rec.get("params") or {}
+        if not isinstance(p.get("place"), int) or (_short_subject(rec.get("subject")) or "") not in named:
+            continue
+        # EVERY word of the reading's own name, not one of them. Sharing a word is
+        # a coincidence: round B's "filings for AAPL, JPM, and LLY during the
+        # relevant window" met a `holdings.window_return` ordering on the word
+        # "window", and the sentence is about neither.
+        for name in (set(w.lower() for w in _measure_words(rec.get("measure"))), _subject_words(rec)):
+            if name and name <= words:
+                about.append(rec)
+                break
+    if not about or any(_place_fits(words, rec, ordinal) for rec in about):
+        return
+    # WHERE IT ACTUALLY SITS, and not a guess at who is at the end. Which
+    # ordering the sentence means is exactly what a sentence with no figure in it
+    # does not say, so naming "the desk's ordering puts X first" would be picking
+    # one — the first draft of this offered `daily_loss` as the answer to "closest
+    # to its issuer-concentration warning". The analyst's own places are a
+    # lookup, they are what it got wrong, and reading them tells it which figure
+    # to point at.
+    seats: list[dict] = []
+    for rec in about:
+        p = rec.get("params") or {}
+        seat = {"id": rec["id"], "measure": rec.get("measure"), "subject": rec.get("subject"),
+                "place": p.get("place"), "of": p.get("of")}
+        if not any(s["measure"] == seat["measure"] and s["place"] == seat["place"] for s in seats):
+            seats.append(seat)
+    seats.sort(key=lambda s: (str(s["measure"]), s["place"]))
+    v.problems.append({
+        "at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
+        "linked": [s["id"] for s in seats][:4], "candidates": seats[:6],
+        "fix": f"{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: "
+               + "; ".join(f"{s['place']} of {s['of']} on {s['measure']}" for s in seats[:3])
+               + ". Point at the figure whose place you mean, or say it without the superlative"})
+
+
 def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[str], linked: list, tokens: list,
                     ledger: Ledger, subjects_on_ledger: set[str], phrases: dict[str, set[str]]) -> None:
     """The sentence around its figures. `linked` is [(token, [alias records])]
@@ -736,7 +842,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     # they ordered ("Microsoft has the highest capex intensity at 22.9%. Alphabet
     # follows at 22.7%, and Amazon is lower at 18.4%").
     if words & SUPERLATIVES and groups:
-        if not any(_place_fits(words, r) for recs in groups for r in recs):
+        if not any(_place_fits(words, r, _ordinal_claimed(sentence)) for recs in groups for r in recs):
             ranked = _ranked_aliases(ledger, firsts)
             v.problems.append({"at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
                                "linked": [r["id"] for r in firsts][:4], "candidates": ranked,
@@ -748,6 +854,10 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
 
     # V37/V4: the period the sentence claims, against the readings' own dates
     _check_period(v, at, sentence, linked, ledger)
+    # V37/V1: a superlative with no figure beside it, about something the desk
+    # ordered
+    if words & SUPERLATIVES and not groups:
+        _check_bare_superlative(v, at, sentence, words, ledger, subjects_on_ledger)
 
     # a date word is followed by a date
     for dw in DATE_WORDS:
