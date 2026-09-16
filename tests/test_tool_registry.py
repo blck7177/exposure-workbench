@@ -319,3 +319,22 @@ def test_both_faces_reach_their_exit_through_the_gate_class():
         assert reg.get(exit_name).tool_class == GATE, f"{exit_name} is not declared a gate"
         gates = {n for n, t in reg.tools.items() if t.tool_class == GATE}
         assert gates == {exit_name}, f"more than one exit on this face: {sorted(gates)}"
+
+
+async def test_a_program_that_shows_nothing_still_records_every_fact_it_made(monkeypatch):
+    """V38/T1. A program whose `return` names only a node with no figures (a run)
+    shows no figure — and every figure its other nodes made is still evidence,
+    recorded on the step and in the table."""
+    from exposure_workbench.services import facts as F
+    log = _wire(monkeypatch)
+    db = _Db()
+    made = [F.fact(F.SCALAR, "issuer_exposures.weight", subject=f"T{i}", unit="RATIO", value=i / 100,
+                   as_of="2026-09-03", params={"node": "w", "label": f"T{i}"}) for i in range(5)]
+    payload = {"program_id": "calc_p", "returns": ["book"], "nodes": {"book": {"kind": "run", "run": "run_1"},
+                                                                       "w": {"kind": "vector"}},
+               "settled": 2, "refused": [], "_facts": [F.for_record(f) for f in made]}
+    tool = Tool(name="run", description="", json_schema={"type": "object"}, fn=_returning(payload), tool_class=READ)
+    out = await R.invoke(_registry(tool), db, "sess_1", "run", {"program": {"let": []}})
+    assert "facts" not in out and out["not_returned"] == {"w": 5}
+    [(recorded)] = _facts_recorded(log)
+    assert {r["id"] for r in recorded} == {f.id for f in made} == {r.id for r in db.added}

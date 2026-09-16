@@ -55,7 +55,7 @@ def _largest_container(obj: dict, exclude: tuple[str, ...] = ()) -> str | None:
     return best
 
 
-def _drop_tail(obj: dict, key: str, limit: int) -> str | None:
+def _drop_tail(obj: dict, key: str, limit: int, extra: dict | None = None) -> str | None:
     """`obj` with entries taken off the tail of container `key` until it fits,
     the dropped names declared; None when even an empty container does not fit."""
     container = obj[key]
@@ -68,8 +68,12 @@ def _drop_tail(obj: dict, key: str, limit: int) -> str | None:
         head, tail = entries[:keep], entries[keep:]
         kept = dict(head) if is_dict else [v for _, v in head]
         names = [k if is_dict else f"[{k}]" for k, _ in tail]
+        if not is_dict and len(names) > 20:
+            # a long run of positions is one range: two hundred "[n]" names
+            # were a declaration too big to fit beside what it declared (V38/T2)
+            names = [f"[{tail[0][0]}:{tail[-1][0] + 1}]"]
         trial = dumps({**obj, key: kept,
-                       "truncated": {"container": key, "dropped": names,
+                       "truncated": {"container": key, "dropped": names, **(extra or {}),
                                      "detail": _CAP_DETAIL}})
         if len(trial) <= limit:
             return trial
@@ -99,11 +103,31 @@ def dumps_capped(obj: Any, limit: int, keep: tuple[str, ...] = ()) -> str:
         return text[:limit]
 
     kept_keys = tuple(k for k in keep if k)
-    key = None
-    for key in (k for k in (_largest_container(obj, exclude=kept_keys), _largest_container(obj)) if k is not None):
+    key = _largest_container(obj, exclude=kept_keys)
+    if key is not None:
         out = _drop_tail(obj, key, limit)
         if out is not None:
             return out
+    if kept_keys:
+        # Emptying the largest other container was not enough: every container
+        # that is not kept goes, and only then does a kept one give from its tail
+        # (V38/T2 — the refusals a result carries were cut whole before a figure
+        # list that had already been emptied once).
+        emptied = [k for k, v in obj.items()
+                   if k not in kept_keys and k != "table" and isinstance(v, (dict, list)) and v]
+        rest = {k: (type(v)() if k in emptied else v) for k, v in obj.items()}
+        note = {"emptied": emptied} if emptied else None
+        if emptied:
+            whole = dumps({**rest, "truncated": {**note, "detail": _CAP_DETAIL}})
+            if len(whole) <= limit:
+                return whole
+        key = _largest_container(rest)
+        if key is not None:
+            out = _drop_tail(rest, key, limit, extra=note)
+            if out is not None:
+                return out
+    else:
+        key = _largest_container(obj)
     return dumps({k: v for k, v in obj.items() if not isinstance(v, (dict, list))} |
                  {"truncated": {"container": key, "byte_cut": True,
                                 "detail": _CAP_DETAIL}})[:limit]

@@ -329,19 +329,19 @@ async def invoke(
             status = "error"
             result = {"error": "fact_adapter_error", "tool": tool_name, "detail": str(exc)[:500]}
         else:
-            if shown:
-                result = {**note, "facts": fct.block_for_model(shown)}
-                if held:
-                    result["held_back"] = held
-                # THE LEDGER RECORDS EVERY FACT THE CALL MADE. The cap above is a
-                # bound on what one PAYLOAD shows a model; a figure it held back
-                # was still computed, is still evidence, and the answer check
-                # must be able to resolve it (V33 Q15: the rank the analyst asked
-                # for was capped out of the ledger and the answer refused for it).
-                recorded = made or shown
+            result = {**note, "facts": fct.block_for_model(shown)} if shown else note
+            if held and isinstance(result, dict):
+                result["held_back"] = held
+            # THE LEDGER RECORDS EVERY FACT THE CALL MADE. The cap above is a
+            # bound on what one PAYLOAD shows a model; a figure it held back
+            # was still computed, is still evidence, and the answer check
+            # must be able to resolve it (V33 Q15: the rank the analyst asked
+            # for was capped out of the ledger and the answer refused for it).
+            # Recorded even when nothing is shown: a program whose `return`
+            # names only a run still made every figure of its other nodes (V38/T1).
+            recorded = made or shown
+            if recorded:
                 refs = [ledger_svc.step_entry(recorded)]
-            else:
-                result = note
     try:
         step_id = await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,

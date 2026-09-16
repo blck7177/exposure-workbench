@@ -746,9 +746,37 @@ READ_BY_NAME = {
     "describe": "read_book(ref, names=[…]) for a run or scenario; a fundamentals(ticker, metric) node for an issuer",
     "read_book": "read_book(ref, names=[…]) with fewer names",
     "compute": "read_book(<calc_id>, names=[…]) reads a scenario's figures by name",
-    "run": "return fewer nodes, or pick the figures you need with fn pick / column",
+    "run": "return fewer of these nodes, or pick(of=$node, key=…) / top(of=$node, n=…) the entries you need",
     "read_prices": "a price(ticker, as_of=YYYY-MM-DD) node reads one session",
+    "read_filings": "ask for fewer passages (a smaller k), or one Item whole with item",
+    "search_web": "ask a narrower query",
 }
+
+
+def _to_show(tool: str, facts: list[F.Fact], note: Any) -> tuple[list[F.Fact], dict[str, int]]:
+    """What a result shows: for a program, the nodes its `return` names (V38/T1).
+
+    `return` is the program writer saying which bindings the answer will point
+    at, and nothing read it: every intermediate's facts were shown, in the order
+    the executor made them, and the cap then held back whatever came last — which
+    was the returned scalars, after two 48-row tables (round C: 45% of what mini's
+    analysts read was not what they named, and 115 named nodes never reached
+    them). Every fact is still made and recorded (`adapt_all`); what is SHOWN is
+    what was asked for, with every refusal, and a count per node for the rest.
+    A program with no `return` names all its own bindings (program_service.parse);
+    the hoisted intermediates of an expression are not shown unless named."""
+    if tool != "run" or not isinstance(note, dict) or not isinstance(note.get("returns"), list):
+        return facts, {}
+    named = set(note["returns"])
+    show: list[F.Fact] = []
+    omitted: dict[str, int] = {}
+    for f in facts:
+        node = (f.params or {}).get("node")
+        if f.kind == F.ABSENCE or node is None or node in named:
+            show.append(f)
+        else:
+            omitted[node] = omitted.get(node, 0) + 1
+    return show, omitted
 
 
 def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None]:
@@ -779,11 +807,22 @@ def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict
         # Said, not swallowed: the model is told which numbers it cannot point
         # at and why, in the same note that carries the ones it can.
         note = {**note, "untyped": {u["key"]: u["reason"] for u in untyped}}
-    kept, held = F.cap(facts)
+    show, not_returned = _to_show(tool, facts, note)
+    if not_returned:
+        note = {**note, "not_returned": not_returned}
+    kept, held = F.cap(show)
     if held:
         held["how"] = READ_BY_NAME.get(tool, "ask for fewer names")
-        dropped = {f.id for f in facts[len(kept):]}
-        note = _blank_ids(note, dropped)
+        kept_ids = {f.id for f in kept}
+        dropped = [f for f in show if f.id not in kept_ids]
+        by_node: dict[str, int] = {}
+        for f in dropped:
+            node = (f.params or {}).get("node")
+            if node:
+                by_node[node] = by_node.get(node, 0) + 1
+        if by_node:
+            held["nodes"] = by_node
+        note = _blank_ids(note, {f.id for f in dropped})
     _ALL.set(facts)
     return kept, note, held
 

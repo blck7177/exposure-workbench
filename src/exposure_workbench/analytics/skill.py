@@ -218,7 +218,7 @@ _BOOK_METHODS: tuple[Method, ...] = (
     Method(
         name="book.analysis", subject_kind="run", family="book",
         describes="one run's factor exposures netted per risk (net beta), positions ordered by weight, and the room from every limit check to its warning and breach tiers",
-        procedure="net beta per risk = Σ beta_i × direction_i (TLT and HYG move opposite to the risk they proxy); room = tier − current; positions ordered by weight",
+        procedure="net beta per risk = Σ beta_i × sense_i, the sense being the risk's effect on the book for a positive beta: −1 for SPY, QQQ and IWM (equity_down), for TLT (rates_up) and for HYG (credit_spreads_widen); room = tier − current; positions ordered by weight",
         authority="arithmetic over the run's own rows; instrument directions are properties of the factor ETFs, not of any issuer",
         fails_when="the run is not completed; a risk no factor in the regression measures is reported unmeasured, not zero",
         executor="book.analysis", unit_class="ratio",
@@ -427,8 +427,10 @@ READINGS: dict[str, Reading] = {r.method: r for r in (
             "CFA Program, market microstructure; this desk's own participation convention"),
     Reading("book.analysis",
             "room_to_warning below zero means the check is already in warning; room_to_breach is what remains "
-            "before the hard tier; a net beta is this desk's netting of the legs, and TLT and HYG enter with "
-            "the sign opposite to the risk they proxy",
+            "before the hard tier; a net beta is the book's move per unit of the risk it names (equity_down, "
+            "rates_up, credit_spreads_widen): every factor enters as its beta times that risk's effect on the "
+            "book, so a net beta below zero is a book that loses when the risk happens — net_beta.equity_down "
+            "of −0.86 is a book LONG equities, not short",
             "a run not completed; a collinear fit (the legs are not quotable individually, the net is)",
             "the portfolio's risk_limits; the factor model's own regression record"),
 )}
@@ -804,7 +806,7 @@ PROCEDURES: dict[str, Procedure] = {p.name: p for p in (
                   "the filings' own rate-sensitivity disclosure (Item 7A) for banks and floating-rate borrowers"),
         desk=("TLT and HYG carry explicit duration and spread; equities carry only a measured sensitivity, per name",
               "a day's P&L contribution is not a sensitivity; an unfittable beta is unmeasured, never zero",
-              "the netted exposure enters TLT and HYG with the sign opposite to the risk they proxy",
+              "a net beta is signed by the risk it names: below zero, the book loses when that risk happens (net_beta.equity_down below zero is a book long equities; SPY, QQQ and IWM enter it with the sign of an equity fall, TLT enters rates_up and HYG credit_spreads_widen the same way)",
               "stress results are withheld pending validation and are not rebuilt from betas"),
         compare=("the explicit duration against the equities' measured sensitivities: which side of the exposure is which",
                  "each name's short-window volatility against its long: whose rose",

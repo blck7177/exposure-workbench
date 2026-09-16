@@ -140,6 +140,9 @@ def _subjects_of(task: dl.Task, briefing: dict) -> dict:
     return out
 
 
+_KEEP_LAST = ("boundaries", "nodes", "made", "started", "repeated")
+
+
 def _held_in(briefing: dict) -> dict:
     return {tk: [h.get("portfolio_id") for h in (d.get("held_in") or []) if isinstance(h, dict) and h.get("portfolio_id")]
             for tk, d in (briefing.get("issuers") or {}).items() if isinstance(d, dict)}
@@ -371,8 +374,11 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                 res = {"error": "unknown_tool",
                        "detail": f"your tools are compile, {', '.join(EVIDENCE_TOOLS)} and submit"}
 
+            # what could not be done, and what the program built, are the last
+            # things cut when a result is over its room (V38/T2): round C cut
+            # refusals first, under a note saying they "were computed"
             _append({"role": "tool", "tool_call_id": tc["id"],
-                     "content": ejson.dumps_capped(res, room)})
+                     "content": ejson.dumps_capped(res, room, keep=_KEEP_LAST)})
         if done:
             break
 
@@ -407,7 +413,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
         # most expensive part of the turn used to fall on the floor. It is not a
         # brief and is not offered as one: no line is claimed answered.
         result.shown = ([{k: v for k, v in f.items() if k in
-                          ("value", "subject", "measure", "as_of", "place", "of", "node", "unit")}
+                          ("value", "subject", "measure", "as_of", "window", "place", "of", "node", "unit", "made_of")}
                          for f in list(seen.values())[:40]]
                         + [{k: v for k, v in sr.items() if k in
                             ("id", "subject", "measure", "spacing", "span", "n", "first", "last")}

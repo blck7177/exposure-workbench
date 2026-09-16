@@ -515,16 +515,19 @@ async def test_one_completions_reading_is_shared_by_the_results_it_reads(monkeyp
     """The cap was per RESULT, so three calls in one completion could hand the
     analyst three times it: round B did 43.5k characters once and answered with
     three tokens, and five of its empty replies came straight after a read of more
-    than 9k. The budget belongs to the completion."""
+    than 9k. The budget belongs to the completion. (Each result keeps a floor of
+    4,000 characters; the budget here is set where the floor does not bind — at
+    9,000 it did, and the test passed only because the second and third results
+    were being swallowed empty, the V38/T4 defect.)"""
     from exposure_workbench.app_state import settings as st
-    monkeypatch.setattr(st.get_settings(), "sub_analyst_result_chars", 9_000, raising=False)
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_result_chars", 15_000, raising=False)
     wide = [_scalar("issuer_exposures.weight", f"T{i:04d}", i / 1000, node="w") for i in range(300)]
     tools = _Tools({"run": lambda a: _run_result(wide)})
     llm = _Llm([("", [("run", {"program": {"let": [[f"n{i}", i]]}}) for i in range(3)]), ("", None)])
     await sa.run_sub_analyst(_task(), _ctx(tools, llm))
     read = [m for m in llm.seen[1]["messages"] if m.get("role") == "tool"]
     assert len(read) == 3
-    assert sum(len(m["content"]) for m in read) <= 9_000 * 1.05, "three results, one completion's budget"
+    assert sum(len(m["content"]) for m in read) <= 15_000 * 1.05, "three results, one completion's budget"
 
 
 @pytest.mark.asyncio

@@ -200,13 +200,24 @@ def cap(facts: list[Fact], *, per_result: int = FACTS_PER_RESULT,
     Whole facts come off the tail; a fact is never cut. `held_back` names how
     many and which measures — the adapter that knows the tool adds WHICH call
     reads them by name (services/fact_adapters).
+
+    A REFUSAL IS NEVER HELD BACK (V38/T2). The cap is a bound on how much a
+    reader is given to read, and "this was not computed, and why" is not more
+    of the same reading: it is the other half of what the result is. It was
+    capped like a figure, and an absence is minted where its node stands — often
+    after a whole table — so round C held back 72 of them; both analysts who
+    tried to buy TLT never read that the buy was refused. Refusals are kept in
+    place and not counted; the rest is capped as before.
     """
-    kept = list(facts[:per_result])
-    while kept and len(json.dumps(block_for_model(kept))) > char_limit:
-        kept.pop()
-    if len(kept) == len(facts):
-        return kept, None
-    dropped = facts[len(kept):]
+    rest = [f for f in facts if f.kind != ABSENCE]
+    kept_rest = list(rest[:per_result])
+    while kept_rest and len(json.dumps(block_for_model(kept_rest))) > char_limit:
+        kept_rest.pop()
+    if len(kept_rest) == len(rest):
+        return list(facts), None
+    keep = {f.id for f in kept_rest}
+    kept = [f for f in facts if f.kind == ABSENCE or f.id in keep]
+    dropped = rest[len(kept_rest):]
     return kept, {"count": len(dropped),
                   "measures": sorted({f"{d.subject or ''}:{d.measure}".strip(":") for d in dropped})[:40]}
 

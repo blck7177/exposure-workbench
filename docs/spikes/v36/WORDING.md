@@ -4,7 +4,7 @@
 
 > 这些文字是模型在运行时逐字读的,措辞的代价是持续的——要审的是**用词本身**,不只是意图。审阅时想的问题:主分析师读了 A 段会不会去碰 desk 名字?域分析师读了 B 段会不会给读者写字、会不会心算?14 段 offers 会不会让主分析师把题派错域?
 
-状态:**未过目**。9/15 起待过目的三处仍在(A、B、C);V37(9/16)动了其中四处并新增两处:A 段重写了主分析师被交到手里的每个字段各一句并要求 caveat 挨着它限定的数字(A1)、A2 是五块推送上下文的新标签(A3)、A3 的 HOW_TO_CITE 加了 caveats 与 shown、B4 是从每个结果里搬进 system 的读法(T5)、C 里 book_market_risk 六行重写与 issuer_price_context 一行新增(K1)、B2 的域段落现在带 how these read(K3)与两条新知识(K4)。
+状态:**未过目**。9/15 起待过目的三处仍在(A、B、C);V37(9/16)动了其中四处并新增两处:A 段重写了主分析师被交到手里的每个字段各一句并要求 caveat 挨着它限定的数字(A1)、A2 是五块推送上下文的新标签(A3)、A3 的 HOW_TO_CITE 加了 caveats 与 shown、B4 是从每个结果里搬进 system 的读法(T5)、C 里 book_market_risk 六行重写与 issuer_price_context 一行新增(K1)、B2 的域段落现在带 how these read(K3)与两条新知识(K4)。V38(9/16)再动三处、新增一处:B4 的读法加了 made_of、repeated、nodes 的种类与字面量、blocks、按节点的 held_back(T1–T4);A3 的 shown 一句加了 window 与 made_of;新增 B5,净 beta 的符号三处(K5,原文只说 TLT 与 HYG 反号,与代码不符)。
 
 ---
 
@@ -60,7 +60,7 @@ ROSTER 里一条的实际形状(`skill.roster()`,以 book_limits_and_triggers �
 ### A3. delegate 结果里的固定文案 `HOW_TO_CITE` — `agents/delegation.py:426`
 
 ```text
-Every figure below is written exactly as you must write it, bracket included: the bracket is the desk's id for that reading and a figure written without it is refused. `said` beside a not_done line, and `desk_said` beside a finding, are the desk's own words for what it could not do: those you may quote verbatim, citing their id. An analyst's sentences are not the desk's words — say what they say in yours, without quotation marks. `made` lists the books an analyst built this turn (a scenario after a trade) by id: to have another analyst read that book, put the id among the subjects of its task. `shown` appears only when an analyst filed nothing: the figures it was shown before it ran out, on the ledger and yours to write exactly as they read there — or to ask another analyst about. `caveats` say where a finding is not quite the line you asked — readings on other dates, another spacing, a proxy in place of the thing you named — and each belongs beside the figure it qualifies: a finding stated without its caveat is not what the analyst found. `read_report(report_id)` opens an analyst's full report.
+Every figure below is written exactly as you must write it, bracket included: the bracket is the desk's id for that reading and a figure written without it is refused. `said` beside a not_done line, and `desk_said` beside a finding, are the desk's own words for what it could not do: those you may quote verbatim, citing their id. An analyst's sentences are not the desk's words — say what they say in yours, without quotation marks. `made` lists the books an analyst built this turn (a scenario after a trade) by id: to have another analyst read that book, put the id among the subjects of its task. `shown` appears only when an analyst filed nothing: the figures it was shown before it ran out, on the ledger and yours to write exactly as they read there, with the `window` they cover and, for a composed total, what it was `made_of` — or to ask another analyst about. `caveats` say where a finding is not quite the line you asked — readings on other dates, another spacing, a proxy in place of the thing you named — and each belongs beside the figure it qualifies: a finding stated without its caveat is not what the analyst found. `read_report(report_id)` opens an analyst's full report.
 ```
 
 ---
@@ -97,21 +97,41 @@ program — every check against its tiers, and the room in weight and dollars:
 {"let":[["current",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"current_value"}],["warning",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"warning_level"}],["breach",{"fn":"column","run":{"fn":"run","portfolio":"<port>"},"table":"limit_checks","col":"breach_level"}],["room_to_warning",{"fn":"sub","a":"$warning","b":"$current"}],["room_to_breach",{"fn":"sub","a":"$breach","b":"$current"}],["nearest",{"fn":"rank","of":"$room_to_breach","direction":"lowest"}],["mv",{"fn":"pick","of":{"fn":"run","portfolio":"<port>"},"key":"exposure_metrics.portfolio_market_value"}],["room_dollars",{"fn":"mul","a":"$room_to_breach","b":"$mv"}]]}
 ```
 
-### B3. V36 补进 book_limits_and_triggers 的一句 desk 知识 — `analytics/skill.py:762`
+### B3. V36 补进 book_limits_and_triggers 的一句 desk 知识 — `analytics/skill.py:768`
 
 ```text
 a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger; the level is in the entries' own unit, and a weight is a fraction: 8% is 0.08
 ```
 
-### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次)— `services/digest.py:51`
+### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次;V38 T1–T4 加句)— `services/digest.py:51`
 
 ```text
-Every result names its parts. `figures` are the scalars it produced: write each exactly as its `value` reads here, bracket included — the bracket is the desk's id for that reading, it is what lets the reader open the figure, and a figure written without it is refused. `series` are readings over time, shown as [date, value] points with `spacing` (annual, quarterly, monthly, daily) and `span`: write a point's value as shown, bracket included — the bracket names the point's date — and say the period the series HAS, not the one the task asked for. A bracket after a quotation or a name cites that fact. `place` is the figure's rank among the entries of its node, `of` how many there are: a superlative rests on that. `nodes` are the bindings this program built and `made` the books among them, by id. `passages` are filing text: quote a passage's words verbatim inside quotation marks. `boundaries` are the desk's own words for what it could not do — quote one the same way, or say it in yours; `held_back` is a boundary saying figures were computed and not shown here. `started` is background work that finishes after your turn and returns no figure. [table: <node>] or [chart: <node>] shows a node's figures.
+Every result names its parts. `figures` are the scalars it produced: write each exactly as its `value` reads here, bracket included — the bracket is the desk's id for that reading, it is what lets the reader open the figure, and a figure written without it is refused. `series` are readings over time, shown as [date, value] points with `spacing` (annual, quarterly, monthly, daily) and `span`: write a point's value as shown, bracket included — the bracket names the point's date — and say the period the series HAS, not the one the task asked for. A bracket after a quotation or a name cites that fact. `place` is the figure's rank among the entries of its node, `of` how many there are: a superlative rests on that. `made_of` beside a figure says what a composed total was built from (`formula`, a `substituted` line) and what it may lack (`missing_at_this_date`; `no_facts_for_issuer`: lines this desk holds nothing under for that issuer) — say it with the figure. `repeated` counts, per node, figures this call produced that you were already shown, with the ids they were shown under (`shown_as`): write those ids. `nodes` lists every binding the program built, with its kind: `refused` points at the boundary that says why; `literal` shows a picked date or name, which is not a figure — write it beside a figure of the node it was passed to (`used_by`), whose `window` or `as_of` carries it; `run` gives the run id a book figure's subject names. A node you did not name in `return` shows only how many figures it holds — name it in `return` to read them. `made` lists the books the program built, by id. `passages` are filing text: quote a passage's words verbatim inside quotation marks. `boundaries` are the desk's own words for what it could not do — quote one the same way, or say it in yours; `blocks` names the nodes a refusal stopped. `held_back` is a boundary saying how many figures of each returned node were computed and not shown here. `started` is background work that finishes after your turn and returns no figure. [table: <node>] or [chart: <node>] shows a node's figures.
+```
+
+### B5. 净 beta 的符号(V38/K5:原文「TLT and HYG enter with the sign opposite」,代码里 SPY/QQQ/IWM 也反号)
+
+book_market_risk 的 desk 一行 — `analytics/skill.py:809`(随域段落下发):
+
+```text
+a net beta is signed by the risk it names: below zero, the book loses when that risk happens (net_beta.equity_down below zero is a book long equities; SPY, QQQ and IWM enter it with the sign of an equity fall, TLT enters rates_up and HYG credit_spreads_widen the same way)
+```
+
+book.analysis 的读法 — `analytics/skill.py:428`(随域段落的 how these read 下发):
+
+```text
+room_to_warning below zero means the check is already in warning; room_to_breach is what remains before the hard tier; a net beta is the book's move per unit of the risk it names (equity_down, rates_up, credit_spreads_widen): every factor enters as its beta times that risk's effect on the book, so a net beta below zero is a book that loses when the risk happens — net_beta.equity_down of −0.86 is a book LONG equities, not short
+```
+
+book.analysis 的 procedure — `analytics/skill.py:221`(不下发给域分析师,供过目对照):
+
+```text
+net beta per risk = Σ beta_i × sense_i, the sense being the risk's effect on the book for a positive beta: −1 for SPY, QQQ and IWM (equity_down), for TLT (rates_up) and for HYG (credit_spreads_widen); room = tier − current; positions ordered by weight
 ```
 
 ---
 
-## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:953`
+## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:959`
 
 每段 3–5 行;最后一行多半是这个域**不**给的东西(与 `absent` 呼应)。导入期断言 offers 与 PROCEDURES 一一对应。
 

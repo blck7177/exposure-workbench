@@ -107,7 +107,9 @@ def build() -> str:
              "A2 是五块推送上下文的新标签(A3)、A3 的 HOW_TO_CITE 加了 caveats 与 shown、"
              "B4 是从每个结果里搬进 system 的读法(T5)、"
              "C 里 book_market_risk 六行重写与 issuer_price_context 一行新增(K1)、"
-             "B2 的域段落现在带 how these read(K3)与两条新知识(K4)。\n")
+             "B2 的域段落现在带 how these read(K3)与两条新知识(K4)。"
+             "V38(9/16)再动三处、新增一处:B4 的读法加了 made_of、repeated、nodes 的种类与字面量、blocks、按节点的 held_back(T1–T4);"
+             "A3 的 shown 一句加了 window 与 made_of;新增 B5,净 beta 的符号三处(K5,原文只说 TLT 与 HYG 反号,与代码不符)。\n")
     L.append("---\n")
     L.append(f"## A. 主分析师(meta)的 system prompt — `src/exposure_workbench/agents/meta_agent.py:{meta_ln}`\n")
     L.append("```text\n" + meta_sys + "\n```\n")
@@ -129,8 +131,20 @@ def build() -> str:
     L.append("```text\n" + cap_text + "\n```\n")
     digest_ln, digest_cite = _const("src/exposure_workbench/services/digest.py", "HOW_TO_CITE")
     assert digest_cite == digest.HOW_TO_CITE
-    L.append(f"### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次)— `services/digest.py:{digest_ln}`\n")
+    L.append(f"### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次;V38 T1–T4 加句)— `services/digest.py:{digest_ln}`\n")
     L.append("```text\n" + digest_cite + "\n```\n")
+    # V38/K5: the sign of a net beta, in the three places the desk says it
+    sign_desk = next(d for d in skill.PROCEDURES["book_market_risk"].desk if "net beta is signed" in d)
+    sign_desk_ln = _line_of("src/exposure_workbench/analytics/skill.py", "a net beta is signed by the risk it names")
+    reading_ln = _line_of("src/exposure_workbench/analytics/skill.py", 'Reading("book.analysis"')
+    proc_ln = _line_of("src/exposure_workbench/analytics/skill.py", "net beta per risk = Σ beta_i × sense_i")
+    L.append("### B5. 净 beta 的符号(V38/K5:原文「TLT and HYG enter with the sign opposite」,代码里 SPY/QQQ/IWM 也反号)\n")
+    L.append(f"book_market_risk 的 desk 一行 — `analytics/skill.py:{sign_desk_ln}`(随域段落下发):\n")
+    L.append("```text\n" + sign_desk + "\n```\n")
+    L.append(f"book.analysis 的读法 — `analytics/skill.py:{reading_ln}`(随域段落的 how these read 下发):\n")
+    L.append("```text\n" + skill.READINGS["book.analysis"].reads + "\n```\n")
+    L.append(f"book.analysis 的 procedure — `analytics/skill.py:{proc_ln}`(不下发给域分析师,供过目对照):\n")
+    L.append("```text\n" + skill.METHODS["book.analysis"].procedure + "\n```\n")
     L.append("---\n")
     L.append(f"## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:{offers_ln}`\n")
     L.append("每段 3–5 行;最后一行多半是这个域**不**给的东西(与 `absent` 呼应)。导入期断言 offers 与 PROCEDURES 一一对应。\n")

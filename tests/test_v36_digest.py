@@ -71,7 +71,36 @@ def test_a_reading_fetched_twice_in_two_calls_collapses_when_the_caller_carries_
 
     assert [f["id"] for f in first["figures"]] == ["f_first"]
     assert second["figures"] == []                       # shown once
-    assert first["figures"][0]["also"] == ["f_again"]    # and the other id named
+    # V38/T4: and THIS result says so, naming the id it was shown under — the
+    # earlier result is not edited after the analyst has read it
+    assert second["repeated"] == [{"node": "w2", "count": 1, "shown_as": ["f_first"]}]
+    assert "also" not in first["figures"][0]
+
+
+def test_a_figure_the_cap_cut_is_not_seen_and_is_shown_when_asked_for():
+    """V38/T4. `seen` was registered before `fit` cut the tail, so a figure the
+    analyst never read was "already shown" and swallowed when it asked for exactly
+    that figure — round C's mini Q01 asked twice for the room it had been cut, and
+    read nothing both times."""
+    seen: dict = {}
+    wide = [_row(f"f_{i:03}", "scalar", f"T{i}", "issuer_exposures.weight", "RATIO", i / 1000.0,
+                 params={"node": "w", "label": f"T{i}"}) for i in range(120)]
+    first = dg.render(_result(wide), mint=dg.Minter(), seen=seen, cap=4_000)
+    shown = {f["id"] for f in first["figures"]}
+    cut = [r for r in wide if r[0] not in shown]
+    assert shown and cut
+    second = dg.render(_result(cut[:2]), mint=dg.Minter(), seen=seen)
+    assert [f["id"] for f in second["figures"]] == [cut[0][0], cut[1][0]]
+    assert "repeated" not in second
+
+
+def test_a_result_of_nothing_new_says_so():
+    seen: dict = {}
+    rows = [_row("f_one", "scalar", "MSFT", "ebit_interest_coverage", "MULTIPLE", 55.65, params={"node": "c2021"})]
+    dg.render(_result(rows), mint=dg.Minter(), seen=seen)
+    again = dg.render(_result([_row("f_two", "scalar", "MSFT", "ebit_interest_coverage", "MULTIPLE", 55.65,
+                                    params={"node": "c2022"})]), mint=dg.Minter(), seen=seen)
+    assert again["figures"] == [] and again["repeated"] == [{"node": "c2022", "count": 1, "shown_as": ["f_one"]}]
 
 
 def test_without_seen_each_call_stands_alone():
@@ -97,11 +126,25 @@ def test_a_boundary_is_minted_as_a_fact_the_caller_collects():
     assert minter.take() == []          # taken once
 
 
-def test_held_back_figures_are_said_and_recorded():
+def test_held_back_figures_are_said_per_returned_node_and_recorded():
+    """V38/T1: by the node the program returned; "run the same program with
+    `return` naming only the nodes you need" named a lever that did nothing."""
     minter = dg.Minter()
-    d = dg.render(_result([], held_back={"count": 58, "measures": ["port:weight"]}), mint=minter)
-    held = [b for b in d["boundaries"] if "58 more figures" in b["text"]]
-    assert held and held[0]["fact"] in {f.id for f in minter.facts}
+    d = dg.render(_result([], held_back={"count": 58, "measures": ["port:weight"], "nodes": {"analysis_prev": 58}}),
+                  mint=minter)
+    (held,) = [b for b in d["boundaries"] if b.get("class") == "held_back"]
+    assert "58 more figures of the nodes you returned" in held["text"] and "analysis_prev: 58" in held["text"]
+    assert held["nodes"] == {"analysis_prev": 58} and "measures" not in held
+    assert held["fact"] in {f.id for f in minter.facts}
+
+
+def test_held_back_results_of_another_tool_say_how_to_ask_for_them():
+    minter = dg.Minter()
+    d = dg.render({"facts": {"columns": list(F.COLUMNS), "rows": []},
+                   "held_back": {"count": 7, "measures": ["AAPL:Item 7"], "how": "ask for fewer passages"}},
+                  mint=minter)
+    (held,) = d["boundaries"]
+    assert "7 more results" in held["text"] and "ask for fewer passages" in held["text"]
 
 
 def test_the_cap_holds_back_rows_and_mints_a_fact_for_them():

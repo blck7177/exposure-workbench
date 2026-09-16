@@ -57,17 +57,27 @@ HOW_TO_CITE = (
     "say the period the series HAS, not the one the task asked for. "
     "A bracket after a quotation or a name cites that fact. "
     "`place` is the figure's rank among the entries of its node, `of` how many there are: a superlative rests on that. "
-    "`nodes` are the bindings this program built and `made` the books among them, by id. "
+    "`made_of` beside a figure says what a composed total was built from (`formula`, a `substituted` line) and what "
+    "it may lack (`missing_at_this_date`; `no_facts_for_issuer`: lines this desk holds nothing under for that "
+    "issuer) — say it with the figure. "
+    "`repeated` counts, per node, figures this call produced that you were already shown, with the ids they were "
+    "shown under (`shown_as`): write those ids. "
+    "`nodes` lists every binding the program built, with its kind: `refused` points at the boundary that says why; "
+    "`literal` shows a picked date or name, which is not a figure — write it beside a figure of the node it was "
+    "passed to (`used_by`), whose `window` or `as_of` carries it; `run` gives the run id a book figure's subject "
+    "names. A node you did not name in `return` shows only how many figures it holds — name it in `return` to read "
+    "them. `made` lists the books the program built, by id. "
     "`passages` are filing text: quote a passage's words verbatim inside quotation marks. "
     "`boundaries` are the desk's own words for what it could not do — quote one the same way, or say it in yours; "
-    "`held_back` is a boundary saying figures were computed and not shown here. "
+    "`blocks` names the nodes a refusal stopped. "
+    "`held_back` is a boundary saying how many figures of each returned node were computed and not shown here. "
     "`started` is background work that finishes after your turn and returns no figure. "
     "[table: <node>] or [chart: <node>] shows a node's figures.")
 
 # What a figure carries besides its value and identity: the node it came from,
 # its place in that node's ordering, the operation that made it, its label and
 # method. `place`/`of` are V36 — see the module docstring.
-_FIGURE_PARAMS = ("node", "rank", "place", "of", "op", "label", "method")
+_FIGURE_PARAMS = ("node", "rank", "place", "of", "op", "label", "method", "made_of")
 
 _REQUEST_KEYS = ("subjects", "want", "window", "compare", "derive", "ask")
 
@@ -75,7 +85,8 @@ _REQUEST_KEYS = ("subjects", "want", "window", "compare", "derive", "ask")
 # partition delegation draws for the lead and for the same reason: a field nobody
 # is told about is a field nobody reads. `request` is the echo of what was asked
 # and needs no instruction.
-FOR_THE_ANALYST_TO_READ = ("figures", "series", "passages", "boundaries", "started", "nodes", "made", "held_back")
+FOR_THE_ANALYST_TO_READ = ("figures", "series", "passages", "boundaries", "started", "nodes", "made", "held_back",
+                           "repeated")
 ANALYSTS_BOOKKEEPING = ("request",)
 
 
@@ -247,6 +258,8 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
             pts = val.get("points") if isinstance(val, dict) else None
             s = {"id": rec["id"], "subject": rec.get("subject"), "measure": rec.get("measure"), "unit": rec.get("unit"),
                  "n": (val.get("n") if isinstance(val, dict) else None), "node": params.get("node")}
+            if params.get("made_of"):
+                s["made_of"] = params["made_of"]
             # HOW IT IS SPACED AND HOW FAR IT REACHES (V37/T5). The entry showed
             # `n`, a first point and a last, and left the analyst to work the
             # cadence out of the dates — which it did wrong five times in round B,
@@ -285,13 +298,20 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
             # as the value (facts.row_for_model); a record-form row, which the
             # forensics rebuild feeds, carries it as `text` — read both, so a
             # rebuilt digest reads as the live one did (V36A §3.4's "" was that).
-            entry["boundaries"].append({"class": cls, "fact": rec["id"], "node": params.get("node"), "code": err,
-                                        "text": str(rec.get("text") or rec.get("value") or "")[:400]})
+            row_b = {"class": cls, "fact": rec["id"], "node": params.get("node"), "code": params.get("error") or err,
+                     "text": str(rec.get("text") or rec.get("value") or "")[:400]}
+            if params.get("label") is not None and params.get("node"):
+                row_b["subject"] = params["label"]          # one refused entry of a vector (V38/T3b)
+            root = params.get("root") if isinstance(params.get("root"), dict) else None
+            if params.get("error") == "depends_on_refused" and root and root.get("node"):
+                row_b["_root"] = root["node"]
+            entry["boundaries"].append(row_b)
         elif kind == "task":
             entry["started"].append({"task": rec["id"], "text": str(rec.get("value") or "")[:200]})
+    _fold_refusals(entry["boundaries"])
     nodes = res.get("nodes")
     if isinstance(nodes, dict):
-        entry["nodes"] = [n for n in nodes if not str(n).startswith("_")]
+        entry["nodes"] = _node_entries(nodes, res.get("not_returned") or {}, entry["boundaries"])
         # the books this program built, by the id another program — another
         # analyst's — reads where a run goes (V36.1, round A's Q13)
         made = [{"node": n, "id": d["ref"], "kind": "scenario"} for n, d in nodes.items()
@@ -299,25 +319,97 @@ def absorb(entry: dict, res: dict, subject: str | None = None, mint=None, call: 
                 and not str(n).startswith("_")]
         if made:
             entry["made"] = made
-    if res.get("held_back"):
-        entry["boundaries"].append({
-            # V37/T5: what to WRITE, not what to want. "Request fewer names" is
-            # not a thing a program says; `return` is. Round B held figures back
-            # fifteen times and the next program was narrower three times.
-            **mint(f"{res['held_back'].get('count')} more figures were computed and are on the ledger, not shown "
-                   f"here: run the same program again with `return` naming only the nodes you need",
-                   cls="held_back"),
-            "measures": res["held_back"].get("measures", [])[:20]})
+    held = res.get("held_back")
+    if held:
+        by_node = held.get("nodes") or {}
+        if by_node:
+            # V38/T1: said per node the program RETURNED — the cap now binds only
+            # when what was named is itself too large, so the way out is to name
+            # less of it, or to take the entries needed out of it. V37/T5 said
+            # "return fewer", and `return` narrowed nothing.
+            text = (f"{held.get('count')} more figures of the nodes you returned are on the ledger and not shown "
+                    f"here — " + ", ".join(f"{n}: {c}" for n, c in by_node.items())
+                    + ". Return fewer of these nodes, or pick(of=$node, key=…) / top(of=$node, n=…) the entries "
+                      "you need")
+            entry["boundaries"].append({**mint(text, cls="held_back"), "nodes": by_node})
+        else:
+            text = (f"{held.get('count')} more results were computed and are on the ledger, not shown here: "
+                    f"{held.get('how') or 'ask for fewer'}")
+            entry["boundaries"].append({**mint(text, cls="held_back"), "measures": held.get("measures", [])[:20]})
     return entry
+
+
+def _fold_refusals(boundaries: list[dict]) -> None:
+    """A node refused because another node was is said ONCE, under the refusal
+    that stopped it (V38/T2): `blocks` names the nodes. Round C's sol Q18 read one
+    collinearity sentence nine times over, and sol Q13 twenty times; every one of
+    those facts is still on the ledger, and the root's words say why."""
+    hosts = {b["node"]: b for b in boundaries if b.get("node") and "_root" not in b}
+    out: list[dict] = []
+    for b in boundaries:
+        root = b.pop("_root", None)
+        if root is None:
+            out.append(b)
+            continue
+        host = hosts.get(root)
+        if host is None:
+            # the root's own refusal is not in this result: the first node it
+            # stopped stands for it
+            hosts[root] = b
+            out.append(b)
+            continue
+        if not str(b.get("node") or "").startswith("_"):
+            host.setdefault("blocks", []).append(b.get("node"))
+    boundaries[:] = out
+
+
+def _node_entries(nodes: dict, not_returned: dict, boundaries: list[dict]) -> list[dict]:
+    """Every binding with its kind (V38/T1, T2, T3c). A refused node points at
+    the boundary that explains it; a literal shows its value and who used it; a
+    run shows its id; a node the program did not return says how many figures it
+    holds. A hoisted intermediate is listed only when it is a literal — a date
+    picked inline is still a date the analyst needs to see."""
+    said_by: dict[str, str] = {}
+    for b in boundaries:
+        if b.get("node") and b.get("fact"):
+            said_by.setdefault(b["node"], b["fact"])
+            for n in b.get("blocks") or []:
+                said_by.setdefault(n, b["fact"])
+    users: dict[str, list[str]] = {}
+    for n, d in nodes.items():
+        for dep in (d.get("deps") or []) if isinstance(d, dict) else []:
+            users.setdefault(dep, []).append(n)
+    out: list[dict] = []
+    for n, d in nodes.items():
+        d = d if isinstance(d, dict) else {}
+        kind = d.get("kind")
+        if str(n).startswith("_") and kind != "literal":
+            continue
+        e: dict = {"name": n, "kind": "refused" if kind == "absence" else kind}
+        if kind == "absence" and said_by.get(n):
+            e["boundary"] = said_by[n]
+        if kind == "literal":
+            e["value"] = d.get("value")
+            used = [u for u in users.get(n, []) if not str(u).startswith("_")]
+            if used:
+                e["used_by"] = used
+        if kind == "run" and d.get("run"):
+            e["run"] = d["run"]
+        if n in not_returned:
+            e["figures"], e["shown"] = not_returned[n], False
+        out.append(e)
+    return out
 
 
 def _reading_of(fig: dict) -> tuple:
     return (fig.get("subject"), fig.get("measure"), fig.get("as_of"), str(fig.get("value")))
 
 
-def tell_apart(items: list[dict], seen: dict | None = None) -> None:
-    """ONE READING IS SHOWN ONCE. A reading fetched twice collapses to one entry
-    naming the other ids: they are the same figure.
+def collapse(items: list[dict], seen: dict | None = None) -> dict[str, tuple]:
+    """ONE READING IS SHOWN ONCE. A reading fetched twice in one call collapses
+    to one entry naming the other ids (`also`): they are the same figure. A
+    reading the analyst was SHOWN in an earlier call is not shown again; it is
+    listed under `repeated` with the id it was shown under.
 
     What tells two readings apart is the id each is shown under, which the
     analyst writes after the figure. V34 put a date into the shown value when
@@ -325,20 +417,56 @@ def tell_apart(items: list[dict], seen: dict | None = None) -> None:
     that matters is two SUBJECTS reading alike (nine issuers share a 15.0%
     warning tier): no suffix short of the id itself tells those apart.
 
-    `seen` carried in by the caller makes the collapse span everything one
-    analyst has been shown, not one call."""
-    seen = {} if seen is None else seen
+    READ-ONLY AGAINST `seen` (V38/T4). `seen` is what the analyst has been
+    shown, and a figure is shown only if it survives `fit`. This used to
+    register every figure before `fit` cut the tail, so a figure cut here was
+    "seen" and swallowed when the analyst asked for exactly it — round C: 343
+    (mini) and 789 (sol) facts never shown, and 21 results that came back
+    empty with no word of why. The caller registers what survived with
+    `register`. Returns each kept figure's reading key, for that call."""
+    keys: dict[str, tuple] = {}
     for e in items:
-        kept = []
+        kept: list[dict] = []
+        here: dict[tuple, dict] = {}
+        repeated: dict[str, dict] = {}
         for f in e.get("figures") or []:
             key = _reading_of(f)
-            first = seen.get(key)
-            if first is None:
-                seen[key] = f
-                kept.append(f)
-            else:
-                first.setdefault("also", []).append(f["id"])    # the same reading, fetched twice
+            first = (seen or {}).get(key)
+            if first is not None:
+                # said per node, with the ids those readings were shown under
+                # (a dozen at most): a re-fetched table is one line, not a copy
+                r = repeated.setdefault(str(f.get("node")), {"node": f.get("node"), "count": 0, "shown_as": []})
+                r["count"] += 1
+                if len(r["shown_as"]) < 12:
+                    r["shown_as"].append(first["id"])
+                continue
+            twin = here.get(key)
+            if twin is not None:
+                twin.setdefault("also", []).append(f["id"])    # the same reading, fetched twice
+                continue
+            here[key] = f
+            keys[f["id"]] = key
+            kept.append(f)
         e["figures"] = kept
+        if repeated:
+            e["repeated"] = list(repeated.values())
+    return keys
+
+
+def register(items: list[dict], seen: dict | None, keys: dict[str, tuple]) -> None:
+    """Record, as shown, the figures that are still in the items — after `fit`."""
+    if seen is None:
+        return
+    for e in items:
+        for f in e.get("figures") or []:
+            key = keys.get(f["id"])
+            if key is not None:
+                seen.setdefault(key, f)
+
+
+def tell_apart(items: list[dict], seen: dict | None = None) -> None:
+    """`collapse` and `register` in one, for a caller that shows everything."""
+    register(items, seen, collapse(items, seen))
 
 
 def stamp_ids(items: list[dict]) -> None:
@@ -374,14 +502,18 @@ def fit(digest: dict, limit: int, mint=None) -> dict:
         dropped, biggest["figures"] = figs[-cut:], figs[:-cut]
         note = next((b for b in biggest["boundaries"] if b.get("class") == "held_back" and b.get("by") == "digest"), None)
         if note is None:
-            text = ("figures computed and on the ledger but not shown here: the request was too wide for one "
-                    "digest; ask again for the names you need")
+            text = ("more figures than one reading holds: the rest are on the ledger and not shown here — return "
+                    "fewer of the nodes counted, or pick(of=$node, key=…) / top(of=$node, n=…) the entries you need")
             # a fact, like every other text the analyst reads (round H refused its quotation)
             note = mint(text, cls="held_back") if mint else {"class": "held_back", "text": text}
-            note.update({"by": "digest", "count": 0, "measures": []})
+            note.update({"by": "digest", "count": 0, "nodes": {}})
             biggest["boundaries"].append(note)
         note["count"] += len(dropped)
-        note["measures"] = sorted({f"{f.get('subject')}:{f.get('measure')}" for f in dropped} | set(note["measures"]))[:30]
+        for f in dropped:
+            # V38/T1: counted by the node the program named, not by a subject
+            # and measure the analyst never wrote (a calc id, round C)
+            key = f.get("node") or f"{f.get('subject')}:{f.get('measure')}"
+            note["nodes"][key] = note["nodes"].get(key, 0) + 1
     guard = 0
     while size() > limit and guard < 50:
         guard += 1
@@ -411,9 +543,10 @@ def render(res: dict, *, request: dict | None = None, subject: str | None = None
     arguments the result answers, so a boundary can say what was asked."""
     entry = absorb(empty(request), res, subject=subject, mint=mint, call=call)
     items = [entry]
-    tell_apart(items, seen)
+    keys = collapse(items, seen)
     stamp_ids(items)
     fit({"items": items}, cap, mint=mint)
+    register(items, seen, keys)
     # ONCE, IN THE SYSTEM PROMPT (V37/T5). These 726 characters rode on every
     # result: `book_market_risk` read them nine times in one turn of round B,
     # which dilutes the reading and breaks the prompt's stable prefix for no

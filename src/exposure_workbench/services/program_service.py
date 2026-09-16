@@ -1972,6 +1972,9 @@ def _facts_of(node: Node) -> list[F.Fact]:
     over is on the identity the gate resolves a written date against."""
     dates = _declared_dates(node)
     p = {"node": node.name, **({"op": node.op} if node.op else {}), **({"method": node.method} if node.method else {}), **dates}
+    if node.kind in (SCALAR, SERIES) and isinstance(node.payload, dict) and node.payload.get("made_of"):
+        # what a composed total was built from, on the figure itself (V38/T3a)
+        p["made_of"] = node.payload["made_of"]
     win = _declared_window(dates)
     group = "book_derived" if (node.ref or "").startswith(("run_", "calc_")) and node.kind in (VECTOR, RANKING, TABLE) else "derived"
     if node.kind == SCALAR and isinstance(node.typed, tc.Typed):
@@ -2017,6 +2020,18 @@ def _facts_of(node: Node) -> list[F.Fact]:
                     measure, subj = named, entity
             out.append(F.fact(F.SCALAR, measure, subject=subj, unit=unit or None, value=float(value),
                               as_of=as_of, window=win, params=extra, sources=(ref,) if ref else (), group=group))
+        # AN ENTRY THAT WAS NOT COMPUTED IS A REFUSAL, LIKE A NODE THAT WAS NOT
+        # (V38/T3b). A method over [JPM, GS] with GS refused was a vector of one
+        # entry and nothing else: the reason sat in the node's note, which the
+        # digest does not read, and round C's sol Q12 learned of GS only from an
+        # ordering that said "got 1".
+        for r in (node.payload.get("refused") or []) if node.kind in (VECTOR, RANKING) else []:
+            who = str(r.get("subject") or r.get("label") or "")
+            if not who:
+                continue
+            out.append(F.fact(F.ABSENCE, node.measure or node.name, subject=who,
+                              text=(f"{node.name}[{who}] was not computed — {r.get('error')}: {r.get('detail', '')}")[:600],
+                              as_of="n/a", params={**p, "label": who, "error": r.get("error")}, group=group))
         return out
     if node.kind == ABSENCE and node.refusal:
         r = node.refusal

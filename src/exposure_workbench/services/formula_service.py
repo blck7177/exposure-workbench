@@ -126,7 +126,8 @@ async def _operand(db: AsyncSession, ticker: str, name: str, months: int,
         ev = await evaluate_formula(db, ticker, name, months=months, at=at,
                                     invoked_by=invoked_by, _cache=cache, _window=window)
         got = ev if ev.get("error") else {"id": ev["calc_id"], "value": ev["value"],
-                                          "basis": ev["basis"]}
+                                          "basis": ev["basis"],
+                                          **({"made_of": ev["made_of"]} if ev.get("made_of") else {})}
     elif name == "total_debt":
         got = await _total_debt(db, ticker, at, invoked_by)
     else:
@@ -148,6 +149,26 @@ async def _operand(db: AsyncSession, ticker: str, name: str, months: int,
                          "basis": flow["basis"], "period": flow.get("period")})
     cache[key] = got
     return got
+
+
+# What a composed input says about itself (V38/T3a). V37/S1 put these on the
+# program node's note, and the digest reads a note's node names only, so the
+# analyst never saw that XOM's "total debt" was its current debt alone.
+_COVER_KEYS = ("formula", "substituted", "missing_at_this_date", "no_facts_for_issuer", "overlapping_not_added")
+
+
+def _made_of(inputs: tuple[str, ...], operands: list[dict], used_instead: dict) -> dict:
+    """By input name: what each composed input was built from and may lack —
+    the total-debt cover directly, and whatever a nested formula carried up."""
+    out: dict = {}
+    for name, got in zip(inputs, operands):
+        used = used_instead.get(name, name)
+        info = {k: got[k] for k in _COVER_KEYS if got.get(k)}
+        if info and used == "total_debt":
+            out[used] = info
+        for k, v in (got.get("made_of") or {}).items():
+            out.setdefault(k, v)
+    return out
 
 
 async def _total_debt(db: AsyncSession, ticker: str, at: str | None, invoked_by: str) -> dict:
@@ -402,6 +423,7 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         for key in ("missing_at_this_date", "no_facts_for_issuer", "overlapping_not_added"):
             if got.get(key):
                 out[key] = got[key]
+        out["made_of"] = {"total_debt": {k: got[k] for k in _COVER_KEYS if got.get(k)}}
         return out
 
     f = fm.FORMULAS[name]
@@ -541,6 +563,9 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         out["periods"] = periods
     if used_instead:
         out["substituted_inputs"] = used_instead
+    made_of = _made_of(f.inputs, operands, used_instead)
+    if made_of:
+        out["made_of"] = made_of
     return out
 
 
@@ -633,6 +658,8 @@ async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
             pt |= {"value": None, "unreachable": ev.get("detail") or ev.get("statement") or ev["error"]}
         else:
             pt |= {"value": ev["value"], "fact_ids": [ev["calc_id"]]}
+            if ev.get("made_of"):
+                pt["made_of"] = ev["made_of"]
             input_ids.append(ev["calc_id"])
         points.append(pt)
     derived = [p for p in points if p.get("value") is not None]
@@ -650,7 +677,12 @@ async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
         {"unreachable_slots": len(points) - len(derived)} if len(points) != len(derived) else {},
         invoked_by,
     )
+    # the series says the composition of its latest composed point, dated
+    latest = next((p for p in reversed(points) if p.get("made_of")), None)
+    made_of = ({k: {**v, "at": latest[u.POINT_PERIOD_KEY]} for k, v in latest["made_of"].items()}
+               if latest else None)
     return {"calc_id": calc_id, "formula": name, "ticker": ticker, "months": months,
+            **({"made_of": made_of} if made_of else {}),
             "last_n": int(last_n), "unit_class": f.unit_class.upper(), "points": points,
             "definition": f.expression, "authority": fm.authority(f),
             "basis": (f"{name} evaluated on each of {len(points)} consecutive periods of {grid}, "
