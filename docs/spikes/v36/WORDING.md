@@ -4,7 +4,7 @@
 
 > 这些文字是模型在运行时逐字读的,措辞的代价是持续的——要审的是**用词本身**,不只是意图。审阅时想的问题:主分析师读了 A 段会不会去碰 desk 名字?域分析师读了 B 段会不会给读者写字、会不会心算?14 段 offers 会不会让主分析师把题派错域?
 
-状态:**未过目**(2026-09-15)。
+状态:**未过目**。9/15 起待过目的三处仍在(A、B、C);V37(9/16)动了其中四处并新增两处:A 段重写了主分析师被交到手里的每个字段各一句并要求 caveat 挨着它限定的数字(A1)、A2 是五块推送上下文的新标签(A3)、A3 的 HOW_TO_CITE 加了 caveats 与 shown、B4 是从每个结果里搬进 system 的读法(T5)、C 里 book_market_risk 六行重写与 issuer_price_context 一行新增(K1)、B2 的域段落现在带 how these read(K3)与两条新知识(K4)。
 
 ---
 
@@ -101,6 +101,12 @@ program — every check against its tiers, and the room in weight and dollars:
 
 ```text
 a cap the mandate does not define has no check and no room — the names over it are filter(of, >, level) over the weights, which the desk computes and puts on the ledger; the level is in the entries' own unit, and a weight is a fraction: 8% is 0.08
+```
+
+### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次)— `services/digest.py:51`
+
+```text
+Every result names its parts. `figures` are the scalars it produced: write each exactly as its `value` reads here, bracket included — the bracket is the desk's id for that reading, it is what lets the reader open the figure, and a figure written without it is refused. `series` are readings over time, shown as [date, value] points with `spacing` (annual, quarterly, monthly, daily) and `span`: write a point's value as shown, bracket included — the bracket names the point's date — and say the period the series HAS, not the one the task asked for. A bracket after a quotation or a name cites that fact. `place` is the figure's rank among the entries of its node, `of` how many there are: a superlative rests on that. `nodes` are the bindings this program built and `made` the books among them, by id. `passages` are filing text: quote a passage's words verbatim inside quotation marks. `boundaries` are the desk's own words for what it could not do — quote one the same way, or say it in yours; `held_back` is a boundary saying figures were computed and not shown here. `started` is background work that finishes after your turn and returns no figure. [table: <node>] or [chart: <node>] shows a node's figures.
 ```
 
 ---

@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from exposure_workbench.agents import delegation, meta_agent, sub_analyst   # noqa: E402
+from exposure_workbench.services import digest                              # noqa: E402
 from exposure_workbench.analytics import skill                              # noqa: E402
 
 OUT = ROOT / "docs/spikes/v36/WORDING.md"
@@ -101,7 +102,12 @@ def build() -> str:
              "本文由 `scripts/v36_wording.py` **从代码原样抽出**(抽出的字面量与运行时对象逐一断言相等),每段带 `文件:行`;你改一处,我同步一处,改完重跑脚本即再生成。\n")
     L.append("> 这些文字是模型在运行时逐字读的,措辞的代价是持续的——要审的是**用词本身**,不只是意图。审阅时想的问题:主分析师读了 A 段会不会去碰 desk 名字?"
              "域分析师读了 B 段会不会给读者写字、会不会心算?14 段 offers 会不会让主分析师把题派错域?\n")
-    L.append("状态:**未过目**(2026-09-15)。\n")
+    L.append("状态:**未过目**。9/15 起待过目的三处仍在(A、B、C);V37(9/16)动了其中四处并新增两处:"
+             "A 段重写了主分析师被交到手里的每个字段各一句并要求 caveat 挨着它限定的数字(A1)、"
+             "A2 是五块推送上下文的新标签(A3)、A3 的 HOW_TO_CITE 加了 caveats 与 shown、"
+             "B4 是从每个结果里搬进 system 的读法(T5)、"
+             "C 里 book_market_risk 六行重写与 issuer_price_context 一行新增(K1)、"
+             "B2 的域段落现在带 how these read(K3)与两条新知识(K4)。\n")
     L.append("---\n")
     L.append(f"## A. 主分析师(meta)的 system prompt — `src/exposure_workbench/agents/meta_agent.py:{meta_ln}`\n")
     L.append("```text\n" + meta_sys + "\n```\n")
@@ -121,6 +127,10 @@ def build() -> str:
     L.append("```text\n" + domain_sample + "\n```\n")
     L.append(f"### B3. V36 补进 book_limits_and_triggers 的一句 desk 知识 — `analytics/skill.py:{cap_ln}`\n")
     L.append("```text\n" + cap_text + "\n```\n")
+    digest_ln, digest_cite = _const("src/exposure_workbench/services/digest.py", "HOW_TO_CITE")
+    assert digest_cite == digest.HOW_TO_CITE
+    L.append(f"### B4. 每个结果怎么读(V37/T5:从每个结果里搬进 system 一次)— `services/digest.py:{digest_ln}`\n")
+    L.append("```text\n" + digest_cite + "\n```\n")
     L.append("---\n")
     L.append(f"## C. 14 段 offers(ROSTER 里每域「能被问什么」)— `src/exposure_workbench/analytics/skill.py:{offers_ln}`\n")
     L.append("每段 3–5 行;最后一行多半是这个域**不**给的东西(与 `absent` 呼应)。导入期断言 offers 与 PROCEDURES 一一对应。\n")

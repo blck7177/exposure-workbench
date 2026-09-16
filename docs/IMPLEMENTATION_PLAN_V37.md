@@ -253,9 +253,9 @@
 |---|---|---|---|
 | **A** ✅ 一行级 + 仪器 | T1、T6、M1、I1 | `sub_analyst.py`、`registry.py`、`tool_session.py`、`mcp_server.py`、两个脚本 | 已完成 `4e7ecbb` `98ee402` |
 | **B** ✅ validation 查表 | 语料 → V6 → V4 → V1 → V2 → V3 → V5 | `answer.py`、`answer_check.py`、`ledger.py`、`facts.py`、`tests/test_v33_answer_check.py`、`tests/data/v36b_accepted.json.gz`、`scripts/v37_corpus.py` | 已完成 `39e6a1c`…`b460a89` |
-| **C** 书侧语言 | T3 → T4 → T7 → S1 | `typed_calculator.py`、`program_service.py`、`definitions.py`、`name_table.py`、`formulas.py`、`PROGRAM_LANGUAGE.md`、`tests/test_v37_refusals_on_face.py` | 一到两天 |
-| **D** 组装层 | T5 → T2 → A2 → A1 → A3（标签 + 字段测试）→ 重生成 `WORDING.md` | `digest.py`、`sub_analyst.py`、`delegation.py`、`meta_agent.py`、`v36_wording.py`、`tests/test_v37_context_labels.py` | 一天半 |
-| **E** skill | K1（测试先红后绿）→ K3 → K4 → K2 → 重生成 `WORDING.md` | `skill.py`、`tests/test_v37_offers.py`、`test_v30_skill_programs.py`（live） | 一天 |
+| **C** ✅ 书侧语言 | T3 → T4 → T7 → S1 | `typed_calculator.py`、`program_service.py`、`skill.py`、`run_reads_service.py`、`tests/test_v37_refusals_on_face.py` | 已完成 `40af76b`…`ab959e6` |
+| **D** ✅ 组装层 | T5 → T2 → A2 → A1 → A3 | `digest.py`、`sub_analyst.py`、`delegation.py`、`meta_agent.py`、`v36_wording.py`、`tests/test_v37_context_labels.py` | 已完成 `32f9ee6`…`1d81118` |
+| **E** ✅ skill | K1（测试先红后绿）→ K3 → K4 → K2 | `skill.py`、`tests/test_v37_offers.py`、`test_v30_skill_programs.py`（live） | 已完成 `b7600cb` |
 | **过目门** | `WORDING.md` 一次过目：A1 三句、K1 十四域 offers、K3 两条 Reading、K4 三句；改一处同步一处后重跑脚本 | `docs/spikes/v36/WORDING.md` | 一次 |
 | **F** C 轮实测 | 同 B 轮条件（fixture、20 题、gpt-5.4-mini、并发 5、deny submit_brief），冻结代码；产出 ACCEPTANCE_V37 + 按域表 + 沟通表 | `docs/spikes/v37/` | 半天跑 + 一天读 |
 
@@ -288,6 +288,44 @@
 （unsourced_figure 82→53、date_expected 13→2、mark_mismatch 61→58），加上 34
 次真拒绝（period_mismatch 0→29、superlative 34→36、subject_mismatch 1→3、
 id_in_prose 10→11）。
+
+## 3.2 Phase C / D / E 的实际形状（2026-09-16，离线 2553 → 2603）
+
+**C（书侧语言）**。T3：拒绝信只说读者叫得动的动词——`describe` 不在域分析师面上，
+而三处拒绝都指向它；新增 `skill.method_for_yield` / `call_for_yield`，一个名字若是
+某个 book 方法声明的产出就直接给出程序节点（Q16 的净 beta），并加静态扫描
+`tests/test_v37_refusals_on_face.py`（七个模块的全部字符串字面量，面从 registry 读）。
+T4：`run(portfolio=…)` 收 port_/run_/calc_ 三种 id，删掉 V36.1 的静态拒（那条文字在场，
+B 轮仍错十一次）；三种都在 fixture 上实测。T7：两条 filed line 相除且精确命中登记公式时
+由桌子命名（模型不命名）。**S1 的结论与计划不同**：在 fixture 上复算后，两样都不该改——
+比值算术正确，分母是 XOM 的短端（该发行人一条长期债务科目都没报，cover 因此"完整"），
+单位是一个写明理由的旧决定（按机构惯例 FFO/债务是百分比）。真正缺的是 cover 算出的
+"没覆盖到什么"没上到事实上：三个键随 note 上行。
+
+**D（组装层）**。T5 四处：读入上限改为每次 completion 的、由它读的结果分摊（B 轮一次
+递过 43.5k 换回三个 token）；序列自报 `spacing`/`span`（与门查的是同一个 `facts.spacing_of`）；
+726 字的引用规则搬进 system 一次（`book_market_risk` 一轮读过九遍）；held_back 说该写
+什么（`return` 收窄）。T2：用尽轮数的分析师把它已看到的图形与序列按 `shown` 交出。
+A2：V31 的重发规则搬到两个 loop——重发不计次、不扣证据额度、第二次结束。A1+A3 合成
+一处：两侧各把载荷的键分成"要读的"与"记账的"两半写在代码里（`FOR_THE_LEAD_TO_READ`
+等），由测试守住——要读的必须在 system 文字里被解释，新键按声明归类；主分析师那段因此
+逐键重写并写明 caveat 挨着它限定的数字；五块推送上下文各带 `source`/`use` 标签，提成
+命名常量（**工具结果不包标签**：它是 JSON，说明它的 `how_to_cite` 本来就在里面）。
+
+**E（skill）**。K1 的守卫先红后绿，表里每条都注明桌子在哪儿说过、由第一个测试核对，
+因为"代码旁边的表能让构建变红，文档里的表不能"（9/15 的过目单挂了一天没人读）。
+K3 把 `READINGS` 随域下发（它唯一的读者是面外的 `describe`）并补两条读法。K4 三句。
+K2 三条程序全部在 fixture 上执行过，顺带查明 `net_beta` 的风险名是 rates_up /
+credit_spreads_widen / equity_down——Q16 用三种拼法要的 "market" 从来不存在。
+
+**一次失误记下来**：`git checkout src/.../skill.py` 一次抹掉了当时未提交的全部 Phase E
+改动，重做了一遍。此后改 skill.py 的脚本一律"全部断言通过才写盘"。
+
+## 3.3 过目门（当前所在）
+
+`docs/spikes/v36/WORDING.md` 已重生成（新增 A2 五个标签、B4 digest 读法两节，状态行
+写明 V37 动了哪四处、新增哪两处）。待过目：主分析师那段（A1）、`HOW_TO_CITE` 两处、
+五个标签、14 段 offers 中改动的两域、两条 Reading 与三句知识。过目之后才跑 Phase F。
 
 ## 4. C 轮验收线（对照 B）
 
