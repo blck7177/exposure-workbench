@@ -36,7 +36,7 @@ from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import delegation, sub_analyst
+from exposure_workbench.agents import delegation, repeats as rp, sub_analyst
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import skill
@@ -331,6 +331,16 @@ async def handle_message(
         domains = {d["domain"] for d in roster}
 
         nudges = 0
+        # A REPLY RE-SENT UNCHANGED IS NOT A SECOND ATTEMPT (V37/A2, the V31 rule
+        # this loop never had). Given the same prose and the same ledger the check
+        # returns the same refusal, and it cost one of the two attempts to hear it
+        # again: round B's Q03 and Q18 each sent their answer twice, word for word,
+        # and ended on the gate-exhausted text. The first repeat is told it
+        # repeated itself, with the tokens the check named; the second ends the
+        # turn, because a third identical payload has never once been the one that
+        # passed. A reply that changed by one byte goes out however many times it
+        # is sent — the bound is on repetition, never on effort.
+        repeated = rp.Repeats()
         read = {"chars": 0, "results": 0}          # what the next completion reads (V36.1, recorded on its row)
 
         def _append(msg: dict) -> None:
@@ -388,10 +398,19 @@ async def handle_message(
                             reply_verified, reply_blocks = acc["verified"], acc["blocks"]
                             result = {"accepted": True}
                         else:
-                            attempts += 1
-                            gate_refusals.append(verdict.error)
+                            again = repeated.record({"text": text})
+                            if again > rp.STOP:
+                                gate_refusals.append("repeated_answer")
+                                answer, standing = text, verdict
+                                break
+                            if again < rp.STOP:
+                                # a repeat earns no attempt and logs no second
+                                # refusal: it is the same refusal, already logged
+                                attempts += 1
+                                gate_refusals.append(verdict.error)
                             answer, standing = text, verdict
                             result = {"accepted": False, "refusal": _refusal_message(verdict),
+                                      **({"repeated": rp.nudge("your reply", verdict.as_refusal())} if again == rp.STOP else {}),
                                       **({"tags_not_among_the_failed": unknown} if unknown else {})}
                     elif name == REPAIR_TOOL_NAME:
                         result = {"error": "nothing_to_repair", "detail": "no verdict stands on a reply; write the answer"}
@@ -427,12 +446,18 @@ async def handle_message(
                 reply_text, reply_citations = acc["text"], acc["citations"]
                 reply_verified, reply_blocks = acc["verified"], acc["blocks"]
                 break
-            attempts += 1
-            gate_refusals.append(verdict.error)
+            again = repeated.record({"text": text})
+            if again > rp.STOP:
+                gate_refusals.append("repeated_answer")
+                break
+            if again < rp.STOP:
+                attempts += 1
+                gate_refusals.append(verdict.error)
             if attempts >= MAX_ANSWER_ATTEMPTS:
                 break
             answer, standing = text, verdict
-            _append({"role": "user", "content": _refusal_message(verdict)})
+            _append({"role": "user", "content": _refusal_message(verdict)
+                     + (f"\n\n{rp.nudge('your reply', verdict.as_refusal())}" if again == rp.STOP else "")})
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,

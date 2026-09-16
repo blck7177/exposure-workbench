@@ -289,3 +289,102 @@ async def test_the_lead_is_never_handed_the_desks_vocabulary():
             assert name not in surface, f"the lead is handed {name}"
     assert '"fn"' not in surface and '"let"' not in surface
     assert "never name a measure, a program or a fact id" in meta_agent._SYSTEM.lower()
+
+
+# ── V37/A2: the lead's reply re-sent unchanged is not a second attempt ─────────
+
+@pytest.mark.asyncio
+async def test_a_reply_re_sent_word_for_word_does_not_spend_the_second_attempt(monkeypatch):
+    """Round B's Q03 and Q18 each sent their answer twice, word for word, and
+    ended on the gate-exhausted text: given the same prose and the same ledger the
+    check returns the same refusal, and hearing it again cost one of the two
+    attempts. The first repeat is told it repeated itself, with the token the
+    check named; the second ends the turn, because a third identical payload has
+    never once been the one that passed."""
+    from contextlib import asynccontextmanager
+
+    # Once a verdict stands the turn is a tool call by construction, so a repeat
+    # reaches the check the way round B's did: through `repair_answer`, with a
+    # replacement that reproduces the sentence it replaced. Q18's two answers were
+    # byte-identical and its second attempt was spent hearing the same refusal.
+    bad = "The desk holds $1.23B of it."          # a figure no ledger accounts for
+    same = {"replacements": [{"tag": "S1", "text": bad}]}
+    turns = [("text", bad), ("repair", same), ("repair", same), ("text", "")]
+    seen: list[list[dict]] = []
+    ledger = Ledger.of_facts(_rows())
+
+    class _Llm:
+        def for_actor(self, actor):
+            return self
+
+        async def chat(self, messages, tools=None, **kw):
+            seen.append(list(messages))
+            kind, payload = turns.pop(0) if turns else ("text", "")
+            if kind == "text":
+                return payload, None
+            return "", [{"id": "r1", "function": {"name": meta_agent.REPAIR_TOOL_NAME,
+                                                  "arguments": json.dumps(payload)}}]
+
+    class _Tools:
+        tools: list = []
+
+        async def call(self, name, args, *, actor=None):
+            raise AssertionError("the lead fetches nothing here")
+
+    class _Db:
+        def add(self, _row):
+            pass
+
+        async def execute(self, *_a, **_k):
+            class _R:
+                @staticmethod
+                def scalars():
+                    class _S:
+                        @staticmethod
+                        def all():
+                            return []
+                    return _S()
+            return _R()
+
+        async def commit(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_e):
+            return False
+
+    @asynccontextmanager
+    async def _fake_llm(*_a, **_k):
+        yield _Llm()
+
+    @asynccontextmanager
+    async def _fake_tools(*_a, **_k):
+        yield _Tools()
+
+    async def _no_briefing(_f, _t):
+        return {"subjects": {"tickers": [], "portfolios": [], "runs": []}}
+
+    monkeypatch.setattr(meta_agent, "llm_session", _fake_llm)
+    monkeypatch.setattr(meta_agent, "tool_session", _fake_tools)
+    monkeypatch.setattr(meta_agent, "_briefing", _no_briefing)
+    monkeypatch.setattr(meta_agent, "_load_ledger", lambda *_a, **_k: _await(ledger))
+    monkeypatch.setattr(meta_agent, "_record_answer", _noop4)
+
+    out = await meta_agent.handle_message(_Db, "sess_repeat", "how much is held?", max_turns=6)
+
+    assert out["meta"]["gate"] == "exhausted", out["meta"]
+    refusals = out["meta"]["gate_refusals"]
+    assert refusals == ["unsourced_figure", "repeated_answer"], \
+        "one refusal earned, then the turn ended because the reply stopped changing"
+    told = json.dumps([m.get("content") for m in seen[-1] if m.get("role") == "tool"])
+    assert "byte-identical" in told and "1.23" in told
+
+
+async def _await(value):
+    return value
+
+
+async def _noop4(*_a, **_k):
+    return None

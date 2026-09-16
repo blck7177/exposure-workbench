@@ -204,8 +204,11 @@ async def test_the_analysts_evidence_calls_are_counted_in_its_own_loop(monkeypat
     from exposure_workbench.app_state import settings as st
     monkeypatch.setattr(st.get_settings(), "sub_analyst_evidence_calls", 2, raising=False)
     tools = _Tools({"run": _run_result([])})
-    llm = _Llm([("", [("run", {"program": {}})]), ("", [("run", {"program": {}})]),
-                ("", [("run", {"program": {}})]), ("", None)])
+    # three DIFFERENT programs: a byte-identical one is not a second call at all
+    # (V37/A2), which is a different rule and has its own test
+    llm = _Llm([("", [("run", {"program": {"let": [["a", 1]]}})]),
+                ("", [("run", {"program": {"let": [["b", 2]]}})]),
+                ("", [("run", {"program": {"let": [["c", 3]]}})]), ("", None)])
     await sa.run_sub_analyst(_task(), _ctx(tools, llm))
     assert len(tools.calls) == 2
     third = json.loads(llm.seen[3]["messages"][-1]["content"])
@@ -509,7 +512,7 @@ async def test_one_completions_reading_is_shared_by_the_results_it_reads(monkeyp
     monkeypatch.setattr(st.get_settings(), "sub_analyst_result_chars", 9_000, raising=False)
     wide = [_scalar("issuer_exposures.weight", f"T{i:04d}", i / 1000, node="w") for i in range(300)]
     tools = _Tools({"run": lambda a: _run_result(wide)})
-    llm = _Llm([("", [("run", {"program": {"let": []}}) for _ in range(3)]), ("", None)])
+    llm = _Llm([("", [("run", {"program": {"let": [[f"n{i}", i]]}}) for i in range(3)]), ("", None)])
     await sa.run_sub_analyst(_task(), _ctx(tools, llm))
     read = [m for m in llm.seen[1]["messages"] if m.get("role") == "tool"]
     assert len(read) == 3
@@ -565,3 +568,56 @@ async def test_an_analyst_out_of_turns_hands_over_the_figures_it_was_shown(monke
     # and it reaches the lead
     for_lead = dl.for_lead([r])["analysts"][0]
     assert for_lead["shown"] == r.shown and "shown" in dl.HOW_TO_CITE
+
+
+# ── V37/A2: a payload re-sent unchanged is not a second try ────────────────────
+
+@pytest.mark.asyncio
+async def test_the_same_program_twice_is_answered_once_and_charged_once(monkeypatch):
+    """Round B's Q08 sent one program four times, two of them byte for byte, and
+    the turn ended with no answer. Given the same program the type report is the
+    same report, and reading it again cost a slot of this analyst's eight evidence
+    calls. The budget counts calls that could bring something back."""
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_evidence_calls", 8, raising=False)
+    prog = {"program": {"let": [["x", {"fn": "run", "portfolio": "port_001"}]]}}
+    tools = _Tools({"run": lambda a: {"error": "type_errors", "problems": [{"reason": "x", "fix": "y"}]}})
+    llm = _Llm([("", [("run", prog)]), ("", [("run", prog)]), ("", [("run", prog)]), ("", None)])
+    r = await sa.run_sub_analyst(_task(), _ctx(tools, llm))
+
+    assert len(tools.calls) == 1, "the desk was asked once"
+    assert r.cost["evidence_calls"] == 1, "a repeat cannot bring anything back, so it is not charged"
+    first = json.loads(llm.seen[1]["messages"][-1]["content"])
+    second = json.loads(llm.seen[2]["messages"][-1]["content"])
+    third = json.loads(llm.seen[3]["messages"][-1]["content"])
+    assert "byte-identical" in second["repeated"] and "will not answer differently" in third["repeated"]
+    # and it is the desk's own answer that comes back, not a new one
+    assert {k: v for k, v in second.items() if k != "repeated"} == first
+
+
+@pytest.mark.asyncio
+async def test_a_program_changed_by_one_byte_goes_out():
+    """The bound is on repetition, never on effort."""
+    tools = _Tools({"run": lambda a: _run_result([])})
+    llm = _Llm([("", [("run", {"program": {"let": [["a", 1]]}})]),
+                ("", [("run", {"program": {"let": [["a", 2]]}})]), ("", None)])
+    r = await sa.run_sub_analyst(_task(), _ctx(tools, llm))
+    assert len(tools.calls) == 2 and r.cost["evidence_calls"] == 2
+
+
+@pytest.mark.asyncio
+async def test_the_same_submission_twice_does_not_spend_the_repair():
+    """The check returns the same verdict on the same brief; hearing it twice is
+    not the repair it asked for."""
+    f = _scalar("limit_checks.current_value", "issuer_concentration:MSFT", 0.1604, node="c")
+    bad = _submit([{"want": 1, "facts": [], "finding": "MSFT sits at 99.9%."},
+                   {"want": 2, "facts": [], "finding": "The room is 1.1%."}])
+    llm = _Llm([("", [bad]), ("", [bad]), ("", [bad])])
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), llm, ledger=Ledger.of_facts([f])))
+    briefs = [s for s in sa.RECORDED if s["step_type"] == "brief"]
+    checked = [b for b in briefs if "brief" in b["args"]]
+    assert len(checked) == 1, "one submission, one verdict on the record"
+    again = json.loads(llm.seen[2]["messages"][-1]["content"])
+    assert "byte-identical to the one refused" in again["repeated"]
+    # the analyst settled nothing and said so, which is the fallback's own step
+    assert r.status == "refused" and [b["args"] for b in briefs if "task_id" in b["args"]]

@@ -36,7 +36,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 
-from exposure_workbench.agents import delegation as dl
+from exposure_workbench.agents import delegation as dl, repeats as rp
 from exposure_workbench.services import answer_check
 from exposure_workbench.analytics import skill
 from exposure_workbench.app_state.settings import get_settings
@@ -195,6 +195,16 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     attempts = 0
     nudges = 0
     read = {"chars": 0, "results": 0}                   # what the next completion reads (V36.1, recorded on its row)
+    # A PROGRAM RE-SENT UNCHANGED IS NOT A SECOND TRY (V37/A2, the V31 rule).
+    # Given the same program the type report is the same report, and it cost a
+    # slot of this analyst's eight evidence calls to read it again: round B's Q08
+    # sent one program four times, two of them byte for byte, and the turn ended
+    # with no answer. The repeat is answered from what the desk already said, told
+    # that it repeated itself, and NOT charged — the budget counts calls that could
+    # bring something back, and a repeat cannot. One byte's difference is a new
+    # program, however many times it is sent.
+    sent = rp.Repeats()
+    last: dict[str, dict] = {}                         # payload digest -> the result it got
 
     def _append(msg: dict) -> None:
         messages.append(msg)
@@ -270,7 +280,16 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                                       f"{len(minted)} boundary fact(s) stated", facts=minted)
 
             elif name in _EVIDENCE_BUDGETED:
-                if evidence_calls >= settings.sub_analyst_evidence_calls:
+                key = rp.digest({"tool": name, "args": args})
+                if key in last:
+                    again = sent.record({"tool": name, "args": args})
+                    res = {**last[key],
+                           "repeated": (f"That {name} call was byte-identical to one this analyst already made, and the "
+                                        f"desk answered it the same way. It is not charged, and it will not change: "
+                                        f"change the program, or file what you have."
+                                        if again <= rp.STOP else
+                                        f"Sent unchanged again. The desk will not answer differently; file your brief.")}
+                elif evidence_calls >= settings.sub_analyst_evidence_calls:
                     res = {"error": "analyst_budget",
                            "detail": f"you have used this analyst's {settings.sub_analyst_evidence_calls} evidence "
                                      f"calls; file your brief with what you have and say what is missing in not_done"}
@@ -292,6 +311,17 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                         # (round G refused an analyst for quoting one).
                         await _record(ctx, actor, "boundary", name, {"of": name},
                                       f"{len(minted)} boundary fact(s) stated", facts=minted)
+                    sent.record({"tool": name, "args": args})
+                    last[key] = res
+
+            elif name == dl.SUBMIT_TOOL_NAME and standing is not None and rp.digest(args) in last:
+                # THE SAME SUBMISSION AGAIN (V37/A2). The check returns the same
+                # verdict on the same brief, and hearing it twice is not the repair
+                # it asked for. Answered from the verdict that already stands, and
+                # not counted as the attempt it is not.
+                res = {"accepted": False, "refusal": dl.refusal_message(task, standing),
+                       "repeated": "That submission was byte-identical to the one refused. Replace the entries "
+                                   "named, or file the lines you can settle and say what stopped the rest."}
 
             elif name == dl.SUBMIT_TOOL_NAME:
                 try:
@@ -300,6 +330,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                     res = {"accepted": False, "error": "malformed_submission", "detail": str(exc)}
                 else:
                     attempts += 1
+                    last[rp.digest(args)] = {}
                     led = await _ledger(ctx)
                     verdict = dl.handoff_check(task, brief, report, led)
                     # the verdict rides on the step (V36.1): the retort the analyst
