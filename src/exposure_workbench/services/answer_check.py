@@ -396,8 +396,13 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 v.links[(i, start)] = {"to": "fact", "ids": [fid], "primary": fid, "period": period, "as_written": tok}
                 linked_by_sentence.setdefault(si, []).append((t, [_reading(rec, period)]))
                 continue
-            # G2 — a bare number: an identity field, the user's own, a passage's, or refused
+            # G2 — a bare number or a date: an identity field, the user's own, a
+            # passage's, or refused. A date spelled out resolves against the ISO
+            # form the facts carry: the spelling is the reader's, the identity is
+            # the fact's (V37).
             ids = ledger.resolve_identity(tok)
+            if not ids and kind == "date":
+                ids = ledger.resolve_identity(A.iso_date(tok) or tok)
             if ids:
                 # an identity field (a date, a year, a window's digits): a citation, never a figure
                 v.links[(i, start)] = {"to": "fact", "ids": ids, "as_written": tok, "how": "identity"}
@@ -416,7 +421,14 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                                           "(16.0% [f_…]); the desk showed this figure under the ids listed"})
                 continue
             v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unsourced_figure", "figure": tok,
-                               "fix": "a number the ledger cannot account for: request the figure, quote the passage that states it, or drop it"})
+                               # A date is not requested, computed or dropped the way a figure is:
+                               # the desk's dates are its facts' own, and a date only a filing
+                               # states is quoted (V37; round B wrote three maturity dates out of
+                               # the 10-K's prose and read "request the figure" for each).
+                               "fix": ("a date no fact of this turn carries: the desk's dates are the facts' own "
+                                       "as_of and window — quote the words that state this one, or drop it"
+                                       if kind == "date" else
+                                       "a number the ledger cannot account for: request the figure, quote the passage that states it, or drop it")})
 
         # G3 — the sentence around the figures
         for si, (s, e) in enumerate(sentences):

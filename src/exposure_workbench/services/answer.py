@@ -193,7 +193,53 @@ def prose_by_block(blocks) -> list[tuple[int, str, list[str]]]:
 
 ID_PREFIXES = ("f_", "fact_", "calc_", "chunk_", "src_", "run_", "alert_", "pos_", "task_", "rrun_", "brief_", "sess_", "msg_")
 _ID = r"(?P<id>\b(?:" + "|".join(p[:-1] for p in ID_PREFIXES) + r")_[A-Za-z0-9]{4,}\b)"
-_DATE = r"(?P<date>\b\d{4}-\d{2}-\d{2}\b)"
+# A DATE IS ONE TOKEN, SPELLED OUT OR NOT (V37). A filing says "As of June 30,
+# 2025"; the finder read that as the numbers 30 and 2025, and 30 is a figure no
+# ledger can account for — six of round B's handoff refusals were led by
+# `date_expected` on exactly that day-of-month, including two inside a quotation
+# the check had already verified, and Q03's "January 25, 2026" was refused as
+# both an unsourced figure and a missing date. The day and the year are one
+# identity field, so they are one token; what a date MEANS is still nobody's
+# business here — the readers resolve it against the facts' own dates
+# (services/ledger.identity_tokens indexes these spellings).
+# The abbreviations a reader actually writes, as DATA rather than as a rule about
+# prefixes: "Sept" is not the three-letter abbreviation of anything and "Janu" is
+# not a word. Adding one is an edit here.
+_MONTH_FORMS = ("Jan(?:uary)?", "Feb(?:ruary)?", "Mar(?:ch)?", "Apr(?:il)?", "May",
+                "Jun(?:e)?", "Jul(?:y)?", "Aug(?:ust)?", "Sep(?:tember|t)?",
+                "Oct(?:ober)?", "Nov(?:ember)?", "Dec(?:ember)?")
+_MONTH = "(?i:" + "|".join(_MONTH_FORMS) + ")"
+_DATE = (r"(?P<date>\b\d{4}-\d{2}-\d{2}\b"
+         r"|\b" + _MONTH + r"\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b"
+         r"|\b\d{1,2}(?:st|nd|rd|th)?\s+" + _MONTH + r"\.?,?\s+\d{4}\b)")
+_SPELLED = re.compile(r"(?:(?P<m1>[A-Za-z]{3,9})\.?\s+(?P<d1>\d{1,2})(?:st|nd|rd|th)?,?\s+(?P<y1>\d{4})"
+                      r"|(?P<d2>\d{1,2})(?:st|nd|rd|th)?\s+(?P<m2>[A-Za-z]{3,9})\.?,?\s+(?P<y2>\d{4}))\Z")
+_MONTH_INDEX = {n[:3].lower(): i for i, n in enumerate(
+    ("January", "February", "March", "April", "May", "June", "July",
+     "August", "September", "October", "November", "December"), start=1)}
+
+
+def iso_date(token: str) -> str | None:
+    """`June 30, 2025` / `30 Jun 2025` / `Sept. 27th, 2025` -> `2025-06-30`-form;
+    an ISO date -> itself; anything else None.
+
+    One normalisation, here, where the shape of a date is already decided —
+    so the readers resolve a date against the facts' own `as_of` and window
+    without a second idea of how a date is written (V37). The month is read by
+    its first three letters, which is what every abbreviation this desk has seen
+    shares with its full name.
+    """
+    t = (token or "").strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", t):
+        return t
+    m = _SPELLED.match(t)
+    if not m:
+        return None
+    month = _MONTH_INDEX.get((m.group("m1") or m.group("m2") or "")[:3].lower())
+    if month is None:
+        return None
+    day, year = int(m.group("d1") or m.group("d2")), int(m.group("y1") or m.group("y2"))
+    return f"{year:04d}-{month:02d}-{day:02d}" if 1 <= day <= 31 else None
 _FORM = r"(?P<form>\b\d{1,2}-[KQF](?:/A)?\b|\b[SF]-[13]\b|\bDEF\s?14A\b)"
 # `\d(?:[\d,]*\d)?` and not `\d[\d,]*`: the second swallows the comma that ends
 # a clause, so "in 2024, revenue rose" offered the gate the token "2024," —

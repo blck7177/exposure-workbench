@@ -107,6 +107,17 @@ def test_prose_by_block_blanks_the_pointers_and_keeps_the_length():
     ("in 2024, revenue rose", [("2024", "num")]),
     ("of $1,785,420, which is", [("$1,785,420", "num")]),
     ("16.3%, and then", [("16.3%", "num")]),
+    # V37: a date spelled out is ONE token, because the day and the year are one
+    # identity field. Read as two numbers, the day was a figure no ledger could
+    # account for — six of round B's handoff refusals were led by `date_expected`
+    # on exactly that day-of-month, two of them inside a verified quotation.
+    ("As of June 30, 2025, we had none", [("June 30, 2025", "date")]),
+    ("as of january 25, 2026 the authorization", [("january 25, 2026", "date")]),
+    ("filed 30 June 2025 and Jun 30, 2025", [("30 June 2025", "date"), ("Jun 30, 2025", "date")]),
+    ("on May 5, 2024 and Sept. 27th, 2025", [("May 5, 2024", "date"), ("Sept. 27th, 2025", "date")]),
+    # and a month with no day and no year is prose, not a date: nothing to resolve
+    ("through June and July", []),
+    ("a 12 month window in June", [("12", "num")]),
 ])
 def test_tokens_in_finds_whole_tokens_and_stops_at_the_clause(text, expected):
     assert [(t["token"], t["kind"]) for t in A.tokens_in(text)] == expected

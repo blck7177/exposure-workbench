@@ -435,6 +435,9 @@ def check(answer: dict, led: Ledger, question: str | None = None) -> Verdict:
             ids = led.resolve_number(tok) if kind == "num" else []
             if not ids:
                 ids = led.resolve_identity(tok)
+            if not ids and kind == "date":
+                # a date spelled out is the ISO date the facts carry (V37)
+                ids = led.resolve_identity(A.iso_date(tok) or tok)
             if ids:
                 v.links[(i, t["start"])] = {"to": "fact", "ids": ids, "as_written": tok}
                 continue

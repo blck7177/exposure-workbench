@@ -607,3 +607,44 @@ def test_a_direction_verb_in_the_present_tense_is_read_too():
     v = ac.check("Technology sector concentration falls to 35.3% [f_techcur0] from 35.0% [f_techprv0].", led)
     assert "direction_conflict" in {p["reason"] for p in v.problems}
     assert ac.check("Technology sector concentration rises to 35.3% [f_techcur0] from 35.0% [f_techprv0].", led).ok
+
+
+# ── V37/V6: a date spelled out is a date ──────────────────────────────────────
+
+def test_a_date_spelled_out_resolves_against_the_facts_own_date():
+    """Round B refused six briefs for the day-of-month of a spelled date, two of
+    them inside a quotation the check had already verified. "As of June 30, 2025"
+    was read as the numbers 30 and 2025: the year resolved against a fact's
+    as-of and the day was a figure no ledger could account for, so the same
+    sentence was refused as an unsourced figure AND as a date word with no date
+    after it.
+
+    The day and the year are one identity field, so the finder reads them as one
+    token and the check resolves it against the ISO form the facts carry. The
+    spelling is the reader's; the identity is the fact's."""
+    _accepted("The episode troughed on March 27, 2026 after a drawdown of 12.0% [f_depth1].")
+    _accepted("The episode troughed on 27 March 2026.")
+    _accepted("The episode troughed on 2026-03-27.")            # unchanged
+    # a date word is answered by a date, whichever way it is written
+    v = ac.check("The worst drawdown started on January 7, 2026.", LEDGER, None)
+    assert v.ok, v.problems
+    # and a figure in a date's slot is still a figure in a date's slot
+    _refused("The worst drawdown started on 12.0% [f_depth1] and troughed on 2026-03-27.", "date_expected")
+
+
+def test_a_date_no_fact_carries_is_refused_as_a_date_and_not_as_a_figure():
+    """The three maturity dates round B wrote out of a 10-K's prose were refused
+    — correctly, nothing on the ledger carries them — and told to "request the
+    figure", which is not a thing anybody can do about a date. What it can do is
+    quote the words that state it."""
+    v = _refused("The notes mature on December 31, 2031.", "unsourced_figure")
+    [p] = [p for p in v.problems if p["reason"] == "unsourced_figure"]
+    assert p["figure"] == "December 31, 2031", "the whole date is named, not its day"
+    assert "quote the words that state this one" in p["fix"] and "request the figure" not in p["fix"]
+
+
+def test_a_month_without_a_day_and_a_year_is_prose():
+    """Nothing to resolve and nothing to refuse: "through June and July" makes no
+    claim a fact could settle, and a finder that called it a date would invent
+    one."""
+    _accepted("Operating cash flow ran through June and July at its usual seasonal shape.")
