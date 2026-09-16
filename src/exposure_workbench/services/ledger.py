@@ -303,14 +303,34 @@ class Ledger:
     _MARKED = re.compile(r"[$%]|(?:bn|mn|[KMB]|million|billion|thousand)\s*$", re.IGNORECASE)
     _MIN_BARE_DIGITS = 4
 
+    # THE SPACING IS THE WRITER'S, THE WORDS ARE THE SOURCE'S (V37). The token's
+    # spaces were stripped and the passage's were not, so a figure written WITH
+    # its scale word could never be found: the filing says "$99.3 billion" and
+    # the pattern looked for "99.3billion". Only the bare form worked, which is
+    # the one form the desk's own rule does not ask for.
+    #
+    # It cost round B its Q03. The 10-K states the buyback authorization only in
+    # prose; the analyst pointed a figure at the passage that states it and read
+    # "that passage does not state this figure", then quoted two words of it and
+    # read "quote the passage that states it" — the two ways out pointing at each
+    # other, five submissions apart — and the lead then invented $14.7B and an id
+    # to carry it. Both messages were true to the code and false to the passage.
     def resolve_in_passages(self, token: str, cited: Sequence[str]) -> list[str]:
         tok = (token or "").strip()
-        core = re.sub(r"[$,%\s]", "", tok)
-        if not core:
+        core = re.sub(r"[$,%]", "", tok)
+        if not core.strip():
             return []
         if not self._MARKED.search(tok) and len(re.sub(r"\D", "", core)) < self._MIN_BARE_DIGITS:
             return []
-        pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?![\d])")
+        # The digits and the scale word are matched as they are written, with the
+        # spacing between them free: "$99.3 billion", "$99.3billion" and the
+        # filing's own "$99.3 billion" are one figure. The WORDS are not coerced —
+        # "bn" is not looked up as "billion", because the spacing is the writer's
+        # and the words are the source's.
+        parts = re.findall(r"\d[\d.]*|[A-Za-z]+", core)
+        if not parts:
+            return []
+        pat = re.compile(r"(?<![\d.])" + r"\s*".join(re.escape(x) for x in parts) + r"(?![\d])", re.IGNORECASE)
         return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
 
 

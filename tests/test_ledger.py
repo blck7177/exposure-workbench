@@ -139,3 +139,43 @@ def test_the_day_and_month_of_a_date_are_not_identity_tokens():
     assert led.resolve_identity("2026-02-20") and led.resolve_identity("2026")
     assert led.resolve_identity("20") == [] and led.resolve_identity("02") == []
     assert led.resolve_identity("10-K") and led.resolve_identity("10"), "a form name still gives its digits"
+
+
+# ── V37: a figure written with its scale word ─────────────────────────────────
+
+def _passage_ledger(text: str):
+    f = F.fact(F.PASSAGE, "10-K Item 7", subject="NVDA", text=text, as_of="n/a")
+    return f.id, L.Ledger.of_facts([f])
+
+
+def test_a_figure_written_with_its_scale_word_is_found_in_the_passage():
+    """The token's spaces were stripped and the passage's were not, so the one
+    form the desk's own rule asks for — the figure as the filing writes it — was
+    the one form that could never be found. "$99.3 billion" was looked up as
+    "99.3billion".
+
+    It cost round B its Q03. The 10-K states the buyback authorization only in
+    prose; the analyst pointed a figure at the passage that states it and read
+    "that passage does not state this figure", quoted two words of it and read
+    "quote the passage that states it", and the lead then invented $14.7B and an
+    id to carry it. Both messages were true to the code and false to the passage.
+    """
+    pid, led = _passage_ledger(
+        "As of July 26, 2026, we were authorized, subject to certain specifications, to repurchase up to "
+        "$99.3 billion of our common stock. Segment revenue was $65,179 million, and R&D expenses "
+        "increased 21 percent in 2025.")
+    for tok in ("$99.3 billion", "$65,179 million", "21%", "$65,179", "65179"):
+        assert led.resolve_in_passages(tok, [pid]) == [pid], tok
+    # and a figure the passage does not state is still not in it
+    for tok in ("$99.4 billion", "$14.7B", "$60.0 billion"):
+        assert led.resolve_in_passages(tok, [pid]) == [], tok
+
+
+def test_the_scale_word_itself_is_not_coerced():
+    """"$38.1bn" is not looked up as "38.1 billion": the spacing is the writer's
+    and may vary, the words are the source's and may not. A lookup that rewrote
+    them would be guessing at what the filing said."""
+    pid, led = _passage_ledger("Total debt was $38.1 billion at year end.")
+    assert led.resolve_in_passages("$38.1 billion", [pid]) == [pid]
+    assert led.resolve_in_passages("$38.1billion", [pid]) == [pid], "the writer's spacing, not the source's"
+    assert led.resolve_in_passages("$38.1bn", [pid]) == []
