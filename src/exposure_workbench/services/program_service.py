@@ -54,6 +54,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import series_ops as so
 from exposure_workbench.analytics import skill
 from exposure_workbench.db.models import ExposureRun, FinancialFact
@@ -1306,6 +1307,59 @@ def _structural(op: str, *parts: str) -> str:
     return name if len(name) <= 160 else f"{op}({', '.join(p[:60] + '…' if len(p) > 60 else p for p in parts)})"
 
 
+def _subject_of_node(x: Any) -> str | None:
+    """The issuer a node's figure is about, as far as the node knows."""
+    if not isinstance(x, Node):
+        return None
+    if x.subject:
+        return x.subject
+    t = x.typed
+    if isinstance(t, tc.Typed) and t.issuers:
+        return t.issuers[0]
+    if isinstance(t, tc.TypedSeries) and getattr(t, "issuers", None):
+        return t.issuers[0]
+    return None
+
+
+def _by_formula(op: str, a: Any, b: Any) -> tuple[str, str] | None:
+    """(name, unit class) when the desk's own registry defines exactly this
+    quotient of exactly these two lines (V37/T7).
+
+    THE DESK NAMES ITS OWN MEASURES, AND ONLY ITS OWN. `capex ÷ revenue` is
+    `capex_intensity` — that is a definition in `analytics/formulas`, with a
+    citation and a unit class — and a program that divides those two lines
+    produced `capex.divide.revenue` instead: a lineage name, true and nobody's
+    word for the measure. Round B's Q08 then had the same reading under three
+    identities on one ledger (`capex.divide.revenue`, `capex_intensity` with a
+    place, `vector(capex_intensity)` with a place), all carrying the same float,
+    and the lead cited the one with no place in it. The gate refused the
+    superlative, correctly, and the turn ended with no answer.
+    
+    This is not the model naming anything (PROGRAM_LANGUAGE rule 1, and the AWS
+    case of the 9/9 review): the only way to this name is to have computed that
+    exact formula out of those exact lines, and a name the registry does not
+    define stays a lineage name. The match is exact — the formula's own inputs,
+    or an alternative it declares for one of them — and the subjects must agree,
+    because one issuer's capex over another's revenue is not anybody's measure.
+    """
+    if op != "divide":
+        return None
+    ma, mb = _measure_of(a), _measure_of(b)
+    sa, sb = _subject_of_node(a), _subject_of_node(b)
+    if sa and sb and sa != sb:
+        return None
+    for fname, f in fm.FORMULAS.items():
+        if f.op != "divide" or len(f.inputs) != 2:
+            continue
+        num, den = f.inputs
+        if ma != num and ma not in (f.alternatives.get(num) or ()):
+            continue
+        if mb != den and mb not in (f.alternatives.get(den) or ()):
+            continue
+        return fname, f.unit_class
+    return None
+
+
 def _operand_refs(x: Any) -> list[tuple[str, str]] | dict:
     """(label, ref) for a scalar node (one entry) or a vector/ranking/table node."""
     if isinstance(x, Node):
@@ -1379,9 +1433,13 @@ async def _p_binary(ctx: _Ctx, node: Node, fn: str, a: Any, b: Any) -> Node:
         if isinstance(side, dict):
             node.kind, node.refusal = ABSENCE, side
             return node
-    name = name or _structural(op, _measure_of(a), _measure_of(b))
+    # The desk's own definition first, its lineage name otherwise (V37/T7)
+    declared = _by_formula(op, a, b)
+    name = name or (declared[0] if declared else None) or _structural(op, _measure_of(a), _measure_of(b))
+    as_unit = declared[1] if declared else None
     if len(la) == 1 and len(lb) == 1:
-        return await _from_payload(ctx, node, await tc.calculate(ctx.db, op, la[0][1], lb[0][1], invoked_by=ctx.invoked_by, as_quantity=name))
+        return await _from_payload(ctx, node, await tc.calculate(
+            ctx.db, op, la[0][1], lb[0][1], invoked_by=ctx.invoked_by, as_quantity=name, as_unit_class=as_unit))
     # broadcast: a vector against one figure, or two vectors aligned by label
     if len(la) == 1 or len(lb) == 1:
         one, many, left = (la[0][1], lb, False) if len(la) == 1 else (lb[0][1], la, True)
@@ -1395,7 +1453,8 @@ async def _p_binary(ctx: _Ctx, node: Node, fn: str, a: Any, b: Any) -> Node:
     node.kind, node.payload = VECTOR, {"op": op, "pairs": len(pairs)}
     refused = []
     for lab, (x, y) in pairs:
-        r = await tc.calculate(ctx.db, op, x, y, invoked_by=ctx.invoked_by, as_quantity=name)
+        r = await tc.calculate(ctx.db, op, x, y, invoked_by=ctx.invoked_by, as_quantity=name,
+                               as_unit_class=as_unit)
         if r.get("error"):
             refused.append({"label": lab, **{k: r[k] for k in ("error", "detail") if k in r}})
             continue

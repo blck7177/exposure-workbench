@@ -147,3 +147,36 @@ async def test_a_run_and_a_scenario_id_read_as_that_one_run():
             assert out.get("refused") == ["b"]
     finally:
         await engine.dispose()
+
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_a_quotient_the_registry_defines_comes_back_under_its_own_name():
+    """V37/T7, measured: the program's quotient and the registry's method are one
+    measure and one value, so a ledger cannot hold the same reading under two
+    names with only one of them carrying a place."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from exposure_workbench.auth.context import current_user_ctx
+    from exposure_workbench.services import program_service as ps
+
+    engine = create_async_engine(URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    current_user_ctx.set(os.getenv("BATTERY_OWNER_ID", "user_3IDBMeAxLTbecvGorzwV7FCeroR"))
+    try:
+        async with mk() as db:
+            out = await ps.run(db, {"let": [
+                ["cx", {"fn": "fundamentals", "ticker": "MSFT", "metric": "capex", "months": 12}],
+                ["rv", {"fn": "fundamentals", "ticker": "MSFT", "metric": "revenue", "months": 12}],
+                ["divided", {"fn": "div", "a": "$cx", "b": "$rv"}],
+                ["method", {"fn": "method", "name": "capex_intensity", "subject": "MSFT"}],
+                ["ocf", {"fn": "fundamentals", "ticker": "MSFT", "metric": "operating_cash_flow", "months": 12}],
+                ["ni", {"fn": "fundamentals", "ticker": "MSFT", "metric": "net_income", "months": 12}],
+                ["conversion", {"fn": "div", "a": "$ocf", "b": "$ni"}]],
+                "return": ["divided", "method", "conversion"]}, invoked_by="test_v37_t7")
+            nodes = out["nodes"]
+            assert nodes["divided"]["measure"] == nodes["method"]["measure"] == "capex_intensity"
+            assert nodes["divided"]["value"] == nodes["method"]["value"]
+            # and a quotient the registry does not define keeps its lineage name
+            assert nodes["conversion"]["measure"].startswith("divide(")
+    finally:
+        await engine.dispose()

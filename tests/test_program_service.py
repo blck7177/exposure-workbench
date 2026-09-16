@@ -233,3 +233,35 @@ async def test_a_name_at_the_wrong_door_is_sent_to_its_own_door():
     assert _other_door("frobnicate") is None, "an unknown name has no door; `nearest` answers it"
     # a real method is not routed away from its own door
     assert _other_door("roe") is None
+
+
+# ── V37/T7: the desk names its own measures, and only its own ─────────────────
+
+def test_a_quotient_the_registry_defines_is_named_by_the_registry():
+    """`capex ÷ revenue` IS `capex_intensity` — a definition in
+    analytics/formulas, with a citation and a unit class — and a program that
+    divided those two lines produced a lineage name instead. Round B's Q08 then
+    carried one reading under three identities on one ledger
+    (`capex.divide.revenue`, `capex_intensity` with a place,
+    `vector(capex_intensity)` with a place), all the same float, and the lead
+    cited the one with no place. The gate refused the superlative, correctly, and
+    the turn ended with no answer.
+
+    Not the model naming anything: the only way to this name is to have computed
+    that exact formula out of those exact lines."""
+    from exposure_workbench.services.program_service import _by_formula, Node, SCALAR
+
+    def line(metric, subject="MSFT"):
+        n = Node(metric, SCALAR, {})
+        n.measure, n.subject = metric, subject
+        return n
+
+    assert _by_formula("divide", line("capex"), line("revenue")) == ("capex_intensity", "ratio")
+    assert _by_formula("divide", line("free_cash_flow"), line("total_debt")) == ("fcf_to_debt", "ratio")
+    # a declared alternative for one input counts; the registry says which
+    assert _by_formula("divide", line("capex"), line("total_revenues")) == ("capex_intensity", "ratio")
+    # and nothing else does
+    assert _by_formula("divide", line("operating_cash_flow"), line("net_income")) is None
+    assert _by_formula("subtract", line("capex"), line("revenue")) is None, "only a quotient"
+    assert _by_formula("divide", line("capex"), line("revenue", "GOOGL")) is None, \
+        "one issuer's capex over another's revenue is nobody's measure"
