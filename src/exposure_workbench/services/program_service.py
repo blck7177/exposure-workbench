@@ -329,7 +329,8 @@ SIGNATURES: dict[str, Sig] = {
                         "whole balance sheet when metric is omitted"),
     "prices": Sig({"ticker": (T_STRING,), "window": (T_STRING,)}, SERIES, "daily closes over a named window (1m 3m 6m 1y 3y)"),
     "price": Sig({"ticker": (T_STRING,), "as_of": (T_DATE,)}, SCALAR, "one session's close"),
-    "run": Sig({"portfolio": (T_STRING, RUN), "which": (T_STRING,)}, RUN, "a book's completed run: which = latest | prev | a run_… id"),
+    "run": Sig({"portfolio": (T_STRING, RUN), "which": (T_STRING,)}, RUN,
+               "one run: a port_… id (the book, with which = latest | prev | a run_… id), or a run_… / calc_… id itself"),
     "column": Sig({"run": (RUN, TABLE, T_STRING), "table": (T_STRING,), "col": (T_STRING,)}, VECTOR,
                   "one figure per label of a run table: issuer_exposures.{weight,market_value,contribution}, "
                   "sector_exposures.weight, limit_checks.{current_value,warning_level,breach_level}, factor_attributions.{beta,contribution}"),
@@ -578,16 +579,6 @@ def _infer(name: str, expr: Any, kinds: dict, problems: list) -> str | None:
         ok = False
     elif fn == "filter" and given.get("op") not in FILTER_OPS:
         bad("type_mismatch", arg="op", expected=list(FILTER_OPS), got=given.get("op"), fix="op is one of > >= < <= == !=")
-        ok = False
-    elif fn == "run" and isinstance(given.get("portfolio"), str) and given["portfolio"].startswith(("run_", "calc_")):
-        # V36.1: round A's Q13 passed a run id where the book goes and got
-        # eight absences, one per node downstream. The wrong kind of id is a
-        # type problem, and a type problem is reported before anything runs.
-        rid = given["portfolio"]
-        bad("type_mismatch", arg="portfolio", got=rid,
-            fix=f"portfolio is a port_… id, the book; to read {rid!r} give it as which: "
-                f"{{fn: 'run', portfolio: '<its book>', which: {rid!r}}} — or use {rid!r} itself where a run goes, "
-                f"column(run={rid!r}, …)")
         ok = False
     elif fn == "top":
         n = given.get("n")
@@ -949,6 +940,23 @@ async def _p_price(ctx: _Ctx, node: Node, ticker: str, as_of: str | None = None)
 
 
 async def _p_run(ctx: _Ctx, node: Node, portfolio: str, which: str | None = None) -> Node:
+    # AN ID SAYS WHAT IT IS (V37/T4). `portfolio` took a port_ id only, and a
+    # domain analyst handed a run_ id — by the lead, out of the BRIEFING, or as a
+    # book another analyst built this turn — writes the id it was given where the
+    # book goes. Round B did it eleven times. V36.1's answer was a static type
+    # refusal that named the rewriting, and the analysts went on writing it,
+    # including the hypothetical-trades analyst on both of its two attempts, in a
+    # turn where that domain then filed nothing at all: a message cannot make two
+    # vocabularies one. One verb, three kinds of id, each read as what it is.
+    if isinstance(portfolio, str) and portfolio.startswith(("run_", "calc_")):
+        if which:
+            node.kind, node.refusal = ABSENCE, _err(
+                "type_mismatch", f"which chooses among a book's runs, and {portfolio!r} is already one: drop which")
+            return node
+        if portfolio.startswith("calc_"):
+            # a scenario row: the book another analyst built, read by its own names
+            return await _from_payload(ctx, node, {"calc_id": portfolio})
+        which, portfolio = portfolio, ""
     which = which or "latest"
     if which.startswith("run_"):
         run = await run_reads_service.completed_run(ctx.db, which)

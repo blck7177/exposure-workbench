@@ -23,6 +23,7 @@ a review checklist.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -82,3 +83,67 @@ def test_the_face_this_file_reads_is_the_one_the_mount_serves():
     refusing a verb that is now reachable."""
     assert set(faces.FACE_META_AGENT) == {"run", "read_filings", "search_web", "start"}
     assert "describe" in OFF_FACE and "run" not in OFF_FACE
+
+
+# ── V37/T4: one verb, three kinds of id ───────────────────────────────────────
+
+URL = os.getenv("DATABASE_URL_LOCAL",
+                "postgresql+asyncpg://exposure:exposure@localhost:5433/exposure_workbench").replace(
+    "/exposure_workbench", "/exposure_gold")
+
+
+def test_the_typecheck_accepts_a_book_a_run_and_a_scenario_where_the_book_goes():
+    """Q13's first program was run(portfolio="run_e2945c5ebd5a") — eight absences
+    downstream and a completion spent on each. V36.1 answered with a static type
+    refusal naming the rewriting; round B's analysts wrote it eleven more times,
+    the hypothetical-trades analyst on both of its two attempts, in a turn where
+    that domain filed nothing at all.
+
+    The lead names subjects out of the BRIEFING and out of another analyst's
+    `made`, so run_ and calc_ ids are what it hands down. A message cannot make
+    two vocabularies one; the verb reads whichever kind it is given, which is
+    what `_run_ref` has always done everywhere else in the language."""
+    from exposure_workbench.services import program_service as ps
+    for rid in ("port_001", "run_e2945c5ebd5a", "calc_7c1f2a0b9d4e"):
+        problems = ps.typecheck({"let": [["base", {"fn": "run", "portfolio": rid}],
+                                         ["w", {"fn": "column", "run": "$base", "table": "issuer_exposures",
+                                                "col": "weight"}]], "return": ["w"]})
+        assert not [p for p in problems if p.get("at") == "base"], rid
+
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_a_run_and_a_scenario_id_read_as_that_one_run():
+    """Measured, because a typecheck that accepts an id it cannot execute is
+    worse than the refusal it replaced. All three settle, and `column` and `pick`
+    read all three."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from exposure_workbench.auth.context import current_user_ctx
+    from exposure_workbench.services import program_service as ps
+    from sqlalchemy import text as sql
+
+    engine = create_async_engine(URL)
+    mk = async_sessionmaker(engine, expire_on_commit=False)
+    current_user_ctx.set(os.getenv("BATTERY_OWNER_ID", "user_3IDBMeAxLTbecvGorzwV7FCeroR"))
+    try:
+        async with mk() as db:
+            run_id = (await db.execute(sql(
+                "select id from exposure_runs where status = 'completed' order by as_of_date desc limit 1"))).scalar()
+            calc_id = (await db.execute(sql(
+                "select id from calc_ledger where operation = 'book.scenario' order by created_at desc limit 1"))).scalar()
+            assert run_id, "the fixture has a completed run"
+            for rid in [pid for pid in ("port_001", run_id, calc_id) if pid]:
+                out = await ps.run(db, {"let": [
+                    ["book", {"fn": "run", "portfolio": rid}],
+                    ["w", {"fn": "column", "run": "$book", "table": "issuer_exposures", "col": "weight"}],
+                    ["mv", {"fn": "pick", "of": "$book", "key": "exposure_metrics.portfolio_market_value"}]],
+                    "return": ["w", "mv"]}, invoked_by="test_v37_t4")
+                kinds = {n: d.get("kind") for n, d in (out.get("nodes") or {}).items()}
+                assert not out.get("refused"), (rid, out.get("refused"))
+                assert kinds["w"] == "vector" and kinds["mv"] == "scalar", (rid, kinds)
+            # and `which` on an id that is already one run says so rather than guessing
+            out = await ps.run(db, {"let": [["b", {"fn": "run", "portfolio": run_id, "which": "prev"}]]},
+                               invoked_by="test_v37_t4")
+            assert out.get("refused") == ["b"]
+    finally:
+        await engine.dispose()

@@ -119,17 +119,23 @@ def test_the_limits_procedure_says_a_level_is_a_fraction():
     assert "a weight is a fraction: 8% is 0.08" in " ".join(skill.PROCEDURES["book_limits_and_triggers"].desk)
 
 
-# ── T7 · a run id where the book goes is a type problem, before anything runs ──
+# ── T7 → V37/T4 · an id says what it is, and the verb reads it ────────────────
 
-def test_a_run_id_given_as_the_portfolio_is_refused_by_the_typecheck_with_the_fix():
-    """Q13's first program: run(portfolio="run_e2945c5ebd5a") — eight absences
-    downstream and a completion spent on each. The wrong kind of id is a type
-    problem, and a type problem is reported once, with the way to say it."""
+def test_a_run_id_where_the_book_goes_is_read_as_that_run():
+    """Q13's first program was run(portfolio="run_e2945c5ebd5a") — eight absences
+    downstream, a completion spent on each. V36.1 answered with a static type
+    refusal that named the rewriting; round B's analysts wrote it eleven more
+    times anyway, the hypothetical-trades analyst on both of its two attempts, in
+    a turn where that domain then filed nothing at all.
+
+    A message cannot make two vocabularies one. The lead names subjects out of the
+    BRIEFING and out of another analyst's `made`, so run_ and calc_ ids are what
+    it hands down; the verb reads whichever kind it is given, which is what
+    `_run_ref` has always done everywhere else in the language."""
     from exposure_workbench.services import program_service as ps
-    problems = ps.typecheck({"let": [["base", {"fn": "run", "portfolio": "run_e2945c5ebd5a"}],
-                                     ["w", {"fn": "column", "run": "$base", "table": "issuer_exposures", "col": "weight"}]],
-                             "return": ["w"]})
-    (p,) = [p for p in problems if p.get("at") == "base"]
-    assert p["arg"] == "portfolio" and p["got"] == "run_e2945c5ebd5a"
-    assert "which: 'run_e2945c5ebd5a'" in p["fix"] and "column(run='run_e2945c5ebd5a'" in p["fix"]
-    assert not [p for p in ps.typecheck({"let": [["base", {"fn": "run", "portfolio": "port_001"}]]}) if p.get("at") == "base"]
+    for rid in ("run_e2945c5ebd5a", "calc_7c1f2a0b9d4e", "port_001"):
+        problems = ps.typecheck({"let": [["base", {"fn": "run", "portfolio": rid}],
+                                         ["w", {"fn": "column", "run": "$base", "table": "issuer_exposures",
+                                                "col": "weight"}]],
+                                 "return": ["w"]})
+        assert not [p for p in problems if p.get("at") == "base"], rid

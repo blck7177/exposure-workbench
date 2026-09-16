@@ -415,7 +415,7 @@ RUN_DESCRIPTION = (
     "Execute one analysis program and get every figure back typed and on the ledger. A program is "
     "{let: [[name, expr], …], return?: [names]}; expr is {fn, …args}, '$name' (an earlier binding) or a "
     "literal. Reads: fundamentals(ticker, metric?, months?|start,end?|at?|last_n?) → a flow, a balance, "
-    "a series (last_n) or the whole sheet; prices(ticker, window?) → series; run(portfolio, which?=latest|prev|run_id); "
+    "a series (last_n) or the whole sheet; prices(ticker, window?) → series; run(portfolio, which?=latest|prev|run_id) — portfolio is a port_… id, or a run_… / calc_… id read as that one run; "
     "column(run, table, col) → one figure per label (issuer_exposures.weight/market_value/contribution, "
     "sector_exposures.weight, limit_checks.current_value/warning_level/breach_level, factor_attributions.beta/contribution); "
     "pick(of, key) → one figure of a run or table (exposure_metrics.portfolio_market_value; beta; adv_dollars); "
