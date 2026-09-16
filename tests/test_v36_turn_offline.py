@@ -107,8 +107,8 @@ async def test_q11_end_to_end(monkeypatch):
         tools = [{"type": "function", "function": {"name": n, "description": n, "parameters": {}}}
                  for n in sub_analyst.EVIDENCE_TOOLS]
 
-        async def call(self, name, args):
-            tool_calls.append((name, args))
+        async def call(self, name, args, *, actor=None):
+            tool_calls.append((name, args, actor))
             return _run_result(facts)
 
     def _lead_reply(n: int, messages: list[dict]):
@@ -247,10 +247,12 @@ async def test_q11_end_to_end(monkeypatch):
     names = [b["name"] for b in compiled[0]["program"]["let"]]
     assert "room_to_warning" in names and "room_to_breach" in names, \
         "the room the lead asked for is a node of the program, not a subtraction in prose"
-    assert [n for n, _ in tool_calls] == ["run"], "one program, once"
+    assert [n for n, _a, _actor in tool_calls] == ["run"], "one program, once"
     ran = [b["name"] for b in tool_calls[0][1]["program"]["let"]]
     assert "move_to_breach" in ran and "over_8pct" in ran, \
         "the analyst added what the request syntax could not say — that is why it is an analyst"
+    # V37/M1: the call says who made it, so the trace does not have to guess
+    assert [a for _n, _a, a in tool_calls] == ["sub:book_limits_and_triggers"]
 
     # — the boundary was crossed with everything accounted for —
     assert out["meta"]["delegations"][0]["coverage"] == {"asked": 4, "done": 4, "not_done": 0, "refused": 0}

@@ -201,12 +201,19 @@ async def invoke(
     args: dict,
     *,
     message_id: str | None = None,
+    actor: str | None = None,
 ) -> dict:
     """Run one LLM-driven tool call with budget + trace enforcement.
 
     Returns a structured dict always (never raises to the caller): budget
     rejections and tool errors come back as {'error': ...} and are traced, so an
     agent loop can read the failure and adapt instead of crashing.
+
+    `actor` (V37) is which agent of the turn called, for the trace only. It is
+    None for the loop that owns the turn and for every row written before V37.
+    Nothing here enforces anything with it: who may call what is the face and
+    the bearer, decided at the door (tools/mcp_server, apps/mcp/middleware), and
+    a value the caller declares about itself could not be an authorisation.
     """
     started = time.monotonic()
     _session_ctx.set(session_id)          # so calc tools stamp ledger.invoked_by
@@ -216,6 +223,7 @@ async def invoke(
         await trace_service.record_step(
             db, session_id, step_type="tool_call", tool_name=tool_name, args=args,
             result_summary=f"unknown tool {tool_name!r}", evidence_refs=[], status="error",
+            actor=actor,
         )
         return {"error": "unknown_tool", "tool": tool_name}
 
@@ -235,7 +243,7 @@ async def invoke(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
             result_summary=f"invalid arguments: {len(problems)} problem(s)", evidence_refs=[],
             status="rejected", duration_ms=int((time.monotonic() - started) * 1000),
-            message_id=message_id,
+            message_id=message_id, actor=actor,
         )
         # V27: a name that failed an enum but IS a name the desk has — a method
         # written as a metric, a filed line written as a method — is told what
@@ -272,6 +280,7 @@ async def invoke(
                 db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
                 result_summary=str(e), evidence_refs=[], status="rejected",
                 duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
+                actor=actor,
             )
             return {"error": "budget_exceeded", "kind": e.kind, "used": e.used, "limit": e.limit}
 
@@ -304,6 +313,14 @@ async def invoke(
     # failure — loud, structured, never a number shown without an identity.
     refs: list[dict] = []
     shown: list = []
+    # Every fact the call MADE, which is what both the step and the facts table
+    # record. It is a wider set than `shown` whenever the payload cap held
+    # figures back, and the two readers of a fact have to agree about it: the
+    # answer check reads the step (services/ledger), the drawer reads the table
+    # (services/ledger.record). Round B had a held-back figure cited in an
+    # accepted answer twice (Q11, Q15) — on the ledger, so the check resolved
+    # it, absent from the table, so the reader opened it and saw nothing.
+    recorded: list = []
     if status == "completed" and isinstance(result, dict) and tool.name in fa.ADAPTERS:
         try:
             shown, note, held, made = fa.adapt_all(tool.name, args, result)
@@ -321,7 +338,8 @@ async def invoke(
                 # was still computed, is still evidence, and the answer check
                 # must be able to resolve it (V33 Q15: the rank the analyst asked
                 # for was capped out of the ledger and the answer refused for it).
-                refs = [ledger_svc.step_entry(made or shown)]
+                recorded = made or shown
+                refs = [ledger_svc.step_entry(recorded)]
             else:
                 result = note
     try:
@@ -329,9 +347,12 @@ async def invoke(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
             result_summary=_summarize(result), evidence_refs=refs, status=status,
             duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
+            actor=actor,
         )
-        if shown:
-            for row in ledger_svc.rows_for(shown, session_id=session_id, step_id=step_id, message_id=message_id):
+        if recorded:
+            # `recorded`, not `shown`: the table indexes what the call made, so a
+            # figure the reader can open is every figure the check can resolve.
+            for row in ledger_svc.rows_for(recorded, session_id=session_id, step_id=step_id, message_id=message_id):
                 db.add(row)
             await db.flush()
     except Exception:  # noqa: BLE001

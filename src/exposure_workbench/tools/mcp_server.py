@@ -123,6 +123,28 @@ def build_mcp_server(
     # FIRST failure. That preempts the gate — one problem instead of all of them,
     # and no trace step at all, because invoke() is never reached. The single
     # enforcement point has to stay single.
+    def _actor() -> str | None:
+        """Which agent of the turn made this call, when the call says so (V37).
+
+        The bearer cannot carry it: a turn's lead analyst and its domain
+        analysts share one token by design (D3), because their facts have to
+        land on one ledger. So the turn is in the token and the caller is in the
+        request's metadata, and the trace answers both. A call that says nothing
+        is the loop that owns the turn, which is how every row before V37 reads.
+
+        LookupError means there is no request bound at all — a build-time test
+        calling the handler directly. That is not a turn, so it has no actor;
+        who is calling for ENFORCEMENT is still the bearer's business, verified
+        at the door, and nothing here reads this value for anything but the
+        trace.
+        """
+        try:
+            meta = server.request_context.meta
+        except LookupError:
+            return None
+        actor = getattr(meta, "actor", None) if meta is not None else None
+        return str(actor)[:64] if actor else None
+
     @server.call_tool(validate_input=False)
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
         claims = mcp_request.current()
@@ -136,7 +158,7 @@ def build_mcp_server(
         scoped = _served(claims.deny)
         async with db_factory() as db:
             result = await R.invoke(scoped, db, claims.session_id, name, arguments or {},
-                                    message_id=claims.message_id)
+                                    message_id=claims.message_id, actor=_actor())
             await db.commit()
         # isError marks a refusal as one for a client that cares, while the
         # structured payload — problems[], budget numbers, the tool's own error —

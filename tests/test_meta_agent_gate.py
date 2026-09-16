@@ -59,9 +59,11 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None, by_name: d
                 for n in sub_analyst.EVIDENCE_TOOLS]
             self.calls: list[tuple[str, dict]] = []
             self.returned: list[dict] = []
+            self.actors: list[str | None] = []
 
-        async def call(self, name, args):
+        async def call(self, name, args, *, actor=None):
             self.calls.append((name, args))
+            self.actors.append(actor)
             res = (by_name or {}).get(name, result)
             self.returned.append(res)
             return res

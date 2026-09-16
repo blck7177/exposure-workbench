@@ -25,13 +25,17 @@ Reads V35 rounds too: rows written before the `actor` column are the lead
 analyst's by definition, and in a V35 session the tool calls were the broker's
 (the session's own `request`/`digest` steps are what say so).
 
-ONE ATTRIBUTION IS INFERRED, and it is worth knowing which. A `tool_call` row is
-written by the registry wrapper, which lives behind the MCP door and is not told
-who is calling — the bearer carries the session and the message, not the actor.
-So an actor-less tool call in a V36 session is attributed to the analyst that
-spoke last, which is exact while analysts run one at a time and stops being
-exact the moment they run in parallel (Phase 3). The fix belongs in the token,
-not here; until it exists the inferred rows are marked with `~`.
+AN INFERRED ATTRIBUTION IS MARKED `~`, and since V37 there are none to mark in a
+fresh round. A `tool_call` row is written by the registry wrapper, behind the MCP
+door; through V36 that door was not told who was calling, because the bearer
+carries the turn (user, session, message) and one turn's analysts share it by
+design (D3) — their facts have to land on one ledger. So round B's hundred `run`
+rows were attributed to the analyst that spoke last, which is exact while
+analysts run one at a time and stops being exact the moment they run in parallel.
+V37/M1 moved the caller onto the CALL instead of the token: `ToolSession.call`
+sends it as request metadata and `mcp_server` writes it to the row. Rows from
+V35, V36 and V36.1 rounds still have no actor and are still inferred and marked,
+which is why the inference stays here.
 """
 from __future__ import annotations
 

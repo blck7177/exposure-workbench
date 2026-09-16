@@ -338,7 +338,7 @@ async def test_a_transport_failure_is_a_result_not_an_exception():
     from exposure_workbench.agents.tool_session import ToolSession
 
     class _Boom:
-        async def call_tool(self, name, args):
+        async def call_tool(self, name, args, *, meta=None):
             raise RuntimeError("connection died mid-call")
 
     session = ToolSession(_Boom(), [])
@@ -357,7 +357,7 @@ async def test_a_result_that_is_not_our_json_is_reported_as_one():
         content = [_Content()]
 
     class _Odd:
-        async def call_tool(self, name, args):
+        async def call_tool(self, name, args, *, meta=None):
             return _Result()
 
     out = await ToolSession(_Odd(), []).call("think", {"thought": "x"})

@@ -208,6 +208,31 @@ async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(
     assert len(recorded) == total, "the ledger records every fact the call made"
 
 
+async def test_a_held_back_figure_is_in_the_facts_table_the_reader_opens(monkeypatch):
+    """V37/T6. The step and the facts table are read by two different people —
+    the answer check reads the step (services/ledger.load), the drawer reads the
+    table (services/ledger.record) — so a fact in one and not the other is a
+    figure the check accepts and the reader cannot open. Round B did that twice:
+    Q11 and Q15 each cited a held-back figure in an accepted answer, and the
+    reader clicking it got nothing.
+
+    One set, both readers."""
+    from exposure_workbench.services import facts as F
+    log = _wire(monkeypatch)
+    db = _Db()
+    payload = {"run_id": "run_1", "as_of": "2026-09-03",
+               "figures": {f"issuer_exposures.T{i:03d}.weight": {"value": i / 1000, "unit_class": "RATIO"}
+                           for i in range(F.FACTS_PER_RESULT + 40)}}
+    tool = Tool(name="read_book", description="", json_schema={"type": "object"},
+                fn=_returning(payload), tool_class=READ)
+    out = await R.invoke(_registry(tool), db, "sess_1", "read_book", {"ref": "run_1", "names": ["x"]})
+    [(recorded)] = _facts_recorded(log)
+    on_the_step = {r["id"] for r in recorded}
+    in_the_table = {r.id for r in db.added}
+    assert len(on_the_step) == F.FACTS_PER_RESULT + 40 > len(out["facts"]["rows"])
+    assert in_the_table == on_the_step, "what the check can resolve is what the reader can open"
+
+
 def test_every_tool_on_a_face_has_a_fact_adapter():
     """V24: a tool's figures reach the model only through its adapter, so a
     read or delegation tool with none would show bare numbers. Pinned on the

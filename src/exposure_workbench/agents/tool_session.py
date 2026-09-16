@@ -116,8 +116,16 @@ class ToolSession:
         self._client = client
         self.tools = [_as_openai_tool(t) for t in mcp_tools]
 
-    async def call(self, name: str, args: dict) -> dict:
+    async def call(self, name: str, args: dict, *, actor: str | None = None) -> dict:
         """One tool call, returning what invoke() returned.
+
+        `actor` (V37) is which agent of the turn is calling, carried as request
+        metadata rather than in the bearer. It cannot be in the bearer: a turn's
+        lead analyst and its domain analysts share one token by design (D3),
+        because their facts have to land on one ledger. So the token says whose
+        turn this is and the call says who made it, and the trace can answer
+        both without a second identity. Round B's communication table had to
+        guess the caller of all one hundred `run` rows from whoever spoke last.
 
         Never raises on anything the server answers with, because invoke() does
         not and the loops are written to that contract: a tool failure is a
@@ -143,7 +151,7 @@ class ToolSession:
         loudly, at the caller.
         """
         try:
-            out = await self._client.call_tool(name, args)
+            out = await self._client.call_tool(name, args, meta={"actor": actor} if actor else None)
         except Exception as exc:  # noqa: BLE001 — see docstring
             logger.warning("tool session call %s failed: %s", name, exc, exc_info=True)
             return {"error": "tool_transport_error", "detail": str(exc)}

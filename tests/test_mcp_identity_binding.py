@@ -189,3 +189,44 @@ async def test_a_tool_handler_with_no_verified_request_behind_it_refuses_to_gues
 
     with pytest.raises(mcp_request.NoMcpRequestBound):
         await handler(types.ListToolsRequest(method="tools/list"))
+
+
+# ── V37/M1: which agent of the turn made the call ────────────────────────────
+
+async def _call_with_actor(actor: str | None) -> list:
+    """One real call through the real mount, and the step it wrote.
+
+    `db_factory=lambda: db` so the row survives the request: invoke() opens the
+    factory per call and the trace write is the only thing underneath.
+    """
+    db = RecordingDb()
+    async with mounted(_registry(), FACE_TOOLS, face_name=FACE, db_factory=lambda: db) as door:
+        async with connected(door, face_name=FACE, user_id="user_a", session_id="sess_a",
+                             message_id="msg_a") as client:
+            await client.call_tool("whoami", {}, meta={"actor": actor} if actor else None)
+    return db.added
+
+
+async def test_the_call_says_which_agent_of_the_turn_made_it():
+    """V37/M1. One turn holds a lead analyst and a domain analyst per delegated
+    task, and they share a bearer by design (D3): their facts have to land on one
+    ledger, so the token names the turn and cannot name the caller. Round B's
+    communication table therefore had to attribute all one hundred `run` calls to
+    whoever had spoken last, and said so with a `~` on every row.
+
+    The actor rides on the CALL, as request metadata, through the shipped
+    middleware and transport. It is trace only — enforcement is still the face
+    and the bearer, verified at the door — so what is asserted here is that it
+    arrives and is written down, and that the identity it travels beside is
+    untouched.
+    """
+    [step] = await _call_with_actor("sub:book_market_risk")
+    assert step.actor == "sub:book_market_risk"
+    assert (step.session_id, step.message_id) == ("sess_a", "msg_a"), "the bearer still says whose turn"
+
+
+async def test_a_call_that_names_no_actor_is_the_loop_that_owns_the_turn():
+    """None, not a guess and not a default: every row written before V37 reads
+    this way, and the lead analyst's own calls still do."""
+    [step] = await _call_with_actor(None)
+    assert step.actor is None

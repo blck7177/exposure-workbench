@@ -246,7 +246,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                                      f"them returns within your turn — file your brief and put the rest in follow_ups"}
                 else:
                     start_calls += 1
-                    raw = await ctx.tools_session.call(name, args)
+                    raw = await ctx.tools_session.call(name, args, actor=actor)
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
                     res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
                                     call={"tool": name, "args": args})
@@ -263,7 +263,7 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                                      f"calls; file your brief with what you have and say what is missing in not_done"}
                 else:
                     evidence_calls += 1
-                    raw = await ctx.tools_session.call(name, args)
+                    raw = await ctx.tools_session.call(name, args, actor=actor)
                     raw = raw if isinstance(raw, dict) else {"error": "tool_transport_error", "detail": str(raw)[:200]}
                     res = dg.render(raw, mint=minter, seen=seen, cap=settings.sub_analyst_result_chars,
                                     call={"tool": name, "args": args})
@@ -325,7 +325,19 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
                 if completions >= settings.sub_analyst_max_turns
                 else "the domain analyst stopped without filing a brief")
         entry, fact = dg.boundary(text, want=list(task.want_to_know), subject=task.subjects[0], cls="error")
-        await _record(ctx, actor, "brief", "submit", {"task_id": task.task_id}, text, facts=[fact], status="rejected")
+        # THE BOUNDARY GOES ON ITS OWN STEP, and the brief step says only that
+        # none was filed. V36.1's T1 hands the lead this fact's id and its
+        # words; `ledger.load` reads the facts of COMPLETED steps, and this one
+        # used to ride on the `brief` step, which is rejected — so the lead was
+        # invited to quote something the gate could not look up, and round B
+        # lost Q10 and Q18 to exactly that (not_on_ledger, twice each, both
+        # turns otherwise answerable). Every other boundary this analyst states
+        # is already recorded this way: the analyst did say what stopped it,
+        # which is a completed piece of work, and the brief it never filed is
+        # the rejected one.
+        await _record(ctx, actor, "boundary", "submit", {"of": "submit"},
+                      "1 boundary fact(s) stated", facts=[fact])
+        await _record(ctx, actor, "brief", "submit", {"task_id": task.task_id}, text, status="rejected")
         result.status = "refused"
         result.not_done = [{"want": i, "why": text, "boundary": fact.id, "said": fact.text}
                            for i in range(1, len(task.want_to_know) + 1)]

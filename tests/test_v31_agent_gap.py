@@ -169,7 +169,7 @@ async def test_the_L02_batch_end_to_end_sends_the_three_calls_it_used_to_hold():
     class _Session:
         def __init__(self): self.sent = []
 
-        async def call(self, name, args):
+        async def call(self, name, args, *, actor=None):
             self.sent.append(args)
             if args.get("params", {}).get("window_days") == 20:
                 return {"error": "invalid_params", "detail": "window_days is one of 21, 63, 252"}

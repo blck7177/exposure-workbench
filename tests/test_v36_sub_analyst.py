@@ -25,10 +25,12 @@ class _Tools:
     def __init__(self, by_name: dict, face=sa.EVIDENCE_TOOLS):
         self.by_name = by_name
         self.calls: list[tuple[str, dict]] = []
+        self.actors: list[str | None] = []
         self.tools = [{"type": "function", "function": {"name": n, "description": n, "parameters": {}}} for n in face]
 
-    async def call(self, name, args):
+    async def call(self, name, args, *, actor=None):
         self.calls.append((name, args))
+        self.actors.append(actor)
         r = self.by_name.get(name)
         return r(args) if callable(r) else r
 
@@ -370,6 +372,41 @@ async def test_an_analyst_that_files_nothing_still_hands_the_lead_the_desks_word
     monkeypatch.setattr(st.get_settings(), "sub_analyst_max_turns", 1, raising=False)
     r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), _Llm([("thinking", None)])))
     assert r.not_done and all(d["said"] and d["said"] == d["why"] for d in r.not_done)
+
+
+# ── V37 (round B) · T1: what the lead is handed, the ledger holds ─────────────
+
+@pytest.mark.asyncio
+async def test_the_boundary_of_an_analyst_that_files_nothing_is_on_the_ledger(monkeypatch, _no_db):
+    """Round B lost Q10 and Q18 here, and lost them to V36.1's own T1.
+
+    An analyst out of turns states one boundary — "the domain analyst did not
+    file a brief within its turns" — and T1 hands the lead its id and its
+    words, to be quoted like any other thing the desk said. The fact rode on
+    the `brief` step, whose status is `rejected` because no brief was filed,
+    and `ledger.load` reads the facts of COMPLETED steps only. So the lead
+    quoted an id the gate could not look up, twice per turn, and two otherwise
+    answerable questions ended on the gate-exhausted text.
+
+    The boundary is a completed piece of work — the analyst did say what
+    stopped it — and is recorded the way the other forty-eight of round B were.
+    What this pins is the invariant, not the arrangement: rebuild the ledger
+    from the steps the loader would read, and the id the lead was handed is on
+    it."""
+    from exposure_workbench.app_state import settings as st
+    monkeypatch.setattr(st.get_settings(), "sub_analyst_max_turns", 1, raising=False)
+
+    r = await sa.run_sub_analyst(_task(), _ctx(_Tools({}), _Llm([("thinking", None)])))
+
+    handed = {d["boundary"] for d in r.not_done}
+    assert len(handed) == 1 and r.status == "refused"
+    # the ledger as services/ledger.load builds it: the facts of completed steps
+    led = Ledger.of_facts([f for s in _no_db if s["status"] == "completed" for f in s["facts"]])
+    assert led.holds(next(iter(handed)))
+    assert all(led.kind(d["boundary"]) == F.ABSENCE for d in r.not_done)
+    # and the brief step still says no brief was filed, carrying no facts
+    brief = [s for s in _no_db if s["step_type"] == "brief"]
+    assert [s["status"] for s in brief] == ["rejected"] and not brief[0]["facts"]
 
 
 # ── V36.1 (round A) · a start is not evidence ─────────────────────────────────
