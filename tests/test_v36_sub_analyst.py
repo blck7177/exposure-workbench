@@ -18,6 +18,7 @@ import pytest
 from exposure_workbench.agents import delegation as dl, sub_analyst as sa
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.ledger import Ledger
+from tests import provider_contract
 
 
 class _Tools:
@@ -49,6 +50,7 @@ class _Llm:
         return self
 
     async def chat(self, messages, tools=None, **kw):
+        provider_contract.check(messages)
         self.seen.append({"messages": list(messages), "tools": [t["function"]["name"] for t in (tools or [])]})
         self.kwargs.append(kw)
         if not self.script:

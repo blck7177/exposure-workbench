@@ -29,6 +29,7 @@ from exposure_workbench.agents.meta_agent import handle_message
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.digest import display
 from exposure_workbench.services.ledger import Ledger
+from tests import provider_contract
 
 Q11 = ("Which position is closest to its issuer-concentration warning, how much room is left, and what percentage "
        "move in that name alone would take it to the breach tier with everything else fixed? If we capped any "
@@ -176,6 +177,7 @@ async def test_q11_end_to_end(monkeypatch):
                                                "arguments": json.dumps(payload)}}])
 
     async def _chat(messages, tools, **_kw):
+        provider_contract.check(messages)
         if delegation.DELEGATE_TOOL_NAME in [t["function"]["name"] for t in tools]:
             lead.append(list(messages))
             return _lead_reply(len(lead), messages)
@@ -309,7 +311,7 @@ async def test_a_reply_re_sent_word_for_word_does_not_spend_the_second_attempt(m
     # byte-identical and its second attempt was spent hearing the same refusal.
     bad = "The desk holds $1.23B of it."          # a figure no ledger accounts for
     same = {"replacements": [{"tag": "S1", "text": bad}]}
-    turns = [("text", bad), ("repair", same), ("repair", same), ("text", "")]
+    turns = [("text", bad), ("repair", same), ("repair", same)]
     seen: list[list[dict]] = []
     ledger = Ledger.of_facts(_rows())
 
@@ -318,6 +320,7 @@ async def test_a_reply_re_sent_word_for_word_does_not_spend_the_second_attempt(m
             return self
 
         async def chat(self, messages, tools=None, **kw):
+            provider_contract.check(messages)
             seen.append(list(messages))
             kind, payload = turns.pop(0) if turns else ("text", "")
             if kind == "text":
@@ -378,6 +381,11 @@ async def test_a_reply_re_sent_word_for_word_does_not_spend_the_second_attempt(m
     refusals = out["meta"]["gate_refusals"]
     assert refusals == ["unsourced_figure", "repeated_answer"], \
         "one refusal earned, then the turn ended because the reply stopped changing"
+    # ENDED MEANS NOTHING MORE IS ASKED (V38/A-R1). The second repeat came through
+    # repair_answer and left only the tool-call loop: with one attempt spent the
+    # lead was asked again, its repair call unanswered, and round C's Q13 ended in
+    # the provider's 400 with no reply at all.
+    assert len(seen) == 3, f"{len(seen)} completions: the turn went on after the second repeat"
     told = json.dumps([m.get("content") for m in seen[-1] if m.get("role") == "tool"])
     assert "byte-identical" in told and "1.23" in told
 

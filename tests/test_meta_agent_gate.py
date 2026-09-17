@@ -23,6 +23,7 @@ from exposure_workbench.agents import delegation, meta_agent, sub_analyst
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.ledger import Ledger
+from tests import provider_contract
 
 
 class _FakeResult:
@@ -82,7 +83,11 @@ def _stub_llm(monkeypatch, chat):
     from contextlib import asynccontextmanager
     from types import SimpleNamespace
 
-    session = SimpleNamespace(chat=chat)
+    async def _as_the_provider_reads_it(**kw):
+        provider_contract.check(kw["messages"])      # a request it would 400 fails here (V38/A-R1)
+        return await chat(**kw)
+
+    session = SimpleNamespace(chat=_as_the_provider_reads_it)
     # `for_actor` is how a domain analyst spends under its own name; here both
     # loops read the one script, which is what the turn does.
     session.for_actor = lambda _actor: session

@@ -24,6 +24,7 @@ import pytest
 
 from exposure_workbench.agents import delegation as dl, meta_agent, sub_analyst
 from exposure_workbench.services import digest as dg, facts as F
+from tests import provider_contract
 
 
 def _one_result() -> dict:
@@ -102,6 +103,7 @@ async def test_each_block_of_context_says_where_it_came_from_and_what_it_is_for(
             return self
 
         async def chat(self, messages, tools=None, **kw):
+            provider_contract.check(messages)
             seen.append({"messages": list(messages)})
             return "", None
 

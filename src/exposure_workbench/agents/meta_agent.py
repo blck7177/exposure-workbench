@@ -390,6 +390,7 @@ async def handle_message(
             messages.append(assistant_msg)
 
             if tool_calls:
+                ended = False
                 for tc in tool_calls:
                     name = tc["function"]["name"]
                     try:
@@ -425,8 +426,15 @@ async def handle_message(
                         else:
                             again = repeated.record({"text": text})
                             if again > rp.STOP:
+                                # THE SECOND REPEAT ENDS THE TURN HERE TOO (V38/A-R1),
+                                # not just this loop over tool calls. With one attempt
+                                # spent the lead used to be asked again, this call left
+                                # without its tool message, and the provider refused
+                                # the request: round C's Q13 ended in a 400 and the
+                                # reader got no reply. Nothing is asked after this.
                                 gate_refusals.append("repeated_answer")
                                 answer, standing = text, verdict
+                                ended = True
                                 break
                             if again < rp.STOP:
                                 # a repeat earns no attempt and logs no second
@@ -451,7 +459,7 @@ async def handle_message(
                     # tool result unwrap one, to say what the payload can say.
                     _append({"role": "tool", "tool_call_id": tc["id"],
                              "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
-                if reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:
+                if ended or reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:
                     break
                 continue
 

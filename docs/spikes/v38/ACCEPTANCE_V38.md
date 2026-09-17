@@ -3,7 +3,7 @@
 > 计划：`docs/IMPLEMENTATION_PLAN_V38.md`（12 条）。起点 HEAD `0986dca`，离线 2603 passed。
 > 提交：`02180ef`（计划与工具层分析）→ `aa78c83`（Phase A）→ `855f4f6`（Phase B）→ `297a436`（Phase C）→ 本记录。均未 push。
 > 离线：2603 → **2643 passed** / 11 skipped / 314 deselected。
-> 未跑 D 轮：它等 A-R1 崩溃修复（本计划不含）和模型拍板；执行脚本 `tools/phase_d.sh` 已备好，比 C 轮多一步 v5 remap。
+> 未跑 D 轮：它等 A-R1 崩溃修复（本计划不含，9/17 已修，见 §4）和模型拍板；执行脚本 `tools/phase_d.sh` 已备好，比 C 轮多一步 v5 remap。
 
 ## 0. 结论
 
@@ -108,3 +108,23 @@ SP=docs/spikes/v38/tools
 .venv/bin/python $SP/live_checks.py --db exposure_battery_v38      # 9/13 快照 + v36 迁移 + remap --apply --db
 .venv/bin/python scripts/unmapped_family_concepts.py --db exposure_battery_v38
 ```
+
+## 4. 9/17 补记
+
+### A-R1：修复分支第二次原样重发，结束本轮
+
+- **缺陷**：`meta_agent` 的修复分支里，同一回答第二次原样重发（`again > STOP`）时，`break` 只跳出工具调用循环。
+  - 这时 `attempts` 仍为 1，外层循环照常再请求模型，而那个 `repair_answer` 调用没有配 tool 消息。
+  - provider 返回 400，本轮以异常结束，读者收不到回复（C 轮 mini Q13）。
+- **修复**：这一处记下 `ended`，工具循环结束后与「已接受」「次数用完」一起结束外层循环，之后不再请求模型。
+  - 与普通回复分支一致：本轮以 gate 用尽的文字结束，`gate_refusals` 末尾是 `repeated_answer`。
+- **离线测试为什么没抓到**：脚本化模型接受任何消息列表。
+  - 新增 `tests/provider_contract.py`，按 provider 的两条规则检查每次请求：带 `tool_calls` 的 assistant 消息之后，必须先给每个调用一条 tool 消息；tool 消息必须回应它前面那条 assistant 消息的调用。
+  - 四个文件里的脚本化 `chat` 都先过这道检查：`test_meta_agent_gate._stub_llm`（`test_v31_agent_gap` 也用它）、`test_v36_turn_offline`（两处）、`test_v36_sub_analyst`、`test_v37_context_labels`。
+- **先红后绿**：接上检查、代码未改时，85 条循环测试只有 `test_a_reply_re_sent_word_for_word_does_not_spend_the_second_attempt` 失败，报的正是 Q13 的请求形状（`['r1'] not answered`）。
+  - 这条测试原来能过，是因为第三次 completion 之后循环又问了三次模型，脚本化模型照答。
+  - 修复后它断言本轮只有 3 次 completion。
+- **其余循环没有同样的缺陷**：`sub_analyst` 每个调用都先补 tool 消息，`done` 在工具循环结束后才生效；`batch.dispatch` 每个调用给一条结果。两处在检查下都通过。
+- **离线**：2643 → **2647 passed**（新增 `tests/test_v38_provider_contract.py` 4 条）。
+
+D 轮的前置剩下模型拍板和额度探针。

@@ -3,8 +3,8 @@
 # credit preflight -> freeze -> stop/restore/migrate/serve -> 20 questions ->
 # communication tables, counters, answers, audit -> freeze check.
 # Nothing under src/ tests/ scripts/ is written; round artefacts go to docs/spikes/v38/.
-# NOT RUN by V38: round D waits on the A-R1 fix (meta_agent repair branch) and the
-# model decision. The one step added to round C's procedure is the v5 remap after
+# NOT RUN by V38: round D waits on the model decision (the A-R1 fix to the
+# meta_agent repair branch landed 9/17). The one step added to round C's procedure is the v5 remap after
 # the restore (V38/S3: the snapshot predates the two debt-and-lease lines).
 set -uo pipefail
 cd /home/ubuntu/exposure-workbench
