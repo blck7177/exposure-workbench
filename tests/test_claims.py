@@ -314,21 +314,18 @@ def test_the_claim_schema_does_not_invite_what_the_gate_refuses():
     assert set(props) == {"id", "relation", "of", "against", "rows", "span", "title"}
 
 
-def test_a_superlative_refusal_names_the_binding_it_would_rank(led):
+def test_a_superlative_refusal_says_what_to_do_in_words_the_writer_has(led):
     """Superlatives without a computed ordering are flat across every arm and both
-    protocols (V26: 37 / 36 / 37 per 140 turns). The generic sentence has not moved
-    it, so the refusal names the node the ordering would be built from."""
+    protocols (V26: 37 / 36 / 37 per 140 turns). Until V1 the refusal named the
+    program node the ordering would be built from ('{"fn": "rank", "of": "$w"}');
+    the program language is gone and the writer of a brief holds verbs, so the
+    refusal says what is needed and names no node."""
     l, ids = led
-    jpm = _id(ids, "issuer_exposures.weight", "JPM")          # entry 'JPM' of node 'w', no rank
+    jpm = _id(ids, "issuer_exposures.weight", "JPM")          # a weight nobody ranked
     v = C.check({"claims": [{"id": "c1", "relation": "rank", "of": jpm}], "prose": ["The biggest is {c1}."]}, l)
     assert v.problems[0]["reason"] == "no_ordering"
     d = v.problems[0]["detail"]
-    assert "'JPM' of node $w" in d and '{"fn": "rank", "of": "$w"}' in d, d
-    # a fact with no node/label still gets the general sentence
-    lone = _f(F.SCALAR, "free_cash_flow", subject="MSFT", unit="MONEY", value=1.0, as_of="2026-06-30")
-    l2 = Ledger.of_facts([lone])
-    v = C.check({"claims": [{"id": "c1", "relation": "rank", "of": lone.id}], "prose": ["{c1}"]}, l2)
-    assert "A superlative rests on a rank node" in v.problems[0]["detail"]
+    assert "Have the figures ranked first, and claim the ranked row" in d and "node" not in d and '"fn"' not in d, d
     # the accepted case is unchanged: an entry of a rank node carries its rank
     msft = _id(ids, "issuer_exposures.weight", "MSFT")
     _ok(C.check({"claims": [{"id": "c1", "relation": "rank", "of": msft}], "prose": ["The biggest is {c1}."]}, l))

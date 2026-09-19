@@ -238,14 +238,15 @@ async def test_a_held_back_figure_is_in_the_facts_table_the_reader_opens(monkeyp
 def test_every_tool_on_a_face_has_a_fact_adapter():
     """V24: a tool's figures reach the model only through its adapter, so a
     read or delegation tool with none would show bare numbers. Pinned on the
-    real faces; the reflection and the two gates are the deliberate no-fact
+    real faces; the reflection and the brief's gate are the deliberate no-fact
     adapters."""
     from exposure_workbench.services import fact_adapters as fa
     from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
     for reg in (build_meta_registry(), build_research_registry()):
         missing = sorted(n for n in reg.tools if n not in fa.ADAPTERS)
         assert missing == [], f"tools with no fact adapter: {missing}"
-    assert fa.ADAPTERS["think"] is fa.no_facts and fa.ADAPTERS["respond"] is fa.no_facts
+    assert fa.ADAPTERS["think"] is fa.no_facts and fa.ADAPTERS["submit_brief"] is fa.no_facts
+    assert "respond" not in fa.ADAPTERS          # V1: the chat exit is gone; the lead's reply is prose
 
 
 # ── schemas, faces, redaction ─────────────────────────────────────────────────

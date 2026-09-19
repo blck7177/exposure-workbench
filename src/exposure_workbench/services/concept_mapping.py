@@ -326,7 +326,9 @@ _METRIC_CONCEPTS: dict[str, tuple[str, ...]] = {
     # variant; zero overlap in issuers, so zero overlap in periods), so no
     # series can switch basis and no last-filed-wins is possible. The residual
     # semantic gap — the broader tag may include preferred/NCI dividends where
-    # the variant is common-only — is stated in semantics.METRICS, not hidden.
+    # the variant is common-only — was stated in analytics/semantics.METRICS, a
+    # table of per-line notes nothing had read since V23; it was removed with the
+    # rest of the dead code on 2026-09-19, so today nothing tells the reader this.
     "dividends_paid": (
         "PaymentsOfDividends",
         "PaymentsOfDividendsCommonStock",

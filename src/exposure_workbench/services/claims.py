@@ -55,13 +55,15 @@ from exposure_workbench.services.ledger import Ledger
 
 RELATIONS = ("level", "tier", "change", "versus", "ratio", "rank", "room", "absent", "quote", "series", "table")
 
-# THE statement of what a number in prose may be (V30; supersedes gate.PROSE_RULE
-# for the chat exit). Handed to the model verbatim: the system prompt and
-# respond's description import it.
+# THE statement of what a number in prose may be (V30). Handed to the model verbatim:
+# the research session's system text and submit_brief's description import it. (It was
+# the chat exit's rule too until V1, when `respond` went and the lead's reply became
+# prose checked by services/answer_check.)
 PROSE_RULE = ("Write {cN} in the prose where claim cN's figure goes; the reader sees the fact's value with its "
               "identity. A number you write out yourself is accepted only when the ledger accounts for it — a "
               "fact's value, its date or window, a quoted passage's words, or a figure from the user's own "
-              "question. A figure you worked out yourself has no fact: run a program for it.")
+              "question. A figure you worked out yourself has no fact: have the desk compute it, and claim "
+              "the figure it returns.")
 
 # Tier columns: a figure whose measure ends with one of these is a threshold the
 # mandate set, never a reading of the book (X15: "already at 20.0%" was the
@@ -171,7 +173,7 @@ def validate_shape(answer) -> list[dict]:
             elif len({len(r) for r in rows}) != 1:
                 p.append({"at": at, "reason": "row_width_mismatch"})
         elif rel == "absent" and not c.get("of"):
-            p.append({"at": at, "reason": "claim_without_of", "detail": "absent: point at the absence fact (of=f_…) — a refused program node's fact (in the run's facts), or a describe not_held / cannot entry. "
+            p.append({"at": at, "reason": "claim_without_of", "detail": "absent: point at the absence fact (of=f_…) — the row a refusal came back as, or one of the desk's standing policies. "
                                                                         "An absence the ledger holds no fact for is not a claim: say it in the prose in your own words, with no {cN} (a claim is what the desk said; the prose is what you say)"})
         elif not isinstance(c.get("of"), str) or not c["of"]:
             p.append({"at": at, "reason": "claim_without_of", "detail": f"a {rel} claim points at a fact: of=f_…"})
@@ -243,7 +245,7 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
         # at a filing passage (`level` on 10-K Item 7). The passage holds words, not
         # a figure, and the relation that fits is the one that carries the words.
         return {"reason": "kind_does_not_fit", "detail": f"{rel}: {of} is a passage of a filing, which holds words and no figure — "
-                                                        f"state it with relation 'quote' and the words verbatim in `span`; a figure from it is read with a program"}
+                                                        f"state it with relation 'quote' and the words verbatim in `span`; a figure the filing states only in words is quoted, never computed"}
     if rel == "level":
         if kind == F.SERIES:
             return None                       # a series' latest reading is a reading; the chip shows it with its period
@@ -264,8 +266,8 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
             # V30 C2 (N12): "the desk has no completed run for port_1" passed as text
             # over a misspelled id. An absence is a fact the desk produced, like
             # any other claim's; the reader is not told one the desk did not say.
-            return {"reason": "absence_unsourced", "detail": "absent: `of` is the absence fact — a refused program node (its f_… is in the run's facts), "
-                                                          "or a describe not_held / cannot entry; an absence with no fact is a guess"}
+            return {"reason": "absence_unsourced", "detail": "absent: `of` is the absence fact — the row a refusal came back as, or one of the desk's "
+                                                          "standing policies; an absence with no fact is a guess"}
         if kind != F.ABSENCE:
             # V30 C3: nine of these. Every refusal names the relation that fits, as
             # the passage and the change refusals above already do.
@@ -296,16 +298,13 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
             return {"reason": "unit_does_not_fit", "detail": f"ratio: {of} is {rec.get('unit')} and was not divided; state it as a level"}
         return None
     if rel == "rank":
-        if kind != F.SCALAR or "rank" not in params:
+        # V1: a ranked row carries its `place` among `of` (fact_adapters._ranked); rows stored
+        # before V1 carry `rank`. Either is a place in an ordering the desk built.
+        if kind != F.SCALAR or not ("rank" in params or isinstance(params.get("place"), int)):
             # 37 superlatives a battery rest on no ordering, in every arm and both
-            # protocols (V26 R2 37, R3 36, C3 37). The generic sentence has not moved
-            # it, so the refusal names the binding the ordering would be built from:
-            # the fact knows which node it is an entry of.
-            node, label = params.get("node"), params.get("label")
-            how = (f' The figure is entry {label!r} of node ${node}: add {{"fn": "rank", "of": "${node}"}} '
-                   f'(or "top" with n) to the program and claim its entry.' if node and label else
-                   f' A superlative rests on a rank node: compute {{"fn": "rank", "of": <the vector>}} first.')
-            return {"reason": "no_ordering", "detail": f"rank: the fact must be an entry of a computed ordering (fn rank / top); {of} carries no rank.{how}"}
+            # protocols (V26 R2 37, R3 36, C3 37). The refusal says what to do about it.
+            return {"reason": "no_ordering", "detail": f"rank: the fact must be an entry of an ordering the desk built; {of} carries no place. "
+                                                       f"Have the figures ranked first, and claim the ranked row."}
         return None
     if rel == "room":
         measure = rec.get("measure") or "" if rec else ""
@@ -344,11 +343,11 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
             against = _rec(led, c.get("against"))
             base = (rec.get("measure") or "").rsplit(".", 1)[0]
             if not against or against.get("kind") != F.SCALAR:
-                return {"reason": "kind_does_not_fit", "detail": f"change: {of} already is the move (a {params.get('op')} node) — leave `against` out, "
+                return {"reason": "kind_does_not_fit", "detail": f"change: {of} already is the move (a {params.get('op')} figure) — leave `against` out, "
                                                                f"or make it the earlier reading of {base} it moved from (a scalar, f_…@period)"}
             if against.get("id") == rec.get("id") and against.get("as_of") == rec.get("as_of"):
                 # V30 C2 (N01 t2): rendered "6.50% (2026-01-25) from 6.50% (2026-01-25)"
-                return {"reason": "same_figure", "detail": f"change: `against` is {of} itself; a {params.get('op')} node needs no `against` — "
+                return {"reason": "same_figure", "detail": f"change: `against` is {of} itself; a {params.get('op')} figure needs no `against` — "
                                                           f"leave it out, or point it at the earlier reading of {base}"}
             if against.get("measure") not in (base, rec.get("measure")) or (against.get("subject") or None) != (rec.get("subject") or None):
                 return {"reason": "different_measures", "detail": f"change: {of} is {rec.get('subject')} {rec.get('measure')}; `against` is "
@@ -356,7 +355,7 @@ def _check_relation(c: dict, led: Ledger) -> dict | None:
             return None
         against = _rec(led, c.get("against"))
         if kind != F.SCALAR or not against or against.get("kind") != F.SCALAR:
-            return {"reason": "no_two_readings", "detail": "change: two readings of one measure (of = later, against = earlier; a series point is f_…@period), a series, or a yoy/qoq/subtract node"}
+            return {"reason": "no_two_readings", "detail": "change: two readings of one measure (of = later, against = earlier; a series point is f_…@period), a series, or a yoy/qoq/subtract figure"}
         if not _same_measure(rec, against):
             # C3: six "rolling_vol_30d against rolling_vol_60d" — two measures of one subject is a versus, and the refusal says so
             return {"reason": "different_measures", "detail": f"change: {rec.get('subject')} {rec.get('measure')} against {against.get('subject')} {against.get('measure')} are not one measure of one subject at two dates; "
@@ -564,7 +563,8 @@ def _runs_for(c: dict, led: Ledger) -> list:
         m = (rec.get("measure") or "").rsplit(".", 1)[-1].replace("_level", "").replace("limit_value", "limit")
         return [f"the {m} tier of ", {"fact": A.fill(rec)}]
     if rel == "rank":
-        r = (rec.get("params") or {}).get("rank")
+        p = rec.get("params") or {}
+        r = p.get("place") if isinstance(p.get("place"), int) else p.get("rank")
         return [{"fact": A.fill(rec)}, f" (#{r})"] if r else [{"fact": A.fill(rec)}]
     if rel == "table":
         return ["the table below"]

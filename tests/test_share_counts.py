@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import importlib
 
-from exposure_workbench.analytics import semantics as sm
 from exposure_workbench.services import concept_mapping as cm
 
 _V4_METRICS = (
@@ -54,18 +53,6 @@ def test_duplicate_claim_guard_survives_v4():
     for metric, concepts in cm._METRIC_CONCEPTS.items():
         for c in concepts:
             assert cm._CONCEPT_TO_METRIC[c] == metric
-
-
-def test_three_share_counts_are_mutually_do_not_combine():
-    """Weighted-diluted, weighted-basic and point-in-time outstanding are three
-    quantities wearing one word. The model may arrive at any of the three first,
-    so every one must name the other two."""
-    counts = ("shares_diluted_weighted", "shares_basic_weighted", "shares_outstanding")
-    for name in counts:
-        s = sm.METRICS.get(name)
-        assert s is not None, name
-        others = set(counts) - {name}
-        assert others <= set(s.do_not_combine_with), f"{name}: missing {others - set(s.do_not_combine_with)}"
 
 
 def test_us_gaap_concepts_normalize_to_their_metric():

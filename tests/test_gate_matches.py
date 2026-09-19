@@ -136,26 +136,25 @@ def test_neither_entry_point_mutates_the_evidence_it_was_given(fn):
     assert values == before
 
 
-def test_the_respond_gate_returns_what_the_resolver_accepted():
-    """Read off the tool, because this is the seam the UI depends on.
+def test_the_claims_exit_returns_what_the_gate_accepted():
+    """Read off the exit, because this is the seam the UI depends on.
 
-    V15-S4: the gate no longer reads figures out of a sentence and matches them.
-    The verified matches come from the one resolver — `_respond_blocks` hands
-    the blocks to `resolver.resolve` and returns `resolver.accepted(...)`, whose
-    `verified` carries a count and a match per slot on every accepted path,
-    including an answer with no slots at all (zero, not an absent field, so the
-    badge can say "0 figures checked" rather than disappearing).
+    The verified matches come from the one gate: `verified` carries a count and a
+    match per figure on every accepted path, including an answer with no figures
+    at all (zero, not an absent field, so the badge can say "0 figures checked"
+    rather than disappearing). V1: the chat exit `respond` is gone (the lead
+    writes prose, checked by services/answer_check); the claims exit that remains
+    is the research brief's, and it still must not run a second checker.
     """
     import inspect
 
-    from exposure_workbench.services import gate, ledger
-    from exposure_workbench.tools import meta_tools
+    from exposure_workbench.services import ledger
+    from exposure_workbench.tools import research_tools
 
     from exposure_workbench.services import claims
-    body = inspect.getsource(meta_tools._respond_claims)
-    assert "claims_mod.check(" in body
-    assert "return {\"responded\": True, \"format\": \"blocks\", **claims_mod.accepted(answer_, verdict, led)}" in body
-    assert "verify_with_matches" not in inspect.getsource(meta_tools), (
+    body = inspect.getsource(research_tools)
+    assert "claims.check(" in body and "claims.accepted(" in body
+    assert "verify_with_matches" not in body, (
         "the exit must not run the prose checker: a second judgement beside the "
         "gate's is free to disagree with it"
     )

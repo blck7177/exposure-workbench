@@ -245,9 +245,13 @@ _RETIRED = re.compile(
     r"\b(read_fundamentals|read_prices|read_book|read_filings|search_web|run_program|submit_report|describe_issuer)\b"
     r"|\b(compute|describe|run|delegate)\((?!\))"
     r"|\bfundamentals\(|\bmethod\(name|\ba [a-z_]+\(…[^)]*\) node\b|\{'fn':"
-    r"|\bparams\.(by|factor)\b|\bcall describe\b|\bdescribe lists\b|\bcompare: rank\b")
-# dead modules kept only until the boss rules on deleting them (docs/IMPLEMENTATION_PLAN_V1.md §5)
-_EXEMPT = {"tools/meta_tools.py", "analytics/semantics.py", "services/claims.py"}
+    r"|\bparams\.(by|factor)\b|\bcall describe\b|\bdescribe lists\b|\bcompare: rank\b"
+    r"|\bprogram node\b|\brun a program\b|\bto the program\b|\bdescribe not_held\b|\b(rank|yoy|qoq|subtract) node\b")
+# No module is exempt. Three were, on the claim that they were dead: two were (the chat exit
+# in tools/meta_tools.py and analytics/semantics.py, deleted 2026-09-19) and one was not —
+# services/claims.py is the research brief's exit, and its refusals were still sending a
+# research agent that holds verbs to "a refused program node" and "a describe entry".
+_EXEMPT: set[str] = set()
 
 
 def _sentences(path: pathlib.Path):
@@ -586,3 +590,32 @@ async def test_a_price_measure_asked_of_a_book_says_whose_the_question_is(monkey
     f = fa.refusal_fact("metric", {"name": "price.drawdown", "subject": "port_001"}, out)
     assert f.means["reason"] == "not_on_this_face" and "risk analyst" in f.means["way_out"]
     assert "holds" not in f.text                       # never "the desk holds no prices for this book"
+
+
+
+# ── after the dead code went (2026-09-19) ────────────────────────────────────
+
+def test_a_row_the_desk_ranked_is_a_rank_claim_in_the_brief_too():
+    """`_ranked` renamed a ranked row's `rank` to `place` (among `of`), and the claims
+    gate — the research brief's exit, which was thought dead and is not — still looked
+    for `rank` only: every rank claim over a V1 ranked row would have been refused."""
+    from exposure_workbench.services import claims as C
+    ranked = F.fact(F.SCALAR, "gross_margin", subject="MSFT", unit="RATIO", value=0.69, as_of="2026-03-31",
+                    params={"op": "rank", "place": 1, "of": 4, "direction": "highest"})
+    plain = F.fact(F.SCALAR, "gross_margin", subject="AAPL", unit="RATIO", value=0.46, as_of="2026-03-28")
+    led = _ledger_with(ranked, plain)
+    assert C._check_relation({"relation": "rank", "of": ranked.id}, led) is None
+    refused = C._check_relation({"relation": "rank", "of": plain.id}, led)
+    assert refused["reason"] == "no_ordering" and "ranked" in refused["detail"] and "node" not in refused["detail"]
+    assert C._runs_for({"relation": "rank", "of": ranked.id}, led)[1] == " (#1)"
+
+
+def test_a_place_in_a_lowest_first_ordering_is_counted_from_the_other_end():
+    from exposure_workbench.services import answer_check as AC
+    low = F.fact(F.SCALAR, "price.volatility", subject="KO", unit="RATIO", value=0.14, as_of="2026-09-10",
+                 params={"op": "rank", "place": 1, "of": 9, "direction": "lowest"})
+    led = _ledger_with(low)
+    assert not [p for p in AC.check(f"KO has the lowest volatility of the nine at 14.0% [{low.id}].", led).problems
+                if p["reason"] == "superlative_without_rank"]
+    assert [p for p in AC.check(f"KO has the highest volatility of the nine at 14.0% [{low.id}].", led).problems
+            if p["reason"] == "superlative_without_rank"]

@@ -261,7 +261,8 @@ MIN_WORDS = frozenset("smallest lowest least bottom weakest narrowest shortest".
 
 
 def _ordered(rec: dict) -> bool:
-    if "rank" in (rec.get("params") or {}):
+    params = rec.get("params") or {}
+    if "rank" in params or isinstance(params.get("place"), int):
         return True
     parts = set(re.split(r"[^A-Za-z0-9]+", (rec.get("measure") or "").lower())) | ({"first"} if "[0]" in (rec.get("measure") or "") else set())
     return bool(parts & _ORDER_WORDS)
@@ -707,6 +708,8 @@ def _place_fits(words: set[str], rec: dict, ordinal: int | None = None) -> bool:
     place, of = p.get("place"), p.get("of")
     if not isinstance(place, int) or not isinstance(of, int):
         return _ordered(rec)
+    if p.get("direction") == "lowest":
+        place = of - place + 1          # an ordering built lowest-first counts its places from the other end
     want_max, want_min = bool(words & MAX_WORDS), bool(words & MIN_WORDS)
     if ordinal is not None:
         if want_max and not want_min:

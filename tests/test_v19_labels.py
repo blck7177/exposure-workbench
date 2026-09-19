@@ -21,7 +21,9 @@ from exposure_workbench.services import evidence_resolver_service as ev
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.tools import definitions, faces
 from exposure_workbench.tools.arg_validation import validate_args
-from exposure_workbench.tools.meta_tools import RESPOND_SCHEMA
+# the claims grammar, which the research brief's sections are written in (V1: the chat exit
+# `respond` that also used it is gone; the grammar and these rules about it are not)
+from exposure_workbench.services.claims import ANSWER_SCHEMA as RESPOND_SCHEMA
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
 

@@ -13,9 +13,9 @@ expenditure", `commercial_paper` -> "Commercial paper" (not "Commercial Paper"),
 income" are not. A formatter that is right most of the time is worse than a table
 here, because the cases it gets wrong are the ones a reader stops on.
 
-WHAT IS NOT HERE. Nothing that carries meaning beyond the name. The semantics —
-which metric supersedes which, what may not be added to what — belong to
-analytics/semantics.py and are the agent's; these are captions.
+WHAT IS NOT HERE. Nothing that carries meaning beyond the name. What a measure is
+and how it reads belongs to the registry (analytics/registry.py); what may not be
+added to what is enforced by the typed calculator; these are captions.
 
 THE GUARD. tests/test_display_names.py derives the required key sets from their
 sources — concept_mapping.SUPPORTED_METRICS, the recipe's own labels,

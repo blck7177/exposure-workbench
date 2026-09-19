@@ -29,8 +29,11 @@ a fact's parameter, a form name is a passage's — and a token the ledger
 cannot account for is refused with the three ways out: compute it, cite the
 passage that states it, or drop it (IMPLEMENTATION_PLAN_V24 §6.2, §7).
 
-Both exits resolve here: respond (tools/meta_tools.py) and submit_brief
-(tools/research_tools.py).
+The blocks of a stored answer resolve here. Until V1 two exits did: `respond`
+(the chat exit, removed with the meta tool face) and submit_brief
+(tools/research_tools.py), which still does through services/claims. The lead's
+prose reply is checked by services/answer_check, which shares this module's
+quotation and figure rules.
 """
 
 from __future__ import annotations

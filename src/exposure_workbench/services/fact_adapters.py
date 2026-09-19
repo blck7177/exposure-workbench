@@ -1110,7 +1110,6 @@ ADAPTERS: dict[str, Adapter] = {
     "filings_search": read_filings, "filings_section": read_filings, "web_search": search_web,
     "start": start,
     "think": no_facts,
-    "respond": no_facts,
     "submit_brief": no_facts,
 }
 

@@ -1,29 +1,23 @@
-"""Meta-agent-face tools (M10) — delegation + the respond gate.
+"""Background work a desk verb may start (`start`, tools/primitives.py).
 
-Delegation tools only ENQUEUE (non-blocking): they return a run/task id
-immediately, never wait for completion, so the meta-agent stays responsive and
-the heavy work runs on the worker. respond is the meta-agent's exit: an answer
-is blocks (services/answer.py), and every pointer in it is checked against the
-session's ledger by the one gate (services/gate.py) — submit_brief goes
-through the same function.
+Each function only ENQUEUES: it returns a run or task id at once and never waits,
+so the turn stays responsive and the heavy work runs on the worker.
+
+This module was "the meta-agent's tools" until V1: the `start` registration for the
+old meta face and `respond`, the chat exit built on the claims grammar. The lead
+holds no tool face now (agents/meta_agent.py: ask, open, repair_answer) and its
+reply is natural prose checked by services/answer_check.py, so both are gone. The
+claims grammar itself is alive — it is the research brief's exit
+(tools/research_tools.submit_brief).
 """
 
 from __future__ import annotations
 
-import logging
-
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.auth.context import current_user_id
-from exposure_workbench.db.models import Company
 from exposure_workbench.services import company_service, research_run_service, task_service, usage_service
-from exposure_workbench.services import answer, claims, gate, ledger
-from exposure_workbench.tools.registry import (
-    DELEGATION, GATE, Tool, ToolRegistry, current_session_id,
-)
-
-logger = logging.getLogger(__name__)
+from exposure_workbench.tools.registry import current_session_id
 
 
 # ── delegation (enqueue-only, non-blocking) ─────────────────────────────────────
@@ -164,46 +158,15 @@ async def _start_exposure_run(db: AsyncSession, portfolio_id: str, reason: str,
     return {"enqueued": True, "run_id": run.id, "kind": "exposure_update", "reason": reason}
 
 
-# ── respond gate (V24) ──────────────────────────────────────────────────────────
-
-async def _respond_claims(db: AsyncSession, claims: list, prose: list) -> dict:
-    """The exit (V30): claims typed against the facts they point at, prose whose
-    digits account to the ledger (services/claims.py). The ledger is read as
-    recorded; nothing here rebuilds anything."""
-    led = await ledger.load(db, current_session_id())
-    from exposure_workbench.services import claims as claims_mod
-    answer_ = {"claims": claims, "prose": prose}
-    verdict = claims_mod.check(answer_, led, question=await _question(db, current_session_id()))
-    if not verdict.ok:
-        return verdict.as_refusal()
-    return {"responded": True, "format": "blocks", **claims_mod.accepted(answer_, verdict, led)}
-
-
-async def _question(db: AsyncSession, session_id: str) -> str | None:
-    """The user's message this turn answers — the latest user row of the session."""
-    from exposure_workbench.db.models import AgentMessage
-    row = (await db.execute(
-        select(AgentMessage.content).where(AgentMessage.session_id == session_id, AgentMessage.role == "user")
-        .order_by(AgentMessage.created_at.desc()).limit(1))).first()
-    return row[0] if row else None
-
-
-# The exit's grammar, as schema (Law B): services/answer.py owns the block
-# shapes; the brief's sections reuse the same list.
-BLOCK_SCHEMAS = answer.BLOCK_SCHEMAS
-RESPOND_SCHEMA = claims.ANSWER_SCHEMA
-
-
-# ── registration ────────────────────────────────────────────────────────────────
+# ── the one door ────────────────────────────────────────────────────────────────
 
 _START_KINDS = ("readiness", "research", "exposure_run")
 
 
 async def _start(db: AsyncSession, kind: str, subject: str, reason: str,
                  as_of_date: str | None = None) -> dict:
-    """One delegation tool (V23): readiness for an issuer, a research run for an
-    issuer, an exposure run for a portfolio. Each returns an id immediately and
-    the work runs in the background; read_book(id, ['state']) follows it."""
+    """Readiness for an issuer, a research run for an issuer, an exposure run for a
+    portfolio. Each returns an id immediately and the work runs in the background."""
     if kind == "readiness":
         return await _ensure_company_ready(db, subject, reason)
     if kind == "research":
@@ -211,39 +174,3 @@ async def _start(db: AsyncSession, kind: str, subject: str, reason: str,
     if kind == "exposure_run":
         return await _start_exposure_run(db, subject, reason, as_of_date)
     return {"error": "unknown_kind", "kind": kind, "known": list(_START_KINDS)}
-
-
-def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
-    reg.register(Tool(
-        name="start",
-        display="Starting {kind} for {subject}",
-        description=(
-            "Start background work and return its id at once: readiness (ingest, index and price an "
-            "issuer — any listed SEC filer, prepared in a couple of minutes), research (an Issuer Risk "
-            "Brief), exposure_run (a portfolio run on the book AS IT IS, on the last completed session "
-            "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is the "
-            "scenario verb, which answers at once). Never blocks; tell the user it is being prepared."
-        ),
-        json_schema={"type": "object", "properties": {
-            "kind": {"type": "string", "enum": list(_START_KINDS)},
-            "subject": {"type": "string", "description": "a ticker (readiness, research) or a port_… id (exposure_run)"},
-            "reason": {"type": "string", "description": "why this work is needed now"},
-            "as_of_date": {"type": ["string", "null"], "description": "YYYY-MM-DD; exposure_run only; omit unless asked"},
-        }, "required": ["kind", "subject", "reason"], "additionalProperties": False},
-        fn=_start, tool_class=DELEGATION,
-    ))
-    reg.register(Tool(
-        name="respond",
-        display="Checking every claim against its facts, then answering",
-        description=(
-            "Reply to the user. An answer is CLAIMS and PROSE. Each claim states one relation over facts you were "
-            "shown (f_… ids): level (a reading), tier (a warning/breach/limit level, said as one), change (of = later reading, against = earlier; or a yoy/qoq/subtract "
-            "node, or one series), versus (one measure on two subjects, of against against), ratio (a divided or ratio-method figure), rank (an entry of a rank/top node), room (a check's "
-            "current_value against its warning or breach tier), absent (an absence fact), quote (a passage + the "
-            "verbatim span), series (a chart), table (rows of scalar facts). " + claims.PROSE_RULE + " "
-            "A claim whose relation its facts do not fit is refused with the reason; a number the ledger cannot account for is refused."
-        ),
-        json_schema=RESPOND_SCHEMA,
-        fn=_respond_claims, tool_class=GATE,
-    ))
-    return reg

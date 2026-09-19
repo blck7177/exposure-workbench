@@ -28,12 +28,12 @@ def _names(rel: str) -> set[str]:
             if t.type == tokenize.NAME}
 
 
-def test_both_exits_resolve_through_the_one_resolver():
-    """V24: the one resolver is services/gate.check; both exits call it and
-    both hand its verdict to gate.accepted."""
-    # V31: both exits check CLAIMS. The brief was the last thing checked by a
-    # second grammar, and one grammar with one gate is the standing rule.
-    for rel, mod in (("tools/meta_tools.py", "claims_mod"), ("tools/research_tools.py", "claims")):
+def test_the_claims_exit_resolves_through_the_one_gate():
+    """V24: one gate, and an exit hands its verdict to that gate's `accepted`."""
+    # V31: the brief checks CLAIMS. V1: the chat exit that also did (`respond`,
+    # tools/meta_tools) is gone — the lead writes prose, checked by
+    # services/answer_check — so the brief's is the one claims exit left.
+    for rel, mod in (("tools/research_tools.py", "claims"),):
         src = _src(rel)
         assert f"{mod}.check(" in src and f"{mod}.accepted(" in src, f"{rel} does not go through the gate"
         assert "resolver." not in src, f"{rel} still reaches the V15 resolver"
@@ -47,7 +47,7 @@ def test_standalone_is_decided_by_the_adapter_and_read_by_the_gate_only():
     carries it onto the Fact as `standalone`; the gate reads the field. The
     exits and the grammar never mention it in code."""
     assert "standalone" in _names("services/fact_adapters.py") and "standalone" in _names("services/gate.py")
-    for rel in ("tools/meta_tools.py", "tools/research_tools.py", "services/answer.py"):
+    for rel in ("tools/research_tools.py", "services/answer.py"):
         assert "not_alone" not in _names(rel) and "quotable_individually" not in _names(rel), rel
 
 

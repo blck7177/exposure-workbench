@@ -30,7 +30,6 @@ from mcp import types
 from mcp.server.lowlevel import Server
 
 from exposure_workbench.auth.context import current_user_ctx
-from exposure_workbench.services import gate
 from exposure_workbench.services import claims
 from exposure_workbench.tools import faces, mcp_request, registry as R
 
