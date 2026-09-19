@@ -224,6 +224,22 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 
 **与计划的出入**：事件扫描没有放在风险经理一章。风险面没有文本工具，持仓名字的事件由主分析师按名字派给发行人分析师（它有 `book.position`，能说这条消息碰到多大的仓位）。
 
+### 步骤 2–5 之后 · 真库烟测与活体冒烟（2026-09-19，`desk-v1`，提交 8f71426、fab67e9、0df5d07、440ca67）
+
+离线套件在步骤 2–5 全绿，但夹具只是长得像 payload。汇报前做了两件事，不是 E 轮，没有冻结代码，发现即修：
+
+- **真库烟测**：一次性库 `exposure_v1_smoke`（`exposure_battery_v38` 的克隆加 v39 迁移，生产库零写入），每个面的每个动词经 `R.invoke` 跑一遍，按模型的读法读行。
+- **活体冒烟**：`scripts/battery_fixture.sh serve`（`BATTERY_DB=exposure_v1_smoke`、端口 8115）加 `scripts/conversation_battery.py --fixture`，先 4 题、后 10 题（自拟 4 题加 V26 题库 6 题的首轮），模型 gpt-5.4-mini。按节点沟通表读 trace。
+
+修掉的缺陷按角色归类（每条在 `tests/test_v1_smoke_findings.py`、`tests/test_v1_analyst.py` 有测试，离线套件 2874 通过）：
+
+- 工具没让模型能表达意图：`metric.params` 只写了"一个对象"，分析师猜键名（`window: "21d"`、`end`）被拒后放弃——现在 `params` 与 `name` 的描述由登记簿渲染（每个度量收什么、每个 key 在手册里叫什么），参数类拒绝写明该度量收什么；`metric` 对 run 类度量认 `port_…`；`filings_read` 一次读多家同一科目；`scenario` 只回交易与"没重算的东西"，新书进账本由 `book_read` 读（原 99 行）；`list` 不计入取证预算；预算用尽是一条可引用的缺席行；价格度量问到一本书上，拒绝写明归风险经理。
+- 行说错话：`book.analysis` 改专用适配器（146→47 行；共线时净 beta 原来被标成不可单独引用，gate 会拒掉主分析师引用它；腿不再成行；未测到的风险成缺席行）；beta 统一 MULTIPLE；方向词只在净 beta 上；余额读数不再夹带别的科目；回撤行写峰谷日期（`book.explain_episode` 的参数）；一个数跨两个期间就写两个；排名行以被排名的度量命名；`calc` 的结果记下它的输入（`params.inputs`）。
+- 校验对写的人说了假话：段落里"Debt to capital14.0"被说成"段落没有这个数"——规则不变，拒绝句改成真话并给出路；ISO 日期认段落里的拼写日期；"12 months"认段落原话；分析师命名的商仍对它的构成度量负责；情景书与原书同值是比较不是"一个读数写两遍"；**数字与方括号之间允许隔几个词，前提是方括号所指的事实确实持有这个数**（推翻 V33 的一个钉子，见 `test_v33_answer_check`）；被拒的简报告诉分析师派生数字用 `calc`；一串方括号去掉后不留",,."。
+- 知识层：手册每个问题写明"由哪些度量回答"（`Topic.measures` 原来只声明不渲染）；服务层拒绝句不再点名任何动词（三十余句仍在推荐已退役的门），AST 扫描测试守住。
+
+10 题、gpt-5.4-mini 的结果在各次运行间波动大（同一题时成时败）。稳定失败的一类见 §5 新增的待拍板项。
+
 ### 步骤 6 · 风格指南单源与校验
 
 - 做什么：`services/style_guide.py` 唯一承载八条，两份角色说明各引入一次；`answer_check`、`handoff_check` 的拒绝按 §2.4 的 verdict 形状带规则号与出路；其他地方的复述删除。
@@ -251,6 +267,14 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 9/19 已拍板：`program_service` 退役（步骤 3）；D 轮不跑（步骤 0）；K5 五文件 stash（`git stash list` 第一条）；归档与本计划先提交；执行分支 `desk-v1`。
 
 仍未拍板：`metric` 作为独立动词（本计划按保留执行；若拍掉，则 §2.3 只剩 read 加 calc，登记簿的组成与替代记录改由 calc 承担）；push。
+
+烟测后新增的待拍板项（9/19）：
+
+1. **`book.analysis` 要不要拆成两个名字自明的度量**（如 `book.net_exposures`、`book.room_to_tiers`）。证据：问"哪些集中度检查最接近突破、各剩多少空间"，风险经理 6 次运行 0 次去问 `book.analysis`，每次都是 `book_read` 读当前值与档位，再逐对 `calc subtract`（一次 15 个），预算用尽；手册已写明"由它回答"、`metric.name` 已写明 key 对应的叫法，仍不选。key 不说它给什么，是 V14 的复合度量，不正交。
+2. **数字与方括号的配对放宽**（按值核对）是否保留。
+3. **"回到高点所需涨幅"** 不是任何度量，`calc` 不收常数，桌子给不出；主分析师心算被拒。要不要作为回撤度量的产出。
+4. **book.reconcile、issuer.panel、price.beta 的行名**来自通用遍历，读得懂但不漂亮，要不要各给专用适配器。
+5. **电池脚本 `load_dotenv(override=True)`** 使 `OPENAI_MODEL` 环境变量无效，E 轮按模型分组前要改。
 
 ## 6. 验收总表（机械，红了就是越界）
 
