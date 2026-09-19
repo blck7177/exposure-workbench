@@ -27,6 +27,15 @@ the reports were marked, and the completions split by who spent them. Note that
 series comparable with the rounds before V36. A round without analysts reads as
 zeros here and its lead completions equal its round trips.
 
+V1 (2026-09-19): the analysts hold twelve primitive verbs, every call says WHY, and a step says
+what the call GOT — "r_… book_read(…) → 1 row | refused: unknown_name" (fact_adapters.came_back).
+What plan step 7 measures is read off that: asks a turn and tasks an ask, calls a task and by
+verb, how a why reads (its length, whether it names the line it serves), the analysts' own prompt
+peak, the share of calls refused, refusals by the style guide's RULE (the sentences that
+contradicted the word on their row are rule 6: `sense_conflict`, `status_conflict`), how much of
+what the desk refused was arithmetic (decides whether `calc` needs another operation), and which
+model each agent ran on. A round from before V1 reads as zeros in these and keeps its own series.
+
     python scripts/battery_counters.py docs/spikes/v30/V26_R1.json [more.json] [--json out]
 """
 from __future__ import annotations
@@ -63,6 +72,8 @@ SPELLING = set(SPELLING_REFUSALS) | {
     # V33: the program writer's type work (a static report before anything runs)
     # and a request the analyst's one tool could not parse
     "type_errors", "malformed_program", "invalid_request", "not_a_filed_line", "metric_is_a_method",
+    # V1: a trade that is neither a sale nor a purchase, a trade list with nothing in it
+    "bad_trade", "no_trades",
 }
 GATE = {
     "unsourced_figure", "malformed_answer", "unverified_quote", "not_on_ledger", "id_in_prose",
@@ -79,6 +90,8 @@ GATE = {
     # V35 (the figures point): a bare figure the ledger holds, a series point on
     # several dates, a reply written while a verdict stood
     "unpointed_figure", "ambiguous_point", "malformed_repair",
+    # V1: the sentence against the word its own row carries
+    "sense_conflict", "status_conflict", "repeated_answer",
 }
 ALGEBRA = {
     "different_instants", "overlapping_intervals", "mismatched_windows", "overlapping_quantities",
@@ -90,6 +103,8 @@ ALGEBRA = {
     "not_combinable", "undeclarable_unit", "bad_sale", "bad_buy", "bad_fraction", "bad_weight",
     "duplicate_sale", "duplicate_buy", "already_held", "empty_book", "unpriced_holding",
     "run_not_reconcilable", "limits_incomplete",
+    # V1: a measure with no meaning for the subject, as the desk refuses it
+    "not_for_financials", "denominator_not_positive", "several_figures", "double_count", "different_dates",
 }
 DATA = {
     "metric_not_filed", "not_reported", "not_reported_at_this_date", "no_price_data",
@@ -101,7 +116,8 @@ DATA = {
     "no_entry_satisfies", "no_prior_run",
 }
 SYSTEM = {"tool_error", "fact_adapter_error", "tool_transport_error", "budget_exceeded",
-          "quota_exceeded", "provider_unavailable", "sign_in_required", "no_research_run"}
+          "quota_exceeded", "provider_unavailable", "sign_in_required", "no_research_run",
+          "analyst_budget"}                  # V1: an analyst's own evidence calls, used
 
 # a tool step's summary is "error: <code>"; a V33 answer step's is "refused: <code>; …"
 _ERR = re.compile(r"^(?:error|refused): ([a-z_]+)")
@@ -173,6 +189,97 @@ def runs_by_domain(steps: list[dict]) -> dict[str, collections.Counter]:
     return out
 
 
+# V1: what a primitive's step says its call got (services/fact_adapters.came_back)
+_V1_STEP = re.compile(r"^r_[0-9a-z]+ (?P<verb>[a-z_]+)\(")
+_V1_REFUSED = re.compile(r"\| refused: (?P<codes>[a-z_]+(?:, [a-z_]+)*)\s*$")
+_WHY = re.compile(r'"why":\s*"((?:[^"\\]|\\.)*)"')
+_NAMES_A_LINE = re.compile(r"\blines?\s*\d", re.I)
+_MODEL = re.compile(r"^([^:\s]+): \d+ tool call")
+ARITHMETIC_VERBS = ("calc",)
+
+
+def _rule_of(reason) -> int | None:
+    """The style guide's rule a reason enforces, for a problem recorded before problems carried it.
+    The guide is the one place that mapping is written (services/style_guide); where it is not
+    there to ask, a problem without a rule stays unnumbered rather than guessed."""
+    try:
+        from exposure_workbench.services import style_guide
+    except ImportError:
+        return None
+    return style_guide.rule_of(reason)
+
+
+def refused_codes(summary: str) -> list[str]:
+    """The codes of the refusals among a V1 call's rows; none for a call that only read."""
+    m = _V1_REFUSED.search(summary or "")
+    return m.group("codes").split(", ") if m else []
+
+
+def class_of(code: str) -> str:
+    for name, members in (("spelling", SPELLING), ("gate", GATE), ("algebra", ALGEBRA), ("data", DATA), ("system", SYSTEM)):
+        if code in members:
+            return name
+    return f"other:{code}"
+
+
+def why_of(args) -> str | None:
+    """A call's `why`, from its arguments as the battery stored them (text, cut at a cap: a cut
+    breaks the JSON, never the why, which a call says before anything long)."""
+    if isinstance(args, dict):
+        return args.get("why")
+    try:
+        got = json.loads(args or "{}")
+        return got.get("why") if isinstance(got, dict) else None
+    except (ValueError, TypeError):
+        m = _WHY.search(args or "")
+        return m.group(1) if m else None
+
+
+def problems_of(step: dict) -> list[dict]:
+    """Every problem a check named on an `answer` or a `brief` step (V1 keeps the list on both)."""
+    for raw in (step.get("problems"), step.get("args")):
+        try:
+            got = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            continue
+        if isinstance(got, dict):
+            got = got.get("problems")
+        if isinstance(got, list):
+            return [x for x in got if isinstance(x, dict)]
+    return []
+
+
+def calls_by_analyst(steps: list[dict]) -> dict[str, collections.Counter]:
+    """V1: every call of one turn by the analyst that made it — how many, by verb, and how each
+    came back. `list` is a look and `start` an id; the rest are the evidence calls a task is
+    allowed sixteen of. The actor is on every row a V1 round records."""
+    out: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    for s in steps:
+        actor = str(s.get("actor") or "")
+        if not actor.startswith("sub:") or s.get("step_type") not in ("tool_call", "delegation"):
+            continue
+        result = s.get("result") or ""
+        # the first V1 turns (2026-09-19, before a step said what its call got) summarised every
+        # primitive by its payload's keys: a call, by a verb, that came back as nobody can now say
+        unstated = result.startswith("keys: pull, head")
+        if not (_V1_STEP.match(result) or unstated or s.get("status") == "rejected" or result.startswith("error")):
+            continue                                  # a call of the surface before V1: runs_by_domain reads those
+        c = out[actor[4:]]
+        c["calls"] += 1
+        c[f"verb.{s.get('tool_name')}"] += 1
+        if unstated:
+            c["unstated"] += 1
+        elif s.get("status") == "rejected":
+            c["not_run"] += 1                         # arguments that do not fit, or a budget spent
+        elif refused_codes(result):
+            c["refused"] += 1
+        elif result.startswith("error"):
+            c["errors"] += 1
+        else:
+            c["read"] += 1
+    return out
+
+
 def classify(summary: str, status: str) -> str | None:
     s = summary or ""
     if s.startswith("not attempted"):
@@ -207,6 +314,15 @@ def tally(paths: list[str]) -> dict:
     report_status: collections.Counter = collections.Counter()
     handoff: collections.Counter = collections.Counter()
     coverage: collections.Counter = collections.Counter()
+    # V1
+    sub_peak, per_task_calls, why_words = [], [], []
+    why_missing = why_lines = v1_calls = v1_refused = v1_not_run = v1_unstated = 0
+    by_rule: collections.Counter = collections.Counter()
+    by_reason: collections.Counter = collections.Counter()
+    absences: collections.Counter = collections.Counter()
+    absences_by_verb: collections.Counter = collections.Counter()
+    models: dict[str, collections.Counter] = {"lead": collections.Counter(), "analysts": collections.Counter()}
+    by_analyst: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     n = 0
     for p in paths:
         for conv in json.loads(Path(p).read_text()):
@@ -249,16 +365,50 @@ def tally(paths: list[str]) -> dict:
                 for d in meta.get("delegations") or []:
                     analysts += 1
                     analyst_status[d.get("status") or "unstated"] += 1
+                    # one series under two spellings: V36 filed lines `done / not_done`, V1 `settled / unsettled`
+                    cov = d.get("coverage") or {}
+                    cov = {"asked": cov.get("asked"), "refused": cov.get("refused"),
+                           "done": cov.get("done", cov.get("settled")), "not_done": cov.get("not_done", cov.get("unsettled"))}
                     for k in ("asked", "done", "not_done", "refused"):
-                        coverage[k] += int((d.get("coverage") or {}).get(k) or 0)
+                        coverage[k] += int(cov.get(k) or 0)
                     dom = by_domain[str(d.get("domain") or "unstated")]
                     dom["delegations"] += 1
                     for k in ("asked", "done", "not_done", "refused"):
-                        dom[k] += int((d.get("coverage") or {}).get(k) or 0)
+                        dom[k] += int(cov.get(k) or 0)
+                    if isinstance((d.get("cost") or {}).get("evidence_calls"), int):
+                        per_task_calls.append(d["cost"]["evidence_calls"])
                     for k in ("completions", "evidence_calls", "starts"):
                         dom[k] += int((d.get("cost") or {}).get(k) or 0)
                 for who, counts in runs_by_domain(steps).items():
                     by_domain[who].update(counts)
+                # V1: the calls, the whys, the refusals by rule, the models
+                for who, counts in calls_by_analyst(steps).items():
+                    by_analyst[who].update(counts)
+                    v1_calls += counts["calls"]; v1_refused += counts["refused"]; v1_not_run += counts["not_run"]
+                    v1_unstated += counts["unstated"]
+                subs = [s.get("prompt_tokens") or 0 for s in llm if str(s.get("actor") or "").startswith("sub:")]
+                if subs:
+                    sub_peak.append(max(subs))
+                for s in llm:
+                    m = _MODEL.match(s.get("result") or "")
+                    if m:
+                        models["analysts" if str(s.get("actor") or "").startswith("sub:") else "lead"][m.group(1)] += 1
+                for s in steps:
+                    if s.get("step_type") in ("tool_call", "delegation") and str(s.get("actor") or "").startswith("sub:"):
+                        why = why_of(s.get("args"))
+                        if why is None or not str(why).strip():
+                            why_missing += 1
+                        else:
+                            why_words.append(len(str(why).split()))
+                            why_lines += int(bool(_NAMES_A_LINE.search(str(why))))
+                        for code in refused_codes(s.get("result") or ""):
+                            absences[code] += 1
+                            absences_by_verb[str(s.get("tool_name"))] += 1
+                    if s.get("step_type") in ("answer", "brief") and s.get("status") == "rejected":
+                        for pr in problems_of(s):
+                            by_reason[str(pr.get("reason"))] += 1
+                            rule = pr.get("rule") if pr.get("rule") is not None else _rule_of(pr.get("reason"))
+                            by_rule[str(rule) if rule is not None else "shape"] += 1
                 for r in meta.get("reports") or []:
                     report_status[r.get("status") or "unstated"] += 1
                 if isinstance(meta.get("prompt_tokens"), (int, float)):
@@ -319,7 +469,8 @@ def tally(paths: list[str]) -> dict:
                     if s.get("step_type") not in ("tool_call", "delegation", "respond", "answer"):
                         continue
                     k = classify(s.get("result") or "", s.get("status") or "")
-                    if k:
+                    # V1: a call that came back with refusals among its rows names each by code
+                    for k in ([k] if k else []) + [class_of(code) for code in refused_codes(s.get("result") or "")]:
                         c[k] += 1
                         turns_with[k].add(tid)
     med = lambda xs: statistics.median(xs) if xs else 0
@@ -360,6 +511,26 @@ def tally(paths: list[str]) -> dict:
         "lead_prompt_peak_median": med(lead_peak), "lead_prompt_peak_p90": q(lead_peak, .9),
         "refusals": {k: {"count": v, "turns": len(turns_with[k]),
                          "per_turn": round(v / n, 2) if n else 0} for k, v in sorted(c.items())},
+        # V1 (plan step 7)
+        "tasks_per_turn_mean": round(analysts / n, 2) if n else 0,
+        "evidence_calls_per_task_median": med(per_task_calls), "evidence_calls_per_task_p90": q(per_task_calls, .9),
+        "analyst_calls": v1_calls, "analyst_calls_refused": v1_refused, "analyst_calls_not_run": v1_not_run,
+        # of the calls whose step says how they came back (the first V1 turns' steps do not)
+        "analyst_calls_refused_share": (round((v1_refused + v1_not_run) / (v1_calls - v1_unstated), 2)
+                                        if v1_calls > v1_unstated else 0),
+        "why_words_median": med(why_words), "why_missing": why_missing,
+        "why_names_a_line_share": round(why_lines / len(why_words), 2) if why_words else 0,
+        "analyst_prompt_peak_median": med(sub_peak), "analyst_prompt_peak_p90": q(sub_peak, .9),
+        "check_problems_by_rule": dict(sorted(by_rule.items())),
+        "sense_conflicts": by_reason["sense_conflict"], "status_conflicts": by_reason["status_conflict"],
+        "check_problems_by_reason": dict(by_reason.most_common()),
+        "absences": sum(absences.values()), "absences_by_code": dict(absences.most_common()),
+        "absences_by_verb": dict(absences_by_verb.most_common()),
+        "absences_arithmetic_share": round(sum(v for code, v in absences.items() if class_of(code) == "algebra")
+                                           / sum(absences.values()), 2) if absences else 0,
+        "absences_from_calc": sum(absences_by_verb[v] for v in ARITHMETIC_VERBS),
+        "completions_by_model": {k: dict(v.most_common()) for k, v in models.items()},
+        "by_analyst": {a: dict(cn) for a, cn in sorted(by_analyst.items())},
     }
     return out
 
@@ -371,7 +542,7 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
     out = tally(args.traces)
     for k, v in out.items():
-        if k in ("refusals", "by_domain"):
+        if k in ("refusals", "by_domain", "by_analyst"):
             continue
         if isinstance(v, dict):
             print(f"{k:40s} " + (", ".join(f"{kk} {vv}" for kk, vv in v.items()) or "-"))
@@ -385,6 +556,13 @@ def main(argv: list[str]) -> int:
         print("  " + "domain".ljust(34) + "".join(c[:6].rjust(8) for c in cols))
         for dom, c in sorted(out["by_domain"].items(), key=lambda kv: -kv[1].get("completions", 0)):
             print("  " + dom.ljust(34) + "".join(str(c.get(k, 0)).rjust(8) for k in cols))
+    if out["by_analyst"]:
+        verbs = sorted({k for c in out["by_analyst"].values() for k in c if k.startswith("verb.")})
+        cols = ("calls", "read", "refused", "not_run", "errors", "unstated", *verbs)
+        print("by analyst (V1: every call, how it came back, and by verb):")
+        print("  " + "analyst".ljust(12) + "".join(c.removeprefix("verb.")[:9].rjust(10) for c in cols))
+        for who, c in sorted(out["by_analyst"].items(), key=lambda kv: -kv[1].get("calls", 0)):
+            print("  " + who.ljust(12) + "".join(str(c.get(k, 0)).rjust(10) for k in cols))
     print("refusals by class (count / turns / per turn):")
     for k, v in out["refusals"].items():
         print(f"  {k:28s} {v['count']:5d} {v['turns']:5d} {v['per_turn']:6.2f}")

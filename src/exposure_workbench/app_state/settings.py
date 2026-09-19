@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # gpt-5.x takes max_completion_tokens rather than max_tokens and accepts only
     # the default temperature — see llm/client.py, which branches on the prefix.
     openai_model: str = "gpt-5.4-mini"
+    # V1 step 7: the model is a VARIABLE of a measured round — the lead on one, the analysts on
+    # another (plan §3 步骤 7). Empty means `openai_model`, which is every deployment to date.
+    lead_model: str = ""
+    analyst_model: str = ""
     embedding_model: str = "text-embedding-3-small"   # 1536-dim, filing_chunks (M5)
 
     # External providers (Issuer Intelligence)

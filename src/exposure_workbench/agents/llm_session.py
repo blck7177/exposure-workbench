@@ -34,6 +34,19 @@ from exposure_workbench.services import trace_service
 logger = logging.getLogger(__name__)
 
 
+def model_for(actor: str | None) -> str | None:
+    """WHICH MODEL AN AGENT OF THE TURN SPENDS ON (V1 step 7). A measured round varies the lead's
+    model and the analysts' apart — a strong lead over weak analysts, and the other way — and until
+    now one setting moved both. An analyst spends under `sub:<analyst>` (for_actor); a loop that
+    spends under no name is the one that owns its session — the lead of a turn, or a research run.
+    None leaves the choice where it was: `settings.openai_model`. The row records the model the
+    provider SERVED, so a round reads back who ran on what."""
+    from exposure_workbench.app_state.settings import get_settings
+    s = get_settings()
+    chosen = s.analyst_model if str(actor or "").startswith("sub:") else s.lead_model
+    return chosen or None
+
+
 class LlmSession:
     """What a loop holds for the length of a turn: one verb, returning two things."""
 
@@ -85,6 +98,7 @@ class LlmSession:
         table had a size for every edge except the ones into a completion,
         which were the largest; this is where they were missing from.
         """
+        kw.setdefault("model", model_for(self._actor))
         content, tool_calls, usage = await llm_client.chat_with_tools(
             messages=messages, tools=tools, **kw,
         )

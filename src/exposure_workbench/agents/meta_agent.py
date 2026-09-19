@@ -255,8 +255,15 @@ async def _record_open(db_factory, session_id: str, message_id: str, ref: str, r
 async def _record_answer(db_factory, session_id: str, message_id: str, text: str, verdict) -> None:
     try:
         async with db_factory() as db:
+            # EVERY PROBLEM, not the first: the summary below names one reason, and a round that
+            # counts refusals by kind — how many sentences contradicted the word on their row —
+            # read only the ones that happened to come first (V1 step 7). The brief step has
+            # always kept its list; this keeps the answer's, by reason and sentence.
+            named = [{k: p[k] for k in ("reason", "rule", "sentence") if p.get(k) is not None}
+                     for p in (getattr(verdict, "problems", None) or [])[:40]]
             await trace_service.record_step(
-                db, session_id, step_type="answer", tool_name="answer", args={"text": text[:4000]},
+                db, session_id, step_type="answer", tool_name="answer",
+                args={"text": text[:4000], **({"problems": named} if named else {})},
                 result_summary=("accepted" if verdict.ok else f"refused: {verdict.error}; {verdict.detail}"),
                 evidence_refs=[], status="completed" if verdict.ok else "rejected", message_id=message_id)
             await db.commit()

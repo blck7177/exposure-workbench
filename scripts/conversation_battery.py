@@ -34,7 +34,15 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+# `.env` is the truth for everything a battery must not get wrong by accident — the keys, the
+# database — so it overrides whatever the shell happens to hold. THE MODEL IS NOT ONE OF THOSE:
+# it is the variable of a measured round (plan V1 §3 步骤 7), and `OPENAI_MODEL=… battery …` was
+# silently run on the model in `.env` (plan §5, item 5). What the operator set for a model on the
+# command line survives the load; `--model`, `--lead-model` and `--analyst-model` say it outright.
+_MODEL_VARS = ("OPENAI_MODEL", "LEAD_MODEL", "ANALYST_MODEL")
+_asked = {k: os.environ[k] for k in _MODEL_VARS if os.environ.get(k)}
 load_dotenv(".env", override=True)
+os.environ.update(_asked)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -76,9 +84,13 @@ FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 # declaration existed is reported as undeclared, never guessed.
 _ARGS_CAP, _RESULT_CAP = 4000, 1000
 
+# `problems` is read on its own: jsonb orders keys by length, so inside `args` the answer's text
+# comes before the list of what the check refused in it, and a long answer pushed that list past
+# the cap — the one thing a counter of refusals by rule has to read (V1 step 7).
 _STEPS = text(
     f"SELECT seq, step_type, tool_name, actor, status, left(result_summary, {_RESULT_CAP}) AS result, "
-    f"       left(args::text, {_ARGS_CAP}) AS args, prompt_tokens, completion_tokens "
+    f"       left(args::text, {_ARGS_CAP}) AS args, left((args->'problems')::text, {_ARGS_CAP}) AS problems, "
+    "       prompt_tokens, completion_tokens "
     "FROM agent_steps WHERE session_id = :s AND message_id = :m ORDER BY seq")
 
 _RELEASE = text("UPDATE agent_sessions SET turn_started_at = NULL WHERE id = :s")
@@ -128,7 +140,10 @@ async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tu
                    or (s["step_type"] == "answer" and s["status"] == "rejected")]
         requests = [s for s in steps if s["step_type"] == "request"]
         type_errors = [s for s in calls if s["tool_name"] == "run" and (s["result"] or "").startswith("error: type_errors")]
+        # V1: a primitive's step says what the call got, and a refusal among its rows by code
+        rows_refused = [s for s in calls if "| refused: " in (s["result"] or "") or s["status"] == "rejected"]
         print(f"[{tag} t{i}] {elapsed}s calls={len(calls)}"
+              f"{f' refused={len(rows_refused)}' if rows_refused else ''}"
               f"{f' requests={len(requests)}' if requests else ''}"
               f"{f' type_errors={len(type_errors)}' if type_errors else ''}"
               f"{f' held={len(held)}' if held else ''}"
@@ -148,7 +163,16 @@ async def main(argv: list[str]) -> int:
                     help="run against exposure_battery and the fixture face (scripts/battery_fixture.sh)")
     ap.add_argument("--deny", action="append", default=[],
                     help="tool names taken off the face for every turn (Phase 0: start)")
+    ap.add_argument("--model", help="every agent of the turn (OPENAI_MODEL)")
+    ap.add_argument("--lead-model", help="the lead analyst only (LEAD_MODEL); the rest stay on --model")
+    ap.add_argument("--analyst-model", help="the three analysts only (ANALYST_MODEL)")
     args = ap.parse_args(argv)
+    for var, value in (("OPENAI_MODEL", args.model), ("LEAD_MODEL", args.lead_model), ("ANALYST_MODEL", args.analyst_model)):
+        if value:
+            os.environ[var] = value
+    # settings is a lazily built module global: what it read before this line is dropped
+    from exposure_workbench.app_state import settings as _settings_mod
+    _settings_mod._settings = None
     url = URL
     if args.fixture:
         url = FIXTURE_URL
@@ -168,7 +192,8 @@ async def main(argv: list[str]) -> int:
     if args.only:
         convos = [c for c in convos if c["tag"] in args.only]
     print(f"{len(convos)} conversation(s), {sum(len(c['turns']) for c in convos)} turn(s), "
-          f"concurrency {args.concurrency}, model {os.getenv('OPENAI_MODEL') or 'settings default'}, "
+          f"concurrency {args.concurrency}, model {os.getenv('OPENAI_MODEL') or 'settings default'}"
+          f" (lead {os.getenv('LEAD_MODEL') or '='}, analysts {os.getenv('ANALYST_MODEL') or '='}), "
           f"db {url.rsplit('/', 1)[-1]}, mcp {os.environ.get('MCP_URL') or 'settings default'}, deny {list(deny) or '-'}")
 
     engine = create_async_engine(url)
