@@ -340,11 +340,15 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         mark_spans: list[tuple[int, int]] = []
         for m in MARK_BLOCK.finditer(para):
             kind, node = m.group(1), m.group(2)
-            ids = [fid for fid, r in ledger.by_id.items() if (r.get("params") or {}).get("node") == node
+            # V1: a table is the rows ONE CALL pulled, named by that call's id (r_…,
+            # stamped on every row as `params.pull`). A program's binding name — what
+            # this named until V1 — still resolves, for the sessions recorded before.
+            ids = [fid for fid, r in ledger.by_id.items()
+                   if node in ((r.get("params") or {}).get("pull"), (r.get("params") or {}).get("node"))
                    and r.get("kind") in (F.SCALAR, F.SERIES)]
             if not ids:
                 v.problems.append({"at": f"prose[{i}]", "_at": m.start(), "reason": "unknown_node", "node": node,
-                                   "fix": "a [table: …] or [chart: …] names a binding of a program this turn ran, and its facts are on the ledger"})
+                                   "fix": "a [table: …] or [chart: …] names the id of a call whose rows you were shown (r_…), and its rows are on the ledger"})
             else:
                 v.marks.append({"para": i, "start": m.start(), "end": m.end(), "kind": kind, "node": node, "ids": ids})
                 v.refs += ids

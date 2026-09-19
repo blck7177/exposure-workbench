@@ -52,7 +52,9 @@ async def test_the_briefing_reads_the_same_split(monkeypatch):
     desk = await briefing._desk(None)
     assert desk["issuers_on_desk"] == ["MSFT"]
     assert desk["issuers_preparing"] == ["BAC", "MRK"]
-    assert desk["cannot"] and desk["not_held"] and desk["domains"]
+    # V1: what the desk does not hold is the ROSTER's to say, once (analytics/handbook);
+    # the domains and their method names were the desk's vocabulary, and the lead has none
+    assert set(desk) == {"issuers_on_desk", "issuers_preparing"}
 
 
 @pytest.mark.asyncio

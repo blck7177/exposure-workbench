@@ -37,9 +37,6 @@ class Settings(BaseSettings):
     # refuses to mint or verify without it, because an unsigned internal bearer
     # is not a degraded tool face, it is an open one.
     mcp_internal_secret: str = ""
-    # V30 Phase C: push the matched domains' programs into the turn (the other
-    # arm of the measurement is pull, through describe). Env PUSH_DOMAINS.
-    push_domains: bool = True
     # A token must outlive the longest legal run and not much more, which is the
     # same interval task_lease_seconds already picks. Shorter, and a research run
     # still inside its lease loses its tool face mid-flight — every remaining
@@ -67,8 +64,10 @@ class Settings(BaseSettings):
     # for a turn and no shape at all for "how much may ONE of the three analysts
     # in this turn use", which is what these are. They are loop counters, and the
     # registry is untouched.
-    sub_analyst_max_turns: int = 8          # completions one domain analyst may take
-    sub_analyst_evidence_calls: int = 8     # run / read_filings / search_web, per analyst
+    # V1: an analyst's verbs are single operations (tools/primitives), so a task that was one
+    # program is now several calls — and several calls may ride on one completion.
+    sub_analyst_max_turns: int = 10         # completions one analyst may take
+    sub_analyst_evidence_calls: int = 16    # every verb but `start`, per analyst
     # V36.1: a start is a background task, not evidence — it returns an id and
     # nothing the turn can use. Round A's Q14 spent all eight evidence calls
     # starting readiness for eight held names and filed nothing; counted apart.

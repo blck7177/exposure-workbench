@@ -6,11 +6,15 @@ V3-A0-2 and are pinned here: nothing reaches the user that the check did not
 accept, and every path to a turn with no accepted answer converges on ONE
 wording, marked in meta so the UI can render it as a refusal.
 
-V36: the lead's one working tool is `delegate`, and what it delegates to is a
-domain analyst that runs in this same turn. Both loops read from the same fake
-provider here, in the order they actually run — lead, then analyst, then lead —
-because they share a session by construction (D3) and a harness that pretended
-otherwise would be testing a shape the code does not have.
+V36: the lead's one working tool asks an analyst that runs in this same turn.
+Both loops read from the same fake provider here, in the order they actually run
+— lead, then analyst, then lead — because they share a session by construction
+(D3) and a harness that pretended otherwise would be testing a shape the code
+does not have.
+
+V1: the tool is `ask`, the asked party is one of three analysts on its own face,
+an analyst's tools return ROWS, and what the lead is handed is a Return — for
+each line a finding with the desk's rows under it, or why with the boundary row.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from exposure_workbench.agents import delegation, meta_agent, sub_analyst
 from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_message
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.ledger import Ledger
+from exposure_workbench.tools import faces
 from tests import provider_contract
 
 
@@ -39,6 +44,7 @@ class _FakeSession:
     async def execute(self, *_a, **_k): return _FakeResult(list(self.store))
     def add(self, obj): self.store.append(obj)
     async def commit(self): pass
+    async def flush(self): pass
     async def __aenter__(self): return self
     async def __aexit__(self, *_exc): return False
 
@@ -48,31 +54,33 @@ def _factory(store: list):
 
 
 def _stub_tools(monkeypatch, result: dict, tools: list | None = None, by_name: dict | None = None):
-    """Stand in for the turn's tool session — a domain analyst's door to the face.
-    Records every call and every result it handed back, so a test can build the
-    ledger the check reads from exactly what the analysts fetched."""
+    """Stand in for an analyst's tool session — its door to its own face. Records
+    every call, and the RECORDS behind every row it handed back, so a test can
+    build the ledger the check reads from exactly what the analysts pulled."""
     from contextlib import asynccontextmanager
 
     class _Session:
         def __init__(self):
             self.tools = tools if tools is not None else [
                 {"type": "function", "function": {"name": n, "description": n, "parameters": {}}}
-                for n in sub_analyst.EVIDENCE_TOOLS]
+                for n in sorted({n for face in faces.ANALYST_FACES.values() for n in face})]
             self.calls: list[tuple[str, dict]] = []
-            self.returned: list[dict] = []
+            self.records: list[dict] = []
             self.actors: list[str | None] = []
+            self.faces: list[str] = []
 
         async def call(self, name, args, *, actor=None):
             self.calls.append((name, args))
             self.actors.append(actor)
-            res = (by_name or {}).get(name, result)
-            self.returned.append(res)
+            res = dict((by_name or {}).get(name, result))
+            self.records += res.pop("_records", [])        # what the wrapper put on the ledger
             return res
 
     session = _Session()
 
     @asynccontextmanager
-    async def _fake(*_a, **_k):
+    async def _fake(face, **_k):
+        session.faces.append(face)                           # which mount the analyst opened
         yield session
 
     monkeypatch.setattr(meta_agent, "tool_session", _fake)
@@ -100,18 +108,13 @@ def _stub_llm(monkeypatch, chat):
 
 
 def _stub_desk(monkeypatch, session):
-    """No database: the briefing is empty and the ledger is whatever facts the
-    stubbed face returned this turn — which is what the real ledger holds too."""
+    """No database: the briefing is empty and the ledger is whatever rows the
+    stubbed faces returned this turn — which is what the real ledger holds too."""
     async def _no_briefing(_db_factory, _text):
         return {"subjects": {"tickers": [], "portfolios": [], "runs": []}}
 
     async def _ledger(_db_factory, _session_id):
-        recs = []
-        for res in session.returned:
-            block = (res or {}).get("facts") or {}
-            for row in block.get("rows") or []:
-                recs.append(F.from_model_row(row, block.get("sources")))
-        return Ledger.of(recs)
+        return Ledger.of(session.records)
 
     async def _no_record(*_a, **_k):
         return None
@@ -124,34 +127,37 @@ def _stub_desk(monkeypatch, session):
     monkeypatch.setattr(meta_agent, "_record_answer", _no_record)
     monkeypatch.setattr(meta_agent, "_record_delegate", _no_record)
     monkeypatch.setattr(meta_agent, "_record_bad_delegate", _no_record)
-    monkeypatch.setattr(meta_agent, "_record_read_report", _no_record)
+    monkeypatch.setattr(meta_agent, "_record_open", _no_record)
     monkeypatch.setattr(sub_analyst, "_record", _no_record)
     monkeypatch.setattr(sub_analyst, "_ledger", _sub_ledger)
 
 
+WHY = "line 1 asks how big the name is in the book; its weight is on the holdings table"
+
+
 def _delegate(*tasks):
-    """What the lead writes: a domain, subjects, and lines in its own words."""
-    full = [{"domain": "book_composition", "subjects": ["port_001"],
-             "want_to_know": ["how big MSFT is in the book"], **t} for t in (tasks or [{}])]
-    return [{"id": "c1", "function": {"name": delegation.DELEGATE_TOOL_NAME,
-                                      "arguments": json.dumps({"tasks": full})}}]
+    """What the lead writes: an analyst, subjects, and lines in its own words."""
+    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], **t}
+            for t in (tasks or [{}])]
+    return [{"id": "c1", "function": {"name": delegation.ASK_TOOL_NAME, "arguments": json.dumps({"tasks": full})}}]
 
 
-def _submit(*findings, report="ok"):
-    """What a domain analyst files."""
+def _submit(*findings):
+    """What an analyst files: every line settled, with the ids it rests on."""
     return [{"id": "s1", "function": {"name": delegation.SUBMIT_TOOL_NAME, "arguments": json.dumps(
-        {"brief": {"findings": [{"want": i, "facts": f[0], "finding": f[1]} for i, f in enumerate(findings, 1)]},
-         "report": {"title": "t", "text": report}})}}]
+        {"lines": [{"n": i, "settled": True, "facts": f[0], "finding": f[1]} for i, f in enumerate(findings, 1)]})}}]
 
 
-def _run(program=None):
-    return [{"id": "r0", "function": {"name": "run", "arguments": json.dumps({"program": program or {"let": []}})}}]
+def _run(**args):
+    """One verb of the analyst's face, saying why."""
+    return [{"id": "r0", "function": {"name": "book_read", "arguments": json.dumps(
+        {"book": "port_001", "table": "issuer_exposures", "column": "weight", "why": WHY, **args})}}]
 
 
 def _is_lead(tools) -> bool:
     """Which loop is asking. They share the provider because they share the
-    turn; `delegate` is on exactly one of the two faces."""
-    return delegation.DELEGATE_TOOL_NAME in [t["function"]["name"] for t in tools]
+    turn; `ask` is on exactly one of the two tool lists."""
+    return delegation.ASK_TOOL_NAME in [t["function"]["name"] for t in tools]
 
 
 def _two_loops(lead_replies, sub_replies):
@@ -173,14 +179,17 @@ def _repair(*replacements):
                                       "arguments": json.dumps({"replacements": list(replacements)})}}]
 
 
-def _run_result(*rows, nodes=None):
-    """A `run` result as the face returns it: the note and the facts block."""
-    return {"program_id": "calc_p", "returns": [], "settled": len(rows), "refused": [],
-            "nodes": nodes or {r[8].get("node", "n"): {"kind": "scalar", "fact": r[0]} for r in rows},
-            "facts": {"columns": list(F.COLUMNS), "rows": [list(r) for r in rows]}}
+def _run_result(*records):
+    """A primitive's result as the face returns it: the call's id, a header and the
+    rows — and, for this harness only, the records the wrapper ledgered behind them."""
+    return {"pull": "r_w", "head": f"r_w book_read(book=\"port_001\") → {len(records)} rows",
+            "rows": [F.line(r) for r in records], "_records": [dict(r) for r in records]}
 
 
-_W_MSFT = ("f_wmsft0001", "scalar", "MSFT", "issuer_exposures.weight", "RATIO", 0.16, "2026-09-10", None, {"node": "w"}, ["run_x"])
+_W_MSFT = {"id": "f_wmsft0001", "kind": "scalar", "measure": "issuer_exposures.weight", "subject": "MSFT",
+           "unit": "RATIO", "value": 0.16, "as_of": "2026-09-10", "window": None,
+           "params": {"pull": "r_w", "of": "run_x"}, "standalone": True, "sources": ["run_x"],
+           "group": "composition", "means": {}}
 
 
 # ── nothing reaches the user that the check did not accept ───────────────────
@@ -208,16 +217,16 @@ async def test_an_invented_number_is_refused_and_the_turn_ends_on_the_bar(monkey
     assert out["citations"] == []
     assert out["meta"]["gate"] == "exhausted"
     assert out["meta"]["gate_refusals"] == ["unsourced_figure", "malformed_repair"]
-    assert seen[0] == {"tools": [delegation.DELEGATE_TOOL_NAME], "tool_choice": None}
-    assert seen[1] == {"tools": [delegation.DELEGATE_TOOL_NAME, meta_agent.REPAIR_TOOL_NAME], "tool_choice": "required"}
+    assert seen[0] == {"tools": [delegation.ASK_TOOL_NAME], "tool_choice": None}
+    assert seen[1] == {"tools": [delegation.ASK_TOOL_NAME, meta_agent.REPAIR_TOOL_NAME], "tool_choice": "required"}
     assert len(seen) == 3, "one nudge, then the bar"
 
 
 @pytest.mark.asyncio
 async def test_a_loop_that_never_writes_an_answer_says_so_in_the_same_words(monkeypatch):
     async def _always_delegates(**_kw):
-        return ("", _delegate({"domain": "issuer_profitability", "subjects": ["NVDA"],
-                               "want_to_know": ["how revenue did over 12 months"]}))
+        return ("", _delegate({"analyst": "issuer", "subjects": ["NVDA"],
+                               "lines": ["how revenue did over the trailing twelve months"]}))
 
     _stub_llm(monkeypatch, _always_delegates)
     session = _stub_tools(monkeypatch, _run_result())
@@ -303,23 +312,29 @@ _FINDING = (["f_wmsft0001"], "MSFT weighs 16.0% [f_wmsft0001] of the book.")
 async def test_a_delegation_is_answered_and_the_figure_it_returned_can_be_stated(monkeypatch):
     chat, lead, sub = _two_loops(
         lead_replies=[("", _delegate()), ("MSFT is 16.0% [f_wmsft0001] of the book.", None)],
-        sub_replies=[("", _run()), ("", _submit(_FINDING, report="MSFT weighs 16.0% [f_wmsft0001]."))])
+        sub_replies=[("", _run()), ("", _submit(_FINDING))])
     _stub_llm(monkeypatch, chat)
     session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_6", "how big is MSFT in the book?", max_turns=4)
 
-    assert [n for n, _ in session.calls] == ["run"]                 # the analyst ran one program
+    assert session.faces == ["risk"]                                # the analyst opened its OWN face
+    assert [n for n, _ in session.calls] == ["book_read"]           # and made one call, saying why
+    assert session.calls[0][1]["why"] == WHY
     shown = json.loads([m for m in sub[1] if m.get("role") == "tool"][0]["content"])
-    assert shown["figures"][0]["value"] == "16.0% [f_wmsft0001]"    # as the analyst copies it
+    assert shown["rows"] == [F.line(_W_MSFT)] and "_records" not in shown
+    assert shown["rows"][0].startswith("[f_wmsft0001] issuer exposures: weight, MSFT, as of 2026-09-10: 16.0%")
     handed = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
-    assert handed["analysts"][0]["coverage"] == {"asked": 1, "done": 1, "not_done": 0, "refused": 0}
-    assert handed["analysts"][0]["findings"][0]["asked"] == "how big MSFT is in the book"
+    (line,) = handed["returns"][0]["lines"]
+    assert line == {"n": 1, "asked": "how big MSFT is in the book", "finding": _FINDING[1],
+                    "rows": [F.line(_W_MSFT)]}                       # the desk's own row, not a transcription
+    assert set(handed) == {"returns"}                               # no legend travels with it
+    assert handed["returns"][0]["analyst"] == "risk" and handed["returns"][0]["status"] == "settled"
     assert out["text"] == "MSFT is 16.0% of the book."              # as the reader sees it
     assert out["citations"] == ["f_wmsft0001"]
     assert out["meta"]["format"] == "blocks" and out["meta"]["verified"]["figures"] == 1
     assert "gate" not in out["meta"]
-    assert out["meta"]["delegations"][0]["status"] == "verified"
+    assert out["meta"]["delegations"][0]["status"] == "settled"
 
 
 @pytest.mark.asyncio
@@ -330,18 +345,17 @@ async def test_the_lead_never_sees_a_figure_that_did_not_pass_the_handoff(monkey
     chat, lead, sub = _two_loops(
         lead_replies=[("", _delegate()), ("The desk could not settle it.", None)],
         sub_replies=[("", _run()),
-                     ("", _submit((["f_wmsft0001"], "MSFT is 1.0% [f_wmsft0001] above its tier."),
-                                  report="MSFT weighs 16.0% [f_wmsft0001].")),
-                     ("", _submit((["f_wmsft0001"], "MSFT is 1.0% [f_wmsft0001] above its tier."),
-                                  report="MSFT weighs 16.0% [f_wmsft0001]."))])
+                     ("", _submit((["f_wmsft0001"], "MSFT is 1.0% [f_wmsft0001] above its tier."))),
+                     ("", _submit((["f_wmsft0001"], "MSFT is 1.5% [f_wmsft0001] above its tier.")))])
     _stub_llm(monkeypatch, chat)
     session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_handoff", "how big is MSFT?", max_turns=4)
 
     handed = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
-    assert handed["analysts"][0]["findings"] == []
-    assert handed["analysts"][0]["refused"][0]["reason"] == "mark_mismatch"
+    (line,) = handed["returns"][0]["lines"]
+    assert "finding" not in line and "rows" not in line
+    assert "did not pass the desk's check" in line["refused"] and "mark_mismatch" in line["refused"]
     assert out["text"] == "The desk could not settle it."
     assert out["meta"]["delegations"][0]["status"] == "refused"
 
@@ -349,7 +363,7 @@ async def test_the_lead_never_sees_a_figure_that_did_not_pass_the_handoff(monkey
 @pytest.mark.asyncio
 async def test_a_delegation_the_roster_cannot_take_is_told_to_the_lead(monkeypatch):
     chat, lead, _sub = _two_loops(
-        lead_replies=[("", _delegate({"domain": "no_such_desk"})), ("Hello.", None)],
+        lead_replies=[("", _delegate({"analyst": "no_such_desk"})), ("Hello.", None)],
         sub_replies=[("", None)])
     _stub_llm(monkeypatch, chat)
     session = _stub_tools(monkeypatch, {"noted": True})
@@ -357,7 +371,7 @@ async def test_a_delegation_the_roster_cannot_take_is_told_to_the_lead(monkeypat
     out = await handle_message(_factory([]), "sess_bad", "hi", max_turns=4)
 
     told = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
-    assert told["error"] == "invalid_delegation" and "ROSTER" in told["detail"]
+    assert told["error"] == "invalid_ask" and "issuer, market, risk" in told["detail"]
     assert session.calls == []
     assert out["text"] == "Hello."
 
@@ -368,7 +382,7 @@ async def test_a_refused_reply_is_told_every_problem_and_the_second_attempt_can_
         lead_replies=[("", _delegate()),
                       ("MSFT is 16.0% of the book, up from 12.5% last year, the largest holding.", None),
                       ("", _repair({"tag": "S1", "text": "MSFT is 16.0% [f_wmsft0001] of the book."}))],
-        sub_replies=[("", _run()), ("", _submit(_FINDING, report="MSFT weighs 16.0% [f_wmsft0001]."))])
+        sub_replies=[("", _run()), ("", _submit(_FINDING))])
     _stub_llm(monkeypatch, chat)
     session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
     _stub_desk(monkeypatch, session)
@@ -427,15 +441,13 @@ def test_the_analysts_only_tool_is_not_a_registry_tool():
     """The budget bounds EVIDENCE, and the analyst retrieves none itself: its one
     tool is in-process, on no face, and every call the broker makes on its
     behalf goes through the face and is charged there."""
-    from exposure_workbench.tools import faces
-    from exposure_workbench.tools.registries import build_meta_registry
+    from exposure_workbench.tools.registries import build_analyst_registry
 
-    assert meta_agent._BUDGET_FREE_TOOLS == (delegation.DELEGATE_TOOL_NAME,
-                                             delegation.READ_REPORT_TOOL_NAME,
+    assert meta_agent._BUDGET_FREE_TOOLS == (delegation.ASK_TOOL_NAME, delegation.OPEN_TOOL_NAME,
                                              meta_agent.REPAIR_TOOL_NAME)
     for name in meta_agent._BUDGET_FREE_TOOLS:
-        assert name not in build_meta_registry().tools
-        assert name not in faces.FACE_META_AGENT
+        for face, verbs in faces.ANALYST_FACES.items():
+            assert name not in build_analyst_registry(face).tools and name not in verbs
 
 
 @pytest.mark.asyncio
@@ -451,7 +463,7 @@ async def test_a_refused_reply_is_repaired_sentence_by_sentence_through_the_tool
         ("MSFT weighs 23.4% of the book. The book leans on its largest names.", None),
         ("", _repair({"tag": "S1", "text": "MSFT weighs 16.0% [f_wmsft0001] of the book."})),
     ])
-    sub_replies = iter([("", _run()), ("", _submit(_FINDING, report="MSFT weighs 16.0% [f_wmsft0001]."))])
+    sub_replies = iter([("", _run()), ("", _submit(_FINDING))])
 
     async def _llm(**kw):
         if not _is_lead(kw["tools"]):
@@ -490,9 +502,9 @@ async def test_a_whole_new_reply_while_a_verdict_stands_is_not_read(monkeypatch)
 
 
     _stub_llm(monkeypatch, _llm)
-    session = _stub_tools(monkeypatch, _run_result(_W_MSFT), by_name={"run": _run_result(_W_MSFT)})
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
     _stub_desk(monkeypatch, session)
-    session.returned.append(_run_result(_W_MSFT))          # the ledger holds the weight this turn
+    session.records.append(dict(_W_MSFT))                  # the ledger holds the weight this turn
     out = await handle_message(_factory([]), "sess_nudge", "how big is MSFT", max_turns=8)
 
     assert told[2]["messages"][-1] == {"role": "user", "content": meta_agent._REPAIR_ONLY}
@@ -521,34 +533,39 @@ async def test_a_repair_that_still_fails_spends_the_second_attempt(monkeypatch):
 # ── V36.1 (round A) · the two edges the table had to infer are recorded ──────
 
 @pytest.mark.asyncio
-async def test_a_rejected_delegation_and_a_read_report_are_steps(monkeypatch):
+async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
     """Round A's table showed eight lead completions with one tool call and
-    nothing after: three delegations the protocol refused, five read_reports.
-    Both are steps now, so the next table needs no inference."""
+    nothing after: three asks the protocol refused, five reads of the record.
+    Both are steps, so the next table needs no inference."""
     recorded: list = []
 
     async def _bad(_f, _s, _m, args, detail):
-        recorded.append(("delegate", "rejected", detail))
+        recorded.append(("ask", "rejected", detail))
 
-    async def _read(_f, _s, _m, report_id, result):
-        recorded.append(("read_report", result.get("status") or result.get("error"), report_id))
+    async def _opened(_f, _s, _m, ref, result):
+        recorded.append(("open", "row" if "row" in result else result.get("error"), ref))
 
     chat, lead, _sub = _two_loops(
-        lead_replies=[("", _delegate({"domain": "no_such_desk"})),
+        lead_replies=[("", _delegate({"analyst": "no_such_desk"})),
                       ("", _delegate()),
-                      ("", [{"id": "rr", "function": {"name": delegation.READ_REPORT_TOOL_NAME,
-                                                      "arguments": json.dumps({"report_id": "rep_missing"})}}]),
+                      ("", [{"id": "o1", "function": {"name": delegation.OPEN_TOOL_NAME,
+                                                      "arguments": json.dumps({"id": "f_wmsft0001"})}}]),
+                      ("", [{"id": "o2", "function": {"name": delegation.OPEN_TOOL_NAME,
+                                                      "arguments": json.dumps({"id": "f_never_shown"})}}]),
                       ("Hello.", None)],
-        sub_replies=[("", _submit((["f_wmsft0001"], "MSFT is 16.0% [f_wmsft0001] of the book.")))])
+        sub_replies=[("", _run()), ("", _submit(_FINDING))])
     _stub_llm(monkeypatch, chat)
-    session = _stub_tools(monkeypatch, {"noted": True})
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
     _stub_desk(monkeypatch, session)
     monkeypatch.setattr(meta_agent, "_record_bad_delegate", _bad)
-    monkeypatch.setattr(meta_agent, "_record_read_report", _read)
-    out = await handle_message(_factory([]), "sess_rec", "hi", max_turns=6)
+    monkeypatch.setattr(meta_agent, "_record_open", _opened)
+    out = await handle_message(_factory([]), "sess_rec", "hi", max_turns=8)
 
     assert out["text"] == "Hello."
-    assert recorded[0][:2] == ("delegate", "rejected") and "ROSTER" in recorded[0][2]
-    assert recorded[-1][0] == "read_report" and recorded[-1][2] == "rep_missing"
+    assert recorded[0][:2] == ("ask", "rejected") and "analysts" in recorded[0][2]
+    assert recorded[1] == ("open", "row", "f_wmsft0001")                 # what is on the record opens as its row
+    assert recorded[2] == ("open", "not_on_the_record", "f_never_shown")  # and nothing else can be pulled this way
+    opened = json.loads([m for m in lead[3] if m.get("role") == "tool"][-1]["content"])
+    assert opened == {"row": F.line(_W_MSFT)}
     # what the lead read between completions is measured on the way in
     assert all("note" not in m for m in lead[1])         # the note is the row's, not the prompt's

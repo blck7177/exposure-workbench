@@ -20,10 +20,9 @@ import re
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.analytics import skill
+from exposure_workbench.analytics import display_names as dn
 from exposure_workbench.db.models import ExposureRun
 from exposure_workbench.services import catalogue_service, company_service, portfolio_service, quantities as qn
-from exposure_workbench.services import program_service as ps
 from exposure_workbench.services import run_reads_service
 
 BRIEFING_CHAR_LIMIT = 12_000
@@ -61,7 +60,7 @@ async def subjects_in(db: AsyncSession, text: str) -> dict:
 
 async def for_question(db: AsyncSession, text: str) -> dict:
     subs = await subjects_in(db, text)
-    out: dict = {"subjects": subs, "portfolios": {}, "issuers": {}, "desk": {}, "boundaries": list(ps.BOUNDARIES)}
+    out: dict = {"subjects": subs, "portfolios": {}, "issuers": {}, "desk": {}}
     for pid in subs["portfolios"]:
         out["portfolios"][pid] = await _portfolio(db, pid)
     for tk in subs["tickers"]:
@@ -76,19 +75,19 @@ async def _desk(db: AsyncSession) -> dict:
     does not hold and cannot do, and its domains by name."""
     companies = await company_service.list_companies(db, investigable_only=True)
     ready = await company_service.ready_company_ids(db, [c.id for c in companies])
+    # V1: what the desk does not hold or will not do is the ROSTER's to say, once
+    # (analytics/handbook, each chapter's `absent`); the domains and their method
+    # names were the desk's vocabulary, handed to the one reader told not to use it.
     return {
         "issuers_on_desk": sorted(c.ticker for c in companies if c.id in ready),
         "issuers_preparing": sorted(c.ticker for c in companies if c.id not in ready),
-        "not_held": dict(catalogue_service.NOT_HELD),
-        "cannot": dict(catalogue_service.CANNOT),
-        "domains": [{"name": p.name, "question": p.question, "methods": list(p.methods)} for p in skill.PROCEDURES.values()],
     }
 
 
 def _trim(out: dict) -> dict:
     """Under the limit by dropping the longest lists first; never a figure, since
     there are none."""
-    for path in (("desk", "domains"), ("issuers", "*", "items_indexed"), ("issuers", "*", "filed_lines")):
+    for path in (("issuers", "*", "coverage"), ("desk", "issuers_preparing")):
         if len(json.dumps(out, default=str)) <= BRIEFING_CHAR_LIMIT:
             break
         if path[1] == "*":
@@ -124,9 +123,15 @@ async def _portfolio(db: AsyncSession, pid: str) -> dict:
         "positions_as_of": pos.get("positions_as_of"),
         "holdings": [{"ticker": h["ticker"], "sector": h.get("sector"), "asset_class": h.get("asset_class")}
                      for h in pos.get("holdings", [])],
-        "checks": checks,
-        "read_with": "request_evidence: subjects [port id], want [issuer_exposures.weight, limit_checks.current_value, …]",
+        # which checks the mandate defines, as the desk SAYS them — never a level:
+        # a tier is a figure, and a figure comes back from an analyst under an id
+        "checks": sorted({_check_said(name) for name in checks}),
     }
+
+
+def _check_said(name: str) -> str:
+    kind, _, entity = name.partition(":")
+    return dn.label("limit", kind) + (f": {entity}" if entity else "")
 
 
 async def _issuer(db: AsyncSession, tk: str) -> dict:
@@ -141,12 +146,25 @@ async def _issuer(db: AsyncSession, tk: str) -> dict:
         "sector": (d.get("identity") or {}).get("sector"),
         "fiscal_year_end": (f.get("fiscal") or {}).get("fiscal_year_ends"),
         "latest_period_end": f.get("latest_period_end"),
-        "filed_lines": f.get("names"),
-        "lines_ending_early": f.get("lines"),
-        "methods_not_computable": f.get("methods_not_computable"),
         "filings": {form: {"latest": v.get("latest")} for form, v in fil.items() if isinstance(v, dict)},
-        "items_indexed": (d.get("filings") or {}).get("items_indexed"),
         "prices": {k: (d.get("prices") or {}).get(k) for k in ("from", "to")},
-        "held_in": [{"portfolio_id": h.get("portfolio_id"), "as_of": h.get("as_of"), "checks": h.get("checks")}
+        "held_in": [{"portfolio_id": h.get("portfolio_id"), "as_of": h.get("as_of")}
                     for h in ((d.get("book") or {}).get("held_in") or [])],
+        # FOR THE ANALYST WHO IS ASKED ABOUT THIS NAME, never for the lead
+        # (`for_lead` drops it): the desk's own names — which filed lines stop
+        # early, which measures this issuer's filings cannot feed, which Items are
+        # indexed. They are its tools' vocabulary, and the lead has none.
+        "coverage": {"lines_ending_early": f.get("lines"),
+                     "measures_not_computable": f.get("methods_not_computable"),
+                     "items_indexed": (d.get("filings") or {}).get("items_indexed")},
     }
+
+
+def for_lead(briefing: dict) -> dict:
+    """The lead's copy of the briefing: names, dates and coverage — and none of
+    the desk's vocabulary (V1). An analyst asked about a name gets that name's
+    whole entry (agents/sub_analyst._coverage_of)."""
+    out = {k: v for k, v in briefing.items() if k != "issuers"}
+    out["issuers"] = {tk: ({k: v for k, v in d.items() if k != "coverage"} if isinstance(d, dict) else d)
+                      for tk, d in (briefing.get("issuers") or {}).items()}
+    return out

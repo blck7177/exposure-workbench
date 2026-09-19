@@ -69,33 +69,59 @@ async def test_a_report_of_another_conversation_is_not_readable_by_its_id():
 
 
 @pytest.mark.asyncio
-async def test_a_refused_report_is_kept_marked_and_its_prose_withheld_from_the_lead():
+async def test_a_refused_brief_is_kept_and_marked():
     db = _Db()
     rid = await _store(db, status="refused", problems=[{"reason": "mark_mismatch"}],
-                       text="MSFT has 4.0% of room.", blocks=[])
+                       text="tsk_1 — the risk analyst …", blocks=[])
     stored = await analyst_reports.load(db, "sess_a", rid)
     assert stored["status"] == "refused" and stored["text"], "kept: the record of what was tried"
-
-    out = await meta_agent._read_report(lambda: db, "sess_a", rid)
-    assert out["status"] == "refused"
-    assert "text" not in out, "an unchecked reading is not the lead's to quote"
-    assert out["problems"] == ["mark_mismatch"]
+    assert stored["blocks"] == [], "and never rendered as if its findings had passed"
 
 
-@pytest.mark.asyncio
-async def test_a_verified_report_comes_back_whole_for_the_lead_to_read():
-    db = _Db()
-    rid = await _store(db, citations=["f_a"])
-    out = await meta_agent._read_report(lambda: db, "sess_a", rid)
-    assert out["text"] == "The book clears in a day." and out["citations"] == ["f_a"]
+# ── V1: what is on the record is opened by its id, and nothing else is ───────
+
+class _TaskDb(_Db):
+    """The same store, answering the query `load_by_task` makes."""
+
+    async def execute(self, stmt):
+        wanted = {str(c.right.value) for c in stmt.whereclause.clauses}
+        return _Result([r for r in self.rows if {r.task_id, r.session_id} >= wanted])
 
 
 @pytest.mark.asyncio
-async def test_an_id_from_nowhere_is_told_to_the_lead_not_raised():
-    db = _Db()
-    out = await meta_agent._read_report(lambda: db, "sess_a", "rep_invented")
-    assert out["error"] == "unknown_report" and "this conversation" in out["detail"]
-    assert (await meta_agent._read_report(lambda: db, "sess_a", ""))["error"] == "no_report_id"
+async def test_the_lead_opens_an_analysts_log_by_the_tasks_id(monkeypatch):
+    """V1: the text on the record is the LOG — the analyst's calls in order, each
+    with why — and `open(<task id>)` reads it, for a task of an earlier turn too."""
+    db = _TaskDb()
+    await _store(db, task_id="tsk_1", text="tsk_1 — the risk analyst, asked about port_001: 1. how big is MSFT\n"
+                                           "1. book_read(book=\"port_001\") — why: line 1 asks the weight → 1 row")
+    out = await meta_agent._open(lambda: db, "sess_a", "tsk_1", delegated=[])
+    assert out["log"].startswith("tsk_1 — the risk analyst") and "why: line 1 asks the weight" in out["log"]
+    assert (await meta_agent._open(lambda: db, "sess_b", "tsk_1", delegated=[]))["error"] == "unknown_task"
+
+
+@pytest.mark.asyncio
+async def test_a_task_of_this_turn_opens_from_the_turn_itself():
+    task = dl.Task("tsk_9", "market", ("AAPL",), ("has volatility risen",))
+    result = dl.AnalystResult(task=task, status="settled", log=[
+        {"step": 1, "tool": "metric", "asked": 'name="price.volatility"', "why": "line 1: the short window", "got": "1 row"}])
+    out = await meta_agent._open(None, "sess_a", "tsk_9", delegated=[result])
+    assert out == {"log": dl.log_text(result)}
+    assert "1. metric(name=\"price.volatility\") — why: line 1: the short window → 1 row" in out["log"]
+
+
+@pytest.mark.asyncio
+async def test_an_id_from_nowhere_is_told_to_the_lead_not_raised(monkeypatch):
+    from exposure_workbench.services.ledger import Ledger
+
+    async def _ledger(_f, _s):
+        return Ledger()
+    monkeypatch.setattr(meta_agent, "_load_ledger", _ledger)
+    assert (await meta_agent._open(None, "sess_a", "", delegated=[]))["error"] == "no_id"
+    assert (await meta_agent._open(None, "sess_a", "rep_invented", delegated=[]))["error"] == "unknown_id"
+    assert (await meta_agent._open(None, "sess_a", "f_invented", delegated=[]))["error"] == "not_on_the_record"
+    # a standing policy is on every ledger: it opens as its row
+    assert "The desk does not forecast" in (await meta_agent._open(None, "sess_a", "f_policy_no_forecast", delegated=[]))["row"]
 
 
 @pytest.mark.asyncio
@@ -105,12 +131,12 @@ async def test_the_prose_is_bounded_at_the_store_not_at_the_reader():
     assert len((await analyst_reports.load(db, "sess_a", rid))["text"]) == analyst_reports.MAX_TEXT_CHARS
 
 
-def test_the_lead_can_open_a_report_only_once_one_exists():
-    """The tool is on the face after a delegation and not before: a tool whose
-    every argument would be invented is a tool that invites inventing one."""
+def test_the_lead_can_open_the_record_only_once_something_is_on_it():
+    """The tool is offered after an ask and not before: a tool whose every
+    argument would be invented is a tool that invites inventing one."""
     import inspect
     src = inspect.getsource(meta_agent.handle_message)
-    assert "READ_REPORT_TOOL] if delegated else []" in src
+    assert "OPEN_TOOL] if delegated else []" in src
 
 
 def test_the_table_is_owned_by_the_session_and_erased_with_it():

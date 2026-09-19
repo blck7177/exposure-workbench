@@ -187,6 +187,19 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - 做什么：`agents/sub_analyst.py` 按面实例化三位，system 由四样组成，工具列表原生下发；每次调用的 `why` 记入 `agent_steps`，log 可按 task 重建；`agents/delegation.py` 的 submit schema 做 §2.4 的强制，`for_lead` 改出 Return（附行、无 shown、无 coverage、无 how_to_cite），`made` 从账本填；`agents/meta_agent.py` 只剩 ask、open、reply（被退回时按 tag 替换），system 加含义层与三条名册，`services/briefing.py` 清掉度量名与调用提示，只留桌上有什么。
 - 验收：主分析师全部文字无度量名、无 tool 名、无登记簿 key（扫描）；submit 的四种非法组合被 schema 拒绝；从 `agent_steps` 离线重建一份沟通表与 log 相等；措辞过目。
 
+**执行记录 4（2026-09-19，`desk-v1`）：分析师与主分析师已切到新面**。离线套件 3053 通过。
+
+- `agents/delegation.py` 重写：`ask`（analyst 三选一、subjects、lines、context、follow_up_of；没有 facts_to_derive 与 constraints）、`submit`（lines 每条 settled 真或假，两种形状写成 schema 的 oneOf，并在 `parse_submission` 里于任何检查之前拒绝第三态；caveat 必须挂行；没有 report）、`open`（f_ 一行、r_ 一次调用的全部行、任务 id 的 log、calc_ 一本建出来的书）。同一位分析师在一次 ask 里可以出现多次，只要主体不同（几个发行人各自深挖）。
+- 交接检查五条：每行恰有一条；发现里的数过答案检查；id 在账本上；未解决行的 boundary 必须是账本上的缺席（常驻政策缺席算）；caveat 指向本任务的行。报告正文那道检查随报告一起取消。
+- 返回（Return）：每行三种形状之一——发现加事实行原文、原因加边界行原文、或"分析师的发现没过桌子的检查"。行由 `for_lead` 按 id 从账本读出附上，分析师改不了；caveat 贴在它限定的行上；没有 shown、coverage、cost、图例。
+- `agents/sub_analyst.py` 重写：每位分析师为自己的任务打开自己面的挂载（`TurnContext.open_tools`），工具列表是该面的动词加进程内的 submit；system 是角色说明加手册本章；每次调用的 why 进 `AnalystResult.log`，`delegation.log_text` 把它渲染成 log，存进 `analyst_reports.text`（页面与 `open` 读的就是它）；原样重发（不看 why）不计费；`start` 单独计数、同主体只发一次；没交简报时铸一条缺席事实记在 completed 的 boundary 步骤上，每行以它为边界。旧的 `shown` 旁路已不存在。证据调用上限 8→16、完成数 8→10，因为一个程序现在是几次单步调用。
+- `agents/meta_agent.py`：主分析师不再持有工具面；三个工具 ask、open、repair_answer；system 重写（含"用户前提先核"那条旧规则，全桌只此一处）；三个块：desk（`briefing.for_lead`：无度量名、无方法名、无调用提示，检查用桌子的叫法）、roster（手册三条）、readings（含义层）。`[table: …]` 改为指一次调用的 r_ id，旧的节点名仍可解析以兼容旧 session。
+- 简报：主分析师那份去掉 domains、not_held、cannot、boundaries、read_with、科目名与方法名；被问到某个名字的分析师拿到该名字的完整条目（含哪些科目线提前结束、哪些度量算不了、索引了哪些 Item）。
+- 页面契约未动：`analyst_reports` 仍按 findings/not_done/caveats 的形状存，`domain` 写分析师种类，状态词仍是 verified/refused；`meta.delegations` 的键不变，status 取 settled/partial/unsettled/refused。
+- 测试：`tests/test_meta_agent_gate.py` 17 条改到新形状（端到端离线一轮：ask → 分析师开自己的面 → 行 → 简报 → 交接检查 → 带行的返回 → 答案检查）；新增 `tests/test_v1_delegation.py` 19 条、`tests/test_v1_analyst.py` 13 条；`tests/test_v36_reports.py` 的读报告四条改成按 id 打开记录；删除只钉旧形状的四个文件（test_v36_sub_analyst、test_v36_delegation、test_v36_turn_offline、test_v37_context_labels）。
+
+**未做、留给步骤 6**：风格指南单源。引用规则现在写在两份角色说明里各一次（主分析师、分析师），还没有抽成一份共同引入的文件。
+
 ### 步骤 5 · 手册重写
 
 - 做什么：14 章并 3 章，六节五禁区；§2/§3 从登记簿渲染；§4 收下 26 个示例程序所对应的问题，改写成金融语言的做法；名册三条从 §1 与 §5 生成；含义层 = 三章 §3 与 §6，给主分析师。

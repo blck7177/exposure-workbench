@@ -204,24 +204,6 @@ def test_refusals_that_follow_one_root_are_said_once_under_it():
     assert "_after_tlt_w_3" not in kinds and kinds["sold"]["kind"] == "table"
 
 
-def test_the_analysts_last_cut_is_a_refusal():
-    """sol Q04 seq4, Q06 seq16: the final cut dropped boundaries under a note
-    saying they "were computed"."""
-    from exposure_workbench.agents import sub_analyst as sa
-    from exposure_workbench.utils import json as ejson
-    res = {"figures": [{"id": f"f_{i:012d}", "value": f"{i}% [f_{i:012d}]", "measure": "m" * 40} for i in range(200)],
-           "boundaries": [{"class": "data_absent", "fact": f"f_b{i:011d}", "text": "x was not computed — " + "y" * 60}
-                          for i in range(20)]}
-    out = ejson.loads(ejson.dumps_capped(res, 4_000, keep=sa._KEEP_LAST))
-    assert len(out["boundaries"]) == 20 and len(out["figures"]) < 200
-    # and when the refusals alone are over the room, the figures go first, then
-    # the refusals from their tail — never everything by bytes
-    more = {**res, "boundaries": res["boundaries"] * 2}
-    out2 = ejson.loads(ejson.dumps_capped(more, 4_000, keep=sa._KEEP_LAST))
-    assert out2["figures"] == [] and 20 <= len(out2["boundaries"]) < 40
-    assert out2["truncated"]["emptied"] == ["figures"]
-
-
 # ── T3: what the tool already said reaches the analyst ────────────────────────
 
 def test_a_composed_total_says_what_it_was_made_of():

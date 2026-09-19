@@ -70,6 +70,15 @@ async def load(db: AsyncSession, session_id: str, report_id: str) -> dict | None
     return as_dict(row) if row is not None else None
 
 
+async def load_by_task(db: AsyncSession, session_id: str, task_id: str) -> dict | None:
+    """The record of one task of one session — what `open(<task id>)` reads when
+    the task was asked in an earlier turn (V1)."""
+    row = (await db.execute(
+        select(AnalystReport).where(AnalystReport.task_id == task_id, AnalystReport.session_id == session_id)
+        .order_by(AnalystReport.created_at.desc()).limit(1))).scalar_one_or_none()
+    return as_dict(row) if row is not None else None
+
+
 async def for_message(db: AsyncSession, session_id: str, message_id: str) -> list[dict]:
     rows = (await db.execute(
         select(AnalystReport).where(AnalystReport.session_id == session_id,
