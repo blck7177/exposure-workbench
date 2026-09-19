@@ -1,6 +1,7 @@
 """XBRL concept -> normalized metric mapping (M2b), versioned.
 
-Design rules (see MODULE_NOTES M2):
+Design rules (from MODULE_NOTES M2; that document left the tree on 2026-09-19 and is in
+git history — `git show f8a51c0:docs/MODULE_NOTES.md`):
   * Many raw concepts MAY map to one normalized metric — but ONLY when they
     really are the same economic quantity tagged differently. V9-M1 found five
     metrics where they were not, and the corpus proved it: `LongTermDebt`

@@ -69,11 +69,11 @@ Each account gets a daily allowance (chat turns, analysis runs, research runs)
 visible at `GET /api/me/usage` and in the chat panel's header. Limits, tenancy,
 concurrency and audit are described in [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
-Design docs: [docs/TARGET_ARCHITECTURE.md](docs/TARGET_ARCHITECTURE.md) (v3),
-[docs/MODULE_NOTES.md](docs/MODULE_NOTES.md) (M1–M13),
-[docs/archive/plans/IMPLEMENTATION_PLAN.md](docs/archive/plans/IMPLEMENTATION_PLAN.md) (P0–P9, historical),
-[docs/spikes/P9_COVERAGE.md](docs/spikes/P9_COVERAGE.md) (final validation).
-Current plan: [docs/IMPLEMENTATION_PLAN_V1.md](docs/IMPLEMENTATION_PLAN_V1.md); earlier plans are archived under docs/archive/plans/ and are not read.
+Current plan and design: [docs/IMPLEMENTATION_PLAN_V1.md](docs/IMPLEMENTATION_PLAN_V1.md); every sentence
+sent to a model is in [docs/WORDING_V1.md](docs/WORDING_V1.md). Earlier plans are archived under
+docs/archive/plans/ and are not read. The v3 target architecture, the module notes (M1–M30) and the
+2026-09-15 as-built snapshot were removed on 2026-09-19 when the tool and agent layers they described
+were replaced; they are in git history (`git show f8a51c0:docs/MODULE_NOTES.md`).
 
 A stdio debug door onto the same tool face runs via
 `MCP_STDIO_USER_ID=user_... python -m apps.mcp.server` — the same server
