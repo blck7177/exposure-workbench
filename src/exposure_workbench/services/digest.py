@@ -33,6 +33,7 @@ import logging
 from typing import Any
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.analytics import registry
 from exposure_workbench.services import claims, facts as F
 from exposure_workbench.utils import json as ejson
 
@@ -111,6 +112,11 @@ def display(value: Any, unit: str | None) -> Any:
     return value
 
 
+# a boundary's class, where no service code came with it
+_REASON_OF_CLASS = {"data_absent": "not_held", "type": "param_out_of_range", "budget": "cannot",
+                    "held_back": "cannot", "error": "cannot", "boundary": "cannot"}
+
+
 def boundary(text: str, *, want: Any = None, subject: str | None = None, cls: str = "boundary",
              code: str | None = None, nearest: list | None = None) -> tuple[dict, F.Fact]:
     """WHAT THE DESK COULD NOT DO, AS A FACT.
@@ -129,8 +135,13 @@ def boundary(text: str, *, want: Any = None, subject: str | None = None, cls: st
     # a program's type report names every node it refused (V38/T3e), so it is
     # given the room a list needs; every other boundary is one sentence
     limit = 1500 if cls == "type" else 600
+    # WHY, and the way out where the desk named one (V1): a closed reason the
+    # requirement list can be counted by, read off the service's own code.
+    means: dict = {"reason": registry.reason_of(code) if code else _REASON_OF_CLASS.get(cls, "cannot")}
+    if nearest:
+        means["way_out"] = "the nearest names the desk holds: " + ", ".join(str(n) for n in nearest[:4])
     fact = F.fact(F.ABSENCE, measure[:200], subject=subject, text=(text or "the desk could not fulfil this")[:limit],
-                  as_of="n/a", params=params, standalone=False, group="boundary")
+                  as_of="n/a", params=params, standalone=False, group="boundary", means=means)
     entry = {"class": cls, "fact": fact.id, "text": fact.text}
     if code:
         entry["code"] = code

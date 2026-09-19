@@ -55,6 +55,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import registry
 from exposure_workbench.analytics import series_ops as so
 from exposure_workbench.analytics import resources
 from exposure_workbench.analytics import skill
@@ -114,6 +115,11 @@ class Node:
     # ledger's identity and a written date resolves (Q14: the desk showed the peak
     # date as a literal and refused the model for writing it).
     declared: dict = field(default_factory=dict)
+    # V1: the registry words this node's figures carry (analytics/registry) — a
+    # scalar's own, and a vector's / table's by label. The namer reads them off
+    # the row (services/quantities); they are carried here and never decided.
+    means: dict = field(default_factory=dict)
+    meanings: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -925,6 +931,7 @@ async def _from_payload(ctx: _Ctx, node: Node, payload: dict) -> Node:
         if resolved.quantities:
             node.kind, node.ref, node.payload = TABLE, cid, payload
             node.entries = [(q.label, f"{cid}:{q.label}", q.value, q.unit_class) for q in resolved.quantities if q.not_alone is None]
+            node.meanings = {q.label: dict(q.means) for q in resolved.quantities if q.means and q.not_alone is None}
             node.as_of = (payload.get("as_of") if isinstance(payload.get("as_of"), str) else None)
             # WHOSE FIGURES THESE ARE (V38/S4): the row's base — the run an
             # analysis or a reconciliation read, the book a scenario is — which is
@@ -1103,6 +1110,8 @@ async def _p_column(ctx: _Ctx, node: Node, run: Any, table: str, col: str) -> No
         for label, ref, value, unit in run.entries:
             if label.startswith(prefix) and label.endswith(suffix) and label.count(".") >= 2 and value is not None:
                 node.entries.append((label[len(prefix):-len(suffix)], ref, value, unit))
+                if run.meanings.get(label):
+                    node.meanings[label[len(prefix):-len(suffix)]] = dict(run.meanings[label])
         if node.entries:
             node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, run.ref, node.entries[0][3], f"{table}.{col}", run.as_of
             node.payload = {"of": run.ref, "table": table, "col": col, "labels": [e[0] for e in node.entries]}
@@ -1124,6 +1133,8 @@ async def _p_column(ctx: _Ctx, node: Node, run: Any, table: str, col: str) -> No
                 withheld.append((label, q.not_alone))
                 continue
             node.entries.append((label, f"{rid}:{q.label}", q.value, q.unit_class))
+            if q.means:
+                node.meanings[label] = dict(q.means)
     if not node.entries and withheld:
         node.kind, node.refusal = ABSENCE, _err("not_alone", f"{table}.{col} on {rid} may not be used name by name: {withheld[0][1]}",
                                                 labels=[w[0] for w in withheld])
@@ -1193,7 +1204,9 @@ async def _p_pick(ctx: _Ctx, node: Node, of: Any, key: str) -> Node:
             return node
         node.kind, node.refusal = ABSENCE, e
         return node
-    return await _scalar_from_ref(ctx, node, e[1], {"of": of.ref, "key": key})
+    picked = await _scalar_from_ref(ctx, node, e[1], {"of": of.ref, "key": key})
+    picked.means = dict(of.meanings.get(e[0]) or {})
+    return picked
 
 
 # The tables a completed run publishes; a `table.col` name sent as a method is a
@@ -1273,7 +1286,9 @@ async def _p_method(ctx: _Ctx, node: Node, name: str, subject: Any, params: dict
             if isinstance(e, dict):
                 one.kind, one.refusal, one.entries = ABSENCE, e, []
                 return one
-            return await _scalar_from_ref(ctx, Node(node.name, SCALAR, node.expr, deps=node.deps), e[1], {"method": name, "subject": subjects[0], "key": key})
+            picked = await _scalar_from_ref(ctx, Node(node.name, SCALAR, node.expr, deps=node.deps), e[1], {"method": name, "subject": subjects[0], "key": key})
+            picked.means = dict(one.meanings.get(e[0]) or {})
+            return picked
         return one
     # a method over a list: one figure per subject, as a VECTOR labelled by subject —
     # ten issuers' net margin is one node, and rank/top/avg apply to it
@@ -1622,6 +1637,8 @@ async def _p_rank(ctx: _Ctx, node: Node, of: Any, direction: str | None = None) 
     node.measure = r.get("quantity")
     node.unit = str((r.get("type") or {}).get("unit_class") or "").upper()
     node.entries = [(e["label"], e["ref"], e["value"], node.unit) for e in r["ordering"]]
+    if isinstance(of, Node):
+        node.meanings = {k: dict(v) for k, v in of.meanings.items()}
     return node
 
 
@@ -1696,6 +1713,7 @@ async def _p_select(ctx: _Ctx, node: Node, of: Any, labels: Any) -> Node:
         return node
     node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, of.ref, of.unit, of.measure, of.as_of
     node.entries = [have[l] for l in want]
+    node.meanings = {l: dict(of.meanings[l]) for l in want if of.meanings.get(l)}
     node.payload = {"of": of.ref, "labels": want}
     return node
 
@@ -1712,6 +1730,7 @@ async def _p_top(ctx: _Ctx, node: Node, of: Any, n: Any, direction: str | None =
     node.deps.append(ranked.name)
     node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, ranked.ref, ranked.unit, ranked.measure, ranked.as_of
     node.entries = ranked.entries[:n]
+    node.meanings = {e[0]: dict(ranked.meanings[e[0]]) for e in node.entries if ranked.meanings.get(e[0])}
     node.payload = {"of": ranked.ref, "n": n, "direction": direction or "highest", "labels": [e[0] for e in node.entries]}
     return node
 
@@ -1752,6 +1771,7 @@ async def _p_filter(ctx: _Ctx, node: Node, of: Any, op: Any, level: Any) -> Node
         return node
     node.kind, node.ref, node.unit, node.measure, node.as_of = VECTOR, of.ref, of.unit, of.measure, of.as_of
     node.entries = kept
+    node.meanings = {e[0]: dict(of.meanings[e[0]]) for e in kept if of.meanings.get(e[0])}
     node.payload = {"of": of.ref, "op": op, "level": lvl, **({"level_ref": lvl_ref} if lvl_ref else {}), "labels": [e[0] for e in kept]}
     return node
 
@@ -1975,13 +1995,17 @@ def _facts_of(node: Node) -> list[F.Fact]:
     if node.kind in (SCALAR, SERIES) and isinstance(node.payload, dict) and node.payload.get("made_of"):
         # what a composed total was built from, on the figure itself (V38/T3a)
         p["made_of"] = node.payload["made_of"]
+    if node.kind in (SCALAR, SERIES) and isinstance(node.payload, dict) and node.payload.get("substituted_inputs"):
+        # which filed line stood in for which (V1): the formula recorded it under
+        # `substituted_inputs` and only its `definition` prose ever said so
+        p["substituted"] = dict(node.payload["substituted_inputs"])
     win = _declared_window(dates)
     group = "book_derived" if (node.ref or "").startswith(("run_", "calc_")) and node.kind in (VECTOR, RANKING, TABLE) else "derived"
     if node.kind == SCALAR and isinstance(node.typed, tc.Typed):
         as_of, unit, measure, window = _typed_identity(node.typed)
         return [F.fact(F.SCALAR, measure or node.name, subject=_subject_of(node.typed, node.subject), unit=unit,
                        value=float(node.typed.value), as_of=as_of or (win["end"] if win else None), window=window or win, params=p,
-                       sources=(node.ref,) if node.ref else (), group=group)]
+                       sources=(node.ref,) if node.ref else (), group=group, means=dict(node.means))]
     if node.kind == SERIES and isinstance(node.typed, tc.TypedSeries):
         as_of, unit, measure, window = _typed_identity(node.typed)
         pts = tuple((d.isoformat(), float(t.value)) for d, t in node.typed.points)
@@ -2019,7 +2043,8 @@ def _facts_of(node: Node) -> list[F.Fact]:
                 if entity is not None:
                     measure, subj = named, entity
             out.append(F.fact(F.SCALAR, measure, subject=subj, unit=unit or None, value=float(value),
-                              as_of=as_of, window=win, params=extra, sources=(ref,) if ref else (), group=group))
+                              as_of=as_of, window=win, params=extra, sources=(ref,) if ref else (), group=group,
+                              means=dict(node.meanings.get(label) or {})))
         # AN ENTRY THAT WAS NOT COMPUTED IS A REFUSAL, LIKE A NODE THAT WAS NOT
         # (V38/T3b). A method over [JPM, GS] with GS refused was a vector of one
         # entry and nothing else: the reason sat in the node's note, which the
@@ -2031,13 +2056,17 @@ def _facts_of(node: Node) -> list[F.Fact]:
                 continue
             out.append(F.fact(F.ABSENCE, node.measure or node.name, subject=who,
                               text=(f"{node.name}[{who}] was not computed — {r.get('error')}: {r.get('detail', '')}")[:600],
-                              as_of="n/a", params={**p, "label": who, "error": r.get("error")}, group=group))
+                              as_of="n/a", params={**p, "label": who, "error": r.get("error")}, group=group,
+                              means={"reason": registry.reason_of(r.get("error"))}))
         return out
     if node.kind == ABSENCE and node.refusal:
         r = node.refusal
+        # WHY, in the registry's words (V1): a node that waited on a refused one
+        # is absent for the ROOT's reason, which is the one the reader can act on.
+        code = (r.get("root") or {}).get("error") if r.get("error") == "depends_on_refused" else r.get("error")
         return [F.fact(F.ABSENCE, node.name, text=_absence_text(node, r)[:600],
                        as_of="n/a", params={**p, "error": r.get("error"), **({"root": r.get("root")} if r.get("root") else {})},
-                       group=group)]
+                       group=group, means={"reason": registry.reason_of(code)})]
     return []
 
 

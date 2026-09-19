@@ -191,14 +191,20 @@ async def _record(db: AsyncSession, run_id: str, out: dict) -> str:
     # Labelled families, the shape _CALC_RESULT_KEYS declares for this op. The
     # label is the risk or the check, so a refusal can say WHICH net beta the
     # answer nearly matched rather than which position in a list.
+    # V1: the WORD beside the number. `direction` and `status` were computed
+    # above and lived only in the payload's prose; the namer reads a row's own
+    # words (analytics/registry.words_beside), so the fact of a net beta says
+    # `loses` and the fact of a room says `warning` — no sign convention for a
+    # handbook to teach. A gross beta has no direction: it is a size.
     recorded: dict = {
-        "net_beta": [{"label": risk, "value": n["net_beta"]}
+        "net_beta": [{"label": risk, "value": n["net_beta"], "direction": n["direction"],
+                      "quotable_individually": n["quotable_individually"]}
                      for risk, n in out["net_exposures"].items() if n.get("measured")],
         "gross_beta": [{"label": risk, "value": n["gross_beta"]}
                        for risk, n in out["net_exposures"].items() if n.get("measured")],
-        "room_to_warning": [{"label": h["check"], "value": h["room_to_warning"]}
+        "room_to_warning": [{"label": h["check"], "value": h["room_to_warning"], "status": h["status"]}
                             for h in out["headroom"]],
-        "room_to_breach": [{"label": h["check"], "value": h["room_to_breach"]}
+        "room_to_breach": [{"label": h["check"], "value": h["room_to_breach"], "status": h["status"]}
                            for h in out["headroom"]],
     }
 

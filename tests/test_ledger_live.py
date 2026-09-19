@@ -42,7 +42,7 @@ async def test_step_and_table_agree_and_the_drawer_resolves():
             rows = (await db.execute(select(FactRecord).where(FactRecord.session_id == sid))).scalars().all()
             step = (await db.execute(select(AgentStep).where(AgentStep.session_id == sid))).scalars().one()
         on_step = L.facts_in(step.evidence_refs)
-        assert on_step and len(on_step) == len(rows) == len(led.by_id)
+        assert on_step and len(on_step) == len(rows) == len(led.shown)   # V1: by_id also holds the standing policies
         assert {r["id"] for r in on_step} == {row.id for row in rows}
         by_row = {row.id: row for row in rows}
         for rec in on_step:

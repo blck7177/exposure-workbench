@@ -76,7 +76,9 @@ def test_G2_a_cell_is_a_scalar_a_chart_a_series_a_cite_a_passage(world):
 
 def test_G2_a_figure_the_row_says_is_not_determined_alone_may_not_stand_alone(world):
     led, *_ = world
-    leg = next(r for r in led.by_id.values() if not r.get("standalone", True))
+    # among the facts this session showed: the standing policy absences (V1) are
+    # not figures, and a boundary is never the thing this rule is about
+    leg = next(r for r in led.shown.values() if not r.get("standalone", True))
     v = G.check([_para("The rates leg is ", {"fact": leg["id"]}, ".")], led)
     assert v.error == "not_standalone" and v.problems[0]["id"] == leg["id"]
     assert G.check([{"type": "table", "rows": [[leg["id"]]]}], led).error == "not_standalone"

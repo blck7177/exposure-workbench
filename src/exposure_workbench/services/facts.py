@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Iterable, Sequence
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.analytics import registry
 from exposure_workbench.utils.ids import new_id
 
 # ── kinds ─────────────────────────────────────────────────────────────────────
@@ -77,10 +78,18 @@ class Fact:
     standalone: bool = True                       # False: citable, may not stand alone (collinear coefficient)
     sources: tuple[str, ...] = ()                 # the rows it rests on — the drawer's path
     group: str = "other"                          # the M2 question key
+    # V1: what the reading MEANS, in the registry's closed vocabulary — the
+    # direction of an exposure, a check's status, a basis, a flag, an absence's
+    # reason and way out. Only what the row cannot derive (analytics/registry).
+    means: dict = field(default_factory=dict)
 
     def __post_init__(self):
         if self.kind not in KINDS:
             raise ValueError(f"fact {self.id}: unknown kind {self.kind!r}")
+        try:
+            object.__setattr__(self, "means", registry.validate_means(self.means))
+        except ValueError as exc:
+            raise ValueError(f"fact {self.id} ({self.measure}): {exc}") from None
         if self.kind == SCALAR and self.value is None:
             raise ValueError(f"fact {self.id} ({self.measure}): a scalar has a value")
         if self.kind == SERIES and not self.points:
@@ -109,6 +118,7 @@ def from_record(d: dict) -> Fact:
         d["points"] = tuple((str(p[0]), float(p[1])) for p in d["points"])
     d["sources"] = tuple(d.get("sources") or ())
     d["params"] = dict(d.get("params") or {})
+    d["means"] = dict(d.get("means") or {})       # a record from before V1 has none
     return Fact(**d)
 
 
@@ -189,6 +199,101 @@ def from_model_row(row: Sequence, shared_sources: Sequence[str] | None = None) -
     d["standalone"] = params.pop("standalone", True)
     d["params"] = params
     return d
+
+
+# ── the row a reader is shown (V1) ────────────────────────────────────────────
+#
+# Eight fields, every one a thing a trained analyst reads without a legend, and
+# one line made of them:
+#
+#     [f_…] what, of, when: value — means — from
+#
+# The analyst reads it, the ledger stores the row it is made from, the lead
+# quotes it, the check resolves against it and the reader opens it: one row, and
+# the line is a PURE FUNCTION of that stored row (tests pin it). Nothing here
+# is stored twice — `what` is the measure's financial name, `when` the period
+# the row actually has, `means` the registry's words (analytics/registry).
+ROW_FIELDS = ("id", "kind", "what", "of", "when", "value", "means", "from")
+_KIND_WORDS = {SCALAR: "reading", SERIES: "series", PASSAGE: "passage", ABSENCE: "absence", TASK: "task"}
+
+
+def _record_of(f: "Fact | dict") -> dict:
+    return for_record(f) if isinstance(f, Fact) else f
+
+
+def when_of(rec: dict) -> str:
+    """The period the row HAS, as words: a series' spacing and reach, a window's
+    two dates, a flow's months up to its date, an instant."""
+    if rec.get("kind") == SERIES and rec.get("points"):
+        pts = rec["points"]
+        spacing = spacing_of(pts)
+        return ", ".join(x for x in (spacing, f"{pts[0][0]} to {pts[-1][0]}", f"{len(pts)} points") if x)
+    as_of = rec.get("as_of") if rec.get("as_of") not in (None, "", "n/a") else None
+    w = rec.get("window") or {}
+    if w.get("start") and w.get("end"):
+        return f"{w['start']} to {w['end']}"
+    if w.get("instant"):
+        return f"at {w['instant']}"
+    for key, word in (("months", "months"), ("days", "sessions")):
+        if isinstance(w.get(key), (int, float)) and not isinstance(w.get(key), bool):
+            return f"{w[key]:g} {word}" + (f" to {as_of}" if as_of else "")
+    if isinstance(w.get("name"), str) and w["name"]:
+        return w["name"] + (f" to {as_of}" if as_of else "")
+    return f"as of {as_of}" if as_of else ""
+
+
+def value_of(rec: dict) -> str:
+    """The value as displayed, unit in the writing (analytics/display_conventions)."""
+    kind, unit = rec.get("kind"), rec.get("unit")
+    if kind == SCALAR:
+        v = rec.get("value")
+        return dc.display(float(v), unit) if unit and isinstance(v, (int, float)) else str(v)
+    if kind == SERIES:
+        pts = _thin([(str(p[0]), float(p[1])) for p in rec.get("points") or []], SERIES_POINTS_INLINE)
+        return "; ".join(f"{p} {dc.display(v, unit) if unit else v}" for p, v in pts)
+    if kind == PASSAGE:
+        text = str(rec.get("text") or "")
+        return '"' + text[:PASSAGE_CHARS] + ('…"' if len(text) > PASSAGE_CHARS else '"')
+    if kind == TASK:
+        return str(rec.get("text") or "")
+    return "—"
+
+
+def from_of(rec: dict) -> str:
+    """Where the row came from: the method or operation that made it, else the
+    row it was read off."""
+    params = rec.get("params") or {}
+    if params.get("method"):
+        return f"method {params['method']}"
+    if params.get("op"):
+        return f"op {params['op']}"
+    sources = [s for s in rec.get("sources") or [] if isinstance(s, str)]
+    if sources:
+        return ", ".join(sources[:2])
+    return str(rec.get("group") or "")
+
+
+def model_row(f: "Fact | dict") -> dict:
+    """The eight fields of one row, from the stored record."""
+    rec = _record_of(f)
+    return {"id": rec.get("id"), "kind": _KIND_WORDS.get(rec.get("kind"), rec.get("kind")),
+            "what": registry.reads_as(rec.get("measure")), "of": rec.get("subject") or "",
+            "when": when_of(rec), "value": value_of(rec), "means": registry.means_words(rec),
+            "from": from_of(rec)}
+
+
+def line(f: "Fact | dict") -> str:
+    """One row as the line a reader is shown. No legend goes with it."""
+    r = model_row(f)
+    head = ", ".join(x for x in (r["what"], r["of"], r["when"]) if x)
+    if r["kind"] == "absence":
+        head = f"absent: {head}"
+    tail = " — ".join(x for x in (r["value"], r["means"], r["from"]) if x)
+    return f"[{r['id']}] {head}: {tail}"
+
+
+def lines(facts: Sequence["Fact | dict"]) -> str:
+    return "\n".join(line(f) for f in facts)
 
 
 # ── caps ──────────────────────────────────────────────────────────────────────

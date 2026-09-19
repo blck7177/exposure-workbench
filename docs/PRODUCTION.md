@@ -412,6 +412,14 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v36_analyst_reports.sql
 
+# v39_fact_means.sql adds facts.means: the registry words a reading carries (a
+# net beta's loses/gains, a check's clear/warning/breach, a collinear fit, an
+# absence's reason and way out). Additive and idempotent; a row written before
+# it holds '{}' and renders without the clause. Nothing is backfilled: the words
+# were computed and dropped at the tool boundary, so no earlier row recorded them.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v39_fact_means.sql
+
 docker compose up -d
 
 # Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry

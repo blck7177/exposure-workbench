@@ -43,6 +43,7 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
+from exposure_workbench.analytics import registry
 from exposure_workbench.analytics import resources as rs
 from exposure_workbench.analytics import skill
 from exposure_workbench.services import facts as F
@@ -196,6 +197,10 @@ class Ctx:
     # numeric leaf beneath it — the producer's declaration, read before the
     # consumer-side key list. A catalogue's structural counts arrive this way.
     leaf_unit: str | None = None
+    # V1: the registry words said beside the figures being walked — a check's
+    # `status`, a net exposure's `direction`, a collinear row — so the Fact
+    # carries what the service computed (analytics/registry.words_beside).
+    means: dict = field(default_factory=dict)
 
     def child(self, **changes) -> "Ctx":
         return replace(self, **changes)
@@ -343,7 +348,8 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                        subject=node.get("ticker") or ctx.subject, text=node["statement"],
                        as_of=_as_of_of(node, ctx) or "n/a", params={k: v for k, v in node.items()
                                                                     if k in ("error", "missing", "formula", "metric")},
-                       sources=_sources_of(node, ctx), group=ctx.group)
+                       sources=_sources_of(node, ctx), group=ctx.group,
+                       means={"reason": registry.reason_of(node.get("error") or "not_held")})
             facts.append(f)
             note = {k: v for k, v in node.items() if k != "statement"}
             note = _harvest(note, key, path, ctx.child(as_of=f.as_of), facts)
@@ -376,7 +382,8 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                        value=float(node["value"]), as_of=_as_of_of(node, ctx), window=_window_of(node, ctx),
                        params={**ctx.params, **_params_of(node, ctx)},
                        standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
-                       sources=_sources_of(node, ctx), group=ctx.group)
+                       sources=_sources_of(node, ctx), group=ctx.group,
+                       means=registry.merged(ctx.means, registry.words_beside(node)))
             facts.append(f)
             note = {k: v for k, v in node.items() if k != "value"}
             note = _harvest(note, key, path, ctx.child(as_of=f.as_of, window=f.window, sources=f.sources), facts)
@@ -387,7 +394,8 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
         sub = ctx.child(as_of=_as_of_of(node, ctx), window=_window_of(node, ctx), sources=_sources_of(node, ctx),
                         params={**ctx.params, **_params_of(node, ctx)},
                         standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
-                        default_unit=declared.upper() if isinstance(declared, str) else ctx.default_unit)
+                        default_unit=declared.upper() if isinstance(declared, str) else ctx.default_unit,
+                        means=registry.merged(ctx.means, registry.words_beside(node)))
         if isinstance(node.get("ticker"), str) and key not in ("brief",):
             sub = sub.child(subject=node["ticker"])
         if isinstance(node.get("numeric_unit"), str):
@@ -418,7 +426,7 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
             return _untyped_leaf(key, exc)
         f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit, value=float(node),
                    as_of=ctx.as_of, window=ctx.window, params=dict(ctx.params), standalone=ctx.standalone,
-                   sources=ctx.sources, group=ctx.group)
+                   sources=ctx.sources, group=ctx.group, means=dict(ctx.means))
         facts.append(f)
         return f.id
     return node
@@ -429,7 +437,8 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
     label = _label_of(row)
     sub = ctx.child(subject=label or ctx.subject, as_of=_as_of_of(row, ctx), window=_window_of(row, ctx),
                     sources=_sources_of(row, ctx), params={**ctx.params, **_params_of(row, ctx)},
-                    standalone=ctx.standalone and row.get("quotable_individually", True) is not False)
+                    standalone=ctx.standalone and row.get("quotable_individually", True) is not False,
+                    means=registry.merged(ctx.means, registry.words_beside(row)))
     out: dict = {}
     for k, v in row.items():
         if k in DROP_KEYS:
@@ -446,7 +455,7 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
                 continue
             f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=unit,
                        value=float(v), as_of=sub.as_of, window=sub.window, params=dict(sub.params),
-                       standalone=sub.standalone, sources=sub.sources, group=ctx.group)
+                       standalone=sub.standalone, sources=sub.sources, group=ctx.group, means=dict(sub.means))
             facts.append(f)
             out[k] = f.id
         else:
@@ -460,6 +469,8 @@ def _params_of(obj: dict, ctx: Ctx) -> dict:
               "peak_date", "trough_date", "recovery_date", "high_date", "form_type", "item", "fiscal_year",
               "fiscal_quarter", "confidence", "fraction", "scenario"):
         v = obj.get(k)
+        if k == "direction" and v in registry.DIRECTION:
+            continue          # an exposure's direction is what the figure MEANS (V1), not a parameter of it
         if isinstance(v, (str, int, float)) and not isinstance(v, bool):
             p[k] = v
     return p

@@ -51,6 +51,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from exposure_workbench.analytics import registry
 from exposure_workbench.services import answer as A
 from exposure_workbench.services import facts as F
 from exposure_workbench.services.facts import extent_in as F_extent, spacing_of as F_spacing
@@ -153,6 +154,29 @@ _PERIOD_CLAIM = re.compile(
     re.I)
 TIER_SUFFIXES = ("warning_level", "breach_level", "limit_value")
 CHANGE_OPS = ("yoy", "qoq", "pct", "cagr", "subtract")
+
+# ── V1: what the reading MEANS is on the fact ────────────────────────────────
+# A net beta's fact says `loses` or `gains` and a check's fact says `clear`,
+# `warning` or `breach` (analytics/registry): the services always computed those
+# words, and until V1 the tool boundary dropped them, so "the book is net short
+# equities" beside −0.86 (round C, mini Q08, twice) was a sentence no ledger
+# could contradict. Now it is a lookup. What the sentence CLAIMS is a word from a
+# closed list; a sentence that negates, or says both, is not judged.
+GAIN_WORDS = frozenset("gains gain gaining gained benefits benefit benefiting benefited profits profit".split())
+LOSE_WORDS = frozenset("loses lose losing lost hurt hurts hurting suffers suffer suffering".split())
+NEGATIONS = frozenset("not no never neither nor without hardly isn't aren't doesn't don't cannot".split())
+# Every risk this desk nets is the move that hurts a LONG (analytics/integration
+# ._RISK_SENSE): equities down, rates up, spreads wider. So a book that loses to
+# it is long, and one that gains is short — whichever risk the fact names.
+_SHORT_CLAIM = re.compile(r"\b(?:net\s+)?short(?:ed)?\b(?![\s-]+(?:term|window|run|dated|of\b))", re.I)
+_LONG_CLAIM = re.compile(r"\b(?:net\s+)?long\b(?![\s-]+(?:term|window|run|dated|as\b|way\b))", re.I)
+_STATUS_CLAIMS = (
+    ("breach", re.compile(r"\b(?:in\s+breach|breached|breaches|breaching)\b", re.I)),
+    ("warning", re.compile(r"\bin\s+(?:the\s+)?warning\b", re.I)),
+    ("clear", re.compile(r"\b(?:clear\s+of|(?:is|are|remains?|stays?|sits?)\s+clear|"
+                         r"within\s+(?:its\s+|the\s+|all\s+|every\s+)?(?:limits?|tiers?|mandate)|"
+                         r"comfortably\s+(?:inside|within))\b", re.I)),
+)
 _WORD = re.compile(r"[A-Za-z][A-Za-z_']*")
 _MIN_QUOTED_WORDS = 4
 
@@ -517,7 +541,8 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
     if v.problems:
         order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "unpointed_figure",
                  "ambiguous_point", "unverified_quote", "date_expected", "subject_mismatch", "measure_mismatch",
-                 "period_mismatch", "superlative_without_rank", "change_conflict", "direction_conflict", "tier_mismatch")
+                 "period_mismatch", "superlative_without_rank", "change_conflict", "direction_conflict", "tier_mismatch",
+                 "sense_conflict", "status_conflict")
         reasons = {p["reason"] for p in v.problems}
         v.error = next((r for r in order if r in reasons), v.problems[0]["reason"])
         v.detail = (f"{len(v.problems)} problem(s), all listed; the first: " + _one_line(v.problems[0]))
@@ -912,6 +937,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         if "breach" in words and "breach" not in kinds and kinds:
             v.problems.append({"at": at, "reason": "tier_mismatch", "id": tiers[0]["id"],
                                "fix": f"the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier"})
+    _check_meaning(v, at, sentence, words, [r for recs in groups for r in recs])
     # a change or a comparison joins the right two figures, and points the way they moved
     up, down = words & UP_WORDS, words & DOWN_WORDS
     # A CHANGE IS TWO FIGURES. "went from 10.7% to 32.5%, then down to 3.81%, then
@@ -963,6 +989,35 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
             if (up and val < 0) or (down and val > 0):
                 v.problems.append({"at": at, "reason": "direction_conflict", "ids": [r["id"]],
                                    "fix": f"this change is {'negative' if val < 0 else 'positive'}; the sentence points the other way"})
+
+
+def _check_meaning(v: Verdict, at: str, sentence: str, words: set[str], recs: list[dict]) -> None:
+    """The sentence against the words its own facts carry (V1). Two lookups, and
+    both stand down where the sentence negates: "is not in breach" names the
+    state it denies, and which way a negation cuts is not this check's to read."""
+    if words & NEGATIONS or "n't" in sentence:
+        return
+    sensed = [r for r in recs if (r.get("means") or {}).get("direction") in ("loses", "gains")]
+    if sensed:
+        says_gain = bool(words & GAIN_WORDS) or bool(_SHORT_CLAIM.search(sentence))
+        says_lose = bool(words & LOSE_WORDS) or bool(_LONG_CLAIM.search(sentence))
+        if says_gain != says_lose:                      # one side claimed, not both
+            claimed = "gains" if says_gain else "loses"
+            if all(r["means"]["direction"] != claimed for r in sensed):
+                r = sensed[0]
+                v.problems.append({"at": at, "reason": "sense_conflict", "id": r["id"],
+                                   "fix": f"the desk's reading says {registry.DIRECTION[r['means']['direction']]}; "
+                                          f"the sentence says the opposite (a book that loses to this risk is long it, "
+                                          f"one that gains is short it)"})
+    stated = [r for r in recs if (r.get("means") or {}).get("status") in ("clear", "warning", "breach")]
+    if stated:
+        claimed = [name for name, pat in _STATUS_CLAIMS if pat.search(sentence)]
+        held = {r["means"]["status"] for r in stated}
+        if claimed and not (set(claimed) & held):
+            r = stated[0]
+            v.problems.append({"at": at, "reason": "status_conflict", "id": r["id"],
+                               "fix": f"the check here is {registry.STATUS[r['means']['status']]}; "
+                                      f"the sentence says {' and '.join(claimed)}"})
 
 
 # ── the render ───────────────────────────────────────────────────────────────

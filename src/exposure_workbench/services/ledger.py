@@ -36,6 +36,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.analytics import registry
 from exposure_workbench.db.models import AgentStep, FactRecord
 from exposure_workbench.services import facts as F
 
@@ -65,7 +66,7 @@ def rows_for(facts: Sequence[F.Fact], *, session_id: str, step_id: str | None,
             kind=f.kind, subject=f.subject, measure=f.measure, unit=f.unit, value=f.value,
             points=[list(p) for p in f.points] if f.points else None, text=f.text,
             as_of=f.as_of, window=f.window, params=dict(f.params), standalone=f.standalone,
-            sources=list(f.sources), group=f.group,
+            sources=list(f.sources), group=f.group, means=dict(f.means),
         ))
     return out
 
@@ -143,6 +144,16 @@ class Ledger:
     _series: list[dict] = field(default_factory=list)
     _tol: dict = field(default_factory=dict)           # (value, unit) -> the desk's own precision
 
+    def __post_init__(self) -> None:
+        # WHAT THE DESK DOES NOT SAY STANDS ON EVERY LEDGER (V1). A line a policy
+        # stops is filed "not settled" with the id of a boundary, and no tool
+        # mints one for a policy — nothing was asked of a tool. The three
+        # policies are facts under fixed ids (analytics/registry), here before
+        # anything a session shows, so a sentence can point at them and the
+        # check resolves the pointer like any other.
+        for rec in registry.POLICY_ABSENCES:
+            self.add(dict(rec))
+
     # ── building ──
     def add(self, rec: dict) -> None:
         if not F.is_fact_id(rec.get("id")):
@@ -181,6 +192,16 @@ class Ledger:
     def standalone(self, fid: str) -> bool:
         r = self.by_id.get(fid)
         return bool(r.get("standalone", True)) if r else False
+
+    def means(self, fid: str) -> dict:
+        """The registry words the fact carries (its direction, status, flags)."""
+        r = self.by_id.get(fid)
+        return dict(r.get("means") or {}) if r else {}
+
+    @property
+    def shown(self) -> dict[str, dict]:
+        """The facts this SESSION put on the ledger — without the standing policies."""
+        return {k: v for k, v in self.by_id.items() if k not in registry.POLICY_IDS}
 
     @property
     def measures(self) -> set[str]:
@@ -360,6 +381,7 @@ async def record(db: AsyncSession, fid: str) -> dict | None:
         "id": row.id, "kind": row.kind, "measure": row.measure, "subject": row.subject, "unit": row.unit,
         "value": row.value, "points": row.points, "text": row.text, "as_of": row.as_of, "window": row.window,
         "params": row.params or {}, "standalone": row.standalone, "sources": row.sources or [],
+        "means": row.means or {},
         "group": row.group, "session_id": row.session_id, "step_id": row.step_id, "message_id": row.message_id,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }

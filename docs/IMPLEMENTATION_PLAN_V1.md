@@ -138,6 +138,21 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - 验收：六条金标准渲染行（净 beta、余地、利息覆盖、DSO、缺席、政策缺席）逐字相等；渲染行是存储行的纯函数（测试从存储行重渲染相等）；方向冲突与状态冲突各一条红得了的测试。
 - 提交：一组，只改事实形状，不与其他步同提交。
 
+**执行记录（2026-09-19，分支 `desk-v1`）**：已完成。离线套件 2673 通过（基线 2647 加本步 26 条，`tests/test_v1_fact_means.py`），11 跳过，314 未选。
+
+- 落地形状：存储行保留原有类型化列（`measure`、`params`、`unit`、`value`…），新增一列 `means`，只存行自己推不出来的词：`direction`、`status`、`basis`、`flags`、`reason`、`way_out`；位次、变化方向、组成分别由 `params.place/of`、`params.op` 加值的符号、`params.made_of/substituted` **渲染**出来，不抄第二份。词表与措辞在新模块 `analytics/registry.py`，词表外的词在 Fact 构造时即报错。存储层的 kind 仍是 `scalar|series|passage|absence|task`，模型面的词是 `reading|series|passage|absence`；`task` 留到步骤 3 随 `start` 一起改。
+- 渲染：`services/facts.py` 的 `model_row()`（8 字段）与 `line()`（一行）；六条金标准行、"同一条存储行渲染四次相等"的纯函数测试已钉住。渲染行用英文，与桌子发给模型的其他文字一致。
+- 词从生产者带到事实：`integration_service` 记账时把 `direction`、`status`、`quotable_individually` 写在数字旁边；命名器 `quantities` 读行上自己的词（limit_checks 行的 `status`，`ok` 映射为 `clear`）；`program_service` 的节点按标签携带并在 rank/top/select/filter/pick 里传下去；`fact_adapters` 的上下文同样携带；`digest.boundary` 与被拒节点的缺席带 `reason`（依赖被拒的取根因），有最近名字时带 `way_out`。利息覆盖的替代科目从 `substituted_inputs` 进 `params.substituted`。
+- 常驻政策缺席：`f_policy_no_forecast`、`f_policy_no_threshold`、`f_policy_no_estimate`，句子取自沿用至今的 DESK_RULES 原文；每个 Ledger 构造时即持有，抽屉在库里查不到时回登记簿；`Ledger.shown` 给出不含它们的本 session 事实。
+- 两道新检查：`sense_conflict`（事实说亏而句子说赚、net short，或反之）与 `status_conflict`（句子声称的状态与所指检查的状态无一相符）；句子带否定词或两边都说则不判。
+- 库：`infra/migrations/v39_fact_means.sql`（库迁移沿用 v 编号的自身序列）、`init.sql`、`FactRecord.means`，已列入 PRODUCTION.md 的部署顺序。
+
+**本步发现，留给后面**：
+1. 净 beta 与毛 beta 在 `resources.CALC_RESULTS` 里声明为 RATIO，于是 −0.86 渲染成 "-86.0%"。beta 的单位与写法归步骤 2 的登记簿条目定。
+2. `pick` 直接从 run 取单个数、`figure()` 走类型计算器解析，拿不到行上的词；步骤 3 的 `book_read` 直接读行，连词一起带，不在将退役的程序语言里补。
+3. 模型现在仍经旧 digest 读数，看不到 `means` 的词，只会在被新检查拒绝时从出路里读到；词随行下发在步骤 3。`registry.py` 里的措辞是发给模型的新文字，步骤 3 接线前走措辞过目。
+4. 读者抽屉的 body 已含 `means` 与 `line`，前端卡片尚未显示，随步骤 4 或 7 的读者面一起做。
+
 ### 步骤 2 · 登记簿
 
 - 做什么：新模块（`analytics/registry.py`）承载 §2.5 的条目；`formulas.py`、`skill.METHODS` 的执行器、`READINGS`、`integration` 方向映射、`containment`、`units`、`resources._DECLARED` 迁入或被它引用；`metric` 的执行路径 = 登记簿条目 → 现有 service（`formula_service`、`price_analytics_service`、`drawdown_service`、`reconcile_service`、`integration_service`）→ 一行事实带组成。16 条 `DESK_RULES` 逐条归位：定义类进登记簿（EBIT 从净利润起算、FCF 定义、金融发行人不适用、总债务覆盖、权重代数、净 beta 方向、情景不重拟、扣留）、政策类进手册 §6（不预测、不给阈值、前提先核、比较的形状）、引用类进风格指南（数字是事实、缺席如实说）；`skill.py` 里不再有 READINGS 与 DESK_RULES 文本。

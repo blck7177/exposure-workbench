@@ -43,6 +43,7 @@ import re
 from typing import Any
 
 from exposure_workbench.analytics import display_conventions as dc
+from exposure_workbench.analytics import registry
 from exposure_workbench.services import facts as F
 
 BLOCK_TYPES = ("paragraph", "table", "chart")
@@ -338,6 +339,9 @@ def fill(rec: dict) -> dict:
     unit = rec.get("unit") or ""
     out = {k: rec.get(k) for k in ("id", "kind", "measure", "subject", "unit", "value", "as_of", "window",
                                    "params", "standalone", "sources", "group")}
+    said = registry.means_words(rec)
+    if said:
+        out["means"] = said           # V1: the reading's own words, as the analyst read them
     if rec.get("kind") == F.SCALAR and isinstance(rec.get("value"), (int, float)):
         out["display"] = dc.display(rec["value"], unit) if unit else str(rec["value"])
     elif rec.get("kind") == F.SERIES:

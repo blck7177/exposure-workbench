@@ -387,8 +387,14 @@ async def _fact_record(db: AsyncSession, fid: str) -> dict | None:
     """V24. A Fact by its id: what a tool put in front of the model, with the
     identity it carried, and the rows it rests on as upstream — so the drawer
     keeps drilling from a chip to the calc, the fact, the filing."""
+    from exposure_workbench.analytics import registry
+    from exposure_workbench.services import facts as F
     from exposure_workbench.services import ledger as ledger_svc
     rec = await ledger_svc.record(db, fid)
+    if rec is None:
+        # what the desk does not say stands on every ledger under a fixed id and
+        # in no session's table (V1): the registry holds the row
+        rec = next((dict(p) for p in registry.POLICY_ABSENCES if p["id"] == fid), None)
     if rec is None:
         return None
     when = rec.get("as_of") or _window((rec.get("window") or {}).get("start"), (rec.get("window") or {}).get("end"))
@@ -398,8 +404,11 @@ async def _fact_record(db: AsyncSession, fid: str) -> dict | None:
     ) if x)
     return {
         "type": "fact_record", "id": fid, "label": label,
-        "body": {k: rec.get(k) for k in ("kind", "measure", "subject", "unit", "value", "points", "text",
-                                          "as_of", "window", "params", "standalone", "group")},
+        # V1: `line` is the row as the analyst read it — what it is, whose, when,
+        # the value, what it means, where it came from — and `means` its words
+        "body": {**{k: rec.get(k) for k in ("kind", "measure", "subject", "unit", "value", "points", "text",
+                                             "as_of", "window", "params", "standalone", "group")},
+                 "means": rec.get("means") or {}, "line": F.line(rec)},
         "provenance": {"session_id": rec.get("session_id"), "step_id": rec.get("step_id"),
                        "message_id": rec.get("message_id"), "created_at": rec.get("created_at")},
         "upstream": [{"type": ("fact" if r.startswith("fact_") else "calc" if r.startswith("calc_")

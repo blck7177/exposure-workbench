@@ -35,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
+from exposure_workbench.analytics import registry
 from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.analytics import resources
 from exposure_workbench.analytics import units
@@ -103,6 +104,10 @@ class Quantity:
     # resources.GROUP_QUESTIONS. The table prints it beside the value with one
     # legend per payload, so the model reads meaning, not only a name.
     group: str = "other"
+    # V1. The registry words the ROW says about this number — a check's status,
+    # a net beta's direction, a collinear fit (analytics/registry.words_beside).
+    # Carried, not decided here, exactly as `not_alone` is.
+    means: dict | None = None
 
 
 # The name the gate has used for this since V3; kept so the daily-report path and
@@ -233,7 +238,8 @@ async def _from_calc(db: AsyncSession, cid: str) -> Resolved:
             if isinstance(item, dict):
                 iv, name = item.get("value"), item.get("label")
                 if isinstance(iv, (int, float)) and not isinstance(iv, bool) and isinstance(name, str):
-                    values.append(Quantity(float(iv), key_unit, f"{row.operation}.{key}.{name}", cid))
+                    values.append(Quantity(float(iv), key_unit, f"{row.operation}.{key}.{name}", cid,
+                                           means=registry.words_beside(item) or None))
                 continue
             if isinstance(item, (int, float)) and not isinstance(item, bool):
                 label = f"{row.operation}.{key}" + (f"[{i}]" if isinstance(kv, list) else "")
@@ -432,11 +438,15 @@ async def _from_run(db: AsyncSession, rid: str) -> Resolved:
         table = model.__tablename__
         for row in rows:
             who = _row_label(row, name_col, qual_col)
+            # A check's row says where the check stands; every figure of the row
+            # is a figure OF that check, so each carries the word (V1).
+            said = registry.words_beside({"status": getattr(row, "status", None)}) if table == "limit_checks" else {}
             for unit, cols in cols_by_unit.items():
                 for col in cols:
                     v = getattr(row, col, None)
                     if v is not None:
-                        out.append(Quantity(float(v), unit, f"{table}{who}.{col}", rid, table=table))
+                        out.append(Quantity(float(v), unit, f"{table}{who}.{col}", rid, table=table,
+                                            means=said or None))
 
     # Under collinearity a single beta is not identified; the sum is.
     metrics = next(iter(by_model.get(ExposureMetrics) or []), None)

@@ -707,6 +707,7 @@ CREATE TABLE IF NOT EXISTS facts (
     standalone  BOOLEAN NOT NULL DEFAULT TRUE,
     sources     JSONB NOT NULL DEFAULT '[]',
     "group"     VARCHAR(32),
+    means       JSONB NOT NULL DEFAULT '{}',   -- V1: direction | status | basis | flags | reason | way_out
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_facts_session ON facts(session_id);
