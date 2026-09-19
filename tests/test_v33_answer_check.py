@@ -526,7 +526,12 @@ def test_a_bracket_after_a_quotation_or_a_name_cites_that_fact():
     assert "f_plly" in out["citations"]
     _accepted("AAPL's 10-K Item 7 passage [f_plly] discusses margins.")
     _refused("AAPL's 10-K Item 7 passage [f_nothere] discusses margins.", "not_on_ledger")
-    _refused("A figure the bracket does not follow: 16.0% of the book [f_wmsft].", "unpointed_figure")
+    # V1 (live smoke, 2026-09-19): a few words may sit between a figure and its bracket WHEN THE
+    # FACT THE BRACKET NAMES HOLDS THE FIGURE — "a 20.0% breach tier [f_…]" is how English puts
+    # it, and refusing it cost the risk analyst its brief twice. The pairing is by value, so a
+    # bracket whose fact does not hold the figure still points at nothing.
+    _accepted("A figure with its noun before the bracket: 16.0% of the book [f_wmsft].")
+    _refused("A figure the bracket's fact does not hold: 19.0% of the book [f_wmsft].", "unsourced_figure")
 
 
 def test_the_punctuation_that_closes_the_writers_sentence_inside_the_marks_is_not_the_sources():

@@ -50,12 +50,16 @@ def test_the_description_surface_is_a_third_of_what_it_was():
     system prompt — carried the 'when to use' that is the agent's judgement.
     The ceiling here is the plan's acceptance number, with respond's block
     grammar (the gate's contract) counted in."""
-    reg = build_meta_registry()
-    total = sum(len(reg.get(n).description) + len(json.dumps(reg.get(n).json_schema))
-                for n in faces.FACE_META_AGENT)
-    # V27: the two name enums (46 methods, 47 filed lines) are the directory
-    # itself, in the schema; the description TEXT did not grow.
-    assert total < 14_500, total
+    # V1: measured on what an AGENT holds. The three analysts each hold one face;
+    # the mount named "meta" is the debug door with every verb and every family's
+    # measures, which no agent is handed (tools/primitives.DESK_TOOLS), so its size
+    # is nobody's context. `metric` now says what each measure takes (the first
+    # live turn guessed a param key), and each face still sits under the ceiling.
+    from exposure_workbench.tools.primitives import FACES, build_analyst_registry
+    for face in FACES:
+        reg = build_analyst_registry(face)
+        total = sum(len(t.description) + len(json.dumps(t.json_schema)) for t in reg.tools.values())
+        assert total < 14_500, (face, total)
 
 
 # ── the skill registry ──────────────────────────────────────────────────────

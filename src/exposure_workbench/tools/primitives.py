@@ -102,9 +102,8 @@ def _metric_lines(names: list[str]) -> list[str]:
     """The measures THIS registry's `metric` takes, each with what it is."""
     out = []
     for m in (desk.METHODS[n] for n in names):
-        takes = ", ".join(f"{k}∈{[e for e in (v.get('enum') or []) if e is not None]}" if v.get("enum") else k
-                          for k, v in (m.params_schema.get("properties") or {}).items())
-        out.append(f"{m.name} — {m.reads_as}: {m.describes}" + (f" [params: {takes}]" if takes else ""))
+        takes = desk.params_said(m)
+        out.append(f"{m.name} — {m.reads_as}: {m.describes}" + (f" [params — {takes}]" if takes else " [no params]"))
     return out
 
 
@@ -507,10 +506,19 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                         "stood in for which, and what a composed total left out come back on the row. `list(what='metrics')` "
                         "names every measure you may ask for and the params each takes. Refused: a subject the measure has "
                         "no meaning for, an input not filed, too little history — each with its reason.",
-            json_schema=_schema({"name": {"type": "string", "enum": metric_names},
+            json_schema=_schema({"name": {"type": "string", "enum": metric_names,
+                                          # the handbook speaks of measures by what they ARE and never by key
+                                          # (its first ban); the key and the words meet here, at the argument
+                                          "description": "; ".join(f"{n} = {desk.METHODS[n].reads_as}" for n in metric_names)},
                                  "subject": {"type": ["string", "array"], "items": {"type": "string"}, "maxItems": 40,
                                              "description": "a ticker, a run_/port_ id, or a list of them — what the measure says it is over"},
-                                 "params": {"type": ["object", "null"]}}, ["name", "subject"])),
+                                 # WHAT EACH MEASURE TAKES, said where the argument is filled in. The first
+                                 # live turn asked price.volatility for `window: "21d"` — a key it had to
+                                 # guess, because this said "an object" and nothing else.
+                                 "params": {"type": ["object", "null"],
+                                            "description": "only the keys the measure takes — "
+                                                           + desk.params_by_measure([desk.METHODS[n] for n in metric_names])}},
+                                ["name", "subject"])),
         "calc": Tool(
             name="calc", display="Computing {op}", rows=True, tool_class=READ, fn=_calc,
             description="ONE operation over figures you were already shown, named by their f_ ids — never a number typed "

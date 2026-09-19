@@ -354,3 +354,182 @@ def test_a_change_between_two_dates_runs_from_one_to_the_other():
                       "basis": {"leaves": {"instants": ["2026-03-31", "2025-06-30"], "intervals": []}}}}
     facts, _ = fa.compute({"op": "subtract"}, delta)
     assert "2025-06-30 to 2026-03-31" in F.line(facts[0])
+
+
+# ── the first live turns (2026-09-19) ────────────────────────────────────────
+# Four questions through the whole chain — lead, ask, analyst, verbs, submit,
+# handoff, answer check — against the smoke database.
+
+def test_metric_says_what_each_measure_takes_where_the_argument_is_filled_in():
+    """The market analyst asked price.volatility for `window: "21d"`: it had to
+    guess the key, because `params` was described as an object and nothing more.
+    All three calls were refused, and it filed both lines unsettled."""
+    said = P.build_analyst_registry("market").get("metric").json_schema["properties"]["params"]["description"]
+    assert "price.volatility — window_days = 21 | 30 | 63 | 126 | 252" in said
+    assert "price.momentum_12_1, price.distance_from_52w_high — takes no params" in said
+    issuer = P.build_analyst_registry("issuer").get("metric").json_schema["properties"]["params"]["description"]
+    assert "every other measure — months = 3 | 6 | 9 | 12" in issuer and issuer.count("months = ") == 1   # thirty formulas, said once
+    risk = P.build_analyst_registry("risk").get("metric").json_schema["properties"]["params"]["description"]
+    assert "book.explain_episode — peak (required): YYYY-MM-DD; trough (required): YYYY-MM-DD" in risk
+
+
+def test_params_that_do_not_fit_are_refused_with_the_params_the_measure_takes():
+    spec = desk.METHODS["price.volatility"]
+    f = fa.refusal_fact("metric", {"name": "price.volatility", "subject": "AAPL", "params": {"window": "21d"}},
+                        {"error": "invalid_params", "detail": "price.volatility: params do not fit the method's schema",
+                         "problems": [{"field": "window", "problem": "Additional properties are not allowed ('window' was unexpected)"}],
+                         "params_schema": spec.params_schema})
+    assert f.means["reason"] == "param_out_of_range"
+    assert f.means["way_out"].startswith("price.volatility takes: window_days = 21 | 30 | 63 | 126 | 252")
+
+
+# ── the checks, where they were false to what the reader was shown ──────────
+
+def _ledger_with(*facts):
+    from exposure_workbench.services import ledger as L
+    return L.Ledger.of_facts(list(facts))
+
+
+def test_a_calculation_records_what_it_was_made_of_and_the_row_says_so():
+    facts, _ = fa.compute({"op": "divide", "inputs": ["f_aaaa11112222", "f_bbbb33334444"], "name": "fcf_to_debt_xom", "why": WHY},
+                          {"calc_id": "calc_q", "op": "divide", "value": 0.394,
+                           "type": {"unit_class": "ratio", "quantity": "fcf_to_debt_xom", "issuers": ["XOM"],
+                                    "basis": {"leaves": {"instants": ["2026-03-31"], "intervals": [["2025-04-01", "2026-03-31"]]}}}})
+    assert facts[0].params["inputs"] == ["f_aaaa11112222", "f_bbbb33334444"]
+    assert "op divide of f_aaaa11112222 and f_bbbb33334444" in F.line(facts[0])
+    # a measure is made by its method, not by inputs the caller typed
+    own, _ = fa.compute({"name": "roe", "subject": "XOM", "inputs": ["f_x"]},
+                        {"method": "roe", "subject": "XOM", "calc_id": "calc_r", "value": 0.1, "unit_class": "ratio", "as_of": "2026-03-31"})
+    assert "inputs" not in own[0].params
+
+
+def test_each_entry_of_a_list_combined_with_one_figure_is_made_of_that_entry_and_that_figure():
+    facts, _ = fa.compute({"op": "divide", "inputs": ["f_a1a1a1a1a1a1", "f_b2b2b2b2b2b2"], "by": "f_c3c3c3c3c3c3"},
+                          {"op": "divide", "by": "f_c3c3c3c3c3c3", "count": 2, "results": [
+                              {"operand": "f_a1a1a1a1a1a1", "calc_id": "calc_1", "op": "divide", "value": 0.2, "type": {"unit_class": "ratio", "quantity": "x"}},
+                              {"operand": "f_b2b2b2b2b2b2", "calc_id": "calc_2", "op": "divide", "value": 0.3, "type": {"unit_class": "ratio", "quantity": "x"}}]})
+    assert [f.params["inputs"] for f in facts] == [["f_a1a1a1a1a1a1", "f_c3c3c3c3c3c3"], ["f_b2b2b2b2b2b2", "f_c3c3c3c3c3c3"]]
+
+
+def test_a_named_quotient_still_answers_to_the_measures_it_was_made_of():
+    """Refused live: "free cash flow to debt is 39.4% [f_…]" beside the analyst's own
+    `fcf_to_debt_xom` = divide(free_cash_flow, total_debt) — the sentence named a
+    measure the ledger held, and nothing on the quotient said it was built from it."""
+    from exposure_workbench.services import answer_check as AC
+    fcf = F.fact(F.SCALAR, "free_cash_flow", subject="XOM", unit="MONEY", value=18.79e9, window={"start": "2025-04-01", "end": "2026-03-31"})
+    debt = F.fact(F.SCALAR, "total_debt", subject="XOM", unit="MONEY", value=47.66e9, as_of="2026-03-31")
+    q = F.fact(F.SCALAR, "fcf_to_debt_xom", subject="XOM", unit="RATIO", value=0.394, as_of="2026-03-31",
+               params={"op": "divide", "inputs": [fcf.id, debt.id]})
+    led = _ledger_with(fcf, debt, q)
+    ok = AC.check(f"XOM's free cash flow to debt is 39.4% [{q.id}].", led)
+    assert not [p for p in ok.problems if p["reason"] == "measure_mismatch"], ok.problems
+    bare = F.fact(F.SCALAR, "fcf_to_debt_xom", subject="XOM", unit="RATIO", value=0.394, as_of="2026-03-31", params={"op": "divide"})
+    led2 = _ledger_with(fcf, debt, bare)
+    assert [p for p in AC.check(f"XOM's free cash flow to debt is 39.4% [{bare.id}].", led2).problems if p["reason"] == "measure_mismatch"]
+
+
+_MDA = ("On December 31, 2025, the Corporation had total unused short-term committed lines of credit of $7.3 billion. "
+        "The table below shows the Corporation's consolidated debt to capital ratios.\\n (percent)202520242023\\n"
+        "Debt to capital14.0 13.4 16.4 \\nNet debt to capital (1)\\n11.0 6.5 4.5")
+
+
+def test_a_short_bare_number_the_passage_holds_is_refused_with_a_way_out_that_is_true():
+    """Live: the lead wrote "debt to capital was 14.0 [f_passage]", was told the
+    passage "does not state this figure", sent the same sentence again and lost
+    the answer. The passage reads "Debt to capital14.0". The rule stands — a short
+    number written bare is not matched against a filing — and the refusal now says
+    that, and what to write instead."""
+    from exposure_workbench.services import answer_check as AC
+    p = F.fact(F.PASSAGE, "10-K Item 7", subject="XOM", text=_MDA, as_of="2026-02-18")
+    led = _ledger_with(p)
+    refused = AC.check(f"XOM's debt to capital was 14.0 [{p.id}].", led)
+    (problem,) = [x for x in refused.problems if x["reason"] == "mark_mismatch"]
+    assert "WITH THE UNIT THE PASSAGE GIVES IT" in problem["fix"] and "does not state" not in problem["fix"]
+    assert not AC.check(f"XOM's debt to capital was 14.0 percent [{p.id}].", led).problems
+    # a number the passage does NOT hold keeps the old sentence
+    (other,) = [x for x in AC.check(f"XOM's debt to capital was 19.5 [{p.id}].", led).problems if x["reason"] == "mark_mismatch"]
+    assert "does not state this figure" in other["fix"]
+
+
+def test_a_date_a_cited_passage_spells_out_is_the_same_date_written_iso():
+    from exposure_workbench.services import answer as A, answer_check as AC
+    assert A.dates_stated(_MDA) == {"2025-12-31"}
+    p = F.fact(F.PASSAGE, "10-K Item 7", subject="XOM", text=_MDA, as_of="2026-02-18")
+    led = _ledger_with(p)
+    v = AC.check(f"At 2025-12-31 the Corporation had unused short-term committed lines of $7.3 billion [{p.id}].", led)
+    assert not [x for x in v.problems if x.get("figure") == "2025-12-31"], v.problems
+    wrong = AC.check(f"At 2024-12-31 the Corporation had unused short-term committed lines of $7.3 billion [{p.id}].", led)
+    assert [x for x in wrong.problems if x.get("figure") == "2024-12-31"]
+
+
+def test_the_same_reading_on_two_books_is_a_comparison_not_a_reading_written_twice():
+    """Live: "gross exposure would stay at 100.0% [after] versus 100.0% [before]" —
+    the scenario's book against the run it started from — refused as one reading
+    written twice. The book a row was read off is part of which reading it is."""
+    from exposure_workbench.services import answer_check as AC
+    before = F.fact(F.SCALAR, "limit_checks.current_value", subject="gross_exposure", unit="RATIO", value=1.0,
+                    as_of="2026-09-10", params={"of": "run_e2945c5ebd5a"})
+    after = F.fact(F.SCALAR, "limit_checks.current_value", subject="gross_exposure", unit="RATIO", value=1.0,
+                   as_of="2026-09-10", params={"of": "calc_50d834000e6f"})
+    led = _ledger_with(before, after)
+    v = AC.check(f"Gross exposure would stay at 100.0% [{after.id}] after the sale, versus 100.0% [{before.id}] in the latest book.", led)
+    assert not [p for p in v.problems if p["reason"] == "change_conflict"], v.problems
+    twice = F.fact(F.SCALAR, "issuer_exposures.weight", subject="gross_exposure", unit="RATIO", value=1.0,
+                   as_of="2026-09-10", params={"of": "run_e2945c5ebd5a"})
+    led2 = _ledger_with(before, twice)
+    v2 = AC.check(f"Gross exposure went from 100.0% [{before.id}] to 100.0% [{twice.id}].", led2)
+    assert [p for p in v2.problems if p["reason"] == "change_conflict"]
+
+
+def test_a_refused_brief_names_the_analysts_own_way_to_a_derived_figure():
+    from exposure_workbench.agents import delegation as D
+    task = D.Task(task_id="tsk_1", analyst="risk", subjects=("port_001",), lines=("1. room to each tier",), context="")
+    told = D.refusal_message(task, D.HandoffVerdict(problems=[
+        {"where": "line 1", "reason": "unsourced_figure", "figure": "0.2%", "fix": "a number the ledger cannot account for"}]))
+    assert "make it with `calc` from the ids of the figures it comes from" in told
+    dated = D.refusal_message(task, D.HandoffVerdict(problems=[
+        {"where": "line 1", "reason": "unsourced_figure", "figure": "2025-12-31", "fix": "a date no fact of this turn carries"}]))
+    assert "`calc`" not in dated                       # a date is not computed
+
+
+def test_the_metric_verb_says_each_name_in_the_handbooks_words():
+    said = P.build_analyst_registry("risk").get("metric").json_schema["properties"]["name"]["description"]
+    assert "book.analysis = the book's net exposures and room to its tiers" in said
+
+
+def test_a_span_of_time_a_cited_passage_states_is_the_passages_phrase():
+    from exposure_workbench.services import answer_check as AC
+    p = F.fact(F.PASSAGE, "10-K Item 7", subject="AAPL", as_of="2025-10-31",
+               text="The Company had fixed-rate notes for an aggregate principal amount of $91.3 billion, with $12.4 billion "
+                    "payable within 12 months. Cash is expected to be sufficient over the next 12 months and beyond.")
+    led = _ledger_with(p)
+    v = AC.check(f"The filing says $12.4 billion of its notes is payable within 12 months [{p.id}].", led)
+    assert not [x for x in v.problems if x.get("figure") == "12"], v.problems
+    other = AC.check(f"The filing says $12.4 billion of its notes is payable within 18 months [{p.id}].", led)
+    assert [x for x in other.problems if x.get("figure") == "18"]
+
+
+def test_a_figure_with_its_noun_before_the_bracket_is_pointed_when_the_fact_holds_it():
+    from exposure_workbench.services import answer_check as AC
+    cur = F.fact(F.SCALAR, "limit_checks.current_value", subject="issuer_concentration:AAPL", unit="RATIO", value=0.152,
+                 as_of="2026-09-10", params={"of": "run_x"}, means={"status": "warning"})
+    tier = F.fact(F.SCALAR, "limit_checks.breach_level", subject="issuer_concentration:AAPL", unit="RATIO", value=0.20,
+                  as_of="2026-09-10", params={"of": "run_x"}, means={"status": "warning"})
+    led = _ledger_with(cur, tier)
+    ok = AC.check(f"issuer_concentration:AAPL is in warning at 15.2% [{cur.id}] against a 20.0% breach tier [{tier.id}].", led)
+    assert not [p for p in ok.problems if p["reason"] == "unpointed_figure"], ok.problems
+    # the pairing is by VALUE: a bracket whose fact does not hold the figure points at nothing
+    wrong = AC.check(f"issuer_concentration:AAPL is in warning at 15.2% [{cur.id}] against a 25.0% breach tier [{tier.id}].", led)
+    assert [p for p in wrong.problems if p.get("figure") == "25.0%"]
+
+
+def test_a_list_of_brackets_leaves_no_commas_behind():
+    from exposure_workbench.services import answer_check as AC
+    a, b, c = (F.fact(F.SCALAR, "limit_checks.current_value", subject=f"issuer_concentration:{t}", unit="RATIO", value=v,
+                      as_of="2026-09-10", means={"status": "warning"}) for t, v in (("JPM", 0.16), ("LLY", 0.136), ("MSFT", 0.174)))
+    led = _ledger_with(a, b, c)
+    text = f"The checks that would still warn are JPM, LLY, and MSFT issuer concentration [{a.id}], [{b.id}], [{c.id}]. Nothing else moves."
+    v = AC.check(text, led)
+    out = AC.accepted(text, v, led)
+    assert out["text"].startswith("The checks that would still warn are JPM, LLY, and MSFT issuer concentration. Nothing else moves.")
+    assert ",," not in out["text"] and set(out["citations"]) == {a.id, b.id, c.id}

@@ -71,6 +71,9 @@ _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
 _UNIT_TAIL = (r"(?:/[A-Za-z]+|×|\s?(?:x|times|pp|bps|basis\s+points?|percentage\s+points?|points?|days?|years?|"
               r"quarters?|months?|shares?|sessions?))?")
 _POINTER_AFTER = re.compile(_UNIT_TAIL + r"\s*\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
+# the same pointer with the figure's own noun between them: up to four words, no punctuation
+_POINTER_NEARBY = re.compile(_UNIT_TAIL + r"(?:\s+[A-Za-z][A-Za-z'’\-]*){1,4}\s*"
+                             r"\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
 _CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\]")
 
 # ── the closed word lists G3 reads ───────────────────────────────────────────
@@ -178,6 +181,16 @@ _STATUS_CLAIMS = (
                          r"comfortably\s+(?:inside|within))\b", re.I)),
 )
 _WORD = re.compile(r"[A-Za-z][A-Za-z_']*")
+
+_TIME_SPAN = re.compile(r"[\s-]+(days?|weeks?|months?|quarters?|years?|sessions?)\b", re.I)
+
+# A SHORT NUMBER WRITTEN BARE, WHICH THE PASSAGE DOES HOLD. The rule that refuses it
+# is right (a long filing holds nearly every short number, and matching one would
+# manufacture a source — ledger._MIN_BARE_DIGITS); the sentence that refused it was
+# false to the passage and named no way out the writer could take.
+_SHORT_BARE = ("{ids} holds these digits, but a short number written bare is not taken as a figure a passage "
+               "states: write it WITH THE UNIT THE PASSAGE GIVES IT (14.0 percent, $7.3 billion), or quote the "
+               "passage's own words")
 _MIN_QUOTED_WORDS = 4
 
 
@@ -383,6 +396,16 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 continue
             m = _POINTER_AFTER.match(blanked, t["end"])
             if not m:
+                # "versus a 20.0% breach tier [f_…]": English puts the noun after the number,
+                # and the bracket after the noun. The pairing is not taken on trust — it holds
+                # only when the fact the bracket names HOLDS the figure as written — so this
+                # widens what may be written and not what may be claimed. Live, the risk
+                # analyst wrote four tiers this way, read "unpointed figure" for each, wrote
+                # them the same way again and lost the brief (V1 smoke).
+                near = _POINTER_NEARBY.match(blanked, t["end"])
+                if near and near.group(1) in {f for f, _p in ledger.readings(t["token"])}:
+                    m = near
+            if not m:
                 continue
             pointed[t["start"]] = (m.group(1), m.group(2))
             consumed.add(m.start(1))
@@ -444,14 +467,15 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 if rec.get("kind") == F.PASSAGE:
                     # the figure a passage states, pointed at the passage (round I:
                     # Q04 "$65,179 million [f_passage]", Q19 nine segment figures)
-                    if ledger.resolve_in_passages(tok, [fid]):
+                    if ledger.resolve_in_passages(tok, [fid]) or _time_span_in(ledger, tok, blanked, end, [fid]):
                         v.links[(i, start)] = {"to": "passage", "ids": [fid], "as_written": tok}
                         v.refs.append(fid)
                     else:
                         v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
                                            "holds": "passage", "candidates": held_by,
-                                           "fix": f"{fid} is a passage and does not state this figure: quote the passage's own "
-                                                  f"words, or point at the fact that holds it"})
+                                           "fix": (_SHORT_BARE.format(ids=fid) if ledger.short_bare_in_passages(tok, [fid]) else
+                                                   f"{fid} is a passage and does not state this figure: quote the passage's own "
+                                                   f"words, or point at the fact that holds it")})
                     continue
                 hits = [p for f, p in ledger.readings(tok) if f == fid]
                 if period is not None:
@@ -498,6 +522,16 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
                 continue
             pids = ledger.resolve_in_passages(tok, all_passages)
+            if not pids and kind == "num":
+                # A SPAN OF TIME A CITED PASSAGE STATES IN THE SAME WORDS: "payable within 12
+                # months", "over the next 12 months". Bare, "12" is a short number and is not
+                # matched against a filing; with its unit it is the passage's own phrase, and
+                # it cost the issuer analyst its whole brief twice (V1 live smoke).
+                pids = _time_span_in(ledger, tok, blanked, end, all_passages)
+            if not pids and kind == "date" and A.iso_date(tok):
+                # the filing says "December 31, 2025" and the analyst who read it wrote
+                # 2025-12-31: one date, and the passage states it (V1 live smoke)
+                pids = ledger.dates_in_passages(A.iso_date(tok), all_passages)
             if pids:
                 v.links[(i, start)] = {"to": "passage", "ids": pids, "as_written": tok}
                 continue
@@ -515,6 +549,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                                "fix": ("a date no fact of this turn carries: the desk's dates are the facts' own "
                                        "as_of and window — quote the words that state this one, or drop it"
                                        if kind == "date" else
+                                       _SHORT_BARE.format(ids=", ".join(bare_in)) if (bare_in := ledger.short_bare_in_passages(tok, all_passages)) else
                                        "a number the ledger cannot account for: request the figure, quote the passage that states it, or drop it")})
 
         # G3 — the sentence around the figures
@@ -574,6 +609,23 @@ def _group_key(rec: dict, period: str | None) -> tuple:
     twice. They are aliases, not an ambiguity; the ambiguity the reader cares
     about is two subjects or two dates holding the same number."""
     return (_short_subject(rec.get("subject")) or rec.get("subject"), period or rec.get("as_of"))
+
+
+def _time_span_in(ledger: Ledger, tok: str, text: str, end: int, cited) -> list[str]:
+    """The cited passages that state `tok` followed by the same unit of time the
+    sentence gives it ("12 months"), or none."""
+    span = _TIME_SPAN.match(text, end)
+    if not span or not re.fullmatch(r"\d{1,4}", _core(tok)):
+        return []
+    unit = span.group(1).lower().rstrip("s")
+    phrase = re.compile(rf"(?<![\d.,]){re.escape(_core(tok))}[\s-]+{unit}s?\b", re.I)
+    return [pid for pid in cited if pid in ledger.passages and phrase.search(ledger.passages[pid])]
+
+
+def _book_of(rec: dict) -> str | None:
+    """The book a row was read off, where the row says one."""
+    of = (rec.get("params") or {}).get("of")
+    return of if isinstance(of, str) and of.startswith(("run_", "calc_", "port_")) else None
 
 
 def _holders(ledger: Ledger, tok: str) -> list[dict]:
@@ -867,7 +919,16 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
     # flow" beside divide(dividends_paid, operating_cash_flow), and may NOT say
     # "factor share 0.85%" beside alpha_plus_residual (V33B Q18, the one reader-
     # visible falsehood nothing else catches).
-    linked_words = [set(w.lower() for w in _measure_words(r.get("measure"))) for _t, recs in linked for r in recs]
+    # "…or one the figure is built from": a calculation's inputs are on the fact (params.inputs,
+    # V1), so a quotient the analyst NAMED still answers to the measures it was made of.
+    def _words_of(r: dict) -> set[str]:
+        have = set(w.lower() for w in _measure_words(r.get("measure")))
+        for fid in (r.get("params") or {}).get("inputs") or []:
+            made_of = ledger.by_id.get(fid)
+            if made_of:
+                have |= set(w.lower() for w in _measure_words(made_of.get("measure")))
+        return have
+    linked_words = [_words_of(r) for _t, recs in linked for r in recs]
     for phrase, measures in phrases.items():
         if not phrase or phrase not in low or not linked_words:
             continue
@@ -959,8 +1020,13 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         # measure test does not.
         # one reading under two names is one subject, one date AND one value:
         # two different quantities of one subject on one day are not a change
+        # …and ONE BOOK. A row read off a book says which (`params.of`), and the book a
+        # scenario built is a different book from the run it started from: "gross exposure
+        # stays at 100.0% after the sale, versus 100.0% before" is two readings that agree,
+        # and it was refused as one reading written twice (V1 live smoke).
         same_group = (_group_key(a, None) == _group_key(b, None)
-                      and abs(float(a["value"]) - float(b["value"])) < 1e-12)
+                      and abs(float(a["value"]) - float(b["value"])) < 1e-12
+                      and _book_of(a) == _book_of(b))
         same_measure = a.get("measure") == b.get("measure") or same_group
         same_subject = (_short_subject(a.get("subject")) or a.get("subject")) == (_short_subject(b.get("subject")) or b.get("subject"))
         va, vb = float(a["value"]), float(b["value"])
@@ -1026,6 +1092,9 @@ def _check_meaning(v: Verdict, at: str, sentence: str, words: set[str], recs: li
 
 # ── the render ───────────────────────────────────────────────────────────────
 
+_BETWEEN_BRACKETS = re.compile(r"\s*(?:,|;|and|&|,\s*and)?\s*")
+
+
 def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
     """The answer as stored and shown: paragraphs whose numbers carry their
     fact, the tables and charts the marks asked for, in the block shape
@@ -1049,11 +1118,17 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
         runs: list = []
         pos = 0
         after: list[dict] = []
+        last_kind = None
         for s, e, kind, payload in cuts:
             if s < pos:
                 continue
             if s > pos:
-                runs.append(para[pos:s])
+                between = para[pos:s]
+                # A LIST OF BRACKETS IS ONE POINTING. "…still warn [f_a], [f_b], [f_c]." dropped
+                # its brackets and kept their commas: the reader saw "still warn,,." (V1 live
+                # smoke). What separates two dropped brackets is the writer's pointing too.
+                if not (kind == "drop" and last_kind == "drop" and _BETWEEN_BRACKETS.fullmatch(between)):
+                    runs.append(between)
             if kind == "link":
                 # THE READER SEES THE WORDS THE ANALYST WROTE. A resolved figure is
                 # that text, underlined, opening the fact it equals (the page's
@@ -1065,6 +1140,7 @@ def accepted(text: str, verdict: Verdict, ledger: Ledger) -> dict:
             elif kind == "block":
                 after.append(_block_for(payload, ledger))
             pos = e
+            last_kind = kind
         if pos < len(para):
             runs.append(para[pos:])
         runs = [r for r in runs if r != ""]

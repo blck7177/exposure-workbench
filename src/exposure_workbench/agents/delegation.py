@@ -47,6 +47,7 @@ step with them.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -363,6 +364,14 @@ def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
         if line not in seen:
             seen.add(line)
             lines.append(line)
+    if any(p.get("reason") == "unsourced_figure" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(p.get("figure") or ""))
+           for p in verdict.problems):
+        # The analyst HAS the way out and the refusal did not name it: a room written as
+        # "0.2% above warning", three ratios divided in the head (V1 live smoke). The
+        # check's sentence is shared with the lead, who has no `calc`; this one is ours.
+        lines += ["", "A figure you worked out yourself — a difference, a ratio, a sum, a room to a tier — is not on "
+                      "the ledger until the desk makes it: make it with `calc` from the ids of the figures it comes "
+                      "from (or ask for the measure that already is that figure), then point at the row it returns."]
     lines += ["", "Submit again with those entries replaced. Pull the row a fix needs first if you were not shown the "
                   "figure; a line the desk cannot settle is an entry with why and its boundary, not a finding."]
     return "\n".join(lines)

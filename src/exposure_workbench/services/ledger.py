@@ -336,6 +336,25 @@ class Ledger:
     # read "quote the passage that states it" — the two ways out pointing at each
     # other, five submissions apart — and the lead then invented $14.7B and an id
     # to carry it. Both messages were true to the code and false to the passage.
+    def short_bare_in_passages(self, token: str, cited: Sequence[str]) -> list[str]:
+        """The passages that DO hold a token `resolve_in_passages` will not take
+        because it is a short number written bare. Not a resolution — the rule
+        above stands — but what a refusal needs in order to be true to the passage:
+        "does not state this figure" was said of a passage reading "Debt to capital
+        14.0" (V1 live smoke), and the writer, told nothing it could act on, sent
+        the same sentence again and lost the answer."""
+        tok = (token or "").strip()
+        core = re.sub(r"[$,%]", "", tok).strip()
+        if not core or self._MARKED.search(tok) or len(re.sub(r"\D", "", core)) >= self._MIN_BARE_DIGITS:
+            return []
+        pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?![\d])")
+        return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
+
+    def dates_in_passages(self, iso: str, cited: Sequence[str]) -> list[str]:
+        """The cited passages that state this date in any spelling."""
+        from exposure_workbench.services import answer as _answer
+        return [pid for pid in cited if pid in self.passages and iso in _answer.dates_stated(self.passages[pid])]
+
     def resolve_in_passages(self, token: str, cited: Sequence[str]) -> list[str]:
         tok = (token or "").strip()
         core = re.sub(r"[$,%]", "", tok)

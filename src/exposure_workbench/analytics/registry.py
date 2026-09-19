@@ -818,6 +818,47 @@ for _key in READS:
         raise RuntimeError(f"a reading for {_key!r}, which is neither a measure nor a declared column")
 
 
+def params_said(method: "Method") -> str:
+    """The params ONE measure takes, as a reader is told them: each key, the values
+    it may hold, and what it is. Rendered from the measure's own schema, so the
+    sentence cannot drift from what the call is validated against. Empty when the
+    measure takes none."""
+    said = []
+    required = set(method.params_schema.get("required") or [])
+    for key, spec in (method.params_schema.get("properties") or {}).items():
+        values = [v for v in (spec.get("enum") or []) if v is not None]
+        if values:
+            holds = " | ".join(str(v) for v in values)
+        elif "minimum" in spec or "maximum" in spec:
+            holds = f"{spec.get('minimum', '')}–{spec.get('maximum', '')}"
+        else:
+            holds = ""
+        what = str(spec.get("description") or "").strip()
+        said.append(f"{key}{' (required)' if key in required else ''}"
+                    + (f" = {holds}" if holds else "") + (f": {what}" if what else ""))
+    return "; ".join(said)
+
+
+def params_by_measure(methods: "list[Method]") -> str:
+    """Every measure of one face with the params it takes, measures that take the
+    same params said together. This is what `metric`'s `params` argument is
+    described with: the first live turn asked price.volatility for
+    `window: "21d"`, a key it had to guess because the tool named none."""
+    groups: dict[str, list[str]] = {}
+    for m in methods:
+        groups.setdefault(params_said(m), []).append(m.name)
+    # the largest group is "every other measure": thirty issuer formulas share one schema
+    biggest = max(groups, key=lambda k: len(groups[k])) if groups else None
+    lines = []
+    for said, names in groups.items():
+        if said == biggest and len(names) > 6:
+            continue
+        lines.append(f"{', '.join(names)} — {said or 'takes no params'}")
+    if biggest is not None and len(groups[biggest]) > 6:
+        lines.append(f"every other measure — {biggest or 'takes no params'}")
+    return " ‖ ".join(lines)
+
+
 def metrics_for(face: str) -> list[Method]:
     """The measures one analyst may ask for by name — its `metric` tool's enum."""
     if face not in FACES:

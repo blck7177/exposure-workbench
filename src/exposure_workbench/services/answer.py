@@ -225,6 +225,21 @@ _MONTH_INDEX = {n[:3].lower(): i for i, n in enumerate(
      "August", "September", "October", "November", "December"), start=1)}
 
 
+_DATE_IN_TEXT = re.compile(_DATE)
+
+
+def dates_stated(text: str) -> set[str]:
+    """Every date a text states, however it spells it, in the ISO form the facts
+    carry. The other direction of `iso_date`: a filing writes "December 31, 2025"
+    and the analyst who read it writes 2025-12-31."""
+    out = set()
+    for m in _DATE_IN_TEXT.finditer(text or ""):
+        iso = iso_date(m.group("date"))
+        if iso:
+            out.add(iso)
+    return out
+
+
 def iso_date(token: str) -> str | None:
     """`June 30, 2025` / `30 Jun 2025` / `Sept. 27th, 2025` -> `2025-06-30`-form;
     an ISO date -> itself; anything else None.

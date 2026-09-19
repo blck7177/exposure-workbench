@@ -275,8 +275,10 @@ def from_of(rec: dict) -> str:
     row it was read off."""
     params = rec.get("params") or {}
     sources = [s for s in rec.get("sources") or [] if isinstance(s, str)]
+    inputs = [i for i in params.get("inputs") or [] if isinstance(i, str)]
     made_by = (f"method {params['method']}" if params.get("method") else
-               f"op {params['op']}" if params.get("op") else
+               f"op {params['op']}" + (f" of {' and '.join(inputs[:4])}" + (" and others" if len(inputs) > 4 else "")
+                                       if inputs else "") if params.get("op") else
                ", ".join(sources[:2]) if sources else str(rec.get("group") or ""))
     return " ".join(x for x in (params.get("pull"), made_by) if x)
 

@@ -771,7 +771,10 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         allf: list[F.Fact] = []
         notes = []
         for r in result["results"]:
-            fs, n = compute(args, r)
+            # each entry of a list combined with ONE figure is made of that entry and that figure
+            own = ({**args, "inputs": [r["operand"], *([result["by"]] if isinstance(result.get("by"), str) else [])]}
+                   if isinstance(r, dict) and isinstance(r.get("operand"), str) else args)
+            fs, n = compute(own, r)
             allf += fs
             notes.append(n)
         return allf, {"results": notes}
@@ -819,6 +822,15 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         params = _params_of(r, ctx)
         if one in skill.METHODS:
             params["method"] = one                            # the row's `from`: the measure that made it
+        # WHAT A CALCULATION WAS MADE OF (V1 live smoke). `calc` promises "a new figure
+        # with what it was made of", and the fact recorded only the operation — so once the
+        # analyst named a quotient "fcf_to_debt_xom", nothing said free cash flow was in it,
+        # and the check refused "free cash flow to debt is 39.4%" as naming a measure the
+        # figure is not. The inputs are the f_ ids the call was made with.
+        made_of = [i for i in (args.get("inputs") or []) if isinstance(i, str) and i.startswith(F.PREFIX)] \
+            if isinstance(args.get("inputs"), list) else []
+        if made_of and not (one in skill.METHODS):
+            params["inputs"] = made_of[:_INPUTS_KEPT]
         params.update(_composition_of(r))                     # what a composed total was built from
         f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit.upper(), value=float(r.pop("value")),
                    as_of=_as_of_of(r, ctx), window=_window_of(r, ctx), params=params,
@@ -962,6 +974,7 @@ def _is_table_row(f: F.Fact) -> bool:
 _RECORDED_NOT_SHOWN: dict[str, Any] = {"scenario": _is_table_row}
 
 
+_INPUTS_KEPT = 40          # the most a `calc` takes (tools/primitives: inputs.maxItems)
 PULL_PREFIX = "r_"
 _WAY_OUT_KEYS = ("available", "nearest", "known", "allowed", "portfolios", "tables", "columns_of_table",
                  "items_indexed", "data_covers", "hint")
@@ -1010,6 +1023,13 @@ def refusal_fact(tool: str, args: dict, result: dict) -> F.Fact:
     # goes back to the lead as "ask the other analyst" and not as "unavailable".
     elsewhere = [p.get("value") for p in (result.get("problems") or []) if isinstance(p, dict)
                  and p.get("field") == "name" and p.get("value") in registry.METHODS]
+    # PARAMS THAT DO NOT FIT: the way out is what the measure DOES take, from its own
+    # schema. "'window' was unexpected" sent the market analyst home with two lines
+    # unsettled and thirteen calls unspent (V1 live smoke): it never learned the key.
+    asked = args.get("name") if isinstance(args.get("name"), str) else None
+    if code == "invalid_params" and asked in registry.METHODS and isinstance(result.get("params_schema"), dict):
+        takes = registry.params_said(registry.METHODS[asked])
+        ways.insert(0, f"{asked} takes: {takes}" if takes else f"{asked} takes no params")
     if tool == "metric" and elsewhere:
         owners = " and ".join(f"the {f} analyst" for f in registry.METHODS[elsewhere[0]].faces) or "no analyst (it is an action)"
         means["reason"] = "not_on_this_face"
