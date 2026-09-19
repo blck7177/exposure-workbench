@@ -791,6 +791,62 @@ READINGS: dict[str, Reading] = {r.method: r for r in (
 )}
 
 
+# ── how a measure READS, and what the instruments are (V1 step 5) ────────────
+#
+# The handbook's "how it reads" is rendered from here, never hand-copied. A
+# reading says what the ROW cannot: a word that is on the row — a direction, a
+# status, a basis, which line stood in — is not repeated, no figure of any run
+# or corpus is quoted, and nothing says how a tool is called. The five readings
+# above (READINGS) are the pre-V1 text the old analyst prompt still renders;
+# they go with it.
+
+READS: dict[str, str] = {
+    "ebit": "EBIT and EBITDA start from net income, adding back interest and tax — not from operating income. Where an "
+            "issuer carries large non-operating income the two differ, and a correct EBIT is then mostly non-operating.",
+    "free_cash_flow": "Free cash flow has no uniform definition, so the definition is said beside the number. A negative "
+                      "figure with capital expenditure above operating cash flow is the capital-expenditure line at work.",
+    "total_debt": "Total debt is composed from the debt lines the issuer files, without double-counting a total and its "
+                  "parts; the row says what it was built from and what was left out at the date — say it with the figure.",
+    "ebit_interest_coverage": "Coverage may rest on the non-operating interest line where an issuer no longer files "
+                              "interest expense under its own tag; the row names the line used — say which when the "
+                              "coverage is quoted.",
+    "gross_margin": "A margin names the revenue line it divided by; an issuer that files revenue under two tags is read "
+                    "on the one the desk maps.",
+    "price.beta": "Against a rates or credit instrument, a name's beta is its own sensitivity to that risk — the per-name "
+                  "figure the book-level factor fit does not give; the book-level fit is over the book's return and says "
+                  "nothing per name.",
+    "book.analysis": "A net beta is the book's move per unit of the risk it names, and the row says which way the book "
+                     "moves. When the fit is collinear the net is quotable and a single leg is not. A risk no factor "
+                     "measures is unmeasured, never zero. Room is the distance from a check's reading to its tier, and "
+                     "the row says where the check stands.",
+    "book.reconcile": "The factor-explained share and the unexplained share sum to one by construction; a share is not a "
+                      "return and not a loss.",
+    "issuer_exposures.weight": "A weight is a share of its own book's market value and of nothing else: a tier in dollars "
+                               "is the book's market value times the tier, and two books' weights are compared by "
+                               "difference, never summed.",
+    "issuer_exposures.contribution": "A day's contribution to the book's return is not a sensitivity. A name's rate or "
+                                     "credit sensitivity is its beta to the rates or credit instrument; a beta that "
+                                     "cannot be fitted is unmeasured, never zero.",
+}
+
+# The factor instruments: what each IS. The model knows what an S&P 500 ETF is;
+# it is told which instrument stands for which risk on this desk, and nothing
+# about how a coefficient is signed — the row says which way the book moves.
+INSTRUMENTS: tuple[tuple[str, str, str], ...] = (
+    ("SPY", "the S&P 500 ETF", "the broad US equity market"),
+    ("QQQ", "the Nasdaq-100 ETF", "US growth and technology"),
+    ("IWM", "the Russell 2000 ETF", "US small caps"),
+    ("TLT", "the 20+ year Treasury ETF", "long rates: it carries duration directly"),
+    ("HYG", "the high-yield corporate bond ETF", "credit spreads: it carries spread directly"),
+    ("GLD", "the gold ETF", "gold, a risk-off proxy"),
+    ("USO", "the oil ETF", "oil and energy"),
+)
+
+for _key in READS:
+    if _key not in METHODS and _key not in _COLUMN_NAMES:
+        raise RuntimeError(f"a reading for {_key!r}, which is neither a measure nor a declared column")
+
+
 def metrics_for(face: str) -> list[Method]:
     """The measures one analyst may ask for by name — its `metric` tool's enum."""
     if face not in FACES:
