@@ -215,6 +215,8 @@ _DERIVED_NAMES: dict[str, str] = {
 
 def reads_as(measure: str | None) -> str:
     m = measure or ""
+    if m in METHODS:
+        return METHODS[m].reads_as
     if m in dn.FORMULA:
         return dn.FORMULA[m]
     if m in dn.METRIC:
@@ -323,3 +325,451 @@ POLICY_ABSENCES: tuple[dict, ...] = tuple(
          "under the asked-for name, never an estimate."),
     ))
 POLICY_IDS = frozenset(p["id"] for p in POLICY_ABSENCES)
+
+
+# ══ the measures (V1 step 2) ═════════════════════════════════════════════════
+#
+# ONE ENTRY, THREE FACES. A measure this desk computes is written once, here:
+# the handbook's "what it is" and "how it reads" are rendered from the entry,
+# a tool's `metric` takes its name and declares what it yields, and the Fact it
+# births carries its words. Until V1 the entry was `analytics/skill.Method` and
+# its reading a separate table the model met as prose; both moved here whole
+# (skill re-exports them), and an entry now also says its financial name
+# (`reads_as`), what it is built on (`basis`), and which analysts may ask for it
+# by name (`faces`). A word that is on the row — a direction, a status — is not
+# repeated in a reading: the reading says only what the row cannot.
+
+from dataclasses import dataclass, field, replace  # noqa: E402
+
+from exposure_workbench.analytics import formulas as fm  # noqa: E402
+
+FACES = ("issuer", "market", "risk")
+
+SUBJECT_KINDS = ("issuer", "price", "run", "portfolio", "series")
+
+# Where compute finds the code that runs a method. A name, not a callable, so
+# this module imports no service and the registry stays importable anywhere
+# (the tool container, a test, the catalogue).
+EXECUTORS = (
+    "formula", "formula.panel",
+    "price.rolling_volatility", "price.beta", "price.momentum_12_1",
+    "price.distance_from_52w_high", "price.adv", "price.drawdown", "price.window_return",
+    "book.analysis", "book.reconcile", "book.drawdown_episodes", "book.explain_episode",
+    "book.sell", "book.buy",
+)
+
+
+@dataclass(frozen=True)
+class Method:
+    """One named method. `describes` is one sentence for a reader; `procedure`
+    is what the number is made of; `authority` is who says it is made that way."""
+
+    name: str
+    subject_kind: str
+    family: str
+    describes: str
+    procedure: str
+    authority: str
+    fails_when: str
+    executor: str
+    params_schema: dict = field(default_factory=lambda: {"type": "object", "properties": {},
+                                                          "additionalProperties": False})
+    unit_class: str | None = None
+    source_url: str = ""
+    inputs: tuple[str, ...] = ()
+    # Which quantities the result puts on the table, as the reader will see
+    # them named — for `describe`, so the model knows what a method yields
+    # before paying for it.
+    yields: tuple[str, ...] = ()
+    # V1: the entry's other two faces. `reads_as` is the financial name a row
+    # prints; `basis` the registry words every fact of it carries; `faces` the
+    # analysts who may ask for it by name (a scenario is an action and has none).
+    reads_as: str = ""
+    basis: tuple[str, ...] = ()
+    faces: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.reads_as:
+            object.__setattr__(self, "reads_as", dn.FORMULA.get(self.name) or self.name.split(".", 1)[-1].replace("_", " "))
+        if any(b not in BASIS for b in self.basis):
+            raise ValueError(f"{self.name}: basis {self.basis!r} is not in the registry's vocabulary")
+        if any(f not in FACES for f in self.faces):
+            raise ValueError(f"{self.name}: faces {self.faces!r} must be among {FACES}")
+        if self.subject_kind not in SUBJECT_KINDS:
+            raise ValueError(f"{self.name}: subject_kind {self.subject_kind!r} is not one of {SUBJECT_KINDS}")
+        if self.executor not in EXECUTORS:
+            raise ValueError(f"{self.name}: executor {self.executor!r} is not one compute knows")
+        if not self.authority.strip():
+            raise ValueError(f"{self.name}: a method states its authority; none given")
+        if not self.fails_when.strip():
+            raise ValueError(f"{self.name}: a method states when it fails or is meaningless; none given")
+        if self.params_schema.get("type") != "object":
+            raise ValueError(f"{self.name}: params_schema must describe an object")
+
+
+# ── issuer methods: the formula registry, one entry per formula ──────────────
+
+_ISSUER_PARAMS = {"type": "object", "properties": {
+    "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None],
+               "description": "window for flow-based measures (default 12)"},
+    "at": {"type": ["string", "null"], "description": "YYYY-MM-DD: the balances at this date and every flow over the `months` window ending there (a reported period end); omitted = latest"},
+    "last_n": {"type": ["integer", "null"], "minimum": 2, "maximum": 16,
+               "description": "the measure over its last N periods (months each) as ONE series, for yoy/cagr/trend; omitted = one value"},
+}, "additionalProperties": False}
+
+
+# the working-capital days are built on ENDING balances, not averages, and every
+# fact of them says so (the handbook said it in prose; the row says it now)
+_ENDING_BALANCE_MEASURES = ("days_sales_outstanding", "days_inventory", "days_payable", "cash_conversion_cycle")
+
+
+def _fails_when_formula(f: fm.Formula) -> str:
+    parts = ["an input the issuer did not file at the window or instant asked"]
+    if f.not_for_financials is not None:
+        parts.append("the issuer is a financial company: " + f.not_for_financials.split(":")[0])
+    if f.denominator_must_be_positive:
+        parts.append(f.denominator_must_be_positive)
+    return "; ".join(parts)
+
+
+def _issuer_methods() -> dict[str, Method]:
+    out: dict[str, Method] = {}
+    for name, f in fm.FORMULAS.items():
+        out[name] = Method(
+            name=name, subject_kind="issuer", family=f.family, describes=f.expression,
+            procedure=f"{f.op} over {', '.join(f.inputs)}", authority=f.citation,
+            source_url=f.source_url, fails_when=_fails_when_formula(f), executor="formula",
+            params_schema=_ISSUER_PARAMS, unit_class=f.unit_class, inputs=f.inputs,
+            yields=(name,), faces=("issuer",),
+            basis=(("ending_balance",) if name in _ENDING_BALANCE_MEASURES else ()),
+        )
+    out["issuer.panel"] = Method(
+        name="issuer.panel", subject_kind="issuer", family="panel",
+        describes="every named issuer measure this desk knows, evaluated once, with each one's own refusal where an input is missing",
+        procedure="evaluate every entry of the formula registry", authority="the registry's own entries, each with its citation",
+        fails_when="never as a whole; each measure fails on its own terms",
+        executor="formula.panel", params_schema=_ISSUER_PARAMS, yields=tuple(fm.FORMULAS),
+        reads_as="every issuer measure at once", faces=("issuer",),
+    )
+    return out
+
+
+# ── price methods: what price_analytics_service computes, as data ────────────
+
+_TICKER_WINDOW = {"type": "object", "properties": {
+    "window": {"type": ["string", "null"], "enum": ["1m", "3m", "6m", "1y", "3y", None],
+               "description": "named span (default 1y)"},
+}, "additionalProperties": False}
+
+_PRICE_METHODS: tuple[Method, ...] = (
+    Method(
+        name="price.volatility", subject_kind="price", family="risk",
+        reads_as="annualised volatility", basis=("adjusted_close",), faces=("market", "risk"),
+        describes="annualised volatility of the last N daily returns; a short window reacts, a long one is the baseline",
+        procedure="standard deviation of daily simple returns over the window × √252",
+        authority="CFA Program, Quantitative Methods (return volatility); √252 annualisation is the industry convention",
+        fails_when="fewer than 20 sessions in the window (VOL_MIN_OBS): refused with the counts, never shortened",
+        executor="price.rolling_volatility", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "window_days": {"type": ["integer", "null"], "enum": [21, 30, 63, 126, 252, None],
+                            "description": "sessions in the window (default 30)"}},
+            "additionalProperties": False},
+        yields=("{ticker}.vol.{n}d",),
+    ),
+    Method(
+        name="price.beta", subject_kind="price", family="risk",
+        reads_as="beta to a benchmark", basis=("adjusted_close", "name_return"), faces=("market", "risk"),
+        describes="a name's sensitivity to a benchmark: OLS beta, alpha and R² of its daily returns on the benchmark's (default SPY; TLT for rates, HYG for credit — the per-name sensitivity)",
+        procedure="ordinary least squares of adjusted daily returns on the benchmark's, aligned by date",
+        authority="Sharpe (1964) market model; CFA Program, Portfolio Management (beta estimation)",
+        fails_when="fewer than 60 aligned observations (BETA_MIN_OBS); a benchmark with no price history",
+        executor="price.beta", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "benchmark": {"type": ["string", "null"], "description": "benchmark ticker (default SPY); a factor ETF such as TLT gives the name's sensitivity to that factor"},
+            "window": _TICKER_WINDOW["properties"]["window"]},
+            "additionalProperties": False},
+        yields=("{ticker}.beta", "{ticker}.alpha", "{ticker}.r_squared"),
+    ),
+    Method(
+        name="price.momentum_12_1", subject_kind="price", family="momentum",
+        reads_as="12-1 momentum", basis=("adjusted_close",), faces=("market",),
+        describes="cumulative adjusted return from ~12 months back through 21 sessions back, the last month skipped",
+        procedure="adjusted close 21 sessions back ÷ adjusted close ~252 sessions back − 1",
+        authority="Jegadeesh & Titman (1993), Returns to Buying Winners and Selling Losers",
+        fails_when="fewer than 200 sessions of history (MOMENTUM_MIN_OBS); a formation window under 252 sessions is flagged",
+        executor="price.momentum_12_1", unit_class="ratio", yields=("{ticker}.momentum_12_1",),
+    ),
+    Method(
+        name="price.distance_from_52w_high", subject_kind="price", family="momentum",
+        reads_as="distance from the 52-week high", basis=("adjusted_close",), faces=("market",),
+        describes="how far the adjusted close sits below its trailing-year high, with the date the high was set",
+        procedure="close ÷ max(close over the trailing year) − 1",
+        authority="George & Hwang (2004), The 52-Week High and Momentum Investing",
+        fails_when="fewer than 200 sessions of history (MOMENTUM_MIN_OBS)",
+        executor="price.distance_from_52w_high", unit_class="ratio",
+        yields=("{ticker}.distance_from_52w_high",),
+    ),
+    Method(
+        name="price.adv", subject_kind="price", family="liquidity",
+        reads_as="average daily volume", basis=("as_traded_close",), faces=("market", "risk"),
+        describes="average daily volume over the last N sessions, in shares a session and in dollars a session — the liquidity a position is measured against: a position's market value divided by dollar ADV is its days to liquidate",
+        procedure="mean of daily volume, and of close × volume, over the window; sessions without volume dropped and counted",
+        authority="average daily volume as the standard market-depth measure; days to liquidate = position ÷ (participation rate × dollar ADV), the days-to-cash framing of SEC Rule 22e-4",
+        fails_when="fewer than 20 sessions (ADV_MIN_OBS) or no recorded volume",
+        executor="price.adv", unit_class="count_per_day",
+        params_schema={"type": "object", "properties": {
+            "window_days": {"type": ["integer", "null"], "enum": [20, 30, 60, None],
+                            "description": "sessions in the window (default 20)"}},
+            "additionalProperties": False},
+        yields=("{ticker}.adv.shares", "{ticker}.adv.dollars"),
+    ),
+    Method(
+        name="price.drawdown", subject_kind="price", family="risk",
+        reads_as="deepest drawdown", basis=("adjusted_close",), faces=("market",),
+        describes="the deepest peak-to-trough fall of the adjusted close over a window: peak, trough, fall and depth, dated, with the recovery date if regained",
+        procedure="max over the window of (running peak − close); fall = peak − trough, depth = fall ÷ peak",
+        authority="the standard drawdown definition (Magdon-Ismail, Atiya, Pratap & Abu-Mostafa, 2004)",
+        fails_when="fewer than 20 sessions (DRAWDOWN_MIN_OBS); a window that never fell is stated, not zero",
+        executor="price.drawdown", unit_class="ratio", params_schema=_TICKER_WINDOW,
+        yields=("{ticker}.drawdown.peak", "{ticker}.drawdown.trough", "{ticker}.drawdown.fall", "{ticker}.drawdown.depth"),
+    ),
+    Method(
+        name="price.window_return", subject_kind="price", family="return",
+        reads_as="return over a window", basis=("adjusted_close",), faces=("market",),
+        describes="total return over a named window, and relative to a benchmark when one is given",
+        procedure="adjusted close at the window's end ÷ at its start − 1; relative = the name's return − the benchmark's",
+        authority="total-return convention on split- and dividend-adjusted closes",
+        fails_when="no price on or before either end of the window",
+        executor="price.window_return", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "window": {"type": ["string", "null"], "enum": ["1m", "3m", "6m", "1y", None], "description": "default 1y"},
+            "benchmark": {"type": ["string", "null"], "description": "benchmark ticker for the relative return; null for none"}},
+            "additionalProperties": False},
+        yields=("{ticker}.window_return", "{ticker}.window_return.relative"),
+    ),
+)
+
+
+# ── book methods: what the run's readers derive, as data ─────────────────────
+
+_BOOK_METHODS: tuple[Method, ...] = (
+    Method(
+        name="book.analysis", subject_kind="run", family="book",
+        reads_as="the book's net exposures and room to its tiers", basis=("book_return",), faces=("risk",),
+        describes="one run's factor exposures netted per risk (net beta), positions ordered by weight, and the room from every limit check to its warning and breach tiers",
+        procedure="net beta per risk = Σ beta_i × sense_i, the sense being the risk's effect on the book for a positive beta: −1 for SPY, QQQ and IWM (equity_down), for TLT (rates_up) and for HYG (credit_spreads_widen); room = tier − current; positions ordered by weight",
+        authority="arithmetic over the run's own rows; instrument directions are properties of the factor ETFs, not of any issuer",
+        fails_when="the run is not completed; a risk no factor in the regression measures is reported unmeasured, not zero",
+        executor="book.analysis", unit_class="ratio",
+        yields=("portfolio.integration.net_beta.<risk>", "portfolio.integration.gross_beta.<risk>",
+                "portfolio.integration.room_to_warning.<check>", "portfolio.integration.room_to_breach.<check>"),
+    ),
+    Method(
+        name="book.reconcile", subject_kind="run", family="attribution",
+        reads_as="one day's move, reconciled", faces=("risk",),
+        describes="one day's portfolio move reconciled: position contributions against the day's return, and the factor-explained share against the residual",
+        procedure="Σ position contributions = portfolio return; Σ factor contributions + alpha + residual = portfolio return; factor_share = Σ factor / total",
+        authority="the two accounting identities of return attribution (Brinson-style position attribution; the factor model's own decomposition)",
+        fails_when="the position identity does not hold within tolerance — then no share of the move is reported at all",
+        executor="book.reconcile", unit_class="ratio",
+        # every figure the reconciliation records (resources.CALC_RESULTS), so the
+        # page offers the factor sum the second identity needs (V38/S5)
+        yields=("portfolio.reconcile.sum_of_position_contributions", "portfolio.reconcile.sum_of_factor_contributions",
+                "portfolio.reconcile.alpha_plus_residual", "portfolio.reconcile.factor_share",
+                "portfolio.reconcile.unexplained_share"),
+    ),
+    Method(
+        name="book.drawdown_episodes", subject_kind="portfolio", family="risk",
+        reads_as="the book's drawdown episodes", faces=("risk",),
+        describes="every peak-to-trough episode of the book at least 5% deep in a span, deepest first, with trough and recovery dates",
+        procedure="episodes of the portfolio value path; depth = (peak − trough) ÷ peak",
+        authority="the standard drawdown definition; the 5% floor is a producer parameter",
+        fails_when="fewer sessions than the span needs; a span that never fell 5% has no episodes",
+        executor="book.drawdown_episodes", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "span": {"type": ["string", "null"], "enum": ["3m", "6m", "1y", "3y", None], "description": "default 1y"}},
+            "additionalProperties": False},
+        yields=("portfolio.drawdown_episodes.deepest_depth", "portfolio.drawdown_episodes.episode_depths"),
+    ),
+    Method(
+        name="book.explain_episode", subject_kind="portfolio", family="risk",
+        reads_as="what one drawdown episode was made of", faces=("risk",),
+        describes="what one drawdown episode was made of: the book's return over the window and each holding's contribution to it",
+        procedure="window return of the book and of each position between the peak and trough dates",
+        authority="arithmetic over the price series the book holds",
+        fails_when="no prices on the peak or trough date",
+        executor="book.explain_episode", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "peak": {"type": "string", "description": "YYYY-MM-DD"},
+            "trough": {"type": "string", "description": "YYYY-MM-DD"}},
+            "required": ["peak", "trough"], "additionalProperties": False},
+    ),
+    Method(
+        name="book.sell", subject_kind="run", family="scenario",
+        reads_as="the book after a sale",
+        describes="the book after selling all or part of some names: weights renormalised over what remains, sector weights, market value, and every concentration and exposure limit check re-run; the proceeds leave the book. The subject is a run (run_…) or another scenario's calc_ row, so trades chain",
+        procedure="remove the sold market value; weight_i = mv_i ÷ Σ mv remaining; check_limits over the result with the portfolio's own thresholds",
+        authority="arithmetic over the run's positions; thresholds from the portfolio's risk_limits (analytics/limits)",
+        fails_when="a name not held, a fraction outside (0, 1], a name sold twice, a sale emptying the book, an unpriced holding; factor exposures are not re-fitted and are stated unmeasured",
+        executor="book.sell", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "sales": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "object", "properties": {
+                "ticker": {"type": "string"},
+                "fraction": {"type": "number", "exclusiveMinimum": 0, "maximum": 1,
+                             "description": "share of the position sold; omitted means all of it"}},
+                "required": ["ticker"], "additionalProperties": False}}},
+            "required": ["sales"], "additionalProperties": False},
+        yields=("issuer_exposures.<T>.weight", "sector_exposures.<S>.weight", "exposure_metrics.portfolio_market_value",
+                "limit_checks.<check>.current_value", "count.alerts"),
+    ),
+    Method(
+        name="book.buy", subject_kind="run", family="scenario",
+        reads_as="the book after a purchase",
+        describes="the book after adding names at target weights of the new book: every existing weight scaled down, sector weights, market value, and every concentration and exposure limit check re-run; the money comes from outside the book. The subject is a run (run_…) or another scenario's calc_ row (a sale, then this purchase on its result)",
+        procedure="mv_added = w × mv_old ÷ (1 − Σ w); weight_i = mv_i ÷ Σ mv; check_limits over the result",
+        authority="arithmetic over the run's positions; thresholds from the portfolio's risk_limits; the new name's sector from the desk's company record",
+        fails_when="a target weight outside (0, 1), targets summing to 1 or more, a name the desk cannot place in a sector, a name already held (trim or add to it through its weight instead); factor exposures are stated unmeasured",
+        executor="book.buy", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "buys": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "object", "properties": {
+                "ticker": {"type": "string"},
+                "weight": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1,
+                           "description": "target share of the book AFTER the purchase"}},
+                "required": ["ticker", "weight"], "additionalProperties": False}}},
+            "required": ["buys"], "additionalProperties": False},
+        yields=("issuer_exposures.<T>.weight", "sector_exposures.<S>.weight", "exposure_metrics.portfolio_market_value",
+                "limit_checks.<check>.current_value", "count.alerts"),
+    ),
+)
+
+
+METHODS: dict[str, Method] = {
+    **_issuer_methods(),
+    **{m.name: m for m in _PRICE_METHODS},
+    **{m.name: m for m in _BOOK_METHODS},
+}
+
+
+# The names a RUN's own tables hold, which `column` and `pick` read. A scenario
+# method yields them too, because it re-prices the book — so routing a plain table
+# name to `sell` would answer a question nobody asked.
+_RUN_TABLE_PREFIXES = ("issuer_exposures.", "sector_exposures.", "limit_checks.",
+                       "factor_attributions.", "exposure_metrics.", "risk_alerts.", "count.")
+
+
+def method_for_yield(name: str) -> Method | None:
+    """The method whose result carries a figure of this name, if one does (V37).
+
+    A run's table names are read with `column` and `pick`; a name like
+    `portfolio.integration.net_beta.market` is on no table at all — it is what
+    `book.analysis` YIELDS — so a refusal that only says the run holds no such
+    figure leaves the analyst asking the run for something no run has. Round B's
+    Q16 asked four times, in three spellings, and the answer told the reader the
+    book's net beta was unavailable while the desk's own method computes it.
+
+    A lookup over the methods' declared yields, with `<risk>` / `<check>` / `<T>`
+    standing for a name the caller fills in.
+    """
+    import fnmatch
+    import re as _re
+    if name.startswith(_RUN_TABLE_PREFIXES):
+        return None                      # a run's own table: column / pick read it
+    for m in METHODS.values():
+        if m.subject_kind not in ("run", "portfolio"):
+            continue                     # the caller asked a BOOK for this name
+        if len(m.yields) <= 1 and (not m.yields or m.yields[0] == m.name):
+            continue                     # a method that yields one figure under its own name
+        for y in m.yields:
+            pat = _re.sub(r"<[A-Za-z_]+>", "*", y)
+            if fnmatch.fnmatchcase(name, pat) or fnmatch.fnmatchcase(name, pat + ".*"):
+                return m
+    return None
+
+
+def methods_for(subject_kind: str) -> list[Method]:
+    return [m for m in METHODS.values() if m.subject_kind == subject_kind]
+
+
+def nearest(name: str, n: int = 5) -> list[str]:
+    """The registry names closest to an unknown one — a closed lookup, so an
+    `unknown_method` refusal can point at `roic` when `return_on_capital` was asked."""
+    import difflib
+    return difflib.get_close_matches(name, list(METHODS), n=n, cutoff=0.4)
+
+
+# ── the arithmetic ops compute also takes, named once ────────────────────────
+
+SCALAR_OPS = ("add", "subtract", "multiply", "divide")
+SCALE_OP = "scale"          # one operand × a constant (params.factor); the typed calculator's scale
+RANK_OP = "rank"
+REGRESS_OP = "regress"
+
+
+# ── readings: what this DESK knows about reading a measure ───────────────────
+#
+# V25. Seventeen readings used to live here and fourteen were the textbook —
+# "high ROE on thin equity is leverage, not profitability" — which the model
+# already holds and never asked for (1 call in 23 across the 2026-09-06
+# battery). A reading now states only what the desk knows and the textbook
+# does not: a tag the held issuers stopped filing, a measure the book-level
+# fit cannot give, a quantity this desk invented. Refusal conditions that were
+# written here as prose ("EBITDA is zero or negative") are Formula data now
+# (denominator_must_be_positive), where the evaluator applies them.
+
+@dataclass(frozen=True)
+class Reading:
+    """What this desk knows about reading one measure that a textbook does not.
+    Guidance for the agent's sentence, with its authority; nothing here reaches compute."""
+    method: str
+    reads: str
+    meaningless_when: str
+    authority: str
+
+    def __post_init__(self) -> None:
+        if self.method not in METHODS:
+            raise ValueError(f"reading for unknown method {self.method!r}")
+        if not self.authority.strip():
+            raise ValueError(f"{self.method}: a reading states its authority")
+
+
+READINGS: dict[str, Reading] = {r.method: r for r in (
+    Reading("ebit_interest_coverage",
+            "7 of the 8 held issuers stopped tagging InterestExpense after 2024; the registry substitutes "
+            "the non-operating interest line and the result's definition names the substitution — say which "
+            "line was used when the coverage is quoted",
+            "interest expense is zero or unreported under both tags",
+            "the desk's own corpus measurement (V9_FORMULA_BASIS); CFA Program, coverage ratios"),
+    Reading("price.beta",
+            "against a factor ETF (TLT for rates, HYG for credit) this is the name's own sensitivity to that "
+            "risk — the per-name figure the book-level factor regression does not give; the book-level fit "
+            "is over the BOOK's return and says nothing per name",
+            "fewer than 60 aligned sessions; a benchmark whose returns are collinear with another factor's",
+            "the factor model's regression record; Sharpe (1964)"),
+    Reading("book.reconcile",
+            "factor_share is the share of the move the factor model explains and unexplained is what is left: they "
+            "sum to one by construction, so a NEGATIVE factor share means the factors explain the opposite "
+            "direction — it is not a return, not a loss, and not evidence that the move was market-wide",
+            "a run that does not reconcile; a window with no position contributions",
+            "the two accounting identities of return attribution (the factor model's own decomposition)"),
+    Reading("price.adv",
+            "days to liquidate is market value divided by (the participation rate × ADV in dollars): the quotient of "
+            "market value over ADV alone is a ratio of two dollar figures and is not days, so a figure offered as "
+            "days is wrong unless the participation rate is in the divisor",
+            "fewer sessions of volume than the window asks for",
+            "CFA Program, market microstructure; this desk's own participation convention"),
+    Reading("book.analysis",
+            "room_to_warning below zero means the check is already in warning; room_to_breach is what remains "
+            "before the hard tier; a net beta is the book's move per unit of the risk it names (equity_down, "
+            "rates_up, credit_spreads_widen): every factor enters as its beta times that risk's effect on the "
+            "book, so a net beta below zero is a book that loses when the risk happens — net_beta.equity_down "
+            "of −0.86 is a book LONG equities, not short",
+            "a run not completed; a collinear fit (the legs are not quotable individually, the net is)",
+            "the portfolio's risk_limits; the factor model's own regression record"),
+)}
+
+
+def metrics_for(face: str) -> list[Method]:
+    """The measures one analyst may ask for by name — its `metric` tool's enum."""
+    if face not in FACES:
+        raise ValueError(f"face {face!r} is not one of {FACES}")
+    return [m for m in METHODS.values() if face in m.faces]

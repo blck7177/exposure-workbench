@@ -215,8 +215,11 @@ CALC_RESULTS: dict[str, dict[str, str]] = {
     # V14-A. The quantities that read DERIVED and only those: a net beta is a sum
     # it performed, a distance to a threshold a subtraction. The stress losses and
     # limit levels it ORDERS are columns above and resolve through the run id.
+    # V1: a beta is a move per unit of move — a MULTIPLE, as `price.beta` has
+    # always been typed (price_analytics_service). Declared RATIO it rendered as
+    # a percentage: a net beta of −0.86 read "-86.0%".
     "portfolio.integration": {
-        "net_beta": RATIO, "gross_beta": RATIO,
+        "net_beta": MULTIPLE, "gross_beta": MULTIPLE,
         "room_to_warning": RATIO, "room_to_breach": RATIO,
     },
 }

@@ -27,7 +27,11 @@ def test_every_derived_quantity_is_declared_with_a_unit():
     produced that nothing can cite — V8-C ④'s episode depths, exactly."""
     declared = set(nv._CALC_RESULT_KEYS[isvc.OP_INTEGRATION])
     assert declared == {"net_beta", "gross_beta", "room_to_warning", "room_to_breach"}
-    assert all(u == nv.RATIO for u in nv._CALC_RESULT_KEYS[isvc.OP_INTEGRATION].values())
+    # V1: a beta is a MULTIPLE (as price.beta always was); declared RATIO, a net
+    # beta of −0.86 rendered "-86.0%". A room is a distance in weight: a RATIO.
+    units = nv._CALC_RESULT_KEYS[isvc.OP_INTEGRATION]
+    assert units["net_beta"] == units["gross_beta"] == "MULTIPLE"
+    assert units["room_to_warning"] == units["room_to_breach"] == nv.RATIO
 
 
 def test_what_is_only_ordered_is_not_recorded_again():

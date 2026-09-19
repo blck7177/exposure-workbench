@@ -665,10 +665,13 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     # and the per-result branch above has already handled the successful case.
     one = method if isinstance(method, str) else (method[0] if isinstance(method, list) and len(method) == 1 else None)
     declared = skill.METHODS[one].unit_class if one in skill.METHODS else None
+    # V1: what the measure is BUILT ON is the registry entry's to say, and every
+    # fact of it carries the word (ending balances, the adjusted close)
+    built_on = {"basis": list(skill.METHODS[one].basis)} if one in skill.METHODS and skill.METHODS[one].basis else {}
     ctx = Ctx("compute", subject=subject.upper() if isinstance(subject, str) and not subject.startswith(("run_", "port_", "calc_")) else subject,
               as_of=result.get("as_of"), group=group,
               leaf_unit=declared.upper() if isinstance(declared, str) else None,
-              sources=tuple(s for s in (result.get("calc_id"),) if _is_id(s)))
+              sources=tuple(s for s in (result.get("calc_id"),) if _is_id(s)), means=built_on)
     r = copy.deepcopy(result)
     # an op over one issuer's figures is that issuer's figure: the typed
     # calculator records the operands' issuers, and a single one is the subject
@@ -683,9 +686,15 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         unit = r.get("unit_class") or (r.get("type") or {}).get("unit_class")
         if not isinstance(unit, str):
             raise UnknownUnit(f"compute {method}: top-level value carries no unit_class")
+        params = _params_of(r, ctx)
+        if isinstance(r.get("made_of"), dict) and r["made_of"]:
+            params["made_of"] = r["made_of"]                  # what a composed total was built from
+        if isinstance(r.get("substituted_inputs"), dict) and r["substituted_inputs"]:
+            params["substituted"] = dict(r["substituted_inputs"])   # which filed line stood in for which
         f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit.upper(), value=float(r.pop("value")),
-                   as_of=_as_of_of(r, ctx), window=_window_of(r, ctx), params=_params_of(r, ctx),
-                   sources=_sources_of(r, ctx), group=group)
+                   as_of=_as_of_of(r, ctx), window=_window_of(r, ctx), params=params,
+                   sources=_sources_of(r, ctx), group=group,
+                   means=registry.merged(ctx.means, registry.words_beside(r)))
         facts, note = harvest(r, ctx.child(as_of=f.as_of, window=f.window))
         note["fact"] = f.id
         return [f, *facts], note

@@ -158,6 +158,15 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - 做什么：新模块（`analytics/registry.py`）承载 §2.5 的条目；`formulas.py`、`skill.METHODS` 的执行器、`READINGS`、`integration` 方向映射、`containment`、`units`、`resources._DECLARED` 迁入或被它引用；`metric` 的执行路径 = 登记簿条目 → 现有 service（`formula_service`、`price_analytics_service`、`drawdown_service`、`reconcile_service`、`integration_service`）→ 一行事实带组成。16 条 `DESK_RULES` 逐条归位：定义类进登记簿（EBIT 从净利润起算、FCF 定义、金融发行人不适用、总债务覆盖、权重代数、净 beta 方向、情景不重拟、扣留）、政策类进手册 §6（不预测、不给阈值、前提先核、比较的形状）、引用类进风格指南（数字是事实、缺席如实说）；`skill.py` 里不再有 READINGS 与 DESK_RULES 文本。
 - 验收：每个条目能渲染手册 §2/§3 一段与事实一行；DESK_RULES 在发给模型的文字里出现次数 = 0；每条规则的关键短语在全部模型文字里各出现一次。
 
+**执行记录（2026-09-19，`desk-v1`）**：条目层已完成；离线套件 2681 通过（新增 `tests/test_v1_registry.py` 8 条）。
+
+- `skill.py` 里的 `Method`、`METHODS`（46 条）、`Reading`、`READINGS`、运算名整体搬进 `analytics/registry.py`，`skill` 只转出口，所有旧读者读到的是同一批对象；没有另起第二套条目类。条目新增三个字段：`reads_as`（金融名，行上印的）、`basis`（登记簿依据词）、`faces`（哪几位分析师可按名字要）。`registry.metrics_for(face)` 给出每个面的度量名单：发行人 33、市场 7、风险 7（含 price 的 beta、波动、成交额）；卖出与买入没有面，它们是动作。
+- 度量的依据词随事实走：周转天数四条带"期末余额"，价格类带"调整收盘/成交价"，净 beta 带"书的收益"；`fact_adapters.compute` 把条目的 `basis`、公式返回的 `made_of` 与 `substituted_inputs` 都放到它生出的事实上。
+- 净 beta 与毛 beta 的单位从 RATIO 改为 MULTIPLE，与 `price.beta` 一致，−0.86 不再渲染成百分比。
+- `metric` 的执行路径不用新建：`compute_service.compute(method=…)` 加 `fact_adapters.compute` 就是"条目 → 现有 service → 一行事实"，步骤 3 的 `metric` 动词包它。
+
+**顺序调整（依赖决定，非计划变更）**：旧 prompt 仍在读 `READINGS` 与 14 个域的文字，直到分析师切到新面为止；所以 16 条 DESK_RULES 的归位、READINGS 的改写、旧文字的删除，放到步骤 5（手册）与退役提交里做，那时一并进措辞过目单。实际执行顺序：2 → 3a（新动词加面，旧面仍在）→ 5（手册）→ 4（分析师切换）→ 3b（退役程序语言与旧测试）。
+
 ### 步骤 3 · 原语工具层
 
 - 做什么：`tools/definitions.py` 注册 §2.3 的 12 个动词，JSON schema 用枚举，`why` 必填，期间类型化，输出经 fact_adapters 成行，拒绝成缺席行；`tools/faces.py` 改为三个面（`FACE_ISSUER`、`FACE_MARKET`、`FACE_RISK`）加各面的 metric 名单与 `list` 的 what 枚举；`program_service` 的原语被拎出来单步调用（fundamentals→filings_read，prices/price→prices_read，run/column/figure/pick→book_read，method→metric，算术与集合与序列→calc，sell/buy→scenario）；`run`、`compile`、签名页、符号表、`digest.HOW_TO_CITE` 下面；`program_service` 退役（9/19 决定）：原语拎出后删除 `run`、`compile`、签名页、符号表与 `docs/PROGRAM_LANGUAGE.md`；日后若做代码组合，以 12 个动词为函数面另建，不复用程序语言。
