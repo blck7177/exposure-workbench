@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 # `start` is on the face and reachable, and is counted apart (V36.1): it returns a
 # task id, never a row. Every other verb is an evidence call.
+LIST_TOOL = "list"
 START_TOOL = "start"
 
 # what the row says when a task's evidence calls are used (the row is the boundary of
@@ -263,6 +264,18 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                                         f"else, or file what you have."
                                         if again <= rp.STOP else
                                         "Sent unchanged again. The desk will not answer differently; file your brief.")}
+                elif name == LIST_TOOL:
+                    # LOOKING AT WHAT THE DESK HOLDS IS NOT EVIDENCE. `list` returns names and dates
+                    # and never a figure, so it is not charged against the evidence budget: the
+                    # issuer analyst, asked about nine names, looked at what each one files — eight
+                    # calls — and had eight left for the reading itself (V1 live smoke). The turn
+                    # cap still bounds it, and the same `list` twice is answered from before.
+                    res = await tools_session.call(name, args, actor=actor)
+                    res = res if isinstance(res, dict) else {"error": "tool_transport_error", "detail": str(res)[:200]}
+                    sent.record({"tool": name, "key": key})
+                    last[key] = res
+                    result.log.append({"step": len(result.log) + 1, "tool": name, "asked": _asked(args),
+                                       "why": str(args.get("why") or ""), "got": _got(res)})
                 elif evidence_calls >= settings.sub_analyst_evidence_calls:
                     # THE STOP IS A ROW (V1 live smoke). A line the budget kept the analyst from
                     # is "not settled, with the id of the absence row that says so" — and nothing

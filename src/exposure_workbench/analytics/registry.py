@@ -117,6 +117,7 @@ _REASON_OF_CODE: dict[str, str] = {
         "incompatible_units", "misaligned_vectors", "unit_mismatch", "different_books", "mixed_worlds",
         "overlapping_intervals", "different_dates", "double_count")},
     **{c: "policy" for c in ("withheld", "forecast", "no_threshold")},
+    **{c: "not_on_this_face" for c in ("not_on_this_face",)},
 }
 
 MEANS_KEYS = ("direction", "status", "basis", "flags", "reason", "way_out")

@@ -575,3 +575,14 @@ def test_a_list_argument_reads_as_names_in_the_progress_line():
     from exposure_workbench.tools import display
     said = display.render("Measuring {name} for {subject}", {"name": "price.beta", "subject": ["AAPL", "XOM"]})
     assert "AAPL, XOM" in said and "[" not in said
+
+
+async def test_a_price_measure_asked_of_a_book_says_whose_the_question_is(monkeypatch):
+    async def _compute(db, **kw):
+        raise AssertionError("a book is never sent to a price measure")
+    monkeypatch.setattr(P.compute_service, "compute", _compute)
+    out = await P.build_analyst_registry("market").get("metric").fn(None, name="price.drawdown", subject="port_001", why=WHY)
+    assert out["error"] == "not_on_this_face" and "the risk analyst's" in out["hint"]
+    f = fa.refusal_fact("metric", {"name": "price.drawdown", "subject": "port_001"}, out)
+    assert f.means["reason"] == "not_on_this_face" and "risk analyst" in f.means["way_out"]
+    assert "holds" not in f.text                       # never "the desk holds no prices for this book"

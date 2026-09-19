@@ -330,6 +330,18 @@ async def _at_its_run(db: AsyncSession, subject):
 def _metric_for(face: str):
     async def _metric(db: AsyncSession, name: str, subject, params: dict | None = None, *, why: str) -> dict:
         spec = desk.METHODS.get(name)
+        if spec is not None and spec.subject_kind == "price":
+            # A PRICE MEASURE IS ONE NAME'S. Asked of a book, it found no prices under "PORT_001"
+            # and said the desk holds none — and the lead told the user the desk has no price
+            # history for their portfolio, with the book's drawdown episodes one analyst away
+            # (V1 live smoke, three runs of four). The refusal says whose the question is.
+            books = [s for s in ([subject] if isinstance(subject, str) else list(subject or []))
+                     if isinstance(s, str) and s.startswith(("port_", "run_", "calc_"))]
+            if books:
+                return _err("not_on_this_face",
+                            f"{name} is measured on one name's prices, and {books[0]} is a book",
+                            hint="a book's own drawdowns, volatility, return and betas are the risk analyst's, read off the "
+                                 "book's runs; a price measure here takes the tickers the book holds")
         if spec is not None and spec.subject_kind == "run":
             subject = await _at_its_run(db, subject)
             if isinstance(subject, dict):

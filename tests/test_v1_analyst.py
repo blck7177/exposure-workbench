@@ -248,3 +248,17 @@ async def test_a_verb_it_does_not_have_is_answered_not_dispatched(monkeypatch):
     told = json.loads([m for m in seen[1]["messages"] if m.get("role") == "tool"][-1]["content"])
     assert told["error"] == "unknown_tool" and "book_read" in told["detail"] and "filings_read" not in told["detail"]
     assert [c[0] for c in tools.calls] == ["book_read"]
+
+
+async def test_looking_at_what_the_desk_holds_is_not_charged_as_evidence(monkeypatch):
+    """`list` returns names and dates, never a figure. Charged like a read, it took
+    eight of the issuer analyst's sixteen calls on a nine-name question (V1 live smoke)."""
+    monkeypatch.setattr(get_settings(), "sub_analyst_evidence_calls", 1, raising=False)
+    tools = _Tools()
+    looks = [("", [{"id": f"c{i}", "type": "function",
+                    "function": {"name": "list", "arguments": json.dumps({"what": "book", "subject": f"port_{i}", "why": WHY})}}])
+             for i in range(3)]
+    ctx, seen, _steps, _stored = _ctx(monkeypatch, [*looks, ("", _read()), ("", _submit(SETTLED))], tools)
+    result = await sa.run_sub_analyst(TASK, ctx)
+    assert [c[0] for c in tools.calls] == ["list", "list", "list", "book_read"]
+    assert result.cost["evidence_calls"] == 1 and len(result.log) == 4      # looked three times, read once, all of it logged
