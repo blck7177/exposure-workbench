@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.analytics import registry as desk
+from exposure_workbench.services import fact_adapters as fa
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import ledger as L
 from exposure_workbench.tools import faces
@@ -282,13 +283,22 @@ async def test_top_is_a_ranking_cut_at_n(monkeypatch):
 async def test_a_section_is_read_a_page_at_a_time(monkeypatch):
     text = "x" * (F.PASSAGE_CHARS + 500)
 
-    async def _read_filings(db, ticker, query=None, item=None, k=5, form_type=None):
-        return {"ticker": "MSFT", "item_code": "Item 7", "title": "MD&A", "text": text, "citation": {"form_type": "10-K"}}
+    asked = {}
+
+    async def _read_filings(db, ticker, query=None, item=None, k=5, form_type=None, accession=None):
+        asked["accession"] = accession
+        return {"ticker": "MSFT", "item_code": "Item 7", "title": "MD&A", "text": text,
+                "citation": {"form_type": "10-K", "accession": accession or "0000950170-25-100235"}}
     monkeypatch.setattr(P.D, "_read_filings", _read_filings)
     first = await P._filings_section(None, "MSFT", "7", why=WHY)
     assert len(first["text"]) == F.PASSAGE_CHARS and first["next_offset"] == F.PASSAGE_CHARS
-    last = await P._filings_section(None, "MSFT", "7", offset=first["next_offset"], why=WHY)
-    assert len(last["text"]) == 500 and "next_offset" not in last
+    assert first["char_span"] == [0, F.PASSAGE_CHARS] and asked["accession"] is None       # no filing named: the latest
+    last = await P._filings_section(None, "MSFT", "7", filing="0000950170-24-087843", offset=first["next_offset"], why=WHY)
+    assert len(last["text"]) == 500 and "next_offset" not in last and asked["accession"] == "0000950170-24-087843"
+    # the page's row says which filing and where in the Item, which is what reading on is asked with
+    facts, _ = fa.read_filings({"ticker": "MSFT", "item": "7"}, last)
+    assert facts[0].params["chars"] == [F.PASSAGE_CHARS, F.PASSAGE_CHARS + 500]
+    assert f"accession 0000950170-24-087843, chars {F.PASSAGE_CHARS}–{F.PASSAGE_CHARS + 500} of the Item" in F.line(facts[0])
     past = await P._filings_section(None, "MSFT", "7", offset=len(text), why=WHY)
     assert past["error"] == "invalid_params"
 

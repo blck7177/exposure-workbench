@@ -198,13 +198,13 @@ What the desk holds, as names and dates — never a figure. `metrics`: the measu
 **filings_read**（面：issuer）
 
 ```text
-One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates). A flow is read over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` omitted: every balance at one date. The row states the period it HAS. Refused: a line this issuer does not file (the lines it does are named); a flow asked `at` a date; a window the filings cannot make.
+One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates), for one `period`: a flow over a fiscal year, a fiscal quarter, twelve months to a date or N months to a date; a balance at a date (asked for a window, it is read at the window's end). A fiscal year or quarter is the issuer's own, so the same `period` asks each issuer the same question. `last_n` gives the last N of them as one series. `line` omitted: every balance at one date. The row states the period it HAS and the filing it came from. Refused: a line this issuer does not file (the lines it does are named); a flow asked `at` a date; a year, a quarter or a window the filings do not hold (the ones they do are named).
 ```
 
 **metric**（面：issuer, market, risk）
 
 ```text
-A measure of this desk's registry, by name, over one subject or a list of them (one row each, or each one's own refusal). The definition is the registry's: what it was built on, which filed line stood in for which, and what a composed total left out come back on the row. `list(what='metrics')` names every measure you may ask for and the params each takes. Refused: a subject the measure has no meaning for, an input not filed, too little history — each with its reason.
+A measure of this desk's registry, by name, over one subject or a list of them (one row each, or each one's own refusal). The definition is the registry's: what it was built on, which filed line stood in for which, and what a composed total left out come back on the row. A measure built on filed lines takes a `period` — the same one `filings_read` takes, each issuer's own fiscal year or quarter — and `last_n` for a series; a price or book measure is over its own window and takes `params`. `list(what='metrics')` names every measure you may ask for and what each takes. Refused: a subject the measure has no meaning for, an input not filed, too little history, a measure over a window asked at a date — each with its reason.
 ```
 
 **calc**（面：issuer, market, risk）
@@ -216,13 +216,13 @@ ONE operation over figures you were already shown, named by their f_ ids — nev
 **filings_search**（面：issuer）
 
 ```text
-Passages of one issuer's filings that match a query, each quotable verbatim under its id, with the form, Item and accession it came from. Narrow with `item`, `form` or `filed_after`. A figure stated only in prose is quoted from here, never computed. Refused: filings not indexed.
+Passages of one issuer's filings that match a query, each quotable verbatim under its id, with the form, Item, accession and the characters of the Item it spans. Narrow with `item`, `form` or `filed_after`. A figure stated only in prose is quoted from here, never computed. Refused: filings not indexed.
 ```
 
 **filings_section**（面：issuer）
 
 ```text
-One Item of the latest filing, verbatim, a page at a time: `next_offset` comes back while there is more. Refused: an Item the filing does not have.
+One Item of one filing, verbatim, a page at a time from `offset`: `next_offset` comes back while there is more. `filing` is an accession — the one a found passage shows, or one from the filings list; omitted, the latest filing that has the Item. A found passage shows where in its Item it sits, so reading on from there is this verb with that offset. Refused: an Item the filing does not have.
 ```
 
 **web_search**（面：issuer）

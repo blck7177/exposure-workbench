@@ -838,6 +838,9 @@ for _key in READS:
         raise RuntimeError(f"a reading for {_key!r}, which is neither a measure nor a declared column")
 
 
+PERIOD_EXECUTORS = ("formula", "formula.panel")     # measures built on filed lines: asked with a typed period
+
+
 def params_said(method: "Method") -> str:
     """The params ONE measure takes, as a reader is told them: each key, the values
     it may hold, and what it is. Rendered from the measure's own schema, so the
@@ -845,6 +848,8 @@ def params_said(method: "Method") -> str:
     measure takes none."""
     said = []
     required = set(method.params_schema.get("required") or [])
+    if method.executor in PERIOD_EXECUTORS:
+        return ""          # its window is the verb's typed `period`, its series `last_n`: no params of its own
     for key, spec in (method.params_schema.get("properties") or {}).items():
         values = [v for v in (spec.get("enum") or []) if v is not None]
         if values:
@@ -873,9 +878,9 @@ def params_by_measure(methods: "list[Method]") -> str:
     for said, names in groups.items():
         if said == biggest and len(names) > 6:
             continue
-        lines.append(f"{', '.join(names)} — {said or 'takes no params'}")
+        lines.append(f"{', '.join(names)} — {said or 'no params'}")
     if biggest is not None and len(groups[biggest]) > 6:
-        lines.append(f"every other measure — {biggest or 'takes no params'}")
+        lines.append(f"every other measure — {biggest or 'no params: its window is `period`'}")
     return " ‖ ".join(lines)
 
 

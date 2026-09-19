@@ -41,7 +41,7 @@ def test_a_line_the_sheet_does_not_carry_is_an_absence_with_the_date_it_has():
     assert [f.measure for f in figures] == ["inventory"]                  # and nothing called "… value then"
     gone = [f for f in facts if f.kind == F.ABSENCE]
     assert len(gone) == 1 and gone[0].measure == "commercial_paper"
-    assert gone[0].means["reason"] == "not_held" and "at=2025-06-30" in gone[0].means["way_out"]
+    assert gone[0].means["reason"] == "not_held" and "2025-06-30" in gone[0].means["way_out"]
     assert "as of 2026-03-31" in gone[0].text and "2025-06-30" in gone[0].text
 
 
@@ -370,9 +370,11 @@ def test_metric_says_what_each_measure_takes_where_the_argument_is_filled_in():
     All three calls were refused, and it filed both lines unsettled."""
     said = P.build_analyst_registry("market").get("metric").json_schema["properties"]["params"]["description"]
     assert "price.volatility — window_days = 21 | 30 | 63 | 126 | 252" in said
-    assert "price.momentum_12_1, price.distance_from_52w_high — takes no params" in said
+    assert "price.momentum_12_1, price.distance_from_52w_high — no params" in said
     issuer = P.build_analyst_registry("issuer").get("metric").json_schema["properties"]["params"]["description"]
-    assert "every other measure — months = 3 | 6 | 9 | 12" in issuer and issuer.count("months = ") == 1   # thirty formulas, said once
+    assert "every other measure — no params: its window is `period`" in issuer                   # thirty formulas, said once
+    assert "period" in P.build_analyst_registry("issuer").get("metric").json_schema["properties"]
+    assert "period" not in P.build_analyst_registry("market").get("metric").json_schema["properties"]   # no filed-line measure there
     risk = P.build_analyst_registry("risk").get("metric").json_schema["properties"]["params"]["description"]
     assert "book.explain_episode — peak (required): YYYY-MM-DD; trough (required): YYYY-MM-DD" in risk
 
@@ -516,14 +518,41 @@ def test_a_list_of_brackets_leaves_no_commas_behind():
 
 # ── the broader live pass (seven questions) ─────────────────────────────────
 
-async def test_one_filed_line_is_read_over_several_issuers_in_one_call(monkeypatch):
+def _filed_world(monkeypatch, *, instant=False, asked=None):
+    """The issuer, its calendar and the read, stubbed: what the verb decides is what is tested."""
+    from exposure_workbench.services import period_semantics as ps
+    from datetime import date
+    calls = []
+
+    async def _company(db, ticker):
+        return {"id": f"co_{ticker.lower()}", "ticker": ticker.upper()}
+
+    async def _is_instant(db, company_id, metric):
+        return instant
+
+    async def _calendar(db, ticker):
+        return ps.FiscalCalendar(
+            years=(ps.FiscalPeriod(2024, None, date(2023, 7, 1), date(2024, 6, 30)),
+                   ps.FiscalPeriod(2025, None, date(2024, 7, 1), date(2025, 6, 30))),
+            quarters=(ps.FiscalPeriod(2026, 1, date(2025, 7, 1), date(2025, 9, 30)),
+                      ps.FiscalPeriod(2026, 2, date(2025, 10, 1), date(2025, 12, 31))))
+
     async def _read(db, ticker, metric=None, **kw):
+        calls.append({"ticker": ticker, "metric": metric, **{k: v for k, v in kw.items() if v is not None}})
         if ticker == "JPM":
             return {"error": "metric_not_filed", "ticker": "JPM", "metric": metric, "detail": "JPM has no filed facts under 'inventory'"}
         return {"ticker": ticker, "metric": metric, "value": 1.0e9, "unit_class": "money", "calc_id": f"calc_{ticker.lower()}aaaa",
-                "period": {"start": "2025-04-01", "end": "2026-03-31"}}
+                "period": {"start": "2025-04-01", "end": "2026-03-31"}, "accessions": ["0000950170-25-100235", "0001193125-26-191507"]}
+    monkeypatch.setattr(P.D, "_resolve_company", _company)
+    monkeypatch.setattr(P.D, "_metric_is_instant", _is_instant)
     monkeypatch.setattr(P.D, "_read_fundamentals", _read)
-    out = await P._filings_read(None, ["MSFT", "JPM", "MSFT"], line="inventory", months=12, why=WHY)
+    monkeypatch.setattr(P.periods.period_semantics, "fiscal_calendar", _calendar)
+    return calls
+
+
+async def test_one_filed_line_is_read_over_several_issuers_in_one_call(monkeypatch):
+    _filed_world(monkeypatch)
+    out = await P._filings_read(None, ["MSFT", "JPM", "MSFT"], line="inventory", why=WHY)
     assert [r["asked"] for r in out["results"]] == ["MSFT", "JPM"]                 # a name asked twice is read once
     facts, _ = fa.read_fundamentals({"ticker": ["MSFT", "JPM"], "line": "inventory"}, out)
     assert [(f.kind, f.subject) for f in facts] == [(F.SCALAR, "MSFT"), (F.ABSENCE, "JPM")]
@@ -532,6 +561,76 @@ async def test_one_filed_line_is_read_over_several_issuers_in_one_call(monkeypat
     assert whole["error"] == "invalid_params"                                        # a whole sheet is one issuer's
     schema = P.build_analyst_registry("issuer").get("filings_read").json_schema["properties"]["ticker"]
     assert schema["type"] == ["string", "array"] and schema["maxItems"] == P.FILINGS_READ_TICKERS
+
+
+async def test_a_typed_period_is_resolved_against_the_issuers_own_calendar(monkeypatch):
+    """Plan V1 §2.3: period ∈ {fy, quarter, ttm_to, months+end, at}. The verb spoke its
+    service's parameters (months, start, end, at) until 2026-09-19, and a fiscal year
+    could not be said at all."""
+    calls = _filed_world(monkeypatch)
+    await P._filings_read(None, "MSFT", line="revenue", period={"fy": 2025}, why=WHY)
+    await P._filings_read(None, "MSFT", line="revenue", period={"quarter": "latest"}, why=WHY)
+    await P._filings_read(None, "MSFT", line="revenue", period={"ttm_to": "2025-12-31"}, why=WHY)
+    await P._filings_read(None, "MSFT", line="revenue", period={"months": 6, "end": "latest"}, why=WHY)
+    await P._filings_read(None, "MSFT", line="revenue", why=WHY)
+    await P._filings_read(None, "MSFT", line="revenue", period={"fy": "latest"}, last_n=5, why=WHY)
+    assert [{k: v for k, v in c.items() if k not in ("ticker", "metric")} for c in calls] == [
+        {"start": "2024-07-01", "end": "2025-06-30"},        # the issuer's OWN fiscal year, as filed
+        {"start": "2025-10-01", "end": "2025-12-31"},        # its latest fiscal quarter
+        {"months": 12, "end": "2025-12-31"},
+        {"months": 6},
+        {"months": 12},                                        # no period: the latest twelve months
+        {"months": 12, "last_n": 5},                           # five fiscal years, one series
+    ]
+    # the plan's refusals, made before anything is read
+    flow_at = await P._filings_read(None, "MSFT", line="revenue", period={"at": "2025-06-30"}, why=WHY)
+    assert flow_at["error"] == "invalid_params" and "is a flow" in flow_at["detail"]
+    unheld = await P._filings_read(None, "MSFT", line="revenue", period={"fy": 2019}, why=WHY)
+    assert unheld["error"] == "not_held" and any("FY2025" in a for a in unheld["available"])
+    loose = await P._filings_read(None, "MSFT", line="revenue", period={"ttm_to": "latest"}, last_n=4, why=WHY)
+    assert loose["error"] == "invalid_params" and "fiscal years or quarters" in loose["detail"]
+    assert len(calls) == 6
+
+
+async def test_a_balance_asked_for_a_window_is_read_at_its_end(monkeypatch):
+    calls = _filed_world(monkeypatch, instant=True)
+    await P._filings_read(None, "MSFT", line="total_assets", period={"fy": 2025}, why=WHY)
+    await P._filings_read(None, "MSFT", line="total_assets", period={"at": "latest"}, last_n=6, why=WHY)
+    assert [{k: v for k, v in c.items() if k not in ("ticker", "metric")} for c in calls] == [{"at": "2025-06-30"}, {"last_n": 6}]
+
+
+def test_a_filed_figures_row_says_the_filing_it_came_from():
+    facts, _ = fa.read_fundamentals({"ticker": "MSFT", "line": "revenue"}, {
+        "ticker": "MSFT", "metric": "revenue", "value": 3.18e11, "unit_class": "MONEY", "calc_id": "calc_aa39af05e09b",
+        "period": {"start": "2025-04-01", "end": "2026-03-31"},
+        "accessions": ["0001193125-26-191507", "0000950170-25-100235", "0000950170-25-061046"]})
+    assert facts[0].params["filed_in"][0] == "0001193125-26-191507"
+    assert F.line(facts[0]).endswith("filed 0001193125-26-191507 and 2 more")
+
+
+async def test_a_measure_on_filed_lines_takes_the_same_period_and_each_issuers_own_year(monkeypatch):
+    _filed_world(monkeypatch)
+    asked = []
+
+    async def _compute(db, **kw):
+        asked.append((kw["subject"], kw["params"]))
+        return {"calc_id": f"calc_{len(asked):012d}", "value": 0.3, "unit_class": "ratio"}
+    monkeypatch.setattr(P.compute_service, "compute", _compute)
+    metric = P.build_analyst_registry("issuer").get("metric").fn
+    out = await metric(None, name="roe", subject=["MSFT", "AAPL"], period={"fy": 2025}, why=WHY)
+    assert asked == [("MSFT", {"months": 12, "at": "2025-06-30"}), ("AAPL", {"months": 12, "at": "2025-06-30"})]
+    assert out["count"] == 2
+    await metric(None, name="net_debt", subject="MSFT", period={"at": "2025-06-30"}, why=WHY)     # a balance measure: at a date
+    assert asked[-1] == ("MSFT", {"at": "2025-06-30"})
+    await metric(None, name="gross_margin", subject="MSFT", period={"quarter": "latest"}, last_n=8, why=WHY)
+    assert asked[-1] == ("MSFT", {"months": 3, "last_n": 8})
+    refused = await metric(None, name="roe", subject="MSFT", period={"at": "2025-06-30"}, why=WHY)
+    assert refused["error"] == "invalid_params" and "measured over a window" in refused["detail"]
+    old_way = await metric(None, name="roe", subject="MSFT", params={"months": 12, "at": "2025-06-30"}, why=WHY)
+    assert old_way["error"] == "invalid_params" and "`period`" in old_way["detail"]            # one way to say a period
+    price = await P.build_analyst_registry("market").get("metric").fn(None, name="price.volatility", subject="AAPL",
+                                                                      period={"fy": 2025}, why=WHY)
+    assert price["error"] == "invalid_params" and "takes no period" in price["detail"]
 
 
 def test_dated_rows_of_a_list_are_one_measure_and_say_their_own_dates():
@@ -683,3 +782,47 @@ async def test_prices_read_names_the_one_field_it_wants(monkeypatch):
     assert "volume, AAPL, as of 2026-09-10: 10000000" in F.line(facts[0])
     schema = P.build_analyst_registry("market").get("prices_read").json_schema
     assert schema["required"] == ["ticker", "field", "why"] or set(schema["required"]) == {"ticker", "field", "why"}
+
+
+def test_a_found_passage_says_which_filing_and_where_in_its_item():
+    """Plan V1 §2.3: a passage comes back with its accession and character offsets.
+    The index held both and the row showed neither, so reading on from a hit meant
+    paging the Item from its start — or searching again, which is what happened."""
+    found = {"ticker": "XOM", "query": "debt maturities", "passages": [
+        {"chunk_id": "chunk_534783579b81", "text": "The amounts of long-term debt maturing in each of the four years…",
+         "item": "Item 8", "section_title": "Notes", "citation": {
+             "type": "chunk", "id": "chunk_534783579b81", "accession": "0000034088-26-000012", "form_type": "10-K",
+             "filing_date": "2026-02-18", "item": "Item 8", "char_span": [45200, 46859], "source_url": None}}]}
+    facts, _ = fa.read_filings({"ticker": "XOM", "query": "debt maturities"}, found)
+    line = F.line(facts[0])
+    assert "accession 0000034088-26-000012, chars 45200–46859 of the Item" in line
+    assert facts[0].params["accession"] == "0000034088-26-000012" and facts[0].params["chars"] == [45200, 46859]
+    schema = P.build_analyst_registry("issuer").get("filings_section").json_schema["properties"]
+    assert "filing" in schema and "accession" in schema["filing"]["description"]
+
+
+def test_a_fiscal_year_is_the_issuers_own_label_read_off_what_it_filed():
+    """`financial_facts.fiscal_year/quarter` are the FILING's, not the fact's: a 10-Q
+    for FY2026 Q2 carries last year's Q2 as a comparative, labelled 2026 / 2. A
+    period's label is the filing's moved back by the whole years between them."""
+    from datetime import date as d
+    from exposure_workbench.services import period_semantics as ps
+    rows = [
+        # NVDA-like: the year to late January is named for the year it ENDS in
+        (d(2024, 1, 29), d(2025, 1, 26), 2025, None, "k25"),                     # the FY2025 10-K, its own year
+        (d(2024, 1, 29), d(2025, 1, 26), 2026, None, "k26"),                     # …the same year, as next year's comparative
+        (d(2025, 1, 27), d(2026, 1, 25), 2026, None, "k26"),                     # the FY2026 10-K, its own year
+        (d(2025, 1, 27), d(2025, 4, 27), 2026, 1, "q1"),
+        (d(2025, 4, 28), d(2025, 7, 27), 2026, 2, "q2"),
+        (d(2025, 7, 28), d(2025, 10, 26), 2026, 3, "q3"),
+        (d(2025, 4, 28), d(2025, 7, 27), 2027, 2, "q2next"),                     # a comparative inside next year's Q2 10-Q
+        (d(2026, 4, 27), d(2026, 7, 26), 2027, 2, "q2next"),
+        (d(2025, 1, 27), d(2025, 7, 27), 2026, 2, "q2"),                         # a six-month YTD row: not a quarter
+    ]
+    cal = ps.calendar_from(rows)
+    assert [(y.label, y.start, y.end) for y in cal.years] == [
+        ("FY2025", d(2024, 1, 29), d(2025, 1, 26)), ("FY2026", d(2025, 1, 27), d(2026, 1, 25))]
+    assert [q.label for q in cal.quarters] == ["FY2026 Q1", "FY2026 Q2", "FY2026 Q3", "FY2026 Q4", "FY2027 Q2"]
+    q4 = cal.quarter(2026, 4)
+    assert (q4.start, q4.end) == (d(2025, 10, 27), d(2026, 1, 25))               # the year less its first three quarters
+    assert cal.quarter(2026, 2).end == d(2025, 7, 27) and cal.year(2019) is None

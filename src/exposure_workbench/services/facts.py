@@ -276,6 +276,18 @@ def from_of(rec: dict) -> str:
     row it was read off."""
     params = rec.get("params") or {}
     sources = [s for s in rec.get("sources") or [] if isinstance(s, str)]
+    if rec.get("kind") == PASSAGE and isinstance(params.get("accession"), str):
+        # WHICH FILING, AND WHERE IN ITS ITEM (plan V1 §2.3: a found passage comes with its
+        # accession and character offsets) — what reading on from a hit is asked with.
+        chars = params.get("chars")
+        where = f"accession {params['accession']}" + (f", chars {chars[0]}–{chars[1]} of the Item"
+                                                       if isinstance(chars, list) and len(chars) == 2 else "")
+        return " ".join(x for x in (params.get("pull"), where) if x)
+    filed = [a for a in params.get("filed_in") or [] if isinstance(a, str)]
+    if filed and not params.get("method") and not params.get("op"):
+        # a filed line: the filing it was read from (the newest, and how many more it was derived from)
+        where = f"filed {filed[0]}" + (f" and {len(filed) - 1} more" if len(filed) > 1 else "")
+        return " ".join(x for x in (params.get("pull"), where) if x)
     inputs = [i for i in params.get("inputs") or [] if isinstance(i, str)]
     made_by = (f"method {params['method']}" if params.get("method") else
                f"op {params['op']}" + (f" of {' and '.join(inputs[:4])}" + (" and others" if len(inputs) > 4 else "")

@@ -105,7 +105,7 @@ async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None =
         return {"error": "not_reported_at_this_date", "ticker": tk, "metric": metric,
                 "as_of": sheet.get("as_of"),
                 "last_reported": (sheet.get("not_reported_at_this_date") or {}).get(metric),
-                "detail": "ask with `at` set to the date it was last reported, or last_n for its history"}
+                "detail": "read it at the date it was last reported, or read its last few filed dates as a series"}
     return await fundamentals_service.get_flow(
         db, tk, metric, months=(int(months) if months is not None else None), start=start, end=end,
         last_n=(int(last_n) if last_n is not None else None), invoked_by=invoked_by)
@@ -114,7 +114,7 @@ async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None =
 # ── read_filings ────────────────────────────────────────────────────────────────
 
 async def _read_filings(db: AsyncSession, ticker: str, query: str | None = None, item: str | None = None,
-                        k: int = 5, form_type: str | None = None) -> dict:
+                        k: int = 5, form_type: str | None = None, accession: str | None = None) -> dict:
     company = await _resolve_company(db, ticker)
     if company.get("error"):
         return company
@@ -124,12 +124,16 @@ async def _read_filings(db: AsyncSession, ticker: str, query: str | None = None,
                                                     "passages) or `item` (one Item verbatim, e.g. '1A', '7')"}
     if item is not None:
         code = item if item.lower().startswith("item") else f"Item {item}"
-        section = await frs.get_section(db, company["id"], code, form_type=form_type)
+        section = await frs.get_section(db, company["id"], code, form_type=form_type, accession=accession)
         if section is None:
-            return {"error": "section_not_found", "ticker": tk, "item": code}
+            return {"error": "section_not_found", "ticker": tk, "item": code,
+                    **({"filing": accession,
+                        "detail": f"{tk} has no {code} in a filing {accession}: the filings it has, and the Items "
+                                  f"indexed, are listed by name"} if accession else {})}
         return {"ticker": tk, "item_code": section.item_code, "title": section.title, "text": section.text,
                 "citation": {"type": "chunk", "accession": section.accession_number,
                              "form_type": section.form_type, "item": section.item_code,
+                             "filing_date": section.filing_date.isoformat() if section.filing_date else None,
                              "source_url": section.source_url}}
     try:
         passages = await frs.search_passages(db, company["id"], query, k=int(k), form_type=form_type)

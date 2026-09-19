@@ -254,7 +254,7 @@ async def _run_method(db: AsyncSession, spec: skill.Method, subject: str, params
     if ex == "formula.panel":
         if p.get("last_n"):
             return _err("invalid_params", "issuer.panel has no series form; ask ONE measure by its own "
-                                          "name for its last_n periods (gross_margin with last_n=8)")
+                                          "name for its last few fiscal years or quarters")
         return await formula_service.build_panel(
             db, subject.upper(), months=int(p.get("months") or 12), at=p.get("at"), invoked_by=invoked_by)
     if ex == "price.rolling_volatility":

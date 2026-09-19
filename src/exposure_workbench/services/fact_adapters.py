@@ -403,7 +403,7 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
             f = F.fact(F.SCALAR, measure, subject=node.get("ticker") or ctx.subject,
                        unit=(unit.upper() if isinstance(unit, str) else _unit_for(key if key else measure, ctx, node)),
                        value=float(node["value"]), as_of=_as_of_of(node, ctx), window=_window_of(node, ctx),
-                       params={**ctx.params, **_params_of(node, ctx), **_composition_of(node)},
+                       params={**ctx.params, **_params_of(node, ctx), **_composition_of(node), **_filed_in(node)},
                        standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
                        sources=_sources_of(node, ctx), group=ctx.group,
                        means=registry.merged(ctx.means, registry.words_beside(node)))
@@ -498,6 +498,14 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
         else:
             out[k] = _harvest(v, k, f"{path}.{k}", sub, facts)
     return out
+
+
+def _filed_in(obj: dict) -> dict:
+    """The accessions a filed figure came from, as the params its row is rendered with."""
+    got = obj.get("accessions")
+    if isinstance(got, list) and got and all(isinstance(a, str) and a for a in got):
+        return {"filed_in": list(got)[:6]}
+    return {}
 
 
 def _composition_of(obj: dict) -> dict:
@@ -629,7 +637,7 @@ def read_fundamentals(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
                       + (f"; it was last reported as of {last}" if last else ""))[:600],
                 params={"error": "not_reported_at_this_date"},
                 means={"reason": registry.reason_of("not_reported_at_this_date"),
-                       **({"way_out": f"read it at the date it has: at={last}"} if last else {})}))
+                       **({"way_out": f"read it at the date it has, {last}"} if last else {})}))
     # a balance sheet: every balance carries its own as_of and fact_id (typed figures)
     # under its metric name — the walker names each by its key.
     facts, note = harvest(result, ctx)
@@ -638,6 +646,13 @@ def read_fundamentals(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         # a flow or a series is named by its metric, not by the key it sits under
         facts = [replace(f, measure=result["metric"]) if f.measure in ("", "value", "points") else f for f in facts]
     return facts, note
+
+
+def _span(span: Any) -> list[int] | None:
+    """[start, end] of a passage within its Item, as two integers, or nothing."""
+    if isinstance(span, (list, tuple)) and len(span) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in span):
+        return [int(span[0]), int(span[1])]
+    return None
 
 
 def read_filings(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
@@ -651,7 +666,8 @@ def read_filings(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
             f = F.fact(F.PASSAGE, f"{cit.get('form_type') or 'filing'} {p.get('item') or ''}".strip(), subject=tk,
                        text=p.get("text") or "", as_of=cit.get("filing_date") or "n/a",
                        params={k: v for k, v in (("form_type", cit.get("form_type")), ("item", p.get("item")),
-                                                 ("accession", cit.get("accession")), ("section_title", p.get("section_title")))
+                                                 ("accession", cit.get("accession")), ("section_title", p.get("section_title")),
+                                                 ("chars", _span(cit.get("char_span"))))
                                if v},
                        sources=tuple(s for s in (p.get("chunk_id"),) if _is_id(s)), group="fundamentals")
             facts.append(f)
@@ -663,7 +679,8 @@ def read_filings(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         f = F.fact(F.PASSAGE, f"{cit.get('form_type') or 'filing'} {result.get('item_code') or ''}".strip(), subject=tk,
                    text=result["text"], as_of=cit.get("filing_date") or "n/a",
                    params={k: v for k, v in (("form_type", cit.get("form_type")), ("item", result.get("item_code")),
-                                             ("accession", cit.get("accession")), ("title", result.get("title"))) if v},
+                                             ("accession", cit.get("accession")), ("title", result.get("title")),
+                                             ("chars", _span(result.get("char_span")))) if v},
                    sources=tuple(s for s in (cit.get("id"),) if _is_id(s)), group="fundamentals")
         facts.append(f)
         note = {k: v for k, v in result.items() if k != "text"}

@@ -53,6 +53,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import display_names as dn
+from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import registry as desk
 from exposure_workbench.analytics import resources
 from exposure_workbench.db.models import CalcLedger, ExposureRun, Filing, FilingSection, MarketPrice
@@ -67,6 +68,7 @@ from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.services.ledger import Ledger
 from exposure_workbench.services.typed_calculator import SCENARIO_OP
 from exposure_workbench.tools import definitions as D
+from exposure_workbench.tools import periods
 from exposure_workbench.tools.meta_tools import _start as _start_work
 from exposure_workbench.tools.registry import DELEGATION, READ, Shapes, Tool, ToolRegistry, current_session_id
 from exposure_workbench.tools.research_tools import _search_external_research
@@ -113,7 +115,9 @@ def _metric_lines(names: list[str]) -> list[str]:
     out = []
     for m in (desk.METHODS[n] for n in names):
         takes = desk.params_said(m)
-        out.append(f"{m.name} — {m.reads_as}: {m.describes}" + (f" [params — {takes}]" if takes else " [no params]"))
+        out.append(f"{m.name} — {m.reads_as}: {m.describes}"
+                   + (" [takes a period]" if m.executor in desk.PERIOD_EXECUTORS else
+                      f" [params — {takes}]" if takes else " [no params]"))
     return out
 
 
@@ -122,22 +126,38 @@ async def _fundamentals_lines(db: AsyncSession, ticker: str) -> list[str] | dict
     if company.get("error"):
         return company
     rows = (await cs.list_available_metrics(db, company["ticker"]))["metrics"]
-    return [f"{r['metric']} — {dn.metric(r['metric'])}; {'a flow over a window' if r.get('kind') == 'flow' else 'a balance at a date'}; "
-            f"filed through {r.get('latest_period_end')}" for r in sorted(rows, key=lambda r: r["metric"])]
+    # THE ISSUER'S OWN CALENDAR FIRST: a typed period names a fiscal year or quarter, and which
+    # ones are on file — and when they end — is a name and a date, which is what `list` is for.
+    cal = await periods.period_semantics.fiscal_calendar(db, company["ticker"])
+    calendar = []
+    if cal is not None and cal.years:
+        first, last = cal.years[0], cal.years[-1]
+        calendar.append(f"fiscal years on file: {first.label} to {last.label}; {last.label} ran "
+                        f"{last.start.isoformat()} to {last.end.isoformat()}")
+    if cal is not None and cal.quarters:
+        q = cal.quarters[-1]
+        calendar.append(f"latest fiscal quarter on file: {q.fy}Q{q.q}, {q.start.isoformat()} to {q.end.isoformat()}")
+    return calendar + [
+        f"{r['metric']} — {dn.metric(r['metric'])}; {'a flow over a window' if r.get('kind') == 'flow' else 'a balance at a date'}; "
+        f"filed through {r.get('latest_period_end')}" for r in sorted(rows, key=lambda r: r["metric"])]
 
 
 async def _filings_lines(db: AsyncSession, ticker: str) -> list[str] | dict:
     company = await D._resolve_company(db, ticker)
     if company.get("error"):
         return company
-    forms = (await db.execute(select(Filing.form_type, func.max(Filing.filing_date))
-                              .where(Filing.company_id == company["id"]).group_by(Filing.form_type))).all()
+    filed = (await db.execute(select(Filing.form_type, Filing.filing_date, Filing.period_end, Filing.accession_number)
+                              .where(Filing.company_id == company["id"])
+                              .order_by(Filing.filing_date.desc()).limit(FILINGS_LISTED))).all()
+    forms = [(f, d) for f, d, _p, _a in filed]
     items = (await db.execute(select(FilingSection.item_code).join(Filing, Filing.id == FilingSection.filing_id)
                               .where(Filing.company_id == company["id"], FilingSection.item_code.is_not(None))
                               .group_by(FilingSection.item_code))).all()
     if not forms:
         return _err("not_indexed", f"{company['ticker']} has no filings indexed on this desk", hint="start(kind='readiness') prepares it")
-    return ([f"{form} — latest filed {d.isoformat() if d else 'n/a'}" for form, d in sorted(forms)]
+    # each filing by the accession `filings_section` takes, newest first
+    return ([f"{form} filed {d.isoformat() if d else 'n/a'}" + (f", period to {p.isoformat()}" if p else "") + f" — accession {acc}"
+             for form, d, p, acc in filed]
             + ["items indexed: " + ", ".join(sorted(i for (i,) in items))])
 
 
@@ -221,21 +241,49 @@ def _list_for(metric_names: list[str]):
 # ── the three reads ──────────────────────────────────────────────────────────
 
 FILINGS_READ_TICKERS = 12
+FILINGS_LISTED = 12
 
 
-async def _filings_read(db: AsyncSession, ticker, line: str | None = None, months: int | None = None,
-                        start: str | None = None, end: str | None = None, at: str | None = None,
+async def _filings_read(db: AsyncSession, ticker, line: str | None = None, period: dict | None = None,
                         last_n: int | None = None, *, why: str) -> dict:
-    """ONE LINE, OVER ONE ISSUER OR SEVERAL. `metric` has always taken a list of
-    subjects; this read took one ticker, so "is anyone's top line speeding up while
-    the margin goes the other way, across everything we hold" was a read a name for
-    revenue alone — twelve of the issuer analyst's sixteen calls, and no brief (V1
-    live smoke). The same read, the same refusals, one row or one refusal a name."""
+    """ONE LINE, OVER ONE ISSUER OR SEVERAL, FOR ONE TYPED PERIOD (plan V1 §2.3).
+
+    The period is resolved here, against each issuer's own calendar (tools/periods),
+    and the service is asked with dates: a flow over the window, a balance at its
+    end. Two refusals are the plan's and are made before anything is read: a flow
+    asked `at` a date, and a series that is not on the issuer's own years, quarters
+    or filed dates."""
     async def one(tk: str) -> dict:
-        # 12.0 is an integer to a JSON schema and a TypeError to a slice: coerced here
-        return await D._read_fundamentals(db, tk, metric=line,
-                                          months=int(months) if months is not None else None, start=start, end=end,
-                                          last_n=int(last_n) if last_n is not None else None, at=at)
+        company = await D._resolve_company(db, tk)
+        if company.get("error"):
+            return company
+        asked = await periods.resolve(db, company["ticker"], period)
+        if isinstance(asked, dict):
+            return asked
+        n = int(last_n) if last_n is not None else None       # 12.0 is an integer to a schema and a TypeError to a slice
+        instant = True if line is None else await D._metric_is_instant(db, company["id"], line)
+        if instant is None:                                   # not a line this issuer files: the read says which it does
+            return await D._read_fundamentals(db, tk, metric=line)
+        if instant:
+            if n is not None:
+                if asked.kind not in ("at", "latest") or not asked.latest:
+                    return _err("invalid_params", f"a balance's series is its last {n} filed dates: ask it with "
+                                                  f"{{\"at\": \"latest\"}} or no period")
+                return await D._read_fundamentals(db, tk, metric=line, last_n=n)
+            # a balance asked for a window is read at the window's END, and the row says the date
+            return await D._read_fundamentals(db, tk, metric=line, at=asked.end_iso)
+        if asked.kind == "at":
+            return _err("invalid_params", f"{line} is a flow: it is read over a window — a fiscal year, a quarter, "
+                                          f"twelve months to a date, or N months to a date — and not at a date")
+        if n is not None:
+            if asked.kind not in ("fy", "quarter") or not asked.latest:
+                return _err("invalid_params", "a series runs on the issuer's own fiscal years or quarters, ending at the "
+                                              "latest: ask it with {\"fy\": \"latest\"} or {\"quarter\": \"latest\"}")
+            return await D._read_fundamentals(db, tk, metric=line, months=asked.months, last_n=n)
+        if asked.kind in ("fy", "quarter"):
+            return await D._read_fundamentals(db, tk, metric=line, start=asked.start.isoformat(), end=asked.end_iso)
+        return await D._read_fundamentals(db, tk, metric=line, months=asked.months or 12, end=asked.end_iso)
+
     if isinstance(ticker, str):
         return await one(ticker)
     tickers = list(dict.fromkeys(str(t) for t in ticker or []))
@@ -338,9 +386,54 @@ async def _at_its_run(db: AsyncSession, subject):
     return out[0] if one else out
 
 
+PERIOD_EXECUTORS = desk.PERIOD_EXECUTORS             # the measures built on filed lines: they take a period
+
+
+def _formula_params(name: str, asked: "periods.Asked", last_n: int | None) -> dict:
+    """The typed period as the formula service is asked: a window's length and the
+    date it ends at. A measure built on balances alone is read AT that date."""
+    basis = fm.FORMULAS[name].basis if name in fm.FORMULAS else "mixed"
+    if asked.kind == "at" and basis != "instant":
+        return _err("invalid_params", f"{name} is measured over a window: ask it for a fiscal year, a quarter, twelve "
+                                      f"months to a date, or N months to a date — a date alone is a balance's")
+    if last_n is not None:
+        if asked.kind not in ("fy", "quarter") or not asked.latest:
+            return _err("invalid_params", "a measure's series runs on the issuer's own fiscal years or quarters, ending at "
+                                          "the latest: ask it with {\"fy\": \"latest\"} or {\"quarter\": \"latest\"}")
+        return {"months": asked.months, "last_n": int(last_n)}
+    out: dict = {}
+    if asked.months and asked.kind != "latest":
+        out["months"] = asked.months
+    if asked.end_iso:
+        out["at"] = asked.end_iso
+    return out
+
+
 def _metric_for(face: str):
-    async def _metric(db: AsyncSession, name: str, subject, params: dict | None = None, *, why: str) -> dict:
+    async def _metric(db: AsyncSession, name: str, subject, period: dict | None = None, last_n: int | None = None,
+                      params: dict | None = None, *, why: str) -> dict:
         spec = desk.METHODS.get(name)
+        if spec is not None and spec.executor in PERIOD_EXECUTORS:
+            # A MEASURE BUILT ON FILED LINES takes the same typed period `filings_read` does, resolved
+            # against EACH subject's own calendar: FY2025 is one question and nine different windows.
+            if params:
+                return _err("invalid_params", f"{name} takes `period` and `last_n`, and no params")
+            subjects = [subject] if isinstance(subject, str) else list(subject or [])
+            results = []
+            for s_ in subjects:
+                asked = await periods.resolve(db, str(s_).upper(), period)
+                inner = asked if isinstance(asked, dict) else _formula_params(name, asked, last_n)
+                if inner.get("error"):
+                    results.append({"method": name, "subject": s_, **inner})
+                    continue
+                results.append({"method": name, "subject": s_,
+                                **(await compute_service.compute(db, method=name, subject=s_, params=inner))})
+            if not results:
+                return _err("invalid_params", "a measure is asked of a subject: a ticker, or a list of them")
+            return results[0] if len(results) == 1 else {"results": results, "count": len(results)}
+        if period is not None or last_n is not None:
+            return _err("invalid_params", f"{name} is measured over its own window and takes no period: what it takes is "
+                                          + (desk.params_said(spec) if spec is not None and desk.params_said(spec) else "nothing"))
         if spec is not None and spec.subject_kind == "price":
             # A PRICE MEASURE IS ONE NAME'S. Asked of a book, it found no prices under "PORT_001"
             # and said the desk holds none — and the lead told the user the desk has no price
@@ -448,8 +541,11 @@ async def _filings_search(db: AsyncSession, ticker: str, query: str, item: str |
                           "section_title": p.section_title, "citation": p.citation()} for p in passages]}
 
 
-async def _filings_section(db: AsyncSession, ticker: str, item: str, form: str | None = None, offset: int = 0, *, why: str) -> dict:
-    out = await D._read_filings(db, ticker, item=item, form_type=form)
+async def _filings_section(db: AsyncSession, ticker: str, item: str, filing: str | None = None, form: str | None = None,
+                           offset: int = 0, *, why: str) -> dict:
+    """Plan V1 §2.3: ticker, FILING, item, offset. `filing` is the accession a found
+    passage or the filings list shows; without it the latest filing with the Item."""
+    out = await D._read_filings(db, ticker, item=item, form_type=form, accession=filing)
     if out.get("error") or not isinstance(out.get("text"), str):
         return out
     text, start = out["text"], max(0, int(offset or 0))
@@ -457,7 +553,8 @@ async def _filings_section(db: AsyncSession, ticker: str, item: str, form: str |
     if not page:
         return _err("invalid_params", f"offset {start} is past the end of this section ({len(text)} characters)")
     more = start + len(page) < len(text)
-    return {**out, "text": page, **({"next_offset": start + len(page)} if more else {})}
+    return {**out, "text": page, "char_span": [start, start + len(page)],
+            **({"next_offset": start + len(page)} if more else {})}
 
 
 async def _web_search(db: AsyncSession, ticker: str, query: str, days: int | None = None, *, why: str) -> dict:
@@ -510,20 +607,19 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                                 ["what"])),
         "filings_read": Tool(
             name="filings_read", display="Reading {ticker}'s filed figures", rows=True, tool_class=READ, fn=_filings_read,
-            description="One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates). A flow is read "
-                        "over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a "
-                        "date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` "
-                        "omitted: every balance at one date. The row states the period it HAS. Refused: a line this issuer "
-                        "does not file (the lines it does are named); a flow asked `at` a date; a window the filings cannot make.",
+            description="One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what "
+                        "it restates), for one `period`: a flow over a fiscal year, a fiscal quarter, twelve months to a date "
+                        "or N months to a date; a balance at a date (asked for a window, it is read at the window's end). "
+                        "A fiscal year or quarter is the issuer's own, so the same `period` asks each issuer the same "
+                        "question. `last_n` gives the last N of them as one series. `line` omitted: every balance at one "
+                        "date. The row states the period it HAS and the filing it came from. Refused: a line this issuer "
+                        "does not file (the lines it does are named); a flow asked `at` a date; a year, a quarter or a "
+                        "window the filings do not hold (the ones they do are named).",
             json_schema=_schema({"ticker": {"type": ["string", "array"], "items": {"type": "string"}, "minItems": 1,
                                             "maxItems": FILINGS_READ_TICKERS,
                                             "description": "a ticker, or a list of them to read the same line for each"},
                                  "line": {"type": ["string", "null"], "enum": [*nt.TABLE_FILED_LINES, None]},
-                                 "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None]},
-                                 "start": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
-                                 "end": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
-                                 "at": {"type": ["string", "null"], "description": "YYYY-MM-DD, a reported period end"},
-                                 "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40}}, ["ticker"])),
+                                 "period": periods.PERIOD_SCHEMA, "last_n": periods.LAST_N_SCHEMA}, ["ticker"])),
         "prices_read": Tool(
             name="prices_read", display="Reading {ticker}'s prices", rows=True, tool_class=READ, fn=_prices_read,
             description="One field of a name's daily prices: `close` is the as-traded price (market value, display), "
@@ -554,18 +650,23 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
             name="metric", display="Measuring {name} for {subject}", rows=True, tool_class=READ, fn=_metric_for(face),
             description="A measure of this desk's registry, by name, over one subject or a list of them (one row each, or "
                         "each one's own refusal). The definition is the registry's: what it was built on, which filed line "
-                        "stood in for which, and what a composed total left out come back on the row. `list(what='metrics')` "
-                        "names every measure you may ask for and the params each takes. Refused: a subject the measure has "
-                        "no meaning for, an input not filed, too little history — each with its reason.",
+                        "stood in for which, and what a composed total left out come back on the row. A measure built on "
+                        "filed lines takes a `period` — the same one `filings_read` takes, each issuer's own fiscal year or "
+                        "quarter — and `last_n` for a series; a price or book measure is over its own window and takes "
+                        "`params`. `list(what='metrics')` names every measure you may ask for and what each takes. "
+                        "Refused: a subject the measure has no meaning for, an input not filed, too little history, a "
+                        "measure over a window asked at a date — each with its reason.",
             json_schema=_schema({"name": {"type": "string", "enum": metric_names,
                                           # the handbook speaks of measures by what they ARE and never by key
                                           # (its first ban); the key and the words meet here, at the argument
                                           "description": "; ".join(f"{n} = {desk.METHODS[n].reads_as}" for n in metric_names)},
                                  "subject": {"type": ["string", "array"], "items": {"type": "string"}, "maxItems": 40,
                                              "description": "a ticker, a run_/port_ id, or a list of them — what the measure says it is over"},
-                                 # WHAT EACH MEASURE TAKES, said where the argument is filled in. The first
-                                 # live turn asked price.volatility for `window: "21d"` — a key it had to
-                                 # guess, because this said "an object" and nothing else.
+                                 # a face with no measure built on filed lines has no use for a period
+                                 **({"period": periods.PERIOD_SCHEMA_BRIEF if "filings_read" in FACE_TOOLS.get(face, ()) else periods.PERIOD_SCHEMA,
+                                     "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40,
+                                                "description": "a measure over its last N fiscal years or quarters, as one series"}}
+                                    if any(desk.METHODS[n].executor in desk.PERIOD_EXECUTORS for n in metric_names) else {}),
                                  "params": {"type": ["object", "null"],
                                             "description": "only the keys the measure takes — "
                                                            + desk.params_by_measure([desk.METHODS[n] for n in metric_names])}},
@@ -589,8 +690,9 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
         "filings_search": Tool(
             name="filings_search", display="Searching {ticker}'s filings", rows=True, tool_class=READ, fn=_filings_search,
             description="Passages of one issuer's filings that match a query, each quotable verbatim under its id, with the "
-                        "form, Item and accession it came from. Narrow with `item`, `form` or `filed_after`. A figure stated "
-                        "only in prose is quoted from here, never computed. Refused: filings not indexed.",
+                        "form, Item, accession and the characters of the Item it spans. Narrow with `item`, `form` or "
+                        "`filed_after`. A figure stated only in prose is quoted from here, never computed. Refused: filings "
+                        "not indexed.",
             json_schema=_schema({"ticker": _TICKER, "query": {"type": "string", "minLength": 3},
                                  "item": {"type": ["string", "null"], "description": "'1A', '7', '7A', …"},
                                  "form": D._FORM_TYPE, "filed_after": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
@@ -598,9 +700,12 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
         "filings_section": Tool(
             name="filings_section", display="Reading Item {item} of {ticker}'s filing", rows=True, tool_class=READ,
             fn=_filings_section,
-            description="One Item of the latest filing, verbatim, a page at a time: `next_offset` comes back while there is "
-                        "more. Refused: an Item the filing does not have.",
+            description="One Item of one filing, verbatim, a page at a time from `offset`: `next_offset` comes back while "
+                        "there is more. `filing` is an accession — the one a found passage shows, or one from the filings "
+                        "list; omitted, the latest filing that has the Item. A found passage shows where in its Item it "
+                        "sits, so reading on from there is this verb with that offset. Refused: an Item the filing does not have.",
             json_schema=_schema({"ticker": _TICKER, "item": {"type": "string", "description": "'1', '1A', '7', '7A', '8', …"},
+                                 "filing": {"type": ["string", "null"], "description": "an accession number, e.g. 0000034088-26-000012"},
                                  "form": D._FORM_TYPE, "offset": {"type": "integer", "minimum": 0, "default": 0}},
                                 ["ticker", "item"])),
         "web_search": Tool(

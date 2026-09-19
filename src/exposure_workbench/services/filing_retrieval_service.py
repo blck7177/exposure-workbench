@@ -151,8 +151,10 @@ async def get_section(
     company_id: str,
     item_code: str,
     form_type: str | None = None,
+    accession: str | None = None,
 ) -> SectionView | None:
-    """Read one Item verbatim from the company's most recent matching filing."""
+    """Read one Item verbatim — from the filing named by `accession`, or from the
+    company's most recent matching filing when none is named."""
     stmt = (
         select(FilingSection, Filing)
         .join(Filing, Filing.id == FilingSection.filing_id)
@@ -160,6 +162,8 @@ async def get_section(
     )
     if form_type:
         stmt = stmt.where(Filing.form_type == form_type)
+    if accession:
+        stmt = stmt.where(Filing.accession_number == accession)
     stmt = stmt.order_by(Filing.filing_date.desc(), FilingSection.section_order)
 
     row = (await db.execute(stmt)).first()

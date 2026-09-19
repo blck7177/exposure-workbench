@@ -223,8 +223,8 @@ async def get_flow(
     if last_n is not None and last_n > 1:
         if start or end:
             return {"error": "invalid_arguments",
-                    "detail": "a series is anchored to the issuer's reporting grid; give "
-                              "`months` and `last_n`, not start/end"}
+                    "detail": "a series is anchored to the issuer's own reporting grid — its fiscal years "
+                              "or quarters, ending at the latest — and not to a window's dates"}
         return await _flow_series(db, ticker, metric, facts, months or 12, last_n, invoked_by)
 
     if start and end:
@@ -257,9 +257,17 @@ async def get_flow(
          "result_type": {"unit_class": unit, "kind": "flow", "quantity": metric}},
         {"value": window.value}, [t["fact_id"] for t in terms], {}, invoked_by,
     )
+    # THE FILINGS THE FIGURE CAME FROM (plan V1 §2.3: a filed line's row carries its
+    # accession). A window the issuer filed whole is one filing; a derived one — a year
+    # less nine months plus nine — is each filing a term came from, newest first.
+    filed_in = {f.fact_id: f for f in facts}
+    accessions = [a for a, _d in sorted(
+        {(filed_in[fid].source_accession, filed_in[fid].filing_date) for fid, _sign in window.terms
+         if fid in filed_in and filed_in[fid].source_accession},
+        key=lambda t: (t[1] is None, t[1]), reverse=True)]
     return {"calc_id": calc_id, "ticker": ticker, "metric": metric,
             "value": window.value, "unit_class": unit.upper(), "period": period, "terms": terms,
-            "derivation": window.formula,
+            "derivation": window.formula, "accessions": accessions,
             "basis": f"{period['start']}..{period['end']}, derived as: {window.formula}"}
 
 
@@ -311,7 +319,8 @@ async def get_balance_sheet(
             judged = units.fact_unit(here[5])
             balances[metric] = {"value": here[0], "fact_id": here[1],
                                 "as_of": as_of.isoformat(),
-                                "unit_class": judged.upper() if judged else "UNKNOWN"}
+                                "unit_class": judged.upper() if judged else "UNKNOWN",
+                                **({"accessions": [here[3]]} if here[3] else {})}
         else:
             seen = [pe for m, pe in best if m == metric]
             last = max((pe for pe in seen if pe < as_of), default=None) or max(seen)
@@ -354,8 +363,8 @@ async def _flow_series(db, ticker, metric, facts, months, last_n, invoked_by) ->
                  f"{covers['to']}."),
             invoked_by=invoked_by, months=months, data_covers=covers,
             detail=(f"no {months}-month window of {metric} can be derived from the "
-                    f"periods {ticker} reports; it may report this metric only over "
-                    f"longer periods — ask for a longer `months`"))
+                    f"periods {ticker} reports; it may report this line only over "
+                    f"longer periods — ask for a longer window"))
     input_ids = sorted({f for w in derived for f in w.window.fact_ids})
     unit = await _facts_unit(db, input_ids, ticker, metric)
     if isinstance(unit, dict):
