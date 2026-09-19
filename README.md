@@ -23,7 +23,7 @@ out of the tool list rather than leaving a tool that refuses. The LLM call stays
 in the loop and never crosses MCP. Deterministic code (recipes, REST wrappers)
 calls the same functions through the same wrapper directly, in process, and a
 standing parity test pins that both produce identical trace rows.
-See docs/MCP_PLAN.md.
+See docs/archive/plans/MCP_PLAN.md (historical; the current plan is docs/IMPLEMENTATION_PLAN_V1.md).
 
 ## Quick Start
 
@@ -71,8 +71,9 @@ concurrency and audit are described in [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 Design docs: [docs/TARGET_ARCHITECTURE.md](docs/TARGET_ARCHITECTURE.md) (v3),
 [docs/MODULE_NOTES.md](docs/MODULE_NOTES.md) (M1–M13),
-[docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) (P0–P9),
+[docs/archive/plans/IMPLEMENTATION_PLAN.md](docs/archive/plans/IMPLEMENTATION_PLAN.md) (P0–P9, historical),
 [docs/spikes/P9_COVERAGE.md](docs/spikes/P9_COVERAGE.md) (final validation).
+Current plan: [docs/IMPLEMENTATION_PLAN_V1.md](docs/IMPLEMENTATION_PLAN_V1.md); earlier plans are archived under docs/archive/plans/ and are not read.
 
 A stdio debug door onto the same tool face runs via
 `MCP_STDIO_USER_ID=user_... python -m apps.mcp.server` — the same server

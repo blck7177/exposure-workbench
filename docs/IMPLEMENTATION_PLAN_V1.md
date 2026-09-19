@@ -1,0 +1,207 @@
+# IMPLEMENTATION PLAN V1 — 原语工具层、三位分析师、自带意义的事实（2026-09-19）
+
+> 新系列从 V1 重新编号。旧系列 `IMPLEMENTATION_PLAN.md`、`V2`–`V38` 与 `MCP_PLAN.md` 已归档到 `docs/archive/plans/`，以后不再阅读；查某轮的数字或根因才按需去翻一份。
+> 依据：Claude Doc「桌子架构 V39 设计稿」（9/17，角色与文件的正本）；9/17、9/18、9/19 三次讨论的决定（§1）；9/19 三路调研（工具设计原则、数据库与 RAG 工具模式、金融 agent 系统）与仓库数据盘点（§2.0）。
+> 起点：`issuer-intelligence` 的 HEAD `6ebb886`（V38 A-R1）之上提交归档与本计划，再从那里开出执行分支 `desk-v1`。K5 五文件已 stash（9/19）。生产仍是 9/9 的 `e6c290b`。
+> 读法：每步一组提交、一个机械验收。分析按「先判谁越界，再按七层讲位置」；实测轮冻结代码，按节点沟通表分析；手册与角色说明的文字改动走措辞过目。
+
+## 0. 一句话，与不变量
+
+**一句话**：工具层降到底层正交的动词（看有什么、从某表取某信息、按名字取度量、对数字做一步运算、去某文件找某物、动作、出口），每个输出是一行不看图例就能读的事实；问题级的知识（什么是杠杆、怎么判断波动升高）回到手册；度量的定义与读法只在登记簿一处；三位分析师按资源族切面；主分析师只做三件事：和用户说话、向分析师提要求、翻证据链。
+
+**不变量**：
+- 证据链不动：每个数是账本上的类型化事实；typed_calculator 的单位与期间规则（R1–R3、书的代数）不动；registry 四步 wrapper、按 session 记账、两道检查（按行、按句、两次机会、原样重发不算第二次）不动。
+- 不加 fallback；LLM 路径上不加规则补丁；每条改动消灭一类错误。
+- 模型不给度量起名；不开放自由 SQL（每个数必须是账本上的事实，SQL 逃生口与此冲突）。
+- 三个过程规则：措辞过目、实测期冻结代码、按节点沟通表分析。
+
+## 1. 已定的决定（作为前提）
+
+| 日期 | 决定 |
+|---|---|
+| 9/17 | ① 领域分析师像真实桌子一样工作，不写程序；② 主分析师拿含义层；③ 读法写进事实本身；④ V38 D 轮先跑作基线；⑤ 领域分析师按资源族切三位：发行人分析师、市场分析师、组合风险经理 |
+| 9/18 | 五处边界补齐：校验规则退出手册；比较要有可比性约束；意思字段只用登记簿枚举词；主分析师拿到事实行原文；分析师必须能拿到边界事实的 id |
+| 9/19 | 工具是底层正交的动词，不是报表；"波动是否升高、是否已在价格里、杠杆翻转点、回报与杜邦"这类是分析师的问题，进手册不进工具；事实 8 字段最小化；主分析师三件事；领域分析师开工前知道四样（本域有哪些数据、要干嘛、有哪些 tool 各能回答什么、一章手册加风格指南），每次调用必填 why，log 由此长出，不另写报告；先单步调用，代码组合进代办；RAG 召回改进单独代办；**program_service 退役；D 轮不跑；K5 五文件 stash；归档与本计划先提交，再开 `desk-v1` 分支执行** |
+
+本计划**替换**设计稿的 §7「报表目录」与 §10 中的「系统指南」；**保留**设计稿的角色与文件、度量登记簿、事实自带读法、简报与名册、风格指南单源、八步流转与验收思路。
+
+## 2. 目标形状
+
+### 2.0 调研与盘点的结论（只列影响设计的）
+
+- 常驻工具数量与重叠伤选择，常驻面 10 个以内；治法取"少量正交原语 + 知识在 skill"（Claude Code、Vercel 实测：删八成专用工具只留两个原语翻语义层，成功率 80%→100%，步数少 42%）。
+- 数据与动作分开（MCP resources 对 tools）；语义层产品一律"列出、描述、按名字要度量"，度量定义一次，不让 LLM 每次猜算法（dbt、Cube、Malloy）。
+- 金融基准失败顺序：取数期间错位与单位 > 有证据仍算错 > 解读。修法：结构化接口按名字取数、算术交给代码、检索先列文档再取段。
+- 可审计形状：每个操作数带概念、期间、单位、来源；参数、输出、下游动作连成依赖链。本仓库的 typed_calculator + calc_ledger + facts 表已是这个形状。
+- 盘点：结构化数据三族——申报事实 `financial_facts`（XBRL 原始 tag，重述追加不覆盖，取最新申报）、价格 `market_prices`/`factor_prices`、书的 run 表（`issuer_exposures`、`sector_exposures`、`limit_checks` 自带 `status`、`factor_attributions`、`exposure_metrics` 自带 `collinear`）；回撤与对账是 calc_ledger 行；公式登记簿 30 条带出处（`analytics/formulas.py`）；语料只有 `filing_chunks`（按 Item 切段、pgvector、无关键词索引）与 `research_sources`。今天的读原语都在 `program_service` 里：fundamentals、prices、price、run、column、figure、pick、method、加减乘除、rank、sell、buy。
+
+### 2.1 角色与面
+
+四角色不变：主分析师、领域分析师（三位）、手册（skill）、工具；加校验。领域分析师按资源族：
+
+| | 发行人分析师 | 市场分析师 | 组合风险经理 |
+|---|---|---|---|
+| 数据 | 申报数字、申报文本、网页 | 价格与成交量（持仓名字与因子 ETF） | 持仓、run、因子模型、情景引擎、限额、回撤、对账 |
+| 专业 | 财务报表分析、信用、读申报 | 价格统计 | 组合风险管理 |
+
+主分析师三件事：和用户说话；向分析师提要求（ask）；翻证据链（open）。它不碰数据源，拿不到新数。
+
+### 2.2 事实
+
+模型看到的一行只有 8 个字段：
+
+```
+id     f_…
+kind   reading | series | passage | absence
+what   读作，金融名                 "EBIT 利息覆盖率"
+of     主体                         "XOM"
+when   实际找到的期间，不是问的期间   "TTM 至 2025-06-30"；series 写间隔与跨度
+value  值带单位                     "18.4 倍"；series 为 [期, 值] 点列；passage 为原文；absence 为空
+means  意思，登记簿词表写的一句话
+from   来历                         "r_51 metric ebit_interest_coverage"
+```
+
+渲染行：`[f_7d21] EBIT 利息覆盖率，XOM，TTM 至 2025-06-30：18.4 倍 — 用了非经营利息行替代利息费用 — r_51 metric`。分析师读的、账本存的、主分析师引的、读者打开的是同一行；存储行另有模型看不见的类型化列（登记簿 key、数值、单位类、点列、参数、sources），渲染行是存储行的纯函数。
+
+`means` 词表住在登记簿：方向亏/赚/平；状态清/警戒/违约/未跑；位次第 n 共 m；变化升/降/平；依据（按 91 天、期末余额、调整收盘、书的收益、参与率 25%）；组成（用了 X 替代 Y、缺 Z）；限制（共线不可逐腿引用、扣留待验证）。没有自由文本。
+
+缺席也是一行：`means` 写原因加出路（允许值、可行的动词、在哪个面上）。政策类缺席是常驻固定 id 的事实（不预测、不给阈值、不估算），印在每个面的角色说明里，分析师直接引。
+
+### 2.3 工具层：12 个动词
+
+每次调用必填 `why`（这一步为任务的哪一行、为什么）。输出永远是一个头行加若干事实行；拒绝是一条缺席行。
+
+| tool | 动词 | 输入 | 输出 |
+|---|---|---|---|
+| list | 看桌上有什么 | what ∈ {metrics, fundamentals, filings, prices, book, checks}；主体 | 名字、期间、日期、计数；无数字 |
+| filings_read | 取一条申报科目 | ticker；科目枚举（`SUPPORTED_METRICS`）；period ∈ {fy, quarter, ttm_to, months+end, at} | 一行：值、单位、实际期间、accession；重述取最新申报；流量配 at 拒绝 |
+| prices_read | 取价格或成交量 | ticker；window 或 date；field ∈ {close, adj_close, volume} | 序列或一行 |
+| book_read | 取 run 表一格或一列 | run 或 calc；table ∈ {issuer_exposures, sector_exposures, limit_checks, factor_attributions, exposure_metrics}；column；row | 行；限额行自带 status 词，回归行自带 collinear 标志；扣留列不可见 |
+| metric | 按名字取一个登记簿度量 | 名字（本面名单内）；主体；期间或参数 | 一行加组成（用了哪行、替代了什么、缺什么）；读法词随行 |
+| calc | 对已有事实做一步运算 | op ∈ {add, sub, mul, div, scale, rank, top, filter, yoy, qoq, pct, cagr, sum, avg, min, max}；inputs 为 f_ id；params | 一行，made_of 指回输入；单位、期间、主体不合则拒绝并说哪项不合 |
+| filings_search | 在申报文本里找 | ticker；query；filters ∈ {form, item, filed_after}；k | 段落：文本、Item、accession、字符偏移 |
+| filings_section | 读一整节 | ticker；filing；item；offset | 原文，分页 |
+| web_search | 申报不含的事 | ticker；query；理由；天数 | 来源：标题、URL、日期、摘录 |
+| scenario | 卖或买之后的书 | run；trades | 新书 calc_ id，可被 book_read 读；重跑检查，不重拟 |
+| start | 后台准备 | kind ∈ {readiness, exposure_run}；主体 | task id，不是证据 |
+| submit | 交简报 | lines；caveats | 通过，或按行拒绝 |
+
+面按资源族裁剪；跨资源靠 metric 名单而不靠人或报表：
+
+| | 发行人分析师 | 市场分析师 | 组合风险经理 |
+|---|---|---|---|
+| 原始读 | filings_read | prices_read | book_read |
+| metric 名单 | 30 条发行人公式，加 book.position | price 系列：波动、beta、动量、回撤、成交额、区间回报 | book 系列：净 beta、回撤事件、对账；加 price 的 beta、波动、成交额 |
+| 文本 | filings_search、filings_section、web_search | 无 | 无 |
+| 动作 | start | start | scenario、start |
+| 共有 | list、calc、submit | 同 | 同 |
+| 合计 | 9 | 6 | 7 |
+
+意义从哪来：read 的行——读作与单位来自已声明的列（`resources._DECLARED`），when 写实际期间，means 写依据词，限额行带表里的 status，回归行带 collinear；metric 的行——登记簿条目给读作、单位、组成与替代、方向词、无意义时；calc 的行——op 词加输入，rank 给第 n 共 m，变化给升降平。9/17 的根因（工具算了方向却在事实上丢掉）在这里修在行上，不靠报表也不靠图例。
+
+### 2.4 沟通 schema
+
+```
+ask     { analyst: issuer|market|risk, subjects[], lines[]: 金融语言一行一件事, context? }
+Return  { task_id, analyst, status: settled|partial|unsettled|refused,
+          lines[]: { n, asked, finding + rows[] | why + boundary_row },   // rows 由 harness 按 id 从账本附
+          caveats[]: { line, text }, made[]: calc_… }                       // 无 shown、无 coverage 计数、无图例
+submit  { lines[]: { n, settled, finding?, facts?: [f_…], why?, boundary?: f_… }, caveats[]: { line, text } }
+          // schema 强制：settled ⇒ facts 非空；¬settled ⇒ boundary 必填；两者都有或都无直接拒绝
+open    (id) → f_ 一行 | r_ 一次调用的全部行 | task_ 一位分析师的全程 log | calc_ 一本书；只读
+HandoffVerdict { accepted, problems[]: { line, rule: 1..8, reason, way_out } }
+AnswerVerdict  { accepted, problems[]: { tag,  rule: 1..8, reason, way_out } }
+log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；submit → 裁决
+```
+
+主分析师每轮收到的只有四样：用户的话、桌上有什么（无数字、无度量名）、分析师回来的 Return、校验退回的句子。静态知道的：角色说明、三位分析师各一行"答什么"、含义层、风格指南。
+
+领域分析师开工前一次给齐四样：本域有哪些数据（一段话 + 任务主体的覆盖）；任务与简报规矩；tool 列表（描述写能做什么、回来什么、何时拒绝，不写问题）；一章手册加风格指南。
+
+### 2.5 知识层
+
+- **登记簿**（代码）：一个条目 = key、读作、定义、单位、建在什么上、读法、无意义时、意思词、出处、执行器、所在面。今天的 `formulas.py` 30 条、`skill.METHODS` 的 price/book 执行器、`READINGS` 5 条、`integration` 的方向映射、`containment`、`units`、`resources._DECLARED` 合并进来。手册第 2、3 节由它渲染；事实的 what/means 由它渲染。
+- **手册**（散文，三章六节，五禁区）：§1 问题；§2 度量（渲染）；§3 读法（渲染）；§4 比较与收尾——问题级的做法写在这里，用金融语言不写调用语法，例如：波动是否升高——拉 30 日与 252 日波动，算比，比大于一读作升高，不给阈值；是否已在价格里——事件窗口的相对回报；杠杆翻转点——目标倍数乘 EBITDA 减总债务；回报与杜邦——ROE 与净利率、资产周转、权益乘数，读作乘积恒等；§5 桌子持有什么；§6 政策。概念到度量名的映射由 `list(metrics)` 现场给，所以每条知识只在一处。
+- **风格指南**（校验拥有，只此一份，八条）：数字带 id 按展示写法；最高级站在排序事实上；变化同度量同主体两个日期、比较同度量同窗口两个主体；周期写实际有的；引号只引段落与缺席原话；方向、状态、位次词与事实一致；caveat 挨着数字；不估算、不冒充、不预测、不搬数。
+
+## 3. 步骤
+
+每步一组提交、一个验收。第 1 步单独一轮离线全量。第 3 步在第 5 步之前：先有动词，手册里的程序才能删。
+
+### 步骤 0 · D 轮基线——不跑（9/19 决定）
+
+9/17 决定④的 D 轮基线取消：E 轮只与 C 轮（V37，`docs/spikes/v37`）对照。`phase_d.sh` 与 battery 备份留在原处不动。
+
+### 步骤 1 · 事实与账本（单独一轮）
+
+- 做什么：`services/facts.py` 的 Fact 改为 §2.2 的形状（模型面 8 字段，存储面另有类型化列）；渲染函数一处；`means` 词表进登记簿模块；缺席行带出路；常驻政策缺席在启动时上账。`db/models.py` 的 facts 表加列并迁移；`services/ledger.py` 存同一行；`services/fact_adapters.py` 出行不出 digest；`services/answer_check.py` 在 G3 加方向冲突与状态冲突（拿 means 词表查）。语料测试随之改。
+- 验收：六条金标准渲染行（净 beta、余地、利息覆盖、DSO、缺席、政策缺席）逐字相等；渲染行是存储行的纯函数（测试从存储行重渲染相等）；方向冲突与状态冲突各一条红得了的测试。
+- 提交：一组，只改事实形状，不与其他步同提交。
+
+### 步骤 2 · 登记簿
+
+- 做什么：新模块（`analytics/registry.py`）承载 §2.5 的条目；`formulas.py`、`skill.METHODS` 的执行器、`READINGS`、`integration` 方向映射、`containment`、`units`、`resources._DECLARED` 迁入或被它引用；`metric` 的执行路径 = 登记簿条目 → 现有 service（`formula_service`、`price_analytics_service`、`drawdown_service`、`reconcile_service`、`integration_service`）→ 一行事实带组成。16 条 `DESK_RULES` 逐条归位：定义类进登记簿（EBIT 从净利润起算、FCF 定义、金融发行人不适用、总债务覆盖、权重代数、净 beta 方向、情景不重拟、扣留）、政策类进手册 §6（不预测、不给阈值、前提先核、比较的形状）、引用类进风格指南（数字是事实、缺席如实说）；`skill.py` 里不再有 READINGS 与 DESK_RULES 文本。
+- 验收：每个条目能渲染手册 §2/§3 一段与事实一行；DESK_RULES 在发给模型的文字里出现次数 = 0；每条规则的关键短语在全部模型文字里各出现一次。
+
+### 步骤 3 · 原语工具层
+
+- 做什么：`tools/definitions.py` 注册 §2.3 的 12 个动词，JSON schema 用枚举，`why` 必填，期间类型化，输出经 fact_adapters 成行，拒绝成缺席行；`tools/faces.py` 改为三个面（`FACE_ISSUER`、`FACE_MARKET`、`FACE_RISK`）加各面的 metric 名单与 `list` 的 what 枚举；`program_service` 的原语被拎出来单步调用（fundamentals→filings_read，prices/price→prices_read，run/column/figure/pick→book_read，method→metric，算术与集合与序列→calc，sell/buy→scenario）；`run`、`compile`、签名页、符号表、`digest.HOW_TO_CITE` 下面；`program_service` 退役（9/19 决定）：原语拎出后删除 `run`、`compile`、签名页、符号表与 `docs/PROGRAM_LANGUAGE.md`；日后若做代码组合，以 12 个动词为函数面另建，不复用程序语言。
+- 验收：每个动词三类单元测试（正常、拒绝带出路、越面拒绝说在哪个面）；tool 描述扫描不含手册 §1 的问题句；每面 tool 数 9/6/7；结果文本里图例长度 = 0。
+
+### 步骤 4 · 分析师与主分析师
+
+- 做什么：`agents/sub_analyst.py` 按面实例化三位，system 由四样组成，工具列表原生下发；每次调用的 `why` 记入 `agent_steps`，log 可按 task 重建；`agents/delegation.py` 的 submit schema 做 §2.4 的强制，`for_lead` 改出 Return（附行、无 shown、无 coverage、无 how_to_cite），`made` 从账本填；`agents/meta_agent.py` 只剩 ask、open、reply（被退回时按 tag 替换），system 加含义层与三条名册，`services/briefing.py` 清掉度量名与调用提示，只留桌上有什么。
+- 验收：主分析师全部文字无度量名、无 tool 名、无登记簿 key（扫描）；submit 的四种非法组合被 schema 拒绝；从 `agent_steps` 离线重建一份沟通表与 log 相等；措辞过目。
+
+### 步骤 5 · 手册重写
+
+- 做什么：14 章并 3 章，六节五禁区；§2/§3 从登记簿渲染；§4 收下 26 个示例程序所对应的问题，改写成金融语言的做法；名册三条从 §1 与 §5 生成；含义层 = 三章 §3 与 §6，给主分析师。
+- 验收：五禁区扫描绿（无花括号、美元符、键路径、调用形式；无"小于零意味着"类输出约定句；正文无数字与 ticker 作主体；每句只在一处）；能问⇔可达：§1 每一行对应 §4 一条做法，做法点名的度量都在本面 metric 名单里（机械）；措辞过目。
+
+### 步骤 6 · 风格指南单源与校验
+
+- 做什么：`services/style_guide.py` 唯一承载八条，两份角色说明各引入一次；`answer_check`、`handoff_check` 的拒绝按 §2.4 的 verdict 形状带规则号与出路；其他地方的复述删除。
+- 验收：八条关键短语在全部模型文字里各出现一次；A-R1 的重发规则测试仍绿。
+
+### 步骤 7 · E 轮
+
+- 做什么：同 fixture、同 20 题，与 D 轮（若跑）和 C 轮对照；模型分配作为变量：主分析师强模型、领域分析师弱模型各跑一遍。
+- 量：每题派单次数、每任务调用次数与 why 的可读性、prompt 峰值、拒绝率、方向与状态冲突数、缺席事实里算术类占比（决定是否加动词）。
+- 验收：按节点沟通表分析；实测期冻结代码。
+
+## 4. 代办（不进本轮，单独标记）
+
+| 代办 | 内容 | 触发条件 |
+|---|---|---|
+| **RAG 召回** | `filing_chunks` 加关键词索引（tsvector/BM25）做混合检索；嵌入前给每段加 50–100 token 的上下文前缀（Anthropic contextual retrieval：top-20 漏检 5.7%→1.9%）；加 rerank；评估集从 C/D/E 轮的 read_filings 调用构造 | 步骤 7 之后单独一轮；本轮只做两级检索（list → search → section） |
+| **代码组合** | 先单步。若 E 轮显示调用次数或 prompt 峰值是瓶颈，评估 programmatic tool calling / code mode：12 个动词作为沙箱内可调用函数，循环与过滤在沙箱里，账本仍逐步记；以动词为函数面另建，不复用已退役的程序语言 | E 轮数据 |
+| 估值倍数 | P/E、EV/EBITDA、FCF 收益率，价格乘申报，登记簿新条目 | 步骤 2 之后 |
+| web_fetch | 今天只存 Tavily 摘录；取全文要新动词 | 有题目需要时 |
+| 市场分析师去留 | E 轮量它单独被派的比例，决定是否并入组合风险经理 | E 轮数据 |
+| docs/spikes 清理 | 二十多个测试与脚本从那里读语料 | 单独一轮 |
+
+## 5. 拍板记录
+
+9/19 已拍板：`program_service` 退役（步骤 3）；D 轮不跑（步骤 0）；K5 五文件 stash（`git stash list` 第一条）；归档与本计划先提交；执行分支 `desk-v1`。
+
+仍未拍板：`metric` 作为独立动词（本计划按保留执行；若拍掉，则 §2.3 只剩 read 加 calc，登记簿的组成与替代记录改由 calc 承担）；push。
+
+## 6. 验收总表（机械，红了就是越界）
+
+| 边界 | 验收 |
+|---|---|
+| 事实自明 | 六条金标准行逐字相等；渲染是存储行的纯函数 |
+| 意思在账本上 | 方向冲突、状态冲突测试红得了 |
+| 每条知识只在一处 | 八条风格指南与十六条旧 DESK_RULES 的关键短语在全部模型文字里各出现一次 |
+| 手册不含调用语法、输出约定、活数据 | 三条扫描 |
+| 能问⇔可达 | §1 每行对应 §4 一条做法，点名的度量在本面名单里 |
+| 工具只认资源不认问题 | tool 描述不含 §1 问题句；每面 9/6/7 |
+| 面裁剪是结构 | 越面调用返回缺席并说在哪个面上 |
+| 主分析师无词汇 | 扫描：无度量名、无 tool 名、无 key |
+| 图例为零 | 工具结果与派单结果附带的读法文字长度 = 0 |
+| log 由 why 长出 | 从 agent_steps 重建的 log 与实际调用序列相等 |
+| 旁路已拆 | `shown` 不存在；pick 字面量路径不存在 |
+
+## 7. 归档记录（2026-09-19）
+
+`git mv` 到 `docs/archive/plans/`：`IMPLEMENTATION_PLAN.md`、`IMPLEMENTATION_PLAN_V2`–`V38`（含 `V3R`）共 30 份，加 `MCP_PLAN.md`；归档目录有 README 说明"不再阅读"。README.md 的两处链接改指归档路径并指向本计划。代码与测试对旧计划只有注释级引用，无运行时读取，未改。`docs/spikes/` 未动。
