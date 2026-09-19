@@ -73,8 +73,15 @@ UNIT_BY_KEY: dict[str, str] = {
     "proceeds": MONEY, "market_value_sold": MONEY, "value_then": MONEY, "market_value": MONEY,
     # ratios
     "depth": RATIO, "gap": RATIO, "tolerance": RATIO, "difference": RATIO, "factor_share": RATIO,
-    "unexplained_share": RATIO, "signed_for_this_risk": RATIO, "room_to_warning": RATIO,
-    "room_to_breach": RATIO, "current": RATIO, "net_beta": RATIO, "gross_beta": RATIO,
+    "unexplained_share": RATIO, "room_to_warning": RATIO,
+    "room_to_breach": RATIO, "current": RATIO,
+    # A BETA IS A MULTIPLE wherever it sits (V1). The net and gross betas are
+    # declared once, in resources.CALC_RESULTS, and read from there: this list
+    # said RATIO after that one said MULTIPLE, and the smoke read a credit beta
+    # of −0.24 as "-23.9%". A leg signed for its risk is the same beta with the
+    # risk's sense applied.
+    **{k: v for k, v in rs.CALC_RESULTS["portfolio.integration"].items() if k in ("net_beta", "gross_beta")},
+    "signed_for_this_risk": MULTIPLE,
     "sum_of_contributions": RATIO, "sum_of_factor_contributions": RATIO, "alpha_plus_residual": RATIO,
     "recorded_alpha_plus_residual": RATIO, "reported_floor": RATIO, "fraction": RATIO,
     "deepest_depth": RATIO,
@@ -266,6 +273,17 @@ def _window_of(obj: dict, ctx: Ctx | None) -> dict | None:
             leaves = holder.get("leaves") if isinstance(holder.get("leaves"), dict) else holder
             iv = leaves.get("intervals") or ([leaves["interval"]] if isinstance(leaves.get("interval"), list) else [])
             ins = leaves.get("instants") or ([leaves["instant"]] if isinstance(leaves.get("instant"), str) else [])
+            # THE ROW STATES THE PERIOD IT HAS — both of them, when it has two. The
+            # calculator records every leaf's period; this took the last and dropped the
+            # rest, so 30-day volatility over 252-day volatility read as a figure "for
+            # 2026-07-30 to 2026-09-10" (V1 smoke), and a balance's change between two
+            # dates read "as of" the later one.
+            spans = sorted({(str(x[0]), str(x[1])) for x in iv if isinstance(x, list) and len(x) == 2})
+            if len(spans) > 1:
+                return {"mixed": " and ".join(f"{s} to {e}" for s, e in spans)}
+            dates = sorted({str(d) for d in ins})
+            if not spans and len(dates) > 1:
+                return {"start": dates[0], "end": dates[-1]}
             if iv and isinstance(iv[-1], list) and len(iv[-1]) == 2:
                 return {"start": iv[-1][0], "end": iv[-1][1]}
             if ins:
@@ -380,7 +398,7 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
             f = F.fact(F.SCALAR, measure, subject=node.get("ticker") or ctx.subject,
                        unit=(unit.upper() if isinstance(unit, str) else _unit_for(key if key else measure, ctx, node)),
                        value=float(node["value"]), as_of=_as_of_of(node, ctx), window=_window_of(node, ctx),
-                       params={**ctx.params, **_params_of(node, ctx)},
+                       params={**ctx.params, **_params_of(node, ctx), **_composition_of(node)},
                        standalone=ctx.standalone and node.get("quotable_individually", True) is not False,
                        sources=_sources_of(node, ctx), group=ctx.group,
                        means=registry.merged(ctx.means, registry.words_beside(node)))
@@ -398,6 +416,12 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
                         means=registry.merged(ctx.means, registry.words_beside(node)))
         if isinstance(node.get("ticker"), str) and key not in ("brief",):
             sub = sub.child(subject=node["ticker"])
+        elif path:
+            # the reconciliation's "largest factor contribution −0.75%" did not say WHICH
+            # factor: the name sat beside the number as a string, and strings are not rows
+            who = next((node[k] for k in ("factor_name", "sector", "check") if isinstance(node.get(k), str) and node[k]), None)
+            if who:
+                sub = sub.child(subject=who)
         if isinstance(node.get("numeric_unit"), str):
             sub = sub.child(leaf_unit=node["numeric_unit"].upper())
         out: dict = {}
@@ -426,7 +450,7 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
             return _untyped_leaf(key, exc)
         f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit, value=float(node),
                    as_of=ctx.as_of, window=ctx.window, params=dict(ctx.params), standalone=ctx.standalone,
-                   sources=ctx.sources, group=ctx.group, means=dict(ctx.means))
+                   sources=ctx.sources, group=ctx.group, means=registry.for_leaf(key, ctx.means))
         facts.append(f)
         return f.id
     return node
@@ -455,11 +479,25 @@ def _harvest_row(row: dict, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) 
                 continue
             f = F.fact(F.SCALAR, f"{table}.{k}", subject=sub.subject, unit=unit,
                        value=float(v), as_of=sub.as_of, window=sub.window, params=dict(sub.params),
-                       standalone=sub.standalone, sources=sub.sources, group=ctx.group, means=dict(sub.means))
+                       standalone=sub.standalone, sources=sub.sources, group=ctx.group,
+                       means=registry.for_leaf(k, sub.means))
             facts.append(f)
             out[k] = f.id
         else:
             out[k] = _harvest(v, k, f"{path}.{k}", sub, facts)
+    return out
+
+
+def _composition_of(obj: dict) -> dict:
+    """What a composed figure was built from — `made_of`, and which filed line stood
+    in for which — as the params the row is rendered with (registry.composition_words).
+    One rule for a measure asked alone and for the same measure as a line of a panel:
+    the panel's total debt said nothing of the substitution its own row was built on."""
+    out: dict = {}
+    if isinstance(obj.get("made_of"), dict) and obj["made_of"]:
+        out["made_of"] = obj["made_of"]
+    if isinstance(obj.get("substituted_inputs"), dict) and obj["substituted_inputs"]:
+        out["substituted"] = dict(obj["substituted_inputs"])
     return out
 
 
@@ -548,9 +586,28 @@ def read_fundamentals(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
             facts.append(f)
             note["last_reported"] = {"last_reported": lr["last_reported"], "fact": f.id, "note": lr.get("note")}
         return facts, note
+    # A LINE THE SHEET DOES NOT CARRY AT THIS DATE is an absence, not a figure. The
+    # block gives what it read at ANOTHER date; harvested as it stood, that value
+    # became a scalar dated to this sheet ("commercial paper … as of 2026-03-31:
+    # $0.00", V1 smoke) — a number at a date it was never reported for. The row
+    # says it is not here and names the date it is, which is the call to make.
+    missing = result.get("not_reported_at_this_date")
+    absent: list[F.Fact] = []
+    if isinstance(missing, dict) and not result.get("error"):
+        result = {k: v for k, v in result.items() if k != "not_reported_at_this_date"}
+        for line, was in missing.items():
+            last = (was or {}).get("last_reported") if isinstance(was, dict) else None
+            absent.append(F.fact(
+                F.ABSENCE, line, subject=tk, as_of="n/a", group="fundamentals",
+                text=(f"{line} is not on {tk}'s balance sheet as of {result.get('as_of')}"
+                      + (f"; it was last reported as of {last}" if last else ""))[:600],
+                params={"error": "not_reported_at_this_date"},
+                means={"reason": registry.reason_of("not_reported_at_this_date"),
+                       **({"way_out": f"read it at the date it has: at={last}"} if last else {})}))
     # a balance sheet: every balance carries its own as_of and fact_id (typed figures)
     # under its metric name — the walker names each by its key.
     facts, note = harvest(result, ctx)
+    facts = [*facts, *absent]
     if result.get("metric") and not result.get("error"):
         # a flow or a series is named by its metric, not by the key it sits under
         facts = [replace(f, measure=result["metric"]) if f.measure in ("", "value", "points") else f for f in facts]
@@ -636,7 +693,80 @@ def read_book(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return facts, note
 
 
+def analysis(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    """WHAT `book.analysis` DERIVED, UNDER THE NAMES THE REGISTRY SAYS IT YIELDS.
+
+    The measure nets each risk's factor betas and measures the room from every
+    check to its tiers; that is what it records (integration_service._record) and
+    what `Method.yields` declares. Its payload also repeats what it read — every
+    position, every check's value and tiers, every leg — and walked generically
+    (V1 step 3, until the smoke) that was 146 rows where 46 are the measure's own,
+    under a third spelling of the same figures ("net exposures rates up net
+    beta"), with three things wrong that the offline fixtures did not show:
+
+      · a COLLINEAR fit made the whole risk's object "not quotable alone", the NET
+        included — so the gate would refuse the one figure the flag says is
+        quotable (`collinear fit: the net is quotable, no single leg is`);
+      · the legs came back as rows, which `book_read` withholds as undetermined;
+      · a risk no factor measures is a dict with no number in it, so it produced
+        no row at all, and a book with no row for a risk reads as not exposed.
+
+    So: a net and a gross beta per measured risk, an ABSENCE per unmeasured one,
+    the two rooms per check, and an absence for what is withheld. The run's own
+    columns are read off the run (`book_read`), where their one spelling lives."""
+    op = "portfolio.integration"
+    units = rs.CALC_RESULTS[op]
+    run, as_of = result.get("run_id") or result.get("subject"), result.get("as_of")
+    sources = tuple(s for s in (result.get("calc_id"), run) if _is_id(s))
+    made = {"method": "book.analysis"}
+    facts: list[F.Fact] = []
+    for risk, n in (result.get("net_exposures") or {}).items():
+        if not isinstance(n, dict):
+            continue
+        if not n.get("measured"):
+            facts.append(F.fact(F.ABSENCE, f"{op}.net_beta.{risk}", subject=run, as_of="n/a", group="factor_exposure",
+                                text=f"the book's exposure to {risk.replace('_', ' ')} is not measured on this run: "
+                                     f"{n.get('reason') or 'no factor measures it'}"[:600],
+                                params={"error": "not_measured", **made}, sources=sources,
+                                means={"reason": "not_held"}))
+            continue
+        words = registry.words_beside(n)
+        for key in ("net_beta", "gross_beta"):
+            if _is_num(n.get(key)):
+                facts.append(F.fact(F.SCALAR, f"{op}.{key}.{risk}", subject=run, unit=units[key], value=float(n[key]),
+                                    as_of=as_of, params=dict(made), sources=sources, group="factor_exposure",
+                                    means=registry.for_leaf(key, words)))
+    for h in result.get("headroom") or []:
+        check = h.get("check")
+        if not isinstance(check, str):
+            continue
+        for key in ("room_to_warning", "room_to_breach"):
+            if _is_num(h.get(key)):
+                facts.append(F.fact(F.SCALAR, f"{op}.{key}", subject=check, unit=units[key], value=float(h[key]),
+                                    as_of=as_of, params={"of": run, **made}, sources=sources, group="mandate",
+                                    means=registry.words_beside(h)))
+    for check in result.get("headroom_not_recorded") or []:
+        facts.append(F.fact(F.ABSENCE, f"{op}.room_to_breach", subject=str(check), as_of="n/a", group="mandate",
+                            text=f"{check} recorded no measured value on this run, so there is no room to measure"[:600],
+                            params={"error": "not_measured", "of": run, **made}, sources=sources,
+                            means={"reason": "not_held", "status": "not_run"}))
+    if isinstance(result.get("stress_withheld"), str) and result["stress_withheld"]:
+        facts.append(F.fact(F.ABSENCE, "stress_results", subject=run, as_of="n/a", group="stress",
+                            text=result["stress_withheld"][:600], params={"error": "withheld", **made},
+                            sources=sources, means={"reason": "policy", "flags": ["withheld_pending_validation"]}))
+    note = {k: v for k, v in result.items() if k in ("method", "subject", "run_id", "portfolio_id", "as_of", "calc_id")}
+    return facts, note
+
+
+# A measure whose payload is not "its figures and nothing else" is read by the
+# adapter that knows what it derived; every other measure is walked.
+_MEASURE_ADAPTERS: dict[str, Adapter] = {"book.analysis": analysis}
+
+
 def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    own = _MEASURE_ADAPTERS.get(result.get("method")) if isinstance(result.get("method"), str) else None
+    if own is not None and not result.get("error"):
+        return own(args, result)
     if isinstance(result.get("results"), list):
         allf: list[F.Fact] = []
         notes = []
@@ -689,10 +819,7 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         params = _params_of(r, ctx)
         if one in skill.METHODS:
             params["method"] = one                            # the row's `from`: the measure that made it
-        if isinstance(r.get("made_of"), dict) and r["made_of"]:
-            params["made_of"] = r["made_of"]                  # what a composed total was built from
-        if isinstance(r.get("substituted_inputs"), dict) and r["substituted_inputs"]:
-            params["substituted"] = dict(r["substituted_inputs"])   # which filed line stood in for which
+        params.update(_composition_of(r))                     # what a composed total was built from
         f = F.fact(F.SCALAR, measure, subject=ctx.subject, unit=unit.upper(), value=float(r.pop("value")),
                    as_of=_as_of_of(r, ctx), window=_window_of(r, ctx), params=params,
                    sources=_sources_of(r, ctx), group=group,
@@ -701,7 +828,32 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         note["fact"] = f.id
         return [f, *facts], note
     facts, note = harvest(r, ctx)
+    if isinstance(r.get("type"), dict) and r["type"].get("kind") == "ranking":
+        facts = _ranked(facts, r)
     return facts, note
+
+
+def _ranked(facts: list[F.Fact], r: dict) -> list[F.Fact]:
+    """AN ORDERING'S ENTRIES, NAMED FOR WHAT WAS RANKED (V1 smoke). The walker
+    names a leaf by the key it sits under, so ten ranked weights came back as ten
+    rows called "ordering value" — the one thing the row did not say was what
+    had been ordered. The payload says it (`quantity`), and says how many were
+    ordered and which way, so the row reads "issuer exposures: weight, MSFT:
+    16.0% — 1st highest of 10". `place` and `of` are the params the answer check
+    already reads a superlative against (answer_check._ranked_aliases)."""
+    what = r.get("quantity") or r["type"].get("quantity")
+    n = len(r.get("operands") or r.get("ordering") or [])
+    direction = r.get("direction") if r.get("direction") in ("highest", "lowest") else "highest"
+    out: list[F.Fact] = []
+    for f in facts:
+        if f.measure == "ordering.value" and isinstance(f.params.get("rank"), int):
+            params = {k: v for k, v in f.params.items() if k != "rank"}
+            f = replace(f, measure=what or f.measure,
+                        params={**params, "op": "rank", "place": f.params["rank"], "of": n, "direction": direction})
+        elif f.measure == "spread" and what:
+            f = replace(f, measure=f"{what}.spread", params={**f.params, "op": "rank", "of": n})
+        out.append(f)
+    return out
 
 
 def search_web(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
@@ -765,6 +917,51 @@ def book_read(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return facts, note
 
 
+_BOOK_TABLES = frozenset(r.table for r in rs.RUN_CHILDREN if r.table)
+
+
+def scenario(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    """A SCENARIO BUILDS A BOOK; READING IT IS `book_read` (V1 smoke). The payload
+    is the trade AND every table of the book it made, and shown whole one sale
+    was 99 rows — the analyst asked what happens to one check and was handed
+    every weight, sector and tier. So the rows are the trade (what was sold or
+    bought, the proceeds, the book's new value) and what the scenario does NOT
+    carry, each as the absence it is; the new book's tables go on the ledger,
+    where a sentence can point at them, and are read off the id it returns.
+
+    The trade list the caller sent is not echoed back as figures: `sold` says
+    what was done with it, and "sales fraction 50%" beside "sold fraction 50%"
+    was one fact twice."""
+    if result.get("error"):
+        return compute(args, result)
+    made = result.get("made") or result.get("calc_id")
+    facts, note = compute(args, {k: v for k, v in result.items() if k not in ("sales", "buys")})
+    why_not = ("a scenario re-prices the book and re-runs its concentration and exposure checks; it has no "
+               "return history, so nothing fitted on returns is carried")
+    for check in result.get("checks_not_run") or []:
+        facts.append(F.fact(F.ABSENCE, f"limit_checks.{check}", subject=made, as_of="n/a", group="book_derived",
+                            text=f"{check} is not re-run on the book after the trade: {why_not}"[:600],
+                            params={"error": "not_run"}, sources=(made,) if _is_id(made) else (),
+                            means={"reason": "meaningless", "status": "not_run"}))
+    fx = result.get("factor_exposure")
+    if isinstance(fx, dict) and fx.get("measured") is False:
+        facts.append(F.fact(F.ABSENCE, "factor_attributions", subject=made, as_of="n/a", group="book_derived",
+                            text=f"factor betas are not carried to the book after the trade: {fx.get('reason') or why_not}"[:600],
+                            params={"error": "not_run"}, sources=(made,) if _is_id(made) else (),
+                            means={"reason": "meaningless"}))
+    return facts, note
+
+
+def _is_table_row(f: F.Fact) -> bool:
+    return f.kind != F.ABSENCE and f.measure.split(".")[0] in _BOOK_TABLES
+
+
+# WHAT A VERB SHOWS OF WHAT IT RECORDS. Every fact an adapter makes goes on the
+# ledger; a verb whose job is to BUILD something shows what it built and where it
+# is, and leaves the reading of it to the verb that reads.
+_RECORDED_NOT_SHOWN: dict[str, Any] = {"scenario": _is_table_row}
+
+
 PULL_PREFIX = "r_"
 _WAY_OUT_KEYS = ("available", "nearest", "known", "allowed", "portfolios", "tables", "columns_of_table",
                  "items_indexed", "data_covers", "hint")
@@ -816,7 +1013,10 @@ def refusal_fact(tool: str, args: dict, result: dict) -> F.Fact:
     if tool == "metric" and elsewhere:
         owners = " and ".join(f"the {f} analyst" for f in registry.METHODS[elsewhere[0]].faces) or "no analyst (it is an action)"
         means["reason"] = "not_on_this_face"
-        ways.insert(0, f"{elsewhere[0]} is a measure {owners} may ask for")
+        ways = [f"{elsewhere[0]} is a measure {owners} may ask for"]
+        # and the sentence is about whose it is — the enum's own ("not one of the 34
+        # names…; nearest: ebitda, roic") answers a misspelling nobody made
+        detail = f"{elsewhere[0]} is not one of this analyst's measures"
     if ways:
         means["way_out"] = "; ".join(ways)
     return F.fact(F.ABSENCE, str(want)[:200], subject=subject, text=f"{tool}: {detail}"[:600], as_of="n/a",
@@ -828,18 +1028,23 @@ def _call_said(tool: str, args: dict) -> str:
     return f"{tool}({shown})"
 
 
-_PASS_THROUGH = ("catalogue", "made", "task_id", "run_id", "next_offset", "as_of", "book")
+_PASS_THROUGH = ("catalogue", "made", "kept", "task_id", "run_id", "next_offset", "as_of", "book")
 
 
 def present(tool: str, args: dict, shown: list[F.Fact], note: dict, held: dict | None, pull: str) -> dict:
     """One primitive's result as the model reads it: the call's id and what was
     called, then the rows. No legend: a row says what it is (services/facts.line)."""
-    out: dict = {"pull": pull, "head": f"{pull} {_call_said(tool, args)} → {len(shown)} row{'s' if len(shown) != 1 else ''}",
+    listed = note.get("catalogue") if isinstance(note, dict) else None
+    n, unit = (len(listed), "name") if (listed and not shown) else (len(shown), "row")
+    out: dict = {"pull": pull, "head": f"{pull} {_call_said(tool, args)} → {n} {unit}{'s' if n != 1 else ''}",
                  "rows": [F.line(f) for f in shown]}
     for k in _PASS_THROUGH:
         if isinstance(note, dict) and note.get(k) not in (None, "", [], {}):
             out[k] = note[k]
-    if held:
+    if held and held.get("of_the_book_made") and out.get("made"):
+        out["held_back"] = (f"the book it made holds {held['count']} more figures (weights, sector weights, every "
+                            f"re-run check): read the ones you need off it with book_read(book=\"{out['made']}\")")
+    elif held:
         out["held_back"] = (f"{held.get('count')} more rows were pulled and are on the ledger, not shown here: "
                             f"ask for less in one call (one column, one row, fewer subjects)")
     return out
@@ -856,7 +1061,7 @@ ADAPTERS: dict[str, Adapter] = {
     # V1: the primitives. A verb's payload is the payload of the service it
     # wraps, so it reads through the adapter that already knows that payload.
     "list": no_facts, "filings_read": read_fundamentals, "prices_read": read_prices, "book_read": book_read,
-    "metric": compute, "calc": compute, "scenario": compute,
+    "metric": compute, "calc": compute, "scenario": scenario,
     "filings_search": read_filings, "filings_section": read_filings, "web_search": search_web,
     "start": start,
     "think": no_facts,
@@ -893,6 +1098,12 @@ def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict
         # at and why, in the same note that carries the ones it can.
         note = {**note, "untyped": {u["key"]: u["reason"] for u in untyped}}
     kept, held = F.cap(facts)
+    not_shown = _RECORDED_NOT_SHOWN.get(tool)
+    if not_shown is not None and any(not_shown(f) for f in kept):
+        hidden = [f for f in kept if not_shown(f)]
+        kept = [f for f in kept if not not_shown(f)]
+        held = {"count": len(hidden) + int((held or {}).get("count") or 0), "of_the_book_made": True,
+                "measures": sorted({f.measure.split(".")[0] for f in hidden})}
     if held:
         kept_ids = {f.id for f in kept}
         note = _blank_ids(note, {f.id for f in facts if f.id not in kept_ids})

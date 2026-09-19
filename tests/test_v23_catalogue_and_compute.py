@@ -220,7 +220,10 @@ async def test_scale_is_an_op_with_a_factor_not_an_operand():
 async def test_a_bare_run_name_as_an_operand_is_told_its_row():
     from exposure_workbench.services import typed_calculator as tc
     out = await tc._resolve(None, "issuer_exposures.MSFT.market_value")
-    assert out["error"] == "unknown_operand" and "run_<id>:issuer_exposures.MSFT.market_value" in out["detail"]
+    # V1: a calculation takes the ids of figures the reader was shown, so the way
+    # out is to read the figure — not a `run_<id>:name` spelling no verb teaches
+    assert out["error"] == "unknown_operand" and "the id of a figure you were shown" in out["detail"]
+    assert "run_<id>" not in out["detail"]
 
 
 # ── the second live round (2026-09-05) ──────────────────────────────────────

@@ -110,6 +110,9 @@ async def get_portfolio_analysis(db: AsyncSession, run_id: str) -> dict:
             "net_beta": net.net,
             "gross_beta": net.gross,
             "quotable_individually": net.quotable_individually,
+            # V1: what these betas are built on, said where they are — not on the measure's
+            # registry entry, which stamped it on every weight and tier of the same payload
+            "basis": ["book_return"],
             "legs": [{"factor_name": l.name, "beta": l.beta,
                       "signed_for_this_risk": l.signed_contribution, "cite": run_id}
                      for l in net.legs],

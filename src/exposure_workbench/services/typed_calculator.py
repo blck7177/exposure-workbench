@@ -400,8 +400,8 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             # would send the caller to recompute something that is not wrong.
             return _err("not_a_quantity",
                         f"{ref} is an ordering — a relation between quantities, not a "
-                        f"quantity. Its entries' own rows are the operands; its places "
-                        f"and values are on the table by name.")
+                        f"quantity. Each entry is a figure of its own with its own id, and "
+                        f"those are what a calculation takes.")
         params = row.params or {}
         owned = _row_issuers(params.get("result_type"), row.company_id)
         points = (row.result or {}).get("points")
@@ -422,8 +422,8 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             return _err(
                 "untyped_operand",
                 f"{ref} was recorded before quantities carried their type, so what it "
-                f"may be combined with cannot be established. Recompute it with "
-                f"read_fundamentals or compute.")
+                f"may be combined with cannot be established. Read or measure it again "
+                f"and use the new figure.")
         unit = t.get("unit_class")
         if unit is None:
             # A result_type without a unit is not "probably money": refusing it
@@ -449,7 +449,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         # passage instead, so "I cannot compute this" is available to it.
         return _err("unknown_operand",
                     f"{ref} is a filing passage. Figures inside one can be quoted and "
-                    f"cited, but they are not typed quantities and cannot be operands — "
+                    f"cited, but they are not typed quantities and cannot be calculated with — "
                     f"there is no basis, no unit and no metric to check a combination "
                     f"against. If the filing states the figure you want, quote it; if it "
                     f"only states the parts, this desk cannot combine them.")
@@ -458,12 +458,12 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
         # `issuer_exposures.MSFT.market_value` bare. The name is right; it
         # needs the row it is on.
         return _err("unknown_operand",
-                    f"{ref!r} looks like a figure's name without its row: write it as "
-                    f"run_<id>:{ref} (or calc_<id>:{ref} on a scenario row). An operand is an "
-                    f"id or ref:name, never an expression.")
+                    f"{ref!r} looks like a figure's name and not a figure: a calculation takes "
+                    f"the id of a figure you were shown (f_…), never a name or an expression. "
+                    f"Read the figure first; its row carries the id.")
     return _err("unknown_operand",
-                f"{ref} is not a fact_ or calc_ id, nor a named figure on a row "
-                f"(run_…:<name>, calc_…:<name>); an operand is never an expression")
+                f"{ref} is not the id of a figure this desk holds; a calculation takes the ids of "
+                f"figures you were shown (f_…), never a typed number or an expression")
 
 
 def _row_issuers(result_type: dict | None, company_id: str | None) -> tuple[str, ...]:
@@ -505,12 +505,12 @@ def _resolve_series(ref: str, operation: str, params: dict, points: list,
     if not rt:
         return _err("untyped_operand",
                     f"{ref} is a series recorded before series carried their type. "
-                    f"Recompute it with a fundamentals(…, last_n=…) node.")
+                    f"Read the series again and use the new one.")
     unit = rt.get("unit_class")
     if unit is None:
         return _err("untyped_operand",
-                    f"{ref} is a series whose recorded type has no unit_class; "
-                    f"recompute it with a fundamentals(…, last_n=…) node.")
+                    f"{ref} is a series whose recorded type has no unit; "
+                    f"read the series again and use the new one.")
     kind = rt.get("kind", "series")
     quantity = rt.get("quantity")
     typed: list[tuple[date, Typed]] = []
@@ -669,9 +669,8 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
         return _err("different_instants",
                     f"{a.source_id} is as of {a.instant.isoformat()} and {b.source_id} is "
                     f"as of {b.instant.isoformat()}. Balances from two dates describe two "
-                    f"company-moments and cannot be summed; ask for both at one date with "
-                    f"read_fundamentals, or subtract them for the change between the two "
-                    f"readings.")
+                    f"company-moments and cannot be summed; read both at one date, or "
+                    f"subtract them for the change between the two readings.")
 
     # R3 — containment, in both directions.
     if a.quantity and b.quantity:
@@ -704,8 +703,8 @@ def _check(op: str, a: Typed, b: Typed) -> dict | None:
                     f"{a.source_id} covers {a0}..{a1} and {b.source_id} covers {b0}..{b1}. "
                     f"Components of one period may be added when they cover the SAME "
                     f"window, and consecutive periods may be added when they meet; these "
-                    f"do neither, so their sum belongs to no period. Fetch both over one "
-                    f"window with fundamentals(ticker, metric, start=…, end=…) nodes.")
+                    f"do neither, so their sum belongs to no period. Read both over ONE "
+                    f"window (the same start and end) and add those.")
     return None
 
 
@@ -861,7 +860,8 @@ def _derived_name(op: str, a, b) -> str:
 async def calculate(db: AsyncSession, op: str, a: str, b: str,
                     invoked_by: str = "agent", as_quantity: str | None = None,
                     named_by: str | None = None,
-                    as_unit_class: str | None = None) -> dict:
+                    as_unit_class: str | None = None,
+                    default_quantity: str | None = None) -> dict:
     """Combine two quantities, if their types permit it.
 
     `as_quantity` is the name the CALLER gives the result — a formula naming
@@ -914,7 +914,10 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
     basis = result.basis()
 
     rt = {"unit_class": result.unit_class, "basis": basis,
-          "quantity": as_quantity or result.quantity or _derived_name(op, left, right),
+          # `default_quantity`: what a caller that KNOWS what it is building calls the
+          # result when nobody named it — a fold's last step is "sum of 5 figures", where
+          # the lineage name read "w.add.w.add.w.add.w.add.w" (V1 smoke).
+          "quantity": as_quantity or result.quantity or default_quantity or _derived_name(op, left, right),
           "issuers": list(result.issuers)}
     if result.base:
         rt["base"] = result.base
@@ -1318,12 +1321,12 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
     refs = list(refs or [])
     if op == "abs":
         if len(refs) != 1:
-            return _err("operands", f"abs takes one operand; got {len(refs)}")
+            return _err("operands", f"abs takes one input; got {len(refs)}")
     elif len(refs) < 2:
         return _err("too_few_operands",
                     f"a statistic over a set needs at least two figures; got {len(refs)}. "
-                    f"For a statistic over one figure's history, take the series "
-                    f"(fundamentals(…, last_n=…) or method(name, subject, params={{'last_n': …}}))")
+                    f"For a statistic over one figure's history, take it over the series: a filed "
+                    f"line's last N readings, or a measure asked with last_n")
     if len(set(refs)) != len(refs):
         dupes = sorted({r for r in refs if refs.count(r) > 1})
         return _err("duplicate_operand", f"{', '.join(dupes)} appears more than once in the set")
@@ -1335,8 +1338,8 @@ async def aggregate(db: AsyncSession, op: str, refs: list[str], *,
             return t
         if isinstance(t, TypedSeries):
             return _err("series_in_set",
-                        f"{ref} is a series. A statistic over ONE series is that fn over the series "
-                        f"itself ({{'fn': {op!r}, 'of': {ref!r}}}); a set statistic takes scalar figures only.")
+                        f"{ref} is a series. A statistic over ONE series is {op} with that series as its "
+                        f"only input; a set statistic takes single figures only.")
         typed.append(t)
 
     units_seen = {t.unit_class for t in typed}

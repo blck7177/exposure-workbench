@@ -175,8 +175,14 @@ _DECLARED: tuple[Resource, ...] = (
     ),
     Resource(
         FactorAttribution, "factor_name",
-        _ratio(("beta", "beta"), ("factor_return", "factor return"),
-               ("contribution", "contribution"), ("r_squared", "R²")),
+        # V1: a beta is a move per unit of move, a MULTIPLE — as `price.beta` and the
+        # net betas below are typed. As a RATIO the run's own factor betas read as
+        # percentages ("credit beta 23.9%") beside a price beta that read "0.20×".
+        # beta × factor return is still a ratio (units: RATIO × MULTIPLE = RATIO),
+        # which is what a contribution is.
+        _multiple(("beta", "beta"))
+        + _ratio(("factor_return", "factor return"),
+                 ("contribution", "contribution"), ("r_squared", "R²")),
         count_label="factors",
     ),
     # A run's own alerts. Requiring them to be cited separately made a citation
@@ -304,7 +310,7 @@ _DECLARED_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("limit_checks.*.current_value", "limit_checks.*.warning_level", "limit_checks.*.breach_level",
       "portfolio.integration.room_to_warning.*", "portfolio.integration.room_to_breach.*",
       "risk_alerts.*.current_value", "risk_alerts.*.limit_value", "risk_alerts.*.utilization")),
-    ("stress", "what each scenario would cost, ranked by method(name='book.analysis')",
+    ("stress", "what each scenario would cost",
      ("stress_results.*.loss_pct", "stress_results.*.loss_usd",
       "exposure_metrics.stress_loss_market", "exposure_metrics.stress_loss_rates",
       "exposure_metrics.stress_loss_credit", "exposure_metrics.stress_loss_tech")),

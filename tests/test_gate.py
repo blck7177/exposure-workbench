@@ -30,6 +30,13 @@ def world():
         facts += _facts(name)
     var = F.fact(F.SCALAR, "exposure_metrics.var_95_1d", subject="run_b791e7985dcd", unit="RATIO", value=0.0123,
                  as_of="2026-09-03", params={"confidence": 0.95, "window": "1d"}, sources=("run_b791e7985dcd",))
+    # V1: a check's tiers are the run's own columns and are read off the run (book_read);
+    # book.analysis yields what it DERIVED and no longer repeats them. Three issuer checks
+    # share one warning tier, which is what G3's "one written value, several facts" reads.
+    facts += fa.book_read({"book": "run_b791e7985dcd", "table": "limit_checks"}, {
+        "book": "run_b791e7985dcd", "as_of": "2026-09-03", "table": "limit_checks",
+        "figures": [{"name": f"limit_checks.issuer_concentration:{t}.warning_level", "value": 0.15,
+                     "unit_class": "RATIO", "means": {"status": "clear"}} for t in ("AAPL", "MSFT", "JPM")]})[0]
     passage = F.fact(F.PASSAGE, "10-K Item 1", subject="LLY", as_of="2026-02-20", params={"form_type": "10-K"},
                      text="Mounjaro, Zepbound, Verzenio, Trulicity, Taltz, and Jardiance collectively accounted for 82 percent of our total revenues in 2025.",
                      sources=("chunk_lly1",))

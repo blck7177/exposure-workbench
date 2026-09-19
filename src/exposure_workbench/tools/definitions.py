@@ -94,9 +94,14 @@ async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None =
             return sheet
         balances = sheet.get("balances") or {}
         if metric in balances:
-            return {**sheet, "balances": {metric: balances[metric]},
+            # ONE LINE WAS ASKED, so one line is answered: the sheet's note of which
+            # OTHER lines are not reported at this date is about lines nobody named.
+            # Left in, the smoke read of MSFT inventory came back with a second row,
+            # commercial paper at $0.00, dated to a sheet it was never on.
+            one = {k: v for k, v in sheet.items() if k != "not_reported_at_this_date"}
+            return {**one, "balances": {metric: balances[metric]},
                     "detail": f"{metric} is a balance (an instant); the whole sheet at this date "
-                              f"is read with metric omitted"}
+                              f"is read with the line omitted"}
         return {"error": "not_reported_at_this_date", "ticker": tk, "metric": metric,
                 "as_of": sheet.get("as_of"),
                 "last_reported": (sheet.get("not_reported_at_this_date") or {}).get(metric),

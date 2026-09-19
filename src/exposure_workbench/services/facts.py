@@ -230,15 +230,26 @@ def when_of(rec: dict) -> str:
         return ", ".join(x for x in (spacing, f"{pts[0][0]} to {pts[-1][0]}", f"{len(pts)} points") if x)
     as_of = rec.get("as_of") if rec.get("as_of") not in (None, "", "n/a") else None
     w = rec.get("window") or {}
+    p = rec.get("params") or {}
+    # AN EPISODE IS ITS OWN PERIOD. A drawdown's depth is from a peak to a trough, and
+    # those dates are what `book.explain_episode` is asked with; the row showed the
+    # whole span searched ("2025-09-10 to 2026-09-10") and the dates nowhere (V1 smoke).
+    if isinstance(p.get("peak_date"), str) and isinstance(p.get("trough_date"), str):
+        return (f"peak {p['peak_date']} to trough {p['trough_date']}"
+                + (f", recovered {p['recovery_date']}" if isinstance(p.get("recovery_date"), str) else ""))
+    if w.get("mixed"):
+        return f"over two periods, {w['mixed']}"
     if w.get("start") and w.get("end"):
         return f"{w['start']} to {w['end']}"
     if w.get("instant"):
-        return f"at {w['instant']}"
+        return f"as of {w['instant']}"          # one instant, one wording (it read "at …" here and "as of …" below)
     for key, word in (("months", "months"), ("days", "sessions")):
         if isinstance(w.get(key), (int, float)) and not isinstance(w.get(key), bool):
             return f"{w[key]:g} {word}" + (f" to {as_of}" if as_of else "")
     if isinstance(w.get("name"), str) and w["name"]:
         return w["name"] + (f" to {as_of}" if as_of else "")
+    if as_of and isinstance(p.get("high_date"), str):
+        return f"as of {as_of}, against the high set {p['high_date']}"
     return f"as of {as_of}" if as_of else ""
 
 
@@ -273,8 +284,13 @@ def from_of(rec: dict) -> str:
 def model_row(f: "Fact | dict") -> dict:
     """The eight fields of one row, from the stored record."""
     rec = _record_of(f)
+    what, of = registry.reads_as(rec.get("measure")), rec.get("subject") or ""
+    # A price statistic's own label begins with its ticker ("AAPL beta TLT"), and
+    # `of` says the ticker already: the row named its subject twice.
+    if of and what.lower().startswith(f"{of.lower()} ") and len(what) > len(of) + 1:
+        what = what[len(of) + 1:]
     return {"id": rec.get("id"), "kind": _KIND_WORDS.get(rec.get("kind"), rec.get("kind")),
-            "what": registry.reads_as(rec.get("measure")), "of": rec.get("subject") or "",
+            "what": what, "of": of,
             "when": when_of(rec), "value": value_of(rec), "means": registry.means_words(rec),
             "from": from_of(rec)}
 

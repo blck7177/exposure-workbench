@@ -90,7 +90,7 @@ async def _facts_unit(db: AsyncSession, fact_ids, ticker: str, metric: str) -> s
 
 def _unknown_metric(metric: str) -> dict:
     return {"error": "unknown_metric", "metric": metric,
-            "detail": f"{metric} is not a normalised metric; describe lists them"}
+            "detail": f"{metric} is not a line this desk maps; the lines an issuer files are listed by name"}
 
 
 async def _metric_absence(db: AsyncSession, error: str, kind: str, ticker: str, metric: str,
@@ -206,7 +206,7 @@ async def get_flow(
             why=f"This desk holds no {metric} for {ticker} over any period.",
             invoked_by=invoked_by,
             detail=f"{ticker} reports no {metric} with a period; it may report "
-                   f"a related line instead — call describe")
+                   f"a related line instead — the lines it files are listed by name")
 
     if not start and not end:
         # V31. A window anchored on "the latest" must be the latest the issuer
@@ -477,7 +477,7 @@ async def get_balance_series(
             why=f"This desk holds no {metric} for {ticker.upper()} as a balance at any date.",
             invoked_by=invoked_by,
             detail=f"{ticker.upper()} reports no {metric} as a balance; it may be a flow — "
-                   f"call read_fundamentals, or describe to see which it is")
+                   f"the list of its filed lines says which each is")
     points, unit = read["points"], read["unit"]
     calc_id = await cs._record(
         db, read["ticker"], OP_BALANCE_SERIES,

@@ -157,7 +157,12 @@ def test_counts_measured_in_phase_0(adapted):
     n = {name: len(adapted[name][0]) for name in adapted}
     assert n["read_prices_1y"] == 2 and adapted["read_prices_1y"][0][0].kind == F.SERIES or any(f.kind == F.SERIES for f in adapted["read_prices_1y"][0])
     assert n["read_fundamentals_sheet"] >= 17
-    assert n["compute_book_analysis"] == 146, "every figure of book.analysis is shown; none held back"
+    # V1 (decided after the first real-database smoke, 2026-09-19): book.analysis yields what
+    # it DERIVED — a net and a gross beta per risk, two rooms per check, and the absence of what
+    # is withheld — 47 rows. It was 146 while the payload's copy of the run's own columns
+    # (positions, each check's value and tiers, the legs) was walked too; those are read off
+    # the run by `book_read`, under their one spelling.
+    assert n["compute_book_analysis"] == 47, "what book.analysis derived, and nothing it only read"
     assert n["read_book_run_sections"] == 114
     assert all(h is None for _f, _n, h in adapted.values()), "no phase-0 fixture is over the cap"
 
@@ -207,11 +212,21 @@ def test_book_sections_share_the_runs_measure_names(adapted):
     assert "exposure_metrics.portfolio_market_value" in measures
 
 
-def test_collinear_legs_are_not_standalone(adapted):
+def test_a_collinear_fit_leaves_the_net_quotable_and_no_leg_a_row(adapted):
+    """The flag's own words: "the net is quotable, no single leg is". Walked
+    generically, the collinear risk's whole object went non-standalone — the NET
+    with it — and the gate refuses an inline pointer at a non-standalone fact, so
+    the one figure the desk says may be quoted could not be. The legs are the
+    run's factor betas; they are read off the run, where a collinear one is
+    withheld (the run-sections fixture holds them, not standalone)."""
     facts, _n, _h = adapted["compute_book_analysis"]
-    legs = [f for f in facts if f.measure.endswith("legs.beta") or f.measure == "net_exposures.beta" or "legs" in f.measure]
-    flagged = [f for f in facts if not f.standalone]
-    assert flagged, "book.analysis carries quotable_individually flags; some leg must be non-standalone"
+    nets = [f for f in facts if ".net_beta." in f.measure and f.kind == F.SCALAR]
+    assert nets and all(f.standalone for f in nets)
+    assert any(f.means.get("flags") == ["collinear_legs_not_quotable"] for f in nets)
+    assert all(f.means.get("direction") in ("loses", "gains", "flat") for f in nets)
+    assert not any("legs" in f.measure or f.measure.startswith("factor_attributions") for f in facts)
+    run_rows, _n2, _h2 = adapted["read_book_run_sections"]
+    assert any(not f.standalone for f in run_rows if f.measure == "factor_attributions.beta")
 
 
 def test_task_facts(adapted):

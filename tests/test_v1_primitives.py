@@ -257,7 +257,10 @@ async def test_a_filters_level_is_written_as_the_desk_shows_a_figure(monkeypatch
     monkeypatch.setattr(P.tc, "constant", _constant)
 
     out = await P._calc(None, "filter", list(weights), cmp=">", level="8%", why=WHY)        # 8% is 0.08: nobody converts
-    assert out["kept"] == ["f_a", "f_b"] and out["value"] == 2.0 and out["of"] == 3
+    assert out["kept"] == ["f_a", "f_b"] and out["value"] == 2.0
+    # how many it was a count OF is in the figure's name: a bare number beside the
+    # count is a figure with no unit, and the adapter says so out loud (V1 smoke)
+    assert "of the 3 given" in out["quantity"] and "of" not in out
     none = await P._calc(None, "filter", list(weights), cmp=">", level="20%", why=WHY)
     assert none["error"] == "no_entry_satisfies" and "0.07 to 0.16" in none["detail"]
     bad = await P._calc(None, "filter", list(weights), cmp=">", level="a lot", why=WHY)

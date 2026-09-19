@@ -131,7 +131,7 @@ async def test_multiply_folds_like_add(monkeypatch):
 async def test_subtract_and_divide_stay_binary_and_point_at_by(monkeypatch):
     desk = _five_weights(monkeypatch)
     out = await desk.op("divide", ["w1", "w2", "w3"])
-    assert out["error"] == "operands" and "params.by" in out["detail"]
+    assert out["error"] == "operands" and "`by`" in out["detail"]
 
 
 # ── (2) a list against one figure ────────────────────────────────────────────

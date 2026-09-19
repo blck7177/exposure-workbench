@@ -69,6 +69,9 @@ BASIS: dict[str, str] = {
     "as_traded_close": "over the as-traded close",
     "book_return": "fitted on the book's return",
     "name_return": "fitted on the name's own return",
+    # the book's price history is TODAY'S holdings replayed: the desk holds one position
+    # snapshot and no holding history (drawdown_service.valuation_assumption)
+    "todays_holdings": "today's holdings held fixed over the whole span",
 }
 
 # What limits how the figure may be used.
@@ -179,7 +182,27 @@ def words_beside(obj: Any) -> dict:
         out["status"] = status
     if obj.get("quotable_individually") is False:
         out["flags"] = ["collinear_legs_not_quotable"]
+    # `basis` is a sentence in most payloads ("as of 2026-03-31"); it is a registry
+    # word only when the producer wrote a LIST of them, and only then is it taken.
+    basis = obj.get("basis")
+    if isinstance(basis, (list, tuple)) and basis and all(w in BASIS for w in basis):
+        out["basis"] = list(basis)
     return out
+
+
+# THE FIGURE A WORD IS ABOUT, where a payload holds several beside it. `direction`
+# is the word for the NET of a risk's legs. The gross beta beside it is a size and
+# has no direction; a leg has its own sign, which the net's word can contradict
+# (V1 smoke: "gross beta 0.24× — the book loses if this risk happens").
+DIRECTION_IS_ABOUT: tuple[str, ...] = ("net_beta",)
+
+
+def for_leaf(key: str, means: dict | None) -> dict:
+    """The words a walked container said, as they apply to ONE leaf under it."""
+    m = dict(means or {})
+    if "direction" in m and key not in DIRECTION_IS_ABOUT:
+        m.pop("direction")
+    return m
 
 
 def merged(a: dict | None, b: dict | None) -> dict:
@@ -262,8 +285,14 @@ def composition_words(params: dict) -> list[str]:
             continue
         if info.get("formula"):
             out.append(f"{str(name).replace('_', ' ')} = {info['formula']}")
-        if info.get("substituted"):
-            out.append(f"{str(name).replace('_', ' ')} substitutes {_names(info['substituted'])}")
+        subs = info.get("substituted")
+        if isinstance(subs, dict):
+            # {wanted: used}, the shape formula_service._made_of writes. Joined as a
+            # list it printed the dict itself ("substitutes {'long term debt…': …}").
+            out.extend(f"{_names(name)} is built on {_names(used)} in place of {_names(wanted)}"
+                       for wanted, used in subs.items())
+        elif subs:
+            out.append(f"{_names(name)} substitutes {_names(subs)}")
         for key, said in _COVER_WORDS:
             if info.get(key):
                 out.append(f"{said}: {_names(info[key])}")
@@ -288,7 +317,10 @@ def means_words(rec: dict) -> str:
         said.append(STATUS[means["status"]])
     place, of = params.get("place"), params.get("of")
     if isinstance(place, int) and isinstance(of, int):
-        said.append(f"{ordinal(place)} highest of {of}")
+        way = params.get("direction") if params.get("direction") in ("highest", "lowest") else "highest"
+        said.append(f"{ordinal(place)} {way} of {of}")
+    elif params.get("op") == "rank" and isinstance(of, int):
+        said.append(f"highest to lowest of the {of} ranked")
     elif isinstance(params.get("rank"), int):
         said.append(f"rank {params['rank']}")
     value = rec.get("value")
@@ -555,9 +587,11 @@ _PRICE_METHODS: tuple[Method, ...] = (
 _BOOK_METHODS: tuple[Method, ...] = (
     Method(
         name="book.analysis", subject_kind="run", family="book",
-        reads_as="the book's net exposures and room to its tiers", basis=("book_return",), faces=("risk",),
-        describes="one run's factor exposures netted per risk (net beta), positions ordered by weight, and the room from every limit check to its warning and breach tiers",
-        procedure="net beta per risk = Σ beta_i × sense_i, the sense being the risk's effect on the book for a positive beta: −1 for SPY, QQQ and IWM (equity_down), for TLT (rates_up) and for HYG (credit_spreads_widen); room = tier − current; positions ordered by weight",
+        # no `basis` here: the betas are fitted on the book's return and the producer says
+        # so beside them (integration_service); the weights and tiers beside them are not
+        reads_as="the book's net exposures and room to its tiers", faces=("risk",),
+        describes="one run's factor exposures netted per risk (a net and a gross beta each), and the room from every limit check to its warning and breach tiers; the positions, the checks' own values and the single factor betas are the run's columns and are read off the run",
+        procedure="net beta per risk = Σ beta_i × sense_i, the sense being the risk's effect on the book for a positive beta: −1 for SPY, QQQ and IWM (equity_down), for TLT (rates_up) and for HYG (credit_spreads_widen); room = tier − current",
         authority="arithmetic over the run's own rows; instrument directions are properties of the factor ETFs, not of any issuer",
         fails_when="the run is not completed; a risk no factor in the regression measures is reported unmeasured, not zero",
         executor="book.analysis", unit_class="ratio",
@@ -580,7 +614,7 @@ _BOOK_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="book.drawdown_episodes", subject_kind="portfolio", family="risk",
-        reads_as="the book's drawdown episodes", faces=("risk",),
+        reads_as="the book's drawdown episodes", basis=("todays_holdings",), faces=("risk",),
         describes="every peak-to-trough episode of the book at least 5% deep in a span, deepest first, with trough and recovery dates",
         procedure="episodes of the portfolio value path; depth = (peak − trough) ÷ peak",
         authority="the standard drawdown definition; the 5% floor is a producer parameter",
@@ -593,7 +627,7 @@ _BOOK_METHODS: tuple[Method, ...] = (
     ),
     Method(
         name="book.explain_episode", subject_kind="portfolio", family="risk",
-        reads_as="what one drawdown episode was made of", faces=("risk",),
+        reads_as="what one drawdown episode was made of", basis=("todays_holdings",), faces=("risk",),
         describes="what one drawdown episode was made of: the book's return over the window and each holding's contribution to it",
         procedure="window return of the book and of each position between the peak and trough dates",
         authority="arithmetic over the price series the book holds",

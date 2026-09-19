@@ -243,11 +243,12 @@ def test_a_key_whose_unit_depends_on_what_was_computed_reads_the_declaration():
     money = {"op": "rank", "calc_id": "calc_x", "as_of": "2026-09-04", "spread": 1135470.0,
              "type": {"unit_class": "money", "kind": "ranking", "quantity": "market_value"}}
     facts, _ = fa.compute({"op": "rank"}, money)
-    assert next(f for f in facts if f.measure == "spread").unit == MONEY.upper()
+    # V1: the spread is named for what was ranked ("market_value.spread")
+    assert next(f for f in facts if f.measure == "market_value.spread").unit == MONEY.upper()
 
     ratio = {**money, "spread": 0.117, "type": {**money["type"], "unit_class": "ratio"}}
     facts, _ = fa.compute({"op": "rank"}, ratio)
-    assert next(f for f in facts if f.measure == "spread").unit == RATIO.upper()
+    assert next(f for f in facts if f.measure == "market_value.spread").unit == RATIO.upper()
 
     # No declaration is still not a default — the guess is what put
     # "113547000.0%" in front of a reader. V31 §4.3: the undeclared leaf is

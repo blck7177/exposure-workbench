@@ -410,9 +410,8 @@ async def evaluate_formula(db: AsyncSession, ticker: str, name: str, *,
         # reaches the model).
         from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
         if name in SUPPORTED_METRICS:
-            out["detail"] = (f"{name} is a filed metric, not a formula: read it with "
-                             f"fundamentals(ticker, metric={name!r}, months=…) for a flow over a window, or "
-                             f"fundamentals(ticker, metric={name!r}, at=…) for a balance at a date")
+            out["detail"] = (f"{name} is a filed line, not a measure: read the line itself — over a "
+                             f"window if it is a flow, at a date if it is a balance")
         return out
     cache = _cache if _cache is not None else {}
     # Per-formula, per-reason: ROE applies to a bank (not_for_financials=None)
@@ -610,8 +609,8 @@ async def evaluate_formula_series(db: AsyncSession, ticker: str, name: str, *,
     ticker = ticker.upper()
     if name not in fm.FORMULAS:
         return {"error": "unknown_formula", "formula": name, "known": sorted(fm.FORMULAS),
-                "detail": "a series is of a registry formula; total_debt and filed metrics "
-                          "have their own series through fundamentals(…, last_n=…)"}
+                "detail": "a series is of a registry measure; a filed line has its own series: "
+                          "read the line with last_n"}
     if not 2 <= int(last_n) <= FORMULA_SERIES_MAX:
         return {"error": "invalid_params", "formula": name,
                 "detail": f"last_n is between 2 and {FORMULA_SERIES_MAX}; got {last_n}"}
@@ -748,7 +747,7 @@ async def build_panel(db: AsyncSession, ticker: str, *, months: int = 12,
         "ticker": ticker,
         "judgement": ("none: these are measured values with their definitions and period "
                       "bases. Thresholds and conclusions are the reader's."),
-        "per_formula_sources": ("a method(name=...) node carries a formula's source url "
+        "per_formula_sources": ("a measure asked by its own name carries its source url "
                                 "and its caveats"),
         "lines": lines,
     }

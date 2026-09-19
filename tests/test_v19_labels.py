@@ -116,12 +116,14 @@ def test_a_day_window_is_a_request_parameter_not_a_phrase():
 
 # ── a filed metric asked for as a formula is pointed at its tool ─────────────
 
-async def test_evaluate_formula_names_the_tool_that_holds_a_filed_metric():
+async def test_evaluate_formula_says_a_filed_line_is_read_as_a_line():
+    """V1: the refusal says what the name IS (a filed line, read over a window or
+    at a date) and names no verb — the service does not know who is reading it."""
     from exposure_workbench.services import formula_service as fsvc
     out = await fsvc.evaluate_formula(None, "NVDA", "net_income", invoked_by="test")
     assert out["error"] == "unknown_formula"
-    assert "fundamentals(ticker, metric='net_income'" in out["detail"]
-    assert "read_fundamentals" not in out["detail"]
+    assert "net_income is a filed line, not a measure" in out["detail"]
+    assert "read_fundamentals" not in out["detail"] and "fundamentals(" not in out["detail"]
     out = await fsvc.evaluate_formula(None, "NVDA", "not_a_thing", invoked_by="test")
     assert out["error"] == "unknown_formula" and "detail" not in out
 

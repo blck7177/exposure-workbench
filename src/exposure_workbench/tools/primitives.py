@@ -176,6 +176,11 @@ async def _book_lines(db: AsyncSession, subject: str | None) -> list[str] | dict
             + [f"rows of {t}: " + ", ".join(sorted(rows)) for t, rows in sorted(labels.items())])
 
 
+# what a check is a check ON, by the three entity types a limit has (db/models.RiskLimit); a
+# fourth is a new kind of check and is named here before it is listed
+_CHECKED = {"portfolio": "the whole book", "issuer": "one issuer", "sector": "one sector"}
+
+
 async def _checks_lines(db: AsyncSession, subject: str | None) -> list[str] | dict:
     if not (subject or "").startswith("port_"):
         return _err("invalid_params", "checks are a portfolio's: give its port_… id")
@@ -183,7 +188,7 @@ async def _checks_lines(db: AsyncSession, subject: str | None) -> list[str] | di
     if isinstance(limits, dict) and limits.get("error"):
         return limits
     return [f"{l['limit_type']}" + (f":{l['entity_id']}" if l.get("entity_id") else "")
-            + f" — a {l.get('entity_type') or 'portfolio'} check with a warning and a breach tier"
+            + f" — a check on {_CHECKED[l.get('entity_type') or 'portfolio']}, with a warning and a breach tier"
             + ("" if l.get("is_active", True) else " (inactive)")
             for l in (limits.get("limits") or [])]
 
@@ -284,8 +289,35 @@ async def _book_read(db: AsyncSession, book: str, table: str, column: str | None
 
 # ── a measure by name; one operation over figures ────────────────────────────
 
+async def _at_its_run(db: AsyncSession, subject):
+    """A BOOK IS NAMED ONE WAY ON EVERY VERB: a port_… id is its latest completed
+    run, as `book_read` and `scenario` read it. A measure over a run was the one
+    place that did not hold — the smoke asked book.analysis of port_001 and was
+    told no such run exists. One book that cannot be resolved is refused with
+    the resolver's reason (no completed run: start one); in a list it is left
+    as it was written, and the measure refuses that one subject in its own row."""
+    one = isinstance(subject, str)
+    out = []
+    for s in ([subject] if one else list(subject or [])):
+        if isinstance(s, str) and s.startswith("port_"):
+            resolved = await _resolve_book(db, s, None)
+            if isinstance(resolved, dict):
+                if one:
+                    return resolved
+                out.append(s)
+                continue
+            s = resolved[0]
+        out.append(s)
+    return out[0] if one else out
+
+
 def _metric_for(face: str):
     async def _metric(db: AsyncSession, name: str, subject, params: dict | None = None, *, why: str) -> dict:
+        spec = desk.METHODS.get(name)
+        if spec is not None and spec.subject_kind == "run":
+            subject = await _at_its_run(db, subject)
+            if isinstance(subject, dict):
+                return subject
         return await compute_service.compute(db, method=name, subject=subject, params=params)
     return _metric
 
@@ -329,7 +361,7 @@ async def _filter(db: AsyncSession, inputs: list[str], cmp: str | None, level) -
     counted = await tc.constant(db, float(len(kept)), unit_class="count", invoked_by=current_session_id())
     if counted.get("error"):
         return counted
-    return {**counted, "quantity": f"figures {cmp} {level}", "op": "filter", "kept": kept, "of": len(inputs)}
+    return {**counted, "quantity": f"figures {cmp} {level}, of the {len(inputs)} given", "op": "filter", "kept": kept}
 
 
 async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = None, factor: float | None = None,
@@ -344,6 +376,7 @@ async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = N
         if not isinstance(n, int) or n < 1:
             return _err("invalid_params", "top takes n, a positive integer")
         out["ordering"] = (out.get("ordering") or [])[:n]
+        out.pop("spread", None)     # highest to lowest of ALL the inputs: beside the first n it reads as theirs
     return out
 
 

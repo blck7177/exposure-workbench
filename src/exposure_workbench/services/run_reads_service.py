@@ -65,8 +65,8 @@ async def _run_or_error(db: AsyncSession, run_id: str) -> ExposureRun | dict:
         return {"error": "unknown_run", "run_id": run_id,
                 # V37/T3: `describe` is not on the domain analyst's face; the runs of
                 # the books it was pointed at are in the briefing it was handed.
-                "detail": "no run with this id is visible to you; the runs of your own books are in the "
-                          "briefing, and run(portfolio=<port_…>) reads the latest or the previous one"}
+                "detail": "no run with this id is visible to you; a book's runs are listed under the book, "
+                          "and the book's own port_… id reads its latest run"}
     return row
 
 

@@ -101,14 +101,13 @@ async def _op(db: AsyncSession, op: str, operands: list[str], as_quantity: str |
     invoked_by = current_session_id()
     by = params.get("by")
     if by is not None and not isinstance(by, str):
-        return _err("params", "params.by names ONE figure (a fact_/calc_/f_ id or ref:name) that every "
-                              "operand is combined with")
+        return _err("params", "`by` names ONE figure, by its id, that every input is combined with")
     if op == skill.SCALE_OP:
         # A constant is not an operand (typed_calculator.scale's docstring): the
         # first live V23 turn wrote "book_market_value*0.15" as an operand.
         if len(operands) != 1 or not isinstance(params.get("factor"), (int, float)):
-            return _err("operands", "scale takes one operand and params.factor (a number): "
-                                    "compute(op='scale', operands=[ref], params={'factor': 0.15})")
+            return _err("operands", "scale takes ONE input and `factor`, a plain number (0.15 for fifteen "
+                                    "percent of the figure)")
         left = await tc._resolve(db, operands[0])
         if isinstance(left, dict):
             return left
@@ -125,33 +124,36 @@ async def _op(db: AsyncSession, op: str, operands: list[str], as_quantity: str |
         # against ONE figure (params.by) is each operand combined with it.
         if by is not None:
             if not operands:
-                return _err("operands", f"{op} with params.by takes one or more operands, each "
-                                        f"{op}d with the figure `by` names")
+                return _err("operands", f"{op} with `by` takes one or more inputs; each is combined with "
+                                        f"the figure `by` names")
             return await _broadcast(db, op, operands, by, as_quantity, invoked_by)
         if op in ("add", "multiply"):
             if len(operands) < 2:
-                return _err("operands", f"{op} takes two or more operands (fact_/calc_ ids or ref:name "
-                                        f"figures on a run, analysis or scenario row); got {len(operands)}")
+                return _err("operands", f"{op} takes two or more inputs, each the id of a figure you were "
+                                        f"shown; got {len(operands)}")
             return await _fold(db, op, operands, as_quantity, invoked_by)
         if len(operands) != 2:
-            return _err("operands", f"{op} takes exactly two operands; to {op} each of a list by one "
-                                    f"figure, pass the list as operands and the figure as params.by; "
+            return _err("operands", f"{op} takes exactly two inputs; to {op} each of a list by one "
+                                    f"figure, give the list as `inputs` and the figure as `by`; "
                                     f"got {len(operands)}")
         return await tc.calculate(db, op, operands[0], operands[1], invoked_by=invoked_by,
                                   as_quantity=as_quantity,
                                   named_by="session" if as_quantity else None)
     if op == skill.RANK_OP:
         if len(operands) < 2:
-            return _err("operands", "rank takes two or more operands, one per name being ordered")
+            return _err("operands", "rank takes two or more inputs, one per name being ordered")
         return await tc.rank(db, operands, direction=direction or "highest",
                              as_quantity=as_quantity, invoked_by=invoked_by)
     if op == skill.REGRESS_OP:
         if len(operands) != 2:
-            return _err("operands", "regress takes two operands: [series_x, series_y] as calc_ ids")
+            return _err("operands", "regress takes two inputs, both series: [x, y]")
         return await pas.regress(db, operands[0], operands[1], invoked_by=invoked_by)
     if op in SERIES_OPS:
         return await _stat(db, op, operands, as_quantity, invoked_by)
     return _err("unsupported_op", f"{op!r} is not an op this desk has", supported=list(OPS))
+
+
+_FOLD_WORD = {"add": "sum", "multiply": "product"}
 
 
 async def _fold(db: AsyncSession, op: str, operands: list[str], as_quantity: str | None,
@@ -166,7 +168,9 @@ async def _fold(db: AsyncSession, op: str, operands: list[str], as_quantity: str
         final = i == len(operands)
         step = await tc.calculate(db, op, acc, nxt, invoked_by=invoked_by,
                                   as_quantity=as_quantity if final else None,
-                                  named_by="session" if (as_quantity and final) else None)
+                                  named_by="session" if (as_quantity and final) else None,
+                                  default_quantity=(f"{_FOLD_WORD[op]} of {len(operands)} figures"
+                                                    if final and len(operands) > 2 else None))
         if step.get("error"):
             return step | {"at": nxt, "folded_so_far": steps,
                            "detail": f"{op} stopped at operand {i} of {len(operands)} ({nxt}): "
@@ -219,9 +223,9 @@ async def _stat(db: AsyncSession, op: str, operands: list[str], as_quantity: str
             return await tc.aggregate(db, "abs", operands, as_quantity=as_quantity, invoked_by=invoked_by)
         return _err("not_a_series",
                     f"{operands[0]} is one figure, and {op} over one figure is not defined. Over a "
-                    f"series, {op} takes the series' calc_ id (read_fundamentals(last_n=…), "
-                    f"read_prices(window=…), or compute(method=…, params={{'last_n': …}}) "
-                    f"produce one); over a set, it takes two or more figures.")
+                    f"series, {op} takes the series' id — a filed line's last N readings, a window of "
+                    f"prices, and a measure asked with last_n are each one; over a set, it takes two "
+                    f"or more figures.")
     if op == "sum":
         return await _fold(db, "add", operands, as_quantity, invoked_by)
     if op in tc.SET_OPS:
@@ -229,8 +233,8 @@ async def _stat(db: AsyncSession, op: str, operands: list[str], as_quantity: str
     return _err("series_only",
                 f"{op} compares points of ONE series in time; it has no meaning over a set of "
                 f"separate figures. The change between two figures is subtract (the difference) "
-                f"or divide (the ratio); a series to take {op} of comes from read_fundamentals"
-                f"(last_n=…), read_prices(window=…) or compute(method=…, params={{'last_n': …}}).")
+                f"or divide (the ratio); a series to take {op} of is a filed line's last N readings, "
+                f"a window of prices, or a measure asked with last_n.")
 
 
 # ── methods ──────────────────────────────────────────────────────────────────
@@ -249,9 +253,8 @@ async def _run_method(db: AsyncSession, spec: skill.Method, subject: str, params
             invoked_by=invoked_by)
     if ex == "formula.panel":
         if p.get("last_n"):
-            return _err("invalid_params", "issuer.panel has no series form; ask one measure for "
-                                          "its last_n periods: compute(method='gross_margin', "
-                                          "subject=…, params={'last_n': 8})")
+            return _err("invalid_params", "issuer.panel has no series form; ask ONE measure by its own "
+                                          "name for its last_n periods (gross_margin with last_n=8)")
         return await formula_service.build_panel(
             db, subject.upper(), months=int(p.get("months") or 12), at=p.get("at"), invoked_by=invoked_by)
     if ex == "price.rolling_volatility":
