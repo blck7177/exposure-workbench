@@ -180,6 +180,15 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - `calc` 的 `top` 是排序后截断；`filter` 的 `level` 可以写成桌子显示的样子（"8%"、"$1.5M"）或一个 f_ id，由同一个解析器读，分析师不做单位换算；满足的个数记成一条 COUNT 事实，满足的 id 列在 `kept`。
 - 跨资源度量 `book.position`（发行人面）：某个名字在每本持有它的书的最新 run 里的权重、市值、贡献，和它那条集中度检查的三档；新服务 `services/position_service.py`，登记簿与 `compute_service` 各加一条。
 
+**执行记录 3b（2026-09-19，`desk-v1`）：程序语言与旧工具面已退役**。离线套件 2836 通过。
+
+- 删除：`services/program_service.py`（`run(program)`，2211 行）、`services/program_builder.py`（`compile`）、`services/digest.py`（含图例 `HOW_TO_CITE`）、`docs/PROGRAM_LANGUAGE.md`；`analytics/skill.py` 里的 14 个域（`PROCEDURES` 与 26 个程序）、`DESK_RULES`、旧 `READINGS`、`roster`、`system_text`、`match_domains`、`call_for_yield`——`skill` 只剩对登记簿度量的转出口。`delegation.HOW_TO_CITE`（主分析师那份图例）在步骤 4 已去掉。
+- 旧的 V23 工具注册（describe、read_fundamentals、read_prices、compute、run、read_book、旧 search_web）全部撤掉：`tools/definitions.py` 只留原语包装的函数和 `think`；`tools/research_tools.py` 只注册 `submit_brief`。`services/catalogue_service.py` 从 701 行砍到 219 行，只剩简报与 `book.position` 要用的发行人覆盖信息和持仓位置。`services/name_table.py` 改成"名字 → 它是什么 → 哪个动词收它"，拒绝里的路由指向新动词。类型计算器与命名器里提到旧调用写法的两句拒绝改掉，不再在 service 的句子里拼任何动词。
+- 面：五个挂载。三位分析师各一个；研究简报面 = 发行人动词加价格读、两族度量、`think`、`submit_brief`，不含 `start`；名为 meta 的挂载留给 stdio 调试门，全部 11 个动词，没有 agent 使用它（主分析师不持面）。`tests/test_v2_audit.py` 把五扇门钉死，并断言分析师的注册表就是它的面。
+- 研究会话（`agents/research_session.py`）：system 改成新动词的说法并附发行人一章；工作流里跳过外部研究的 deny 名改为 `web_search`。9/15 的决定 D5"研究与日报不动"在这里被打破——程序语言退役后它没有可用的取数工具；简报的 claims 文法与 `submit_brief` 门未动。
+- 测试：删除主题整体退役的 13 个文件（program_service、v33 的 typecheck/language/builder、v30 skill programs、v36 digest、v36a fixes、v37 offers/refusals_on_face、v38 tool_layer、v27 directory、v12 describe live、registry_enforcement_live）；其余文件里按函数删掉钉旧工具面成员与旧目录的约 50 条；保留并改到新动词的有 schema 诚实性（`why` 因此改成无默认的必填关键字参数）、面范围、工具注册、展示短语、withheld 读者、书的代数里的两条拒绝。
+- 脚本：8 个直接依赖退役模块的脚本移到 `scripts/archive/`（附 README）；新增 `scripts/v1_wording.py`，从运行时对象生成 `docs/WORDING_V1.md`（约 6.1 万字符），并有测试断言它不过期。`docs/spikes/` 下的一次性工具未动，它们随历史保留。
+
 **与计划的出入**：`prices_read` 没有 volume 字段（窗口读调整收盘序列，日期读当日收盘与调整收盘；成交量走 `metric price.adv`）；`list` 回的是目录行不是事实，所以不含任何数字。
 
 ### 步骤 4 · 分析师与主分析师

@@ -19,6 +19,7 @@ from exposure_workbench.agents import batch, repeats as rp
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
 from exposure_workbench.agents.tool_session import tool_session
+from exposure_workbench.analytics import handbook
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.services import claims
@@ -36,37 +37,29 @@ _SYSTEM = ("""You are an equity issuer-research analyst producing an Issuer Risk
 The analysis is your job: decide what to look at, what to compare it against, and what the evidence \
 means for a team that holds this name — what changed, why, and what would change your reading.
 
-describe(<ticker>) is where you look first: what the desk holds about the issuer, what it does NOT hold \
-and why, which lines it covers and through when, and the methods and procedures that apply. A domain \
-opens with describe(<ticker>, expand=<domain>) and carries the programs that answer it.
-
-Figures come from ONE tool: run(program). Write a whole computation as one program — the reads, the \
-methods, the arithmetic, the ranking, the change — and every node comes back typed, dated and on the \
-ledger as a fact (f_…). A superlative rests on a rank node; a change on yoy/qoq or two readings; a name \
-in a program is a variable, never a measure. A node that refuses says why; fix the program, do not \
-guess. Filing text is read_filings; what the filings cannot hold is search_web.
+Your tools are verbs over the issuer's evidence: see what the desk holds (list), read one filed line over a \
+stated period, read its prices, take a measure by its name, do one operation on figures you were already \
+shown, search its filings or read one Item, and search the web for what the filings cannot hold. Every call \
+says WHY. Every result is rows: a row says what it is, whose, over what period, the value, what it means and \
+where it came from, under the id (f_…) you point at. A refusal is a row too, with its reason and the way out. \
+Never compute in your head: a figure that is not on a row is a figure nothing stands behind.
 
 The brief is six sections — financial_summary, key_changes, management_explanation, market_context, \
 portfolio_implications, open_questions — and each section is an answer in the same grammar as a reply: \
 CLAIMS and PROSE. Each figure you state is a claim with a relation its facts must fit — level, tier, \
 change, versus, ratio, rank, room, absent, quote, series, table — and the prose writes {cN} where the \
-figure goes. """ + claims.PROSE_RULE + """ A figure the desk does not hold is an absence fact: claim it \
+figure goes. """ + claims.PROSE_RULE + """ A figure the desk does not hold is an absence row: claim it \
 as absent and say why — never a nearby figure wearing the asked-for name, never an estimate.
 
-Every section but open_questions must rest on at least one claim pointing at a fact from this session. \
-Work through the issuer's domains, read the filing text that explains what the numbers did, check the \
-market's reaction, and search the web once if the filings do not explain a development. Then call \
-submit_brief. A refusal names the section and the claim: fix that claim, run the program that produces \
-the figure, or drop it.""")
+Every section but open_questions must rest on at least one claim pointing at a row from this session. \
+Work through the issuer's questions in your handbook chapter, read the filing text that explains what the \
+numbers did, check the market's reaction, and search the web once if the filings do not explain a \
+development. Then call submit_brief. A refusal names the section and the claim: fix that claim, pull the \
+row that gives the figure, or drop it.
 
+YOUR CHAPTER OF THE DESK'S HANDBOOK
+""" + handbook.chapter_text("issuer"))
 
-
-def _keep_for(name: str, args) -> tuple[str, ...]:
-    """The section a describe call asked to open is the last the result cap may
-    drop (V33: `expand='methods'` came back as `methods: {}`)."""
-    if name == "describe" and isinstance(args, dict) and args.get("expand"):
-        return (str(args["expand"]),)
-    return ()
 
 async def run_research_session(
     db_factory,
@@ -157,7 +150,7 @@ async def run_research_session(
                 # model could spell one it was then refused for misspelling.
                 messages.append({
                     "role": "tool", "tool_call_id": tc["id"],
-                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT, keep=_keep_for(name, args)),
+                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT, keep=("rows",)),
                 })
                 if name == "submit_brief":
                     if result.get("accepted"):

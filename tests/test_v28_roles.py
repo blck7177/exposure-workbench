@@ -63,44 +63,6 @@ def test_compute_never_hands_a_series_op_an_id_to_reload():
 
 # ── A2: two shapes of one call are unwritable together, before any spend ──
 
-async def test_op_and_method_together_are_refused_before_any_spend(monkeypatch):
-    """The refusal happens in the registry, before budget — and the tool DECLARES
-    its two shapes rather than encoding them as a schema `not`, which the
-    provider rejects outright (see the provider-legality test below)."""
-    reg = build_meta_registry()
-    assert reg.tools["compute"].shapes.fields == ("op", "method")
-    assert reg.tools["read_filings"].shapes.fields == ("query", "item")
-
-    spent = []
-    from exposure_workbench.services import agent_session_service as sess
-    from exposure_workbench.tools import registry as R
-
-    async def reserve(*a, **k):
-        spent.append(1)
-    monkeypatch.setattr(sess, "reserve", reserve)
-
-    async def record_step(*a, **k):
-        return None
-    monkeypatch.setattr(R.trace_service, "record_step", record_step)
-
-    out = await R.invoke(reg, None, "sess_x", "compute",
-                         {"op": "avg", "method": "price.beta", "subject": ["MSFT", "AAPL"]})
-    assert out["error"] == "invalid_arguments" and not spent
-    assert "two shapes" in out["problems"][0]["problem"] and "two calls" in out["problems"][0]["problem"]
-    assert {p["field"] for p in out["problems"]} == {"op", "method"}
-
-    out = await R.invoke(reg, None, "sess_x", "read_filings",
-                         {"ticker": "MSFT", "query": "risk", "item": "1A"})
-    assert out["error"] == "invalid_arguments" and "not both" in out["problems"][0]["problem"] and not spent
-
-    # One shape, or the other, passes validation untouched.
-    compute = reg.tools["compute"].json_schema
-    assert validate_args(compute, {"op": "avg", "method": None, "operands": ["f_a", "f_b"]}) == []
-    assert validate_args(compute, {"method": "price.beta", "subject": "MSFT", "op": None}) == []
-    filings = reg.tools["read_filings"].json_schema
-    assert validate_args(filings, {"ticker": "MSFT", "item": "1A", "query": None}) == []
-
-
 # The provider's own words, 2026-09-08: "schema must have type 'object' and not
 # have 'oneOf'/'anyOf'/'allOf'/'enum'/'const'/'not' at the top level". A V28
 # schema carried a top-level `not`; jsonschema accepted it, 2,191 offline tests
@@ -377,7 +339,6 @@ def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
     # stays the brief path's (submit_brief) and the registry's.
     assert "every number you write is one a row showed you" in meta_agent._SYSTEM     # V1: the lead reads the desk's rows
     assert claims.PROSE_RULE in mcp_server.INSTRUCTIONS
-    assert claims.PROSE_RULE in build_meta_registry().tools["respond"].description
     assert gate._FIX.startswith(gate.PROSE_RULE)
     assert "never write a number" not in meta_agent._SYSTEM
 

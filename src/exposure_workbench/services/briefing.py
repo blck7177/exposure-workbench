@@ -135,7 +135,7 @@ def _check_said(name: str) -> str:
 
 
 async def _issuer(db: AsyncSession, tk: str) -> dict:
-    d = await catalogue_service.describe(db, tk, None)
+    d = await catalogue_service.issuer(db, tk)
     if d.get("error"):
         return {"error": d["error"], "detail": d.get("detail")}
     f = d.get("fundamentals") or {}

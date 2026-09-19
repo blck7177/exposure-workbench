@@ -22,20 +22,6 @@ _A_TOOLS = ["read_book"]
 
 # ── the face ──────────────────────────────────────────────────────────────────
 
-def test_the_new_reads_are_on_the_meta_face_only():
-    """V36: the meta face is the four tools a domain analyst reaches, and
-    read_book is not one of them — the book's figures come through `run`, typed
-    and on the ledger. What still has to hold is the side it is built for."""
-    research = set(faces.resolve(build_research_registry(), faces.FACE_RESEARCH))
-    for name in _A_TOOLS:
-        assert name in build_meta_registry().tools, (
-            f"{name} must be buildable for the side that answers about the book")
-        assert name not in faces.FACE_META_AGENT, f"{name} is reached by nobody since V36"
-        assert name not in research, (
-            f"{name} is on the research face; a brief-writing agent reading the holder's "
-            "attribution is writing about the wrong company")
-
-
 # ── absence 1: no size argument ───────────────────────────────────────────────
 
 @pytest.mark.parametrize("forbidden", ["top_k", "limit", "n", "max_rows", "head"])
@@ -45,9 +31,9 @@ def test_attribution_has_no_size_argument(forbidden):
     set is small and comes back whole; if it ever stops being small the answer is
     pagination with a stated total, not a cut whose size the model chooses."""
     reg = build_meta_registry()
-    props = reg.tools["read_book"].json_schema["properties"]
+    props = reg.tools["book_read"].json_schema["properties"]      # V1: the verb that reads a book's tables
     assert forbidden not in props
-    assert set(props) == {"ref", "names"}
+    assert set(props) == {"book", "table", "column", "row", "which", "why"}
 
 
 # ── absence 2: no judgement ───────────────────────────────────────────────────

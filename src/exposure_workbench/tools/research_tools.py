@@ -160,35 +160,9 @@ SUBMIT_BRIEF_SCHEMA = {
 }
 
 
-def register_search_tool(reg: ToolRegistry) -> ToolRegistry:
-    """The one registration of the web search — called by both registry builders
-    (V19), so the meta face and the research face carry the same tool with the
-    same budget key and the same evidence declaration."""
-    reg.register(Tool(
-        name="search_web",
-        display="Searching the web for “{query}”",
-        description=(
-            "Search the web about an issuer for what the filings cannot hold: news, guidance, "
-            "an event after the last report — and anything the user asks you to look up. Each "
-            "result is a src_ id on the table; a sentence resting on one names it in cites."
-        ),
-        json_schema={"type": "object", "properties": {
-            "ticker": {"type": "string"},
-            "query": {"type": "string", "description":
-                      "what to look for; the issuer's name is added by the tool, so do not repeat it"},
-            "reason": {"type": "string", "description": "why this search is needed now"},
-            "days": {"type": ["integer", "null"], "minimum": 1, "maximum": 365, "description":
-                     "restrict to news published within this many days (the past week is 7); "
-                     "omit for no time restriction"},
-        }, "required": ["ticker", "query", "reason"], "additionalProperties": False},
-        fn=_search_external_research, tool_class=DELEGATION, budget_key="external_search",
-        # Its sources are the answer's evidence: src_ ids go on the table.,
-    ))
-    return reg
-
-
 def register_research_tools(reg: ToolRegistry) -> ToolRegistry:
-    register_search_tool(reg)
+    # V1: the web search is the primitive `web_search` (tools/primitives), which wraps
+    # `_search_external_research` above; what is registered here is the brief's gate.
     reg.register(Tool(
         name="submit_brief",
         display="Resolving every figure in the brief against the table, then filing it",

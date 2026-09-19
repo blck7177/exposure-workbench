@@ -84,25 +84,6 @@ def test_a_component_says_which_call_produces_the_total():
         assert "total_debt" in s.for_a_total_call, name
 
 
-def test_every_worked_example_calls_tools_that_exist_on_the_face():
-    """A face is a promise about what an agent can do; an example naming a tool
-    the face does not carry is an instruction to fail."""
-    # V30: the examples are not delivered to the model any more (V16 took them
-    # out of the prompt); a name must still be a real tool. V36 narrowed the
-    # meta face to what a domain analyst reaches, so the promise an example can
-    # still break is naming something no registry builds.
-    from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
-
-    real = set(build_meta_registry().tools) | set(build_research_registry().tools)
-    for group, examples in sm.WORKED_EXAMPLES.items():
-        assert examples, group
-        for ex in examples:
-            assert ex.why and ex.question, group
-            for call in ex.calls:
-                tool = call.split("(")[0]
-                assert tool in real, f"{group}: {tool} is not a tool this desk has"
-
-
 def test_no_worked_example_carries_a_figure_or_a_threshold():
     for group, examples in sm.WORKED_EXAMPLES.items():
         for ex in examples:

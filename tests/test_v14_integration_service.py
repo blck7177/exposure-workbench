@@ -78,25 +78,6 @@ def test_an_entry_without_a_number_contributes_nothing():
     assert kept == [{"label": "y", "value": 2.0}]
 
 
-def test_the_tool_is_on_the_meta_face_and_not_the_research_face():
-    """It answers a question about THIS DESK's book, which is the whole of the
-    reason the meta-only block exists."""
-    from exposure_workbench.analytics import skill
-    from exposure_workbench.tools.definitions import ISSUER_KINDS
-    assert skill.METHODS["book.analysis"].subject_kind == "run"
-    assert "run" not in ISSUER_KINDS
-
-
-def test_the_meta_face_resolves_with_the_new_tool_on_it():
-    """A face naming a tool its registry does not have is a build error, not a
-    smaller face — the bug that shipped silently for two phases. Both faces are
-    resolved because both are built from the same read registry: the narrowing
-    is the face's job, and a tool added to the wrong list would still resolve
-    while answering the wrong agent (which the test above holds)."""
-    assert "run" in faces.resolve(build_meta_registry(), faces.FACE_META_AGENT)
-    assert "read_book" not in faces.resolve(build_research_registry(), faces.FACE_RESEARCH)
-
-
 def test_there_is_no_top_k():
     """A ranking that names the three worst scenarios leaves a reader unable to
     tell whether the fourth was 0.1% or 7%. The whole-set rule is why the answer

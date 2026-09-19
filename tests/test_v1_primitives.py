@@ -256,11 +256,11 @@ async def test_a_filters_level_is_written_as_the_desk_shows_a_figure(monkeypatch
     monkeypatch.setattr(P.tc, "_resolve", _resolve)
     monkeypatch.setattr(P.tc, "constant", _constant)
 
-    out = await P._calc(None, "filter", list(weights), cmp=">", level="8%")        # 8% is 0.08: nobody converts
+    out = await P._calc(None, "filter", list(weights), cmp=">", level="8%", why=WHY)        # 8% is 0.08: nobody converts
     assert out["kept"] == ["f_a", "f_b"] and out["value"] == 2.0 and out["of"] == 3
-    none = await P._calc(None, "filter", list(weights), cmp=">", level="20%")
+    none = await P._calc(None, "filter", list(weights), cmp=">", level="20%", why=WHY)
     assert none["error"] == "no_entry_satisfies" and "0.07 to 0.16" in none["detail"]
-    bad = await P._calc(None, "filter", list(weights), cmp=">", level="a lot")
+    bad = await P._calc(None, "filter", list(weights), cmp=">", level="a lot", why=WHY)
     assert bad["error"] == "invalid_params"
 
 
@@ -270,7 +270,7 @@ async def test_top_is_a_ranking_cut_at_n(monkeypatch):
         return {"calc_id": "calc_r", "op": "rank", "ordering": [{"label": x, "value": v, "rank": i + 1}
                                                                  for i, (x, v) in enumerate((("A", 3), ("B", 2), ("C", 1)))]}
     monkeypatch.setattr(P.compute_service, "compute", _compute)
-    out = await P._calc(None, "top", ["f_a", "f_b", "f_c"], direction="highest", n=2)
+    out = await P._calc(None, "top", ["f_a", "f_b", "f_c"], direction="highest", n=2, why=WHY)
     assert [e["label"] for e in out["ordering"]] == ["A", "B"]
 
 
@@ -282,11 +282,11 @@ async def test_a_section_is_read_a_page_at_a_time(monkeypatch):
     async def _read_filings(db, ticker, query=None, item=None, k=5, form_type=None):
         return {"ticker": "MSFT", "item_code": "Item 7", "title": "MD&A", "text": text, "citation": {"form_type": "10-K"}}
     monkeypatch.setattr(P.D, "_read_filings", _read_filings)
-    first = await P._filings_section(None, "MSFT", "7")
+    first = await P._filings_section(None, "MSFT", "7", why=WHY)
     assert len(first["text"]) == F.PASSAGE_CHARS and first["next_offset"] == F.PASSAGE_CHARS
-    last = await P._filings_section(None, "MSFT", "7", offset=first["next_offset"])
+    last = await P._filings_section(None, "MSFT", "7", offset=first["next_offset"], why=WHY)
     assert len(last["text"]) == 500 and "next_offset" not in last
-    past = await P._filings_section(None, "MSFT", "7", offset=len(text))
+    past = await P._filings_section(None, "MSFT", "7", offset=len(text), why=WHY)
     assert past["error"] == "invalid_params"
 
 
@@ -299,10 +299,10 @@ async def test_a_scenario_is_one_trade_list_and_names_the_book_it_made(monkeypat
         return {"calc_id": "calc_after", "as_of": "2026-09-10"}
     monkeypatch.setattr(P, "_resolve_book", _resolve_book)
     monkeypatch.setattr(P.compute_service, "compute", _compute)
-    both = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}], buys=[{"ticker": "TLT", "weight": 0.05}])
-    neither = await P._scenario(None, "port_001")
+    both = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}], buys=[{"ticker": "TLT", "weight": 0.05}], why=WHY)
+    neither = await P._scenario(None, "port_001", why=WHY)
     assert both["error"] == neither["error"] == "invalid_params"
-    made = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}])
+    made = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}], why=WHY)
     assert made["made"] == "calc_after"
 
 

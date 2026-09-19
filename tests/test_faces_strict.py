@@ -17,18 +17,18 @@ from __future__ import annotations
 import pytest
 
 from exposure_workbench.tools import faces
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.registries import build_analyst_registry
 from exposure_workbench.tools.registry import ToolRegistry
 
 
 def test_resolve_returns_the_face_in_declared_order():
-    registry = build_read_registry()
-    assert faces.resolve(registry, faces.READ_CORE) == faces.READ_CORE
+    registry = build_analyst_registry("issuer")
+    assert faces.resolve(registry, faces.FACE_ISSUER) == faces.FACE_ISSUER
 
 
 def test_resolve_raises_and_names_every_missing_tool():
-    registry = build_read_registry()
-    face = faces.READ_CORE + ["no_such_tool", "another_missing_one"]
+    registry = build_analyst_registry("issuer")
+    face = faces.FACE_ISSUER + ["no_such_tool", "another_missing_one"]
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
         faces.resolve(registry, face)

@@ -353,18 +353,28 @@ def test_no_face_declares_a_tool_its_registry_does_not_register(monkeypatch):
     assert drift == {}, f"a shipped face no longer resolves: {drift}"
 
 
-def test_the_shipped_mounts_are_the_two_agent_faces(monkeypatch):
+def test_the_shipped_mounts_are_exactly_the_desks_doors(monkeypatch):
     """N9 is a claim about how many doors there are, and it is only true while
-    the mount table says so. A third mount, or one face served at two paths,
-    would make 'the face is physical' a sentence rather than a fact."""
+    the mount table says so. A door nobody listed, or one face served at two
+    paths, would make 'the face is physical' a sentence rather than a fact.
+
+    V1: five doors. One per analyst — a face is a resource family, and a family's
+    verbs exist on its own mount and nowhere else — the research run's, and the
+    debug door a person opens (named "meta"; the lead analyst holds no face)."""
+    from apps.mcp import http
     from exposure_workbench.tools import faces
 
-    mounts = {name: face for _site, name, _registry, face in _pairings(monkeypatch)
-              if name in (faces.FACE_NAME_META, faces.FACE_NAME_RESEARCH)}
-    assert mounts == {
+    _pairings(monkeypatch)                                    # imports http under a signing key
+    assert {name: face for name, (_registry, face) in http.MOUNTS.items()} == {
         faces.FACE_NAME_META: faces.FACE_META_AGENT,
         faces.FACE_NAME_RESEARCH: faces.FACE_RESEARCH,
+        faces.FACE_NAME_ISSUER: faces.FACE_ISSUER,
+        faces.FACE_NAME_MARKET: faces.FACE_MARKET,
+        faces.FACE_NAME_RISK: faces.FACE_RISK,
     }
+    # an analyst's registry IS its face: nothing registered that the mount does not serve
+    for name, face in faces.ANALYST_FACES.items():
+        assert list(http.MOUNTS[name][0].tools) == face
 
 
 def test_no_agent_reaches_a_tool_except_through_the_transport():

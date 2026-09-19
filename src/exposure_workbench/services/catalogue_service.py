@@ -1,271 +1,59 @@
-"""describe(subject) — the one catalogue: what the desk holds, what it means,
-what is missing, and which methods and procedures apply (V23).
+"""What the desk holds about an issuer, as names, dates and coverage (V23, cut down for V1).
 
-WHY ONE. Until V23 the model saw "what is here" through three tools in three
-formats: describe_issuer (14.9k characters for MSFT), describe_run (7.7k),
-get_portfolio_snapshot (11.5k) — 34k to look at the desk, and the tool
-descriptions carried a further 31k of "use this for". The catalogue is the
-boss's first requirement: get it right, then the agent decides what to look
-at. So a subject — a ticker, a portfolio, a run, a scenario row, or nothing
-(the desk) — is described ONCE, across every domain that holds something
-about it, in one format.
+Until V1 this module was `describe(subject)` — one catalogue for the model, across
+every kind of subject, with each entry's call spelled in the desk's program
+language and the fourteen domains, the desk rules and the readings rendered
+beside it. V1 retired that tool with the language it taught: an analyst sees
+what is there with the `list` verb (tools/primitives), and what the desk knows is
+the handbook's (analytics/handbook).
 
-THREE KINDS OF ABSENCE, as data (IMPLEMENTATION_PLAN_V23 §2.1):
-  not_reported   the issuer did not file it        (absence rows, unchanged)
-  not_held       the desk holds no such figure     NOT_HELD below, derived
-                 (segment revenue lives in prose)  against the concept map
-  cannot         the desk has no method for it     derived from the registry's
-                                                   subject kinds and withheld.py
-The second and third were invisible before V23 and are why the model
-substituted a true figure for the one asked (C04, C13 of the conversation
-battery): the honest sentence had nothing to point at.
-
-LAYERS. The default answer is existence, counts, ranges, absences and the
-NAMES of applicable methods and procedures; `expand` opens one domain's
-detail. The default layer's ceiling is DEFAULT_CEILING characters, pinned by
-a live test on every subject kind.
+What remains is what two readers still need, and neither is a model:
+  * the BRIEFING (services/briefing) — an issuer's identity, how far its filed
+    lines reach and which measures its filings cannot feed, its filings and
+    indexed Items, its price history's span, and the books that hold it;
+  * the POSITION measure (services/position_service) — a name's place in the
+    latest completed run of each book that holds it.
+No figure leaves here as a figure: counts and dates describe coverage.
 """
 
 from __future__ import annotations
-
-import json
-from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import formulas as fm
-from exposure_workbench.analytics import resources, skill
 from exposure_workbench.analytics import withheld as wh
 from exposure_workbench.db.models import (
-    CalcLedger, Company, ExposureRun, Filing, FilingChunk, FilingSection, IssuerBrief,
-    IssuerExposure, LimitCheck, MarketPrice, RiskAlert,
+    Company, ExposureRun, Filing, FilingChunk, FilingSection, IssuerExposure, LimitCheck, MarketPrice, RiskAlert,
 )
 from exposure_workbench.services import calc_service as cs
-from exposure_workbench.services import company_service, portfolio_service, run_reads_service
-from exposure_workbench.services import name_table as nt
-from exposure_workbench.services import quantities as qn
-from exposure_workbench.services.typed_calculator import SCENARIO_OP
-
-# V27: every listed entry carries is/does/call, so a subject level is larger
-# than the bare-name catalogue was (MSFT 10.4k → 21.3k chars, 6.1k tokens);
-# the ceiling is pinned per level by test_v27_directory's live test.
-DEFAULT_CEILING = 24_000
-# V27: a view of the subject, or ONE of the analyst's domains opened as a node.
-VIEWS = nt.VIEWS
-EXPANDS = VIEWS + tuple(skill.PROCEDURES)
-
-# What the desk does NOT hold as figures, with where the same fact lives.
-# Derived, not asserted: test_v23_catalogue checks each kind against the
-# concept map (no mapped concept carries a dimension) so this list cannot
-# claim a gap the ingest has since closed.
-NOT_HELD: dict[str, str] = {
-    "segment_revenue": "not held as figures (companyfacts carries no dimensions); stated in the "
-                       "10-K's segment note and Item 7 — read_filings",
-    "product_revenue": "not held as figures; stated in Item 7 and the product table — read_filings",
-    "geographic_revenue": "not held as figures; stated in the segment note — read_filings",
-    "customer_concentration": "not held as figures; stated in Item 1 / the concentration note — read_filings",
-    "backlog": "not held as figures; stated in Item 7 where the issuer discloses it — read_filings",
-}
-
-# What no method on this desk produces. Derived at import from the registry:
-# a capability is "cannot" when no method's subject kind and yields cover it.
-# The sentences are data; the test pins that each names a real gap.
-CANNOT: dict[str, str] = {
-    "forecast": "the desk does not forecast: asked for next year's figure or a target it says so and gives "
-                "what the issuer's own filings say would move the figure either way (read_filings)",
-    "per_name_factor_sensitivity": "the factor regression is over the BOOK's return; a holding's "
-                                   "sensitivity to a factor is price.beta with that factor's ETF as "
-                                   "benchmark (TLT for rates, HYG for credit), one call per name",
-    "scenario_refit": "a scenario (book.sell / book.buy) re-runs the limit checks and does not "
-                      "re-fit betas, volatility or P&L: stated unmeasured",
-}
+from exposure_workbench.services import company_service
 
 
 def _err(code: str, detail: str, **more) -> dict:
     return {"error": code, "detail": detail, **more}
 
 
-# V30: the program expression that reads a run's figure or column, rendered
-# where the catalogue used to print a read_book call.
-def _run_expr(expr: dict) -> str:
-    return "run: " + json.dumps(expr, separators=(", ", ": "), ensure_ascii=False)
-
-
-def _column_call(ref: str, table: str, col: str) -> str:
-    return _run_expr({"fn": "column", "run": ref, "table": table, "col": col})
-
-
-def _name_call(ref: str, name: str) -> str:
-    """`issuer_exposures.<label>.weight` → a column; `count.alerts` → a pick."""
-    parts = name.split(".")
-    if len(parts) == 3:
-        return _column_call(ref, parts[0], parts[2])
-    return _run_expr({"fn": "pick", "of": ref, "key": name})
-
-
-# What a model writes when it means "no subject": the schema says null, and
-# the first live V23 turn wrote the string "null" (and "port_" for a portfolio
-# it had not looked up). The desk is the desk under any of these spellings.
-# The schema's own placeholders, typed literally, mean the desk too: the model
-# wrote describe("port_") on the first call of two live V24 turns.
-_DESK_ALIASES = ("", "null", "none", "desk", "book", "portfolio", "portfolios",
-                 "port_", "run_", "calc_", "port_…", "run_…", "port_...", "run_...")
-
-
-def kind_of(subject: str | None) -> str:
-    if subject is None or subject.strip().lower() in _DESK_ALIASES:
-        return "desk"
-    if subject.startswith("run_"):
-        return "run"
-    if subject.startswith("calc_"):
-        return "scenario"
-    if subject.startswith("port_"):
-        return "portfolio"
-    return "issuer"
-
-
-async def describe(db: AsyncSession, subject: str | None = None, expand: str | None = None) -> dict:
-    if expand is not None and expand not in EXPANDS:
-        return _err("unknown_expand", f"expand must be one of {', '.join(EXPANDS)}")
-    kind = kind_of(subject)
-    # V27: the root has nothing to expand. 114 of 308 describe calls in the
-    # 2026-09-07 battery were describe(subject=None, expand='book'), answered
-    # with the bare root; the model then read runs by guessed names, believing
-    # it had already opened "the book". The refusal teaches the two-step
-    # address; it never picks a subject for the model.
-    if kind == "desk" and expand is not None:
-        # the ids ride on the refusal: asked for a book domain with no id, the
-        # model guessed "port_1" (V30 C2, N12) — the desk knows its own books
-        desk = await _desk(db)
-        return _err("expand_needs_a_subject",
-                    f"the desk itself has no '{expand}' to expand: expand opens one view or domain OF A SUBJECT",
-                    portfolios=[p["portfolio_id"] for p in desk["portfolios"]], issuers_prepared=desk["issuers_prepared"],
-                    next=["describe('<port_…>')", "describe('<ticker>')", f"describe('<subject>', expand='{expand}')"])
-    if expand in skill.PROCEDURES:
-        want = skill.PROCEDURES[expand].subject_kind
-        fits = (kind == "issuer") if want == "issuer" else (kind in ("portfolio", "run", "scenario"))
-        if not fits:
-            right = [p.name for p in skill.procedures_for("issuer" if kind == "issuer" else "portfolio")]
-            return _err("domain_not_for_subject",
-                        f"{expand} is a domain of an {want}, and {subject} is a {kind}; its domains are listed",
-                        domains=right)
-        # a domain OF a subject the desk has: describe('port_1', expand=…) opened a
-        # view on a book that does not exist (V30 C2, N12); the subject's own
-        # refusal (unknown_portfolio with the ids, not_prepared, company_not_found)
-        if kind == "portfolio" and await portfolio_service.get_portfolio(db, subject) is None:
-            return await _portfolio(db, subject, None)
-        if kind == "issuer" and (await db.execute(select(Company).where(Company.ticker == subject.upper()))).scalar_one_or_none() is None:
-            return await _issuer(db, subject, None)
-        out = await _domain(db, kind, subject, expand)
-    elif kind == "desk":
-        out = await _desk(db)
-    elif kind == "issuer":
-        out = await _issuer(db, subject, expand)
-    elif kind == "portfolio":
-        out = await _portfolio(db, subject, expand)
-    elif kind == "run":
-        out = await _run(db, subject, expand)
-    else:
-        out = await _scenario(db, subject, expand)
-    if out.get("error"):
-        return out
-    # V24: the catalogue's own date. Its counts and latest values are facts and
-    # a fact says as of when; a map of the desk is as of the moment it is drawn.
-    out["catalogue_as_of"] = date.today().isoformat()
-    out["how_to_read"] = _HOW_TO_READ
-    out["withheld"] = wh.withheld_note()
-    return out
-
-
-_HOW_TO_READ = (
-    "Every listed name carries `is` (what it is) and `call` (how to read or compute it); a domain "
-    "carries `open`. `methods` are what compute produces for this subject. `procedures` are the "
-    "analyst's domains for this kind of subject, each with its question, the words it is asked in, its "
-    "methods and what it reads — open one with expand=<domain>. `methods_that_refuse_here` are that "
-    "domain's methods this subject's own filings cannot feed, with why: do not spend a call on them. "
-    "`desk_rules` are this desk's own "
-    "conventions; `not_held` and `cannot` are figures this desk does not have and why — say so, do not "
-    "substitute. `next` lists the calls that open the next level."
-)
-
-
-# ── the desk ─────────────────────────────────────────────────────────────────
-
-async def _desk(db: AsyncSession) -> dict:
-    """The desk: which portfolios, their latest run and its alerts — a map to
-    describe(port_…) and describe(run_…), not the run's payload (the old
-    snapshot carried the whole run state, 11.5k characters, before any
-    question had been asked)."""
-    snaps = await portfolio_service.snapshot_all(db)
-    # V27: each portfolio with one line and `open`; nothing of the run's own
-    # (its figure names are the run's, listed by describe(run_…)).
-    portfolios = [{
-        "portfolio_id": sn["portfolio_id"], "name": sn["name"], "is_own": sn.get("is_own"),
-        "latest_completed_run": sn.get("run_id"), "as_of": sn.get("as_of_date"),
-        "positions": len(sn.get("top_issuers") or []) if sn.get("run_id") else None,
-        "alerts": len(sn.get("alerts") or []),
-        "open": f"describe('{sn['portfolio_id']}')",
-    } for sn in snaps]
-    companies = await company_service.list_companies(db, investigable_only=True)
-    # V33: `start` registers an issuer as investigable at once and its facts and
-    # chunks arrive minutes later; the B round saw MRK/BAC/GS listed as prepared
-    # in another session's catalogue and asked about. Prepared means the
-    # readiness workflow's own test passes; the rest are preparing.
-    ready = await company_service.ready_company_ids(db, [c.id for c in companies])
-    return {
-        "subject": None, "kind": "desk",
-        "portfolios": portfolios,
-        "issuers_prepared": sorted(c.ticker for c in companies if c.id in ready),
-        "issuers_preparing": sorted(c.ticker for c in companies if c.id not in ready),
-        "domains": ["fundamentals (filed figures)", "filings (text)", "prices", "book (runs, positions, limits)",
-                    "web (search_web)"],
-        "issuer_open": "describe('<ticker>')",
-        "procedures": _procedures("issuer", False) + _procedures("portfolio", False),
-        "desk_rules": _rules("all"),
-        "not_held": NOT_HELD,
-        "cannot": CANNOT,
-        "next": [f"describe('{sn['portfolio_id']}')" for sn in snaps] + ["describe('<ticker>')"],
-    }
-
-
-# ── an issuer ────────────────────────────────────────────────────────────────
-
-async def _issuer(db: AsyncSession, ticker: str, expand: str | None) -> dict:
+async def issuer(db: AsyncSession, ticker: str) -> dict:
+    """One issuer: who it is, and what the desk holds about it — coverage, never a figure."""
     from exposure_workbench.services import security_master_service
     tk = ticker.upper()
     company = (await db.execute(select(Company).where(Company.ticker == tk))).scalar_one_or_none()
     if company is None:
         if await security_master_service.is_in_universe(db, tk):
-            return _err("not_prepared", f"{tk} is a listed security this desk has not prepared: it holds "
-                                        f"no filings or facts for it. start(kind='readiness') puts it "
-                                        f"on the desk; the work runs in the background", ticker=tk)
+            return _err("not_prepared", f"{tk} is a listed security this desk has not prepared: it holds no "
+                                        f"filings or facts for it", ticker=tk)
         return _err("company_not_found", f"{tk} is not a company this desk knows", ticker=tk)
     prepared = company.id in await company_service.ready_company_ids(db, [company.id])
-    out: dict = {
+    return {
         "subject": tk, "kind": "issuer",
         "identity": {"ticker": tk, "name": company.name, "cik": company.cik, "sector": company.sector,
-                     "industry": company.industry, "investigable": company.is_investigable,
-                     "prepared": prepared},
+                     "industry": company.industry, "investigable": company.is_investigable, "prepared": prepared},
+        "fundamentals": await _fundamentals(db, tk, company, False),
+        "filings": await _filings(db, company.id, False),
+        "prices": await _prices(db, tk),
+        "book": await in_book(db, tk),
     }
-    out["fundamentals"] = await _fundamentals(db, tk, company, expand == "fundamentals")
-    out["filings"] = await _filings(db, company.id, expand == "filings")
-    out["prices"] = await _prices(db, tk)
-    out["book"] = await _in_book(db, tk)
-    out["desk"] = await _desk_about(db, company.id, tk)
-    out["not_held"] = NOT_HELD
-    out["cannot"] = {k: v for k, v in CANNOT.items() if k == "per_name_factor_sensitivity"}
-    out["methods"] = _methods("issuer", expand == "methods", tk) | _methods("price", expand == "methods", tk)
-    # the domains know what this issuer's filings cannot feed, because the
-    # fundamentals view has already worked it out for this very payload
-    out["procedures"] = _procedures("issuer", expand == "procedures", tk,
-                                    refuses=out["fundamentals"].get("methods_not_computable") or {})
-    out["desk_rules"] = _rules("issuer")
-    if expand == "readings":
-        out["readings"] = _readings()
-    out["next"] = [f"describe('{tk}', expand='<domain>')", _run_expr({"fn": "fundamentals", "ticker": tk, "metric": "<line>"}),
-                   f"read_filings('{tk}', item='1A')", _run_expr({"fn": "prices", "ticker": tk, "window": "1y"})]
-    return out
 
 
 async def _computability(db: AsyncSession, tk: str, have: set[str]) -> tuple[list, dict]:
@@ -290,13 +78,6 @@ async def _computability(db: AsyncSession, tk: str, have: set[str]) -> tuple[lis
         else:
             computable.append(name)
     return computable, not_computable
-
-
-async def _refuses_for(db: AsyncSession, tk: str) -> dict[str, str]:
-    """The refusal reasons alone, for a caller that holds no metric list."""
-    metrics = await cs.list_available_metrics(db, tk)
-    have = {m["metric"] for m in metrics["metrics"]}
-    return (await _computability(db, tk, have))[1]
 
 
 async def _fundamentals(db: AsyncSession, tk: str, company, full: bool) -> dict:
@@ -380,7 +161,6 @@ async def _filings(db: AsyncSession, company_id: str, full: bool) -> dict:
         "filings": {f: {"count": n, "latest": d.isoformat() if d else None} for f, n, d in forms},
         "items_indexed": sorted(i for i, _ in items),
         "passages": passages,
-        "read_with": "read_filings(ticker, query=…) for passages; read_filings(ticker, item='1A') for a section",
     }
     if full:
         # V28 C2: a count of indexed sections is a figure the desk holds about
@@ -397,11 +177,10 @@ async def _prices(db: AsyncSession, tk: str) -> dict:
     lo, hi, n = row
     if not n:
         return {"sessions": 0, "note": "no price history on this desk"}
-    return {"sessions": n, "from": lo.isoformat(), "to": hi.isoformat(),
-            "read_with": "run: {\"fn\": \"prices\", \"ticker\": \"" + tk + "\", \"window\": \"1y\"}"}
+    return {"sessions": n, "from": lo.isoformat(), "to": hi.isoformat()}
 
 
-async def _in_book(db: AsyncSession, tk: str) -> dict | None:
+async def in_book(db: AsyncSession, tk: str) -> dict | None:
     """The name's place in the latest completed run of each portfolio holding it."""
     runs = (await db.execute(
         select(ExposureRun).where(ExposureRun.status == "completed")
@@ -436,266 +215,5 @@ async def _in_book(db: AsyncSession, tk: str) -> dict | None:
             "names": names,
             "checks": [{"name": f"limit_checks.{c.limit_type}.current_value", "status": c.status} for c in checks],
             "alerts": [a.severity for a in wh.published_alerts(alerts)],
-            "methods_on_this_run": [m.name for m in skill.methods_for("run")],
-            "procedures": [p.name for p in skill.procedures_for("portfolio")],
-            "everything_else": f"describe('{run.id}')",
-            "read_with": _run_expr({"fn": "pick", "of": run.id, "key": "<one of names>"}),
         })
     return {"held_in": out} if out else {"held_in": [], "note": "not a position of any run on this desk"}
-
-
-async def _desk_about(db: AsyncSession, company_id: str, tk: str) -> dict:
-    brief = (await db.execute(
-        select(IssuerBrief.id, IssuerBrief.created_at).where(IssuerBrief.company_id == company_id)
-        .order_by(IssuerBrief.created_at.desc()).limit(1))).first()
-    return {"brief": ({"id": brief[0], "created_at": brief[1].isoformat()} if brief else None),
-            "read_with": f"read_book('{tk}', names=['brief'])" if brief else "start(kind='research') produces one"}
-
-
-# ── a portfolio ──────────────────────────────────────────────────────────────
-
-async def _portfolio(db: AsyncSession, pid: str, expand: str | None) -> dict:
-    p = await portfolio_service.get_portfolio(db, pid)
-    if p is None:
-        # A teaching refusal (V16): the ids that DO exist ride on it, so a guessed
-        # id ("port_MSFT", live round 2) costs one call, not two.
-        snaps = await portfolio_service.snapshot_all(db)
-        return _err("unknown_portfolio", f"no portfolio {pid}; the desk's portfolios are listed below — "
-                                         f"describe() with no subject shows them with their latest runs",
-                    portfolio_id=pid, portfolios=[{"portfolio_id": s["portfolio_id"], "name": s["name"]} for s in snaps])
-    positions = await portfolio_service.positions_with_weights(db, pid)
-    limits = await run_reads_service.list_risk_limits(db, pid)
-    fresh = await run_reads_service.get_run_freshness(db, pid)
-    runs = (await db.execute(
-        select(ExposureRun.id, ExposureRun.as_of_date, ExposureRun.status).where(ExposureRun.portfolio_id == pid)
-        .order_by(ExposureRun.as_of_date.desc()).limit(5))).all()
-    out: dict = {
-        "subject": pid, "kind": "portfolio",
-        "identity": {"name": p.name, "portfolio_id": pid},
-        "positions": {"count": len((positions or {}).get("positions", [])),
-                      "read_with": nt.call(nt.TABLE["positions"], ref=pid)},
-        "limits": {"count": len(limits.get("limits", [])) if isinstance(limits, dict) else None,
-                   "read_with": nt.call(nt.TABLE["limits"], ref=pid)},
-        "runs": [{"run_id": r[0], "as_of": r[1].isoformat(), "status": r[2], "open": f"describe('{r[0]}')"}
-                 for r in runs],
-        "freshness": fresh,
-        # The run methods are rendered on the latest completed run — a fact of
-        # this portfolio listed beside them, not a choice made for the model.
-        "methods": _methods("portfolio", expand == "methods", pid)
-                   | _methods("run", expand == "methods", fresh.get("latest_completed_run") if isinstance(fresh, dict) else None),
-        "procedures": _procedures("portfolio", expand == "procedures", pid),
-        "desk_rules": _rules("book"),
-        "cannot": CANNOT,
-        "next": ([f"describe('{fresh['latest_completed_run']}')"] if isinstance(fresh, dict) and fresh.get("latest_completed_run") else [])
-                + [f"describe('{pid}', expand='<domain>')", nt.call(nt.TABLE["positions"], ref=pid)],
-    }
-    if expand == "book" and positions:
-        out["positions"]["detail"] = positions
-    return out
-
-
-# ── a run, a scenario ────────────────────────────────────────────────────────
-
-async def _run(db: AsyncSession, run_id: str, expand: str | None) -> dict:
-    run = await run_reads_service.completed_run(db, run_id)       # V28 C1: the one door
-    if isinstance(run, dict):
-        return run
-    out = await _book_names(db, run_id, expand == "book")
-    return {"subject": run_id, "kind": "run", "portfolio_id": run.portfolio_id,
-            "as_of": run.as_of_date.isoformat(), **out,
-            "sections": {s: nt.call(nt.TABLE[s], ref=run_id) for s in nt.RUN_SECTIONS},
-            "methods": _methods("run", expand == "methods", run_id),
-            "procedures": _procedures("portfolio", expand == "procedures", run_id),
-            "desk_rules": _rules("book"),
-            "cannot": CANNOT,
-            "next": [_column_call(run_id, "issuer_exposures", "weight"), f"describe('{run_id}', expand='<domain>')",
-                     f"describe('{run.portfolio_id}')"]}
-
-
-async def _scenario(db: AsyncSession, cid: str, expand: str | None) -> dict:
-    row = (await db.execute(select(CalcLedger).where(CalcLedger.id == cid))).scalar_one_or_none()
-    if row is None:
-        return _err("unknown_row", f"no ledger row {cid}")
-    if row.operation != SCENARIO_OP:
-        return _err("not_a_book", f"{cid} is a {row.operation} row, not a scenario; its figures are on "
-                                  f"its own table under their names")
-    out = await _book_names(db, cid, expand == "book")
-    params = row.params or {}
-    return {"subject": cid, "kind": "scenario", "from_run": params.get("run_id"),
-            "as_of": params.get("as_of"), "trade": {k: params[k] for k in ("sales", "buys") if k in params},
-            **out,
-            "methods": {"run": [r for r in _methods("run", False, cid)["run"] if r["name"] in ("book.sell", "book.buy")]},
-            "cannot": CANNOT}
-
-
-async def _book_names(db: AsyncSession, ref: str, full: bool) -> dict:
-    """A run's (or scenario's) names by the question each group answers,
-    factored as pattern × labels — the compression describe_run proved."""
-    resolved = await qn.of_ref(db, ref)
-    names = [q.label for q in resolved.quantities if q.not_alone is None]
-    withheld = sorted({q.label for q in resolved.quantities if q.not_alone is not None})
-    groups, grouped = [], set()
-    for key, question, patterns in resources.RUN_GROUPS:
-        members = [n for n in names if n not in grouped and any(resources.matches(p, n) for p in patterns)]
-        if members:
-            grouped.update(members)
-            example = sorted(members)[0]
-            groups.append({"group": key, "answers": question,
-                           **(_factored(members) if not full else {"names": sorted(members)}),
-                           "call": _name_call(ref, example)})
-    rest = [n for n in names if n not in grouped]
-    return {"names": len(names), "groups": groups,
-            **({"other": _factored(rest)} if rest else {}),
-            **({"withheld_collinear": _factored(withheld)} if withheld else {}),
-            "units": {r.table: {c.name: c.unit for c in r.columns} for r in resources.RUN_CHILDREN},
-            "read_with": _column_call(ref, "<table>", "<col>") + " ; " + _run_expr({"fn": "pick", "of": ref, "key": "<name>"})}
-
-
-def _factored(names: list[str]) -> dict:
-    """Names as patterns over their row labels where that is shorter (from
-    definitions._factored, V15): the mandate group's 144 names are five
-    patterns over 27 labels."""
-    by_shape: dict[tuple[str, str], list[str]] = {}
-    plain: list[str] = []
-    for n in names:
-        parts = n.split(".")
-        if len(parts) == 3:
-            by_shape.setdefault((parts[0], parts[2]), []).append(parts[1])
-        elif len(parts) == 4 and parts[0] == "portfolio":
-            by_shape.setdefault((".".join(parts[:3]), ""), []).append(parts[3])
-        else:
-            plain.append(n)
-    by_labels: dict[tuple[str, ...], list[str]] = {}
-    for (head, tail), labels in by_shape.items():
-        if len(labels) <= 3:
-            plain.extend(f"{head}.{lb}.{tail}" if tail else f"{head}.{lb}" for lb in labels)
-            continue
-        by_labels.setdefault(tuple(sorted(labels)), []).append(
-            f"{head}.<label>.{tail}" if tail else f"{head}.<label>")
-    out: dict = {}
-    if plain:
-        out["names"] = sorted(plain)
-    if by_labels:
-        out["patterns"] = [{"patterns": pats, "labels": list(labels)} for labels, pats in by_labels.items()]
-    return out
-
-
-# ── the skill layer, listed ──────────────────────────────────────────────────
-
-def _methods(kind: str, full: bool, subject: str | None = None) -> dict:
-    """The subject's methods as rows the model can copy from: name, what it is,
-    one line, the call (V27). `subject` concrete at the subject level, a
-    placeholder above it. `full` (expand=methods) adds the card."""
-    ms = skill.methods_for(kind)
-    rows = [nt.row(nt.TABLE[m.name], subject=subject) for m in ms]
-    if full:
-        for r, m in zip(rows, ms):
-            r.update({"procedure": m.procedure, "authority": m.authority, "fails_when": m.fails_when,
-                      "params": list(m.params_schema.get("properties", {})), "yields": list(m.yields)})
-    return {kind: rows}
-
-
-async def _domain(db: AsyncSession, kind: str, subject: str, name: str) -> dict:
-    """One analyst domain opened as a node (V27): the card, and its leaves —
-    the methods it turns on and what it reads — each with the call that uses
-    it on THIS subject. The two ids a book domain's calls need, the portfolio
-    and its latest completed run, are looked up here as facts."""
-    p = skill.PROCEDURES[name]
-    ticker = pid = run_id = None
-    if kind == "issuer":
-        ticker = subject.upper()
-    elif kind == "portfolio":
-        pid = subject
-        fresh = await run_reads_service.get_run_freshness(db, pid)
-        run_id = fresh.get("latest_completed_run") if isinstance(fresh, dict) else None
-    elif kind == "run":
-        run = await run_reads_service.completed_run(db, subject)   # V28 C1: the one door
-        if isinstance(run, dict):
-            return run
-        run_id, pid = subject, run.portfolio_id
-    else:
-        run_id = subject          # a scenario row reads like a run
-    by_kind = {"issuer": ticker, "price": ticker, "run": run_id, "portfolio": pid}
-    # V31: the same per-subject refusals the level-1 domain entry carries. A
-    # domain listed for an issuer and the same domain OPENED for that issuer are
-    # one statement or they are a defect, so both read `_computability`.
-    refuses = await _refuses_for(db, ticker) if kind == "issuer" and ticker else {}
-    methods = []
-    for m in p.methods:
-        spec = skill.METHODS[m]
-        r = nt.row(nt.TABLE[m], subject=by_kind.get(spec.subject_kind))
-        r.update({"procedure": spec.procedure, "fails_when": spec.fails_when})
-        if m in refuses:
-            r["refuses_here"] = refuses[m]
-        methods.append(r)
-    groups = {key: (q, pats) for key, q, pats in resources.RUN_GROUPS}
-    reads = []
-    for r in p.reads:
-        if r in groups:
-            q, pats = groups[r]
-            names = [pt.replace("*", "<label>") for pt in pats]
-            reads.append({"name": r, "is": "run figures", "does": q, "names": names,
-                          "call": _name_call(run_id or "<run_…>", names[0])})
-        else:
-            e = nt.TABLE[r]
-            ref = pid if ("portfolio" in e.on and "run" not in e.on) else run_id
-            reads.append(nt.row(e, subject=ticker, ref=ref))
-    return {"subject": subject, "kind": kind, "domain": name, "question": p.question,
-            "asked_as": list(p.triggers), "evidence": list(p.evidence), "this_desk": list(p.desk),
-            "compare": list(p.compare), "close": list(p.close), "absent": p.absent, "authority": p.authority,
-            "methods": methods, "reads": reads,
-            "desk_rules": _rules("issuer" if kind == "issuer" else "book"),
-            "next": [f"describe('{subject}')"] + [x["call"] for x in methods + reads]}
-
-
-def _procedures(kind: str, full: bool, subject: str | None = None,
-                refuses: dict[str, str] | None = None) -> list:
-    """The analyst's domains that fit a kind of subject. Level 1 is the name,
-    the question and the words a user asks it in — enough to know which one
-    fits; level 2 (expand=procedures) is the whole domain in the analyst's
-    words. No tool is named at either level: the evidence is named as the
-    method cards name it, and the model chooses the call.
-
-    V31: a domain also says which of ITS OWN methods will refuse for THIS
-    subject. The knowledge existed and was in the wrong place — the reasons
-    are `fundamentals.methods_not_computable`, a second section of the same
-    payload, so a model reading a domain had to cross-reference to learn that
-    the domain it was about to work through does not apply. It did not: the
-    desk's own seven issuer domains run over JPM produce 50 figures and 32
-    refusals, 18 of them `not_applicable` — days sales outstanding, days
-    inventory and the cash conversion cycle asked of a bank
-    (`tests/battery/gold_brief.json`). Knowledge that has to be pulled is not
-    read (ROOT_CAUSES §1e); this one is pushed, in the place the choice is
-    made."""
-    ps = skill.procedures_for(kind)
-    refuses = refuses or {}
-
-    def base(p) -> dict:
-        blocked = {m: refuses[m] for m in p.methods if m in refuses}
-        return {"name": p.name, "is": "domain", "subject": p.subject_kind, "question": p.question,
-                "asked_as": list(p.triggers[:2]), "methods": list(p.methods), "reads": list(p.reads),
-                **({"methods_that_refuse_here": blocked} if blocked else {}),
-                "open": nt.call(nt.TABLE[p.name], subject=subject)}
-    if not full:
-        return [base(p) for p in ps]
-    return [{**base(p), "asked_as": list(p.triggers),
-             "evidence": list(p.evidence), "this_desk": list(p.desk),
-             "compare": list(p.compare), "close": list(p.close), "absent": p.absent, "authority": p.authority}
-            for p in ps]
-
-
-def _rules(scope: str) -> list:
-    """The desk's own conventions and policies that bear on a kind of subject —
-    what a textbook does not carry. Rendered at every level: they are short,
-    and a model that has not read them substitutes and estimates."""
-    return [{"rule": r.rule, "authority": r.authority} for r in skill.rules_for(scope)]
-
-
-def _readings() -> list:
-    return [{"method": r.method, "reads": r.reads,
-             "meaningless_when": r.meaningless_when, "authority": r.authority}
-            for r in skill.READINGS.values()]
-
-
-def size_of(payload: dict) -> int:
-    return len(json.dumps(payload, default=str))

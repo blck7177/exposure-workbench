@@ -112,7 +112,7 @@ def identity_tokens(rec: dict) -> set[str]:
     for k, v in (rec.get("params") or {}).items():
         if isinstance(v, bool) or k in ("node", "pull", "tool"):
             # `node` is the program's BINDING NAME — a variable, never a measure
-            # and never an identity (PROGRAM_LANGUAGE rule 1). V33D: the node
+            # and never an identity (it named a program's variable until V1). V33D: the node
             # `amzn_rel_1y_vs_spy` put "1" among this fact's identity tokens, and
             # the analyst's "1-year" resolved to it.
             continue

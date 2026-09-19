@@ -648,7 +648,7 @@ def _ordinal_claimed(sentence: str) -> int | None:
 
 def _place_fits(words: set[str], rec: dict, ordinal: int | None = None) -> bool:
     """Whether the figure holds the place the sentence claims. A vector's entries
-    carry their place the moment the desk builds them (program_service._facts_of),
+    carry their place the moment the desk builds them (an ordering's entries),
     so this is a lookup: `highest` is first, `lowest` is last, and an ordinal
     before the superlative names its own place from whichever end it counts."""
     p = rec.get("params") or {}

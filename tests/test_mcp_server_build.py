@@ -27,7 +27,7 @@ import pytest
 
 from exposure_workbench.auth.internal_token import InternalClaims
 from exposure_workbench.tools import faces, mcp_request
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.registries import build_analyst_registry
 from exposure_workbench.tools.registries import build_meta_registry
 
 
@@ -81,8 +81,8 @@ async def test_a_narrower_face_is_served_narrowly():
     """A face is what a mount serves. The other narrowing — a skip flag — is per
     request now and rides in the token; both end at the same view, and
     test_mcp_face_scope drives that one through the door."""
-    tools = await _list(_build(faces.READ_CORE))
-    assert [t.name for t in tools] == faces.READ_CORE
+    tools = await _list(_build(faces.FACE_ISSUER))
+    assert [t.name for t in tools] == faces.FACE_ISSUER
     assert "start_issuer_research" not in {t.name for t in tools}
 
 
@@ -114,7 +114,7 @@ async def test_a_face_the_registry_cannot_satisfy_never_builds():
     with pytest.raises(faces.FaceNotRegistered):
         from exposure_workbench.tools.mcp_server import build_mcp_server
 
-        build_mcp_server(build_read_registry(), faces.FACE_META_AGENT,
+        build_mcp_server(build_analyst_registry("issuer"), faces.FACE_META_AGENT,
                          db_factory=_never_called, face_name=faces.FACE_NAME_META)
 
 

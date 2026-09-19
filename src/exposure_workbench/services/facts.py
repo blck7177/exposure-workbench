@@ -359,7 +359,7 @@ def _dates(points) -> list[str]:
 
 def _ordinal(d: str) -> int | None:
     """A date as a day number, for a gap. `datetime` rather than a parse of our
-    own: the points are ISO by construction (program_service writes them)."""
+    own: the points are ISO by construction (the services write them)."""
     from datetime import date
     try:
         return date.fromisoformat(d[:10]).toordinal()

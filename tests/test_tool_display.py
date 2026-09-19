@@ -93,9 +93,9 @@ def test_every_phrase_renders_from_a_call_that_satisfies_its_schema(name):
 
 
 def test_a_real_call_reads_as_a_sentence():
-    tool = TOOLS["read_fundamentals"]
-    assert render(tool.display, {"ticker": "AAPL", "metric": "total_debt"},
-                  tool_name="read_fundamentals") == "Reading AAPL's filed figures"
+    tool = TOOLS["filings_read"]
+    assert render(tool.display, {"ticker": "AAPL", "line": "total_debt", "why": "line 2"},
+                  tool_name="filings_read") == "Reading AAPL's filed figures"
 
 
 @pytest.mark.parametrize("name", sorted(TOOLS))

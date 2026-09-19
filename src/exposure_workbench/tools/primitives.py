@@ -78,7 +78,7 @@ def _err(code: str, detail: str, **more) -> dict:
     return {"error": code, "detail": detail, **more}
 
 
-_WHY = {"type": "string", "minLength": 8,
+_WHY = {"type": "string",
         "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"}
 _TICKER = {"type": "string", "description": "a ticker, e.g. NVDA"}
 _BOOK = {"type": "string", "description": "a book: a port_… id (its latest completed run), a run_… id, or the calc_… id of a book a scenario built"}
@@ -98,9 +98,10 @@ LIST_WHAT: dict[str, tuple[str, ...]] = {
 }
 
 
-def _metric_lines(face: str) -> list[str]:
+def _metric_lines(names: list[str]) -> list[str]:
+    """The measures THIS registry's `metric` takes, each with what it is."""
     out = []
-    for m in desk.metrics_for(face):
+    for m in (desk.METHODS[n] for n in names):
         takes = ", ".join(f"{k}∈{[e for e in (v.get('enum') or []) if e is not None]}" if v.get("enum") else k
                           for k, v in (m.params_schema.get("properties") or {}).items())
         out.append(f"{m.name} — {m.reads_as}: {m.describes}" + (f" [params: {takes}]" if takes else ""))
@@ -187,10 +188,10 @@ async def _checks_lines(db: AsyncSession, subject: str | None) -> list[str] | di
             for l in (limits.get("limits") or [])]
 
 
-def _list_for(face: str):
-    async def _list(db: AsyncSession, what: str, subject: str | None = None, why: str = "") -> dict:
+def _list_for(metric_names: list[str]):
+    async def _list(db: AsyncSession, what: str, subject: str | None = None, *, why: str) -> dict:
         if what == "metrics":
-            got: list[str] | dict = _metric_lines(face)
+            got: list[str] | dict = _metric_lines(metric_names)
         elif what == "book":
             got = await _book_lines(db, subject)
         elif what == "checks":
@@ -207,13 +208,14 @@ def _list_for(face: str):
 
 async def _filings_read(db: AsyncSession, ticker: str, line: str | None = None, months: int | None = None,
                         start: str | None = None, end: str | None = None, at: str | None = None,
-                        last_n: int | None = None, why: str = "") -> dict:
-    return await D._read_fundamentals(db, ticker, metric=line, months=months, start=start, end=end,
-                                      last_n=last_n, at=at)
+                        last_n: int | None = None, *, why: str) -> dict:
+    # 12.0 is an integer to a JSON schema and a TypeError to a slice: coerced here
+    return await D._read_fundamentals(db, ticker, metric=line,
+                                      months=int(months) if months is not None else None, start=start, end=end,
+                                      last_n=int(last_n) if last_n is not None else None, at=at)
 
 
-async def _prices_read(db: AsyncSession, ticker: str, window: str | None = None, date: str | None = None,
-                       why: str = "") -> dict:
+async def _prices_read(db: AsyncSession, ticker: str, window: str | None = None, date: str | None = None, *, why: str) -> dict:
     return await D._read_prices(db, ticker, window=window, as_of=date)
 
 
@@ -253,7 +255,7 @@ BOOK_TABLES: tuple[str, ...] = tuple(r.table for r in resources.RUN_CHILDREN) + 
 
 
 async def _book_read(db: AsyncSession, book: str, table: str, column: str | None = None, row: str | None = None,
-                     which: str | None = None, why: str = "") -> dict:
+                     which: str | None = None, *, why: str) -> dict:
     resolved = await _resolve_book(db, book, which)
     if isinstance(resolved, dict):
         return resolved
@@ -283,7 +285,7 @@ async def _book_read(db: AsyncSession, book: str, table: str, column: str | None
 # ── a measure by name; one operation over figures ────────────────────────────
 
 def _metric_for(face: str):
-    async def _metric(db: AsyncSession, name: str, subject, params: dict | None = None, why: str = "") -> dict:
+    async def _metric(db: AsyncSession, name: str, subject, params: dict | None = None, *, why: str) -> dict:
         return await compute_service.compute(db, method=name, subject=subject, params=params)
     return _metric
 
@@ -332,7 +334,7 @@ async def _filter(db: AsyncSession, inputs: list[str], cmp: str | None, level) -
 
 async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = None, factor: float | None = None,
                 direction: str | None = None, n: int | None = None, cmp: str | None = None, level=None,
-                name: str | None = None, why: str = "") -> dict:
+                name: str | None = None, *, why: str) -> dict:
     if op == "filter":
         return await _filter(db, inputs, cmp, level)
     params = {k: v for k, v in (("by", by), ("factor", factor)) if v is not None}
@@ -348,7 +350,7 @@ async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = N
 # ── the text ─────────────────────────────────────────────────────────────────
 
 async def _filings_search(db: AsyncSession, ticker: str, query: str, item: str | None = None,
-                          form: str | None = None, filed_after: str | None = None, k: int = 5, why: str = "") -> dict:
+                          form: str | None = None, filed_after: str | None = None, k: int = 5, *, why: str) -> dict:
     company = await D._resolve_company(db, ticker)
     if company.get("error"):
         return company
@@ -368,8 +370,7 @@ async def _filings_search(db: AsyncSession, ticker: str, query: str, item: str |
                           "section_title": p.section_title, "citation": p.citation()} for p in passages]}
 
 
-async def _filings_section(db: AsyncSession, ticker: str, item: str, form: str | None = None, offset: int = 0,
-                           why: str = "") -> dict:
+async def _filings_section(db: AsyncSession, ticker: str, item: str, form: str | None = None, offset: int = 0, *, why: str) -> dict:
     out = await D._read_filings(db, ticker, item=item, form_type=form)
     if out.get("error") or not isinstance(out.get("text"), str):
         return out
@@ -381,14 +382,13 @@ async def _filings_section(db: AsyncSession, ticker: str, item: str, form: str |
     return {**out, "text": page, **({"next_offset": start + len(page)} if more else {})}
 
 
-async def _web_search(db: AsyncSession, ticker: str, query: str, days: int | None = None, why: str = "") -> dict:
+async def _web_search(db: AsyncSession, ticker: str, query: str, days: int | None = None, *, why: str) -> dict:
     return await _search_external_research(db, ticker, query, reason=why, days=days)
 
 
 # ── the two actions ──────────────────────────────────────────────────────────
 
-async def _scenario(db: AsyncSession, book: str, sales: list | None = None, buys: list | None = None,
-                    why: str = "") -> dict:
+async def _scenario(db: AsyncSession, book: str, sales: list | None = None, buys: list | None = None, *, why: str) -> dict:
     if (sales is None) == (buys is None):
         return _err("invalid_params", "a scenario is ONE trade list: give `sales` or `buys`; to do both, run the "
                                       "sale, then run the purchase on the book it made (its calc_… id)")
@@ -407,27 +407,32 @@ START_KINDS: dict[str, tuple[str, ...]] = {"issuer": ("readiness",), "market": (
 
 
 def _start_for(face: str):
-    async def _start(db: AsyncSession, kind: str, subject: str, as_of_date: str | None = None, why: str = "") -> dict:
+    async def _start(db: AsyncSession, kind: str, subject: str, as_of_date: str | None = None, *, why: str) -> dict:
         return await _start_work(db, kind, subject, reason=why, as_of_date=as_of_date)
     return _start
 
 
 # ── registration ─────────────────────────────────────────────────────────────
 
-def _tools(face: str) -> dict[str, Tool]:
-    metric_names = [m.name for m in desk.metrics_for(face)]
+def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[str, ...] | None = None,
+           what: tuple[str, ...] | None = None) -> dict[str, Tool]:
+    """Every verb, shaped for one face: `measures_of` are the faces whose measures
+    `metric` may name, `kinds` what `start` may start, `what` what `list` may list."""
+    metric_names = list(dict.fromkeys(m.name for f in (measures_of or (face,)) for m in desk.metrics_for(f)))
+    start_kinds = list(kinds or START_KINDS[face])
+    list_what = list(what or LIST_WHAT[face])
     t = {
         "list": Tool(
-            name="list", display="Looking at what the desk holds", rows=True, tool_class=READ, fn=_list_for(face),
+            name="list", display="Looking at what the desk holds", rows=True, tool_class=READ, fn=_list_for(metric_names),
             description="What the desk holds, as names and dates — never a figure. `metrics`: the measures you may ask for "
                         "by name, each with what it is and the params it takes. The others take a `subject` and list what "
                         "is there for it: filed lines and how far each is filed; filings and the Items indexed; the span of "
                         "prices; a book's holdings, runs, tables and rows (no subject: the desk's books); a book's checks.",
-            json_schema=_schema({"what": {"type": "string", "enum": list(LIST_WHAT[face])},
+            json_schema=_schema({"what": {"type": "string", "enum": list_what},
                                  "subject": {"type": ["string", "null"], "description": "a ticker, or a port_/run_/calc_ id"}},
                                 ["what"])),
         "filings_read": Tool(
-            name="filings_read", display="Reading {ticker}'s filed {line}", rows=True, tool_class=READ, fn=_filings_read,
+            name="filings_read", display="Reading {ticker}'s filed figures", rows=True, tool_class=READ, fn=_filings_read,
             description="One filed line of one issuer, as filed (a restatement supersedes what it restates). A flow is read "
                         "over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a "
                         "date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` "
@@ -439,7 +444,7 @@ def _tools(face: str) -> dict[str, Tool]:
                                  "start": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
                                  "end": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
                                  "at": {"type": ["string", "null"], "description": "YYYY-MM-DD, a reported period end"},
-                                 "last_n": {"type": ["integer", "null"], "minimum": 2, "maximum": 40}}, ["ticker"])),
+                                 "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40}}, ["ticker"])),
         "prices_read": Tool(
             name="prices_read", display="Reading {ticker}'s prices", rows=True, tool_class=READ, fn=_prices_read,
             description="A name's daily adjusted closes over a named window, as one series — or, with `date` (or neither), "
@@ -531,7 +536,7 @@ def _tools(face: str) -> dict[str, Tool]:
             description="Background preparation, returning an id at once and NEVER evidence: `readiness` puts a listed SEC "
                         "filer on the desk (filings, facts, prices — a couple of minutes); `exposure_run` runs a book as it "
                         "is. Once per subject is enough; say it is being prepared.",
-            json_schema=_schema({"kind": {"type": "string", "enum": list(START_KINDS[face])},
+            json_schema=_schema({"kind": {"type": "string", "enum": start_kinds},
                                  "subject": {"type": "string", "description": "a ticker (readiness) or a port_… id (exposure_run)"},
                                  "as_of_date": {"type": ["string", "null"], "description": "YYYY-MM-DD; exposure_run only"}},
                                 ["kind", "subject"])),
@@ -545,6 +550,36 @@ FACE_TOOLS: dict[str, tuple[str, ...]] = {
     "market": ("list", "prices_read", "metric", "calc", "start"),
     "risk": ("list", "book_read", "metric", "calc", "scenario", "start"),
 }
+
+
+# THE RESEARCH RUN (agents/research_session) writes an Issuer Risk Brief: an issuer
+# from its filings AND its price, so it holds the issuer analyst's verbs, the
+# price read, and both families' measures. It starts nothing: the workflow that
+# runs it has prepared the name already.
+RESEARCH_TOOLS: tuple[str, ...] = ("list", "filings_read", "prices_read", "metric", "calc",
+                                   "filings_search", "filings_section", "web_search")
+# THE DEBUG DOOR (apps/mcp/server, the mount named "meta"): every verb, for a
+# person at a terminal. No agent holds this face — the lead holds none at all.
+DESK_TOOLS: tuple[str, ...] = ("list", "filings_read", "prices_read", "book_read", "metric", "calc",
+                               "filings_search", "filings_section", "web_search", "scenario", "start")
+_EVERYTHING = tuple(dict.fromkeys(w for f in FACES for w in LIST_WHAT[f]))
+
+
+def _registry(names: tuple[str, ...], tools: dict[str, Tool]) -> ToolRegistry:
+    reg = ToolRegistry()
+    for name in names:
+        reg.register(tools[name])
+    return reg
+
+
+def build_research_verbs() -> ToolRegistry:
+    return _registry(RESEARCH_TOOLS, _tools("issuer", measures_of=("issuer", "market"),
+                                            what=("metrics", "fundamentals", "filings", "prices")))
+
+
+def build_desk_registry() -> ToolRegistry:
+    return _registry(DESK_TOOLS, _tools("risk", measures_of=FACES, what=_EVERYTHING,
+                                        kinds=tuple(dict.fromkeys(k for f in FACES for k in START_KINDS[f]))))
 
 
 def build_analyst_registry(face: str) -> ToolRegistry:

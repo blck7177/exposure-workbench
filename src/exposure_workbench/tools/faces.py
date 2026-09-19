@@ -20,45 +20,24 @@ smaller face.
 
 from __future__ import annotations
 
-# Read + reflection tools available to every agent surface (V23: the data
-# domains an issuer question needs, the one compute, and the pause).
-READ_CORE = [
-    "describe",
-    "read_fundamentals",
-    "read_filings",
-    "read_prices",
-    "compute",
-    "think",
-]
+# V1: EVERY FACE IS MADE OF THE SAME TWELVE VERBS (tools/primitives). Until V1 the
+# faces were cut out of one read registry — describe, read_fundamentals, compute,
+# run, … — and `run` took a program in a language of its own; that language and
+# the tools it replaced are retired, and the verbs below are what remains.
+#
+# The lead analyst holds NO face: it asks analysts (agents/delegation) and reads
+# the record, in-process. The mount named "meta" survives as the debug door a
+# person opens from a terminal (apps/mcp/server): every verb, no agent behind it.
+FACE_META_AGENT = ["list", "filings_read", "prices_read", "book_read", "metric", "calc",
+                   "filings_search", "filings_section", "web_search", "scenario", "start"]
 
-# The meta face adds the desk's own book (read_book), the web, delegation and
-# the exit. read_book is meta-only for the reason the old portfolio reads
-# were: it answers questions about THIS DESK's book, and the research face is
-# issuer-scoped by construction — a brief-writing agent reading the book's
-# weights would be writing about the holder, not the issuer.
-META_ONLY_READS = ["read_book"]
-
-# V36: the face is the SURFACE, and a surface wider than what anything reaches
-# through it is an audit statement nobody can rely on. The lead analyst has no
-# tools on this face at all now — it delegates, in-process — and a domain
-# analyst reaches exactly four: one computes (`run`, every node typed and on the
-# ledger), two read text, one puts an issuer on the desk. `describe` went with
-# the pull-catalogue it served (the BRIEFING is pushed), `read_book` with it;
-# `respond` and `think` were the old exit and the old pause, and V33 replaced
-# the first with prose against the answer check and never needed the second.
-# They stay REGISTERED — a read registry is what it is — but a face names what
-# can actually be reached.
-FACE_META_AGENT = [
-    "run", "read_filings", "search_web", "start",
-]
-
-# V31 (Phase 2): so does the research face, and it files its brief in the same
-# grammar the reply uses. `read_fundamentals`, `read_prices` and `compute` are
-# off it — every issuer measure, price statistic, series and piece of arithmetic
-# they offered is a program (docs/PROGRAM_LANGUAGE.md), and a program is one
-# call whose every node is typed and recorded. They stay registered because
-# READ_CORE is what a read registry builds; what a face NAMES is the surface.
-FACE_RESEARCH = ["describe", "run", "read_filings", "search_web", "think", "submit_brief"]
+# The research run writes an Issuer Risk Brief: an issuer from its filings and
+# its price. The issuer analyst's verbs, the price read, both families' measures
+# by name, the pause, and its exit. It starts nothing — the workflow that runs it
+# prepared the name — and it never reads the book: a brief is about the issuer,
+# not about whoever holds it.
+FACE_RESEARCH = ["list", "filings_read", "prices_read", "metric", "calc",
+                 "filings_search", "filings_section", "web_search", "think", "submit_brief"]
 
 # What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
 # at /mcp/<name> and every token carries the name it was minted for, so the same

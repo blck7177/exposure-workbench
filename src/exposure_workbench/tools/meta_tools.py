@@ -221,10 +221,8 @@ def register_meta_tools(reg: ToolRegistry) -> ToolRegistry:
             "Start background work and return its id at once: readiness (ingest, index and price an "
             "issuer — any listed SEC filer, prepared in a couple of minutes), research (an Issuer Risk "
             "Brief), exposure_run (a portfolio run on the book AS IT IS, on the last completed session "
-            "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is "
-            "a sell / buy node in run(program) over the run id, which answers at once). "
-            "Never blocks; tell the user it is being prepared. A started run's figures are readable "
-            "once its status is completed; read_book(task_…, names=['state']) reports its progress."
+            "unless as_of_date — it does not apply a trade; a hypothetical sale or purchase is the "
+            "scenario verb, which answers at once). Never blocks; tell the user it is being prepared."
         ),
         json_schema={"type": "object", "properties": {
             "kind": {"type": "string", "enum": list(_START_KINDS)},

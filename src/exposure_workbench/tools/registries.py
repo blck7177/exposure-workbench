@@ -32,19 +32,21 @@ fails on either.
 
 from __future__ import annotations
 
-from exposure_workbench.tools.definitions import ISSUER_KINDS, build_read_registry
-from exposure_workbench.tools.meta_tools import register_meta_tools
-from exposure_workbench.tools.primitives import build_analyst_registry  # noqa: F401 — V1: one registry per analyst face
+from exposure_workbench.tools.definitions import register_think
+from exposure_workbench.tools.primitives import (  # noqa: F401 — one registry per analyst face
+    build_analyst_registry, build_desk_registry, build_research_verbs,
+)
 from exposure_workbench.tools.registry import ToolRegistry
-from exposure_workbench.tools.research_tools import register_research_tools, register_search_tool
+from exposure_workbench.tools.research_tools import register_research_tools
 
 
 def build_meta_registry() -> ToolRegistry:
-    # V19: the web search is on the meta face too — registered by the one
-    # function the research builder also calls.
-    return register_search_tool(register_meta_tools(build_read_registry()))
+    # V1: the mount named "meta" is the debug door — every verb, no agent behind
+    # it. The lead analyst holds no face (agents/meta_agent).
+    return build_desk_registry()
 
 
 def build_research_registry() -> ToolRegistry:
-    # V23: the research face's compute runs issuer and price methods only.
-    return register_research_tools(build_read_registry(ISSUER_KINDS))
+    # V1: the issuer analyst's verbs with the price read and both families'
+    # measures, the pause, and the brief's gate.
+    return register_research_tools(register_think(build_research_verbs()))

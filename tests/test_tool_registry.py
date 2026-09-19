@@ -12,7 +12,7 @@ import pytest
 
 from exposure_workbench.tools import faces
 from exposure_workbench.tools import registry as R
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.registries import build_analyst_registry
 from exposure_workbench.tools.registry import (
     DELEGATION, GATE, READ, REFLECTION, Tool, ToolRegistry,
 )
@@ -198,7 +198,9 @@ async def test_a_result_over_the_cap_says_what_was_held_back_and_how_to_read_it(
     shown = len(out["facts"]["rows"])
     total = F.FACTS_PER_RESULT + 40
     assert 0 < shown <= F.FACTS_PER_RESULT < total, "whole facts came off the tail until the result fit"
-    assert out["held_back"]["count"] == total - shown and "read_book(" in out["held_back"]["how"]
+    # V1: HOW the rest is read is the rows form's sentence (fact_adapters.present); the
+    # old per-tool hints spelled calls of tools that are retired
+    assert out["held_back"]["count"] == total - shown and "how" not in out["held_back"]
     assert sum(1 for v in out["figures"].values() if v == "held_back") == total - shown
     # V33: the cap bounds the PAYLOAD, not the session's knowledge. A figure held
     # back was still computed and is still evidence; the answer check must be able
@@ -249,7 +251,7 @@ def test_every_tool_on_a_face_has_a_fact_adapter():
 # ── schemas, faces, redaction ─────────────────────────────────────────────────
 
 def test_schemas_are_valid_function_defs():
-    reg = build_read_registry()
+    reg = build_analyst_registry("issuer")
     schemas = reg.schemas()
     assert len(schemas) == len(reg.tools)
     for s in schemas:
@@ -259,10 +261,10 @@ def test_schemas_are_valid_function_defs():
 
 
 def test_required_judgment_fields_are_in_schema():
-    """schema-as-interface: read_fundamentals can't be called without a ticker."""
-    reg = build_read_registry()
-    gfs = reg.get("read_fundamentals")
-    assert set(gfs.json_schema["required"]) == {"ticker"}
+    """schema-as-interface: a filed line can't be read without a ticker — or without saying why."""
+    reg = build_analyst_registry("issuer")
+    gfs = reg.get("filings_read")
+    assert set(gfs.json_schema["required"]) == {"ticker", "why"}
 
 
 def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
@@ -272,12 +274,12 @@ def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
     registry genuinely lacks the delegation/gate tools, and the old assertion
     read that as a smaller face rather than as the wrong registry for this face.
     """
-    reg = build_read_registry()
-    assert "read_fundamentals" in faces.resolve(reg, faces.READ_CORE)
+    reg = build_analyst_registry("issuer")
+    assert "filings_read" in faces.resolve(reg, faces.FACE_ISSUER)
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
-        faces.resolve(reg, faces.FACE_META_AGENT)
-    assert "start" in str(exc.value)   # tools/registries.build_meta_registry
+        faces.resolve(reg, faces.FACE_RISK)                 # another family's face on this registry
+    assert "book_read" in str(exc.value) and "scenario" in str(exc.value)
 
 
 def test_redact_args_masks_key_class_fields_only():
@@ -314,27 +316,11 @@ def test_both_faces_reach_their_exit_through_the_gate_class():
     and 25-32 tool calls against a limit of 40 is not a wide margin."""
     from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
-    for build, exit_name in ((build_meta_registry, "respond"), (build_research_registry, "submit_brief")):
-        reg = build()
-        assert reg.get(exit_name).tool_class == GATE, f"{exit_name} is not declared a gate"
-        gates = {n for n, t in reg.tools.items() if t.tool_class == GATE}
-        assert gates == {exit_name}, f"more than one exit on this face: {sorted(gates)}"
+    # V1: the chat turn's exit is the lead's own prose, checked in-process, and an
+    # analyst's is `submit`, in-process too — neither is on a face. The research
+    # run's exit still is.
+    reg = build_research_registry()
+    assert reg.get("submit_brief").tool_class == GATE, "submit_brief is not declared a gate"
+    assert {n for n, t in reg.tools.items() if t.tool_class == GATE} == {"submit_brief"}
+    assert not [n for n, t in build_meta_registry().tools.items() if t.tool_class == GATE]
 
-
-async def test_a_program_that_shows_nothing_still_records_every_fact_it_made(monkeypatch):
-    """V38/T1. A program whose `return` names only a node with no figures (a run)
-    shows no figure — and every figure its other nodes made is still evidence,
-    recorded on the step and in the table."""
-    from exposure_workbench.services import facts as F
-    log = _wire(monkeypatch)
-    db = _Db()
-    made = [F.fact(F.SCALAR, "issuer_exposures.weight", subject=f"T{i}", unit="RATIO", value=i / 100,
-                   as_of="2026-09-03", params={"node": "w", "label": f"T{i}"}) for i in range(5)]
-    payload = {"program_id": "calc_p", "returns": ["book"], "nodes": {"book": {"kind": "run", "run": "run_1"},
-                                                                       "w": {"kind": "vector"}},
-               "settled": 2, "refused": [], "_facts": [F.for_record(f) for f in made]}
-    tool = Tool(name="run", description="", json_schema={"type": "object"}, fn=_returning(payload), tool_class=READ)
-    out = await R.invoke(_registry(tool), db, "sess_1", "run", {"program": {"let": []}})
-    assert "facts" not in out and out["not_returned"] == {"w": 5}
-    [(recorded)] = _facts_recorded(log)
-    assert {r["id"] for r in recorded} == {f.id for f in made} == {r.id for r in db.added}

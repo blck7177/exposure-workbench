@@ -214,3 +214,16 @@ def test_a_desk_rule_lives_in_exactly_one_place(phrase):
     source = "\n".join([*(s for _a, s in ALL_WRITTEN), *R.READS.values(),
                         *(f"{t} {w} {r}" for t, w, r in R.INSTRUMENTS), *(p["text"] for p in R.POLICY_ABSENCES)])
     assert source.count(phrase) == 1, f"{phrase!r} ({RULE_PHRASES[phrase]}): written {source.count(phrase)} times"
+
+
+# ── the wording sheet the boss reviews is the text the turn sends ────────────
+
+def test_the_wording_sheet_is_rendered_from_the_live_objects_and_is_current():
+    import importlib.util
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("v1_wording", root / "scripts" / "v1_wording.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert (root / "docs" / "WORDING_V1.md").read_text(encoding="utf-8") == mod.render(), \
+        "docs/WORDING_V1.md is stale: run .venv/bin/python scripts/v1_wording.py"

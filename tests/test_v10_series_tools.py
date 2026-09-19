@@ -107,46 +107,9 @@ def test_last_n_has_a_floor():
     """0 asked for none and got all forty; -20 on a twelve-point series returned
     an empty series with a citable id. Inherited from get_fact_series, and kept."""
     reg = build_meta_registry()
-    for name in ("read_fundamentals",):
+    for name in ("filings_read",):                          # V1: the verb that reads a filed line
         ln = reg.tools[name].json_schema["properties"]["last_n"]
         assert ln["minimum"] == 1 and ln["maximum"] == 40, name
-
-
-def test_series_stat_is_the_union_of_both_old_operators_and_nothing_else():
-    """Real use: yoy 74, latest 4, qoq 2, abs 1. None of the eleven can go, and
-    an op that neither old tool had would be new capability, which this batch
-    does not add."""
-    assert set(ss.OPS) == set(so.CHANGE_MODES) | set(so.STAT_OPS)
-    from exposure_workbench.services import compute_service
-    assert set(compute_service.SERIES_OPS) == set(ss.OPS)
-    reg = build_meta_registry()
-    assert set(ss.OPS) <= set(reg.tools["compute"].json_schema["properties"]["op"]["enum"])
-
-
-def test_series_stat_takes_an_id_not_a_fetch_spec():
-    """The whole point. compute_change took (ticker, metric, period_type,
-    last_n, mode): the fetch and the operator in one breath, re-spelled on
-    every operator. series_stat takes what the fetch produced."""
-    props = set(build_meta_registry().tools["compute"].json_schema["properties"])
-    assert "operands" in props and "op" in props
-    assert not ({"ticker", "metric", "period_type", "series_id"} & props)
-
-
-def test_the_new_tools_are_on_both_faces():
-    meta = set(faces.resolve(build_meta_registry(), faces.FACE_META_AGENT))
-    research = set(faces.resolve(build_research_registry(), faces.FACE_RESEARCH))
-    # V31: figures come through `run` on BOTH faces. The per-domain reads and
-    # compute left the research face with the brief (Phase 2); they stay
-    # registered, because that is what a read registry builds, but no face
-    # names them.
-    # V36: `run` is still how both sides compute. `describe` left the meta face
-    # with the catalogue it served — the BRIEFING is pushed into the lead's turn
-    # now, not pulled — and stayed on the research face, where a brief still
-    # starts by asking what the desk holds about an issuer.
-    assert "run" in meta and "run" in research
-    assert "describe" in research and "describe" not in meta
-    for name in ("read_fundamentals", "read_prices", "compute"):
-        assert name not in meta and name not in research, name
 
 
 def test_describe_issuer_names_the_missing_input_not_a_hole():
@@ -160,16 +123,6 @@ def test_describe_issuer_names_the_missing_input_not_a_hole():
     emits = inspect.getsource(catalogue_service._fundamentals)
     assert '"methods_computable"' in emits and '"methods_not_computable"' in emits
     assert "_computability" in emits, "the view reads the rule, it does not restate it"
-
-
-def test_the_refusals_a_domain_reports_are_the_ones_the_issuer_view_reports():
-    """One home. Both callers reach `_computability`; neither has its own copy
-    of "not for a financial issuer"."""
-    from exposure_workbench.services import catalogue_service as cat
-    src = inspect.getsource(cat)
-    assert src.count('"not for a financial issuer"') == 1
-    assert "_computability" in inspect.getsource(cat._refuses_for)
-    assert "_refuses_for" in inspect.getsource(cat._domain)
 
 
 # ── the calculator over series ───────────────────────────────────────────────

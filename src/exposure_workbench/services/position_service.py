@@ -31,7 +31,7 @@ def _figure(q, run_id: str, quantity: str) -> dict:
 
 async def position(db: AsyncSession, ticker: str, book: str | None = None) -> dict:
     tk = ticker.upper()
-    held = ((await catalogue_service._in_book(db, tk)) or {}).get("held_in") or []
+    held = ((await catalogue_service.in_book(db, tk)) or {}).get("held_in") or []
     if book:
         held = [h for h in held if book in (h["portfolio_id"], h["run_id"])]
     if not held:

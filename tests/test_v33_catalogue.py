@@ -36,16 +36,6 @@ async def _no_books(db):
 
 
 @pytest.mark.asyncio
-async def test_the_desk_lists_prepared_and_preparing_issuers_apart(monkeypatch):
-    monkeypatch.setattr(cat.portfolio_service, "snapshot_all", _no_books)
-    monkeypatch.setattr(company_service, "list_companies", _list)
-    monkeypatch.setattr(company_service, "ready_company_ids", _ready)
-    out = await cat._desk(None)
-    assert out["issuers_prepared"] == ["MSFT"]
-    assert out["issuers_preparing"] == ["BAC", "MRK"]
-
-
-@pytest.mark.asyncio
 async def test_the_briefing_reads_the_same_split(monkeypatch):
     monkeypatch.setattr(company_service, "list_companies", _list)
     monkeypatch.setattr(company_service, "ready_company_ids", _ready)
@@ -60,13 +50,6 @@ async def test_the_briefing_reads_the_same_split(monkeypatch):
 @pytest.mark.asyncio
 async def test_no_company_is_ready_when_none_is_asked_about():
     assert await company_service.ready_company_ids(None, []) == set()
-
-
-def test_the_opened_section_is_what_the_research_cap_keeps():
-    assert rs._keep_for("describe", {"subject": "MSFT", "expand": "methods"}) == ("methods",)
-    assert rs._keep_for("describe", {"subject": "MSFT"}) == ()
-    assert rs._keep_for("run", {"expand": "methods"}) == ()
-    assert rs._keep_for("describe", "not a dict") == ()
 
 
 # ── live: the gold snapshot ───────────────────────────────────────────────────

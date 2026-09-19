@@ -231,15 +231,15 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
         # can simply show. Round B's Q16 asked a run four times for
         # `portfolio.integration.net_beta.market` and told the reader the book's
         # net beta was unavailable; `book.analysis` computes it.
-        from exposure_workbench.analytics import skill as _skill
-        route = _skill.call_for_yield(name, subject=f"'{rid}'")
+        from exposure_workbench.analytics import registry as _registry
+        measure = _registry.method_for_yield(name)
         return _err("unknown_name",
                     f"{rid} holds no figure named {name!r}."
                     + (f" Nearest names it holds: {', '.join(near)}." if near else "")
-                    + (f" That name is what {route['name']} yields, not a figure on a table: "
-                       f"compute it with {json.dumps(route)}." if route else
-                       " A run's tables are read with column(run, table, col) and pick(of, key)."),
-                    **({"route": route} if route else {}))
+                    + (f" That name is what the measure {measure.name} yields, not a figure on a table: "
+                       f"ask for the measure by name." if measure is not None else
+                       " A book's figures are read off the table they sit on, by column and row."),
+                    **({"measure": measure.name} if measure is not None else {}))
     if resolved.kind == "series" and "@" in name:
         # A point of a series row — `capex@2025-12-31` — as an operand: its own
         # period, its row's issuer, no base. Live turn 3 wrote exactly this and

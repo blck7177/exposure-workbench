@@ -127,17 +127,3 @@ def test_the_battery_reads_arguments_wide_enough_for_one_program_per_question():
     caps = re.search(r"_ARGS_CAP, _RESULT_CAP = (\d+), (\d+)", src)
     assert caps and int(caps.group(1)) >= 4000 and int(caps.group(2)) >= 1000
 
-
-def test_the_run_adapter_carries_the_kind_declaration_into_the_summary():
-    """The summary is built from the ADAPTED result, not the executor's return.
-    `run_program` lifts `_facts` out and passes the rest through, so the typing
-    the executor did at each node boundary reaches the trace. Pinned here because
-    an adapter that rewrote or dropped `nodes` would blind the counter again
-    without failing anything else — which is the shape of the defect this whole
-    change exists to end."""
-    from exposure_workbench.services import fact_adapters as fa
-
-    raw = {"program_id": "calc_1", "returns": ["r"], "settled": 2, "refused": [],
-           "nodes": {"w": {"kind": "vector"}, "r": {"kind": "ranking"}}, "_facts": []}
-    _, note = fa.ADAPTERS["run"]({}, raw)
-    assert "| nodes: w=vector, r=ranking" in _summarize(note)

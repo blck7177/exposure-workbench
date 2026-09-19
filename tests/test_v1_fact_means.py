@@ -16,10 +16,8 @@ import pytest
 
 from exposure_workbench.analytics import registry as R
 from exposure_workbench.services import answer_check as AC
-from exposure_workbench.services import digest as D
 from exposure_workbench.services import fact_adapters as FA
 from exposure_workbench.services import facts as F
-from exposure_workbench.services import program_service as ps
 from exposure_workbench.services.ledger import Ledger, rows_for
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,15 +113,6 @@ def test_the_limits_engines_ok_is_the_registrys_clear():
         "direction": "loses", "flags": ["collinear_legs_not_quotable"]}
 
 
-def test_every_refusal_the_program_speaks_has_a_reason_in_the_vocabulary():
-    import re
-    src = (ROOT / "src/exposure_workbench/services/program_service.py").read_text()
-    codes = set(re.findall(r'_err\("([a-z_]+)"', src))
-    assert codes, "the scan found no codes"
-    assert {R.reason_of(c) for c in codes} <= set(R.ABSENCE_REASONS)
-    assert R.reason_of("something_new") == "cannot" and R.reason_of(None) == "cannot"
-
-
 # ── the words travel from the producer to the fact ───────────────────────────
 
 def test_a_checks_status_and_an_exposures_direction_reach_the_fact():
@@ -138,34 +127,6 @@ def test_a_checks_status_and_an_exposures_direction_reach_the_fact():
     assert by["net_beta"].means == {"direction": "loses", "flags": ["collinear_legs_not_quotable"]}
     assert "direction" not in by["net_beta"].params            # a meaning, not a parameter
     assert by["room_to_warning"].means == {"status": "warning"}
-
-
-def test_a_vector_entry_carries_the_word_its_row_said():
-    node = ps.Node("rooms", ps.VECTOR, None, ref="calc_9", measure="portfolio.integration.room_to_warning",
-                   as_of="2026-09-10")
-    node.entries = [("issuer_concentration:LLY", "calc_9:a", -0.01, "RATIO"),
-                    ("issuer_concentration:MSFT", "calc_9:b", 0.03, "RATIO")]
-    node.meanings = {"issuer_concentration:LLY": {"status": "warning"},
-                     "issuer_concentration:MSFT": {"status": "clear"}}
-    facts = {f.subject: f for f in ps._facts_of(node)}
-    assert facts["issuer_concentration:LLY"].means == {"status": "warning"}
-    assert facts["issuer_concentration:MSFT"].means == {"status": "clear"}
-    assert "in warning" in F.line(facts["issuer_concentration:LLY"])
-
-
-def test_a_refused_node_is_absent_for_a_reason_from_the_vocabulary():
-    node = ps.Node("cov", ps.ABSENCE, None, refusal={"error": "not_for_financials", "detail": "JPM is a bank"})
-    (f,) = ps._facts_of(node)
-    assert f.kind == F.ABSENCE and f.means == {"reason": "meaningless"}
-    waited = ps.Node("ratio", ps.ABSENCE, None,
-                     refusal={"error": "depends_on_refused", "root": {"node": "cov", "error": "metric_not_filed"}})
-    assert ps._facts_of(waited)[0].means == {"reason": "not_held"}     # the ROOT's reason
-
-
-def test_a_boundary_says_why_and_the_way_out():
-    _entry, fact = D.boundary("no method by that name", cls="type", code="unknown_method", nearest=["roe", "roa"])
-    assert fact.means == {"reason": "no_such_name", "way_out": "the nearest names the desk holds: roe, roa"}
-    assert F.line(fact).endswith("roe, roa — boundary")
 
 
 # ── what the desk does not say stands on every ledger ────────────────────────
@@ -210,3 +171,12 @@ def test_the_means_column_is_in_the_schema_the_migration_and_the_model():
     assert "means       JSONB NOT NULL DEFAULT '{}'" in (ROOT / "infra/init.sql").read_text()
     mig = (ROOT / "infra/migrations/v39_fact_means.sql").read_text()
     assert "ADD COLUMN IF NOT EXISTS means JSONB NOT NULL DEFAULT '{}'" in mig
+
+
+def test_a_refusal_row_says_why_and_the_way_out():
+    fact = FA.refusal_fact("metric", {"name": "roce", "subject": "MSFT"},
+                           {"error": "unknown_method", "detail": "roce: not a measure this desk has",
+                            "nearest": ["roe", "roic"]})
+    assert fact.kind == F.ABSENCE and fact.means == {"reason": "no_such_name", "way_out": "nearest: roe, roic"}
+    assert "nearest: roe, roic — boundary" in F.line(fact)
+    assert R.reason_of("something_new") == "cannot" and R.reason_of(None) == "cannot"

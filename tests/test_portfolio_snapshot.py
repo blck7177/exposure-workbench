@@ -13,7 +13,7 @@ its run_/alert_ ids must be citable — so this file guards three seams:
 from __future__ import annotations
 
 from exposure_workbench.tools import faces
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.registries import build_analyst_registry
 from exposure_workbench.tools.registry import READ
 from exposure_workbench.services import evidence_resolver_service as resolver
 from exposure_workbench.services import quantities as qn
@@ -21,29 +21,6 @@ from exposure_workbench.utils import ids
 
 
 # ── the tool itself ───────────────────────────────────────────────────────────
-
-def test_describe_is_the_no_arg_entry_point():
-    """V23: describe() with no subject is the desk — how a portfolio-level
-    question starts; no ticker, no required args."""
-    reg = build_read_registry()
-    tool = reg.get("describe")
-    assert tool.tool_class == READ
-    assert tool.json_schema.get("required", []) == []
-    assert set(tool.json_schema["properties"]) == {"subject", "expand"}
-
-
-def test_the_book_read_is_meta_only_not_research():
-    """V36 narrowed the meta face to the four tools a domain analyst reaches, so
-    the separation this pins is the one that still decides anything: the book
-    read is built into the registry the meta side gets and named on no face the
-    research side has. A brief-writing agent reading the holder's weights would
-    be writing about the wrong company either way."""
-    from exposure_workbench.tools.registries import build_meta_registry
-
-    assert "read_book" in build_meta_registry().tools
-    assert "read_book" not in faces.FACE_RESEARCH
-    assert "describe" in faces.FACE_RESEARCH, "the catalogue is still how a brief starts"
-
 
 # ── what the snapshot declares onto the table ─────────────────────────────────
 

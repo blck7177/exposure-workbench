@@ -19,8 +19,8 @@ from exposure_workbench.services import facts as F
 
 
 def test_the_skill_module_reads_the_registrys_own_objects():
-    assert skill.METHODS is R.METHODS and skill.READINGS is R.READINGS
-    assert skill.Method is R.Method and skill.EXECUTORS is R.EXECUTORS
+    assert skill.METHODS is R.METHODS and skill.Method is R.Method and skill.EXECUTORS is R.EXECUTORS
+    assert not hasattr(skill, "PROCEDURES") and not hasattr(skill, "DESK_RULES") and not hasattr(skill, "READINGS")
 
 
 def test_every_measure_has_a_financial_name_and_valid_words():

@@ -30,21 +30,6 @@ from exposure_workbench.tools.registries import build_meta_registry, build_resea
 
 # ── the faces: data domains × verbs ─────────────────────────────────────────
 
-def test_the_meta_face_is_ten_tools_by_domain_and_verb():
-    # V31: both faces compute through ONE tool (run), and both file their answer
-    # in one grammar. The research face is issuer-scoped by its kinds, not by
-    # carrying a different set of readers.
-    # V36: four. The lead analyst reaches none of them — it delegates, in
-    # process — and a domain analyst reaches one that computes, two that read
-    # text, and one that puts an issuer on the desk. A face wider than what is
-    # reached through it is an audit statement nobody can rely on.
-    assert faces.FACE_META_AGENT == ["run", "read_filings", "search_web", "start"]
-    assert faces.FACE_RESEARCH == [
-        "describe", "run", "read_filings", "search_web", "think", "submit_brief"]
-    assert faces.resolve(build_meta_registry(), faces.FACE_META_AGENT) == faces.FACE_META_AGENT
-    assert faces.resolve(build_research_registry(), faces.FACE_RESEARCH) == faces.FACE_RESEARCH
-
-
 def test_no_tool_is_a_method_any_more():
     """Thirteen tools were methods with an entry point each. Every one is a
     registry method now, and no tool on either face names one."""
@@ -71,11 +56,6 @@ def test_the_description_surface_is_a_third_of_what_it_was():
     # V27: the two name enums (46 methods, 47 filed lines) are the directory
     # itself, in the schema; the description TEXT did not grow.
     assert total < 14_500, total
-
-
-def test_the_research_faces_compute_is_issuer_scoped():
-    assert set(definitions.ISSUER_KINDS) == {"issuer", "price", "series"}
-    assert "run" not in definitions.ISSUER_KINDS and "portfolio" not in definitions.ISSUER_KINDS
 
 
 # ── the skill registry ──────────────────────────────────────────────────────
@@ -110,95 +90,6 @@ def test_a_method_without_an_authority_cannot_be_constructed():
     with pytest.raises(ValueError):
         skill.Method(name="x", subject_kind="nowhere", family="f", describes="d", procedure="p",
                      authority="a", fails_when="n", executor="formula")
-
-
-def test_no_method_reading_or_procedure_carries_a_threshold():
-    """2026-08-24's rule, extended: a number that reads as a threshold must not
-    appear in a method's procedure or a reading's text."""
-    import re
-    bands = re.compile(r"\b(above|below|over|under|at least|at most|more than|less than)\s+\d")
-    for m in skill.METHODS.values():
-        assert not bands.search(m.procedure), (m.name, m.procedure)
-    for r in skill.READINGS.values():
-        assert not bands.search(r.reads), (r.method, r.reads)
-
-
-def test_every_reading_is_about_a_method_and_every_procedure_about_a_subject_kind():
-    for r in skill.READINGS.values():
-        assert r.method in skill.METHODS
-    for p in skill.PROCEDURES.values():
-        assert p.subject_kind in skill.SUBJECT_KINDS + ("desk",)
-        assert p.triggers and p.evidence and p.close and p.absent.strip() and p.authority.strip(), p.name
-
-
-def test_the_analysts_domains_are_the_skill_set():
-    """V25. A domain per area of the analyst's work — an issuer in S&P's order
-    (financial risk, business risk, the price, the boundary), a book in the
-    risk-management order — so a question never asked still lands in one."""
-    issuer = [p.name for p in skill.procedures_for("issuer")]
-    book = [p.name for p in skill.procedures_for("portfolio")]
-    assert issuer == ["issuer_earnings_quality", "issuer_profitability", "issuer_credit_and_balance_sheet",
-                      "issuer_capital_allocation", "issuer_business_risk_from_filings", "issuer_price_context",
-                      "issuer_outlook_boundary"]
-    assert book == ["book_composition", "book_limits_and_triggers", "book_hypothetical_trades", "book_market_risk",
-                    "book_drawdown_and_attribution", "book_liquidity", "book_events"]
-    assert len(skill.PROCEDURES) == 14
-
-
-def test_a_domain_is_knowledge_not_a_call_script():
-    """The 2026-09-06 finding: 78% of the old procedures' gather/compute steps
-    named a tool, a row or an op, and the model opened none of them. A domain
-    names its evidence as the method cards do and never a tool, an id or an
-    operator; the model chooses the call."""
-    import re
-    scripted = re.compile(r"\b(read_book|read_fundamentals|read_filings|read_prices|search_web|compute\(|describe\()"
-                          r"|\b(issuer_exposures|exposure_metrics|limit_checks)\.|\bcalc_|\brun_[0-9a-f]"
-                          r"|\b(multiply|subtract|divide|yoy)\(")
-    for p in skill.PROCEDURES.values():
-        for seg in ("triggers", "evidence", "desk", "compare", "close"):
-            for sentence in getattr(p, seg):
-                assert not scripted.search(sentence), (p.name, seg, sentence)
-        assert not scripted.search(p.absent), (p.name, "absent", p.absent)
-        assert all(isinstance(getattr(p, seg), tuple) for seg in ("triggers", "evidence", "desk", "compare", "close"))
-
-
-def test_no_rule_or_domain_rests_on_a_desk_convention():
-    """Boss, 2026-09-07: a sentence in the registry is an industry standard or
-    has evidence behind it, or it is not there. 'Desk convention' is neither."""
-    import inspect
-    from exposure_workbench.analytics import skill as _s
-    src = inspect.getsource(_s)
-    assert "desk convention" not in src.lower()
-    for p in _s.PROCEDURES.values():
-        assert "convention" not in " ".join(p.desk).lower(), p.name
-
-
-def test_the_desks_rules_are_scoped_and_reach_every_describe():
-    assert {r.scope for r in skill.DESK_RULES} == {"all", "issuer", "book"}
-    assert len(skill.rules_for("issuer")) > len([r for r in skill.DESK_RULES if r.scope == "all"])
-    assert len(skill.rules_for("book")) > len([r for r in skill.DESK_RULES if r.scope == "all"])
-    assert all(r.authority.strip() for r in skill.DESK_RULES)
-
-
-def test_a_reading_states_what_the_desk_knows_and_the_textbook_does_not():
-    """Fourteen textbook readings were removed (V25); the ones that remain each
-    carry a fact about this desk — a tag the held issuers stopped filing, a figure
-    the book-level fit cannot give, a quantity the desk invented, a share that is
-    not a return, a ratio that is not days.
-
-    V37/K3 added the last two, from round B: a negative factor share was read as
-    "overwhelmingly a market move" and a market-value-over-ADV ratio was offered as
-    days to liquidate. Both are readings, and until V37 the only reader of this
-    table was `describe` — which is not on the domain analyst's face, so the
-    analyst that writes the program had never seen any of it."""
-    assert set(skill.READINGS) == {"ebit_interest_coverage", "price.beta", "book.analysis",
-                                   "book.reconcile", "price.adv"}
-    # and every one of them reaches the analyst that holds that domain
-    for method, reading in skill.READINGS.items():
-        domains = [p for p in skill.PROCEDURES.values() if method in p.methods]
-        assert domains, f"{method} has a reading and belongs to no domain"
-        for p in domains:
-            assert reading.reads[:60] in skill.system_text(p), (p.name, method)
 
 
 def test_an_unknown_method_is_refused_with_near_names():
@@ -252,56 +143,6 @@ async def test_a_list_of_subjects_fans_out_to_one_row_each(monkeypatch):
 
 # ── the catalogue ───────────────────────────────────────────────────────────
 
-def test_the_subject_kind_is_read_off_the_id():
-    assert cat.kind_of(None) == "desk" and cat.kind_of("") == "desk"
-    assert cat.kind_of("run_x") == "run" and cat.kind_of("calc_x") == "scenario"
-    assert cat.kind_of("port_1") == "portfolio" and cat.kind_of("MSFT") == "issuer"
-
-
-def test_not_held_names_only_figure_kinds_the_concept_map_does_not_carry():
-    """The catalogue may not claim a gap the ingest has closed: no mapped
-    concept carries a dimension, and each not_held kind names a dimensional
-    figure."""
-    src = inspect.getsource(concept_mapping)
-    assert "dimension" not in src.lower(), "the map has grown a dimensional axis: revisit NOT_HELD"
-    for kind, where in cat.NOT_HELD.items():
-        assert kind not in concept_mapping.SUPPORTED_METRICS, kind
-        assert "read_filings" in where, kind
-
-
-def test_cannot_is_about_methods_the_registry_lacks():
-    """per-name factor sensitivity: no method yields a per-holding beta over
-    the book; the sentence points at the method that gives it per name."""
-    yields = " ".join(y for m in skill.METHODS.values() for y in m.yields)
-    assert "per_name" not in yields
-    assert "price.beta" in cat.CANNOT["per_name_factor_sensitivity"]
-
-
-def test_the_catalogue_carries_three_kinds_of_absence_in_one_format():
-    src = inspect.getsource(cat)
-    for key in ('"not_held"', '"cannot"', "methods_not_computable"):
-        assert key in src, key
-    assert cat.DEFAULT_CEILING == 24_000     # V27: rows carry is/does/call
-
-
-def test_describe_lists_methods_and_procedures_by_the_subjects_kind():
-    rows = cat._methods("run", False)["run"]
-    assert [r["name"] for r in rows] == [m.name for m in skill.methods_for("run")]
-    assert all({"name", "is", "does", "call"} <= set(r) for r in rows)
-    assert [p["name"] for p in cat._procedures("issuer", False)] == \
-        [p.name for p in skill.procedures_for("issuer")]
-    full = cat._methods("price", True)["price"]
-    assert all({"name", "authority", "fails_when", "params", "yields"} <= set(m) for m in full)
-
-
-def test_the_factoring_is_the_v15_compression():
-    names = [f"limit_checks.{c}.{col}" for c in ("a", "b", "c", "d") for col in ("current_value", "warning_level")]
-    out = cat._factored(names)
-    assert out["patterns"][0]["labels"] == ["a", "b", "c", "d"]
-    assert set(out["patterns"][0]["patterns"]) == {"limit_checks.<label>.current_value",
-                                                   "limit_checks.<label>.warning_level"}
-
-
 # ── the budget's unit is the message ────────────────────────────────────────
 
 def test_the_turn_budget_is_charged_per_message():
@@ -315,36 +156,12 @@ def test_the_turn_budget_is_charged_per_message():
 
 # ── read_book: one spelling for the desk's own work ─────────────────────────
 
-def test_read_book_is_the_one_read_of_the_desks_own_work():
-    src = inspect.getsource(definitions._read_book)
-    for prefix in ('"task_"', '"port_"', '"run_"', '"calc_"'):
-        assert prefix in src
-    assert set(definitions._PORTFOLIO_SECTIONS) == {"positions", "limits", "alerts", "freshness", "runs"}
-    assert set(definitions._RUN_SECTIONS) == {"alerts", "attribution", "risk_state"}
-
-
 def test_read_fundamentals_decides_instant_or_flow_from_the_facts_not_a_list():
     src = inspect.getsource(definitions._metric_is_instant)
     assert "period_start" in src and "FinancialFact" in src
 
 
 # ── what the first live turns taught (2026-09-05, deployed stack) ──────────
-
-def test_the_desk_is_the_desk_under_the_spellings_a_model_writes():
-    """Live turn 4 wrote subject="null" (the schema said null) and got
-    company_not_found, then guessed "port_"."""
-    for spelled in (None, "", "null", "None", "desk", "portfolios"):
-        assert cat.kind_of(spelled) == "desk", spelled
-
-
-def test_a_held_issuers_catalogue_puts_the_books_market_value_and_its_tiers_on_the_table():
-    """Live turn 2 could not price a trim: describe(MSFT) had put three names on
-    the table and the book's market value was not one of them."""
-    src = inspect.getsource(cat._in_book)
-    assert '"exposure_metrics.portfolio_market_value"' in src
-    assert '"warning_level", "breach_level"' in src
-    assert "methods_on_this_run" in src and 'skill.methods_for("run")' in src
-
 
 def test_the_fundamentals_layer_lists_the_metric_names_by_default():
     """Live turn 3 guessed `capital_expenditures`; the desk's name is `capex`."""

@@ -25,12 +25,15 @@ import json
 import pytest
 
 from exposure_workbench.tools import faces
-from exposure_workbench.tools.registries import build_research_registry
+from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 from tests.mcp_mount import RecordingDb, connected, mounted, use_secret
 
 FACE = faces.FACE_NAME_RESEARCH
-SKIPPED = "search_web"          # what skip_external_research removes
-META_ONLY = "read_book"               # registered, and outside this face
+SKIPPED = "web_search"          # what skip_external_research removes
+# V1: a registry built FOR a face holds that face and nothing else, so "registered
+# and outside the face" is shown the way it can still happen — a wider registry
+# (the debug door's, every verb) mounted behind a narrower face.
+META_ONLY = "book_read"
 
 
 @pytest.fixture(autouse=True)
@@ -60,8 +63,12 @@ async def _called(name: str, deny=()) -> tuple[dict, bool, list]:
 async def test_the_mount_serves_its_face_and_not_its_registry():
     served = await _served()
     assert served == faces.FACE_RESEARCH
-    assert META_ONLY in build_research_registry().tools, "the registry has it"
-    assert META_ONLY not in served, "and the face is what the mount serves"
+    assert META_ONLY not in served and META_ONLY not in build_research_registry().tools
+    async with mounted(build_meta_registry(), faces.FACE_ISSUER, face_name=FACE) as door:
+        async with connected(door, face_name=FACE, user_id="user_a", session_id="sess_a") as client:
+            narrow = [t.name for t in (await client.list_tools()).tools]
+    assert META_ONLY in build_meta_registry().tools, "the registry has it"
+    assert narrow == faces.FACE_ISSUER and META_ONLY not in narrow, "and the face is what the mount serves"
 
 
 async def test_a_tool_outside_the_face_is_unknown_rather_than_forbidden():

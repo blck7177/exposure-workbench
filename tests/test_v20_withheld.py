@@ -81,11 +81,10 @@ def test_every_reader_that_used_to_serve_a_withheld_measure_now_asks_withheld_py
     it here when it is written."""
     from exposure_workbench.agents import direct_llm_agent
     from exposure_workbench.services import integration_service, portfolio_service, run_reads_service
-    from exposure_workbench.tools import definitions
     from exposure_workbench.workflow import exposure_workflow
     from apps.api.routes import exposure_runs, portfolios
     for mod in (run_reads_service, integration_service, exposure_runs, portfolios,
-                exposure_workflow, portfolio_service, definitions):
+                exposure_workflow, portfolio_service):
         assert "withheld" in inspect.getsource(mod), mod.__name__
     # Alerts and checks raised by a withheld check before V20 still exist as
     # rows; every reader of them goes through the two filters.
@@ -94,15 +93,9 @@ def test_every_reader_that_used_to_serve_a_withheld_measure_now_asks_withheld_py
     for mod, fn in ((portfolio_service, "published_alerts"), (run_reads_service, "published_alerts"),
                     (run_reads_service, "published_checks"), (integration_service, "published_checks"),
                     (exposure_runs, "published_checks"), (exposure_runs, "is_withheld_check"),
-                    (portfolios, "published_alerts"), (definitions, "published_alerts")):
+                    (portfolios, "published_alerts")):   # V1: the tool that read an issuer's alerts (read_book) is retired
         assert fn in inspect.getsource(mod), (mod.__name__, fn)
     assert "var_95_1d is not None" in inspect.getsource(direct_llm_agent._build_user_message)
-
-
-def test_the_entry_point_and_the_manifest_carry_the_withheld_sentence():
-    from exposure_workbench.services import catalogue_service
-    assert "withheld_note()" in inspect.getsource(catalogue_service.describe)
-    assert '"withheld"' in inspect.getsource(catalogue_service.describe)
 
 
 def test_withheld_check_filters_read_the_type_before_the_colon():

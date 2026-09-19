@@ -56,18 +56,6 @@ def test_every_resource_column_has_a_display_name_and_a_unit():
                 f"{r.table}.{c.name}: {c.unit!r}"
 
 
-def test_describe_run_and_read_quantities_are_meta_only():
-    """They answer questions about THIS DESK's book; the research face is
-    issuer-scoped by construction (faces.py). V36: the meta face carries only
-    what a domain analyst reaches, so the meta side's claim is about its
-    registry — read_book is buildable there and named on no research face."""
-    from exposure_workbench.tools.registries import build_meta_registry
-
-    for name in ("read_book",):
-        assert name in build_meta_registry().tools
-        assert name not in faces.FACE_RESEARCH
-
-
 def test_run_group_patterns_are_well_formed():
     """One star at most, and every literal head is a table a run has or the
     analysis row's own prefix — so a typo in a pattern cannot match nothing forever."""
@@ -76,15 +64,6 @@ def test_run_group_patterns_are_well_formed():
         for p in patterns:
             assert p.count("*") <= 1, (key, p)
             assert p.startswith(heads), (key, p)
-
-
-def test_the_groups_live_in_resources_and_definitions_only_reads_them():
-    """V16 moved RUN_GROUPS to the data layer: the manifest describe_run builds
-    and the group each quantity carries on the table come from the one table,
-    so they cannot drift."""
-    from exposure_workbench.services import catalogue_service
-    src = inspect.getsource(catalogue_service._book_names)
-    assert "resources.RUN_GROUPS" in src and "resources.matches" in src
 
 
 def test_the_group_vocabulary_is_closed_and_every_key_answers_a_question():

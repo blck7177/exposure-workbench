@@ -728,77 +728,14 @@ RANK_OP = "rank"
 REGRESS_OP = "regress"
 
 
-# ── readings: what this DESK knows about reading a measure ───────────────────
-#
-# V25. Seventeen readings used to live here and fourteen were the textbook —
-# "high ROE on thin equity is leverage, not profitability" — which the model
-# already holds and never asked for (1 call in 23 across the 2026-09-06
-# battery). A reading now states only what the desk knows and the textbook
-# does not: a tag the held issuers stopped filing, a measure the book-level
-# fit cannot give, a quantity this desk invented. Refusal conditions that were
-# written here as prose ("EBITDA is zero or negative") are Formula data now
-# (denominator_must_be_positive), where the evaluator applies them.
-
-@dataclass(frozen=True)
-class Reading:
-    """What this desk knows about reading one measure that a textbook does not.
-    Guidance for the agent's sentence, with its authority; nothing here reaches compute."""
-    method: str
-    reads: str
-    meaningless_when: str
-    authority: str
-
-    def __post_init__(self) -> None:
-        if self.method not in METHODS:
-            raise ValueError(f"reading for unknown method {self.method!r}")
-        if not self.authority.strip():
-            raise ValueError(f"{self.method}: a reading states its authority")
-
-
-READINGS: dict[str, Reading] = {r.method: r for r in (
-    Reading("ebit_interest_coverage",
-            "7 of the 8 held issuers stopped tagging InterestExpense after 2024; the registry substitutes "
-            "the non-operating interest line and the result's definition names the substitution — say which "
-            "line was used when the coverage is quoted",
-            "interest expense is zero or unreported under both tags",
-            "the desk's own corpus measurement (V9_FORMULA_BASIS); CFA Program, coverage ratios"),
-    Reading("price.beta",
-            "against a factor ETF (TLT for rates, HYG for credit) this is the name's own sensitivity to that "
-            "risk — the per-name figure the book-level factor regression does not give; the book-level fit "
-            "is over the BOOK's return and says nothing per name",
-            "fewer than 60 aligned sessions; a benchmark whose returns are collinear with another factor's",
-            "the factor model's regression record; Sharpe (1964)"),
-    Reading("book.reconcile",
-            "factor_share is the share of the move the factor model explains and unexplained is what is left: they "
-            "sum to one by construction, so a NEGATIVE factor share means the factors explain the opposite "
-            "direction — it is not a return, not a loss, and not evidence that the move was market-wide",
-            "a run that does not reconcile; a window with no position contributions",
-            "the two accounting identities of return attribution (the factor model's own decomposition)"),
-    Reading("price.adv",
-            "days to liquidate is market value divided by (the participation rate × ADV in dollars): the quotient of "
-            "market value over ADV alone is a ratio of two dollar figures and is not days, so a figure offered as "
-            "days is wrong unless the participation rate is in the divisor",
-            "fewer sessions of volume than the window asks for",
-            "CFA Program, market microstructure; this desk's own participation convention"),
-    Reading("book.analysis",
-            "room_to_warning below zero means the check is already in warning; room_to_breach is what remains "
-            "before the hard tier; a net beta is the book's move per unit of the risk it names (equity_down, "
-            "rates_up, credit_spreads_widen): every factor enters as its beta times that risk's effect on the "
-            "book, so a net beta below zero is a book that loses when the risk happens — net_beta.equity_down "
-            "of −0.86 is a book LONG equities, not short",
-            "a run not completed; a collinear fit (the legs are not quotable individually, the net is)",
-            "the portfolio's risk_limits; the factor model's own regression record"),
-)}
-
-
 # ── how a measure READS, and what the instruments are (V1 step 5) ────────────
 #
 # The handbook's "how it reads" is rendered from here, never hand-copied. A
 # reading says what the ROW cannot: a word that is on the row — a direction, a
 # status, a basis, which line stood in — is not repeated, no figure of any run
-# or corpus is quoted, and nothing says how a tool is called. The five readings
-# above (READINGS) are the pre-V1 text the old analyst prompt still renders;
-# they go with it.
+# or corpus is quoted, and nothing says how a tool is called. (The five pre-V1
+# readings carried a corpus statistic, a sign convention and one run's net beta;
+# they went with the prompt that rendered them.)
 
 READS: dict[str, str] = {
     "ebit": "EBIT and EBITDA start from net income, adding back interest and tax — not from operating income. Where an "

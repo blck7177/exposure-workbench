@@ -44,9 +44,10 @@ INSTRUCTIONS = """Tools for a portfolio risk and issuer-intelligence desk: finan
 calculations, filing search and full-text read, market stats, portfolio
 holdings and alerts, and delegation of long work to background runs.
 
-Every tool result carries a `facts` block — one row per figure, with its id
-(f_…), what it is, whose, its unit, value, as-of and window — and a `note` in
-which each figure stands as its fact id. """ + claims.PROSE_RULE + """ A quote claim cites its passage and carries the verbatim span. The gate refuses an answer that points at what was
+Every tool is a verb over one family of evidence and says why it is called.
+Every result is rows: one line per figure — its id (f_…), what it is, whose,
+over what period, the value, what it means and where it came from — and a
+refusal is a row too. """ + claims.PROSE_RULE + """ A quote claim cites its passage and carries the verbatim span. The gate refuses an answer that points at what was
 never shown, or writes a number the facts cannot account for.
 
 Delegation tools return immediately with a run id; they do not block."""

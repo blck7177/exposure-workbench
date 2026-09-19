@@ -23,7 +23,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from exposure_workbench.tools.arg_validation import validate_args
-from exposure_workbench.tools.definitions import build_read_registry
+from exposure_workbench.tools.registries import build_analyst_registry
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
 
@@ -136,9 +136,9 @@ def test_the_forms_a_filing_can_actually_have_are_selectable():
     provider asks edgartools for a form and gets '10-K/A' too, and nothing skips
     them. So a passage's own citation could name a form the next call was then
     refused for passing back."""
-    registry = build_read_registry()
-    for tool_name in ("read_filings",):
-        enum = registry.get(tool_name).json_schema["properties"]["form_type"]["enum"]
+    registry = build_analyst_registry("issuer")
+    for tool_name in ("filings_search", "filings_section"):
+        enum = registry.get(tool_name).json_schema["properties"]["form"]["enum"]
         assert {"10-K", "10-Q", "10-K/A", "10-Q/A"} <= set(enum), tool_name
 
 
@@ -201,7 +201,7 @@ def test_nested_objects_forbid_unknown_arguments_too(name, tool):
 
 
 _WINDOWED = {
-    "read_fundamentals": "last_n", "read_filings": "k",
+    "filings_read": "last_n", "filings_search": "k",
 }
 
 

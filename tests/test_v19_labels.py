@@ -65,25 +65,6 @@ def test_the_model_cannot_supply_the_derived_keys_itself():
 
 # ── S2: the web is on the meta face ───────────────────────────────────────────
 
-def test_search_external_research_is_on_both_faces_from_one_registration():
-    from exposure_workbench.tools import research_tools
-    meta, research = build_meta_registry(), build_research_registry()
-    assert "search_web" in faces.resolve(meta, faces.FACE_META_AGENT)
-    assert "search_web" in faces.resolve(research, faces.FACE_RESEARCH)
-    assert meta.get("search_web").budget_key == "external_search"
-    from exposure_workbench.services import fact_adapters as fa
-    assert fa.ADAPTERS["search_web"] is fa.search_web, "its sources become passage facts"
-    src = inspect.getsource(research_tools)
-    assert src.count('name="search_web"') == 1
-
-
-def test_the_capability_statement_says_the_web_is_here():
-    from exposure_workbench.services import catalogue_service
-    src = inspect.getsource(catalogue_service._desk)
-    assert "search_web" in src
-    assert not any("web" in c for c in catalogue_service.CANNOT.values())
-
-
 def test_the_search_tool_admits_a_listed_issuer_rather_than_refusing_it():
     from exposure_workbench.tools import research_tools
     src = inspect.getsource(research_tools._search_external_research)
@@ -126,7 +107,7 @@ def test_the_search_query_carries_the_issuer_the_model_named():
 
 def test_a_day_window_is_a_request_parameter_not_a_phrase():
     from exposure_workbench.tools import research_tools
-    schema = build_meta_registry().get("search_web").json_schema
+    schema = build_meta_registry().get("web_search").json_schema        # V1: the verb that wraps it
     assert schema["properties"]["days"]["type"] == ["integer", "null"]
     assert "days" not in schema["required"]
     src = inspect.getsource(research_tools._search_external_research)

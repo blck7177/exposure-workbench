@@ -157,27 +157,6 @@ def test_a_book_name_parses_into_what_and_whose():
     assert tc._parse_book_name("count.limit_checks.fired=true") == ("count.limit_checks.fired=true", None)
 
 
-@pytest.mark.parametrize("label,measure,entity", [
-    ("issuer_exposures.MSFT.weight", "issuer_exposures.weight", "MSFT"),
-    ("limit_checks.issuer_concentration:MSFT.current_value", "limit_checks.current_value", "issuer_concentration:MSFT"),
-    ("portfolio.integration.room_to_breach.issuer_concentration:MSFT", "portfolio.integration.room_to_breach",
-     "issuer_concentration:MSFT"),
-    ("portfolio.integration.net_beta.equity_down", "portfolio.integration.net_beta.equity_down", None),
-    ("portfolio.reconcile.factor_share", "portfolio.reconcile.factor_share", None),
-])
-def test_a_program_table_and_a_pick_read_one_name_as_one_identity(label, measure, entity):
-    """V38/S4. Round C: `pick(key=…net_beta.equity_down)` made a figure of
-    `equity_down` measuring `portfolio.integration.net_beta`, while the same
-    label on the program's table was the whole name — and the handoff check took
-    "net beta" out of the first, 27 times."""
-    from exposure_workbench.services import program_service as ps
-    assert tc._parse_book_name(label) == (measure, entity)
-    node = ps.Node("analysis", ps.TABLE, None, ref="calc_row", subject=RUN,
-                   entries=[(label, f"calc_row:{label}", 0.5, "RATIO")])
-    (fact,) = ps._facts_of(node)
-    assert (fact.measure, fact.subject) == (measure, entity or RUN)
-
-
 async def test_a_run_weight_resolves_typed_with_its_base_and_date(monkeypatch):
     _desk(monkeypatch)
     t = await tc._resolve(None, f"{RUN}:issuer_exposures.MSFT.weight")
@@ -203,7 +182,9 @@ async def test_an_unknown_name_is_refused_and_points_at_a_verb_the_reader_has(mo
     _desk(monkeypatch)
     r = await tc._resolve(None, f"{RUN}:issuer_exposures.MSFT.rank")
     assert r["error"] == "unknown_name" and "describe(" not in r["detail"]
-    assert "column(run, table, col)" in r["detail"] and "Nearest names it holds" in r["detail"]
+    # V1: no verb is spelled in a service's refusal — the reader's verbs are its face's to name
+    assert "read off the table they sit on" in r["detail"] and "Nearest names it holds" in r["detail"]
+    assert "column(" not in r["detail"] and "pick(" not in r["detail"]
 
 
 async def test_a_name_a_book_method_yields_is_refused_with_the_node_that_makes_it(monkeypatch):
@@ -214,9 +195,9 @@ async def test_a_name_a_book_method_yields_is_refused_with_the_node_that_makes_i
     _desk(monkeypatch)
     r = await tc._resolve(None, f"{RUN}:portfolio.integration.net_beta.market")
     assert r["error"] == "unknown_name"
-    assert r["route"]["name"] == "book.analysis" and r["route"]["fn"] == "method"
-    assert r["route"]["key"] == "portfolio.integration.net_beta.market"
-    assert "book.analysis" in r["detail"]
+    assert r["measure"] == "book.analysis"                 # V1: the MEASURE that yields it, asked for by name
+    assert "book.analysis" in r["detail"] and "ask for the measure by name" in r["detail"]
+    assert "route" not in r and "fn" not in r["detail"]
 
 
 async def test_a_collinear_coefficient_may_not_be_an_operand(monkeypatch):
@@ -655,16 +636,6 @@ def test_a_calculator_row_of_the_book_dates_and_bases_itself():
     assert 'rt.get("base")' in src and 'rt["basis"]["instant"]' in src
 
 
-def test_read_quantities_reads_a_scenario_row_and_refuses_other_ledger_rows():
-    """Live turn 1 called read_quantities on the scenario's calc_id and got
-    `unknown_run`, then wrote the whole id as a slot name. A scenario is a
-    run-shaped row and reads like one; a calculator row is not."""
-    src = inspect.getsource(definitions._read_book)
-    assert "SCENARIO_OP" in src and '"not_a_book"' in src
-    rq = build_meta_registry().get("read_book")
-    assert "calc_" in rq.description
-
-
 # ── what a book-derived row is called on the legend ────────────────────────
 
 def test_a_figure_made_from_the_books_figures_is_grouped_as_such():
@@ -689,36 +660,6 @@ async def test_an_ordering_of_one_books_figures_carries_that_base(monkeypatch):
 
 
 # ── the tool, its face, and what the model is told ──────────────────────────
-
-async def test_the_scenario_method_is_on_the_meta_faces_compute_only():
-    """V23: hypothetical_book is the method book.sell, run by compute. The
-    research face's compute refuses book methods by subject kind."""
-    from exposure_workbench.analytics import skill
-    from exposure_workbench.tools.registries import build_research_registry
-    assert skill.METHODS["book.sell"].subject_kind == "run"
-    # V31: the research face no longer NAMES compute, so the refusal that matters
-    # is `run`'s — the one door an issuer-scoped agent has to the algebra.
-    assert "run" in faces.FACE_META_AGENT and "compute" not in faces.FACE_RESEARCH
-    out = await build_research_registry().get("compute").fn(
-        None, method="book.sell", subject="run_x", params={"sales": [{"ticker": "NVDA"}]})
-    assert out["error"] == "not_on_this_face", "the registered tool refuses by kind even off-face"
-    out = await build_research_registry().get("run").fn(
-        None, program={"let": [["after", {"fn": "method", "name": "book.sell", "subject": "run_x", "params": {"sales": [{"ticker": "NVDA"}]}}]]})
-    assert out["error"] == "not_on_this_face"
-
-
-def test_the_operators_say_the_grammar_where_the_model_reads_it():
-    """The battery's C01#t1 handed rank ten run refs and was refused; the
-    description is where the model learns a figure may be named."""
-    from exposure_workbench.analytics import skill
-    compute = build_meta_registry().get("compute")
-    assert "run_…:issuer_exposures" in compute.description
-    assert "rank" in compute.json_schema["properties"]["op"]["enum"]
-    sell = skill.METHODS["book.sell"]
-    assert "unmeasured" in sell.fails_when and "proceeds leave" in sell.describes
-    analysis = skill.METHODS["book.analysis"]
-    assert "room" in analysis.procedure
-
 
 def test_the_scenario_schema_bounds_the_fraction_and_requires_a_ticker():
     from exposure_workbench.analytics import skill
