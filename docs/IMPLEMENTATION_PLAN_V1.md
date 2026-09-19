@@ -204,4 +204,4 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 
 ## 7. 归档记录（2026-09-19）
 
-`git mv` 到 `docs/archive/plans/`：`IMPLEMENTATION_PLAN.md`、`IMPLEMENTATION_PLAN_V2`–`V38`（含 `V3R`）共 30 份，加 `MCP_PLAN.md`；归档目录有 README 说明"不再阅读"。README.md 的两处链接改指归档路径并指向本计划。代码与测试对旧计划只有注释级引用，无运行时读取，未改。`docs/spikes/` 未动。
+提交 `6994b28`（issuer-intelligence，9/19），执行分支 `desk-v1` 从它开出。`git mv` 到 `docs/archive/plans/`：`IMPLEMENTATION_PLAN.md`、`IMPLEMENTATION_PLAN_V2`–`V38`（含 `V3R`）共 30 份，加 `MCP_PLAN.md`；归档目录有 README 说明"不再阅读"。README.md 的两处链接改指归档路径并指向本计划。代码与测试对旧计划只有注释级引用，无运行时读取，未改。`docs/spikes/` 未动。
