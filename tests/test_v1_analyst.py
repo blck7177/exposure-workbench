@@ -169,6 +169,13 @@ async def test_an_analyst_out_of_calls_is_told_to_file_what_it_has(monkeypatch):
     await sa.run_sub_analyst(TASK, ctx)
     told = json.loads([m for m in seen[2]["messages"] if m.get("role") == "tool"][-1]["content"])
     assert told["error"] == "analyst_budget" and len(tools.calls) == 1
+    # THE STOP IS A ROW (V1 live smoke): a line the budget kept the analyst from is filed as
+    # not settled with the id of an absence row, and until this one nothing minted it — the
+    # risk analyst wrote "analyst_budget" where an id goes, and then a policy it had not met.
+    (boundary,) = [s for s in _steps if s["type"] == "boundary"]
+    stop = boundary["facts"][0]
+    assert boundary["status"] == "completed" and stop.kind == F.ABSENCE and stop.means["reason"] == "cannot"
+    assert told["rows"] == [F.line(stop)] and "evidence calls are used" in told["rows"][0]
 
 
 async def test_a_start_is_not_evidence_and_is_made_once_per_subject(monkeypatch):

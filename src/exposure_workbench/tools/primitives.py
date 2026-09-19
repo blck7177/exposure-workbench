@@ -210,13 +210,30 @@ def _list_for(metric_names: list[str]):
 
 # ── the three reads ──────────────────────────────────────────────────────────
 
-async def _filings_read(db: AsyncSession, ticker: str, line: str | None = None, months: int | None = None,
+FILINGS_READ_TICKERS = 12
+
+
+async def _filings_read(db: AsyncSession, ticker, line: str | None = None, months: int | None = None,
                         start: str | None = None, end: str | None = None, at: str | None = None,
                         last_n: int | None = None, *, why: str) -> dict:
-    # 12.0 is an integer to a JSON schema and a TypeError to a slice: coerced here
-    return await D._read_fundamentals(db, ticker, metric=line,
-                                      months=int(months) if months is not None else None, start=start, end=end,
-                                      last_n=int(last_n) if last_n is not None else None, at=at)
+    """ONE LINE, OVER ONE ISSUER OR SEVERAL. `metric` has always taken a list of
+    subjects; this read took one ticker, so "is anyone's top line speeding up while
+    the margin goes the other way, across everything we hold" was a read a name for
+    revenue alone — twelve of the issuer analyst's sixteen calls, and no brief (V1
+    live smoke). The same read, the same refusals, one row or one refusal a name."""
+    async def one(tk: str) -> dict:
+        # 12.0 is an integer to a JSON schema and a TypeError to a slice: coerced here
+        return await D._read_fundamentals(db, tk, metric=line,
+                                          months=int(months) if months is not None else None, start=start, end=end,
+                                          last_n=int(last_n) if last_n is not None else None, at=at)
+    if isinstance(ticker, str):
+        return await one(ticker)
+    tickers = list(dict.fromkeys(str(t) for t in ticker or []))
+    if not tickers:
+        return _err("invalid_params", "give a ticker, or a list of them")
+    if line is None and len(tickers) > 1:
+        return _err("invalid_params", "several issuers are read on ONE line: name the `line` (a whole balance sheet is one issuer's)")
+    return {"results": [{"asked": tk, **(await one(tk))} for tk in tickers], "count": len(tickers)}
 
 
 async def _prices_read(db: AsyncSession, ticker: str, window: str | None = None, date: str | None = None, *, why: str) -> dict:
@@ -465,12 +482,14 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                                 ["what"])),
         "filings_read": Tool(
             name="filings_read", display="Reading {ticker}'s filed figures", rows=True, tool_class=READ, fn=_filings_read,
-            description="One filed line of one issuer, as filed (a restatement supersedes what it restates). A flow is read "
+            description="One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates). A flow is read "
                         "over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a "
                         "date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` "
                         "omitted: every balance at one date. The row states the period it HAS. Refused: a line this issuer "
                         "does not file (the lines it does are named); a flow asked `at` a date; a window the filings cannot make.",
-            json_schema=_schema({"ticker": _TICKER,
+            json_schema=_schema({"ticker": {"type": ["string", "array"], "items": {"type": "string"}, "minItems": 1,
+                                            "maxItems": FILINGS_READ_TICKERS,
+                                            "description": "a ticker, or a list of them to read the same line for each"},
                                  "line": {"type": ["string", "null"], "enum": [*nt.TABLE_FILED_LINES, None]},
                                  "months": {"type": ["integer", "null"], "enum": [3, 6, 9, 12, None]},
                                  "start": {"type": ["string", "null"], "description": "YYYY-MM-DD"},

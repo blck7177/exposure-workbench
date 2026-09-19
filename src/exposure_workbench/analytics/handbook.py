@@ -358,7 +358,15 @@ def chapter_text(analyst: str) -> str:
     why = {"data": "the desk does not hold it", "policy": "by policy", "withheld": "withheld"}
     return "\n\n".join((
         f"{c.title.upper()}\n{c.data}",
-        "1. THE QUESTIONS\n" + "\n".join(f"{t.name}: " + "; ".join(t.asked) for t in c.topics),
+        # each question names the measures that answer it, in the words section 2 lists them under.
+        # The topics always declared them (Topic.measures) and the chapter never said so: asked for
+        # "the room left to each tier", the risk analyst subtracted fourteen pairs of figures one
+        # call at a time and ran out of calls, with the measure that IS the room two sections down.
+        "1. THE QUESTIONS\n" + "\n".join(
+            f"{t.name}: " + "; ".join(t.asked)
+            + (". Measured by: " + "; ".join(registry.METHODS[m].reads_as for m in t.measures if m in registry.METHODS)
+               if any(m in registry.METHODS for m in t.measures) else "")
+            for t in c.topics),
         "2. THE MEASURES\n" + measures_text(analyst),
         "3. HOW THEY READ\n" + readings_text(analyst),
         "4. COMPARE AND CLOSE\n" + "\n".join(f"{t.name} — compare: " + "; ".join(t.compare) + ". Close: " + "; ".join(t.close) + "."

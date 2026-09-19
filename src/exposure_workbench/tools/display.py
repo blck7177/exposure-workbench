@@ -99,7 +99,9 @@ def render(template: str, args: dict | None, *, tool_name: str = "") -> str:
     fallback = (tool_name or "").replace("_", " ").strip().capitalize()
     if not template:
         return fallback
-    values = {k: _one_line(_humanise(k, v)) for k, v in (args or {}).items() if v is not None}
+    # several subjects read as a list of names, not as a Python list ("['AAPL', 'MSFT']")
+    values = {k: _one_line(", ".join(str(_humanise(k, x)) for x in v) if isinstance(v, (list, tuple)) else _humanise(k, v))
+              for k, v in (args or {}).items() if v is not None}
     try:
         return string.Formatter().vformat(template, (), _Missing(values))
     except (KeyError, IndexError, ValueError):

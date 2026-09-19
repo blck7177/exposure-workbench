@@ -51,6 +51,11 @@ logger = logging.getLogger(__name__)
 # task id, never a row. Every other verb is an evidence call.
 START_TOOL = "start"
 
+# what the row says when a task's evidence calls are used (the row is the boundary of
+# every line the analyst did not reach)
+_BUDGET_STOP = ("this task's {n} evidence calls are used; what was not read by then was not reached. Asking for one "
+                "column of every row, or one measure over a list of subjects, reads in one call what row-by-row reads in many")
+
 _SYSTEM = """You are {title} of a portfolio risk & issuer-intelligence desk. One task from the desk's lead analyst is in \
 front of you: numbered lines of what it wants to know about the subjects it names. Settle each line from your own family of \
 evidence, and file a brief that answers the task line by line.
@@ -168,6 +173,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
     actor = f"sub:{task.analyst}"
     result = dl.AnalystResult(task=task)
     evidence_calls = start_calls = completions = 0
+    budget_stop = None
     started: dict[tuple[str, str], str] = {}            # (kind, subject) -> the task it enqueued
     llm = ctx.llm.for_actor(actor) if hasattr(ctx.llm, "for_actor") else ctx.llm
 
@@ -258,10 +264,19 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                                         if again <= rp.STOP else
                                         "Sent unchanged again. The desk will not answer differently; file your brief.")}
                 elif evidence_calls >= settings.sub_analyst_evidence_calls:
-                    res = {"error": "analyst_budget",
-                           "detail": f"you have used this task's {settings.sub_analyst_evidence_calls} evidence calls; "
-                                     f"file your brief with what you have — a line you could not reach is not settled, "
-                                     f"and the row that refused you, or the policy, is its boundary"}
+                    # THE STOP IS A ROW (V1 live smoke). A line the budget kept the analyst from
+                    # is "not settled, with the id of the absence row that says so" — and nothing
+                    # minted one: the risk analyst wrote the error's name where an id goes, was
+                    # refused, and then pointed at a policy that had nothing to do with it.
+                    if budget_stop is None:
+                        budget_stop = fa.refusal_fact(name, {"subject": task.subjects[0] if task.subjects else None}, {
+                            "error": "analyst_budget",
+                            "detail": _BUDGET_STOP.format(n=settings.sub_analyst_evidence_calls)})
+                        await _record(ctx, actor, "boundary", name, {"of": "analyst_budget"}, "1 boundary row stated",
+                                      facts=[budget_stop])
+                    res = {"error": "analyst_budget", "rows": [F.line(budget_stop)],
+                           "detail": "file your brief with what you have: a line you did not reach is not settled, and "
+                                     "this row is its boundary"}
                 else:
                     evidence_calls += 1
                     res = await tools_session.call(name, args, actor=actor)

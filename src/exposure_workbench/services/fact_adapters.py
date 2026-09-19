@@ -337,6 +337,10 @@ def _label_of(row: dict) -> str | None:
     return None
 
 
+def _is_dated_row(row: dict) -> bool:
+    return any(isinstance(row.get(k), str) and row[k] for k in ("peak_date", "trough_date", "period_end", "as_of", "date"))
+
+
 def _is_absence(obj: dict) -> bool:
     return isinstance(obj.get("absence_id"), str) and isinstance(obj.get("statement"), str)
 
@@ -439,6 +443,13 @@ def _harvest(node: Any, key: str, path: str, ctx: Ctx, facts: list[F.Fact]) -> A
     if isinstance(node, list):
         if node and all(isinstance(r, dict) for r in node) and any(_label_of(r) for r in node):
             return [_harvest_row(r, key, path, ctx, facts) for r in node]
+        # ROWS THAT ARE DATED ARE ONE MEASURE AT SEVERAL DATES. A book's drawdown episodes came
+        # back as "episodes[0] depth" and "episodes[1] depth" — two measures, by their names — and
+        # the lead's "the last one took 24 sessions to recover, the one before 13" was refused as
+        # a change between two different quantities (V1 live smoke). The index is the list's; the
+        # row's own dates say which episode it is, and the row shows them (facts.when_of).
+        if node and all(isinstance(r, dict) and _is_dated_row(r) for r in node):
+            return [_harvest(r, key, path, ctx, facts) for r in node]
         return [_harvest(v, key, f"{path}[{i}]", ctx, facts) for i, v in enumerate(node)]
     if _is_num(node):
         if key in PARAM_KEYS:
@@ -571,6 +582,20 @@ def describe(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
 
 
 def read_fundamentals(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    if isinstance(result.get("results"), list):
+        # one line over several issuers: each entry is its own read, or its own refusal as a row
+        facts_all: list[F.Fact] = []
+        notes = []
+        for r in result["results"]:
+            asked = {**args, "ticker": r.get("asked") or r.get("ticker")}
+            if r.get("error"):
+                facts_all.append(refusal_fact("filings_read", asked, r))
+                notes.append({"ticker": asked["ticker"], "error": r.get("error")})
+                continue
+            fs, n = read_fundamentals(asked, {k: v for k, v in r.items() if k != "asked"})
+            facts_all += fs
+            notes.append(n)
+        return facts_all, {"results": notes}
     tk = result.get("ticker") or _ticker(args)
     ctx = Ctx("read_fundamentals", subject=tk, as_of=result.get("as_of"), group="fundamentals")
     if result.get("error") == "not_reported_at_this_date":

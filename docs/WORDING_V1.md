@@ -198,7 +198,7 @@ What the desk holds, as names and dates — never a figure. `metrics`: the measu
 **filings_read**（面：issuer）
 
 ```text
-One filed line of one issuer, as filed (a restatement supersedes what it restates). A flow is read over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` omitted: every balance at one date. The row states the period it HAS. Refused: a line this issuer does not file (the lines it does are named); a flow asked `at` a date; a window the filings cannot make.
+One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates). A flow is read over a window — `months` ending at the latest period or at `end`, or `start`..`end`; a balance at a date (`at`; omitted = the latest). `last_n` gives the line's last N readings as one series. `line` omitted: every balance at one date. The row states the period it HAS. Refused: a line this issuer does not file (the lines it does are named); a flow asked `at` a date; a window the filings cannot make.
 ```
 
 **metric**（面：issuer, market, risk）
@@ -365,12 +365,12 @@ THE ISSUER ANALYST
 The issuer's filed figures, as filed; the text of its filings, Item by Item; and the web for what a filing cannot hold.
 
 1. THE QUESTIONS
-earnings quality: operating cash flow beside net income over a window, and whether cash confirms earnings; the accruals ratio, as a level and as a trend; whether receivables, inventory or payables are growing faster than revenue; the working-capital cycle in days, dated, against an earlier reading
-profitability: margins at any filed line — gross, operating, net — as a level and as a slope; return on equity, on assets and on invested capital, and what a return on equity is made of; several issuers on one line at once, ordered, with the runner-up and the gap; whether a margin move is mix, pricing or cost, as far as the filed lines separate them
-leverage and coverage: debt against earnings, interest coverage, free cash flow against debt, and the liquidity ratios; the same readings a year earlier, or another issuer's; what would have to change in earnings or in debt for a reading to flip; what the filing itself says about maturities, covenants and facilities — quoted
-where the cash goes: capital expenditure, buybacks and dividends, each as a share of operating cash flow; capital-expenditure intensity, and whether the spending is outrunning revenue; free cash flow, and what the spending is doing to it
-business risk, from the filings: what the issuer's own filings say can go wrong, quoted from a named Item or a search of the text; the lines a named risk shows in first, over the years; what changed in the business and what did not, in the filing's own words; the drivers the filings name, each with the line it shows in and that line's recent direction
-recent events: recent filing items and web items about the name; whether the name is held, and the size of the position an item touches
+earnings quality: operating cash flow beside net income over a window, and whether cash confirms earnings; the accruals ratio, as a level and as a trend; whether receivables, inventory or payables are growing faster than revenue; the working-capital cycle in days, dated, against an earlier reading. Measured by: accruals ratio; accruals (net income − cash from operations); days sales outstanding; days inventory; days payable; cash conversion cycle
+profitability: margins at any filed line — gross, operating, net — as a level and as a slope; return on equity, on assets and on invested capital, and what a return on equity is made of; several issuers on one line at once, ordered, with the runner-up and the gap; whether a margin move is mix, pricing or cost, as far as the filed lines separate them. Measured by: gross margin; operating margin; net margin; ROE; ROA; ROIC; asset turnover; equity multiplier; tax burden
+leverage and coverage: debt against earnings, interest coverage, free cash flow against debt, and the liquidity ratios; the same readings a year earlier, or another issuer's; what would have to change in earnings or in debt for a reading to flip; what the filing itself says about maturities, covenants and facilities — quoted. Measured by: total debt; net debt; debt / EBITDA; net debt / EBITDA; EBIT / interest coverage; free cash flow / debt; current ratio; quick ratio; EBITDA
+where the cash goes: capital expenditure, buybacks and dividends, each as a share of operating cash flow; capital-expenditure intensity, and whether the spending is outrunning revenue; free cash flow, and what the spending is doing to it. Measured by: free cash flow; capex intensity; free cash flow margin; the name's place in the book
+business risk, from the filings: what the issuer's own filings say can go wrong, quoted from a named Item or a search of the text; the lines a named risk shows in first, over the years; what changed in the business and what did not, in the filing's own words; the drivers the filings name, each with the line it shows in and that line's recent direction. Measured by: gross margin; capex intensity; asset turnover
+recent events: recent filing items and web items about the name; whether the name is held, and the size of the position an item touches. Measured by: the name's place in the book
 
 2. THE MEASURES
 Every issuer measure is refused where an input was not filed at the window or date asked; the refusal names the input.
@@ -451,11 +451,11 @@ THE MARKET ANALYST
 Daily prices and volume for the names the desk follows and for the factor instruments.
 
 1. THE QUESTIONS
-where the price sits: distance from the high of the trailing year, momentum, and the deepest drawdown with its dates; return over a window against a benchmark's
-sensitivity: the name's beta to the market, to the rates instrument and to the credit instrument, with how well the fit explains it
-whether it has become more volatile: volatility over a short window and over a long one, for a name and for the index
-whether it is already in the price: the name's return over the window around an event, against the market's over the same window
-how much of it trades: average daily volume in shares and in dollars, over a stated number of sessions
+where the price sits: distance from the high of the trailing year, momentum, and the deepest drawdown with its dates; return over a window against a benchmark's. Measured by: distance from the 52-week high; 12-1 momentum; deepest drawdown; return over a window
+sensitivity: the name's beta to the market, to the rates instrument and to the credit instrument, with how well the fit explains it. Measured by: beta to a benchmark
+whether it has become more volatile: volatility over a short window and over a long one, for a name and for the index. Measured by: annualised volatility
+whether it is already in the price: the name's return over the window around an event, against the market's over the same window. Measured by: return over a window
+how much of it trades: average daily volume in shares and in dollars, over a stated number of sessions. Measured by: average daily volume
 
 2. THE MEASURES
 - annualised volatility: annualised volatility of the last N daily returns; a short window reacts, a long one is the baseline — over the adjusted close. Not meaningful when: fewer than 20 sessions in the window: refused with the counts, never shortened. (CFA Program, Quantitative Methods (return volatility); √252 annualisation is the industry convention)
@@ -500,11 +500,11 @@ The book: positions, runs and their tables, the mandate's checks, the factor mod
 
 1. THE QUESTIONS
 composition and drift: what the book holds, by weight and by market value, and the sectors they add up to; the largest name, the share of the largest few, the largest sector — each with its change since the prior run
-limits and triggers: every mandate check against its warning and breach tiers, and the room left to each; the nearest check, and the price move in one name that would close its own room; who would be over a cap the mandate does not define
+limits and triggers: every mandate check against its warning and breach tiers, and the room left to each; the nearest check, and the price move in one name that would close its own room; who would be over a cap the mandate does not define. Measured by: the book's net exposures and room to its tiers
 a hypothetical trade: the book after a sale or a purchase, with every check re-run; what tightens and what loosens against the book before; the dollars to sell to land a name at a tier, and the weight it lands at
-market risk: the book's netted exposure to an equity fall, to rates rising and to credit spreads widening; each holding's own sensitivity to the market, to rates and to credit; whether risk has risen, name by name and for the index
-drawdown and attribution: the book's drawdown episodes: depth, peak and trough dates, recovery; which names made an episode, by contribution over it; how much of a day's move was the market and how much was what was held
-liquidity: days to liquidate each name at a stated share of its daily volume, and what the book could clear in a day; whether the problem is one name or the book
+market risk: the book's netted exposure to an equity fall, to rates rising and to credit spreads widening; each holding's own sensitivity to the market, to rates and to credit; whether risk has risen, name by name and for the index. Measured by: the book's net exposures and room to its tiers; beta to a benchmark; annualised volatility
+drawdown and attribution: the book's drawdown episodes: depth, peak and trough dates, recovery; which names made an episode, by contribution over it; how much of a day's move was the market and how much was what was held. Measured by: the book's drawdown episodes; what one drawdown episode was made of; one day's move, reconciled
+liquidity: days to liquidate each name at a stated share of its daily volume, and what the book could clear in a day; whether the problem is one name or the book. Measured by: average daily volume
 
 2. THE MEASURES
 - annualised volatility: annualised volatility of the last N daily returns; a short window reacts, a long one is the baseline — over the adjusted close. Not meaningful when: fewer than 20 sessions in the window: refused with the counts, never shortened. (CFA Program, Quantitative Methods (return volatility); √252 annualisation is the industry convention)

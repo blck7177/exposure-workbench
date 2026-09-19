@@ -956,7 +956,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                                       "this figure does not hold that place — "
                                       + ("the desk's ordering holds the same reading as " + ", ".join(f"[{c['id']}]" for c in ranked[:3])
                                          + ": point at that one, or drop the word" if ranked else
-                                         "request compare: rank over it, or drop the word")})
+                                         "have the figures ranked and point at the ranked row, or drop the word")})
 
     # V37/V4: the period the sentence claims, against the readings' own dates
     _check_period(v, at, sentence, linked, ledger)

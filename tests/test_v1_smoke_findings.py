@@ -245,7 +245,7 @@ _RETIRED = re.compile(
     r"\b(read_fundamentals|read_prices|read_book|read_filings|search_web|run_program|submit_report|describe_issuer)\b"
     r"|\b(compute|describe|run|delegate)\((?!\))"
     r"|\bfundamentals\(|\bmethod\(name|\ba [a-z_]+\(…[^)]*\) node\b|\{'fn':"
-    r"|\bparams\.(by|factor)\b|\bcall describe\b|\bdescribe lists\b")
+    r"|\bparams\.(by|factor)\b|\bcall describe\b|\bdescribe lists\b|\bcompare: rank\b")
 # dead modules kept only until the boss rules on deleting them (docs/IMPLEMENTATION_PLAN_V1.md §5)
 _EXEMPT = {"tools/meta_tools.py", "analytics/semantics.py", "services/claims.py"}
 
@@ -533,3 +533,45 @@ def test_a_list_of_brackets_leaves_no_commas_behind():
     out = AC.accepted(text, v, led)
     assert out["text"].startswith("The checks that would still warn are JPM, LLY, and MSFT issuer concentration. Nothing else moves.")
     assert ",," not in out["text"] and set(out["citations"]) == {a.id, b.id, c.id}
+
+
+# ── the broader live pass (seven questions) ─────────────────────────────────
+
+async def test_one_filed_line_is_read_over_several_issuers_in_one_call(monkeypatch):
+    async def _read(db, ticker, metric=None, **kw):
+        if ticker == "JPM":
+            return {"error": "metric_not_filed", "ticker": "JPM", "metric": metric, "detail": "JPM has no filed facts under 'inventory'"}
+        return {"ticker": ticker, "metric": metric, "value": 1.0e9, "unit_class": "money", "calc_id": f"calc_{ticker.lower()}aaaa",
+                "period": {"start": "2025-04-01", "end": "2026-03-31"}}
+    monkeypatch.setattr(P.D, "_read_fundamentals", _read)
+    out = await P._filings_read(None, ["MSFT", "JPM", "MSFT"], line="inventory", months=12, why=WHY)
+    assert [r["asked"] for r in out["results"]] == ["MSFT", "JPM"]                 # a name asked twice is read once
+    facts, _ = fa.read_fundamentals({"ticker": ["MSFT", "JPM"], "line": "inventory"}, out)
+    assert [(f.kind, f.subject) for f in facts] == [(F.SCALAR, "MSFT"), (F.ABSENCE, "JPM")]
+    assert facts[1].means["reason"] == "not_held"
+    whole = await P._filings_read(None, ["MSFT", "JPM"], why=WHY)
+    assert whole["error"] == "invalid_params"                                        # a whole sheet is one issuer's
+    schema = P.build_analyst_registry("issuer").get("filings_read").json_schema["properties"]["ticker"]
+    assert schema["type"] == ["string", "array"] and schema["maxItems"] == P.FILINGS_READ_TICKERS
+
+
+def test_dated_rows_of_a_list_are_one_measure_and_say_their_own_dates():
+    payload = {"method": "book.drawdown_episodes", "subject": "port_001", "calc_id": "calc_ep", "sessions": 252,
+               "from": "2025-09-10", "to": "2026-09-10",
+               "episodes": [{"peak_date": "2026-01-07", "trough_date": "2026-03-27", "recovery_date": "2026-05-01",
+                             "depth": 0.12, "trough_days": 55, "recovery_days": 24},
+                            {"peak_date": "2026-05-29", "trough_date": "2026-06-25", "recovery_date": None,
+                             "depth": 0.0624, "trough_days": 18}]}
+    facts, _ = fa.compute({"name": "book.drawdown_episodes", "subject": "port_001"}, payload)
+    depths = [f for f in facts if f.measure.endswith("depth")]
+    assert len(depths) == 2 and len({f.measure for f in depths}) == 1              # one measure, two episodes
+    first, second = (F.line(f) for f in depths)
+    assert "peak 2026-01-07 to trough 2026-03-27, recovered 2026-05-01" in first
+    assert "peak 2026-05-29 to trough 2026-06-25" in second and "recovered" not in second
+    assert all(f.means.get("basis") == ["todays_holdings"] for f in depths)
+
+
+def test_a_list_argument_reads_as_names_in_the_progress_line():
+    from exposure_workbench.tools import display
+    said = display.render("Measuring {name} for {subject}", {"name": "price.beta", "subject": ["AAPL", "XOM"]})
+    assert "AAPL, XOM" in said and "[" not in said
