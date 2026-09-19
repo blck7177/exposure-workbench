@@ -616,3 +616,70 @@ def test_calc_takes_no_name_and_the_desk_says_what_the_result_is():
     assert F.line(room).startswith(f"[{room.id}] limit checks: breach tier − limit checks: measured, issuer_concentration:AAPL")
     ratio = F.fact(F.SCALAR, "AAPL.vol.30d.divide.AAPL.vol.252d", subject="AAPL", unit="RATIO", value=1.24, as_of="2026-09-10")
     assert F.model_row(ratio)["what"] == "vol 30d ÷ vol 252d"
+
+
+def test_trades_apply_in_order_and_each_side_keeps_the_engines_refusals():
+    from exposure_workbench.analytics import scenario as sc
+    book = [sc.Holding("AAPL", "Technology", 1500.0), sc.Holding("JPM", "Financials", 1500.0), sc.Holding("XOM", "Energy", 1000.0)]
+    after = sc.traded(book, [("sell", [sc.Sale("AAPL", 0.5)]), ("buy", [sc.Buy("KO", 0.10, "Consumer_Staples")])])
+    assert round(after.market_value, 2) == 3611.11 and round(after.weights["KO"], 4) == 0.10
+    assert round(after.proceeds, 2) == 388.89                     # what left, less what came in from outside
+    assert [(s.ticker, s.market_value_sold) for s in after.sold] == [("AAPL", 750.0)]
+    assert [(b.ticker, round(b.market_value_added, 2)) for b in after.bought] == [("KO", 361.11)]
+    # the order is the writer's: bought first, KO is diluted by nothing later and AAPL's half is of the larger book
+    other = sc.traded(book, [("buy", [sc.Buy("KO", 0.10, "Consumer_Staples")]), ("sell", [sc.Sale("AAPL", 0.5)])])
+    assert round(other.weights["KO"], 4) != 0.10 and [b.ticker for b in other.bought] == ["KO"]
+    assert round(next(b.weight for b in other.bought), 4) == round(other.weights["KO"], 4)     # its FINAL weight
+    assert sc.traded(book, [("buy", [sc.Buy("AAPL", 0.10, "Technology")])])["error"] == "already_held"
+    assert sc.traded(book, [("sell", [sc.Sale("KO", 1.0)])])["error"] == "not_held"
+    assert sc.traded(book, [])["error"] == "no_trades"
+
+
+def test_a_scenario_shows_both_sides_of_the_trade():
+    payload = {**_SCENARIO, "sales": None, "trades": [{"sell": "AAPL", "fraction": 0.5}, {"buy": "KO", "weight": 0.05}],
+               "bought": [{"ticker": "KO", "weight": 0.05, "market_value_added": 522605.5}]}
+    payload = {k: v for k, v in payload.items() if v is not None}
+    shown, _note, held, made = fa.adapt_all("scenario", {"book": "port_001"}, payload)
+    said = "\\n".join(F.line(f) for f in shown)
+    assert "bought market value added, KO" in said and "bought weight, KO" in said and "sold market value sold, AAPL" in said
+    assert not any(f.measure.startswith("trades") for f in made)          # the caller's list is not echoed as figures
+
+
+async def test_prices_read_names_the_one_field_it_wants(monkeypatch):
+    """Plan V1 §2.3: field ∈ {close, adj_close, volume}. It had none, and volume
+    could only be had as the average the liquidity measure computes."""
+    from datetime import date
+    from exposure_workbench.services import price_analytics_service as pas
+    bars = [pas.Bar(date(2026, 9, d), 100.0 + d, 99.0 + d, 1_000_000 * d) for d in (8, 9, 10)]
+
+    async def _bars(db, ticker, start=None, end=None):
+        return [b for b in bars if end is None or b.date <= end]
+
+    async def _market_bars(db, ticker):
+        return bars if ticker == "AAPL" else []
+
+    recorded = []
+
+    async def _record(db, ticker, op, params, result, inputs, flags, invoked_by, **kw):
+        recorded.append((op, params.get("column"), params["result_type"]["unit_class"]))
+        return f"calc_{len(recorded):012d}"
+
+    async def _none(db, **kw):
+        return {"error": "no_price_data", "detail": kw.get("detail")}
+    monkeypatch.setattr(pas, "_bars", _bars)
+    monkeypatch.setattr(pas, "_market_bars", _market_bars)
+    monkeypatch.setattr(pas.cs, "_record", _record)
+    monkeypatch.setattr(pas, "_no_history", _none)
+
+    one = await P._prices_read(None, "AAPL", "volume", why=WHY)
+    assert one["volume"]["value"] == 10_000_000.0 and one["as_of"] == "2026-09-10" and "close" not in one
+    close = await P._prices_read(None, "AAPL", "close", date="2026-09-09", why=WHY)
+    assert close["close"]["value"] == 109.0 and "adj_close" not in close
+    series = await P._prices_read(None, "AAPL", "volume", window="1m", why=WHY)
+    assert series["quantity"] == "AAPL.volume" and [p["value"] for p in series["points"]] == [8e6, 9e6, 1e7]
+    assert series["unit_class"] == "count"
+    assert (await P._prices_read(None, "SPY", "volume", window="1m", why=WHY))["error"] == "no_price_data"   # a factor: no volume
+    facts, _ = fa.read_prices({"ticker": "AAPL", "field": "volume"}, one)
+    assert "volume, AAPL, as of 2026-09-10: 10000000" in F.line(facts[0])
+    schema = P.build_analyst_registry("market").get("prices_read").json_schema
+    assert schema["required"] == ["ticker", "field", "why"] or set(schema["required"]) == {"ticker", "field", "why"}

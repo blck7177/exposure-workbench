@@ -46,6 +46,13 @@ class SoldLeg:
 
 
 @dataclass(frozen=True)
+class BoughtLeg:
+    ticker: str
+    weight: float                # its share of the book right after the purchase
+    market_value_added: float
+
+
+@dataclass(frozen=True)
 class ScenarioBook:
     """The book that remains, with its own weights."""
     holdings: list[Holding]                       # post-sale, sold-out names dropped
@@ -54,6 +61,7 @@ class ScenarioBook:
     market_value: float
     proceeds: float
     sold: list[SoldLeg] = field(default_factory=list)
+    bought: list[BoughtLeg] = field(default_factory=list)
 
 
 def _err(code: str, detail: str) -> dict:
@@ -178,6 +186,38 @@ def with_buys(holdings: list[Holding], buys: list[Buy]) -> ScenarioBook | dict:
     return ScenarioBook(
         holdings=remaining, weights=weights, sectors=sectors,
         market_value=total, proceeds=-sum(float(h.market_value) for h in added),
-        sold=[],
+        sold=[], bought=[BoughtLeg(h.ticker, weights[h.ticker], float(h.market_value)) for h in added],
     )
+
+
+def traded(holdings: list[Holding], groups: list[tuple[str, list]]) -> ScenarioBook | dict:
+    """The book after a list of trades, applied IN THE ORDER GIVEN (V1: the plan's
+    `scenario(run, trades)`). `groups` is that list with neighbouring sales put
+    together and neighbouring purchases put together, so each group is exactly
+    what `without` or `with_buys` has always taken and every refusal of theirs
+    still fires on the group it belongs to.
+
+    The semantics are the engine's and are not changed by putting both in one
+    call: a sale's proceeds LEAVE the book, a purchase is paid with money from
+    OUTSIDE it. A purchase is not funded by a sale; the two only happen to the
+    same book, one after the other. `proceeds` is the net of what left and what
+    came in."""
+    book: ScenarioBook | dict | None = None
+    sold: list[SoldLeg] = []
+    bought: list[BoughtLeg] = []
+    proceeds = 0.0
+    for side, legs in groups:
+        book = without(holdings, legs) if side == "sell" else with_buys(holdings, legs)
+        if isinstance(book, dict):
+            return book
+        sold += book.sold
+        bought += book.bought
+        proceeds += book.proceeds
+        holdings = book.holdings
+    if book is None:
+        return _err("no_trades", "at least one trade is needed")
+    # a name bought early and diluted by a later purchase holds its FINAL weight
+    bought = [BoughtLeg(b.ticker, book.weights.get(b.ticker, b.weight), b.market_value_added) for b in bought]
+    return ScenarioBook(holdings=book.holdings, weights=book.weights, sectors=book.sectors,
+                        market_value=book.market_value, proceeds=proceeds, sold=sold, bought=bought)
 

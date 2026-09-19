@@ -61,7 +61,7 @@ from exposure_workbench.services import compute_service
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import filing_retrieval_service as frs
 from exposure_workbench.services import name_table as nt
-from exposure_workbench.services import portfolio_service, run_reads_service
+from exposure_workbench.services import portfolio_service, run_reads_service, scenario_service
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.services.ledger import Ledger
@@ -82,6 +82,16 @@ _WHY = {"type": "string",
         "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"}
 _TICKER = {"type": "string", "description": "a ticker, e.g. NVDA"}
 _BOOK = {"type": "string", "description": "a book: a port_… id (its latest completed run), a run_… id, or the calc_… id of a book a scenario built"}
+# one trade: a sale of all or part of a held name, or a purchase of a name not held
+_TRADES = {"type": "array", "minItems": 1, "maxItems": 20, "items": {"oneOf": [
+    {"type": "object", "additionalProperties": False, "required": ["sell"], "properties": {
+        "sell": {"type": "string", "description": "the ticker of a name the book holds"},
+        "fraction": {"type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 1,
+                     "description": "share of the position sold; omitted = all of it"}}},
+    {"type": "object", "additionalProperties": False, "required": ["buy", "weight"], "properties": {
+        "buy": {"type": "string", "description": "the ticker of a name the book does not hold"},
+        "weight": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1,
+                   "description": "its share of the book right AFTER this purchase"}}}]}}
 
 
 def _schema(properties: dict, required: list[str]) -> dict:
@@ -236,8 +246,9 @@ async def _filings_read(db: AsyncSession, ticker, line: str | None = None, month
     return {"results": [{"asked": tk, **(await one(tk))} for tk in tickers], "count": len(tickers)}
 
 
-async def _prices_read(db: AsyncSession, ticker: str, window: str | None = None, date: str | None = None, *, why: str) -> dict:
-    return await D._read_prices(db, ticker, window=window, as_of=date)
+async def _prices_read(db: AsyncSession, ticker: str, field: str, window: str | None = None, date: str | None = None,
+                       *, why: str) -> dict:
+    return await D._read_prices(db, ticker, window=window, as_of=date, field=field)
 
 
 async def _resolve_book(db: AsyncSession, book: str, which: str | None) -> tuple[str, str | None] | dict:
@@ -455,18 +466,17 @@ async def _web_search(db: AsyncSession, ticker: str, query: str, days: int | Non
 
 # ── the two actions ──────────────────────────────────────────────────────────
 
-async def _scenario(db: AsyncSession, book: str, sales: list | None = None, buys: list | None = None, *, why: str) -> dict:
-    if (sales is None) == (buys is None):
-        return _err("invalid_params", "a scenario is ONE trade list: give `sales` or `buys`; to do both, run the "
-                                      "sale, then run the purchase on the book it made (its calc_… id)")
+async def _scenario(db: AsyncSession, book: str, trades: list, *, why: str) -> dict:
+    """The plan's signature (V1 §2.3): a book and a list of trades. Until
+    2026-09-19 this took `sales` OR `buys`, the two halves of the engine as the
+    old compute exposed them, one list a call."""
     resolved = await _resolve_book(db, book, None)
     if isinstance(resolved, dict):
         return resolved
-    out = await compute_service.compute(db, method="book.sell" if sales is not None else "book.buy",
-                                        subject=resolved[0],
-                                        params={"sales": sales} if sales is not None else {"buys": buys})
+    out = await scenario_service.hypothetical_trades(db, resolved[0], list(trades or []))
     if isinstance(out, dict) and not out.get("error") and isinstance(out.get("calc_id"), str):
         out["made"] = out["calc_id"]           # the new book, by the id `book_read` and `scenario` take
+        out["subject"] = resolved[0]
     return out
 
 
@@ -516,13 +526,17 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                                  "last_n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40}}, ["ticker"])),
         "prices_read": Tool(
             name="prices_read", display="Reading {ticker}'s prices", rows=True, tool_class=READ, fn=_prices_read,
-            description="A name's daily adjusted closes over a named window, as one series — or, with `date` (or neither), "
-                        "one session's close and adjusted close. A price statistic (volatility, beta, a drawdown, volume) is "
-                        "a measure: ask `metric` for it by name. Refused: a name with no price history here.",
+            description="One field of a name's daily prices: `close` is the as-traded price (market value, display), "
+                        "`adj_close` the split- and dividend-adjusted level returns are measured on, `volume` the shares "
+                        "traded in a session. Over a named `window` it is one series; with `date` (or neither) it is one "
+                        "session's reading. A price STATISTIC (volatility, beta, a drawdown, average daily volume) is a "
+                        "measure: ask `metric` for it by name. Refused: a name with no price history here; volume for a "
+                        "name followed only as a factor instrument.",
             json_schema=_schema({"ticker": _TICKER,
+                                 "field": {"type": "string", "enum": ["close", "adj_close", "volume"]},
                                  "window": {"type": ["string", "null"], "enum": ["1m", "3m", "6m", "1y", "3y", None]},
                                  "date": {"type": ["string", "null"], "description": "YYYY-MM-DD; omitted = the latest session"}},
-                                ["ticker"]),
+                                ["ticker", "field"]),
             shapes=Shapes(("window", "date"), "window reads a series and date reads one session: give one of them")),
         "book_read": Tool(
             name="book_read", display="Reading {table} of {book}", rows=True, tool_class=READ, fn=_book_read,
@@ -598,16 +612,13 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                                  "days": {"type": ["integer", "null"], "minimum": 1, "maximum": 365}}, ["ticker", "query"])),
         "scenario": Tool(
             name="scenario", display="Building the book after a trade", rows=True, tool_class=READ, fn=_scenario,
-            description="The book after ONE list of sales or of purchases: weights, sector weights, market value, and every "
-                        "concentration and exposure check re-run — a NEW book, returned by its id (`made`), which `book_read` "
-                        "and `scenario` take, so trades chain. It re-prices and re-checks; it does not re-fit betas, "
-                        "volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), a name with no "
-                        "sector on this desk, a name already held bought again.",
-            json_schema=_schema({"book": _BOOK,
-                                 "sales": desk.METHODS["book.sell"].params_schema["properties"]["sales"] | {"type": ["array", "null"]},
-                                 "buys": desk.METHODS["book.buy"].params_schema["properties"]["buys"] | {"type": ["array", "null"]}},
-                                ["book"]),
-            shapes=Shapes(("sales", "buys"), "one trade list a call: a sale, then a purchase on the book it made")),
+            description="The book after a list of trades, applied in the order given: weights, sector weights, market value, "
+                        "and every concentration and exposure check re-run — a NEW book, returned by its id (`made`), which "
+                        "`book_read` and `scenario` take. A sale's proceeds leave the book; a purchase is paid with money "
+                        "from outside it, so a purchase is not funded by a sale. It re-prices and re-checks; it does not "
+                        "re-fit betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), "
+                        "a name with no sector on this desk, a name already held bought again.",
+            json_schema=_schema({"book": _BOOK, "trades": _TRADES}, ["book", "trades"])),
         "start": Tool(
             name="start", display="Starting {kind} for {subject}", rows=True, tool_class=DELEGATION, fn=_start_for(face),
             description="Background preparation, returning an id at once and NEVER evidence: `readiness` puts a listed SEC "

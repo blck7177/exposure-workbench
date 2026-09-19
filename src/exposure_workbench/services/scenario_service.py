@@ -97,6 +97,8 @@ def recorded_shape(book: sc.ScenarioBook, checks: list, alerts: list) -> dict:
         "sold": [{"ticker": s.ticker, "fraction": s.fraction,
                   "market_value_sold": s.market_value_sold, "exited": s.exited}
                  for s in book.sold],
+        "bought": [{"ticker": b.ticker, "weight": b.weight, "market_value_added": b.market_value_added}
+                   for b in book.bought],
         "proceeds": book.proceeds,
     }
 
@@ -145,6 +147,48 @@ async def hypothetical_buy(db: AsyncSession, run_id: str, buys: list[dict]) -> d
         placed.append(sc.Buy(b.ticker, b.weight, sector))
     return await _scenario(db, run_id, lambda holdings: sc.with_buys(holdings, placed),
                            {"buys": [{"ticker": b.ticker, "weight": b.weight} for b in placed]})
+
+
+async def hypothetical_trades(db: AsyncSession, run_id: str, trades: list[dict]) -> dict:
+    """The book after a list of trades, as ONE recorded book (V1, plan §2.3:
+    `scenario(run, trades)`). Each trade is one sale — {sell, fraction} — or one
+    purchase — {buy, weight}; they apply in the order given (analytics/scenario.
+    traded). Parsed by the same two parsers a lone sale or purchase list goes
+    through, so a trade is refused for exactly what it was always refused for."""
+    from exposure_workbench.db.models import Company
+    groups: list[tuple[str, list]] = []
+    for i, t in enumerate(trades or []):
+        sells = isinstance(t, dict) and isinstance(t.get("sell"), str) and t["sell"]
+        buys = isinstance(t, dict) and isinstance(t.get("buy"), str) and t["buy"]
+        if bool(sells) == bool(buys):
+            return _err("bad_trade", f"trades[{i}] is one sale ({{sell, fraction}}) or one purchase ({{buy, weight}})")
+        side, leg = (("sell", {"ticker": t["sell"], "fraction": t.get("fraction")}) if sells
+                     else ("buy", {"ticker": t["buy"], "weight": t.get("weight")}))
+        if groups and groups[-1][0] == side:
+            groups[-1][1].append(leg)
+        else:
+            groups.append((side, [leg]))
+    if not groups:
+        return _err("bad_trade", "at least one trade is needed")
+    parsed: list[tuple[str, list]] = []
+    for side, legs in groups:
+        got = _sales(legs) if side == "sell" else _buys(legs)
+        if isinstance(got, dict):
+            return got
+        if side == "buy":
+            placed = []
+            for b in got:
+                sector = (await db.execute(select(Company.sector).where(Company.ticker == b.ticker))).scalar_one_or_none()
+                if not sector:
+                    return _err("no_sector", f"{b.ticker} has no sector on this desk (not prepared, or "
+                                             f"not an SEC filer), so a sector-concentration check on the "
+                                             f"book with it cannot run; prepare the name first", run_id=run_id)
+                placed.append(sc.Buy(b.ticker, b.weight, sector))
+            got = placed
+        parsed.append((side, got))
+    said = [({"sell": x.ticker, "fraction": x.fraction} if side == "sell" else {"buy": x.ticker, "weight": x.weight})
+            for side, legs in parsed for x in legs]
+    return await _scenario(db, run_id, lambda holdings: sc.traded(holdings, parsed), {"trades": said})
 
 
 async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) -> dict:
@@ -221,6 +265,7 @@ async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) 
         "as_of": as_of,
         **identifying,
         "sold": recorded["sold"],
+        "bought": recorded["bought"],
         "proceeds": book.proceeds,
         "market_value": book.market_value,
         "positions": recorded["issuer_exposures"],

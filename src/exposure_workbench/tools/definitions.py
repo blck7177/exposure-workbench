@@ -145,12 +145,15 @@ async def _read_filings(db: AsyncSession, ticker: str, query: str | None = None,
 # ── read_prices ─────────────────────────────────────────────────────────────────
 
 async def _read_prices(db: AsyncSession, ticker: str, window: str | None = None,
-                       as_of: str | None = None) -> dict:
-    """A series over a named window, or — with no window — one session's price."""
+                       as_of: str | None = None, field: str | None = None) -> dict:
+    """One field's series over a named window, or — with no window — one session's
+    reading of it. `field` omitted keeps the old reading: the adjusted-close series,
+    or the session's close and adjusted close together."""
     invoked_by = current_session_id()
     if window is not None:
-        return await pas.get_price_series(db, ticker.upper(), window=window, invoked_by=invoked_by)
-    return await pas.get_price(db, ticker.upper(), as_of=as_of, invoked_by=invoked_by)
+        return await pas.get_price_series(db, ticker.upper(), window=window, invoked_by=invoked_by,
+                                          field=field or "adj_close")
+    return await pas.get_price(db, ticker.upper(), as_of=as_of, invoked_by=invoked_by, field=field)
 
 
 # ── reflection ──────────────────────────────────────────────────────────────────

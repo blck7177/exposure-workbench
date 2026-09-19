@@ -216,8 +216,11 @@ def _simple_returns(bars: list[Bar]) -> tuple[list[tuple[date, float]], dict]:
 
 # ── 1. the price itself — two quantities, two rows ───────────────────────────
 
+PRICE_FIELDS = ("close", "adj_close", "volume")
+
+
 async def get_price(db: AsyncSession, ticker: str, as_of: str | None = None,
-                    invoked_by: str = "agent") -> dict:
+                    invoked_by: str = "agent", field: str | None = None) -> dict:
     """The most recent (or as-of) close AND adj_close, as two named quantities.
 
     Two ledger rows, because they are two different numbers about the same bar
@@ -230,6 +233,10 @@ async def get_price(db: AsyncSession, ticker: str, as_of: str | None = None,
         cutoff = date.fromisoformat(as_of) if as_of else None
     except ValueError:
         return {"error": "invalid_date", "detail": "as_of is YYYY-MM-DD"}
+    if field is not None and field not in PRICE_FIELDS:
+        return {"error": "unknown_field", "field": field, "known": list(PRICE_FIELDS)}
+    if field == "volume":
+        return await _volume_point(db, ticker, cutoff, as_of, invoked_by)
     bars = await _bars(db, ticker, end=cutoff)
     if not bars:
         return await _no_history(
@@ -245,6 +252,8 @@ async def get_price(db: AsyncSession, ticker: str, as_of: str | None = None,
                      "adj_close is the split- and dividend-adjusted level returns "
                      "are measured on. They are two quantities; cite the one you use.")}
     for column, value in (("close", bar.close), ("adj_close", bar.adj_close)):
+        if field is not None and column != field:
+            continue                      # V1: `prices_read` names the ONE field it wants
         quantity = f"{ticker}.{column}"
         if value is None:
             # Distinct from "no bar": the bar exists and this column of it does
@@ -274,17 +283,23 @@ async def get_price(db: AsyncSession, ticker: str, as_of: str | None = None,
 
 async def get_price_series(db: AsyncSession, ticker: str,
                            window: str = _DEFAULT_WINDOW,
-                           invoked_by: str = "agent") -> dict:
-    """adj_close daily series over a named window, as one citable series row.
+                           invoked_by: str = "agent", field: str = "adj_close") -> dict:
+    """One field's daily series over a named window, as one citable series row.
 
-    adj_close and only adj_close: this series exists to feed return work, and
-    a level series that silently mixed conventions would poison every
-    estimator built on it. Points carry POINT_PERIOD_KEY, the one key a series
-    producer writes (analytics/units.py).
+    ONE field a series, named by the caller (V1, plan §2.3: `field ∈ {close,
+    adj_close, volume}`): a level series that silently mixed conventions would
+    poison every estimator built on it, so the series says which it is in its
+    own name and never switches. The desk's estimators do not read this — they
+    load their own adjusted closes. Points carry POINT_PERIOD_KEY, the one key a
+    series producer writes (analytics/units.py).
     """
     ticker = ticker.upper()
     if window not in _WINDOWS:
         return {"error": "unknown_window", "window": window, "known": sorted(_WINDOWS)}
+    if field not in PRICE_FIELDS:
+        return {"error": "unknown_field", "field": field, "known": list(PRICE_FIELDS)}
+    if field != "adj_close":
+        return await _field_series(db, ticker, window, field, invoked_by)
     bars = await _bars(db, ticker)
     if not bars:
         return await _no_history(
@@ -319,6 +334,64 @@ async def get_price_series(db: AsyncSession, ticker: str,
             "from": points[0][POINT_PERIOD_KEY], "to": points[-1][POINT_PERIOD_KEY],
             "quantity": f"{ticker}.adj_close", "unit_class": u.MONEY_PER_SHARE,
             "basis": f"adjusted daily closes, {points[0][POINT_PERIOD_KEY]}..{points[-1][POINT_PERIOD_KEY]}"}
+
+
+async def _field_series(db: AsyncSession, ticker: str, window: str, field: str, invoked_by: str) -> dict:
+    """The as-traded close, or the session's volume, over a named window."""
+    bars = await (_market_bars(db, ticker) if field == "volume" else _bars(db, ticker))
+    quantity = f"{ticker}.{field}"
+    if not bars:
+        return await _no_history(
+            db, ticker=ticker, quantity=quantity,
+            detail=(f"this desk holds no {'volume' if field == 'volume' else 'price'} history for {ticker}"
+                    + ("; a name followed only as a factor instrument has prices and no volume." if field == "volume" else ".")),
+            invoked_by=invoked_by, window=window)
+    start = bars[-1].date - timedelta(days=_WINDOWS[window])
+    value_of = (lambda b: b.volume) if field == "volume" else (lambda b: b.close)
+    kept = [b for b in bars if b.date >= start and value_of(b) is not None]
+    if not kept:
+        return await _no_history(db, ticker=ticker, quantity=quantity,
+                                 detail=f"{ticker}'s bars over the last {window} carry no {field}.",
+                                 invoked_by=invoked_by, window=window)
+    unit = u.COUNT if field == "volume" else u.MONEY_PER_SHARE
+    points = [{POINT_PERIOD_KEY: b.date.isoformat(), "value": float(value_of(b)), "fact_ids": []} for b in kept]
+    calc_id = await cs._record(
+        db, ticker, OP_PRICE_SERIES,
+        {"ticker": ticker, "window": window, "column": field,
+         "result_type": {"unit_class": unit, "kind": "series", "quantity": quantity}},
+        {"points": points},
+        [f"price:{ticker}:{kept[0].date.isoformat()}:{kept[-1].date.isoformat()}"],
+        {"n": len(points)}, invoked_by, unit_class=unit.upper(),
+    )
+    return {"calc_id": calc_id, "ticker": ticker, "window": window, "n": len(points), "points": points,
+            "from": points[0][POINT_PERIOD_KEY], "to": points[-1][POINT_PERIOD_KEY],
+            "quantity": quantity, "unit_class": unit,
+            "basis": (f"shares traded each session, {points[0][POINT_PERIOD_KEY]}..{points[-1][POINT_PERIOD_KEY]}"
+                      if field == "volume" else
+                      f"as-traded daily closes, {points[0][POINT_PERIOD_KEY]}..{points[-1][POINT_PERIOD_KEY]}")}
+
+
+async def _volume_point(db: AsyncSession, ticker: str, cutoff: date | None, as_of: str | None, invoked_by: str) -> dict:
+    """One session's volume: shares traded on the latest session on or before `as_of`."""
+    bars = [b for b in await _market_bars(db, ticker) if (cutoff is None or b.date <= cutoff) and b.volume is not None]
+    quantity = f"{ticker}.volume"
+    if not bars:
+        return await _no_history(
+            db, ticker=ticker, quantity=quantity,
+            detail=(f"this desk holds no volume for {ticker}" + (f" on or before {as_of}" if as_of else "")
+                    + "; a name followed only as a factor instrument has prices and no volume."),
+            invoked_by=invoked_by, as_of=as_of)
+    bar = bars[-1]
+    calc_id = await cs._record(
+        db, ticker, OP_PRICE_POINT,
+        {"ticker": ticker, "column": "volume", "as_of": bar.date.isoformat(),
+         "result_type": {"unit_class": u.COUNT, "kind": "scalar", "quantity": quantity,
+                         "basis": {"instant": bar.date.isoformat()}}},
+        {"value": float(bar.volume)}, [f"price:{ticker}:{bar.date.isoformat()}"], {},
+        invoked_by, unit_class="COUNT",
+    )
+    return {"ticker": ticker, "as_of": bar.date.isoformat(),
+            "volume": {"value": float(bar.volume), "calc_id": calc_id, "quantity": quantity, "unit_class": u.COUNT}}
 
 
 async def _record_returns_series(db: AsyncSession, ticker: str, bars: list[Bar],

@@ -70,7 +70,8 @@ UNIT_BY_KEY: dict[str, str] = {
     # the 102-turn battery that followed them, so this leaf had never met the
     # adapter until V28 opened the route (the third payload of this shape).
     "entries": COUNT,
-    "proceeds": MONEY, "market_value_sold": MONEY, "value_then": MONEY, "market_value": MONEY,
+    "proceeds": MONEY, "market_value_sold": MONEY, "market_value_added": MONEY, "value_then": MONEY,
+    "market_value": MONEY,
     # ratios
     "depth": RATIO, "gap": RATIO, "tolerance": RATIO, "difference": RATIO, "factor_share": RATIO,
     "unexplained_share": RATIO, "room_to_warning": RATIO,
@@ -972,7 +973,7 @@ def scenario(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     if result.get("error"):
         return compute(args, result)
     made = result.get("made") or result.get("calc_id")
-    facts, note = compute(args, {k: v for k, v in result.items() if k not in ("sales", "buys")})
+    facts, note = compute(args, {k: v for k, v in result.items() if k not in ("sales", "buys", "trades")})
     why_not = ("a scenario re-prices the book and re-runs its concentration and exposure checks; it has no "
                "return history, so nothing fitted on returns is carried")
     for check in result.get("checks_not_run") or []:

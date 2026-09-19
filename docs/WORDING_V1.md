@@ -240,7 +240,7 @@ Background preparation, returning an id at once and NEVER evidence: `readiness` 
 **prices_read**（面：market）
 
 ```text
-A name's daily adjusted closes over a named window, as one series — or, with `date` (or neither), one session's close and adjusted close. A price statistic (volatility, beta, a drawdown, volume) is a measure: ask `metric` for it by name. Refused: a name with no price history here.
+One field of a name's daily prices: `close` is the as-traded price (market value, display), `adj_close` the split- and dividend-adjusted level returns are measured on, `volume` the shares traded in a session. Over a named `window` it is one series; with `date` (or neither) it is one session's reading. A price STATISTIC (volatility, beta, a drawdown, average daily volume) is a measure: ask `metric` for it by name. Refused: a name with no price history here; volume for a name followed only as a factor instrument.
 ```
 
 **book_read**（面：risk）
@@ -252,7 +252,7 @@ Figures of a book, off the table they sit on: one `column` for every row, one `r
 **scenario**（面：risk）
 
 ```text
-The book after ONE list of sales or of purchases: weights, sector weights, market value, and every concentration and exposure check re-run — a NEW book, returned by its id (`made`), which `book_read` and `scenario` take, so trades chain. It re-prices and re-checks; it does not re-fit betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), a name with no sector on this desk, a name already held bought again.
+The book after a list of trades, applied in the order given: weights, sector weights, market value, and every concentration and exposure check re-run — a NEW book, returned by its id (`made`), which `book_read` and `scenario` take. A sale's proceeds leave the book; a purchase is paid with money from outside it, so a purchase is not funded by a sale. It re-prices and re-checks; it does not re-fit betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), a name with no sector on this desk, a name already held bought again.
 ```
 
 每个动词都有的 `why` 参数：

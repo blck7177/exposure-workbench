@@ -355,6 +355,13 @@ def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
             fr = leg.get("fraction")
             if isinstance(fr, (int, float)) and not isinstance(fr, bool):
                 values.append(Quantity(float(fr), RATIO, f"trade.sold.{leg['ticker']}.fraction", cid))
+    for leg in result.get("bought") or []:
+        mv = leg.get("market_value_added") if isinstance(leg, dict) else None
+        if isinstance(mv, (int, float)) and not isinstance(mv, bool) and isinstance(leg.get("ticker"), str):
+            values.append(Quantity(float(mv), MONEY, f"trade.bought.{leg['ticker']}.market_value", cid))
+            w = leg.get("weight")
+            if isinstance(w, (int, float)) and not isinstance(w, bool):
+                values.append(Quantity(float(w), RATIO, f"trade.bought.{leg['ticker']}.weight", cid))
     values = [replace(q, group=resources.group_of(q.label) or "other") for q in values]
     # The SUBJECT: which book this is. A scenario's names are a run's names on
     # purpose, so a before/after table's two columns would derive the same
@@ -364,10 +371,14 @@ def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
     # name does not carry it (answer_blocks._derivation_name), so the
     # scenario's column reads "after sale of NVDA issuer exposures weight".
     params = row.params or {}
-    sold = [s.get("ticker") for s in (params.get("sales") or []) if isinstance(s, dict) and s.get("ticker")]
-    bought = [b.get("ticker") for b in (params.get("buys") or []) if isinstance(b, dict) and b.get("ticker")]
-    subject = (("after_sale_of_" + "_".join(sold)) if sold
-               else ("after_buying_" + "_".join(bought)) if bought else "after_trade")
+    trades = [t for t in (params.get("trades") or []) if isinstance(t, dict)]
+    sold = ([s.get("ticker") for s in (params.get("sales") or []) if isinstance(s, dict) and s.get("ticker")]
+            + [t["sell"] for t in trades if isinstance(t.get("sell"), str)])
+    bought = ([b.get("ticker") for b in (params.get("buys") or []) if isinstance(b, dict) and b.get("ticker")]
+              + [t["buy"] for t in trades if isinstance(t.get("buy"), str)])
+    subject = "_and_".join(x for x in (("after_sale_of_" + "_".join(sold)) if sold else "",
+                                        (("after_" if not sold else "") + "buying_" + "_".join(bought)) if bought else "")
+                           if x) or "after_trade"
     return Resolved(tuple(values), frozenset(), calc_kind(row), subject=subject)
 
 

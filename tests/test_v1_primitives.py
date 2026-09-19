@@ -293,20 +293,24 @@ async def test_a_section_is_read_a_page_at_a_time(monkeypatch):
     assert past["error"] == "invalid_params"
 
 
-async def test_a_scenario_is_one_trade_list_and_names_the_book_it_made(monkeypatch):
+async def test_a_scenario_takes_a_book_and_its_trades_and_names_the_book_it_made(monkeypatch):
+    """Plan V1 §2.3: scenario(run, trades). It took `sales` OR `buys` until
+    2026-09-19 — the engine's two halves, one list a call."""
     async def _resolve_book(db, book, which):
         return "run_1", "2026-09-10"
 
-    async def _compute(db, **kw):
-        assert kw["method"] == "book.sell" and kw["subject"] == "run_1" and kw["params"] == {"sales": [{"ticker": "LLY"}]}
+    async def _trades(db, run_id, trades):
+        assert run_id == "run_1" and trades == [{"sell": "LLY"}, {"buy": "TLT", "weight": 0.05}]
         return {"calc_id": "calc_after", "as_of": "2026-09-10"}
     monkeypatch.setattr(P, "_resolve_book", _resolve_book)
-    monkeypatch.setattr(P.compute_service, "compute", _compute)
-    both = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}], buys=[{"ticker": "TLT", "weight": 0.05}], why=WHY)
-    neither = await P._scenario(None, "port_001", why=WHY)
-    assert both["error"] == neither["error"] == "invalid_params"
-    made = await P._scenario(None, "port_001", sales=[{"ticker": "LLY"}], why=WHY)
-    assert made["made"] == "calc_after"
+    monkeypatch.setattr(P.scenario_service, "hypothetical_trades", _trades)
+    made = await P._scenario(None, "port_001", [{"sell": "LLY"}, {"buy": "TLT", "weight": 0.05}], why=WHY)
+    assert made["made"] == "calc_after" and made["subject"] == "run_1"
+    schema = P.build_analyst_registry("risk").get("scenario").json_schema
+    assert set(schema["properties"]) == {"book", "trades", "why"} and "sales" not in schema["properties"]
+    assert validate_args(schema, {"book": "port_001", "trades": [{"sell": "LLY", "fraction": 0.5}], "why": WHY}) == []
+    assert validate_args(schema, {"book": "port_001", "trades": [{"sell": "LLY", "buy": "TLT"}], "why": WHY})   # one side a trade
+    assert validate_args(schema, {"book": "port_001", "trades": [{"buy": "TLT"}], "why": WHY})                  # a purchase needs its weight
 
 
 def test_a_pull_is_not_an_identity_a_sentence_can_resolve_a_number_against():
