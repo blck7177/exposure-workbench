@@ -165,11 +165,11 @@ def _problems(text: str, facts) -> list[str]:
 
 
 def test_a_book_that_loses_to_equities_falling_is_not_net_short():
-    wrong = "The book is net short equities, with a net beta of -86.0% [f_3a9c] to an equity fall."
+    wrong = "The book is net short equities, with a net beta of -0.86× [f_3a9c] to an equity fall."
     assert "sense_conflict" in _problems(wrong, [NET_BETA])
-    right = "The book loses if equities fall: its net beta to that risk is -86.0% [f_3a9c]."
+    right = "The book loses if equities fall: its net beta to that risk is -0.86× [f_3a9c]."
     assert "sense_conflict" not in _problems(right, [NET_BETA])
-    denied = "The book is not short equities: its net beta to an equity fall is -86.0% [f_3a9c]."
+    denied = "The book is not short equities: its net beta to an equity fall is -0.86× [f_3a9c]."
     assert "sense_conflict" not in _problems(denied, [NET_BETA])
 
 
