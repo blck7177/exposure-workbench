@@ -394,12 +394,18 @@ async def _filter(db: AsyncSession, inputs: list[str], cmp: str | None, level) -
 
 async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = None, factor: float | None = None,
                 direction: str | None = None, n: int | None = None, cmp: str | None = None, level=None,
-                name: str | None = None, *, why: str) -> dict:
+                *, why: str) -> dict:
+    """THE MODEL DOES NOT NAME A FIGURE (plan V1 §0). This took a `name` until
+    2026-09-19 — carried over from the old compute's `as_quantity` — and 45 of the
+    46 live `calc` calls used it: "AAPL breach room", "fcf_to_debt_xom". A row's
+    `what` then came from the model and not from the registry, and the check could
+    not tell what such a name was a name of. The desk names the result from the
+    operation and what went into it (analytics/registry.reads_as)."""
     if op == "filter":
         return await _filter(db, inputs, cmp, level)
     params = {k: v for k, v in (("by", by), ("factor", factor)) if v is not None}
     out = await compute_service.compute(db, op="rank" if op == "top" else op, operands=list(inputs),
-                                        params=params, as_quantity=name, direction=direction)
+                                        params=params, direction=direction)
     if op == "top" and not out.get("error"):
         if not isinstance(n, int) or n < 1:
             return _err("invalid_params", "top takes n, a positive integer")
@@ -564,8 +570,7 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                                  "direction": {"type": ["string", "null"], "enum": ["highest", "lowest", None]},
                                  "n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40},
                                  "cmp": {"type": ["string", "null"], "enum": [*_COMPARE, None]},
-                                 "level": {"type": ["string", "number", "null"]},
-                                 "name": {"type": ["string", "null"], "description": "what to call the result, in words"}},
+                                 "level": {"type": ["string", "number", "null"]}},
                                 ["op", "inputs"])),
         "filings_search": Tool(
             name="filings_search", display="Searching {ticker}'s filings", rows=True, tool_class=READ, fn=_filings_search,

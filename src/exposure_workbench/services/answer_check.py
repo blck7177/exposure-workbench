@@ -71,9 +71,6 @@ _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
 _UNIT_TAIL = (r"(?:/[A-Za-z]+|×|\s?(?:x|times|pp|bps|basis\s+points?|percentage\s+points?|points?|days?|years?|"
               r"quarters?|months?|shares?|sessions?))?")
 _POINTER_AFTER = re.compile(_UNIT_TAIL + r"\s*\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
-# the same pointer with the figure's own noun between them: up to four words, no punctuation
-_POINTER_NEARBY = re.compile(_UNIT_TAIL + r"(?:\s+[A-Za-z][A-Za-z'’\-]*){1,4}\s*"
-                             r"\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
 _CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\]")
 
 # ── the closed word lists G3 reads ───────────────────────────────────────────
@@ -396,16 +393,6 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             if t["kind"] != "num":
                 continue
             m = _POINTER_AFTER.match(blanked, t["end"])
-            if not m:
-                # "versus a 20.0% breach tier [f_…]": English puts the noun after the number,
-                # and the bracket after the noun. The pairing is not taken on trust — it holds
-                # only when the fact the bracket names HOLDS the figure as written — so this
-                # widens what may be written and not what may be claimed. Live, the risk
-                # analyst wrote four tiers this way, read "unpointed figure" for each, wrote
-                # them the same way again and lost the brief (V1 smoke).
-                near = _POINTER_NEARBY.match(blanked, t["end"])
-                if near and near.group(1) in {f for f, _p in ledger.readings(t["token"])}:
-                    m = near
             if not m:
                 continue
             pointed[t["start"]] = (m.group(1), m.group(2))

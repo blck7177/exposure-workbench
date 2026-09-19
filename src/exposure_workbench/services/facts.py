@@ -28,6 +28,7 @@ down. It is not a name: the model points at the id, never spells the measure.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Iterable, Sequence
 
@@ -289,8 +290,10 @@ def model_row(f: "Fact | dict") -> dict:
     what, of = registry.reads_as(rec.get("measure")), rec.get("subject") or ""
     # A price statistic's own label begins with its ticker ("AAPL beta TLT"), and
     # `of` says the ticker already: the row named its subject twice.
-    if of and what.lower().startswith(f"{of.lower()} ") and len(what) > len(of) + 1:
-        what = what[len(of) + 1:]
+    # …and a figure made of two of them names it twice more ("AAPL vol 30d ÷ AAPL vol 252d")
+    if of and re.search(rf"(?<!\w){re.escape(of)} ", what):
+        stripped = re.sub(rf"(?<!\w){re.escape(of)} ", "", what).strip()
+        what = stripped or what
     return {"id": rec.get("id"), "kind": _KIND_WORDS.get(rec.get("kind"), rec.get("kind")),
             "what": what, "of": of,
             "when": when_of(rec), "value": value_of(rec), "means": registry.means_words(rec),

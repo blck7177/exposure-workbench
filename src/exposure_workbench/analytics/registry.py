@@ -237,8 +237,27 @@ _DERIVED_NAMES: dict[str, str] = {
 }
 
 
+# WHAT A CALCULATED FIGURE IS CALLED: the operation and what went into it, in the
+# registry's words (plan V1 §2.3: "calc 的行——op 词加输入"). The calculator's lineage
+# name is `<a>.<op>.<b>`, `<x>.scale`, `<x>.<statistic>`; nobody else names one.
+_PAIR_OPS = {"add": "+", "subtract": "−", "multiply": "×", "divide": "÷"}
+_PAIR_NAME = re.compile(r"^(?P<a>.+?)\.(?P<op>add|subtract|multiply|divide)\.(?P<b>.+)$")
+_ONE_NAME = re.compile(r"^(?P<x>.+)\.(?P<op>scale|sum|avg|min|max|std|abs|yoy|qoq|pct|cagr|latest)$")
+_ONE_WORDS = {"scale": "{x}, scaled", "sum": "sum of {x}", "avg": "average of {x}", "min": "lowest of {x}",
+              "max": "highest of {x}", "std": "standard deviation of {x}", "abs": "size of {x}",
+              "yoy": "year-on-year change in {x}", "qoq": "quarter-on-quarter change in {x}",
+              "pct": "change in {x}", "cagr": "compound annual growth of {x}", "latest": "latest {x}"}
+
+
 def reads_as(measure: str | None) -> str:
     m = measure or ""
+    known = m in METHODS or m in _COLUMN_NAMES or m in dn.FORMULA or m in dn.METRIC
+    pair = None if known else _PAIR_NAME.match(m)
+    if pair:
+        return f"{reads_as(pair['a'])} {_PAIR_OPS[pair['op']]} {reads_as(pair['b'])}"
+    one = None if known else _ONE_NAME.match(m)
+    if one:
+        return _ONE_WORDS[one["op"]].format(x=reads_as(one["x"]))
     if m in METHODS:
         return METHODS[m].reads_as
     if m in dn.FORMULA:

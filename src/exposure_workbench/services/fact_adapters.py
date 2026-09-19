@@ -915,13 +915,13 @@ def search_web(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
 
 
 def start(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
-    tid = result.get("run_id") or result.get("task_id")
-    if not result.get("enqueued") or not _is_id(tid):
-        return [], _strip(result, Ctx("start"))
-    f = F.fact(F.TASK, result.get("kind") or args.get("kind") or "task", subject=tid, text="enqueued",
-               params={k: v for k, v in (("ticker", result.get("ticker")), ("reason", result.get("reason"))) if v},
-               sources=tuple(s for s in (result.get("task_id"), result.get("run_id")) if _is_id(s)), group="book_derived")
-    return [f], {**result, "fact": f.id}
+    """STARTED WORK IS AN ID, NOT EVIDENCE (plan §2.3: `start` → "task id，不是证据").
+    Until 2026-09-19 this minted a fact of a fifth kind, `task`, and showed it as a
+    row — a row a sentence could point at, holding nothing a sentence may say. The
+    id travels beside the rows (`task_id` / `run_id`), where the analyst's follow-up
+    names it; the four kinds a model reads stay reading, series, passage, absence.
+    (Stored sessions from before keep their task rows: the ledger still reads them.)"""
+    return [], _strip(result, Ctx("start"))
 
 
 def no_facts(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
@@ -1081,7 +1081,11 @@ def present(tool: str, args: dict, shown: list[F.Fact], note: dict, held: dict |
     called, then the rows. No legend: a row says what it is (services/facts.line)."""
     listed = note.get("catalogue") if isinstance(note, dict) else None
     n, unit = (len(listed), "name") if (listed and not shown) else (len(shown), "row")
-    out: dict = {"pull": pull, "head": f"{pull} {_call_said(tool, args)} → {n} {unit}{'s' if n != 1 else ''}",
+    came = f"{n} {unit}{'s' if n != 1 else ''}"
+    started = next((note.get(k) for k in ("run_id", "task_id") if isinstance(note, dict) and _is_id(note.get(k))), None)
+    if tool == "start" and started and not shown:
+        came = f"started {started}; it runs after this turn and returns nothing to it"
+    out: dict = {"pull": pull, "head": f"{pull} {_call_said(tool, args)} → {came}",
                  "rows": [F.line(f) for f in shown]}
     for k in _PASS_THROUGH:
         if isinstance(note, dict) and note.get(k) not in (None, "", [], {}):

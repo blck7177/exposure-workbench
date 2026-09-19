@@ -54,8 +54,7 @@ START_TOOL = "start"
 
 # what the row says when a task's evidence calls are used (the row is the boundary of
 # every line the analyst did not reach)
-_BUDGET_STOP = ("this task's {n} evidence calls are used; what was not read by then was not reached. Asking for one "
-                "column of every row, or one measure over a list of subjects, reads in one call what row-by-row reads in many")
+_BUDGET_STOP = "this task's {n} evidence calls are used; what was not read by then was not reached"
 
 _SYSTEM = """You are {title} of a portfolio risk & issuer-intelligence desk. One task from the desk's lead analyst is in \
 front of you: numbered lines of what it wants to know about the subjects it names. Settle each line from your own family of \

@@ -159,16 +159,17 @@ async def test_a_tool_that_raised_records_nothing(monkeypatch):
     assert log["recorded"] == [[]]
 
 
-async def test_a_delegation_records_the_work_it_started_as_a_task_fact(monkeypatch):
+async def test_started_work_comes_back_as_an_id_and_no_evidence(monkeypatch):
+    """Plan V1 §2.3: `start` returns a task id, "不是证据". Until 2026-09-19 the adapter
+    minted a fact of a fifth kind (`task`) and the model was shown it as a row."""
     log = _wire(monkeypatch)
-    tool = Tool(name="start", description="", json_schema={"type": "object"},
-                fn=_returning({"enqueued": True, "run_id": "rrun_2", "kind": "issuer_research", "ticker": "NVDA"}),
+    tool = Tool(name="start", description="", json_schema={"type": "object"}, rows=True,
+                fn=_returning({"enqueued": True, "task_id": "task_2", "kind": "company_readiness", "ticker": "NVDA"}),
                 tool_class=DELEGATION)
-    out = await R.invoke(_registry(tool), _Db(), "sess_1", "start", {"kind": "research", "subject": "NVDA"})
-    rows = out["facts"]["rows"]
-    assert len(rows) == 1 and rows[0][1] == "task" and rows[0][2] == "rrun_2"
-    [(rec,)] = _facts_recorded(log)
-    assert rec["kind"] == "task" and rec["text"] == "enqueued"
+    out = await R.invoke(_registry(tool), _Db(), "sess_1", "start", {"kind": "readiness", "subject": "NVDA"})
+    assert out["rows"] == [] and out["task_id"] == "task_2"
+    assert "started task_2" in out["head"] and "returns nothing" in out["head"]
+    assert _facts_recorded(log) in ([], [[]])              # nothing a sentence could point at
 
 
 async def test_an_adapter_that_cannot_name_a_unit_is_the_tools_own_structured_failure(monkeypatch):

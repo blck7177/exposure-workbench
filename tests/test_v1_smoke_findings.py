@@ -395,7 +395,7 @@ def _ledger_with(*facts):
 
 
 def test_a_calculation_records_what_it_was_made_of_and_the_row_says_so():
-    facts, _ = fa.compute({"op": "divide", "inputs": ["f_aaaa11112222", "f_bbbb33334444"], "name": "fcf_to_debt_xom", "why": WHY},
+    facts, _ = fa.compute({"op": "divide", "inputs": ["f_aaaa11112222", "f_bbbb33334444"], "why": WHY},
                           {"calc_id": "calc_q", "op": "divide", "value": 0.394,
                            "type": {"unit_class": "ratio", "quantity": "fcf_to_debt_xom", "issuers": ["XOM"],
                                     "basis": {"leaves": {"instants": ["2026-03-31"], "intervals": [["2025-04-01", "2026-03-31"]]}}}})
@@ -485,17 +485,6 @@ def test_the_same_reading_on_two_books_is_a_comparison_not_a_reading_written_twi
     assert [p for p in v2.problems if p["reason"] == "change_conflict"]
 
 
-def test_a_refused_brief_names_the_analysts_own_way_to_a_derived_figure():
-    from exposure_workbench.agents import delegation as D
-    task = D.Task(task_id="tsk_1", analyst="risk", subjects=("port_001",), lines=("1. room to each tier",), context="")
-    told = D.refusal_message(task, D.HandoffVerdict(problems=[
-        {"where": "line 1", "reason": "unsourced_figure", "figure": "0.2%", "fix": "a number the ledger cannot account for"}]))
-    assert "make it with `calc` from the ids of the figures it comes from" in told
-    dated = D.refusal_message(task, D.HandoffVerdict(problems=[
-        {"where": "line 1", "reason": "unsourced_figure", "figure": "2025-12-31", "fix": "a date no fact of this turn carries"}]))
-    assert "`calc`" not in dated                       # a date is not computed
-
-
 def test_the_metric_verb_says_each_name_in_the_handbooks_words():
     said = P.build_analyst_registry("risk").get("metric").json_schema["properties"]["name"]["description"]
     assert "book.analysis = the book's net exposures and room to its tiers" in said
@@ -511,20 +500,6 @@ def test_a_span_of_time_a_cited_passage_states_is_the_passages_phrase():
     assert not [x for x in v.problems if x.get("figure") == "12"], v.problems
     other = AC.check(f"The filing says $12.4 billion of its notes is payable within 18 months [{p.id}].", led)
     assert [x for x in other.problems if x.get("figure") == "18"]
-
-
-def test_a_figure_with_its_noun_before_the_bracket_is_pointed_when_the_fact_holds_it():
-    from exposure_workbench.services import answer_check as AC
-    cur = F.fact(F.SCALAR, "limit_checks.current_value", subject="issuer_concentration:AAPL", unit="RATIO", value=0.152,
-                 as_of="2026-09-10", params={"of": "run_x"}, means={"status": "warning"})
-    tier = F.fact(F.SCALAR, "limit_checks.breach_level", subject="issuer_concentration:AAPL", unit="RATIO", value=0.20,
-                  as_of="2026-09-10", params={"of": "run_x"}, means={"status": "warning"})
-    led = _ledger_with(cur, tier)
-    ok = AC.check(f"issuer_concentration:AAPL is in warning at 15.2% [{cur.id}] against a 20.0% breach tier [{tier.id}].", led)
-    assert not [p for p in ok.problems if p["reason"] == "unpointed_figure"], ok.problems
-    # the pairing is by VALUE: a bracket whose fact does not hold the figure points at nothing
-    wrong = AC.check(f"issuer_concentration:AAPL is in warning at 15.2% [{cur.id}] against a 25.0% breach tier [{tier.id}].", led)
-    assert [p for p in wrong.problems if p.get("figure") == "25.0%"]
 
 
 def test_a_list_of_brackets_leaves_no_commas_behind():
@@ -619,3 +594,25 @@ def test_a_place_in_a_lowest_first_ordering_is_counted_from_the_other_end():
                 if p["reason"] == "superlative_without_rank"]
     assert [p for p in AC.check(f"KO has the highest volatility of the nine at 14.0% [{low.id}].", led).problems
             if p["reason"] == "superlative_without_rank"]
+
+
+# ── back to the plan's signatures (2026-09-19, after the deviation review) ───
+
+def test_calc_takes_no_name_and_the_desk_says_what_the_result_is():
+    """Plan V1 §0: the model does not name a measure. `calc` carried a `name`
+    (the old compute's `as_quantity`) and 45 of 46 live calls used it."""
+    schema = P.build_analyst_registry("risk").get("calc").json_schema
+    assert "name" not in schema["properties"]
+    assert desk.reads_as("free_cash_flow.divide.total_debt") == "free cash flow ÷ total debt"
+    assert (desk.reads_as("limit_checks.breach_level.subtract.limit_checks.current_value")
+            == "limit checks: breach tier − limit checks: measured")
+    assert desk.reads_as("issuer_exposures.weight.max") == "highest of issuer exposures: weight"
+    assert desk.reads_as("revenue.yoy") == "year-on-year change in Revenue"
+    # a registry name that merely contains an operation's word is still itself
+    assert desk.reads_as("net_margin") == "net margin" and desk.reads_as("price.beta") == "beta to a benchmark"
+    room = F.fact(F.SCALAR, "limit_checks.breach_level.subtract.limit_checks.current_value",
+                  subject="issuer_concentration:AAPL", unit="RATIO", value=0.048, as_of="2026-09-10",
+                  params={"op": "subtract", "inputs": ["f_aaaa11112222", "f_bbbb33334444"]})
+    assert F.line(room).startswith(f"[{room.id}] limit checks: breach tier − limit checks: measured, issuer_concentration:AAPL")
+    ratio = F.fact(F.SCALAR, "AAPL.vol.30d.divide.AAPL.vol.252d", subject="AAPL", unit="RATIO", value=1.24, as_of="2026-09-10")
+    assert F.model_row(ratio)["what"] == "vol 30d ÷ vol 252d"
