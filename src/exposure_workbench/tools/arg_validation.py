@@ -89,6 +89,15 @@ def _problem(error) -> dict:
     what the name is. A long enum is a directory, not a message: forty-six
     names quoted back cost more than the call did, so the message names the
     count and the nearest members instead."""
+    if error.validator in ("oneOf", "anyOf"):
+        # "NOT VALID UNDER ANY OF THE GIVEN SCHEMAS" names nothing a caller can act on, and
+        # V1's typed period and trade list are both a choice of shapes (second smoke,
+        # 2026-09-19: a period written with two kinds came back with that sentence and no
+        # way out). What the argument takes is said after it — the schema's own description
+        # where it has one, else the shapes themselves.
+        branches = [b for b in (error.schema.get(error.validator) or []) if isinstance(b, dict) and b.get("type") != "null"]
+        takes = error.schema.get("description") or " | ".join(schema_hint(b) for b in branches)
+        return {"problem": error.message + (f": {takes}" if takes else "")}
     if error.validator != "enum" or not isinstance(error.instance, str):
         return {"problem": error.message}
     members = [v for v in (error.validator_value or []) if isinstance(v, str)]

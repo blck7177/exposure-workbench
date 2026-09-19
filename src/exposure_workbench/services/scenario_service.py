@@ -176,19 +176,31 @@ async def hypothetical_trades(db: AsyncSession, run_id: str, trades: list[dict])
         if isinstance(got, dict):
             return got
         if side == "buy":
-            placed = []
-            for b in got:
-                sector = (await db.execute(select(Company.sector).where(Company.ticker == b.ticker))).scalar_one_or_none()
-                if not sector:
-                    return _err("no_sector", f"{b.ticker} has no sector on this desk (not prepared, or "
-                                             f"not an SEC filer), so a sector-concentration check on the "
-                                             f"book with it cannot run; prepare the name first", run_id=run_id)
-                placed.append(sc.Buy(b.ticker, b.weight, sector))
-            got = placed
+            got = [sc.Buy(b.ticker, b.weight, (await db.execute(
+                select(Company.sector).where(Company.ticker == b.ticker))).scalar_one_or_none()) for b in got]
         parsed.append((side, got))
     said = [({"sell": x.ticker, "fraction": x.fraction} if side == "sell" else {"buy": x.ticker, "weight": x.weight})
             for side, legs in parsed for x in legs]
-    return await _scenario(db, run_id, lambda holdings: sc.traded(holdings, parsed), {"trades": said})
+    return await _scenario(db, run_id, lambda holdings: traded_then_placed(holdings, parsed), {"trades": said})
+
+
+def traded_then_placed(holdings: list, parsed: list[tuple[str, list]]) -> "sc.ScenarioBook | dict":
+    """THE ENGINE'S OWN REFUSALS COME FIRST, then the desk's. A purchase needs the
+    new name's sector, and the lookup ran before the engine saw the trade — so a
+    name the book ALREADY HOLDS was refused for having no sector on this desk
+    ("not prepared, or not an SEC filer"), which is false of a held name and hid
+    the refusal the verb promises for it (second real-database smoke, 2026-09-19:
+    MSFT, held at 16%, bought again). A name the engine accepts and the desk
+    cannot place is still refused, as before and in the same words."""
+    book = sc.traded(holdings, parsed)
+    if isinstance(book, dict):
+        return book
+    unplaced = [b.ticker for side, legs in parsed if side == "buy" for b in legs if not b.sector]
+    if unplaced:
+        return _err("no_sector", f"{unplaced[0]} has no sector on this desk (not prepared, or "
+                                 f"not an SEC filer), so a sector-concentration check on the "
+                                 f"book with it cannot run; prepare the name first")
+    return book
 
 
 async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) -> dict:

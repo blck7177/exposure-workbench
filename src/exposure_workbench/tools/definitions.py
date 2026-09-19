@@ -76,10 +76,17 @@ async def _read_fundamentals(db: AsyncSession, ticker: str, metric: str | None =
         from exposure_workbench.services import calc_service as cs
         from exposure_workbench.services.concept_mapping import SUPPORTED_METRICS
         have = sorted(m["metric"] for m in (await cs.list_available_metrics(db, tk))["metrics"])
+        # THE LINES NEAREST THE ONE ASKED, said before the whole list: KO files `total_revenues`
+        # and no `revenue`, and the row's way out listed its first twelve lines by alphabet —
+        # accounts_receivable to current_portion_… — with the one that answers the question cut
+        # off the end (second smoke, 2026-09-19).
+        import difflib
+        near = difflib.get_close_matches(metric, have, n=3, cutoff=0.4)
         return {"error": "metric_not_filed", "ticker": tk, "metric": metric,
                 # The refusal is about THIS argument's value: a batch of reads
                 # for other metrics is not held behind it (agents/batch.py).
                 "held_on": {"metric": metric},
+                **({"nearest": near} if near else {}),
                 "available": have,
                 "detail": (f"{tk} has no filed facts under {metric!r}"
                            + ("" if metric in SUPPORTED_METRICS else

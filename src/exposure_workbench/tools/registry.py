@@ -347,6 +347,14 @@ async def invoke(
             if tool.rows:
                 pull = new_id(fa.PULL_PREFIX)
                 refusal = fa.refusal_fact(tool.name, args, result) if result.get("error") else None
+                # A REFUSAL THE SERVICE ALREADY SAID AS A ROW IS SAID ONCE. A service that
+                # refuses with an absence of its own (its sentence, its id) came back as two
+                # rows, the second the wrapper's: for a factor instrument's volume that second
+                # row read "prices_read: no_price_history" and nothing else (second smoke,
+                # 2026-09-19). The wrapper's row stays when it has a way out to add.
+                if refusal is not None and "way_out" not in refusal.means and any(
+                        f.kind == fct.ABSENCE and f.params.get("error") == result.get("error") for f in made):
+                    refusal = None
                 made = [*made, *([refusal] if refusal is not None else [])]
                 shown = [*shown, *([refusal] if refusal is not None else [])]
                 made = [fa.stamped(f, pull) for f in made]

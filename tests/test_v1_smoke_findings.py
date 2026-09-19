@@ -826,3 +826,103 @@ def test_a_fiscal_year_is_the_issuers_own_label_read_off_what_it_filed():
     q4 = cal.quarter(2026, 4)
     assert (q4.start, q4.end) == (d(2025, 10, 27), d(2026, 1, 25))               # the year less its first three quarters
     assert cal.quarter(2026, 2).end == d(2025, 7, 27) and cal.year(2019) is None
+
+
+# ── the second read of the real database (2026-09-19): the verbs whose signatures changed ──
+#
+# `scenario(book, trades)`, `prices_read(field)`, the typed period and `filings_section(filing)`
+# were run through the registry against the same disposable clone. They did what the plan says;
+# these are the four rows that read wrong.
+
+def test_a_held_name_bought_again_is_refused_for_being_held_not_for_having_no_sector():
+    """The sector lookup ran before the engine saw the trade, so MSFT — held at 16% — was
+    refused as "not prepared, or not an SEC filer". The engine's refusals come first."""
+    from exposure_workbench.analytics import scenario as sc
+    from exposure_workbench.services import scenario_service as ss
+    book = [sc.Holding("MSFT", "Technology", 1600.0), sc.Holding("JPM", "Financials", 1400.0)]
+    held = ss.traded_then_placed(book, [("buy", [sc.Buy("MSFT", 0.05, None)])])
+    assert held["error"] == "already_held" and "already a position" in held["detail"]
+    assert ss.traded_then_placed(book, [("sell", [sc.Sale("KO", 1.0)]), ("buy", [sc.Buy("COST", 0.05, None)])])["error"] == "not_held"
+    unplaced = ss.traded_then_placed(book, [("buy", [sc.Buy("COST", 0.05, None)])])
+    assert unplaced["error"] == "no_sector" and unplaced["detail"].startswith("COST has no sector on this desk")
+    placed = ss.traded_then_placed(book, [("buy", [sc.Buy("KO", 0.05, "Consumer_Staples")])])
+    assert round(placed.weights["KO"], 4) == 0.05
+
+
+async def test_a_refusal_the_service_said_as_a_row_is_said_once(monkeypatch):
+    """A factor instrument's volume came back as two absences, the second reading
+    "prices_read: no_price_history" and nothing else."""
+    from exposure_workbench.services import ledger as L
+    from exposure_workbench.tools import registry as R
+    steps = []
+
+    async def _record(db, session_id, **kw):
+        steps.append(kw)
+        return f"step_{len(steps)}"
+
+    async def _reserve(db, session_id, is_external_search=False, message_id=None):
+        pass
+
+    async def _read(db, ticker, window=None, as_of=None, field=None):
+        return {"error": "no_price_history", "absence_id": "calc_608288239074", "ticker": ticker, "kind": "volume",
+                "statement": f"{ticker}.volume was not computed: this desk holds no volume history for {ticker}"}
+
+    class _Db:
+        def add(self, row): pass
+        async def flush(self): pass
+        async def rollback(self): pass
+
+    monkeypatch.setattr(R.trace_service, "record_step", _record)
+    monkeypatch.setattr(R.sess, "reserve", _reserve)
+    monkeypatch.setattr(P.D, "_read_prices", _read)
+    out = await R.invoke(P.build_analyst_registry("market"), _Db(), "sess", "prices_read",
+                         {"ticker": "IWM", "field": "volume", "window": "1m", "why": WHY})
+    (row,) = out["rows"]
+    assert "holds no volume history for IWM" in row and "prices_read: no_price_history" not in row
+    (rec,) = [r for s in steps for r in L.facts_in(s.get("evidence_refs") or [])]
+    assert rec["kind"] == F.ABSENCE and rec["params"]["pull"] == out["pull"]      # still a boundary a line can point at
+
+    # …and the wrapper's row stays when it is the one with a way out
+    async def _with_a_way_out(db, ticker, window=None, as_of=None, field=None):
+        return {**(await _read(db, ticker)), "available": ["close", "adj_close"]}
+    monkeypatch.setattr(P.D, "_read_prices", _with_a_way_out)
+    out = await R.invoke(P.build_analyst_registry("market"), _Db(), "sess", "prices_read",
+                         {"ticker": "IWM", "field": "volume", "window": "1m", "why": WHY})
+    assert len(out["rows"]) == 2 and "available: close, adj_close" in out["rows"][1]
+
+
+async def test_a_line_the_issuer_does_not_file_names_the_nearest_it_does_first(monkeypatch):
+    """KO files `total_revenues` and no `revenue`; the way out listed its first twelve
+    lines by alphabet, and the one that answers the question was cut off the end."""
+    have = ["accounts_receivable", "amortization_of_intangibles", "buybacks", "capex", "cash_and_equivalents",
+            "cash_and_restricted_cash", "commercial_paper", "cost_of_revenue", "current_assets", "current_liabilities",
+            "current_portion_long_term_debt", "current_portion_long_term_debt_and_leases", "net_income", "total_revenues"]
+
+    async def _company(db, ticker):
+        return {"id": "co_ko", "ticker": "KO"}
+
+    async def _instant(db, company_id, metric):
+        return None
+
+    async def _available(db, ticker):
+        return {"metrics": [{"metric": m} for m in have]}
+
+    monkeypatch.setattr(P.D, "_resolve_company", _company)
+    monkeypatch.setattr(P.D, "_metric_is_instant", _instant)
+    monkeypatch.setattr("exposure_workbench.services.calc_service.list_available_metrics", _available)
+    refused = await P.D._read_fundamentals(None, "KO", metric="revenue")
+    assert refused["error"] == "metric_not_filed" and refused["nearest"][0] == "total_revenues"
+    row = F.line(fa.refusal_fact("filings_read", {"ticker": "KO", "line": "revenue"}, refused))
+    assert row.index("nearest: total_revenues") < row.index("available: accounts_receivable")
+
+
+def test_a_choice_of_shapes_that_none_fits_says_what_the_argument_takes():
+    """"Not valid under any of the given schemas" names nothing a caller can act on."""
+    from exposure_workbench.tools.arg_validation import validate_args
+    issuer = P.build_analyst_registry("issuer").get("filings_read").json_schema
+    (p,) = validate_args(issuer, {"ticker": "MSFT", "line": "revenue", "period": {"fy": 2025, "at": "2025-06-30"}, "why": WHY})
+    assert p["field"] == "period" and '{"ttm_to": "2025-06-30"}' in p["problem"] and "said ONE way" in p["problem"]
+    risk = P.build_analyst_registry("risk").get("scenario").json_schema
+    (t,) = validate_args(risk, {"book": "port_001", "trades": [{"sell": "MSFT", "buy": "KO", "weight": 0.05}], "why": WHY})
+    assert t["field"] == "trades.0"
+    assert t["problem"].endswith("{sell: string, fraction?: number (0..1)} | {buy: string, weight: number (0..1)}")

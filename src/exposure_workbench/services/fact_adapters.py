@@ -1019,7 +1019,7 @@ _RECORDED_NOT_SHOWN: dict[str, Any] = {"scenario": _is_table_row}
 
 _INPUTS_KEPT = 40          # the most a `calc` takes (tools/primitives: inputs.maxItems)
 PULL_PREFIX = "r_"
-_WAY_OUT_KEYS = ("available", "nearest", "known", "allowed", "portfolios", "tables", "columns_of_table",
+_WAY_OUT_KEYS = ("nearest", "available", "known", "allowed", "portfolios", "tables", "columns_of_table",
                  "items_indexed", "data_covers", "hint")
 
 
