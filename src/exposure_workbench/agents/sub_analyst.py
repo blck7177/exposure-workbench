@@ -152,14 +152,15 @@ async def _ledger(ctx: TurnContext):
         return await ledger_svc.load(db, ctx.session_id)
 
 
-def _asked(args: dict) -> str:
-    return ", ".join(f"{k}={ejson.dumps(v)[:60]}" for k, v in args.items() if k != "why" and v is not None)
+_asked = dl.asked_of
 
 
 def _got(res: dict) -> str:
+    """What came back, in the words the trace uses for the same call (fact_adapters.came_back), so
+    the log an analyst keeps and the log rebuilt from `agent_steps` are one text."""
     if isinstance(res.get("head"), str):
-        return res["head"].split("→", 1)[-1].strip() + (f"; made {res['made']}" if res.get("made") else "")
-    return f"{res.get('error')}: {str(res.get('detail') or '')[:120]}" if res.get("error") else "done"
+        return dl.got_of(fa.came_back(res, []))
+    return (f"{res.get('error')}" + (f": {str(res['detail'])[:120]}" if res.get("detail") else "")) if res.get("error") else "done"
 
 
 async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:

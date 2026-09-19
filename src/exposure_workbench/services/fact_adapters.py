@@ -1117,6 +1117,20 @@ def present(tool: str, args: dict, shown: list[F.Fact], note: dict, held: dict |
     return out
 
 
+def came_back(presented: dict, facts: list[F.Fact]) -> str:
+    """ONE CALL'S RESULT AS THE TRACE SAYS IT (V1): the head the model read — the
+    call's id, the call, how many rows — then the book it made, then the refusals
+    among its rows, by code. A primitive's step used to be summarised by the keys
+    of its payload, which for every one of them is "keys: pull, head, rows": a
+    refusal and a reading were the same line of the trace, so neither a counter
+    nor a log rebuilt from the steps could say what a call got (plan §6: the log
+    grows out of the calls). The model reads none of this."""
+    refused = sorted({str(f.params.get("error")) for f in facts if f.kind == F.ABSENCE and f.params.get("error")})
+    return (str(presented.get("head") or "")
+            + (f"; made {presented['made']}" if isinstance(presented.get("made"), str) and presented["made"] else "")
+            + (f" | refused: {', '.join(refused)}" if refused else ""))
+
+
 ADAPTERS: dict[str, Adapter] = {
     "describe": describe,
     "read_fundamentals": read_fundamentals,

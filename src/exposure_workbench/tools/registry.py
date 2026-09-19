@@ -192,7 +192,8 @@ def _declared_nodes(result: dict) -> str:
 def _summarize(result: Any) -> str:
     if isinstance(result, dict):
         if result.get("error"):
-            return f"error: {result.get('error')}"
+            # the code first (every reader of a summary matches on "error: <code>"), then what it said
+            return f"error: {result.get('error')}" + (f": {str(result['detail'])[:120]}" if result.get("detail") else "")
         keys = [k for k in result if not k.startswith("_")]
         return "keys: " + ", ".join(keys[:8]) + _declared_nodes(result)
     return str(result)[:200]
@@ -376,9 +377,11 @@ async def invoke(
             if recorded:
                 refs = [ledger_svc.step_entry(recorded)]
     try:
+        said = (fa.came_back(result, recorded) if tool.rows and isinstance(result, dict) and result.get("head")
+                else _summarize(result))
         step_id = await trace_service.record_step(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
-            result_summary=_summarize(result), evidence_refs=refs, status=status,
+            result_summary=said, evidence_refs=refs, status=status,
             duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
             actor=actor,
         )
@@ -405,17 +408,18 @@ async def _refused_as_a_row(db: AsyncSession, session_id: str, tool: Tool, args:
     line to be filed against it."""
     pull = new_id(fa.PULL_PREFIX)
     fact = fa.stamped(fa.refusal_fact(tool.name, args, refused), pull)
+    presented = fa.present(tool.name, args, [fact], refused, None, pull)
     try:
         step_id = await trace_service.record_step(
             db, session_id, step_type="boundary", tool_name=tool.name, args=None,
-            result_summary=f"refused: {refused.get('error')}", evidence_refs=[ledger_svc.step_entry([fact])],
+            result_summary=fa.came_back(presented, [fact]), evidence_refs=[ledger_svc.step_entry([fact])],
             status="completed", message_id=message_id, actor=actor)
         for row in ledger_svc.rows_for([fact], session_id=session_id, step_id=step_id, message_id=message_id):
             db.add(row)
         await db.flush()
     except Exception:  # noqa: BLE001 — as below: a hole in the trail must not take the turn with it
         logger.exception("could not record the refusal of %s (session %s)", tool.name, session_id)
-    return fa.present(tool.name, args, [fact], refused, None, pull)
+    return presented
 
 
 def _step_type(tool: Tool) -> str:

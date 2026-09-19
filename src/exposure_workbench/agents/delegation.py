@@ -410,11 +410,63 @@ def for_lead(results: list[AnalystResult], ledger: Ledger | None = None) -> dict
     return {"returns": out}
 
 
+def asked_of(args: dict) -> str:
+    """A call's arguments as the log shows them — everything but the `why`, which has its own place."""
+    from exposure_workbench.utils import json as ejson
+    return ", ".join(f"{k}={ejson.dumps(v)[:60]}" for k, v in (args or {}).items() if k != "why" and v is not None)
+
+
+def got_of(said: str) -> str:
+    """What came back, from what the desk said of the call: the result's head for the analyst that
+    read it, the step's summary for a reader of the trace (services/fact_adapters.came_back). The
+    same words either way: how many rows, and the book it made."""
+    return str(said or "").split(" | refused:", 1)[0].split("→", 1)[-1].strip()
+
+
+def _log(task: Task, calls: list[dict], status: str) -> str:
+    head = f"{task.task_id} — the {task.analyst} analyst, asked about {', '.join(task.subjects)}: " + " | ".join(
+        f"{i}. {w}" for i, w in enumerate(task.lines, 1))
+    steps = [f"{s['step']}. {s['tool']}({s['asked']}) — why: {s['why']} → {s['got']}" for s in calls]
+    return "\n".join([head, *steps, f"brief: {status}"])
+
+
 def log_text(result: AnalystResult) -> str:
     """An analyst's log, as `open(<task id>)` shows it: its calls in order, each
     with why it was made and what came back. Built from the calls; nobody writes it."""
-    t = result.task
-    head = f"{t.task_id} — the {t.analyst} analyst, asked about {', '.join(t.subjects)}: " + " | ".join(
-        f"{i}. {w}" for i, w in enumerate(t.lines, 1))
-    steps = [f"{s['step']}. {s['tool']}({s['asked']}) — why: {s['why']} → {s['got']}" for s in result.log]
-    return "\n".join([head, *steps, f"brief: {result.status}"])
+    return _log(result.task, result.log, result.status)
+
+
+def log_from_steps(task: Task, steps: list[dict], status: str) -> str:
+    """THE SAME LOG, REBUILT FROM THE TRACE (plan V1 §6: "log 由 why 长出"). Nothing the analyst
+    kept is read: only `agent_steps` rows — {step_type, tool_name, args, result_summary, actor,
+    status} in order — so that the log is what the calls WERE is a property a test can hold, and
+    a log can be had for a turn whose process is gone.
+
+    An analyst's stretch of the trace runs up to the `report` step that names its task. A call is
+    a step its face's registry recorded; one refused before it ran (arguments that do not fit, a
+    budget spent) is a rejected step and then a `boundary` step saying what came back. The
+    analyst's own steps — its brief, its report, the boundary it states when it stops — are not
+    calls. With `parallel_analysts` on, two tasks of ONE analyst interleave under one actor and
+    this cannot tell them apart; that switch is off, and the actor would have to carry the task."""
+    stretch: list[dict] = []
+    for s in steps:
+        if s.get("actor") != f"sub:{task.analyst}":
+            continue
+        if s.get("step_type") == "report":
+            if ((s.get("args") or {}).get("task_id")) == task.task_id:
+                break
+            stretch = []                       # an earlier task of the same analyst ended here
+            continue
+        stretch.append(s)
+    calls: list[dict] = []
+    for i, s in enumerate(stretch):
+        if s.get("step_type") not in ("tool_call", "delegation") or not isinstance(s.get("args"), dict):
+            continue
+        said = s.get("result_summary") or ""
+        if s.get("status") == "rejected":      # refused before it ran: the row it got is on the next boundary step
+            said = next((b.get("result_summary") or "" for b in stretch[i + 1:i + 2]
+                         if b.get("step_type") == "boundary" and b.get("tool_name") == s.get("tool_name")), said)
+        got = got_of(said) if "→" in said else said.removeprefix("error: ")
+        calls.append({"step": len(calls) + 1, "tool": s.get("tool_name"), "asked": asked_of(s["args"]),
+                      "why": str(s["args"].get("why") or ""), "got": got})
+    return _log(task, calls, status)
