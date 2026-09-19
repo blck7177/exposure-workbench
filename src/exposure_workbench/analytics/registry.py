@@ -355,7 +355,7 @@ EXECUTORS = (
     "price.rolling_volatility", "price.beta", "price.momentum_12_1",
     "price.distance_from_52w_high", "price.adv", "price.drawdown", "price.window_return",
     "book.analysis", "book.reconcile", "book.drawdown_episodes", "book.explain_episode",
-    "book.sell", "book.buy",
+    "book.sell", "book.buy", "book.position",
 )
 
 
@@ -643,10 +643,33 @@ _BOOK_METHODS: tuple[Method, ...] = (
 )
 
 
+# ── cross-resource: what one analyst needs from another's family, by name ─────
+# A face is a resource family (tools/faces); a need that crosses two is met by a
+# measure on the asker's list, never by a wider face.
+
+_CROSS_METHODS: tuple[Method, ...] = (
+    Method(
+        name="book.position", subject_kind="issuer", family="book",
+        reads_as="the name's place in the book", faces=("issuer",),
+        describes="a name's own rows in the latest completed run of each book that holds it: its weight, market value and contribution, and the issuer-concentration check on it with its tiers",
+        procedure="the run's own figures for the name, read by name; nothing is computed",
+        authority="the run's own rows (issuer_exposures, limit_checks)",
+        fails_when="no book on this desk holds the name in its latest completed run",
+        executor="book.position", unit_class="ratio",
+        params_schema={"type": "object", "properties": {
+            "book": {"type": ["string", "null"], "description": "a port_… or run_… id; omitted = every book that holds the name"}},
+            "additionalProperties": False},
+        yields=("issuer_exposures.weight", "issuer_exposures.market_value", "issuer_exposures.contribution",
+                "limit_checks.current_value", "limit_checks.warning_level", "limit_checks.breach_level"),
+    ),
+)
+
+
 METHODS: dict[str, Method] = {
     **_issuer_methods(),
     **{m.name: m for m in _PRICE_METHODS},
     **{m.name: m for m in _BOOK_METHODS},
+    **{m.name: m for m in _CROSS_METHODS},
 }
 
 

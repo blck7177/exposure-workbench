@@ -110,7 +110,7 @@ def identity_tokens(rec: dict) -> set[str]:
         elif isinstance(v, (int, float)) and not isinstance(v, bool):
             toks.add(f"{v:g}")
     for k, v in (rec.get("params") or {}).items():
-        if isinstance(v, bool) or k == "node":
+        if isinstance(v, bool) or k in ("node", "pull", "tool"):
             # `node` is the program's BINDING NAME — a variable, never a measure
             # and never an identity (PROGRAM_LANGUAGE rule 1). V33D: the node
             # `amzn_rel_1y_vs_spy` put "1" among this fact's identity tokens, and

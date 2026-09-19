@@ -285,6 +285,9 @@ async def _run_method(db: AsyncSession, spec: skill.Method, subject: str, params
         return await scenario_service.hypothetical_book(db, subject, p["sales"])
     if ex == "book.buy":
         return await scenario_service.hypothetical_buy(db, subject, p["buys"])
+    if ex == "book.position":
+        from exposure_workbench.services import position_service
+        return await position_service.position(db, subject, p.get("book"))
     raise ValueError(f"{spec.name}: executor {ex!r} has no dispatch")   # skill.EXECUTORS pins this
 
 

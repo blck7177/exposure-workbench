@@ -69,6 +69,21 @@ FACE_RESEARCH = ["describe", "run", "read_filings", "search_web", "think", "subm
 FACE_NAME_META = "meta"
 FACE_NAME_RESEARCH = "research"
 
+# V1: the three analysts. A face is a RESOURCE FAMILY — filings, prices, the book
+# — and each is its own mount with its own registry (tools/primitives
+# .build_analyst_registry), so what an analyst cannot reach is not refused: it is
+# not there, neither the verb nor the measure's name in an enum. `submit`, the
+# analyst's exit, is in-process (agents/delegation) and on no face.
+FACE_NAME_ISSUER = "issuer"
+FACE_NAME_MARKET = "market"
+FACE_NAME_RISK = "risk"
+FACE_ISSUER = ["list", "filings_read", "metric", "calc", "filings_search", "filings_section", "web_search", "start"]
+FACE_MARKET = ["list", "prices_read", "metric", "calc", "start"]
+FACE_RISK = ["list", "book_read", "metric", "calc", "scenario", "start"]
+ANALYST_FACES: dict[str, list[str]] = {
+    FACE_NAME_ISSUER: FACE_ISSUER, FACE_NAME_MARKET: FACE_MARKET, FACE_NAME_RISK: FACE_RISK,
+}
+
 
 class FaceNotRegistered(RuntimeError):
     """A face names a tool its registry does not register."""

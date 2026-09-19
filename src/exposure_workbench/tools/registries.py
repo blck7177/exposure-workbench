@@ -34,6 +34,7 @@ from __future__ import annotations
 
 from exposure_workbench.tools.definitions import ISSUER_KINDS, build_read_registry
 from exposure_workbench.tools.meta_tools import register_meta_tools
+from exposure_workbench.tools.primitives import build_analyst_registry  # noqa: F401 — V1: one registry per analyst face
 from exposure_workbench.tools.registry import ToolRegistry
 from exposure_workbench.tools.research_tools import register_research_tools, register_search_tool
 

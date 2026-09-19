@@ -328,10 +328,11 @@ def _from_scenario(row: CalcLedger, cid: str) -> Resolved:
         rows = held if isinstance(held, list) else ([held] if isinstance(held, dict) else [])
         for r in rows:
             who = f".{r['label']}" if res.label_column and isinstance(r.get("label"), str) else ""
+            said = registry.words_beside(r) if res.table == "limit_checks" else {}
             for c in res.columns:
                 v = r.get(c.name)
                 if isinstance(v, (int, float)) and not isinstance(v, bool):
-                    values.append(Quantity(float(v), c.unit, f"{res.table}{who}.{c.name}", cid))
+                    values.append(Quantity(float(v), c.unit, f"{res.table}{who}.{c.name}", cid, means=said or None))
     positions = result.get("issuer_exposures") or []
     checks = result.get("limit_checks") or []
     alerts = result.get("alerts") or []

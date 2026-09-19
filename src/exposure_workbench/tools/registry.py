@@ -37,6 +37,7 @@ from exposure_workbench.services import facts as fct
 from exposure_workbench.services import trace_service
 from exposure_workbench.services import name_table
 from exposure_workbench.tools.arg_validation import validate_args
+from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,12 @@ class Tool:
     # registered tool without one — and defaulted here only so the dataclass
     # stays constructible in the argument order every registration already uses.
     display: str = ""
+    # V1: a PRIMITIVE's result is rows. The model reads one header and the facts
+    # as lines (services/facts.line) — no note, no block, no legend — every row
+    # carries the id of the call that pulled it (`r_…`), and a refusal is itself
+    # a row: an absence on the ledger with its reason and way out, so a line the
+    # analyst cannot settle always has a boundary to point at.
+    rows: bool = False
 
 
 @dataclass
@@ -245,6 +252,10 @@ async def invoke(
             status="rejected", duration_ms=int((time.monotonic() - started) * 1000),
             message_id=message_id, actor=actor,
         )
+        if tool.rows:
+            return await _refused_as_a_row(db, session_id, tool, args,
+                                           {"error": "invalid_arguments", "problems": problems},
+                                           message_id=message_id, actor=actor)
         # V27: a name that failed an enum but IS a name the desk has — a method
         # written as a metric, a filed line written as a method — is told what
         # it is and the call that takes it. Same table as the catalogue's rows.
@@ -282,7 +293,11 @@ async def invoke(
                 duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
                 actor=actor,
             )
-            return {"error": "budget_exceeded", "kind": e.kind, "used": e.used, "limit": e.limit}
+            refused = {"error": "budget_exceeded", "kind": e.kind, "used": e.used, "limit": e.limit}
+            if tool.rows:
+                return await _refused_as_a_row(db, session_id, tool, args, refused,
+                                               message_id=message_id, actor=actor)
+            return refused
 
     # 3) run the fn, catching failures as structured results
     status = "completed"
@@ -329,9 +344,19 @@ async def invoke(
             status = "error"
             result = {"error": "fact_adapter_error", "tool": tool_name, "detail": str(exc)[:500]}
         else:
-            result = {**note, "facts": fct.block_for_model(shown)} if shown else note
-            if held and isinstance(result, dict):
-                result["held_back"] = held
+            if tool.rows:
+                pull = new_id(fa.PULL_PREFIX)
+                refusal = fa.refusal_fact(tool.name, args, result) if result.get("error") else None
+                made = [*made, *([refusal] if refusal is not None else [])]
+                shown = [*shown, *([refusal] if refusal is not None else [])]
+                made = [fa.stamped(f, pull) for f in made]
+                keep = {f.id for f in shown}
+                shown = [f for f in made if f.id in keep]
+                result = fa.present(tool.name, args, shown, note, held, pull)
+            else:
+                result = {**note, "facts": fct.block_for_model(shown)} if shown else note
+                if held and isinstance(result, dict):
+                    result["held_back"] = held
             # THE LEDGER RECORDS EVERY FACT THE CALL MADE. The cap above is a
             # bound on what one PAYLOAD shows a model; a figure it held back
             # was still computed, is still evidence, and the answer check
@@ -361,6 +386,28 @@ async def invoke(
         # see the structured result it was given.
         logger.exception("could not record trace step for %s (session %s)", tool_name, session_id)
     return result
+
+
+async def _refused_as_a_row(db: AsyncSession, session_id: str, tool: Tool, args: dict, refused: dict, *,
+                            message_id: str | None, actor: str | None) -> dict:
+    """A primitive refused BEFORE it ran — arguments that do not fit, a budget
+    spent — says so as a row, like every other refusal it makes (V1). The
+    rejected step above keeps the audit; this second step is `completed` because
+    the ledger reads completed steps only, and the absence has to be on it for a
+    line to be filed against it."""
+    pull = new_id(fa.PULL_PREFIX)
+    fact = fa.stamped(fa.refusal_fact(tool.name, args, refused), pull)
+    try:
+        step_id = await trace_service.record_step(
+            db, session_id, step_type="boundary", tool_name=tool.name, args=None,
+            result_summary=f"refused: {refused.get('error')}", evidence_refs=[ledger_svc.step_entry([fact])],
+            status="completed", message_id=message_id, actor=actor)
+        for row in ledger_svc.rows_for([fact], session_id=session_id, step_id=step_id, message_id=message_id):
+            db.add(row)
+        await db.flush()
+    except Exception:  # noqa: BLE001 — as below: a hole in the trail must not take the turn with it
+        logger.exception("could not record the refusal of %s (session %s)", tool.name, session_id)
+    return fa.present(tool.name, args, [fact], refused, None, pull)
 
 
 def _step_type(tool: Tool) -> str:

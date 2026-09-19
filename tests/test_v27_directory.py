@@ -141,7 +141,9 @@ def test_the_method_enum_is_the_faces_registry_and_the_metric_enum_the_filed_lin
 def test_a_name_at_the_wrong_door_cannot_be_written_and_the_refusal_says_the_door():
     compute = build_meta_registry().tools["compute"].json_schema
     problems = validate_args(compute, {"method": "capex", "subject": "MSFT"})
-    assert problems and problems[0]["value"] == "capex" and "46 names" in problems[0]["problem"]
+    from exposure_workbench.analytics import registry as _registry
+    n = len(_registry.METHODS)               # V1 added book.position; the count is the registry's, not a literal
+    assert problems and problems[0]["value"] == "capex" and f"{n} names" in problems[0]["problem"]
     assert validate_args(compute, {"method": ["gross_margin", "capex"], "subject": "MSFT"})[0]["value"] == "capex"
     assert validate_args(compute, {"method": "gross_margin", "subject": "MSFT"}) == []
     assert validate_args(compute, {"method": None, "op": "add", "operands": ["f_a", "f_b"]}) == []

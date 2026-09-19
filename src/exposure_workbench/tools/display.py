@@ -128,10 +128,14 @@ def _templates() -> dict[str, str]:
     Built once. The registries are pure construction — no database, no network —
     and a step list is rendered on every poll of a running turn.
     """
-    from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
+    from exposure_workbench.tools import faces
+    from exposure_workbench.tools.registries import (
+        build_analyst_registry, build_meta_registry, build_research_registry,
+    )
 
     out: dict[str, str] = {}
-    for registry in (build_meta_registry(), build_research_registry()):
+    for registry in (build_meta_registry(), build_research_registry(),
+                     *(build_analyst_registry(name) for name in faces.ANALYST_FACES)):
         for name, tool in registry.tools.items():
             if tool.display:
                 out[name] = tool.display

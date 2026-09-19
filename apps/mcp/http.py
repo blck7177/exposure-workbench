@@ -48,7 +48,9 @@ from exposure_workbench.auth import internal_token
 from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.mcp_server import build_mcp_server
-from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
+from exposure_workbench.tools.registries import (
+    build_analyst_registry, build_meta_registry, build_research_registry,
+)
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -71,6 +73,9 @@ internal_token.require_secret()
 MOUNTS = {
     faces.FACE_NAME_META: (build_meta_registry(), faces.FACE_META_AGENT),
     faces.FACE_NAME_RESEARCH: (build_research_registry(), faces.FACE_RESEARCH),
+    # V1: one door per analyst. Each registry holds that analyst's verbs and
+    # nothing else, so the face and the registry are the same list by construction.
+    **{name: (build_analyst_registry(name), face) for name, face in faces.ANALYST_FACES.items()},
 }
 
 # One server and one session manager per mount, built at import and held for the

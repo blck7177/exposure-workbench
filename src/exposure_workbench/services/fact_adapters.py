@@ -687,6 +687,8 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
         if not isinstance(unit, str):
             raise UnknownUnit(f"compute {method}: top-level value carries no unit_class")
         params = _params_of(r, ctx)
+        if one in skill.METHODS:
+            params["method"] = one                            # the row's `from`: the measure that made it
         if isinstance(r.get("made_of"), dict) and r["made_of"]:
             params["made_of"] = r["made_of"]                  # what a composed total was built from
         if isinstance(r.get("substituted_inputs"), dict) and r["substituted_inputs"]:
@@ -746,6 +748,112 @@ def no_facts(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return [], _strip(result, Ctx("none"))
 
 
+# ── the primitives (V1): a book's rows, and every result as rows ─────────────
+
+def book_read(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    """A run's or scenario's figures, read off the table they sit on. The payload
+    names each figure as the book does (`limit_checks.issuer_concentration:LLY.
+    current_value`) and carries the word its ROW said (a check's status); the
+    Fact's measure and subject are split by the one rule every reader of a book
+    name uses (analytics/resources.identity_of, V38/S4)."""
+    ref = result.get("book") or args.get("book") or ""
+    facts: list[F.Fact] = []
+    note = {k: v for k, v in result.items() if k not in ("figures", "withheld")}
+    for fig in result.get("figures") or []:
+        name = fig["name"]
+        measure, entity = rs.identity_of(name)
+        facts.append(F.fact(F.SCALAR, measure if entity is not None else name, subject=entity or ref,
+                            unit=str(fig["unit_class"]).upper(), value=float(fig["value"]),
+                            as_of=result.get("as_of"), params=({"of": ref} if entity is not None else {}),
+                            sources=(ref,) if _is_id(ref) else (), group=rs.group_of(name) or "book_derived",
+                            means=registry.validate_means(fig.get("means") or {})))
+    for held in result.get("withheld") or []:
+        facts.append(F.fact(F.ABSENCE, held["name"], subject=ref, text=str(held["reason"])[:600], as_of="n/a",
+                            params={"error": "not_alone"}, sources=(ref,) if _is_id(ref) else (),
+                            group="book_derived", means={"reason": "meaningless"}))
+    return facts, note
+
+
+PULL_PREFIX = "r_"
+_WAY_OUT_KEYS = ("available", "nearest", "known", "allowed", "portfolios", "tables", "columns_of_table",
+                 "items_indexed", "data_covers", "hint")
+
+
+def stamped(f: F.Fact, pull: str) -> F.Fact:
+    """The Fact carrying the id of the call that pulled it — what `open(r_…)`
+    finds a call's rows by and what a row's `from` begins with."""
+    return replace(f, params={**f.params, "pull": pull})
+
+
+def _problems_said(problems: Any) -> str:
+    said = []
+    for p in problems if isinstance(problems, list) else []:
+        if isinstance(p, dict):
+            said.append(f"{p.get('field')}: {p.get('problem')}")
+    return "; ".join(said)
+
+
+def refusal_fact(tool: str, args: dict, result: dict) -> F.Fact:
+    """WHAT A PRIMITIVE COULD NOT DO, AS A ROW (V1). The service's own sentence is
+    the text; the reason is the registry's word for its code; the way out is
+    whatever the refusal already names — the allowed values, the nearest names,
+    the dates the data covers — so a refusal never hands the problem back bare."""
+    code = result.get("error")
+    detail = str(result.get("detail") or result.get("hint") or code or "the desk could not do this")
+    said = _problems_said(result.get("problems"))
+    if said:
+        detail = f"{detail} — {said}" if detail != code else said
+    ways = []
+    for k in _WAY_OUT_KEYS:
+        v = result.get(k)
+        if isinstance(v, dict):
+            v = [f"{a}: {b}" for a, b in list(v.items())[:6]]
+        if isinstance(v, (list, tuple)) and v:
+            ways.append(f"{k.replace('_', ' ')}: " + ", ".join(str(x) if not isinstance(x, dict) else
+                                                              str(x.get("portfolio_id") or x.get("name") or x)
+                                                              for x in list(v)[:12]))
+        elif isinstance(v, str) and v:
+            ways.append(v)
+    subject = next((args.get(k) for k in ("ticker", "book", "subject") if isinstance(args.get(k), str)), None)
+    want = next((args.get(k) for k in ("name", "line", "table", "item", "what", "op", "kind") if isinstance(args.get(k), str)), tool)
+    means: dict = {"reason": registry.reason_of(code) if code != "invalid_arguments" else "param_out_of_range"}
+    # A MEASURE OF ANOTHER FAMILY is not a misspelling: the name is right and the
+    # asker is wrong. The enum refused it; the row says whose it is, so the line
+    # goes back to the lead as "ask the other analyst" and not as "unavailable".
+    elsewhere = [p.get("value") for p in (result.get("problems") or []) if isinstance(p, dict)
+                 and p.get("field") == "name" and p.get("value") in registry.METHODS]
+    if tool == "metric" and elsewhere:
+        owners = " and ".join(f"the {f} analyst" for f in registry.METHODS[elsewhere[0]].faces) or "no analyst (it is an action)"
+        means["reason"] = "not_on_this_face"
+        ways.insert(0, f"{elsewhere[0]} is a measure {owners} may ask for")
+    if ways:
+        means["way_out"] = "; ".join(ways)
+    return F.fact(F.ABSENCE, str(want)[:200], subject=subject, text=f"{tool}: {detail}"[:600], as_of="n/a",
+                  params={"error": code, "tool": tool}, standalone=False, group="boundary", means=means)
+
+
+def _call_said(tool: str, args: dict) -> str:
+    shown = ", ".join(f"{k}={ejson.dumps(v)[:60]}" for k, v in args.items() if k != "why" and v is not None)
+    return f"{tool}({shown})"
+
+
+_PASS_THROUGH = ("catalogue", "made", "task_id", "run_id", "next_offset", "as_of", "book")
+
+
+def present(tool: str, args: dict, shown: list[F.Fact], note: dict, held: dict | None, pull: str) -> dict:
+    """One primitive's result as the model reads it: the call's id and what was
+    called, then the rows. No legend: a row says what it is (services/facts.line)."""
+    out: dict = {"pull": pull, "head": f"{pull} {_call_said(tool, args)} → {len(shown)} row{'s' if len(shown) != 1 else ''}",
+                 "rows": [F.line(f) for f in shown]}
+    for k in _PASS_THROUGH:
+        if isinstance(note, dict) and note.get(k) not in (None, "", [], {}):
+            out[k] = note[k]
+    if held:
+        out["held_back"] = (f"{held.get('count')} more rows were pulled and are on the ledger, not shown here: "
+                            f"ask for less in one call (one column, one row, fewer subjects)")
+    return out
+
+
 ADAPTERS: dict[str, Adapter] = {
     "describe": describe,
     "read_fundamentals": read_fundamentals,
@@ -755,6 +863,11 @@ ADAPTERS: dict[str, Adapter] = {
     "compute": compute,
     "run": run_program,
     "search_web": search_web,
+    # V1: the primitives. A verb's payload is the payload of the service it
+    # wraps, so it reads through the adapter that already knows that payload.
+    "list": no_facts, "filings_read": read_fundamentals, "prices_read": read_prices, "book_read": book_read,
+    "metric": compute, "calc": compute, "scenario": compute,
+    "filings_search": read_filings, "filings_section": read_filings, "web_search": search_web,
     "start": start,
     "think": no_facts,
     "respond": no_facts,

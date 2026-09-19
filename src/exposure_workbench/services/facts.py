@@ -263,14 +263,11 @@ def from_of(rec: dict) -> str:
     """Where the row came from: the method or operation that made it, else the
     row it was read off."""
     params = rec.get("params") or {}
-    if params.get("method"):
-        return f"method {params['method']}"
-    if params.get("op"):
-        return f"op {params['op']}"
     sources = [s for s in rec.get("sources") or [] if isinstance(s, str)]
-    if sources:
-        return ", ".join(sources[:2])
-    return str(rec.get("group") or "")
+    made_by = (f"method {params['method']}" if params.get("method") else
+               f"op {params['op']}" if params.get("op") else
+               ", ".join(sources[:2]) if sources else str(rec.get("group") or ""))
+    return " ".join(x for x in (params.get("pull"), made_by) if x)
 
 
 def model_row(f: "Fact | dict") -> dict:

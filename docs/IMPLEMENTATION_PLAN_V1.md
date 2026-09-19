@@ -172,6 +172,16 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - 做什么：`tools/definitions.py` 注册 §2.3 的 12 个动词，JSON schema 用枚举，`why` 必填，期间类型化，输出经 fact_adapters 成行，拒绝成缺席行；`tools/faces.py` 改为三个面（`FACE_ISSUER`、`FACE_MARKET`、`FACE_RISK`）加各面的 metric 名单与 `list` 的 what 枚举；`program_service` 的原语被拎出来单步调用（fundamentals→filings_read，prices/price→prices_read，run/column/figure/pick→book_read，method→metric，算术与集合与序列→calc，sell/buy→scenario）；`run`、`compile`、签名页、符号表、`digest.HOW_TO_CITE` 下面；`program_service` 退役（9/19 决定）：原语拎出后删除 `run`、`compile`、签名页、符号表与 `docs/PROGRAM_LANGUAGE.md`；日后若做代码组合，以 12 个动词为函数面另建，不复用程序语言。
 - 验收：每个动词三类单元测试（正常、拒绝带出路、越面拒绝说在哪个面）；tool 描述扫描不含手册 §1 的问题句；每面 tool 数 9/6/7；结果文本里图例长度 = 0。
 
+**执行记录 3a（2026-09-19，`desk-v1`）：新动词与三个面已加上，旧面仍在**。离线套件 2703 通过（新增 `tests/test_v1_primitives.py` 22 条）。
+
+- `tools/primitives.py`：11 个动词注册在面上，`submit` 仍是分析师进程内的出口。每个动词是现有 service 的薄包装：`filings_read`→`_read_fundamentals`，`prices_read`→`_read_prices`，`metric`/`calc`/`scenario`→`compute_service.compute`，`filings_search`/`filings_section`→检索服务（search 多了 item、filed_after 过滤；section 按 `PASSAGE_CHARS` 分页，回 `next_offset`），`web_search`、`start` 包原函数，`book_read` 直接读命名器的行（连同行上的状态词），`list` 只回名字与日期。`why` 在每个 schema 里必填，`web_search` 与 `start` 的 reason 就是 why。
+- 面是结构：`build_analyst_registry(face)` 只注册该面的动词，`metric.name`、`list.what`、`start.kind` 的枚举也按面裁剪；三个面各自一个 MCP 挂载（`/mcp/issuer|market|risk`）。别面的动词在这里不存在（`unknown_tool`）；别面的度量名被枚举拒绝，缺席行写明"这是某某分析师可以要的度量"，原因记为 `not_on_this_face`。
+- 行输出：`Tool.rows=True` 时 `invoke` 返回 `{pull, head, rows}`，行就是 `facts.line`；每次调用铸一个 `r_…`，盖在该次全部事实的 `params.pull` 上（不进身份 token），行的来历以它开头。拒绝一律铸成缺席事实上账：fn 返回的错误、参数不合、预算用完都是；后两者发生在执行之前，另记一条 completed 的 boundary 步骤，因为账本只读 completed。出路取自拒绝本身带的允许值、最近名字、数据覆盖范围。
+- `calc` 的 `top` 是排序后截断；`filter` 的 `level` 可以写成桌子显示的样子（"8%"、"$1.5M"）或一个 f_ id，由同一个解析器读，分析师不做单位换算；满足的个数记成一条 COUNT 事实，满足的 id 列在 `kept`。
+- 跨资源度量 `book.position`（发行人面）：某个名字在每本持有它的书的最新 run 里的权重、市值、贡献，和它那条集中度检查的三档；新服务 `services/position_service.py`，登记簿与 `compute_service` 各加一条。
+
+**与计划的出入**：`prices_read` 没有 volume 字段（窗口读调整收盘序列，日期读当日收盘与调整收盘；成交量走 `metric price.adv`）；`list` 回的是目录行不是事实，所以不含任何数字。
+
 ### 步骤 4 · 分析师与主分析师
 
 - 做什么：`agents/sub_analyst.py` 按面实例化三位，system 由四样组成，工具列表原生下发；每次调用的 `why` 记入 `agent_steps`，log 可按 task 重建；`agents/delegation.py` 的 submit schema 做 §2.4 的强制，`for_lead` 改出 Return（附行、无 shown、无 coverage、无 how_to_cite），`made` 从账本填；`agents/meta_agent.py` 只剩 ask、open、reply（被退回时按 tag 替换），system 加含义层与三条名册，`services/briefing.py` 清掉度量名与调用提示，只留桌上有什么。
