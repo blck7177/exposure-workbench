@@ -14,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from exposure_workbench.analytics import formulas as FM
 from exposure_workbench.analytics import registry as R
+from exposure_workbench.analytics import resources as RS
 from exposure_workbench.services import answer_check as AC
 from exposure_workbench.services import fact_adapters as FA
 from exposure_workbench.services import facts as F
@@ -23,10 +25,15 @@ from exposure_workbench.services.ledger import Ledger, rows_for
 ROOT = Path(__file__).resolve().parents[1]
 
 
-# ── the six rows a reader is shown ───────────────────────────────────────────
+# ── the rows a reader is shown: the plan's six, and a series ────────────────────
 
+# A BETA IS A MULTIPLE (step 2): the unit is read off the desk's own declaration, not typed here. This
+# fixture said "RATIO" by hand and its gold line pinned "-86.0%" — the very writing step 1's first
+# finding set out to end — for as long as nobody looked, because a fixture that types its own unit
+# cannot notice the desk changed its mind.
 NET_BETA = F.Fact(id="f_3a9c", kind=F.SCALAR, measure="portfolio.integration.net_beta.equity_down",
-                  subject="run_20260910", unit="RATIO", value=-0.86, as_of="2026-09-10",
+                  subject="run_20260910", unit=RS.CALC_RESULTS["portfolio.integration"]["net_beta"], value=-0.86,
+                  as_of="2026-09-10",
                   params={"method": "book.analysis"},
                   means={"direction": "loses", "flags": ["collinear_legs_not_quotable"]}, sources=("calc_1",))
 # as program_service births it: resources.identity_of splits the check off the name (V38/S4)
@@ -37,6 +44,12 @@ COVERAGE = F.Fact(id="f_7d21", kind=F.SCALAR, measure="ebit_interest_coverage", 
                   value=18.4, as_of="2025-06-30", window={"start": "2024-07-01", "end": "2025-06-30"},
                   params={"method": "ebit_interest_coverage",
                           "substituted": {"interest_expense": "interest_expense_nonoperating"}})
+# the plan's fourth row (§3 步骤 1: 净 beta、余地、利息覆盖、DSO、缺席、政策缺席): what a turnover in days is
+# BUILT ON rides on the row. Unit and basis are the registry entry's, as fact_adapters.compute reads them.
+DSO = F.Fact(id="f_d5d0", kind=F.SCALAR, measure="days_sales_outstanding", subject="AAPL",
+             unit=FM.FORMULAS["days_sales_outstanding"].unit_class.upper(), value=30.0, as_of="2023-09-30",
+             window={"start": "2023-07-02", "end": "2023-09-30"}, params={"method": "days_sales_outstanding"},
+             means={"basis": list(R.METHODS["days_sales_outstanding"].basis)})
 MARGINS = F.Fact(id="f_5b10", kind=F.SERIES, measure="gross_margin", subject="MSFT", unit="RATIO",
                  points=(("2024-06-30", 0.69), ("2025-06-30", 0.688)), as_of="2025-06-30",
                  params={"method": "gross_margin"})
@@ -46,12 +59,16 @@ REFUSED = F.Fact(id="f_9e02", kind=F.ABSENCE, measure="net_debt_to_ebitda", subj
                  means={"reason": "meaningless", "way_out": "ROE, ROA and the accruals ratio do apply to banks"})
 
 GOLD = {
-    "f_3a9c": "[f_3a9c] net beta to equity down, run_20260910, as of 2026-09-10: -86.0% — the book loses if this "
+    "f_3a9c": "[f_3a9c] net beta to equity down, run_20260910, as of 2026-09-10: -0.86× — the book loses if this "
               "risk happens; collinear fit: the net is quotable, no single leg is — method book.analysis",
     "f_r00m": "[f_r00m] room to the warning tier, issuer_concentration:LLY, as of 2026-09-10: -1.00% — in warning; "
               "20th highest of 20 — method book.analysis",
     "f_7d21": "[f_7d21] EBIT / interest coverage, XOM, 2024-07-01 to 2025-06-30: 18.40× — built on interest expense "
               "nonoperating in place of interest expense — method ebit_interest_coverage",
+    # NOT YET THE DESIGN'S ROW ("30.0 天 — 按 91 天换算，期末余额"): the algebra counts days as a COUNT, so the
+    # value carries no unit word, and the day count is only in the window. Open item in the plan (§5).
+    "f_d5d0": "[f_d5d0] days sales outstanding, AAPL, 2023-07-02 to 2023-09-30: 30 — built on ending balances — "
+              "method days_sales_outstanding",
     "f_5b10": "[f_5b10] gross margin, MSFT, annual, 2024-06-30 to 2025-06-30, 2 points: 2024-06-30 69.0%; "
               "2025-06-30 68.8% — method gross_margin",
     "f_9e02": "[f_9e02] absent: net debt / EBITDA, JPM: — — net debt / EBITDA is refused for a financial issuer: "
@@ -60,7 +77,7 @@ GOLD = {
                             "for next year's figure, it says so and gives what the issuer's own filings say would "
                             "move the figure either way. — boundary",
 }
-ROWS = {f.id: f for f in (NET_BETA, ROOM, COVERAGE, MARGINS, REFUSED)}
+ROWS = {f.id: f for f in (NET_BETA, ROOM, COVERAGE, DSO, MARGINS, REFUSED)}
 
 
 @pytest.mark.parametrize("fid", sorted(GOLD))
