@@ -91,7 +91,7 @@ from   来历                         "r_51 metric ebit_interest_coverage"
 | | 发行人分析师 | 市场分析师 | 组合风险经理 |
 |---|---|---|---|
 | 原始读 | filings_read | prices_read | book_read |
-| metric 名单 | 30 条发行人公式，加 book.position | price 系列：波动、beta、动量、回撤、成交额、区间回报 | book 系列：净 beta、回撤事件、对账；加 price 的 beta、波动、成交额 |
+| metric 名单 | 32 条发行人公式与 issuer.panel，加 book.position | price 系列：波动、beta、动量、回撤、成交额、区间回报 | book 系列：净 beta、回撤事件、对账；加 price 的 beta、波动、成交额 |
 | 文本 | filings_search、filings_section、web_search | 无 | 无 |
 | 动作 | start | start | scenario、start |
 | 共有 | list、calc、submit | 同 | 同 |
@@ -108,10 +108,10 @@ Return  { task_id, analyst, status: settled|partial|unsettled|refused,
           caveats[]: { line, text }, made[]: calc_… }                       // 无 shown、无 coverage 计数、无图例
 submit  { lines[]: { n, settled, finding?, facts?: [f_…], why?, boundary?: f_… }, caveats[]: { line, text } }
           // schema 强制：settled ⇒ facts 非空；¬settled ⇒ boundary 必填；两者都有或都无直接拒绝
-open    (id) → f_ 一行 | r_ 一次调用的全部行 | task_ 一位分析师的全程 log | calc_ 一本书；只读
+open    (id) → f_ 一行 | r_ 一次调用的全部行 | tsk_ 一位分析师的全程 log | calc_ 一本书；只读
 HandoffVerdict { accepted, problems[]: { line, rule: 1..8, reason, way_out } }
 AnswerVerdict  { accepted, problems[]: { tag,  rule: 1..8, reason, way_out } }
-log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；submit → 裁决
+log     tsk_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；submit → 裁决
 ```
 
 主分析师每轮收到的只有四样：用户的话、桌上有什么（无数字、无度量名）、分析师回来的 Return、校验退回的句子。静态知道的：角色说明、三位分析师各一行"答什么"、含义层、风格指南。
@@ -189,7 +189,7 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 - 测试：删除主题整体退役的 13 个文件（program_service、v33 的 typecheck/language/builder、v30 skill programs、v36 digest、v36a fixes、v37 offers/refusals_on_face、v38 tool_layer、v27 directory、v12 describe live、registry_enforcement_live）；其余文件里按函数删掉钉旧工具面成员与旧目录的约 50 条；保留并改到新动词的有 schema 诚实性（`why` 因此改成无默认的必填关键字参数）、面范围、工具注册、展示短语、withheld 读者、书的代数里的两条拒绝。
 - 脚本：8 个直接依赖退役模块的脚本移到 `scripts/archive/`（附 README）；新增 `scripts/v1_wording.py`，从运行时对象生成 `docs/WORDING_V1.md`（约 6.1 万字符），并有测试断言它不过期。`docs/spikes/` 下的一次性工具未动，它们随历史保留。
 
-**与计划的出入**：`prices_read` 没有 volume 字段（窗口读调整收盘序列，日期读当日收盘与调整收盘；成交量走 `metric price.adv`）；`list` 回的是目录行不是事实，所以不含任何数字。
+**与计划的出入**：`prices_read` 没有 volume 字段（窗口读调整收盘序列，日期读当日收盘与调整收盘；成交量走 `metric price.adv`）——**已按计划改回，见「回到计划」记录**；`list` 回的是目录行不是事实，所以不含任何数字。
 
 ### 步骤 4 · 分析师与主分析师
 
@@ -235,10 +235,31 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 
 - 工具没让模型能表达意图：`metric.params` 只写了"一个对象"，分析师猜键名（`window: "21d"`、`end`）被拒后放弃——现在 `params` 与 `name` 的描述由登记簿渲染（每个度量收什么、每个 key 在手册里叫什么），参数类拒绝写明该度量收什么；`metric` 对 run 类度量认 `port_…`；`filings_read` 一次读多家同一科目；`scenario` 只回交易与"没重算的东西"，新书进账本由 `book_read` 读（原 99 行）；`list` 不计入取证预算；预算用尽是一条可引用的缺席行；价格度量问到一本书上，拒绝写明归风险经理。
 - 行说错话：`book.analysis` 改专用适配器（146→47 行；共线时净 beta 原来被标成不可单独引用，gate 会拒掉主分析师引用它；腿不再成行；未测到的风险成缺席行）；beta 统一 MULTIPLE；方向词只在净 beta 上；余额读数不再夹带别的科目；回撤行写峰谷日期（`book.explain_episode` 的参数）；一个数跨两个期间就写两个；排名行以被排名的度量命名；`calc` 的结果记下它的输入（`params.inputs`）。
-- 校验对写的人说了假话：段落里"Debt to capital14.0"被说成"段落没有这个数"——规则不变，拒绝句改成真话并给出路；ISO 日期认段落里的拼写日期；"12 months"认段落原话；分析师命名的商仍对它的构成度量负责；情景书与原书同值是比较不是"一个读数写两遍"；**数字与方括号之间允许隔几个词，前提是方括号所指的事实确实持有这个数**（推翻 V33 的一个钉子，见 `test_v33_answer_check`）；被拒的简报告诉分析师派生数字用 `calc`；一串方括号去掉后不留",,."。
+- 校验对写的人说了假话：段落里"Debt to capital14.0"被说成"段落没有这个数"——规则不变，拒绝句改成真话并给出路；ISO 日期认段落里的拼写日期；"12 months"认段落原话；分析师命名的商仍对它的构成度量负责；情景书与原书同值是比较不是"一个读数写两遍"；**数字与方括号之间允许隔几个词，前提是方括号所指的事实确实持有这个数**（推翻 V33 的一个钉子，见 `test_v33_answer_check`）；被拒的简报告诉分析师派生数字用 `calc`（这两条已在「回到计划」第一批撤回：钉子恢复，建议句拿掉）；一串方括号去掉后不留",,."。
 - 知识层：手册每个问题写明"由哪些度量回答"（`Topic.measures` 原来只声明不渲染）；服务层拒绝句不再点名任何动词（三十余句仍在推荐已退役的门），AST 扫描测试守住。
 
 10 题、gpt-5.4-mini 的结果在各次运行间波动大（同一题时成时败）。稳定失败的一类见 §5 新增的待拍板项。
+
+### 步骤 2–5 之后 · 回到计划、第二次真库烟测、金标准行（2026-09-19，`desk-v1`，提交 4e280e2、8b8887b、e23a0b7、6d8343b、a14fb74）
+
+烟测之后把代码与本计划逐条对了一遍。boss 定：**多出来的没问题，其余按原计划改**。偏离的根因三类：动词做成了旧 service 的薄包装（签名跟着 service 走，不跟计划走）；退役时没核对挂在旧工具上的能力；烟测时当场改了校验规则与拒绝句（那是 LLM 路径上的补丁）。
+
+**回到计划，三批**：
+
+- 第一批（4e280e2）：答案检查里"按值配对的方括号"撤回，风格指南第一条（数字后面跟它的 id）与 V33 的钉子恢复；留下的只有检查对写的人说了假话的几处（拼写日期、"12 months"、两本书）和 `calc` 记下输入。两句建议句离开拒绝（被拒简报末尾的 `calc` 提示、预算用尽行里的读法提示）；预算用尽仍是一条可引用的缺席行。`start` 只回 id，不再铸 `task` 这第五种事实；模型读到的种类回到 reading、series、passage、absence 四种。`calc` 去掉 `name`（§0：模型不给度量起名；46 次活体调用里 45 次用了它），结果名由登记簿从运算与输入拼出："free cash flow ÷ total debt"。
+- 第二批（8b8887b）：`scenario(book, trades)`，一份清单、按给定顺序、记成一本书；每笔是 `{sell, fraction}` 或 `{buy, weight}`；卖出的钱离开书，买入的钱来自书外，写进描述。`prices_read(ticker, field, window|date)`，field ∈ close、adj_close、volume；只作因子工具跟踪的名字没有成交量，拒绝。
+- 第三批（e23a0b7）：类型化期间（`tools/periods.py`）：`{fy}`、`{quarter}`、`{ttm_to}`、`{months, end}`、`{at}`，任一处可写 "latest"；`filings_read` 与 `metric` 共用，在工具层逐家按发行人自己的财年日历解析（`period_semantics.fiscal_calendar`：财年标签取自申报、按整年回推；第四季是全年减前三季），service 仍只收日期。计划的两条拒绝在读数之前做：流量配 at；序列不在发行人自己的年、季或申报日期上。余额问窗口读窗口末，行上写日期。申报科目的行带 accession（推导出的窗口列出每个来源申报）；检索到的段落带 accession 与它在 Item 里的字符偏移，`filings_section(filing, offset)` 从那里读下去。`list(fundamentals)` 以财年日历开头。
+
+**第二次真库烟测**（6d8343b）：改过签名的动词经 `registry.invoke` 在一次性库 `exposure_v1_smoke` 上跑了 49 次调用，按模型的读法读行；生产库零写入。另把三个面的 schema 各发给 provider 一次：嵌套的 oneOf、const、pattern、null 都被接受，gpt-5.4-mini 把五种期间、价格字段、两笔交易的清单都填成了桌子自己的校验器接受的形状。动词的行为与 §2.3 一致。读出来不对的四处，各修在拥有它的那一层，没有新增句子：
+
+- service：已持有的名字再买，被说成"桌上没有行业（未准备或不是 SEC 申报人）"——行业查询跑在引擎看到交易之前。改为引擎自己的拒绝在前（已持有、未持有、卖两次），桌子的在后。
+- 工具包装：service 已经用自己的缺席行说过的拒绝，又被包装层说了第二遍，第二行只有"prices_read: no_price_history"。改为只说一次；包装层那行在它带出路时保留。
+- 工具：发行人不报的科目，出路按字母序列前 12 个科目——KO 报的是 `total_revenues`，正好被截掉。改为最接近的名字先说。
+- 参数校验：期间或交易不合任何一种形状时只说"not valid under any of the given schemas"。改为后面跟上这个参数收什么：schema 自己的描述，没有描述则列形状。
+
+**金标准行**（a14fb74）：净 beta 那条钉的是 "-86.0%"——夹具手写了 unit="RATIO"，步骤 2 把 beta 改成 MULTIPLE 之后它仍然是绿的。夹具改读桌子自己的声明，钉 "-0.86×"。计划的第四条 DSO 行曾被换成毛利率序列，现已补回（序列行留作第七条），单位与依据词取自登记簿条目。
+
+**本轮发现，留给拍板**（已并入 §5）：买入名字的行业取自 `companies.sector`，生产库 11 家里 3 家有值且是 SEC 的 SIC 码（"2080"），其余为空，而书的行业是持仓自己的标签；天数类度量的值没有单位词（代数里天数是 COUNT，行上写"30"，设计稿的例子是"30.0 天 — 按 91 天换算"）；序列行没有 accession；`book.position` 的行不说是哪本书的。
 
 ### 步骤 6 · 风格指南单源与校验
 
@@ -264,17 +285,20 @@ log     task_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；subm
 
 ## 5. 拍板记录
 
-9/19 已拍板：`program_service` 退役（步骤 3）；D 轮不跑（步骤 0）；K5 五文件 stash（`git stash list` 第一条）；归档与本计划先提交；执行分支 `desk-v1`。
+9/19 已拍板：`program_service` 退役（步骤 3）；D 轮不跑（步骤 0）；K5 五文件 stash（`git stash list` 第一条）；归档与本计划先提交；执行分支 `desk-v1`；烟测后与计划的出入——多出来的没问题，其余按原计划改（见「回到计划」记录）。
 
 仍未拍板：`metric` 作为独立动词（本计划按保留执行；若拍掉，则 §2.3 只剩 read 加 calc，登记簿的组成与替代记录改由 calc 承担）；push。
 
 烟测后新增的待拍板项（9/19）：
 
 1. **`book.analysis` 要不要拆成两个名字自明的度量**（如 `book.net_exposures`、`book.room_to_tiers`）。证据：问"哪些集中度检查最接近突破、各剩多少空间"，风险经理 6 次运行 0 次去问 `book.analysis`，每次都是 `book_read` 读当前值与档位，再逐对 `calc subtract`（一次 15 个），预算用尽；手册已写明"由它回答"、`metric.name` 已写明 key 对应的叫法，仍不选。key 不说它给什么，是 V14 的复合度量，不正交。
-2. **数字与方括号的配对放宽**（按值核对）是否保留。
+2. ~~**数字与方括号的配对放宽**（按值核对）是否保留。~~ 已定：不保留，4e280e2 撤回，V33 的钉子恢复。
 3. **"回到高点所需涨幅"** 不是任何度量，`calc` 不收常数，桌子给不出；主分析师心算被拒。要不要作为回撤度量的产出。
 4. **book.reconcile、issuer.panel、price.beta 的行名**来自通用遍历，读得懂但不漂亮，要不要各给专用适配器。
 5. **电池脚本 `load_dotenv(override=True)`** 使 `OPENAI_MODEL` 环境变量无效，E 轮按模型分组前要改。
+6. **买入名字的行业从哪来**。`scenario` 的买入用 `companies.sector` 给新名字归行业：生产库 11 家里 3 家有值、且是 SIC 码，其余为空，于是买入要么被拒、要么在书里多出一个叫 "2080" 的行业；书的行业是持仓自己的标签，桌子没有第二个来源。
+7. **天数的单位词**。DSO、DIO、DPO、现金转换周期的值在行上是裸数（"30"），代数里天数是 COUNT；设计稿的金标准例子是"30.0 天 — 按 91 天换算，期末余额"。要不要给天数一个单位类（动到类型计算器的单位代数与前端的显示镜像）。
+8. **序列行的 accession、`book.position` 行属于哪本书**：与第 4 条同类，读得懂但行没说全。
 
 ## 6. 验收总表（机械，红了就是越界）
 
