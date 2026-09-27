@@ -103,7 +103,7 @@ def test_a_pointed_figure_is_looked_up_and_linked_to_the_fact_it_names():
 
 def test_a_pointer_that_does_not_hold_the_figure_is_a_mismatch_naming_what_it_holds():
     v = _refused("MSFT weighs 23.4% [f_wmsft] of the book.", "mark_mismatch")
-    assert v.problems[0]["holds"] == "16.0%" and "16.0%" in v.problems[0]["fix"]
+    assert v.problems[0]["holds"] == "16.0%" and "16.0%" in v.problems[0]["way_out"]
     v = _refused("MSFT weighs 16.0% [f_warnnvda] of the book.", "mark_mismatch")
     assert v.problems[0]["holds"] == "15.0%"
 
@@ -150,12 +150,12 @@ def test_round_g_14_2_an_enumeration_of_checks_in_one_sentence_is_no_longer_a_pr
 def test_a_bare_figure_the_ledger_holds_is_refused_with_the_ids_it_was_shown_under():
     v = _refused("MSFT weighs 16.0% of the book.", "unpointed_figure")
     assert {c["id"] for c in v.problems[0]["candidates"]} >= {"f_wmsft", "f_curmsft"}
-    assert "[f_…]" in v.problems[0]["fix"]
+    assert "[f_…]" in v.problems[0]["way_out"]
 
 
 def test_an_invented_number_is_refused_with_a_way_out():
     v = _refused("MSFT weighs 23.4% of the book.", "unsourced_figure")
-    assert "request" in v.problems[0]["fix"]
+    assert "request" in v.problems[0]["way_out"]
 
 
 def test_the_users_own_number_is_allowed():
@@ -557,9 +557,9 @@ def test_a_series_bracket_names_its_point():
     assert sorted(l["period"] for l in v.links.values()) == ["2023-12-31", "2025-12-31"]
     assert ac.accepted("Headcount was 1.50M [f_flat0001@2023-12-31].", ac.check("Headcount was 1.50M [f_flat0001@2023-12-31].", flat), flat)["text"] == "Headcount was 1.50M."
     v = ac.check("Headcount was 1.50M [f_flat0001] in 2023 and 1.50M [f_flat0001] in 2025.", flat)
-    assert {p["reason"] for p in v.problems} == {"ambiguous_point"} and "[f_flat0001@2023-12-31]" in v.problems[0]["fix"]
+    assert {p["reason"] for p in v.problems} == {"ambiguous_point"} and "[f_flat0001@2023-12-31]" in v.problems[0]["way_out"]
     v = ac.check("Operating cash flow was $46.3B [f_ocf001@2025-12-31].", _C_LEDGER)
-    assert [p["reason"] for p in v.problems] == ["mark_mismatch"] and "on 2025-12-31" in v.problems[0]["fix"]
+    assert [p["reason"] for p in v.problems] == ["mark_mismatch"] and "on 2025-12-31" in v.problems[0]["way_out"]
 
 
 def test_a_refusal_names_the_ids_the_desk_showed_the_figure_under():
@@ -568,7 +568,7 @@ def test_a_refusal_names_the_ids_the_desk_showed_the_figure_under():
     v = _refused("MSFT weighs 16.0% [f_warnnvda] of the book.", "mark_mismatch")
     assert {c["id"] for c in v.problems[0]["candidates"]} >= {"f_wmsft"} and "f_warnnvda" not in {c["id"] for c in v.problems[0]["candidates"]}
     v = _refused("MSFT is the largest issuer concentration at 16.0% [f_curmsft].", "superlative_without_rank")
-    assert [c["id"] for c in v.problems[0]["candidates"]] == ["f_rmsft"] and "[f_rmsft]" in v.problems[0]["fix"]
+    assert [c["id"] for c in v.problems[0]["candidates"]] == ["f_rmsft"] and "[f_rmsft]" in v.problems[0]["way_out"]
 
 
 def test_a_filings_form_name_is_a_word_not_a_figure():
@@ -640,7 +640,7 @@ def test_a_date_no_fact_carries_is_refused_as_a_date_and_not_as_a_figure():
     v = _refused("The notes mature on December 31, 2031.", "unsourced_figure")
     [p] = [p for p in v.problems if p["reason"] == "unsourced_figure"]
     assert p["figure"] == "December 31, 2031", "the whole date is named, not its day"
-    assert "quote the words that state this one" in p["fix"] and "request the figure" not in p["fix"]
+    assert "quote the words that state this one" in p["way_out"] and "request the figure" not in p["way_out"]
 
 
 def test_a_month_without_a_day_and_a_year_is_prose():
@@ -834,7 +834,7 @@ def test_a_figure_the_sentence_calls_the_books_is_not_one_names_own():
     ])
     v = ac.check("The book's beta to USO is 0.33× [f_xomuso].", led, None)
     assert not v.ok and {p["reason"] for p in v.problems} == {"subject_mismatch"}
-    assert "XOM's own" in v.problems[0]["fix"]
+    assert "XOM's own" in v.problems[0]["way_out"]
     # naming the issuer is all it takes
     assert ac.check("XOM's beta to USO is 0.33× [f_xomuso].", led, None).ok
     # and a book row keeps its name as a subject while being the book's figure
@@ -851,5 +851,5 @@ def test_a_report_id_is_not_something_the_reader_can_open():
     finder knows, so they were not tokens at all."""
     v = _refused("The desk cannot express that as of a past date [rep_3d15ad4012b4].", "id_in_prose")
     [p] = [p for p in v.problems if p["reason"] == "id_in_prose"]
-    assert p["id"] == "rep_3d15ad4012b4" and "not something the reader can open" in p["fix"]
+    assert p["id"] == "rep_3d15ad4012b4" and "not something the reader can open" in p["way_out"]
     _refused("That is what task tsk_a5a3fb7b9b9b asked for.", "id_in_prose")

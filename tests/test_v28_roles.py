@@ -338,7 +338,9 @@ def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
     # V33: the chat exit is prose checked by services/answer_check; the analyst is
     # told the one rule that check enforces, in its own words. claims.PROSE_RULE
     # stays the brief path's (submit_brief) and the registry's.
-    assert "every number you write is one a row showed you" in meta_agent._SYSTEM     # V1: the lead reads the desk's rows
+    # V1 step 6: that rule is the style guide's first, written once (services/style_guide) and included whole
+    from exposure_workbench.services import style_guide
+    assert style_guide.RULES[0].text in meta_agent._SYSTEM and "Every number you write is one a row showed you" in meta_agent._SYSTEM
     assert claims.PROSE_RULE in mcp_server.INSTRUCTIONS
     assert gate._FIX.startswith(gate.PROSE_RULE)
     assert "never write a number" not in meta_agent._SYSTEM

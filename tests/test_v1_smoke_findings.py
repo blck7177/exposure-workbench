@@ -450,11 +450,11 @@ def test_a_short_bare_number_the_passage_holds_is_refused_with_a_way_out_that_is
     led = _ledger_with(p)
     refused = AC.check(f"XOM's debt to capital was 14.0 [{p.id}].", led)
     (problem,) = [x for x in refused.problems if x["reason"] == "mark_mismatch"]
-    assert "WITH THE UNIT THE PASSAGE GIVES IT" in problem["fix"] and "does not state" not in problem["fix"]
+    assert "WITH THE UNIT THE PASSAGE GIVES IT" in problem["way_out"] and "does not state" not in problem["way_out"]
     assert not AC.check(f"XOM's debt to capital was 14.0 percent [{p.id}].", led).problems
     # a number the passage does NOT hold keeps the old sentence
     (other,) = [x for x in AC.check(f"XOM's debt to capital was 19.5 [{p.id}].", led).problems if x["reason"] == "mark_mismatch"]
-    assert "does not state this figure" in other["fix"]
+    assert "does not state this figure" in other["way_out"]
 
 
 def test_a_date_a_cited_passage_spells_out_is_the_same_date_written_iso():

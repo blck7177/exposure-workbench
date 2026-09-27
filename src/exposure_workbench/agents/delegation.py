@@ -53,6 +53,7 @@ from typing import Any
 from exposure_workbench.analytics import handbook
 from exposure_workbench.services import answer_check
 from exposure_workbench.services import facts as F
+from exposure_workbench.services import style_guide
 from exposure_workbench.services.ledger import Ledger
 
 ASK_TOOL_NAME = "ask"
@@ -97,8 +98,7 @@ ASK_TOOL = {"type": "function", "function": {
 
 _SETTLED = {"type": "object", "properties": {
     "n": {"type": "integer", "minimum": 1}, "settled": {"const": True},
-    "finding": {"type": "string", "minLength": 1,
-                "description": "one to three sentences, every figure written as its row shows it, with its id"},
+    "finding": {"type": "string", "minLength": 1, "description": "one to three sentences, written to the style guide"},
     "facts": {"type": "array", "minItems": 1, "items": {"type": "string"},
               "description": "the f_… ids of the rows the finding rests on"}},
     "required": ["n", "settled", "finding", "facts"], "additionalProperties": False}
@@ -298,6 +298,10 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
       C3  the ids a finding names are on the ledger
       C4  the boundary of an unsettled line is an absence the ledger holds
       C5  a caveat qualifies a line of this task
+
+    A problem that enforces one of the style guide's eight rules says which, by
+    number (`rule`, services/style_guide): everything C2 finds, and C5. The others
+    are about the SHAPE of the brief and carry none. Every problem says the way out.
     """
     v = HandoffVerdict()
     asked = task.asked_text()
@@ -306,12 +310,12 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
     for want in range(1, n + 1):
         if want not in filed:
             v.problems.append({"where": "coverage", "reason": "uncovered_line", "n": want, "line": task.lines[want - 1],
-                               "fix": f"line {want} of the task has no entry: settle it, or say what stopped you and "
+                               "way_out": f"line {want} of the task has no entry: settle it, or say what stopped you and "
                                       f"point at the absence row that says so"})
     for want in sorted(filed):
         if not 1 <= want <= n:
             v.problems.append({"where": "coverage", "reason": "unknown_line", "n": want,
-                               "fix": f"the task has {n} numbered line(s); {want} is not one of them"})
+                               "way_out": f"the task has {n} numbered line(s); {want} is not one of them"})
 
     for e in brief.get("lines") or []:
         where = f"line {e['n']}"
@@ -319,7 +323,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
             fid = e["boundary"]
             if ledger.kind(fid) != F.ABSENCE:
                 v.problems.append({"where": where, "reason": "not_a_boundary", "id": fid, "n": e["n"],
-                                   "fix": f"{fid} is not an absence row the desk showed you: point at the row that "
+                                   "way_out": f"{fid} is not an absence row the desk showed you: point at the row that "
                                           f"says what could not be done, or at the policy that stops the line"})
             continue
         problems = [{**p, "where": where, "n": e["n"]}
@@ -327,7 +331,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
         for fid in e["facts"]:
             if not ledger.holds(fid):
                 problems.append({"where": where, "reason": "not_on_ledger", "id": fid, "n": e["n"],
-                                 "fix": f"{fid} is not a row the desk showed you this turn: copy the id from the row"})
+                                 "way_out": f"{fid} is not a row the desk showed you this turn: copy the id from the row"})
         if problems:
             v.rejected.append({**e, "problems": problems})
             v.problems += problems
@@ -336,8 +340,8 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
 
     for i, c in enumerate(brief.get("caveats") or []):
         if not 1 <= c["line"] <= n:
-            v.problems.append({"where": f"caveats[{i}]", "reason": "unknown_line", "n": c["line"],
-                               "fix": f"a caveat qualifies one of the task's {n} line(s)"})
+            v.problems.append(style_guide.ruled({"where": f"caveats[{i}]", "reason": "caveat_without_a_line", "n": c["line"],
+                                                 "way_out": f"a caveat qualifies one of the task's {n} line(s)"}))
 
     unsettled = [e for e in brief.get("lines") or [] if not e["settled"]]
     v.coverage = {"asked": n, "settled": len(v.accepted), "unsettled": len(unsettled), "refused": len(v.rejected)}
@@ -352,11 +356,12 @@ def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
     seen: set[str] = set()
     for p in verdict.problems[:20]:
         what = p.get("figure") or p.get("id") or p.get("quote") or p.get("word") or p.get("phrase") or ""
-        line = f"[{p.get('where') or '?'}] {p['reason']}" + (f" ({what!r})" if what else "")
+        line = (f"[{p.get('where') or '?'}] " + (f"rule {p['rule']} — " if p.get("rule") else "") + p["reason"]
+                + (f" ({what!r})" if what else ""))
         if p.get("line"):
             line += f" — {p['line']}"
-        if p.get("fix"):
-            line += f": {p['fix']}"
+        if p.get("way_out"):
+            line += f": {p['way_out']}"
         if p.get("candidates"):
             line += " — the desk showed: " + "; ".join(
                 f"{c.get('measure')} {c.get('subject')} {c.get('as_of')} [{c.get('id')}]" for c in p["candidates"][:4])

@@ -40,7 +40,10 @@ Here the model writes prose. This module reads it the way the reader will:
 
 Every check is a lookup on the ledger (services/ledger.py) or a word from a
 short closed list; nothing here judges meaning beyond what a fact's own fields
-can settle. Problems are reported ALL AT ONCE, each with the way out. The
+can settle. Problems are reported ALL AT ONCE, each with the number of the
+style-guide rule it enforces (`rule`, services/style_guide — the rules' text
+lives there and nowhere else) and the way out (`way_out`), which is about the
+sentence in front of it and never restates the rule. The
 render (`accepted`) puts the ledger's value and identity where the number
 stood, in the block shape the web already reads.
 """
@@ -54,6 +57,7 @@ from typing import Any
 from exposure_workbench.analytics import registry
 from exposure_workbench.services import answer as A
 from exposure_workbench.services import facts as F
+from exposure_workbench.services import style_guide
 from exposure_workbench.services.facts import extent_in as F_extent, spacing_of as F_spacing
 from exposure_workbench.services.gate import _core, quoted_spans, _normalise
 from exposure_workbench.services.ledger import Ledger
@@ -359,7 +363,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                    and r.get("kind") in (F.SCALAR, F.SERIES)]
             if not ids:
                 v.problems.append({"at": f"prose[{i}]", "_at": m.start(), "reason": "unknown_node", "node": node,
-                                   "fix": "a [table: …] or [chart: …] names the id of a call whose rows you were shown (r_…), and its rows are on the ledger"})
+                                   "way_out": "a [table: …] or [chart: …] names the id of a call whose rows you were shown (r_…), and its rows are on the ledger"})
             else:
                 v.marks.append({"para": i, "start": m.start(), "end": m.end(), "kind": kind, "node": node, "ids": ids})
                 v.refs += ids
@@ -377,7 +381,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 v.refs += [t for t in hit[:1] if t]
             else:
                 v.problems.append({"at": f"prose[{i}]", "_at": max(start, 0), "reason": "unverified_quote", "quote": span[:120],
-                                   "fix": "quotation marks say these words are verbatim in a text this turn holds — a passage "
+                                   "way_out": "quotation marks say these words are verbatim in a text this turn holds — a passage "
                                           "the desk read, the desk's own words for what it could not do, or the question: "
                                           "reproduce the wording, or drop the marks"})
 
@@ -414,7 +418,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 v.refs.append(fid)
             else:
                 v.problems.append({"at": f"prose[{i}]", "_at": m.start(), "reason": "not_on_ledger", "id": fid,
-                                   "fix": "this bracket names no fact the desk showed this turn: copy the id from the evidence, or drop the bracket"})
+                                   "way_out": "this bracket names no fact the desk showed this turn: copy the id from the evidence, or drop the bracket"})
 
         # G1 / G2 — every token
         for t in tokens:
@@ -427,7 +431,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 if start in consumed:
                     continue
                 v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "id_in_prose", "id": tok,
-                                   "fix": ("a report or a task is not something the reader can open: say what it said, "
+                                   "way_out": ("a report or a task is not something the reader can open: say what it said, "
                                            "or cite the fact that carries it"
                                            if tok.startswith(("rep_", "tsk_")) else
                                            "an id is written in brackets — after the figure it points to (16.0% [f_…]), or after "
@@ -449,7 +453,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                 if rec is None:
                     v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "not_on_ledger", "figure": tok, "id": fid,
                                        "candidates": held_by,
-                                       "fix": "the id after a figure is the one the desk showed it under: copy the figure and "
+                                       "way_out": "the id after a figure is the one the desk showed it under: copy the figure and "
                                               "its bracket from the evidence" + (" — the desk showed this figure under the ids listed" if held_by else "")})
                     continue
                 if rec.get("kind") == F.PASSAGE:
@@ -461,7 +465,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                     else:
                         v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
                                            "holds": "passage", "candidates": held_by,
-                                           "fix": (_SHORT_BARE.format(ids=fid) if ledger.short_bare_in_passages(tok, [fid]) else
+                                           "way_out": (_SHORT_BARE.format(ids=fid) if ledger.short_bare_in_passages(tok, [fid]) else
                                                    f"{fid} is a passage and does not state this figure: quote the passage's own "
                                                    f"words, or point at the fact that holds it")})
                     continue
@@ -470,13 +474,13 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                     if period not in hits:
                         v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
                                            "holds": _shown_point(rec, period), "candidates": [c for c in held_by if c["id"] != fid],
-                                           "fix": f"{fid} holds {_shown_point(rec, period)} on {period}, not this figure: write the point "
+                                           "way_out": f"{fid} holds {_shown_point(rec, period)} on {period}, not this figure: write the point "
                                                   f"as the desk showed it, or point at the fact that holds it"})
                         continue
                 elif not hits:
                     v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "mark_mismatch", "figure": tok, "id": fid,
                                        "holds": _shown(rec), "candidates": [c for c in held_by if c["id"] != fid],
-                                       "fix": f"{fid} holds {_shown(rec)}, not this figure: write the figure as the desk showed "
+                                       "way_out": f"{fid} holds {_shown(rec)}, not this figure: write the figure as the desk showed "
                                               f"it, or point at the fact that holds it" + (" — the desk showed this figure under the ids listed" if held_by else "")})
                     continue
                 elif rec.get("kind") == F.SERIES:
@@ -489,7 +493,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                     else:
                         v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "ambiguous_point", "figure": tok, "id": fid,
                                            "periods": periods[:6],
-                                           "fix": "this series holds the figure on several dates: write the point's bracket as the "
+                                           "way_out": "this series holds the figure on several dates: write the point's bracket as the "
                                                   "desk showed it, with its date — " + ", ".join(f"[{fid}@{p}]" for p in periods[:4])})
                         continue
                 v.links[(i, start)] = {"to": "fact", "ids": [fid], "primary": fid, "period": period, "as_written": tok}
@@ -526,7 +530,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             held_by = _holders(ledger, tok)
             if held_by:
                 v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unpointed_figure", "figure": tok, "candidates": held_by,
-                                   "fix": "a figure the desk showed is written as shown, followed by its id in brackets "
+                                   "way_out": "a figure the desk showed is written as shown, followed by its id in brackets "
                                           "(16.0% [f_…]); the desk showed this figure under the ids listed"})
                 continue
             v.problems.append({"at": f"prose[{i}]", "_at": start, "reason": "unsourced_figure", "figure": tok,
@@ -534,7 +538,7 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
                                # the desk's dates are its facts' own, and a date only a filing
                                # states is quoted (V37; round B wrote three maturity dates out of
                                # the 10-K's prose and read "request the figure" for each).
-                               "fix": ("a date no fact of this turn carries: the desk's dates are the facts' own "
+                               "way_out": ("a date no fact of this turn carries: the desk's dates are the facts' own "
                                        "as_of and window — quote the words that state this one, or drop it"
                                        if kind == "date" else
                                        _SHORT_BARE.format(ids=", ".join(bare_in)) if (bare_in := ledger.short_bare_in_passages(tok, all_passages)) else
@@ -564,6 +568,8 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
 
     for p in v.problems:
         p.pop("_at", None)
+        if style_guide.rule_of(p.get("reason")) is not None:
+            p["rule"] = style_guide.rule_of(p["reason"])        # in place: a sentence's `problems` hold the same dicts
     v.refs = list(dict.fromkeys([*v.refs, *[l.get("primary") or fid for l in v.links.values() for fid in l["ids"][:1]]]))
     if v.problems:
         order = ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure", "unpointed_figure",
@@ -578,7 +584,8 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
 
 def _one_line(p: dict) -> str:
     what = p.get("figure") or p.get("id") or p.get("node") or p.get("quote") or p.get("word") or ""
-    return f"{p['at']} {p['reason']}" + (f" ({what!r})" if what else "") + (f": {p['fix']}" if p.get("fix") else "")
+    return (f"{p['at']} " + (f"rule {p['rule']} — " if p.get("rule") else "") + p["reason"]
+            + (f" ({what!r})" if what else "") + (f": {p['way_out']}" if p.get("way_out") else ""))
 
 
 def _reading(rec: dict, period: str | None) -> dict:
@@ -796,7 +803,7 @@ def _check_period(v: Verdict, at: str, sentence: str, linked: list, ledger: Ledg
             "at": at, "reason": "period_mismatch", "word": claim["as_written"], "id": rec["id"],
             "holds": f"{len([p for p in points if p])} {F_spacing(points) or 'undated'} reading(s), "
                      f"{str(points[0][0])[:10]}..{str(points[-1][0])[:10]}" if points else "no points",
-            "fix": f"the sentence says {claim['as_written']!r}; the readings it points at are "
+            "way_out": f"the sentence says {claim['as_written']!r}; the readings it points at are "
                    f"{F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request "
                    f"the series the question asked for"})
         return
@@ -877,7 +884,7 @@ def _check_bare_superlative(v: Verdict, at: str, sentence: str, words: set[str],
     v.problems.append({
         "at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
         "linked": [s["id"] for s in seats][:4], "candidates": seats[:6],
-        "fix": f"{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: "
+        "way_out": f"{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: "
                + "; ".join(f"{s['place']} of {s['of']} on {s['measure']}" for s in seats[:3])
                + ". Point at the figure whose place you mean, or say it without the superlative"})
 
@@ -901,7 +908,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
             if short and short in tickers and short not in named:
                 v.problems.append({"at": at, "reason": "subject_mismatch", "figure": t["token"], "id": recs[0]["id"],
                                    "figure_subject": recs[0].get("subject"), "sentence_names": sorted(named)[:6],
-                                   "fix": f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"})
+                                   "way_out": f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"})
 
     # A MEASURE THE SENTENCE NAMES IS THE MEASURE OF A FIGURE IN IT, or one the
     # figure is built from. The phrase's words must be among the linked measure's
@@ -926,7 +933,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         if not any(want <= have for have in linked_words):
             v.problems.append({"at": at, "reason": "measure_mismatch", "phrase": phrase,
                                "linked": [recs[0]["id"] for _t, recs in linked][:4],
-                               "fix": f"the sentence says '{phrase}' but the figure beside it is "
+                               "way_out": f"the sentence says '{phrase}' but the figure beside it is "
                                       f"{', '.join(sorted({str(r.get('measure')) for _t, recs in linked for r in recs})[:3])}; "
                                       f"the ledger holds {' / '.join(sorted(measures)[:2])} as its own fact — write that value, or drop the phrase"})
             break
@@ -942,8 +949,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
             ranked = _ranked_aliases(ledger, firsts)
             v.problems.append({"at": at, "reason": "superlative_without_rank", "word": sorted(words & SUPERLATIVES)[0],
                                "linked": [r["id"] for r in firsts][:4], "candidates": ranked,
-                               "fix": "a largest/smallest/most/least rests on the figure's own place in an ordering the desk built; "
-                                      "this figure does not hold that place — "
+                               "way_out": "this figure holds no such place in an ordering the desk built — "
                                       + ("the desk's ordering holds the same reading as " + ", ".join(f"[{c['id']}]" for c in ranked[:3])
                                          + ": point at that one, or drop the word" if ranked else
                                          "have the figures ranked and point at the ranked row, or drop the word")})
@@ -963,7 +969,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
             if (short in tickers and not str(rec.get("measure") or "").startswith(_BOOK_MEASURES)):
                 v.problems.append({"at": at, "reason": "subject_mismatch", "figure": t["token"], "id": rec["id"],
                                    "figure_subject": rec.get("subject"), "sentence_names": ["the book"],
-                                   "fix": f"this figure is {rec.get('subject')}'s own ({rec.get('measure')}); the "
+                                   "way_out": f"this figure is {rec.get('subject')}'s own ({rec.get('measure')}); the "
                                           f"sentence says it is the book's — name the issuer, or request the "
                                           f"book-level figure"})
                 break
@@ -974,7 +980,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
             nxt = next((t for t in tokens if t["start"] >= offset + m.end() and t["start"] < offset + len(sentence)), None)
             if nxt and nxt["kind"] == "num" and nxt["start"] - (offset + m.end()) <= 12:
                 v.problems.append({"at": at, "reason": "date_expected", "word": dw, "figure": nxt["token"],
-                                   "fix": f"'{dw}' introduces a date; this figure is not one — the date is on the facts' window (start/end) or as_of"})
+                                   "way_out": f"'{dw}' introduces a date; this figure is not one — the date is on the facts' window (start/end) or as_of"})
 
     # tier words sit beside the tier they name
     # A TIER WORD NAMES THE TIER'S KIND — a lookup on each pointed tier fact. Which
@@ -988,10 +994,10 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         kinds = {("warning" if t["measure"].endswith("warning_level") else "breach" if t["measure"].endswith("breach_level") else "limit") for t in tiers}
         if "warning" in words and "warning" not in kinds and kinds:
             v.problems.append({"at": at, "reason": "tier_mismatch", "id": tiers[0]["id"],
-                               "fix": f"the sentence says warning; the tier figure here is the {sorted(kinds)[0]} tier"})
+                               "way_out": f"the sentence says warning; the tier figure here is the {sorted(kinds)[0]} tier"})
         if "breach" in words and "breach" not in kinds and kinds:
             v.problems.append({"at": at, "reason": "tier_mismatch", "id": tiers[0]["id"],
-                               "fix": f"the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier"})
+                               "way_out": f"the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier"})
     _check_meaning(v, at, sentence, words, [r for recs in groups for r in recs])
     # a change or a comparison joins the right two figures, and points the way they moved
     up, down = words & UP_WORDS, words & DOWN_WORDS
@@ -1022,7 +1028,7 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
         va, vb = float(a["value"]), float(b["value"])
         if same_group and abs(va - vb) < 1e-12:
             v.problems.append({"at": at, "reason": "change_conflict", "ids": [a["id"], b["id"]],
-                               "fix": "the two figures are one reading written twice; a change is two dates, a comparison two subjects"})
+                               "way_out": "the two figures are one reading written twice: point at the other reading, or say it without the change"})
         elif same_measure and same_subject:
             if a.get("as_of") and b.get("as_of") and a.get("as_of") != b.get("as_of"):
                 earlier, later = sorted((a, b), key=lambda r: str(r.get("as_of")))
@@ -1031,24 +1037,24 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                 moved_up = vb > va            # "from A to B": the order written
             if (up and not moved_up) or (down and moved_up):
                 v.problems.append({"at": at, "reason": "direction_conflict", "ids": [a["id"], b["id"]],
-                                   "fix": f"the figure moved {'up' if moved_up else 'down'}; the sentence says the opposite"})
+                                   "way_out": f"the figure moved {'up' if moved_up else 'down'}; the sentence says the opposite"})
         elif same_measure and not same_subject:
             if up or down:
                 first_higher = va > vb
                 if (up and not first_higher) or (down and first_higher):
                     v.problems.append({"at": at, "reason": "direction_conflict", "ids": [a["id"], b["id"]],
-                                       "fix": f"{a.get('subject')} is {'above' if first_higher else 'below'} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite"})
+                                       "way_out": f"{a.get('subject')} is {'above' if first_higher else 'below'} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite"})
         elif not same_measure and (("from" in words and "to" in words) or words & CHANGE_VERBS):
             if not any((r.get("params") or {}).get("op") in CHANGE_OPS for r in (a, b)):
                 v.problems.append({"at": at, "reason": "change_conflict", "ids": [a["id"], b["id"]],
-                                   "fix": f"{a.get('measure')} and {b.get('measure')} are two different quantities; a change is one measure of one subject at two dates"})
+                                   "way_out": f"{a.get('measure')} and {b.get('measure')} are two different quantities: point at two readings of one of them, or say it without the change"})
     elif (up or down) and len(groups) == 1:
         r = next((x for x in groups[0] if (x.get("params") or {}).get("op") in CHANGE_OPS), None)
         if r is not None:
             val = float(r["value"])
             if (up and val < 0) or (down and val > 0):
                 v.problems.append({"at": at, "reason": "direction_conflict", "ids": [r["id"]],
-                                   "fix": f"this change is {'negative' if val < 0 else 'positive'}; the sentence points the other way"})
+                                   "way_out": f"this change is {'negative' if val < 0 else 'positive'}; the sentence points the other way"})
 
 
 def _check_meaning(v: Verdict, at: str, sentence: str, words: set[str], recs: list[dict]) -> None:
@@ -1066,9 +1072,8 @@ def _check_meaning(v: Verdict, at: str, sentence: str, words: set[str], recs: li
             if all(r["means"]["direction"] != claimed for r in sensed):
                 r = sensed[0]
                 v.problems.append({"at": at, "reason": "sense_conflict", "id": r["id"],
-                                   "fix": f"the desk's reading says {registry.DIRECTION[r['means']['direction']]}; "
-                                          f"the sentence says the opposite (a book that loses to this risk is long it, "
-                                          f"one that gains is short it)"})
+                                   "way_out": f"the row says {registry.DIRECTION[r['means']['direction']]}; the sentence "
+                                              f"says the opposite — say what the row says, or drop the word"})
     stated = [r for r in recs if (r.get("means") or {}).get("status") in ("clear", "warning", "breach")]
     if stated:
         claimed = [name for name, pat in _STATUS_CLAIMS if pat.search(sentence)]
@@ -1076,7 +1081,7 @@ def _check_meaning(v: Verdict, at: str, sentence: str, words: set[str], recs: li
         if claimed and not (set(claimed) & held):
             r = stated[0]
             v.problems.append({"at": at, "reason": "status_conflict", "id": r["id"],
-                               "fix": f"the check here is {registry.STATUS[r['means']['status']]}; "
+                               "way_out": f"the check here is {registry.STATUS[r['means']['status']]}; "
                                       f"the sentence says {' and '.join(claimed)}"})
 
 

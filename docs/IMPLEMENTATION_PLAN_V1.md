@@ -266,6 +266,22 @@ log     tsk_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；submi
 - 做什么：`services/style_guide.py` 唯一承载八条，两份角色说明各引入一次；`answer_check`、`handoff_check` 的拒绝按 §2.4 的 verdict 形状带规则号与出路；其他地方的复述删除。
 - 验收：八条关键短语在全部模型文字里各出现一次；A-R1 的重发规则测试仍绿。
 
+**执行记录 6（2026-09-19，`desk-v1`；代码与测试已就绪，措辞过目后提交）**：离线套件 2968 通过（新增 `tests/test_v1_style_guide.py` 42 条）。
+
+- 新模块 `services/style_guide.py`：八条规则各写一次，每条带一个关键短语；`text()` 是两份角色说明各引入一次的那一段；`rule_of(reason)` 把两道检查说的 reason 码映到规则号（1：not_on_ledger、unknown_node、id_in_prose、mark_mismatch、unsourced_figure、unpointed_figure、ambiguous_point；2：superlative_without_rank；3：change_conflict、direction_conflict；4：period_mismatch、date_expected；5：unverified_quote；6：sense_conflict、status_conflict、tier_mismatch；7：caveat_without_a_line；8：subject_mismatch、measure_mismatch）。关于简报形状的问题（漏行、多出的行、边界不是缺席）不带规则号。
+- 第 8 条不复述政策：「不估算、不用邻近的数冒充」是三条常驻政策缺席的原句，由手册 §6 与含义层各渲染一次；第 8 条只指向政策，并补上政策里没有的「不把一个主体或日期的数搬到另一个」。
+- 两份角色说明（`meta_agent._ROLE`、`sub_analyst._SYSTEM`）里自己写的规则句全部拿掉，各引入风格指南一次；`submit` 的 schema 里那句「按行上写法写、带 id」也拿掉。研究简报（claims 文法、自己的门）不是风格指南的读者，未动——它是否并入同一流程仍是 §5 的待拍板项。
+- 裁决形状按 §2.4：每个问题带 `rule`（有则带）与 `way_out`（原 `fix` 改名）；拒绝里写「rule N — reason」。三句逐字复述规则的出路句改成只说出路（change_conflict 两句、superlative_without_rank 一句）。`sense_conflict` 的出路句不再在拒绝里教读法（"亏的书是多头"）——那条读法进了登记簿 `READS["book.analysis"]`，由风险经理一章 §3 与主分析师的含义层各渲染一次。主分析师拒绝模板末句的 "Delegate" 改为 "Ask"。
+- 措辞过目单扩到九组：新增第 8 组风格指南（含规则号与 reason 的对应）、第 9 组拒绝、修复与提示——两个循环的回话与两道检查的全部出路句，从源码用 AST 读出，模板的槽原样显示。
+- 验收：每条规则的关键短语，在每位读者（主分析师、三位分析师）收到的全部文字里恰好出现一次，且那一次在风格指南里（对每位读者、每条规则各一条测试；变异验证过能变红）；A-R1 的重发规则测试仍绿。
+
+### §6 验收总表补测与 E 轮前的准备（2026-09-19，提交 5ec4a87、b4f979f）
+
+- 总表里四行此前没有测试或只守了一部分，现已补上（`tests/test_v1_acceptance.py` 40 条）：tool 描述不含手册 §1 的问题句；从 `agent_steps` 重建的 log 与分析师留下的 log 逐字相等（新函数 `delegation.log_from_steps`）；每个动词三类（给什么、拒绝带出路、属于谁）；主分析师无词汇的扫描范围扩到名册、含义层、三个工具与提示句。为了让第二条成立，原语步骤的 summary 改为说「这次调用得到了什么」（`fact_adapters.came_back`：`r_… book_read(…) → 1 row | refused: invalid_arguments`）——此前每个原语的 summary 都是 "keys: pull, head, rows"，拒绝与读数在 trace 上是同一行。模型读不到这段文字。
+- `scripts/battery_counters.py` 读得懂 V1 的一轮：每题派单次数与每单任务数、每任务调用次数（按分析师、按动词、按结果）、why 的长度与是否点名所服务的行、分析师自己的 prompt 峰值、调用被拒占比、两道检查按风格指南规则号的拒绝数（含方向冲突与状态冲突）、缺席按码与按动词及其中算术类占比、每个 agent 跑在哪个模型上；旧系列全部保留，V1 的 `settled/unsettled` 与 V36 的 `done/not_done` 读成同一系列。答案步骤现在记下检查点名的全部问题（此前 summary 只有第一条）。
+- 模型可以当变量：`.env` 仍覆盖 shell（密钥与库不能错），但操作者为模型设的值保留；`--model`、`--lead-model`、`--analyst-model`；主分析师与三位分析师可以跑在不同模型上（`settings.lead_model / analyst_model`，按 completion 的 actor 选；为空即现状）。
+- 用 9/19 活体冒烟的 trace 读了一遍：风险经理 26 次调用里 `calc` 15 次、`book_read` 7 次、`list` 4 次、`metric` 0 次——§5 第 1 条，读成了一行数。
+
 ### 步骤 7 · E 轮
 
 - 做什么：同 fixture、同 20 题，与 D 轮（若跑）和 C 轮对照；模型分配作为变量：主分析师强模型、领域分析师弱模型各跑一遍。
@@ -295,7 +311,7 @@ log     tsk_… ← ask；每步 { n, tool, args, why, → r_… k 行 }；submi
 2. ~~**数字与方括号的配对放宽**（按值核对）是否保留。~~ 已定：不保留，4e280e2 撤回，V33 的钉子恢复。
 3. **"回到高点所需涨幅"** 不是任何度量，`calc` 不收常数，桌子给不出；主分析师心算被拒。要不要作为回撤度量的产出。
 4. **book.reconcile、issuer.panel、price.beta 的行名**来自通用遍历，读得懂但不漂亮，要不要各给专用适配器。
-5. **电池脚本 `load_dotenv(override=True)`** 使 `OPENAI_MODEL` 环境变量无效，E 轮按模型分组前要改。
+5. ~~**电池脚本 `load_dotenv(override=True)`** 使 `OPENAI_MODEL` 环境变量无效，E 轮按模型分组前要改。~~ 已改（b4f979f）：模型变量不被 `.env` 覆盖，并可分别指定主分析师与分析师的模型。
 6. **买入名字的行业从哪来**。`scenario` 的买入用 `companies.sector` 给新名字归行业：生产库 11 家里 3 家有值、且是 SIC 码，其余为空，于是买入要么被拒、要么在书里多出一个叫 "2080" 的行业；书的行业是持仓自己的标签，桌子没有第二个来源。
 7. **天数的单位词**。DSO、DIO、DPO、现金转换周期的值在行上是裸数（"30"），代数里天数是 COUNT；设计稿的金标准例子是"30.0 天 — 按 91 天换算，期末余额"。要不要给天数一个单位类（动到类型计算器的单位代数与前端的显示镜像）。
 8. **序列行的 accession、`book.position` 行属于哪本书**：与第 4 条同类，读得懂但行没说全。

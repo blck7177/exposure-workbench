@@ -806,8 +806,12 @@ READS: dict[str, str] = {
     "price.beta": "Against a rates or credit instrument, a name's beta is its own sensitivity to that risk — the per-name "
                   "figure the book-level factor fit does not give; the book-level fit is over the book's return and says "
                   "nothing per name.",
+    # "…is long the exposure, …is short it": what the row's word means in positions. It was taught by the
+    # answer check, inside a refusal, after the mistake (V1 step 1); what a word means is the handbook's.
     "book.analysis": "A net beta is the book's move per unit of the risk it names, and the row says which way the book "
-                     "moves. When the fit is collinear the net is quotable and a single leg is not. A risk no factor "
+                     "moves. A book that loses if the risk happens is long the exposure it names — equities, duration, "
+                     "credit — and one that gains is short it. "
+                     "When the fit is collinear the net is quotable and a single leg is not. A risk no factor "
                      "measures is unmeasured, never zero. Room is the distance from a check's reading to its tier, and "
                      "the row says where the check stands.",
     "book.reconcile": "The factor-explained share and the unexplained share sum to one by construction; a share is not a "

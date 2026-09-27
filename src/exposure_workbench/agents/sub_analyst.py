@@ -41,7 +41,7 @@ from exposure_workbench.agents import delegation as dl, repeats as rp
 from exposure_workbench.analytics import handbook, registry
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.services import analyst_reports, answer_check, fact_adapters as fa, facts as F, \
-    ledger as ledger_svc, trace_service
+    ledger as ledger_svc, style_guide, trace_service
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 
@@ -63,19 +63,13 @@ evidence, and file a brief that answers the task line by line.
 Your tools are verbs over that evidence: see what the desk holds, read one thing, take a measure by its name, do one \
 operation on figures you were already shown. Every call says WHY — which line it serves and why this verb; your log is made \
 of those sentences, and it is the only record of your reading. Every result is rows. A row says what it is, whose, over \
-what period, the value, what it means, and where it came from, under the id you cite it by: what a row says a reading means \
-— that the book loses, that a check is in warning, which line stood in for which — is the desk's reading, and yours to \
-repeat, never to contradict. A refusal is a row too: it says why, and the way out where there is one.
+what period, the value, what it means, and where it came from, under the id you cite it by. A refusal is a row too: it says \
+why, and the way out where there is one.
 
-Never compute in your head: a figure that is not on a row is a figure nothing stands behind, and it is refused. Write every \
-figure exactly as its row shows it, followed by the row's id in brackets — 18.40× [f_2592baab170e] — and say the period the \
-row HAS, not the one the task asked for.
-
-The brief is one entry per numbered line, and an entry is one of two things. Settled: one to three sentences, with the ids \
-of the rows they rest on. Not settled: why, in a line of your own, and the id of the absence row that says so — a tool's \
-refusal, or one of the desk's standing policies: {policies}. Never both, never neither; never an estimate, never a nearby \
-figure under the asked-for name. Where a finding is not quite the line asked — another date, another spacing, a proxy — say \
-so in a caveat that names the line.
+The brief is one entry per numbered line, and an entry is one of two things. Settled: one to three sentences, written to \
+the desk's style guide below, with the ids of the rows they rest on. Not settled: why, in a line of your own, and the id of \
+the absence row that says so — a tool's refusal, or one of the desk's standing policies: {policies}. Never both, never \
+neither.
 
 You write for the lead analyst, never for the reader, and you answer the task you were given rather than the one you would \
 have asked. If your brief is refused you are told which entries and why: submit again with those replaced, pulling the row a \
@@ -95,8 +89,11 @@ _POLICIES = "; ".join(f"{p['id']} ({p['measure'].split('.', 1)[1].replace('_', '
 
 
 def system_text(analyst: str) -> str:
-    """One analyst's standing text: its role, then its chapter of the handbook."""
+    """One analyst's standing text: its role, the desk's style guide — once, from
+    the one place its rules are written (services/style_guide) — then its chapter
+    of the handbook."""
     return (_SYSTEM.format(title=_TITLES[analyst], policies=_POLICIES)
+            + "\n\n" + style_guide.text()
             + "\n\nYOUR CHAPTER OF THE DESK'S HANDBOOK\n" + handbook.chapter_text(analyst))
 
 

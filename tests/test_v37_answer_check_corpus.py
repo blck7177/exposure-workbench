@@ -90,7 +90,7 @@ def test_a_refused_period_says_what_the_readings_are():
     [p] = [p for p in _verdicts()["Q04"].problems if p["reason"] == "period_mismatch"]
     assert p["word"] == "twelve quarters"
     assert "5 annual reading(s)" in p["holds"] and "2021-12-31..2025-12-31" in p["holds"]
-    assert "request the series the question asked for" in p["fix"]
+    assert "request the series the question asked for" in p["way_out"]
 
 
 def test_a_refused_superlative_says_where_the_subject_actually_sits():
@@ -100,6 +100,6 @@ def test_a_refused_superlative_says_where_the_subject_actually_sits():
     `daily_loss` as the answer to "closest to its issuer-concentration warning"."""
     [p] = [p for p in _verdicts()["Q11"].problems if p["reason"] == "superlative_without_rank"]
     assert p["word"] == "closest"
-    assert "19 of 20" in p["fix"] and "8 of 20" in p["fix"]
-    assert "Point at the figure whose place you mean" in p["fix"]
+    assert "19 of 20" in p["way_out"] and "8 of 20" in p["way_out"]
+    assert "Point at the figure whose place you mean" in p["way_out"]
     assert all(str(c["subject"]).endswith("LLY") for c in p["candidates"]), "its own places, not somebody else's"

@@ -112,7 +112,7 @@ def test_a_line_left_out_a_boundary_that_is_not_one_and_a_figure_nothing_backs_a
     assert {"unsourced_figure", "not_on_ledger"} <= {p["reason"] for p in v.problems}
     assert v.rejected[0]["n"] == 1 and not v.accepted
     v = _check(SETTLED, UNSETTLED, POLICY, caveats=[{"line": 9, "text": "x"}])
-    assert [p["reason"] for p in v.problems] == ["unknown_line"]
+    assert [(p["reason"], p["rule"]) for p in v.problems] == [("caveat_without_a_line", 7)]     # the style guide's seventh
 
 
 # ── up: the Return ───────────────────────────────────────────────────────────

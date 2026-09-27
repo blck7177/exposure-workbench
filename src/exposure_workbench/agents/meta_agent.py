@@ -43,13 +43,17 @@ from exposure_workbench.analytics import handbook
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.services import analyst_reports, answer_check, briefing as briefing_svc, context_budget, \
-    facts as F, ledger as ledger_svc, trace_service
+    facts as F, ledger as ledger_svc, style_guide, trace_service
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = """You are the lead analyst of a portfolio risk & issuer-intelligence desk, and the one the user talks to. \
+# THE ROLE, and then the desk's style guide, ONCE (V1 step 6). How a figure is cited and how a
+# statement stands — the id in brackets, the superlative's ordering, quotation marks, the caveat, what
+# is never written — was told here in the role's own words and again in the analysts' and in a tool
+# schema; the rules' text lives in services/style_guide now, and this role says only what is the lead's.
+_ROLE = """You are the lead analyst of a portfolio risk & issuer-intelligence desk, and the one the user talks to. \
 The analysis is your job: take the question apart, decide what has to be known to answer it, ask the desk's analysts for \
 it, and say what it shows and what it means for the question asked — its implication for this book and what would change \
 your reading.
@@ -65,23 +69,19 @@ question is answered, and one the desk holds no figure for is neither agreed wit
 
 What comes back is, for each numbered line, one of three things: a finding with the desk's rows under it; why the line \
 could not be settled, with the desk's own row that says so; or that the analyst's finding did not pass the desk's check. A \
-row says what it is, whose, over what period, the value, what it means and where it came from, under its id. What a row says \
-a reading means is the desk's reading; the READINGS block says what those readings mean in finance, and the implication you \
-write rests on it. A caveat sits on the line it qualifies: a finding stated without its caveat is not what the analyst \
-found. `open` reads anything already on the record — a row, the rows of one call, an analyst's log of what it did and why, \
-a book a scenario built; it cannot pull a new figure.
+row says what it is, whose, over what period, the value, what it means and where it came from, under its id. The READINGS \
+block says what the desk's readings mean in finance, and the implication you write rests on it. A caveat comes back on the \
+line it qualifies. `open` reads anything already on the record — a row, the rows of one call, an analyst's log of what it \
+did and why, a book a scenario built; it cannot pull a new figure.
 
-Your reply is plain prose, and every number you write is one a row showed you, written exactly as the row shows it, with \
-the row's id in brackets: 16.0% [f_2592baab170e]. The bracket is what lets the reader open the figure, and a figure written \
-without it is refused. A table or a chart is [table: <id>] or [chart: <id>], naming the call whose rows it shows. Quotation \
-marks are for text that came to you under an id — a passage's words, or the desk's own words on an absence row — cited with \
-that id; an analyst's sentences are not the desk's words: say what they say in yours. A superlative rests on an ordering the \
-desk computed. What the desk could not do or does not hold, say so and say what you gave instead — never an estimate, never \
-a figure carried from one company or date to another, never a nearby figure under the asked-for name.
+Your reply is plain prose, written to the desk's style guide below. A table or a chart is [table: <id>] or [chart: <id>], \
+naming the call whose rows it shows.
 
 If your reply is not accepted, you are told which sentences did not pass and why. Call repair_answer with a replacement for \
 exactly those sentences (an empty replacement drops one); ask first if a fix needs a figure you were not shown. You have two \
 attempts."""
+
+_SYSTEM = _ROLE + "\n\n" + style_guide.text()
 
 
 # What the user is told when the turn ended without an accepted answer. ONE
@@ -284,18 +284,18 @@ def _refusal_message(verdict) -> str:
         lines.append(f"[{x['tag']}] {x['text']}")
         for p in x["problems"][:6]:
             what = p.get("figure") or p.get("node") or p.get("quote") or p.get("word") or p.get("phrase") or ""
-            line = f"      {p['reason']}" + (f" ({what!r})" if what else "")
-            if p.get("fix"):
-                line += f": {p['fix']}"
+            line = "      " + (f"rule {p['rule']} — " if p.get("rule") else "") + p["reason"] + (f" ({what!r})" if what else "")
+            if p.get("way_out"):
+                line += f": {p['way_out']}"
             if p.get("candidates"):
                 line += " — the desk showed: " + "; ".join(
                     f"{c.get('measure')} {c.get('subject')} {c.get('as_of')} [{c.get('id')}]" for c in p["candidates"][:4])
             lines.append(line)
     other = [p for p in verdict.problems if not p.get("sentence")]
     for p in other[:6]:
-        lines.append(f"      {p['reason']}: {p.get('fix') or p.get('detail') or ''}")
+        lines.append(f"      {p['reason']}: {p.get('way_out') or p.get('detail') or ''}")
     lines += ["", "Call repair_answer with a replacement for each tag above (an empty text drops the sentence). "
-                  "Delegate for the evidence you lack first if a fix needs a figure you were not shown."]
+                  "Ask for the evidence you lack first if a fix needs a figure you were not shown."]
     return "\n".join(lines)
 
 
