@@ -21,6 +21,13 @@ half of the reading, taken from the round rather than from the source.
     python scripts/v36_forensics.py docs/spikes/v33/V33J.json --out /tmp/J.txt
     python scripts/v36_forensics.py docs/spikes/v36/V36A.json --out ... --samples ...
 
+Reads a V1 round (2026-09-20): the lead's `ask` names one of three analysts, so the edge says
+which (`meta → sub:risk`, `meta → sub:issuer+market`) and the per-pair counts read by family; an
+`open` is the lead reading the record; a brief files `lines`, settled or not. After each turn's
+table the asks and the briefs are printed in full — every line the lead wrote down, every
+numbered line as it came back — because a question that spans two families is read by whether
+the second ask carried what the first one found, and 150 characters of payload cannot say.
+
 Reads V35 rounds too: rows written before the `actor` column are the lead
 analyst's by definition, and in a V35 session the tool calls were the broker's
 (the session's own `request`/`digest` steps are what say so).
@@ -122,14 +129,21 @@ def _edge(st: dict, legacy_caller: str, speaking: str | None = None) -> tuple[st
         return ("broker", LEAD, "digest")
     if kind == "boundary":                      # V36: what the desk could not do, put on the ledger
         return (who, "ledger", "boundaries")
-    if kind == "delegate":                      # V36
-        return (LEAD, "sub", "delegate")
+    if kind == "delegate":
+        # V1: the asked party is one of three analysts, and which one is the point of the edge —
+        # a question that spans two families is read by how often the lead spoke to each. V36's
+        # fourteen domains stay one node (`sub`), as every table written from them reads.
+        asked = sorted({str(t["analyst"]) for t in (_j(st.get("args")).get("tasks") or [])
+                        if isinstance(t, dict) and t.get("analyst")}) if isinstance(_j(st.get("args")), dict) else []
+        return (LEAD, "sub:" + "+".join(asked) if asked else "sub", tool or "delegate")
     if kind == "brief":                         # V36: the sub-analyst's submission
         return (who, "check", "submit")
     if kind == "report":                        # V36: the verified report, stored
         return (who, "store", "report")
     if kind == "read_report":                   # V36.1: the lead opening a report (was inferred before)
         return (LEAD, "store", "read_report")
+    if kind == "open":                          # V1: the lead reading something already on the record
+        return (LEAD, "store", "open")
     if kind in ("answer", "respond"):
         return (LEAD, "gate", kind)
     if kind == "delegation":                    # a background task was registered
@@ -160,17 +174,20 @@ def _summary(st: dict, args: dict) -> str:
             + (" ask✓" if i.get("ask") else "")
             for i in items if isinstance(i, dict))
     if kind == "delegate":
+        # one series under two spellings: V36 asked a `domain` what it `want_to_know`, V1 asks an
+        # `analyst` its `lines` — and a V1 task may follow another up
         tasks = args.get("tasks") or []
         return "; ".join(
-            f"{t.get('domain')} [{','.join(t.get('subjects') or [])}] "
-            f"{len(t.get('want_to_know') or [])} line(s)"
+            f"{t.get('analyst') or t.get('domain')} [{','.join(t.get('subjects') or [])}] "
+            f"{len(t.get('lines') or t.get('want_to_know') or [])} line(s)"
             + (f" +{len(t['facts_to_derive'])} derive" if t.get("facts_to_derive") else "")
+            + (f" ↩{t['follow_up_of']}" if t.get("follow_up_of") else "")
             for t in tasks if isinstance(t, dict))
     if kind == "brief":
         cov = args.get("coverage") or {}
         probs = args.get("problems") or []
-        return (f"coverage {cov.get('done', '?')}/{cov.get('asked', '?')}"
-                f" not_done {cov.get('not_done', 0)} refused {cov.get('refused', 0)}"
+        return (f"coverage {cov.get('done', cov.get('settled', '?'))}/{cov.get('asked', '?')}"
+                f" not_done {cov.get('not_done', cov.get('unsettled', 0))} refused {cov.get('refused', 0)}"
                 f" · {st['status']}"
                 + (f" · {len(probs)} problem(s): " + ", ".join(sorted({str(p.get('reason')) for p in probs if isinstance(p, dict)})[:4])
                    if probs else ""))
@@ -201,7 +218,54 @@ def _one_line(p: dict) -> str:
         extra = " → " + str([f"{c.get('id')} {c.get('measure')} {c.get('subject')}" for c in p["candidates"][:4]])
     if p.get("holds"):
         extra += f" holds={p['holds']!r}"
-    return f"- {p.get('at')} {p['reason']} {what!r}{extra}  fix={str(p.get('fix') or '')[:130]}"
+    # V1 step 6 calls it `way_out`; a problem replayed from a round before that says `fix`
+    return f"- {p.get('at')} {p['reason']} {what!r}{extra}  way_out={str(p.get('way_out') or p.get('fix') or '')[:130]}"
+
+
+def _brief_text(brief: dict) -> str:
+    """The findings of a brief as the check read them: V1 files `lines`, V36 filed `findings`."""
+    entries = brief.get("lines") or brief.get("findings") or []
+    return "\n".join(str(e.get("finding") or "") for e in entries if isinstance(e, dict) and e.get("finding"))
+
+
+def _exchange(turn_steps: list[dict]) -> list[str]:
+    """WHAT WENT DOWN AND WHAT CAME BACK, IN FULL (V1). The table cuts a payload at 150 characters,
+    which is enough to see that the lead asked and not what it asked — and a question that spans
+    two families is read by exactly that: whether the second ask carried what the first one found
+    (a name in its subjects or its lines, a row by its id), or asked again from nothing. One block
+    an ask, with every task's lines as the lead wrote them; one a brief, with each numbered line as
+    it was filed: settled with how many rows under it, or why not and the boundary's id."""
+    out: list[str] = []
+    for st in turn_steps:
+        a = _j(st["args"])
+        if st["step_type"] == "delegate" and isinstance(a, dict):
+            for t in a.get("tasks") or []:
+                if not isinstance(t, dict) or not t.get("analyst"):
+                    continue
+                out.append(f"  [{st['seq']:>3}] ask → {t['analyst']} [{', '.join(t.get('subjects') or [])}]  {t.get('task_id') or ''}"
+                           + (f"  follows up {t['follow_up_of']}" if t.get("follow_up_of") else "")
+                           + (f"  · {st['status']}" if st["status"] != "completed" else ""))
+                out += [f"          {w}" for w in t.get("lines") or []]
+                if t.get("context"):
+                    out.append(f"          context: {t['context']}")
+        elif st["step_type"] == "brief" and isinstance(a, dict) and isinstance((a.get("brief") or {}).get("lines"), list):
+            who = _short_actor(st["actor"], LEAD)
+            out.append(f"  [{st['seq']:>3}] {who} → check  {a.get('task_id') or ''}  · {st['status']}"
+                       + (f" · {len(a['problems'])} problem(s)" if a.get("problems") else ""))
+            for e in a["brief"]["lines"]:
+                if not isinstance(e, dict):
+                    continue
+                if e.get("settled"):
+                    out.append(f"          {e.get('n')}. settled, {len(e.get('facts') or [])} row(s): "
+                               + str(e.get("finding") or "").replace("\n", " ")[:300])
+                else:
+                    out.append(f"          {e.get('n')}. not settled [{e.get('boundary')}]: {str(e.get('why') or '')[:300]}")
+            for c in a["brief"].get("caveats") or []:
+                if isinstance(c, dict):
+                    out.append(f"          caveat on {c.get('line')}: {str(c.get('text') or '')[:200]}")
+            if a["brief"].get("follow_ups"):
+                out.append("          would ask next: " + " | ".join(str(x)[:120] for x in a["brief"]["follow_ups"][:4]))
+    return out
 
 
 # Steps whose `args` are a LABEL and not a payload the sender composed: a
@@ -310,6 +374,11 @@ async def main(argv: list[str]) -> int:
                                  _sizes(st, st["args"]), _keys(st["args"]), _summary(st, a)[:150]))
                 out += _table(rows)
 
+                said = _exchange(turn_steps)
+                if said:
+                    out.append("--- 派单与回单原文 ---")
+                    out += said
+
                 out.append("--- 往返计数 ---")
                 out += ["  " + f"{k:<24} {v}" for k, v in sorted(pairs.items())]
                 out.append("  " + "completions              " + " · ".join(f"{k} {v}" for k, v in sorted(completions.items())))
@@ -321,7 +390,7 @@ async def main(argv: list[str]) -> int:
                     a = _j(st["args"])
                     text = a.get("text") or ""
                     if st["step_type"] == "brief":
-                        text = "\n".join(f.get("finding", "") for f in (a.get("brief") or {}).get("findings") or [])
+                        text = _brief_text(a.get("brief") or {})
                     led = _ledger_before(turn_steps, st["seq"])
                     v = answer_check.check(text, led, question=t["q"]) if text else None
                     kinds = collections.Counter(r.get("kind") for r in led.by_id.values())

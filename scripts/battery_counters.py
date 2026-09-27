@@ -36,7 +36,17 @@ contradicted the word on their row are rule 6: `sense_conflict`, `status_conflic
 what the desk refused was arithmetic (decides whether `calc` needs another operation), and which
 model each agent ran on. A round from before V1 reads as zeros in these and keeps its own series.
 
+V1, the cross-family series (2026-09-20): an analyst reaches one family of evidence, so a question
+whose second half depends on what the first half found goes through the lead between two
+analysts. Read per turn: the asks in order ("risk → issuer"), the shape (`together`: every family
+in the first ask; `in_sequence`: a later ask brought one in), what a later ask named that the
+first did not, asks that carried a row's id down, calls one task made that an earlier task had
+already made, analysts stopped by their budget — and, by shape, what the turns cost and came to.
+`--questions` reads docs/spikes/v1/questions_cross_family.json beside the round: each entry says
+which handoff it was written to need, and the round is read for what became of it.
+
     python scripts/battery_counters.py docs/spikes/v30/V26_R1.json [more.json] [--json out]
+    python scripts/battery_counters.py ROUND_X.json --questions docs/spikes/v1/questions_cross_family.json
 """
 from __future__ import annotations
 
@@ -280,6 +290,203 @@ def calls_by_analyst(steps: list[dict]) -> dict[str, collections.Counter]:
     return out
 
 
+# ── V1, the cross-family series (plan step 7): what crosses the lead between two analysts ──
+# An analyst reaches one family of evidence, so a question whose second half depends on what the
+# first half FOUND — the largest holding, then that issuer's filings — is two asks with the lead
+# in between: the name travels down in the second ask's subjects or lines, a figure only by its
+# id. What that costs, and whether the thing carried was the thing found, is read off the
+# `delegate` steps: their summary ("risk [port_001] 2 line(s); issuer [MSFT] 3 line(s)") survives
+# the battery's cut of `args`, and the lines themselves are read from `args` where it parses.
+_ASKED = re.compile(r"([a-z_]+) \[([^\]]*)\] (\d+) line\(s\)")
+_FACT_ID = re.compile(r"\bf_[0-9a-f]{6,}\b")
+LOOKS = ("list", "start")                      # a look and an id: neither is evidence pulled twice
+SHAPES = ("no_ask", "one_family", "together", "in_sequence")
+
+
+def _json(raw):
+    if isinstance(raw, (dict, list)):
+        return raw
+    try:
+        return json.loads(raw or "null")
+    except (ValueError, TypeError):
+        return None
+
+
+def asks_of(steps: list[dict]) -> list[list[dict]]:
+    """The asks of one turn that the protocol accepted, in order, each a list of its tasks:
+    {analyst, subjects, lines, text, follow_up_of}. `text` is what the lead wrote down to that
+    analyst — its lines and its sentence of context — or None where the battery's cut broke the
+    JSON: a counter that reads the text then says `unreadable`, never "not there"."""
+    out: list[list[dict]] = []
+    for s in steps:
+        if s.get("step_type") != "delegate" or s.get("status") == "rejected":
+            continue
+        tasks = [{"analyst": a, "subjects": [x for x in subs.split(",") if x], "lines": int(n), "text": None,
+                  "follow_up_of": None} for a, subs, n in _ASKED.findall(s.get("result") or "")]
+        args = _json(s.get("args"))
+        sent = args.get("tasks") if isinstance(args, dict) else None
+        if isinstance(sent, list) and len(sent) == len(tasks):
+            for t, got in zip(tasks, sent):
+                if isinstance(got, dict):
+                    t["text"] = " ".join([*(str(w) for w in got.get("lines") or []), str(got.get("context") or "")])
+                    t["follow_up_of"] = got.get("follow_up_of") or None
+        if tasks:
+            out.append(tasks)
+    return out
+
+
+def shape_of(asks: list[list[dict]]) -> str:
+    """How a turn reached its families. `together`: every family it used was in the first ask — the
+    lead took the question apart before anything came back. `in_sequence`: a later ask brought in a
+    family not asked before — something had to come back first, or the lead did not see the second
+    half coming. One family, however many asks, is `one_family`."""
+    if not asks:
+        return "no_ask"
+    families = {t["analyst"] for ask in asks for t in ask}
+    if len(families) < 2:
+        return "one_family"
+    return "together" if families == {t["analyst"] for t in asks[0]} else "in_sequence"
+
+
+def chain_of(asks: list[list[dict]]) -> str:
+    """The asks as a reader says them: "risk → issuer", "issuer+risk → risk", "issuer×3"."""
+    said = []
+    for ask in asks:
+        n = collections.Counter(t["analyst"] for t in ask)
+        said.append("+".join(a + (f"×{k}" if k > 1 else "") for a, k in sorted(n.items())))
+    return " → ".join(said) or "-"
+
+
+def re_pulls(steps: list[dict]) -> int:
+    """Evidence calls one task made that an EARLIER task of the turn had already made, argument for
+    argument (the `why` aside). Inside a task the desk answers a repeat from what it said before and
+    does not charge it (agents/repeats); across tasks nothing does, because the second analyst was
+    never shown the first one's rows. Tasks run one after another and each ends at its `report`
+    step; with `parallel_analysts` on they would interleave and this could not tell them apart."""
+    seen: dict[str, int] = {}
+    task = again = 0
+    for s in steps:
+        if s.get("step_type") == "report":
+            task += 1
+            continue
+        if (s.get("step_type") != "tool_call" or not str(s.get("actor") or "").startswith("sub:")
+                or s.get("tool_name") in LOOKS or s.get("status") == "rejected"):
+            continue
+        args = _json(s.get("args"))
+        if not isinstance(args, dict):
+            continue
+        key = json.dumps([s.get("tool_name"), {k: v for k, v in args.items() if k != "why"}], sort_keys=True, default=str)
+        if seen.setdefault(key, task) != task:
+            again += 1
+    return again
+
+
+def handoff_of(tag: str, t: dict) -> dict:
+    """One turn, read for what crossed the lead: the asks in order, the shape, what was carried
+    down, what was pulled twice, where a budget stopped an analyst — beside what the turn cost and
+    what came of it, so that turns of one shape can be set against turns of another."""
+    steps, meta = t.get("steps") or [], t.get("meta") or {}
+    asks = asks_of(steps)
+    tasks = [x for ask in asks for x in ask]
+    later = [x for ask in asks[1:] for x in ask]
+    first = {sub for x in (asks[0] if asks else []) for sub in x["subjects"]}
+    cov = [d.get("coverage") or {} for d in meta.get("delegations") or []]
+    answers = [s for s in steps if s.get("step_type") == "answer"]
+    return {
+        "tag": tag, "turn": t.get("turn"), "chain": chain_of(asks), "shape": shape_of(asks),
+        "asks": len(asks), "tasks": len(tasks), "families": sorted({x["analyst"] for x in tasks}),
+        # what a later ask named that the first did not: the subject the lead carried across
+        "later_subjects": sorted({sub for x in later for sub in x["subjects"]} - first),
+        "follow_ups": sum(1 for x in tasks if x["follow_up_of"]),
+        "ids_carried": sum(1 for x in tasks if x["text"] and _FACT_ID.search(x["text"])),
+        "unreadable": sum(1 for x in tasks if x["text"] is None),
+        "re_pulls": re_pulls(steps),
+        "budget_stops": sum(1 for s in steps if s.get("step_type") == "boundary" and "analyst_budget" in str(s.get("args") or "")),
+        "opens": sum(1 for s in steps if s.get("step_type") == "open"),
+        "lead_completions": sum(1 for s in steps if s.get("step_type") == "llm_call"
+                                and not str(s.get("actor") or "").startswith("sub:")),
+        "evidence_calls": sum(int((d.get("cost") or {}).get("evidence_calls") or 0) for d in meta.get("delegations") or []),
+        "elapsed_s": t.get("elapsed_s") or 0,
+        "asked": sum(int(c.get("asked") or 0) for c in cov),
+        "settled": sum(int(c.get("settled", c.get("done")) or 0) for c in cov),
+        # a task that came back with no line settled: the family asked did not hold it, or could
+        # not reach it — in a turn `in_sequence`, the round trip that found out who does
+        "empty_returns": sum(1 for c in cov if int(c.get("asked") or 0) and not int(c.get("settled", c.get("done")) or 0)),
+        "answer": ("accepted" if any(s.get("status") == "completed" for s in answers)
+                   else "refused" if answers else "none"),
+        "_asks": asks,
+    }
+
+
+def _names(task: dict, spellings: list[str]) -> bool | None:
+    """Whether a task names one company, under any of its spellings (["MSFT", "Microsoft"]) — as a
+    subject, or as a word of what the lead wrote: a name sold in a scenario is in the line, and the
+    subject is the book. None: the lines could not be read, and the subjects do not say."""
+    if any(s.upper() in (x.upper() for x in task["subjects"]) for s in spellings):
+        return True
+    if task["text"] is None:
+        return None
+    return any(re.search(rf"\b{re.escape(s)}\b", task["text"], re.I) for s in spellings)
+
+
+def _carried_by(task: dict, carries: list[list[str]], among: list[list[str]]) -> str:
+    """One downstream task against what it should have been handed: `carried` — it names what was
+    found and none of the other candidates; `shotgun` — it names what was found AND others it was
+    found among, which is asking about everything rather than about the finding; `wrong_name`;
+    `unreadable`."""
+    named = [_names(task, c) for c in carries]
+    if any(n is None for n in named):
+        return "unreadable"
+    if not all(named):
+        return "wrong_name"
+    found = {c[0] for c in carries}
+    others = [c for c in among if c[0] not in found and _names(task, c)]
+    return "shotgun" if others else "carried"
+
+
+def expected_handoff(expect: dict, rows: list[dict]) -> str:
+    """What became of the handoff a question was WRITTEN to need (docs/spikes/v1/questions_cross_family
+    .json, `handoff`), read off the turns of its conversation.
+
+      carried            the analyst downstream was asked AFTER the one upstream came back, and about
+                         what it found (a figure-level join: a later ask carries a row's id)
+      shotgun            asked afterwards about what was found and about the others it was found
+                         among: everything was asked, so nothing was carried
+      wrong_name         asked afterwards, about something else
+      up_front           asked before the finding could have come back: the lead did not wait for it
+      never_asked        the family downstream was not asked at all
+      upstream_never_asked, not_carried, unreadable — as they say
+    `+re_asked` on a conversation of two turns: the second turn went back upstream for what the
+    first had already found."""
+    kind, to = expect.get("kind"), expect.get("to")
+    carries, among = list(expect.get("carries") or []), list(expect.get("among") or [])
+    if kind == "figure":
+        asks = [a for r in rows for a in r["_asks"]]
+        later = [x for ask in asks[1:] for x in ask]
+        if any(x["text"] and _FACT_ID.search(x["text"]) for x in later):
+            return "carried"
+        return "unreadable" if later and all(x["text"] is None for x in later) else "not_carried"
+    frm = expect.get("from")
+    if kind == "name_across_turns":
+        asks, before = (rows[-1]["_asks"] if rows else []), 0
+        upstream = any(x["analyst"] == frm for r in rows[:-1] for ask in r["_asks"] for x in ask)
+    else:
+        asks = [a for r in rows for a in r["_asks"]]
+        at = next((i for i, ask in enumerate(asks) if any(x["analyst"] == frm for x in ask)), None)
+        upstream, before = at is not None, (at + 1 if at is not None else 0)
+    if not upstream:
+        return "upstream_never_asked"
+    down = [x for ask in asks[before:] for x in ask if x["analyst"] == to]
+    if not down:
+        early = any(x["analyst"] == to for ask in asks[:before] for x in ask)
+        return "up_front" if early else "never_asked"
+    got = [_carried_by(x, carries, among) for x in down]
+    out = next(o for o in ("carried", "shotgun", "unreadable", "wrong_name") if o in got)
+    if kind == "name_across_turns" and any(x["analyst"] == frm for ask in asks for x in ask):
+        out += "+re_asked"
+    return out
+
+
 def classify(summary: str, status: str) -> str | None:
     s = summary or ""
     if s.startswith("not attempted"):
@@ -297,7 +504,9 @@ def classify(summary: str, status: str) -> str | None:
     return f"other:{code}"
 
 
-def tally(paths: list[str]) -> dict:
+def tally(paths: list[str], questions: str | None = None) -> dict:
+    """`questions`: the file the round was asked from, when its entries say which handoff each was
+    written to need (`handoff`); the round is then also read for what became of each."""
     c: collections.Counter = collections.Counter()
     turns_with: dict[str, set] = collections.defaultdict(set)
     rt, calls, resp, elapsed, ptok, figs = [], [], [], [], [], []
@@ -323,11 +532,13 @@ def tally(paths: list[str]) -> dict:
     absences_by_verb: collections.Counter = collections.Counter()
     models: dict[str, collections.Counter] = {"lead": collections.Counter(), "analysts": collections.Counter()}
     by_analyst: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    handoffs: list[dict] = []                   # V1, cross-family: one row a turn, in the order asked
     n = 0
     for p in paths:
         for conv in json.loads(Path(p).read_text()):
             for t in conv.get("turns", []):
                 n += 1
+                handoffs.append(handoff_of(str(conv.get("tag")), t))
                 tid = f"{conv.get('tag')}#{t.get('turn')}#{p}"
                 steps = t.get("steps", [])
                 llm = [s for s in steps if s.get("step_type") == "llm_call"]
@@ -532,6 +743,47 @@ def tally(paths: list[str]) -> dict:
         "completions_by_model": {k: dict(v.most_common()) for k, v in models.items()},
         "by_analyst": {a: dict(cn) for a, cn in sorted(by_analyst.items())},
     }
+    # V1, cross-family (plan step 7): the turns by how they reached their families, and what each
+    # shape cost and came to — the comparison that says whether going through the lead is the cost
+    by_shape = {}
+    for shape in SHAPES:
+        rows = [r for r in handoffs if r["shape"] == shape]
+        if not rows:
+            continue
+        asked = sum(r["asked"] for r in rows)
+        by_shape[shape] = {
+            "turns": len(rows), "asks_mean": round(statistics.mean(r["asks"] for r in rows), 2),
+            "lead_completions_median": med([r["lead_completions"] for r in rows]),
+            "evidence_calls_median": med([r["evidence_calls"] for r in rows]),
+            "elapsed_s_median": med([r["elapsed_s"] for r in rows]),
+            "settled_share": round(sum(r["settled"] for r in rows) / asked, 2) if asked else 0,
+            "answers_not_accepted": sum(1 for r in rows if r["answer"] != "accepted"),
+            "empty_returns": sum(r["empty_returns"] for r in rows),
+            "re_pulls": sum(r["re_pulls"] for r in rows), "budget_stops": sum(r["budget_stops"] for r in rows)}
+    out.update({
+        "handoff_shapes": {s: by_shape[s]["turns"] for s in by_shape},
+        "handoff_by_shape": by_shape,
+        "asks_with_follow_up": sum(r["follow_ups"] for r in handoffs),
+        "asks_carrying_ids": sum(r["ids_carried"] for r in handoffs),
+        "asks_unreadable": sum(r["unreadable"] for r in handoffs),
+        "re_pulled_calls": sum(r["re_pulls"] for r in handoffs),
+        "tasks_returned_empty": sum(r["empty_returns"] for r in handoffs),
+        "analyst_budget_stops": sum(r["budget_stops"] for r in handoffs),
+        "lead_opens": sum(r["opens"] for r in handoffs),
+    })
+    if questions:
+        expect = {str(q.get("tag")): q["handoff"] for q in json.loads(Path(questions).read_text())
+                  if isinstance(q.get("handoff"), dict)}
+        by_tag: dict[str, list[dict]] = collections.defaultdict(list)
+        for r in handoffs:
+            by_tag[r["tag"]].append(r)
+        became = {tag: expected_handoff(e, by_tag[tag]) for tag, e in expect.items() if tag in by_tag}
+        for r in handoffs:
+            if r["tag"] in became and r is by_tag[r["tag"]][-1]:
+                r["expected"] = became[r["tag"]]
+        out["handoffs_expected"] = became
+        out["handoffs_expected_by_outcome"] = dict(collections.Counter(became.values()).most_common())
+    out["handoff_turns"] = [{k: v for k, v in r.items() if k != "_asks"} for r in handoffs]
     return out
 
 
@@ -539,10 +791,12 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("traces", nargs="+")
     ap.add_argument("--json")
+    ap.add_argument("--questions", help="the question file the round was asked from; where an entry says which "
+                                        "handoff it was written to need, the round is read for what became of it")
     args = ap.parse_args(argv)
-    out = tally(args.traces)
+    out = tally(args.traces, questions=args.questions)
     for k, v in out.items():
-        if k in ("refusals", "by_domain", "by_analyst"):
+        if k in ("refusals", "by_domain", "by_analyst", "handoff_by_shape", "handoff_turns", "handoffs_expected"):
             continue
         if isinstance(v, dict):
             print(f"{k:40s} " + (", ".join(f"{kk} {vv}" for kk, vv in v.items()) or "-"))
@@ -563,6 +817,23 @@ def main(argv: list[str]) -> int:
         print("  " + "analyst".ljust(12) + "".join(c.removeprefix("verb.")[:9].rjust(10) for c in cols))
         for who, c in sorted(out["by_analyst"].items(), key=lambda kv: -kv[1].get("calls", 0)):
             print("  " + who.ljust(12) + "".join(str(c.get(k, 0)).rjust(10) for k in cols))
+    if out["handoff_by_shape"]:
+        cols = ("turns", "asks_mean", "lead_completions_median", "evidence_calls_median", "elapsed_s_median",
+                "settled_share", "answers_not_accepted", "empty_returns", "re_pulls", "budget_stops")
+        heads = ("turns", "asks", "lead_cmp", "ev_calls", "elapsed", "settled", "not_acc", "empty_ret", "re_pulls", "bdg_stop")
+        print("by shape (V1: how a turn reached its families — `in_sequence` went through the lead between two of them):")
+        print("  " + "shape".ljust(14) + "".join(h.rjust(10) for h in heads))
+        for shape, v in out["handoff_by_shape"].items():
+            print("  " + shape.ljust(14) + "".join(str(v[k]).rjust(10) for k in cols))
+        print("by question (the asks in order; what a later ask named that the first did not; what was carried by id):")
+        rows = [("question", "t", "asks", "shape", "carried down", "ids", "f-up", "empty", "re-pull", "stops", "settled", "answer", "expected")]
+        for r in out["handoff_turns"]:
+            rows.append((r["tag"][:36], r["turn"], r["chain"], r["shape"], ",".join(r["later_subjects"]) or "-",
+                         r["ids_carried"], r["follow_ups"], r["empty_returns"], r["re_pulls"], r["budget_stops"],
+                         f"{r['settled']}/{r['asked']}", r["answer"], r.get("expected", "")))
+        widths = [max(len(str(row[i])) for row in rows) for i in range(len(rows[0]))]
+        for row in rows:
+            print("  " + "  ".join(str(x).ljust(widths[i]) for i, x in enumerate(row)).rstrip())
     print("refusals by class (count / turns / per turn):")
     for k, v in out["refusals"].items():
         print(f"  {k:28s} {v['count']:5d} {v['turns']:5d} {v['per_turn']:6.2f}")

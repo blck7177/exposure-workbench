@@ -1,0 +1,114 @@
+[
+ {
+  "tag": "X01-largest-weight-then-its-cash",
+  "turns": [
+   "Which holding carries the largest weight in the book? For that company, where is the cash going: capital expenditure as a share of revenue and free cash flow margin over the last three fiscal years, and how many times over does it cover its interest?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "risk",
+   "to": "issuer",
+   "carries": [["MSFT", "Microsoft"]],
+   "among": [["AAPL", "Apple"], ["AMZN", "Amazon"], ["GOOGL", "Alphabet", "Google"], ["JPM", "JPMorgan"], ["LLY", "Lilly"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["XOM", "Exxon"]],
+   "fixture": "port_001 latest run: MSFT 16.0% is the largest weight (AAPL 15.2%, JPM 14.8%). MSFT capex intensity, FCF margin and EBIT interest coverage are computable for FY2023-FY2025; its net debt to EBITDA is not (no D&A line), which is why the question does not ask for it."
+  }
+ },
+ {
+  "tag": "X02-weakest-fcf-margin-then-sell-it",
+  "turns": [
+   "Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "issuer",
+   "to": "risk",
+   "carries": [["AAPL", "Apple"]],
+   "among": [["AAPL", "Apple"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"]],
+   "fixture": "FCF margin FY2025: AAPL 23.7%, MSFT 25.4%, NVDA 46.6%. Selling all of AAPL (15.2% of the book) lifts every other weight by about 1.18x: JPM 14.8% crosses its 15% warning, MSFT moves toward its 20% breach."
+  }
+ },
+ {
+  "tag": "X03-furthest-below-high-then-filings",
+  "turns": [
+   "Which of our equity holdings sits furthest below its 52-week high? For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "market",
+   "to": "issuer",
+   "carries": [["GOOGL", "Alphabet", "Google"]],
+   "among": [["AAPL", "Apple"], ["AMZN", "Amazon"], ["GOOGL", "Alphabet", "Google"], ["JPM", "JPMorgan"], ["LLY", "Lilly"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["XOM", "Exxon"]],
+   "fixture": "Distance from the 52-week high at 2026-09-10: GOOGL -17.3%, LLY -12.3%, AMZN -11.3%, MSFT -8.4%, NVDA -7.2%, AAPL -3.9%, JPM -3.2%, XOM -2.4%. GOOGL's 10-K (filed 2026-02-05) and 10-Q (filed 2026-07-23) are indexed; its quarterly operating margin is computable."
+  }
+ },
+ {
+  "tag": "X04-thinnest-coverage-then-its-price",
+  "turns": [
+   "Of Amazon, Lilly and Exxon, which covered its interest bill the fewest times over in fiscal 2025? Is the market marking that stock down: its return over the past year against SPY, its deepest drawdown in that year with the dates, and how far it sits below its 52-week high?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "issuer",
+   "to": "market",
+   "carries": [["LLY", "Lilly"]],
+   "among": [["AMZN", "Amazon"], ["LLY", "Lilly"], ["XOM", "Exxon"]],
+   "fixture": "EBIT interest coverage FY2025: LLY 29.7x, AMZN 43.5x, XOM 67.9x. LLY's one-year return is +32.3% relative to SPY, so the premise in the question (marked down) is one the answer has to correct, not confirm."
+  }
+ },
+ {
+  "tag": "X05-biggest-drag-then-its-tape",
+  "turns": [
+   "Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "risk",
+   "to": "market",
+   "carries": [["NVDA", "NVIDIA"]],
+   "among": [["AAPL", "Apple"], ["AMZN", "Amazon"], ["GOOGL", "Alphabet", "Google"], ["JPM", "JPMorgan"], ["LLY", "Lilly"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["XOM", "Exxon"]],
+   "fixture": "Contribution to the book's return on run_e2945c5ebd5a (2026-09-10): NVDA -0.095%, TLT -0.071%, JPM -0.048%. Momentum, drawdown and distance from the high are market-only measures: the risk manager's face holds volatility, beta and ADV, not these."
+  }
+ },
+ {
+  "tag": "X06-weakest-momentum-then-trim-it",
+  "turns": [
+   "Which of our equity holdings has the weakest 12-1 momentum? If we sold half of that position, where does its weight land, and which concentration checks loosen or tighten?"
+  ],
+  "handoff": {
+   "kind": "name",
+   "from": "market",
+   "to": "risk",
+   "carries": [["MSFT", "Microsoft"]],
+   "among": [["AAPL", "Apple"], ["AMZN", "Amazon"], ["GOOGL", "Alphabet", "Google"], ["JPM", "JPMorgan"], ["LLY", "Lilly"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["XOM", "Exxon"]],
+   "fixture": "12-1 momentum: MSFT +1.3% is the weakest (AMZN +18.2%, JPM +22.8%, NVDA +22.8%, AAPL +34.9%, GOOGL +44.0%, XOM +45.2%, LLY +61.8%). MSFT is in warning on its issuer check at 16.0% against 15%; half of it sold brings it back under, and lifts AAPL (15.2%) and JPM (14.8%) against their 15% warnings."
+  }
+ },
+ {
+  "tag": "X07-drawdown-repeated-in-dollars",
+  "turns": [
+   "If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?"
+  ],
+  "handoff": {
+   "kind": "figure",
+   "from": ["risk", "market"],
+   "to": "any",
+   "carries": [],
+   "fixture": "The join is a product of two families' figures: the position's market value (the book) times the drawdown's depth (prices). No face holds both, so one analyst has to be handed the other's row by its id. The algebra allows it: a book's money times a name's ratio goes through (typed_calculator._book_rule), and calc resolves an f_ id whoever pulled it."
+  }
+ },
+ {
+  "tag": "X08-two-turns-high-then-filings",
+  "turns": [
+   "Which of our equity holdings sits furthest below its 52-week high, and when was that high set?",
+   "For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?"
+  ],
+  "handoff": {
+   "kind": "name_across_turns",
+   "from": "market",
+   "to": "issuer",
+   "carries": [["GOOGL", "Alphabet", "Google"]],
+   "among": [["AAPL", "Apple"], ["AMZN", "Amazon"], ["GOOGL", "Alphabet", "Google"], ["JPM", "JPMorgan"], ["LLY", "Lilly"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["XOM", "Exxon"]],
+   "fixture": "X03 cut in two at the dependency: the same finding (GOOGL, -17.3%, high set 2026-05-13) has to cross a turn boundary instead of an ask. The history a turn reloads is prose without ids, so the name survives and the rows do not."
+  }
+ }
+]
