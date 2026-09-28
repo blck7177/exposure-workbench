@@ -270,7 +270,10 @@ def _ordered(rec: dict) -> bool:
 
 
 def _words(text: str) -> set[str]:
-    return {w.lower().strip("'") for w in _WORD.findall(text)}
+    """The words of a sentence, lower-cased. A possessive names its owner: "MSFT's
+    revenue" names MSFT (V2 P5; the 9/19 review found "MSFT's revenue was $416B
+    [AAPL's id]" passing because the word read was msft's)."""
+    return {re.sub(r"'s$", "", w.lower().strip("'")) for w in _WORD.findall(text)}
 
 
 def _measure_words(measure: str | None) -> list[str]:

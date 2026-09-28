@@ -673,3 +673,35 @@ def test_the_provider_exemptions_are_modules_that_still_exist():
     agents = ROOT / "src" / "exposure_workbench" / "agents"
     missing = {name for name in _MAY_REACH_THE_PROVIDER if not (agents / name).exists()}
     assert missing == set(), f"exempted from a law they are no longer subject to: {missing}"
+
+
+
+# ─── V2 P5 / acceptance A1: the offline reviewer is unreachable from the runtime ─
+
+def _runtime_sources() -> list[Path]:
+    return [p for d in ("src", "apps", "scripts") for p in (ROOT / d).rglob("*.py")]
+
+
+def test_nothing_in_the_runtime_imports_the_offline_reviewer():
+    """Design v0.4 §05: the semantic reviewer is not in the runtime topology. Not a
+    flag, not a class: no module under src/, apps/ or scripts/ imports evals, so
+    there is no code path from a request, a tool or a loop to it. Verified on the
+    import graph, as the design asks, not by running the judge twice."""
+    offenders = [str(p.relative_to(ROOT)) for p in _runtime_sources()
+                 if re.search(r"^\s*(from|import)\s+evals\b", p.read_text(encoding="utf-8"), re.M)]
+    assert offenders == [], f"runtime code reaches the offline reviewer: {offenders}"
+
+
+def test_the_containers_do_not_carry_the_offline_reviewer():
+    for name in ("Dockerfile.api", "Dockerfile.mcp", "Dockerfile.worker"):
+        text = (ROOT / "infra" / name).read_text(encoding="utf-8")
+        assert not re.search(r"^\s*(COPY|ADD)\s+evals", text, re.M), f"{name} copies evals/ into the image"
+
+
+def test_the_reviewer_writes_only_under_its_own_reports_directory():
+    """The judge's output is a file in evals/reports — never a row. The two modules
+    that produce output open no database session and import nothing that does."""
+    for name in ("review.py", "score.py", "corpus.py"):
+        text = (ROOT / "evals" / "semantic_review" / name).read_text(encoding="utf-8")
+        assert "exposure_workbench" not in text, f"{name} reaches into the product"
+        assert "sqlalchemy" not in text and "asyncpg" not in text, f"{name} opens a database"

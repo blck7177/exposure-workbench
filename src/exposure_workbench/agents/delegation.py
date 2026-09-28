@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from exposure_workbench.analytics import handbook
-from exposure_workbench.services import answer_check
+from exposure_workbench.services import fact_boundary
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import style_guide
 from exposure_workbench.services.ledger import Ledger
@@ -462,7 +462,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
                                         f"says what could not be done, or at the policy that stops the line"})
             # C7 — the why is the analyst's words about a fact, and reads like one
             problems += [{**p, "where": f"{where} / why", "n": e["n"]}
-                         for p in answer_check.check(e["why"], ledger, question=asked).problems]
+                         for p in fact_boundary.check_text("why", e["why"], ledger, question=asked).problems]
             if problems:
                 v.rejected.append({**e, "problems": problems})
                 v.problems += problems
@@ -470,7 +470,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
                 v.kept.append(e)
             continue
         problems = [{**p, "where": where, "n": e["n"]}
-                    for p in answer_check.check(e["finding"], ledger, question=asked).problems]
+                    for p in fact_boundary.check_text("finding", e["finding"], ledger, question=asked).problems]
         for fid in e["facts"]:
             if not ledger.holds(fid):
                 problems.append({"where": where, "reason": "not_on_ledger", "id": fid, "n": e["n"],
@@ -490,7 +490,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
                                                "way_out": f"a caveat qualifies one of the task's {n} line(s)"}))
         # C6 — a caveat's figure points at a row like any other figure
         problems += [{**p, "where": where, "n": c["line"]}
-                     for p in answer_check.check(c["text"], ledger, question=asked).problems]
+                     for p in fact_boundary.check_text("caveat", c["text"], ledger, question=asked).problems]
         if problems:
             v.problems += problems
         else:
@@ -499,7 +499,7 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
     for i, s in enumerate(brief.get("follow_ups") or []):
         # C8 — a question carries no figure; one that does carries it under an id
         problems = [{**p, "where": f"follow_ups[{i}]"}
-                    for p in answer_check.check(s, ledger, question=asked).problems]
+                    for p in fact_boundary.check_text("follow_up", s, ledger, question=asked).problems]
         if problems:
             v.problems += problems
         else:

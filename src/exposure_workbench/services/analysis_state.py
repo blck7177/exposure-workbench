@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exposure_workbench.analytics import display_conventions as dc
 from exposure_workbench.db.models import AnalysisState
-from exposure_workbench.services import answer_check
+from exposure_workbench.services import answer_check, fact_boundary
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import trace_service
 from exposure_workbench.services.ledger import Ledger
@@ -126,11 +126,13 @@ def new_turn(session_id: str, message_id: str | None, question: str, briefing: d
 # ── the boundary: the one way a model's sentence gets in ─────────────────────
 
 def check_text(channel: str, text: str, ledger: Ledger, question: str | None = None) -> answer_check.Verdict:
-    """THE entry. The same function the finding, the caveat, the why, the follow-up
-    and the lead's reply go through; `channel` only labels the problems."""
-    verdict = answer_check.check(text or "", ledger, question=question)
+    """THE entry — services/fact_boundary.check_text, the same function the finding,
+    the caveat, the why, the follow-up and the lead's reply go through. `channel`
+    is the proposal's own name for where it came from; the boundary records it as
+    a state_proposal."""
+    verdict = fact_boundary.check_text("state_proposal", text, ledger, question)
     for p in verdict.problems:
-        p.setdefault("where", channel)
+        p["where"] = channel
     return verdict
 
 

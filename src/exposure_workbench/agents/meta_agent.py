@@ -43,7 +43,8 @@ from exposure_workbench.analytics import handbook
 from exposure_workbench.auth.context import current_user_id
 from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.services import analysis_state as AS, analyst_reports, answer_check, \
-    briefing as briefing_svc, context_budget, facts as F, ledger as ledger_svc, style_guide, trace_service
+    briefing as briefing_svc, context_budget, fact_boundary, facts as F, ledger as ledger_svc, style_guide, \
+    trace_service
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
 
@@ -566,7 +567,7 @@ async def handle_message(
                         repl, unknown = _parse_replacements(args, standing)
                         led = await _load_ledger(db_factory, session_id)
                         text = answer_check.repair(answer, standing, repl) if repl else answer
-                        verdict = answer_check.check(text, led, question=user_text)
+                        verdict = fact_boundary.check_text("answer", text, led, question=user_text)
                         unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
                         if verdict.ok and unaddressed and coverage_refusals == 0:
                             # V2 P3: the sentences pass and a requirement has neither a finding nor a
@@ -642,7 +643,7 @@ async def handle_message(
                 _append({"role": "user", "content": _REPAIR_ONLY})
                 continue
             led = await _load_ledger(db_factory, session_id)
-            verdict = answer_check.check(text, led, question=user_text)
+            verdict = fact_boundary.check_text("answer", text, led, question=user_text)
             unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
             if verdict.ok and unaddressed and coverage_refusals == 0 and attempts < MAX_ANSWER_ATTEMPTS - 1:
                 # V2 P3 (design v0.4 §06): structural coverage. The reply's sentences pass, and a
