@@ -43,7 +43,7 @@ rc=${PIPESTATUS[0]}
 
 say ""
 say "=== FREEZE $(date -u +%FT%T+00:00) ==="
-{ git rev-parse HEAD; git rev-parse 'HEAD^{tree}'; git log -1 --format='HEAD commit time %cI'; } 2>&1 | tee -a "$LOG"
+{ git rev-parse HEAD; git rev-parse 'HEAD^{tree}'; git log -1 --format='HEAD commit time %cI'; git describe --always --dirty; } 2>&1 | tee -a "$LOG"
 dirty=$(git status --porcelain --untracked-files=no)
 if [ -n "$dirty" ]; then say "tracked changes present, refusing to measure:"; say "$dirty"; exit 4; fi
 say "--- offline baseline ---"

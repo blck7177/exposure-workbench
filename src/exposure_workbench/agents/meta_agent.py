@@ -261,11 +261,15 @@ async def _record_answer(db_factory, session_id: str, message_id: str, text: str
             # always kept its list; this keeps the answer's, by reason and sentence.
             named = [{k: p[k] for k in ("reason", "rule", "sentence") if p.get(k) is not None}
                      for p in (getattr(verdict, "problems", None) or [])[:40]]
+            # THE WHOLE DRAFT (V2 P0a). A refused reply lives only on this step — the
+            # accepted one is agent_messages.content — and round E reads refusals
+            # back in full; text[:4000] cut long drafts short of what was refused.
             await trace_service.record_step(
                 db, session_id, step_type="answer", tool_name="answer",
-                args={"text": text[:4000], **({"problems": named} if named else {})},
+                args={"text": text, **({"problems": named} if named else {})},
                 result_summary=("accepted" if verdict.ok else f"refused: {verdict.error}; {verdict.detail}"),
-                evidence_refs=[], status="completed" if verdict.ok else "rejected", message_id=message_id)
+                evidence_refs=[], status="completed" if verdict.ok else "rejected", message_id=message_id,
+                unbounded=("text",))
             await db.commit()
     except Exception:  # noqa: BLE001
         logger.exception("could not record answer step for %s", session_id)
@@ -321,9 +325,14 @@ async def handle_message(
     user_text: str,
     max_turns: int = 16,
     deny: Sequence[str] = (),
+    message_id: str | None = None,
 ) -> dict:
-    """Run one user turn. Persists the user + assistant messages; returns the reply."""
-    message_id = new_id("msg_")
+    """Run one user turn. Persists the user + assistant messages; returns the reply.
+
+    `message_id` (V2 P0a) lets the caller mint the turn's id before the loop runs, so a
+    turn that dies in an exception still has an id its steps hang off and the caller
+    can name in its own record of the failure. None keeps the old behaviour."""
+    message_id = message_id or new_id("msg_")
     async with db_factory() as db:
         db.add(AgentMessage(id=new_id("msg_"), session_id=session_id, role="user", content=user_text))
         await db.commit()

@@ -6,6 +6,7 @@ Delegations inside the loop are non-blocking, so the turn stays responsive.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,8 +21,12 @@ from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
 from exposure_workbench.db.session import get_db, get_session_factory
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import agent_session_service, analyst_reports, context_budget, usage_service
+from exposure_workbench.services import agent_session_service, analyst_reports, context_budget, trace_service, \
+    usage_service
 from exposure_workbench.tools import display as tool_display
+from exposure_workbench.utils.ids import new_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -158,8 +163,13 @@ async def post_message(
         except usage_service.QuotaExceeded as e:
             raise HTTPException(429, e.as_dict()) from e
 
+    # THE TURN'S ID IS MINTED HERE (V2 P0a), before the loop, so a turn that ends in an
+    # exception still has an id: its steps hang off it, the record of the failure below
+    # carries it, and the caller reads it back in the error body. handle_message used
+    # to mint it inside, where an exception took it away with the turn.
+    message_id = new_id("msg_")
     try:
-        return await handle_message(factory, session_id, body.text)
+        return await handle_message(factory, session_id, body.text, message_id=message_id)
     except ToolFaceUnavailable as e:
         # The tool face is down or refused this turn's bearer (S1). Before this
         # clause the group anyio raises came out as a bare 500 — the user's quota
@@ -183,8 +193,10 @@ async def post_message(
         #
         # str(e) names the face and the internal URL; the body deliberately does
         # not. tool_session logs that line for the operator.
+        await _record_turn_error(factory, session_id, message_id, "tool_face_unavailable")
         raise HTTPException(503, {
             "error": "tool_face_unavailable",
+            "message_id": message_id,
             "detail": "the tool service this assistant runs on could not be reached, so "
                       "your message was not answered; it is still in the conversation — "
                       "try again shortly",
@@ -198,10 +210,13 @@ async def post_message(
         # charge shares its caller's transaction only when the money is spent
         # later on the worker.
         if _is_provider_context_error(e):
+            await _record_turn_error(factory, session_id, message_id, "session_context_exhausted")
             raise HTTPException(413, {
                 "error": "session_context_exhausted",
+                "message_id": message_id,
                 "detail": "the provider refused this turn as too long; start a new session",
             }) from e
+        await _record_turn_error(factory, session_id, message_id, "turn_failed")
         raise
     finally:
         # finally, not a happy-path call: chat_with_tools raises outright when no
@@ -211,6 +226,27 @@ async def post_message(
         # Fenced on the stamp we claimed: if this turn outlived its lease and was
         # superseded, releasing unconditionally would free the REPLACEMENT's slot.
         await agent_session_service.release_turn(session_id, claimed_at)
+
+
+async def _record_turn_error(factory, session_id: str, message_id: str, code: str) -> None:
+    """A turn that died in an exception, as one step on the trace (V2 P0a).
+
+    Nothing is written to the transcript — that rule stands (see the 503 clause) —
+    but the steps this turn already recorded now have a row that says how the turn
+    ended, under the same message_id, so a round's forensics can tell "the loop
+    stopped" from "the loop was never asked". The code is the error class the body
+    carries; the exception's own words stay in the process log, where the operator
+    reads them and the user does not. Never raises: the failure being recorded is
+    the one the caller is about to report.
+    """
+    try:
+        async with factory() as db:
+            await trace_service.record_step(
+                db, session_id, step_type="turn_error", tool_name=None, args={"error": code},
+                result_summary=code, evidence_refs=[], status="error", message_id=message_id)
+            await db.commit()
+    except Exception:  # noqa: BLE001 — a hole in the trail beats hiding the error the user is owed
+        logger.exception("could not record turn_error for %s/%s", session_id, message_id)
 
 
 class StepOut(BaseModel):

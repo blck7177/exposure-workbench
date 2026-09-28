@@ -50,6 +50,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from exposure_workbench.agents.meta_agent import handle_message   # noqa: E402
 from exposure_workbench.auth.context import current_user_ctx      # noqa: E402
 from exposure_workbench.services import agent_session_service as sess   # noqa: E402
+from exposure_workbench.services.trace_service import MAX_ARG_CHARS, MAX_SUMMARY_CHARS   # noqa: E402
+from exposure_workbench.utils.ids import new_id                    # noqa: E402
 
 URL = os.getenv("DATABASE_URL_RLS",
                 "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")
@@ -82,7 +84,10 @@ FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 # of a trace: the mark counter's payload, a replay, a forensic recount. Rounds
 # already on disk keep the cut they were written with; a round before the
 # declaration existed is reported as undeclared, never guessed.
-_ARGS_CAP, _RESULT_CAP = 4000, 1000
+# V2 P0a: the export is as wide as the row. The trace bounds each string argument and the
+# summary itself (trace_service); a cap below that here made the battery's JSON a second,
+# shorter record of the same step, and round E reads the JSON.
+_ARGS_CAP, _RESULT_CAP = MAX_ARG_CHARS, MAX_SUMMARY_CHARS
 
 # `problems` is read on its own: jsonb orders keys by length, so inside `args` the answer's text
 # comes before the list of what the check refused in it, and a long answer pushed that list past
@@ -112,22 +117,24 @@ async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tu
             out.append({"q": q, "error": "turn already in flight", "steps": []})
             break
         started = time.time()
+        # V2 P0a: the turn's id is minted HERE, so a turn that dies in an exception still
+        # has its steps read back under it (they used to be orphaned with the turn).
+        mid = new_id("msg_")
         try:
-            res = await handle_message(lambda: mk(), sid, q, deny=deny)
+            res = await handle_message(lambda: mk(), sid, q, deny=deny, message_id=mid)
             error = None
         except Exception as exc:                    # noqa: BLE001 — recorded, not raised
-            res, error = {}, f"{type(exc).__name__}: {exc}"
+            res, error = {"message_id": mid}, f"{type(exc).__name__}: {exc}"
         elapsed = round(time.time() - started, 1)
         async with mk() as db:
             await db.execute(_RELEASE, {"s": sid})
             await db.commit()
-        mid = res.get("message_id")
         steps = []
         if mid:
             async with mk() as db:
                 steps = [dict(r) for r in (await db.execute(_STEPS, {"s": sid, "m": mid})).mappings().all()]
         meta = res.get("meta", {})
-        out.append({"turn": i, "q": q, "error": error, "answer": res.get("text"),
+        out.append({"turn": i, "q": q, "message_id": mid, "error": error, "answer": res.get("text"),
                     "citations": res.get("citations", []), "blocks": meta.get("blocks"),
                     "meta": {k: v for k, v in meta.items() if k != "blocks"},
                     "elapsed_s": elapsed, "steps": steps})

@@ -57,11 +57,20 @@ def redact_args(args: Any) -> dict[str, Any]:
 # Wide enough that no real call is altered — the longest argument any tool takes
 # is a search query or a thought, and both are sentences.
 MAX_ARG_CHARS = 4096
+# result_summary's own width. Named so the instruments that export a step (the
+# battery's left(result_summary, n)) read the same number this row is written at.
+MAX_SUMMARY_CHARS = 2000
 _TRUNCATED = "…[truncated]"
 
 
-def bound_args(args: dict[str, Any]) -> dict[str, Any]:
+def bound_args(args: dict[str, Any], unbounded: tuple[str, ...] = ()) -> dict[str, Any]:
     """Cap each string argument, so one row cannot be arbitrarily large.
+
+    `unbounded` names the keys the cap does not touch (V2 P0a). One step carries a
+    text that IS the record: the answer step's `text` is the reply draft the check
+    refused, and a draft cut at 4,096 characters is a refusal a round cannot read
+    back in full. The accepted reply was always whole (agent_messages.content); the
+    refused ones are only here. Every other argument keeps the cap.
 
     result_summary beside it has been capped at 2000 all along; args was not,
     and the arguments are the half that comes from the model. `think` takes free
@@ -75,7 +84,9 @@ def bound_args(args: dict[str, Any]) -> dict[str, Any]:
     """
     out: dict[str, Any] = {}
     for k, v in args.items():
-        if isinstance(v, str) and len(v) > MAX_ARG_CHARS:
+        if k in unbounded:
+            out[k] = v
+        elif isinstance(v, str) and len(v) > MAX_ARG_CHARS:
             # The marker counts against the cap. A bound that the marker pushes
             # past itself is not a bound.
             out[k] = v[:MAX_ARG_CHARS - len(_TRUNCATED)] + _TRUNCATED
@@ -118,6 +129,9 @@ async def record_step(
     # the question a round is read with is how often two nodes talked and with
     # what, which is a question about who.
     actor: str | None = None,
+    # V2 P0a: the argument keys kept whole (see bound_args). Only the answer step
+    # asks for one; a tool call never does.
+    unbounded: tuple[str, ...] = (),
 ) -> str:
     """Append one immutable trace row; returns its seq-scoped id."""
     next_seq = (
@@ -134,8 +148,8 @@ async def record_step(
             step_type=step_type,
             tool_name=tool_name,
             actor=actor,
-            args=_jsonable(bound_args(redact_args(args))),
-            result_summary=(result_summary or "")[:2000],
+            args=_jsonable(bound_args(redact_args(args), unbounded)),
+            result_summary=(result_summary or "")[:MAX_SUMMARY_CHARS],
             evidence_refs=evidence_refs or [],
             status=status,
             duration_ms=duration_ms,
