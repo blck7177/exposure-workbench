@@ -196,7 +196,11 @@ def check(blocks, ledger: Ledger, question: str | None = None) -> Verdict:
         elif role == A.CHART and kind != F.SERIES:
             v.problems.append({"at": at, "id": fid, "reason": "kind_does_not_fit", "kind": kind,
                                "detail": "a chart draws a series fact"})
-        elif role in (A.CELL, A.INLINE) and not ledger.standalone(fid):
+        elif role in (A.CELL, A.INLINE) and kind != F.ABSENCE and not ledger.standalone(fid):
+            # an absence stands inline by its nature (G2 above); `standalone` is about a
+            # FIGURE that is not determined on its own. The desk's standing policies are
+            # absences with standalone=False, and they became visible to this rule when
+            # V2 P3 let a pointer carry underscores.
             rec = ledger.by_id[fid]
             v.problems.append({"at": at, "id": fid, "reason": "not_standalone",
                                "detail": (rec.get("params") or {}).get("reason")

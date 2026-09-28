@@ -191,10 +191,11 @@ def merge_task(state: State, task, result, ledger: Ledger | None) -> None:
     is analyst_reports.problems). `task.requirement_ids` (P3) is what the
     findings and gaps are mapped to; empty until the lead declares requirements."""
     refused = {x["n"] for x in (getattr(result, "refused", None) or [])}
-    req_ids = list(getattr(task, "requirement_ids", ()) or ())
+    of_line = getattr(task, "requirements_of_line", None)
     for e in getattr(result, "lines", None) or []:
         if e.get("n") in refused:
             continue
+        req_ids = list(of_line(int(e.get("n") or 0)) if callable(of_line) else (getattr(task, "requirement_ids", ()) or ()))
         if e.get("settled"):
             add_finding(state, e["finding"], refs=e.get("facts") or [], ledger=ledger,
                         requirement_ids=req_ids, task_id=task.task_id, source="brief")
@@ -279,6 +280,21 @@ def _recompute_requirements(state: State) -> None:
         req["status"] = ("covered" if req["id"] in covered else "boundary" if req["id"] in bounded else "unresolved")
         req["evidence"] = [f["refs"][0] for f in state.accepted() if req["id"] in (f.get("requirement_ids") or []) and f.get("refs")]
         req["boundary"] = next((g.get("boundary") for g in state.gaps if req["id"] in (g.get("requirement_ids") or []) and g.get("boundary")), None)
+
+
+def unaddressed(state: State, cited: Iterable[str]) -> list[dict]:
+    """The declared requirements a reply does not reach (V2 P3): a requirement is
+    addressed when the reply points at a row of one of its findings, or at the
+    boundary row of one of its gaps. One with neither a finding nor a gap on the
+    record is unaddressed whatever the reply says. A lookup over ids."""
+    refs = set(cited or ())
+    out = []
+    for req in state.requirements:
+        rows = {r for f in state.accepted() if req["id"] in (f.get("requirement_ids") or []) for r in f.get("refs") or []}
+        bounds = {g.get("boundary") for g in state.gaps if req["id"] in (g.get("requirement_ids") or []) and g.get("boundary")}
+        if not (refs & (rows | bounds)):
+            out.append(req)
+    return out
 
 
 def completion_of(state: State) -> str | None:

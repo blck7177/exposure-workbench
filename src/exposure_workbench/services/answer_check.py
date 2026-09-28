@@ -74,8 +74,8 @@ _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+(?=[A-Z“\"(\[])")
 # passage [f_…]"): those are CITATIONS — a fact named, no figure to check.
 _UNIT_TAIL = (r"(?:/[A-Za-z]+|×|\s?(?:x|times|pp|bps|basis\s+points?|percentage\s+points?|points?|days?|years?|"
               r"quarters?|months?|shares?|sessions?))?")
-_POINTER_AFTER = re.compile(_UNIT_TAIL + r"\s*\[\s*(f_[0-9A-Za-z]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
-_CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\]")
+_POINTER_AFTER = re.compile(_UNIT_TAIL + r"\s*\[\s*(f_[0-9A-Za-z_]{4,})(?:@([0-9A-Za-z:.\-]{1,32}))?\s*\]")
+_CITATION = re.compile(r"\[\s*(f_[0-9A-Za-z_]{4,})(?:@[0-9A-Za-z:.\-]{1,32})?\s*\]")
 
 # ── the closed word lists G3 reads ───────────────────────────────────────────
 SUPERLATIVES = frozenset("""largest smallest biggest highest lowest most least top bottom worst best weakest

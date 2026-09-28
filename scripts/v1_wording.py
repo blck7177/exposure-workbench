@@ -98,7 +98,8 @@ def render() -> str:
              "登记簿读法与工具说明、手册三章、研究简报、风格指南、拒绝与提示。旧架构的文字（14 个域、程序语言说明、两份图例、READINGS、DESK_RULES）已随退役删除。\n"]
 
     parts += ["\n## 1. 主分析师\n", "### 1.1 角色说明 `meta_agent._ROLE`（其后引入风格指南全文，见第 8 组）\n", _block(meta_agent._ROLE),
-              "### 1.2 三个块的标签\n", _block("\n".join((meta_agent.BRIEFING_TAG, meta_agent.ROSTER_TAG, meta_agent.READINGS_TAG))),
+              "### 1.2 四个块的标签（`<state>` 每次 completion 前由记录重新渲染）\n",
+              _block("\n".join((meta_agent.BRIEFING_TAG, meta_agent.ROSTER_TAG, meta_agent.READINGS_TAG, meta_agent.STATE_TAG))),
               "### 1.3 三个工具的描述\n"]
     for tool in (delegation.ASK_TOOL, delegation.OPEN_TOOL, meta_agent.REPAIR_TOOL):
         f = tool["function"]
@@ -158,6 +159,10 @@ def render() -> str:
               _block("\n".join(said_in(meta_agent, "_refusal_message"))),
               "循环里的其他回话 `meta_agent.handle_message`，与原样重发的提示 `repeats.nudge`：\n",
               _block("\n".join([*said_under_keys(meta_agent, "handle_message"), *said_in(repeats, "nudge")])),
+              "回复留下未覆盖的要求时 `meta_agent._coverage_message`（V2 P3；不是句子修复，主分析师可再问再写）：\n",
+              _block("\n".join(said_in(meta_agent, "_coverage_message"))),
+              "读者读到的固定句 `meta_agent._PARTIAL_TEXT`（runtime 写，附在 partial 回复之后）：\n",
+              _block(meta_agent._PARTIAL_TEXT),
               "### 9.2 分析师读到的\n", "简报被退回 `delegation.refusal_message`、`parse_submission` 的形状拒绝：\n",
               _block("\n".join([*said_in(delegation, "refusal_message"), *said_in(delegation, "parse_submission")])),
               "循环里的其他回话 `sub_analyst._run`，与预算用尽那一行：\n",

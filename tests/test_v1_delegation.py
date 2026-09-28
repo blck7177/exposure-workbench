@@ -33,7 +33,8 @@ TASK = dl.Task("tsk_1", "risk", ("port_001",), ("how big MSFT is in the book", "
 def test_the_lead_asks_one_of_three_analysts_in_financial_language():
     task = dl.ASK_TOOL["function"]["parameters"]["properties"]["tasks"]["items"]
     assert task["properties"]["analyst"]["enum"] == ["issuer", "market", "risk"]
-    assert set(task["properties"]) == {"analyst", "subjects", "lines", "context", "follow_up_of"}
+    # V2 P3: `for` names the declared requirements a task serves; still no measure, verb or window
+    assert set(task["properties"]) == {"analyst", "subjects", "lines", "context", "follow_up_of", "for"}
     # no field invites arithmetic in words, a measure's name or a window to be parsed
     assert not {"facts_to_derive", "constraints", "measures", "window"} & set(task["properties"])
 

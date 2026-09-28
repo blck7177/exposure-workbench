@@ -47,6 +47,7 @@ step with them.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -67,6 +68,9 @@ ANALYSTS: tuple[str, ...] = handbook.ANALYSTS
 MAX_TASKS = 4
 # Lines in one task. A task with more is two tasks or a question not yet taken apart.
 MAX_LINES = 8
+# Requirements of one question (V2 P3). A question with more is several questions.
+MAX_REQUIREMENTS = 12
+_REQUIREMENT_ID = re.compile(r"^R\d{1,2}$")
 
 
 ASK_TOOL = {"type": "function", "function": {
@@ -78,8 +82,16 @@ ASK_TOOL = {"type": "function", "function": {
         "in financial language: say the period, and say what is to be set against what where the line is a "
         "comparison. Ask several analysts in one call when a question spans them; several issuers studied in depth "
         "are one task each. Every line comes back settled — a finding with the desk's rows under it — or with what "
-        "stopped it."),
+        "stopped it. On your first ask, declare the question's requirements — each a span of the user's own words, "
+        "copied exactly — and say which of them every task serves (`for`); the STATE block then keeps their standing."),
     "parameters": {"type": "object", "properties": {
+        "requirements": {"type": ["array", "null"], "maxItems": MAX_REQUIREMENTS, "items": {
+            "type": "object", "properties": {
+                "id": {"type": "string", "description": "R1, R2, …"},
+                "anchor": {"type": "string", "minLength": 1,
+                           "description": "the user's own words for this requirement, copied exactly from the question"}},
+            "required": ["id", "anchor"], "additionalProperties": False},
+            "description": "what the question asks, taken apart — declared once, on the first ask of the turn"},
         "tasks": {"type": "array", "minItems": 1, "maxItems": MAX_TASKS, "items": {
             "type": "object", "properties": {
                 "analyst": {"type": "string", "enum": list(ANALYSTS)},
@@ -88,6 +100,11 @@ ASK_TOOL = {"type": "function", "function": {
                                             "book an analyst built this turn, to have another analyst read it"},
                 "lines": {"type": "array", "minItems": 1, "maxItems": MAX_LINES, "items": {"type": "string"},
                           "description": "one thing you want to know per line, in your own words"},
+                "for": {"type": ["array", "null"],
+                        "items": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
+                        "description": "the requirement ids this task serves, once requirements are declared: ids for the "
+                                       "whole task, or — when its lines serve different requirements — one list per line, "
+                                       "in the lines' order"},
                 "context": {"type": ["string", "null"],
                             "description": "one sentence on what the answer is for, when it changes what matters"},
                 "follow_up_of": {"type": ["string", "null"],
@@ -148,6 +165,22 @@ class Task:
     lines: tuple[str, ...]
     context: str | None = None
     follow_up_of: str | None = None
+    # V2 P3: the requirements of the question this task serves — (id, anchor) pairs
+    # the lead declared, in the user's own words. The analyst reads them; the
+    # state maps the task's findings and gaps to them, line by line when the lead
+    # said which line serves which (`line_requirements`, one tuple per line).
+    requirements: tuple[tuple[str, str], ...] = ()
+    line_requirements: tuple[tuple[str, ...], ...] = ()
+
+    @property
+    def requirement_ids(self) -> tuple[str, ...]:
+        return tuple(r[0] for r in self.requirements)
+
+    def requirements_of_line(self, n: int) -> tuple[str, ...]:
+        """The requirement ids line `n` (1-based) serves: its own, else the task's."""
+        if self.line_requirements and 1 <= n <= len(self.line_requirements):
+            return self.line_requirements[n - 1]
+        return self.requirement_ids
 
     @property
     def domain(self) -> str:
@@ -162,6 +195,10 @@ class Task:
             out["context"] = self.context
         if self.follow_up_of:
             out["follow_up_of"] = self.follow_up_of
+        if self.requirements:
+            out["for"] = [{"id": i, "anchor": a} for i, a in self.requirements]
+            if self.line_requirements and len(set(self.line_requirements)) > 1:
+                out["line_for"] = {str(i): list(g) for i, g in enumerate(self.line_requirements, 1)}
         return out
 
     def asked_text(self) -> str:
@@ -208,10 +245,53 @@ class BadDelegation(ValueError):
     raised at the turn: a malformed tool call is a message to fix, not a lost turn."""
 
 
-def parse_tasks(args: dict, new_id) -> list[Task]:
-    """The tasks of one ask, normalised, or a BadDelegation in words the lead can act on."""
+def _squeeze(text: str) -> str:
+    return " ".join(str(text or "").split()).casefold()
+
+
+def parse_requirements(args: dict, question: str | None, known: list[dict] | None = None) -> list[dict]:
+    """The requirements an ask declares, checked against the user's own words (V2 P3,
+    design v0.4 §06: "Requirement 分解需对照用户原文核实"). Each anchor must be a
+    verbatim span of the question — the one thing about a decomposition that is
+    mechanical — and requirements are declared once: a second declaration is
+    refused rather than merged, so the denominator cannot quietly move. Returns
+    the declared list ([] when the ask declares none)."""
+    declared = (args or {}).get("requirements")
+    if not declared:
+        return []
+    if known:
+        raise BadDelegation("the question's requirements are declared once, on the first ask; they stand as "
+                            f"{', '.join(r['id'] for r in known)} — say which of them each task is for")
+    if not isinstance(declared, list) or len(declared) > MAX_REQUIREMENTS:
+        raise BadDelegation(f"requirements is a list of at most {MAX_REQUIREMENTS} {{id, anchor}} entries")
+    asked = _squeeze(question or "")
+    out: list[dict] = []
+    seen: set[str] = set()
+    for i, r in enumerate(declared):
+        if not isinstance(r, dict):
+            raise BadDelegation(f"requirements[{i}] is not an object")
+        rid = str(r.get("id") or "").strip().upper()
+        anchor = " ".join(str(r.get("anchor") or "").split())
+        if not _REQUIREMENT_ID.match(rid):
+            raise BadDelegation(f"requirements[{i}].id {r.get('id')!r}: an id is R1, R2, …")
+        if rid in seen:
+            raise BadDelegation(f"{rid} is declared twice")
+        if not anchor or _squeeze(anchor) not in asked:
+            raise BadDelegation(f"{rid}: the anchor is not a span of the user's words — copy it exactly from the "
+                                f"question ({anchor[:80]!r} is not in it)")
+        seen.add(rid)
+        out.append({"id": rid, "anchor": anchor, "status": "unresolved"})
+    return out
+
+
+def parse_tasks(args: dict, new_id, requirements: list[dict] | None = None) -> list[Task]:
+    """The tasks of one ask, normalised, or a BadDelegation in words the lead can act on.
+
+    `requirements` (V2 P3) are the turn's declared requirements; once there are
+    any, every task says which it is `for`, and an id it names must be one of them."""
     if not isinstance(args, dict) or not isinstance(args.get("tasks"), list) or not args["tasks"]:
         raise BadDelegation("ask takes {tasks: [{analyst, subjects, lines, …}]}")
+    by_id = {r["id"]: r for r in (requirements or [])}
     if len(args["tasks"]) > MAX_TASKS:
         raise BadDelegation(f"at most {MAX_TASKS} tasks in one call; ask the rest after you read these")
     out: list[Task] = []
@@ -241,8 +321,40 @@ def parse_tasks(args: dict, new_id) -> list[Task]:
             raise BadDelegation(f"tasks[{i}].lines is a non-empty list of things you want to know")
         if len(lines) > MAX_LINES:
             raise BadDelegation(f"tasks[{i}].lines has more than {MAX_LINES} lines; that is more than one task")
+        served = t.get("for")
+        if isinstance(served, str):
+            served = [served]
+        served = list(served or [])
+        per_line: list[list[str]] | None = None
+        if served and all(isinstance(x, list) for x in served):
+            if len(served) != len(lines):
+                raise BadDelegation(f"tasks[{i}].for gives {len(served)} list(s) for {len(lines)} line(s): one list per "
+                                    f"line, in the lines' order — or one list of ids for the whole task")
+            per_line = [[str(x).strip().upper() for x in group if str(x).strip()] for group in served]
+            flat = [x for group in per_line for x in group]
+        elif served and any(isinstance(x, list) for x in served):
+            raise BadDelegation(f"tasks[{i}].for is ids for the whole task, or one list per line — not a mix")
+        else:
+            flat = [str(x).strip().upper() for x in served if str(x).strip()]
+        if by_id:
+            unknown = [x for x in flat if x not in by_id]
+            if unknown:
+                raise BadDelegation(f"tasks[{i}] is for {', '.join(unknown)}, which is not a declared requirement "
+                                    f"({', '.join(by_id)})")
+            if not flat:
+                raise BadDelegation(f"tasks[{i}] says which requirement(s) it is for: one or more of {', '.join(by_id)}")
+            if per_line is not None and any(not group for group in per_line):
+                empty = next(k for k, group in enumerate(per_line, 1) if not group)
+                raise BadDelegation(f"tasks[{i}] line {empty} serves no requirement: name one of {', '.join(by_id)}")
+        elif flat:
+            raise BadDelegation(f"tasks[{i}] is for {', '.join(flat)}, but no requirement has been declared: declare "
+                                f"the question's requirements on this ask")
+        distinct = list(dict.fromkeys(flat))
         out.append(Task(task_id=new_id("tsk_"), analyst=analyst, subjects=tuple(subjects), lines=tuple(lines),
-                        context=(t.get("context") or None), follow_up_of=(t.get("follow_up_of") or None)))
+                        context=(t.get("context") or None), follow_up_of=(t.get("follow_up_of") or None),
+                        requirements=tuple((x, by_id[x]["anchor"]) for x in distinct),
+                        line_requirements=(tuple(tuple(dict.fromkeys(g)) for g in per_line) if per_line is not None
+                                           else tuple(tuple(distinct) for _ in lines) if distinct else ())))
     return out
 
 

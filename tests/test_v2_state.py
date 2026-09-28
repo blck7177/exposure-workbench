@@ -116,8 +116,7 @@ def test_undelivered_rows_become_one_gap_per_call_and_conflicts_are_found_by_loo
 def test_requirement_status_and_completion_are_counts():
     st = S.new_turn("sess", "msg", "q", BRIEFING)
     st.requirements = [{"id": "R1", "anchor": "how big MSFT is"}, {"id": "R2", "anchor": "its beta"}, {"id": "R3", "anchor": "next year"}]
-    task = dl.Task("tsk_1", "risk", ("port_001",), ("a", "b", "c"))
-    object.__setattr__(task, "requirement_ids", ["R1"])
+    task = dl.Task("tsk_1", "risk", ("port_001",), ("a", "b", "c"), requirements=(("R1", "how big MSFT is"),))
     S.merge_task(st, task, _result(SETTLED), LEDGER)
     assert [r["status"] for r in st.requirements] == ["covered", "unresolved", "unresolved"] and S.completion_of(st) == "partial"
     st.gaps.append({"type": "policy_boundary", "requirement_ids": ["R2", "R3"], "boundary": "f_policy_no_forecast"})

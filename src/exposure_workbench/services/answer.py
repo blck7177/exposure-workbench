@@ -278,12 +278,15 @@ TOKEN = re.compile("|".join((_ID, _DATE, _FORM, _NUM)))
 # A pointer written in the prose: the fact's id, optionally addressing one
 # point of a series. Permissive on the body so a mistyped id is refused as
 # `not_on_ledger` (which says what to do about it) rather than read as a word.
-POINTER = re.compile(r"\bf_[0-9A-Za-z]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?\b")
+# V2 P3: an id may carry underscores — the desk's three standing policies do
+# (f_policy_no_forecast …), and a reply that points at one as the boundary of a
+# requirement has to be READ as pointing, not left with a bracket in its prose.
+POINTER = re.compile(r"\bf_[0-9A-Za-z_]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?\b")
 
 # The object decoration the old grammar required, if the model still writes it:
 # `{fact:f_3a…}`, `{"fact": "f_3a…"}`. A closed shape carrying a pointer, so it
 # is NORMALISED to the pointer rather than refused — 22 of 94 stored answers.
-WRAPPED = re.compile(r"\{\s*[\"']?fact[\"']?\s*:\s*[\"']?(f_[0-9A-Za-z]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?)[\"']?\s*\}")
+WRAPPED = re.compile(r"\{\s*[\"']?fact[\"']?\s*:\s*[\"']?(f_[0-9A-Za-z_]{4,}(?:@[0-9A-Za-z:.\-]{1,32})?)[\"']?\s*\}")
 
 
 def normalise(text: str) -> str:
@@ -308,7 +311,7 @@ def pointers_in(text: str) -> list[tuple[str, int, int]]:
 # the id rule, and the id would reach the reader as literal prose. Found by
 # replaying the stored corpus; refused rather than guessed at, because a silent
 # id in a sentence is the one failure this desk must not have.
-GLUED = re.compile(r"(?<=[0-9A-Za-z])f_[0-9A-Za-z]{4,}")
+GLUED = re.compile(r"(?<=[0-9A-Za-z])f_[0-9A-Za-z_]{4,}")
 
 
 def _blank(text: str) -> str:
