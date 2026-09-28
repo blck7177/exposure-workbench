@@ -42,6 +42,9 @@ def _stub(schema: dict):
     fields — the only nested schema in the registry, and the one whose gate
     matters most.
     """
+    if schema.get("oneOf"):
+        # a choice of shapes (V1's typed period, a trade): the first non-null branch is a value
+        return _stub(next(b for b in schema["oneOf"] if b.get("type") != "null"))
     kind = schema.get("type")
     if isinstance(kind, list):
         kind = next((k for k in kind if k != "null"), "string")

@@ -496,20 +496,50 @@ async def _filter(db: AsyncSession, inputs: list[str], cmp: str | None, level) -
     return {**counted, "quantity": f"figures {cmp} {level}, of the {len(inputs)} given", "op": "filter", "kept": kept}
 
 
+CONSTANT_SOURCES: tuple[str, ...] = ("user_assumption", "method_constant")
+
+
+def _constant_source(op: str, factor, level, source) -> dict | None:
+    """A NUMBER TYPED IN NEEDS A PROVENANCE (V2 P4, design v0.4 §09 "常量与结果身份").
+    `scale`'s factor and `filter`'s written level are the two places a figure enters
+    the desk from the model's own hand; the desk records whose it is — the user's
+    assumption ("sell half", "20% of ADV") or a constant of the method — or refuses
+    it, so a number worked out in the model's head cannot ride in as a factor and
+    come back out as a row the desk computed."""
+    typed = (op == "scale" and factor is not None) or (op == "filter" and level is not None
+                                                        and not (isinstance(level, str) and level.startswith("f_")))
+    if not typed:
+        return None
+    if source not in CONSTANT_SOURCES:
+        return _err("invalid_params", f"a number you type in ({'factor' if op == 'scale' else 'level'}) says whose it is: "
+                                      f"source = user_assumption (the user's own figure) or method_constant (a constant "
+                                      f"of the method you are applying); a figure you worked out is not either — have "
+                                      f"the desk compute it and point at its row", allowed=list(CONSTANT_SOURCES))
+    return {}
+
+
 async def _calc(db: AsyncSession, op: str, inputs: list[str], by: str | None = None, factor: float | None = None,
                 direction: str | None = None, n: int | None = None, cmp: str | None = None, level=None,
-                *, why: str) -> dict:
+                source: str | None = None, *, why: str) -> dict:
     """THE MODEL DOES NOT NAME A FIGURE (plan V1 §0). This took a `name` until
     2026-09-19 — carried over from the old compute's `as_quantity` — and 45 of the
     46 live `calc` calls used it: "AAPL breach room", "fcf_to_debt_xom". A row's
     `what` then came from the model and not from the registry, and the check could
     not tell what such a name was a name of. The desk names the result from the
     operation and what went into it (analytics/registry.reads_as)."""
+    refused = _constant_source(op, factor, level, source)
+    if refused:
+        return refused
     if op == "filter":
-        return await _filter(db, inputs, cmp, level)
+        out = await _filter(db, inputs, cmp, level)
+        if refused is not None and not out.get("error"):
+            out["constant_source"] = source                # the count's row says whose the level was
+        return out
     params = {k: v for k, v in (("by", by), ("factor", factor)) if v is not None}
     out = await compute_service.compute(db, op="rank" if op == "top" else op, operands=list(inputs),
                                         params=params, direction=direction)
+    if refused is not None and isinstance(out, dict) and not out.get("error"):
+        out["constant_source"] = source                    # the scaled row says whose the factor was
     if op == "top" and not out.get("error"):
         if not isinstance(n, int) or n < 1:
             return _err("invalid_params", "top takes n, a positive integer")
@@ -563,14 +593,15 @@ async def _web_search(db: AsyncSession, ticker: str, query: str, days: int | Non
 
 # ── the two actions ──────────────────────────────────────────────────────────
 
-async def _scenario(db: AsyncSession, book: str, trades: list, *, why: str) -> dict:
+async def _scenario(db: AsyncSession, book: str, trades: list, funding: str | None = None, *, why: str) -> dict:
     """The plan's signature (V1 §2.3): a book and a list of trades. Until
     2026-09-19 this took `sales` OR `buys`, the two halves of the engine as the
-    old compute exposed them, one list a call."""
+    old compute exposed them, one list a call. `funding` (V2 P4) says where a
+    purchase's money comes from; omitted, from outside the book, as before."""
     resolved = await _resolve_book(db, book, None)
     if isinstance(resolved, dict):
         return resolved
-    out = await scenario_service.hypothetical_trades(db, resolved[0], list(trades or []))
+    out = await scenario_service.hypothetical_trades(db, resolved[0], list(trades or []), funding=funding or "external")
     if isinstance(out, dict) and not out.get("error") and isinstance(out.get("calc_id"), str):
         out["made"] = out["calc_id"]           # the new book, by the id `book_read` and `scenario` take
         out["subject"] = resolved[0]
@@ -677,15 +708,19 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
                         "in. add/multiply take two or more; subtract/divide exactly two, or a list each combined with `by`; "
                         "scale takes one and `factor`; rank orders two or more (`direction`), top keeps its first `n`; "
                         "filter keeps those `cmp` a `level` (an f_ id, or a figure written as the desk shows one: 8%, $1.5M); "
-                        "sum/avg/min/max/std/abs are over a set; yoy/qoq/pct/cagr/latest over ONE series. The result is a new "
-                        "figure with what it was made of. Refused: units, periods or books that do not combine — it says which.",
+                        "sum/avg/min/max/std/abs are over a set; yoy/qoq/pct/cagr/latest over ONE series. A typed-in factor "
+                        "or level says whose it is (`source`). The result is a new figure with what it was made of. Refused: "
+                        "units, periods or books that do not combine — it says which; a typed number with no source.",
             json_schema=_schema({"op": {"type": "string", "enum": list(CALC_OPS)},
                                  "inputs": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 40},
                                  "by": {"type": ["string", "null"]}, "factor": {"type": ["number", "null"]},
                                  "direction": {"type": ["string", "null"], "enum": ["highest", "lowest", None]},
                                  "n": {"type": ["integer", "null"], "minimum": 1, "maximum": 40},
                                  "cmp": {"type": ["string", "null"], "enum": [*_COMPARE, None]},
-                                 "level": {"type": ["string", "number", "null"]}},
+                                 "level": {"type": ["string", "number", "null"]},
+                                 "source": {"type": ["string", "null"], "enum": [*CONSTANT_SOURCES, None],
+                                            "description": "whose a typed-in factor or level is: the user's own figure, or a "
+                                                           "constant of the method"}},
                                 ["op", "inputs"])),
         "filings_search": Tool(
             name="filings_search", display="Searching {ticker}'s filings", rows=True, tool_class=READ, fn=_filings_search,
@@ -719,11 +754,16 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
             name="scenario", display="Building the book after a trade", rows=True, tool_class=READ, fn=_scenario,
             description="The book after a list of trades, applied in the order given: weights, sector weights, market value, "
                         "and every concentration and exposure check re-run — a NEW book, returned by its id (`made`), which "
-                        "`book_read` and `scenario` take. A sale's proceeds leave the book; a purchase is paid with money "
-                        "from outside it, so a purchase is not funded by a sale. It re-prices and re-checks; it does not "
-                        "re-fit betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), "
-                        "a name with no sector on this desk, a name already held bought again.",
-            json_schema=_schema({"book": _BOOK, "trades": _TRADES}, ["book", "trades"])),
+                        "`book_read` and `scenario` take. `funding` says where a purchase's money comes from: omitted or "
+                        "`external`, from outside the book — a sale's proceeds leave it, and a name already held is not "
+                        "bought again; `proceeds`, from the sales in this trade — a purchase may then add to a held name, "
+                        "and what the sales did not fund leaves the book. It re-prices and re-checks; it does not re-fit "
+                        "betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), a name "
+                        "with no sector on this desk, a purchase the proceeds do not cover.",
+            json_schema=_schema({"book": _BOOK, "trades": _TRADES,
+                                 "funding": {"type": ["string", "null"], "enum": ["external", "proceeds", None],
+                                             "description": "where a purchase's money comes from; omitted = external"}},
+                                ["book", "trades"])),
         "start": Tool(
             name="start", display="Starting {kind} for {subject}", rows=True, tool_class=DELEGATION, fn=_start_for(face),
             description="Background preparation, returning an id at once and NEVER evidence: `readiness` puts a listed SEC "

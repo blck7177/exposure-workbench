@@ -72,6 +72,10 @@ BASIS: dict[str, str] = {
     # the book's price history is TODAY'S holdings replayed: the desk holds one position
     # snapshot and no holding history (drawdown_service.valuation_assumption)
     "todays_holdings": "today's holdings held fixed over the whole span",
+    # V2 P4: a number the model typed in — a scale's factor, a filter's level — says
+    # whose it is, and the row it made carries the word (tools/primitives._constant_source)
+    "user_assumption": "scaled or filtered by a figure the user gave",
+    "method_constant": "scaled or filtered by a constant of the method",
 }
 
 # What limits how the figure may be used.
@@ -188,6 +192,9 @@ def words_beside(obj: Any) -> dict:
     basis = obj.get("basis")
     if isinstance(basis, (list, tuple)) and basis and all(w in BASIS for w in basis):
         out["basis"] = list(basis)
+    # V2 P4: whose a typed-in constant was, written beside the figure by the verb
+    if obj.get("constant_source") in ("user_assumption", "method_constant"):
+        out["basis"] = [*out.get("basis", []), obj["constant_source"]]
     return out
 
 
@@ -803,6 +810,10 @@ READS: dict[str, str] = {
                               "coverage is quoted.",
     "gross_margin": "A margin names the revenue line it divided by; an issuer that files revenue under two tags is read "
                     "on the one the desk maps.",
+    # V2 P4 (design v0.4 §09 "财务天数"): the convention is said once, where the measure is read
+    "days_sales_outstanding": "A days measure counts the days of its own window — a full year's for twelve months, a "
+                              "quarter's for three — so two readings compare only over windows of the same length; the "
+                              "row says the window it has.",
     "price.beta": "Against a rates or credit instrument, a name's beta is its own sensitivity to that risk — the per-name "
                   "figure the book-level factor fit does not give; the book-level fit is over the book's return and says "
                   "nothing per name.",

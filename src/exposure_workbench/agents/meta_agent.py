@@ -244,7 +244,7 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
     if ref.startswith(("r_", "calc_")):
         rows = [F.line(r) for r in led.shown.values()
                 if ref in ((r.get("params") or {}).get("pull"), r.get("subject"), *(r.get("sources") or []),
-                           (r.get("params") or {}).get("of"))]
+                           (r.get("params") or {}).get("of"), (r.get("params") or {}).get("book"))]
         if not rows:
             return {"error": "not_on_the_record", "detail": f"no row of this conversation came from {ref}"}
         return _page(rows, offset, OPEN_PAGE_ROWS, "rows")

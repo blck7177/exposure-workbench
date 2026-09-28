@@ -276,7 +276,9 @@ RISK = Chapter(
                      "how much of a day's move was the market and how much was what was held"),
               compare=("an episode's depth and length against the market's over the same dates",
                        "the factor-explained share against the residual: the market against the book's own",
-                       "each holding's contribution against its weight: who hurt more than their size"),
+                       "each holding's contribution against its weight: who hurt more than their size",
+                       "a share of revenue is not a share of the return: what drove a move is read off the factor "
+                       "contributions and the residual, never off how a business's sales divide"),
               close=("depth, dates and recovery in one sentence, then the names that made it, then market against specific",
                      "what the unexplained share is made of, by name")),
         Topic("liquidity",

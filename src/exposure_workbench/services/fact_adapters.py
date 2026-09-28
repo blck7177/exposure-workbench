@@ -71,6 +71,7 @@ UNIT_BY_KEY: dict[str, str] = {
     # adapter until V28 opened the route (the third payload of this shape).
     "entries": COUNT,
     "proceeds": MONEY, "market_value_sold": MONEY, "market_value_added": MONEY, "value_then": MONEY,
+    "spent": MONEY, "unspent": MONEY,      # V2 P4: a scenario funded from proceeds says what it spent and left
     "market_value": MONEY,
     # ratios
     "depth": RATIO, "gap": RATIO, "tolerance": RATIO, "difference": RATIO, "factor_share": RATIO,
@@ -645,6 +646,12 @@ def read_fundamentals(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     if result.get("metric") and not result.get("error"):
         # a flow or a series is named by its metric, not by the key it sits under
         facts = [replace(f, measure=result["metric"]) if f.measure in ("", "value", "points") else f for f in facts]
+    # V2 P4 (design v0.4 §09, plan V1 §5-8): a series row says which filings it was read from,
+    # as a filed line's row does — the payload carries the accessions of its points
+    filed = _filed_in(result)
+    if filed:
+        facts = [replace(f, params={**f.params, **filed}) if f.kind == F.SERIES and "filed_in" not in f.params else f
+                 for f in facts]
     return facts, note
 
 
@@ -885,6 +892,11 @@ def compute(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     facts, note = harvest(r, ctx)
     if isinstance(r.get("type"), dict) and r["type"].get("kind") == "ranking":
         facts = _ranked(facts, r)
+    # V2 P4 (plan V1 §5-8): a name's rows in a book say which book — `book.position`
+    # reads them off one run, and the row is rendered with it (facts.from_of)
+    if isinstance(r.get("position"), dict) and isinstance(r.get("run_id"), str):
+        facts = [replace(f, params={**f.params, "book": r["run_id"]}) if f.kind == F.SCALAR and "book" not in f.params else f
+                 for f in facts]
     return facts, note
 
 

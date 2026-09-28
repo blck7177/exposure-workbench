@@ -618,9 +618,14 @@ def _time_span_in(ledger: Ledger, tok: str, text: str, end: int, cited) -> list[
 
 
 def _book_of(rec: dict) -> str | None:
-    """The book a row was read off, where the row says one."""
-    of = (rec.get("params") or {}).get("of")
-    return of if isinstance(of, str) and of.startswith(("run_", "calc_", "port_")) else None
+    """The book a row was read off, where the row says one (`of` for a run table's
+    row, `book` for a name's rows book.position read — V2 P4)."""
+    params = rec.get("params") or {}
+    for key in ("of", "book"):
+        of = params.get(key)
+        if isinstance(of, str) and of.startswith(("run_", "calc_", "port_")):
+            return of
+    return None
 
 
 def _holders(ledger: Ledger, tok: str) -> list[dict]:

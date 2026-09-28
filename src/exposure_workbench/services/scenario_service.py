@@ -149,13 +149,19 @@ async def hypothetical_buy(db: AsyncSession, run_id: str, buys: list[dict]) -> d
                            {"buys": [{"ticker": b.ticker, "weight": b.weight} for b in placed]})
 
 
-async def hypothetical_trades(db: AsyncSession, run_id: str, trades: list[dict]) -> dict:
+async def hypothetical_trades(db: AsyncSession, run_id: str, trades: list[dict], funding: str = "external") -> dict:
     """The book after a list of trades, as ONE recorded book (V1, plan §2.3:
     `scenario(run, trades)`). Each trade is one sale — {sell, fraction} — or one
     purchase — {buy, weight}; they apply in the order given (analytics/scenario.
     traded). Parsed by the same two parsers a lone sale or purchase list goes
-    through, so a trade is refused for exactly what it was always refused for."""
+    through, so a trade is refused for exactly what it was always refused for.
+
+    `funding` (V2 P4, design v0.4 §09): `external` is the engine as it has been;
+    `proceeds` pays the purchases out of the sales in this trade and lets a
+    purchase add to a held name, whose sector is the holding's own."""
     from exposure_workbench.db.models import Company
+    if funding not in sc.FUNDING:
+        return _err("bad_funding", f"funding is one of {', '.join(sc.FUNDING)}")
     groups: list[tuple[str, list]] = []
     for i, t in enumerate(trades or []):
         sells = isinstance(t, dict) and isinstance(t.get("sell"), str) and t["sell"]
@@ -181,10 +187,11 @@ async def hypothetical_trades(db: AsyncSession, run_id: str, trades: list[dict])
         parsed.append((side, got))
     said = [({"sell": x.ticker, "fraction": x.fraction} if side == "sell" else {"buy": x.ticker, "weight": x.weight})
             for side, legs in parsed for x in legs]
-    return await _scenario(db, run_id, lambda holdings: traded_then_placed(holdings, parsed), {"trades": said})
+    return await _scenario(db, run_id, lambda holdings: traded_then_placed(holdings, parsed, funding),
+                           {"trades": said, "funding": funding})
 
 
-def traded_then_placed(holdings: list, parsed: list[tuple[str, list]]) -> "sc.ScenarioBook | dict":
+def traded_then_placed(holdings: list, parsed: list[tuple[str, list]], funding: str = "external") -> "sc.ScenarioBook | dict":
     """THE ENGINE'S OWN REFUSALS COME FIRST, then the desk's. A purchase needs the
     new name's sector, and the lookup ran before the engine saw the trade — so a
     name the book ALREADY HOLDS was refused for having no sector on this desk
@@ -192,7 +199,11 @@ def traded_then_placed(holdings: list, parsed: list[tuple[str, list]]) -> "sc.Sc
     the refusal the verb promises for it (second real-database smoke, 2026-09-19:
     MSFT, held at 16%, bought again). A name the engine accepts and the desk
     cannot place is still refused, as before and in the same words."""
-    book = sc.traded(holdings, parsed)
+    # a held name bought again (funding=proceeds) keeps the sector the book already has for it
+    held_sector = {h.ticker: h.sector for h in holdings}
+    parsed = [(side, [sc.Buy(b.ticker, b.weight, b.sector or held_sector.get(b.ticker)) for b in legs] if side == "buy" else legs)
+              for side, legs in parsed]
+    book = sc.traded(holdings, parsed, funding=funding)
     if isinstance(book, dict):
         return book
     unplaced = [b.ticker for side, legs in parsed if side == "buy" for b in legs if not b.sector]
@@ -290,8 +301,11 @@ async def _scenario(db: AsyncSession, base_id: str, rebuild, identifying: dict) 
                                       "the book after the sale has none, so none is carried"},
         "reads_as": (
             "The book as it would stand after the trade, as of the run's date: each weight is "
-            "its market value over the book's; sale proceeds leave the book and purchase money "
-            "comes from outside it. Every name here is on the table under the calc_id, and the "
+            "its market value over the book's; "
+            + ("the sales fund the purchases and what they did not spend leaves the book"
+               if identifying.get("funding") == "proceeds" else
+               "sale proceeds leave the book and purchase money comes from outside it")
+            + ". Every name here is on the table under the calc_id, and the "
             f"same names on {run_id} are the book before — subtract for the change."
         ),
         "not_a_forecast": True,

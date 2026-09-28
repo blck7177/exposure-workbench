@@ -300,7 +300,10 @@ def from_of(rec: dict) -> str:
                f"op {params['op']}" + (f" of {' and '.join(inputs[:4])}" + (" and others" if len(inputs) > 4 else "")
                                        if inputs else "") if params.get("op") else
                ", ".join(sources[:2]) if sources else str(rec.get("group") or ""))
-    return " ".join(x for x in (params.get("pull"), made_by) if x)
+    # V2 P4: a name's row read off a book says which book (book.position)
+    book = params.get("book")
+    on = f"on {book}" if isinstance(book, str) and book.startswith(("run_", "calc_", "port_")) else None
+    return " ".join(x for x in (params.get("pull"), made_by, on) if x)
 
 
 def model_row(f: "Fact | dict") -> dict:

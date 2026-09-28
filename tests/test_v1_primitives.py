@@ -257,14 +257,15 @@ async def test_a_filters_level_is_written_as_the_desk_shows_a_figure(monkeypatch
     monkeypatch.setattr(P.tc, "_resolve", _resolve)
     monkeypatch.setattr(P.tc, "constant", _constant)
 
-    out = await P._calc(None, "filter", list(weights), cmp=">", level="8%", why=WHY)        # 8% is 0.08: nobody converts
+    # V2 P4: a written level is a number typed in, and says whose it is
+    out = await P._calc(None, "filter", list(weights), cmp=">", level="8%", source="user_assumption", why=WHY)   # 8% is 0.08: nobody converts
     assert out["kept"] == ["f_a", "f_b"] and out["value"] == 2.0
     # how many it was a count OF is in the figure's name: a bare number beside the
     # count is a figure with no unit, and the adapter says so out loud (V1 smoke)
     assert "of the 3 given" in out["quantity"] and "of" not in out
-    none = await P._calc(None, "filter", list(weights), cmp=">", level="20%", why=WHY)
+    none = await P._calc(None, "filter", list(weights), cmp=">", level="20%", source="user_assumption", why=WHY)
     assert none["error"] == "no_entry_satisfies" and "0.07 to 0.16" in none["detail"]
-    bad = await P._calc(None, "filter", list(weights), cmp=">", level="a lot", why=WHY)
+    bad = await P._calc(None, "filter", list(weights), cmp=">", level="a lot", source="user_assumption", why=WHY)
     assert bad["error"] == "invalid_params"
 
 
@@ -309,15 +310,16 @@ async def test_a_scenario_takes_a_book_and_its_trades_and_names_the_book_it_made
     async def _resolve_book(db, book, which):
         return "run_1", "2026-09-10"
 
-    async def _trades(db, run_id, trades):
-        assert run_id == "run_1" and trades == [{"sell": "LLY"}, {"buy": "TLT", "weight": 0.05}]
+    async def _trades(db, run_id, trades, funding="external"):
+        assert run_id == "run_1" and trades == [{"sell": "LLY"}, {"buy": "TLT", "weight": 0.05}] and funding == "external"
         return {"calc_id": "calc_after", "as_of": "2026-09-10"}
     monkeypatch.setattr(P, "_resolve_book", _resolve_book)
     monkeypatch.setattr(P.scenario_service, "hypothetical_trades", _trades)
     made = await P._scenario(None, "port_001", [{"sell": "LLY"}, {"buy": "TLT", "weight": 0.05}], why=WHY)
     assert made["made"] == "calc_after" and made["subject"] == "run_1"
     schema = P.build_analyst_registry("risk").get("scenario").json_schema
-    assert set(schema["properties"]) == {"book", "trades", "why"} and "sales" not in schema["properties"]
+    # V2 P4: `funding` says where a purchase's money comes from; the two halves of the old engine stay retired
+    assert set(schema["properties"]) == {"book", "trades", "funding", "why"} and "sales" not in schema["properties"]
     assert validate_args(schema, {"book": "port_001", "trades": [{"sell": "LLY", "fraction": 0.5}], "why": WHY}) == []
     assert validate_args(schema, {"book": "port_001", "trades": [{"sell": "LLY", "buy": "TLT"}], "why": WHY})   # one side a trade
     assert validate_args(schema, {"book": "port_001", "trades": [{"buy": "TLT"}], "why": WHY})                  # a purchase needs its weight
