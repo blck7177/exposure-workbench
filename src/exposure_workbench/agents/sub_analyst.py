@@ -83,6 +83,11 @@ _WRITE_OR_ASK = "File your brief with submit, or pull the rows you still need."
 TASK_TAG = ('<task source="the desk\'s lead analyst" use="settle every numbered line, or say what stopped it">')
 COVERAGE_TAG = ('<coverage source="the desk\'s catalogue" trust="names, dates and coverage only — no figure here" '
                 'use="what the desk holds for the task\'s subjects, and up to when">')
+# V2 P2.3 (design v0.4 §07, G4): what the task this one follows up left on the record —
+# the entries that passed every check, with the desk's rows under them, and what stopped
+# the rest. Nothing refused is here, and nothing here is read again by a tool.
+PRIOR_TAG = ('<prior source="the desk\'s record of the task this one follows up" use="what that task settled, with '
+             'its rows, and what stopped the rest; ask for what is still missing rather than pulling these again">')
 
 _TITLES = {c.analyst: c.title[0].lower() + c.title[1:] for c in handbook.CHAPTERS.values()}
 _POLICIES = "; ".join(f"{p['id']} ({p['measure'].split('.', 1)[1].replace('_', ' ')})" for p in registry.POLICY_ABSENCES)
@@ -162,6 +167,37 @@ def _got(res: dict) -> str:
     return (f"{res.get('error')}" + (f": {str(res['detail'])[:120]}" if res.get("detail") else "")) if res.get("error") else "done"
 
 
+async def _prior_block(task: dl.Task, ctx: TurnContext) -> str:
+    """The `<prior>` block for a follow-up (V2 P2.3): the record of `task.follow_up_of`
+    as TaskState kept it — accepted lines with their rows read off the ledger, and the
+    unsettled lines with their boundary rows. A task of another session, or one that
+    left no record, gives an empty string; a refused entry is never here (A3)."""
+    if not task.follow_up_of:
+        return ""
+    try:
+        async with ctx.db_factory() as db:
+            rep = await analyst_reports.load_by_task(db, ctx.session_id, task.follow_up_of)
+    except Exception:  # noqa: BLE001 — a follow-up without its record is a task like any other
+        logger.exception("could not read the record of %s", task.follow_up_of)
+        return ""
+    if not rep:
+        return ""
+    led = await _ledger(ctx)
+    settled, not_settled = [], []
+    for e in rep.get("accepted_lines") or []:
+        if e.get("settled"):
+            settled.append({"n": e.get("n"), "finding": e.get("finding"),
+                            "rows": [F.line(led.by_id[fid]) for fid in e.get("facts") or [] if fid in led.by_id]})
+        else:
+            b = e.get("boundary")
+            not_settled.append({"n": e.get("n"), "why": e.get("why"),
+                                "boundary": F.line(led.by_id[b]) if b in led.by_id else b})
+    if not settled and not not_settled:
+        return ""
+    prior = {"task_id": task.follow_up_of, "settled": settled, "not_settled": not_settled}
+    return "\n" + PRIOR_TAG + "\n" + json.dumps(prior, ensure_ascii=False, default=str) + "\n</prior>"
+
+
 async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
     """One analyst, start to brief, on its own face."""
     async with ctx.open_tools(task.analyst) as tools_session:
@@ -182,7 +218,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
         {"role": "user", "content":
          TASK_TAG + "\n" + json.dumps(task.as_dict(), ensure_ascii=False, default=str) + "\n</task>\n"
          + COVERAGE_TAG + "\n" + json.dumps(_coverage_of(task, ctx.briefing), ensure_ascii=False, default=str)
-         + "\n</coverage>"},
+         + "\n</coverage>" + await _prior_block(task, ctx)},
     ]
     face = _face_tools(tools_session, task.analyst)
     verbs = [t["function"]["name"] for t in face]

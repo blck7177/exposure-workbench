@@ -113,7 +113,8 @@ def render() -> str:
     parts += ["\n## 2. 分析师角色说明 `sub_analyst._SYSTEM`（三位共用，标题与政策 id 代入；其后引入风格指南全文，再接本章手册）\n",
               _block(sub_analyst._SYSTEM.format(title="<the issuer analyst | the market analyst | the portfolio risk manager>",
                                                 policies=sub_analyst._POLICIES)),
-              "块标签与提示句：\n", _block("\n".join((sub_analyst.TASK_TAG, sub_analyst.COVERAGE_TAG, sub_analyst._WRITE_OR_ASK))),
+              "块标签与提示句（`<prior>` 只在 follow_up_of 指向本 session 的任务时出现）：\n",
+              _block("\n".join((sub_analyst.TASK_TAG, sub_analyst.COVERAGE_TAG, sub_analyst.PRIOR_TAG, sub_analyst._WRITE_OR_ASK))),
               "`submit` 的描述：\n", _block(delegation.SUBMIT_TOOL["function"]["description"])]
 
     parts += ["\n## 3. 工具描述（tools/primitives，11 个动词；每面只见自己的）\n"]

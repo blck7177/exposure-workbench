@@ -170,11 +170,12 @@ The brief is one entry per numbered line, and an entry is one of two things. Set
 You write for the lead analyst, never for the reader, and you answer the task you were given rather than the one you would have asked. If your brief is refused you are told which entries and why: submit again with those replaced, pulling the row a fix needs first if you were not shown it.
 ```
 
-块标签与提示句：
+块标签与提示句（`<prior>` 只在 follow_up_of 指向本 session 的任务时出现）：
 
 ```text
 <task source="the desk's lead analyst" use="settle every numbered line, or say what stopped it">
 <coverage source="the desk's catalogue" trust="names, dates and coverage only — no figure here" use="what the desk holds for the task's subjects, and up to when">
+<prior source="the desk's record of the task this one follows up" use="what that task settled, with its rows, and what stopped the rest; ask for what is still missing rather than pulling these again">
 File your brief with submit, or pull the rows you still need.
 ```
 
