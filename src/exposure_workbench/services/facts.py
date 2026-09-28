@@ -216,6 +216,9 @@ def from_model_row(row: Sequence, shared_sources: Sequence[str] | None = None) -
 # the row actually has, `means` the registry's words (analytics/registry).
 ROW_FIELDS = ("id", "kind", "what", "of", "when", "value", "means", "from")
 _KIND_WORDS = {SCALAR: "reading", SERIES: "series", PASSAGE: "passage", ABSENCE: "absence", TASK: "task"}
+# V2 P1.3: a series the row thins says so on the row. Until V2 the value showed the
+# 60 points `_thin` kept and nothing said the record held more; `open` pages the rest.
+SERIES_SHOWN = "{k} of {n} points shown; every point is on the record under this id"
 
 
 def _record_of(f: "Fact | dict") -> dict:
@@ -261,8 +264,12 @@ def value_of(rec: dict) -> str:
         v = rec.get("value")
         return dc.display(float(v), unit) if unit and isinstance(v, (int, float)) else str(v)
     if kind == SERIES:
-        pts = _thin([(str(p[0]), float(p[1])) for p in rec.get("points") or []], SERIES_POINTS_INLINE)
-        return "; ".join(f"{p} {dc.display(v, unit) if unit else v}" for p, v in pts)
+        every = [(str(p[0]), float(p[1])) for p in rec.get("points") or []]
+        pts = _thin(every, SERIES_POINTS_INLINE)
+        shown = "; ".join(f"{p} {dc.display(v, unit) if unit else v}" for p, v in pts)
+        if len(pts) < len(every):
+            shown += " (" + SERIES_SHOWN.format(k=len(pts), n=len(every)) + ")"
+        return shown
     if kind == PASSAGE:
         text = str(rec.get("text") or "")
         return '"' + text[:PASSAGE_CHARS] + ('…"' if len(text) > PASSAGE_CHARS else '"')

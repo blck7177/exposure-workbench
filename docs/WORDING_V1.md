@@ -38,7 +38,7 @@ Ask the desk's analysts for what you need to know. Pick each analyst by the fami
 **open**
 
 ```text
-Open something this conversation already put on the record, by its id: a row (f_…), every row one call pulled (r_…), an analyst's log of what it did and why (the task's id), or a book a scenario built (calc_…). It reads what is there; a figure nobody pulled is asked for, not opened.
+Open something this conversation already put on the record, by its id: a row (f_…), every row one call pulled (r_…), an analyst's log of what it did and why (the task's id), or a book a scenario built (calc_…). It reads what is there; a figure nobody pulled is asked for, not opened. A call's rows and a long series come a page at a time: the reply says the total and the range shown, and `offset` reads on from where the last page ended.
 ```
 
 **repair_answer**
@@ -313,7 +313,7 @@ policy: the desk does not say this, by policy
 cannot: the desk could not do this
 ```
 
-**渲染时拼出的词**：位次 `3rd highest of 8`；变化 `up / down / flat`；组成 `built on X in place of Y`、`missing at this date: …`、`never filed by this issuer: …`、`overlapping, not added: …`；不可单独引用 `not quotable on its own`。
+**渲染时拼出的词**：位次 `3rd highest of 8`；变化 `up / down / flat`；组成 `built on X in place of Y`、`missing at this date: …`、`never filed by this issuer: …`、`overlapping, not added: …`；不可单独引用 `not quotable on its own`；序列被压缩时行尾 `({k} of {n} points shown; every point is on the record under this id)`。
 
 **三条常驻政策缺席**
 
@@ -618,7 +618,7 @@ f'That {name} call was byte-identical to the one refused before it, and the gate
 
 ```text
 f'{len(verdict.problems)} problem(s) with your brief. Every entry not named here is kept.'
-'Submit again with those entries replaced. Pull the row a fix needs first if you were not shown the figure; a line the desk cannot settle is an entry with why and its boundary, not a finding.'
+'Submit again with only the entries named above; every other entry stays as you filed it. Pull the row a fix needs first if you were not shown the figure; a line the desk cannot settle is an entry with why and its boundary, not a finding.'
 'submit takes {lines: [one entry per numbered line of the task], caveats?, follow_ups?}'
 'every entry of lines is an object'
 'every entry names the numbered line it is about: n, an integer'
@@ -687,4 +687,10 @@ _SHORT_BARE = {ids} holds these digits, but a short number written bare is not t
 [direction_conflict] f'this change is {('negative' if val < 0 else 'positive')}; the sentence points the other way'
 [sense_conflict] f'the row says {registry.DIRECTION[r['means']['direction']]}; the sentence says the opposite — say what the row says, or drop the word'
 [status_conflict] f'the check here is {registry.STATUS[r['means']['status']]}; the sentence says {' and '.join(claimed)}'
+```
+
+### 9.4 两个循环都读到的截断提示 `utils/json._CAP_DETAIL`（工具结果或回单超出读入上限时，`truncated.detail`）
+
+```text
+omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less
 ```

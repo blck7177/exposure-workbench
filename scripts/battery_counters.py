@@ -208,6 +208,25 @@ _MODEL = re.compile(r"^([^:\s]+): \d+ tool call")
 ARITHMETIC_VERBS = ("calc",)
 
 
+def channel_of(where, step_type) -> str:
+    """Which of the analyst's channels a handoff problem is about (V2 P1.1): the finding
+    of a line, a caveat, an unsettled line's why, a follow-up — or the lead's answer.
+    Read off the problem's `where`, which the check writes; a problem about the SHAPE
+    of the brief (a line with no entry) names no channel."""
+    if step_type == "answer":
+        return "answer"
+    w = str(where or "")
+    if w.startswith("caveats["):
+        return "caveat"
+    if w.endswith("/ why"):
+        return "why"
+    if w.startswith("follow_ups["):
+        return "follow_up"
+    if w.startswith("line"):
+        return "finding"
+    return "shape"
+
+
 def _rule_of(reason) -> int | None:
     """The style guide's rule a reason enforces, for a problem recorded before problems carried it.
     The guide is the one place that mapping is written (services/style_guide); where it is not
@@ -528,6 +547,7 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
     why_missing = why_lines = v1_calls = v1_refused = v1_not_run = v1_unstated = 0
     by_rule: collections.Counter = collections.Counter()
     by_reason: collections.Counter = collections.Counter()
+    by_channel: collections.Counter = collections.Counter()     # V2 P1.1: finding / caveat / why / follow_up / answer
     absences: collections.Counter = collections.Counter()
     absences_by_verb: collections.Counter = collections.Counter()
     models: dict[str, collections.Counter] = {"lead": collections.Counter(), "analysts": collections.Counter()}
@@ -620,6 +640,7 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
                             by_reason[str(pr.get("reason"))] += 1
                             rule = pr.get("rule") if pr.get("rule") is not None else _rule_of(pr.get("reason"))
                             by_rule[str(rule) if rule is not None else "shape"] += 1
+                            by_channel[channel_of(pr.get("where"), s.get("step_type"))] += 1
                 for r in meta.get("reports") or []:
                     report_status[r.get("status") or "unstated"] += 1
                 if isinstance(meta.get("prompt_tokens"), (int, float)):
@@ -733,6 +754,7 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
         "why_names_a_line_share": round(why_lines / len(why_words), 2) if why_words else 0,
         "analyst_prompt_peak_median": med(sub_peak), "analyst_prompt_peak_p90": q(sub_peak, .9),
         "check_problems_by_rule": dict(sorted(by_rule.items())),
+        "check_problems_by_channel": dict(by_channel.most_common()),
         "sense_conflicts": by_reason["sense_conflict"], "status_conflicts": by_reason["status_conflict"],
         "check_problems_by_reason": dict(by_reason.most_common()),
         "absences": sum(absences.values()), "absences_by_code": dict(absences.most_common()),

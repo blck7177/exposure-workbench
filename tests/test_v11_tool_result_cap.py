@@ -25,14 +25,18 @@ def test_a_payload_that_fits_is_untouched():
 
 
 def test_entries_come_off_the_tail_and_are_named():
-    out = json.loads(dumps_capped(_obj(10), 700))
+    # 740 rather than 700: the truncation sentence names the way back since V2 P1.4 and is
+    # a few words longer; the payload it declares is the same five entries.
+    out = json.loads(dumps_capped(_obj(10), 740))
     assert list(out["lines"]) == ["f0", "f1", "f2", "f3", "f4"]
     assert out["truncated"] == {
         "container": "lines",
         "dropped": ["f5", "f6", "f7", "f8", "f9"],
         "detail": out["truncated"]["detail"],
     }
-    assert "requested individually" in out["truncated"]["detail"]
+    # V2 P1.4: the sentence says the way back — what was dropped is on the record,
+    # read by id (a call's r_… with an offset) or asked for in smaller pieces
+    assert "on the record" in out["truncated"]["detail"] and "offset" in out["truncated"]["detail"]
 
 
 def test_the_declaration_itself_fits_inside_the_limit():

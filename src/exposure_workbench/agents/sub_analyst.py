@@ -186,6 +186,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
     verbs = [t["function"]["name"] for t in face]
     tools = face + [dl.SUBMIT_TOOL]
     standing: dl.HandoffVerdict | None = None           # a verdict on a brief, awaiting its replacement
+    kept_brief: dict | None = None                       # what that verdict kept (V2 P1.2: the patch contract)
     attempts = nudges = 0
     read = {"chars": 0, "results": 0}                   # what the next completion reads (V36.1, recorded on its row)
     # A CALL RE-SENT UNCHANGED IS NOT A SECOND TRY (V37/A2, the V31 rule). The same
@@ -314,6 +315,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                     attempts += 1
                     last[rp.digest(args)] = {}
                     led = await _ledger(ctx)
+                    brief = dl.merge_brief(kept_brief, brief)          # a resubmission replaces only what it names
                     verdict = dl.handoff_check(task, brief, led)
                     # the verdict rides on the step (V36.1): the retort the analyst
                     # read is otherwise nowhere on the record
@@ -332,6 +334,8 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                         res = {"accepted": verdict.ok, "coverage": verdict.coverage}
                     else:
                         standing = verdict
+                        kept_brief = {"lines": list(verdict.kept), "caveats": list(verdict.caveats_ok),
+                                      "follow_ups": list(verdict.follow_ups_ok)}
                         res = {"accepted": False, "refusal": dl.refusal_message(task, verdict)}
 
             else:
@@ -365,8 +369,10 @@ def _fill(result: dl.AnalystResult, brief: dict, verdict: dl.HandoffVerdict) -> 
     """What survives the check reaches the lead; what did not is named as refused.
     A brief that half passes is half a brief, not a lost one."""
     result.lines = list(brief["lines"])
-    result.caveats = list(brief.get("caveats") or [])
-    result.follow_ups = list(brief.get("follow_ups") or [])
+    # V2 P1.1: only what passed the check is handed on; a refused caveat or follow-up
+    # is in the verdict's problems and nowhere else
+    result.caveats = list(verdict.caveats_ok)
+    result.follow_ups = list(verdict.follow_ups_ok)
     result.refused = [{"n": x["n"], "finding": x.get("finding"), "problems": x.get("problems") or []}
                       for x in verdict.rejected]
     result.coverage = verdict.coverage
@@ -396,7 +402,8 @@ async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.
     ok = verdict is not None and verdict.ok
     refused = {x["n"] for x in result.refused}
     findings = [{"want": e["n"], "finding": e["finding"]} for e in result.lines if e["settled"] and e["n"] not in refused]
-    not_done = [{"want": e["n"], "why": e["why"], "boundary": e["boundary"]} for e in result.lines if not e["settled"]]
+    not_done = [{"want": e["n"], "why": e["why"], "boundary": e["boundary"]}
+                for e in result.lines if not e["settled"] and e["n"] not in refused]
     rendered: dict = {}
     if ok and ledger is not None and findings:
         try:

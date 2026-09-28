@@ -97,6 +97,9 @@ _GATE_EXHAUSTED_META = {"gate": "exhausted"}
 
 # How much of one tool result reaches the model (research_session reads this too).
 TOOL_RESULT_LIMIT = 28_000
+# V2 P1.3 (design v0.4 G3): `open` reads a call's rows a page at a time and says
+# the total and the range, instead of the first 80 with nothing said of the rest.
+OPEN_PAGE_ROWS = 80
 
 # The rewrites an answer gets: the first refusal lists every problem, the
 # second ends the turn. Decided 2026-09-13 with the natural-language exit.
@@ -172,11 +175,28 @@ async def _load_ledger(db_factory, session_id: str):
         return await ledger_svc.load(db, session_id)
 
 
-async def _open(db_factory, session_id: str, ref: str, delegated: list) -> dict:
+def _page(items: list, offset: int, size: int, key: str) -> dict:
+    """One page of a long list, with the total and the range, and where the next
+    page starts while there is one (V2 P1.3). Nothing is dropped in silence."""
+    start = max(0, int(offset or 0))
+    page = items[start:start + size]
+    if not page:
+        return {"error": "past_the_end", "detail": f"offset {start} is past the end: {len(items)} {key} in all"}
+    out = {key: page, "total": len(items), "shown": [start, start + len(page)]}
+    if start + len(page) < len(items):
+        out["next_offset"] = start + len(page)
+    return out
+
+
+async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: int = 0) -> dict:
     """ANYTHING ALREADY ON THE RECORD, BY ITS ID (V1): a row, the rows one call
     pulled, an analyst's log, a book a scenario built. It reads the session's own
     ledger and its analysts' records — nothing here can pull a figure nobody
-    pulled, which is the whole of the lead's relation to the desk's data."""
+    pulled, which is the whole of the lead's relation to the desk's data.
+
+    `offset` (V2 P1.3) reads on: a call's rows come OPEN_PAGE_ROWS at a time, a
+    series' points SERIES_POINTS_INLINE at a time, each page saying the total,
+    the range it shows and where the next one starts."""
     ref = (ref or "").strip()
     if not ref:
         return {"error": "no_id", "detail": "open takes the id of a row (f_…), a call (r_…), a task, or a built book (calc_…)"}
@@ -195,14 +215,22 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list) -> dict:
     led = await _load_ledger(db_factory, session_id)
     if ref.startswith("f_"):
         rec = led.by_id.get(ref)
-        return {"row": F.line(rec)} if rec else {"error": "not_on_the_record",
-                                                 "detail": f"{ref} is not a row this conversation was shown"}
+        if not rec:
+            return {"error": "not_on_the_record", "detail": f"{ref} is not a row this conversation was shown"}
+        out: dict = {"row": F.line(rec)}
+        points = [[str(p[0]), p[1]] for p in (rec.get("points") or []) if isinstance(p, (list, tuple)) and len(p) == 2]
+        if rec.get("kind") == F.SERIES and len(points) > F.SERIES_POINTS_INLINE:
+            # the row shows a thinned series; the record holds every point, and here they are, paged
+            paged = _page(points, offset, F.SERIES_POINTS_INLINE, "points")
+            return paged if paged.get("error") else {**out, **paged}
+        return out
     if ref.startswith(("r_", "calc_")):
         rows = [F.line(r) for r in led.shown.values()
                 if ref in ((r.get("params") or {}).get("pull"), r.get("subject"), *(r.get("sources") or []),
                            (r.get("params") or {}).get("of"))]
-        return {"rows": rows[:80]} if rows else {"error": "not_on_the_record",
-                                                 "detail": f"no row of this conversation came from {ref}"}
+        if not rows:
+            return {"error": "not_on_the_record", "detail": f"no row of this conversation came from {ref}"}
+        return _page(rows, offset, OPEN_PAGE_ROWS, "rows")
     return {"error": "unknown_id", "detail": "open takes the id of a row (f_…), a call (r_…), a task, or a built book (calc_…)"}
 
 
@@ -244,7 +272,9 @@ async def _record_open(db_factory, session_id: str, message_id: str, ref: str, r
             await trace_service.record_step(
                 db, session_id, step_type="open", tool_name="open", args={"id": ref}, evidence_refs=[],
                 result_summary=(f"{result.get('error')}: {str(result.get('detail') or '')[:160]}" if result.get("error")
-                                else f"{len(result.get('rows') or [])} row(s)" if "rows" in result
+                                else f"{len(result.get('rows') or [])} row(s) of {result.get('total')}, "
+                                     f"shown {result.get('shown')}" if "rows" in result
+                                else f"a row, {len(result.get('points') or [])} of {result.get('total')} points" if "points" in result
                                 else "a row" if "row" in result else "a log"),
                 status="rejected" if result.get("error") else "completed", message_id=message_id)
             await db.commit()
@@ -438,7 +468,11 @@ async def handle_message(
                             result = delegation.for_lead(got, await _load_ledger(db_factory, session_id))
                     elif name == delegation.OPEN_TOOL_NAME:
                         ref = str((args or {}).get("id") or "")
-                        result = await _open(db_factory, session_id, ref, delegated)
+                        try:
+                            offset = int((args or {}).get("offset") or 0)
+                        except (TypeError, ValueError):
+                            offset = 0
+                        result = await _open(db_factory, session_id, ref, delegated, offset)
                         await _record_open(db_factory, session_id, message_id, ref, result)
                     elif name == REPAIR_TOOL_NAME and standing is not None:
                         repl, unknown = _parse_replacements(args, standing)

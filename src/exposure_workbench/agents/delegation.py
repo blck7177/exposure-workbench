@@ -129,9 +129,14 @@ OPEN_TOOL = {"type": "function", "function": {
     "description": (
         "Open something this conversation already put on the record, by its id: a row (f_…), every row one call "
         "pulled (r_…), an analyst's log of what it did and why (the task's id), or a book a scenario built (calc_…). "
-        "It reads what is there; a figure nobody pulled is asked for, not opened."),
-    "parameters": {"type": "object", "properties": {"id": {"type": "string"}},
-                   "required": ["id"], "additionalProperties": False}}}
+        "It reads what is there; a figure nobody pulled is asked for, not opened. A call's rows and a long series "
+        "come a page at a time: the reply says the total and the range shown, and `offset` reads on from where the "
+        "last page ended."),
+    "parameters": {"type": "object", "properties": {
+        "id": {"type": "string"},
+        "offset": {"type": ["integer", "null"], "minimum": 0,
+                   "description": "where to read on from — the last page's next_offset; omitted reads from the start"}},
+        "required": ["id"], "additionalProperties": False}}}
 
 
 @dataclass(frozen=True)
@@ -186,7 +191,12 @@ class HandoffVerdict:
     problems: list[dict] = field(default_factory=list)
     coverage: dict = field(default_factory=dict)
     accepted: list[dict] = field(default_factory=list)      # settled lines that passed
-    rejected: list[dict] = field(default_factory=list)      # {n, finding, problems}
+    rejected: list[dict] = field(default_factory=list)      # {n, finding | why, problems}: entries with a problem
+    # V2 P1: what a resubmission may keep — every entry, caveat and follow-up that passed
+    # every check, so the patch contract (merge_brief) has something to hold on to.
+    kept: list[dict] = field(default_factory=list)          # entries (settled or not) with no problem
+    caveats_ok: list[dict] = field(default_factory=list)
+    follow_ups_ok: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -298,10 +308,22 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
       C3  the ids a finding names are on the ledger
       C4  the boundary of an unsettled line is an absence the ledger holds
       C5  a caveat qualifies a line of this task
+      C6  a caveat's text reads against the ledger exactly as a finding does
+      C7  an unsettled line's `why` reads against the ledger exactly as a finding does
+      C8  a follow-up reads against the ledger exactly as a finding does
+
+    C6–C8 are V2 P1.1 (design v0.4 G1): every channel that carries the analyst's
+    words goes through ONE check — answer_check.check, the same lookup the finding
+    and the lead's reply go through — so moving a figure from a finding into a
+    caveat, a why or a follow-up changes nothing about what it must point at. A
+    caveat or a follow-up that fails is not handed on (`caveats_ok`,
+    `follow_ups_ok`); an unsettled line whose why fails is refused like a settled
+    line whose finding fails.
 
     A problem that enforces one of the style guide's eight rules says which, by
-    number (`rule`, services/style_guide): everything C2 finds, and C5. The others
-    are about the SHAPE of the brief and carry none. Every problem says the way out.
+    number (`rule`, services/style_guide): everything C2, C6, C7 and C8 find, and
+    C5. The others are about the SHAPE of the brief and carry none. Every problem
+    says the way out.
     """
     v = HandoffVerdict()
     asked = task.asked_text()
@@ -320,11 +342,20 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
     for e in brief.get("lines") or []:
         where = f"line {e['n']}"
         if not e["settled"]:
+            problems = []
             fid = e["boundary"]
             if ledger.kind(fid) != F.ABSENCE:
-                v.problems.append({"where": where, "reason": "not_a_boundary", "id": fid, "n": e["n"],
-                                   "way_out": f"{fid} is not an absence row the desk showed you: point at the row that "
-                                          f"says what could not be done, or at the policy that stops the line"})
+                problems.append({"where": where, "reason": "not_a_boundary", "id": fid, "n": e["n"],
+                                 "way_out": f"{fid} is not an absence row the desk showed you: point at the row that "
+                                        f"says what could not be done, or at the policy that stops the line"})
+            # C7 — the why is the analyst's words about a fact, and reads like one
+            problems += [{**p, "where": f"{where} / why", "n": e["n"]}
+                         for p in answer_check.check(e["why"], ledger, question=asked).problems]
+            if problems:
+                v.rejected.append({**e, "problems": problems})
+                v.problems += problems
+            else:
+                v.kept.append(e)
             continue
         problems = [{**p, "where": where, "n": e["n"]}
                     for p in answer_check.check(e["finding"], ledger, question=asked).problems]
@@ -337,15 +368,59 @@ def handoff_check(task: Task, brief: dict, ledger: Ledger) -> HandoffVerdict:
             v.problems += problems
         else:
             v.accepted.append(e)
+            v.kept.append(e)
 
     for i, c in enumerate(brief.get("caveats") or []):
+        where = f"caveats[{i}]"
+        problems = []
         if not 1 <= c["line"] <= n:
-            v.problems.append(style_guide.ruled({"where": f"caveats[{i}]", "reason": "caveat_without_a_line", "n": c["line"],
-                                                 "way_out": f"a caveat qualifies one of the task's {n} line(s)"}))
+            problems.append(style_guide.ruled({"where": where, "reason": "caveat_without_a_line", "n": c["line"],
+                                               "way_out": f"a caveat qualifies one of the task's {n} line(s)"}))
+        # C6 — a caveat's figure points at a row like any other figure
+        problems += [{**p, "where": where, "n": c["line"]}
+                     for p in answer_check.check(c["text"], ledger, question=asked).problems]
+        if problems:
+            v.problems += problems
+        else:
+            v.caveats_ok.append(c)
 
-    unsettled = [e for e in brief.get("lines") or [] if not e["settled"]]
-    v.coverage = {"asked": n, "settled": len(v.accepted), "unsettled": len(unsettled), "refused": len(v.rejected)}
+    for i, s in enumerate(brief.get("follow_ups") or []):
+        # C8 — a question carries no figure; one that does carries it under an id
+        problems = [{**p, "where": f"follow_ups[{i}]"}
+                    for p in answer_check.check(s, ledger, question=asked).problems]
+        if problems:
+            v.problems += problems
+        else:
+            v.follow_ups_ok.append(s)
+
+    v.coverage = {"asked": n, "settled": len(v.accepted),
+                  "unsettled": len([e for e in v.kept if not e["settled"]]), "refused": len(v.rejected)}
     return v
+
+
+def merge_brief(kept: dict | None, new: dict) -> dict:
+    """THE PATCH CONTRACT (V2 P1.2, design v0.4 G2). The refusal tells the analyst
+    that every entry not named is kept, and until V2 the code replaced the whole
+    brief with the resubmission — an analyst that did as told lost its passing
+    lines to C1. Now the resubmission is merged over what the last verdict kept:
+    a line named again is replaced, a line not named stays as filed, caveats that
+    passed stay beside the new ones, and follow-ups are the new list if one was
+    filed. Within one task the ledger only grows and a fact never changes, so an
+    entry that passed against the earlier ledger passes against the later one;
+    nothing is kept across tasks (that is follow_up_of's business, P2)."""
+    if not kept:
+        return new
+    lines = {e["n"]: e for e in kept.get("lines") or []}
+    lines.update({e["n"]: e for e in new.get("lines") or []})
+    seen: set[tuple] = set()
+    caveats: list[dict] = []
+    for c in [*(kept.get("caveats") or []), *(new.get("caveats") or [])]:
+        key = (c["line"], c["text"])
+        if key not in seen:
+            seen.add(key)
+            caveats.append(c)
+    return {"lines": [lines[k] for k in sorted(lines)], "caveats": caveats,
+            "follow_ups": list(new.get("follow_ups") or kept.get("follow_ups") or [])}
 
 
 def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
@@ -368,8 +443,9 @@ def refusal_message(task: Task, verdict: HandoffVerdict) -> str:
         if line not in seen:
             seen.add(line)
             lines.append(line)
-    lines += ["", "Submit again with those entries replaced. Pull the row a fix needs first if you were not shown the "
-                  "figure; a line the desk cannot settle is an entry with why and its boundary, not a finding."]
+    lines += ["", "Submit again with only the entries named above; every other entry stays as you filed it. Pull the "
+                  "row a fix needs first if you were not shown the figure; a line the desk cannot settle is an entry with "
+                  "why and its boundary, not a finding."]
     return "\n".join(lines)
 
 

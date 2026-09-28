@@ -17,8 +17,9 @@ from pathlib import Path
 
 from exposure_workbench.agents import delegation, meta_agent, repeats, research_session, sub_analyst
 from exposure_workbench.analytics import handbook, registry
-from exposure_workbench.services import answer_check, style_guide
+from exposure_workbench.services import answer_check, facts, style_guide
 from exposure_workbench.tools import faces, primitives
+from exposure_workbench.utils import json as ejson
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "WORDING_V1.md"
@@ -131,7 +132,8 @@ def render() -> str:
                          ("限制 FLAGS", registry.FLAGS), ("缺席原因 ABSENCE_REASONS", registry.ABSENCE_REASONS)):
         parts += [f"**{title}**\n", _block("\n".join(f"{k}: {v}" for k, v in table.items()))]
     parts += ["**渲染时拼出的词**：位次 `3rd highest of 8`；变化 `up / down / flat`；组成 `built on X in place of Y`、"
-              "`missing at this date: …`、`never filed by this issuer: …`、`overlapping, not added: …`；不可单独引用 `not quotable on its own`。\n",
+              "`missing at this date: …`、`never filed by this issuer: …`、`overlapping, not added: …`；不可单独引用 `not quotable on its own`；"
+              f"序列被压缩时行尾 `({facts.SERIES_SHOWN})`。\n",
               "**三条常驻政策缺席**\n", _block("\n".join(f"{p['id']}: {p['text']}" for p in registry.POLICY_ABSENCES))]
 
     parts += ["\n## 5. 登记簿读法与因子工具\n", "**READS**\n",
@@ -162,7 +164,9 @@ def render() -> str:
               "### 9.3 两道检查的出路句（方括号里是 reason；规则号见第 8 组）\n", "交接检查 `delegation.handoff_check`：\n",
               _block("\n".join(said_under_keys(delegation, "handoff_check", keys=("way_out",)))),
               "答案检查 `services/answer_check`（`_SHORT_BARE` 是其中两句共用的模板）：\n",
-              _block("\n".join([f"_SHORT_BARE = {answer_check._SHORT_BARE}", *said_under_keys(answer_check, keys=("way_out",))]))]
+              _block("\n".join([f"_SHORT_BARE = {answer_check._SHORT_BARE}", *said_under_keys(answer_check, keys=("way_out",))])),
+              "### 9.4 两个循环都读到的截断提示 `utils/json._CAP_DETAIL`（工具结果或回单超出读入上限时，`truncated.detail`）\n",
+              _block(ejson._CAP_DETAIL)]
     return "\n".join(parts)
 
 

@@ -35,8 +35,11 @@ def loads(s: str) -> Any:
 # line carrying that id never reached the model. A loss the model cannot see is
 # a loss it cannot work around, so this drops whole entries and says which.
 
-_CAP_DETAIL = ("omitted to fit the message size limit — these were computed and can be "
-               "requested individually")
+# V2 P1.4: the cut says the way back. What was dropped is on the record under its
+# ids, so the reader that has `open` pages it and the reader that has the verbs
+# asks for less in one call; neither has to guess that anything is missing.
+_CAP_DETAIL = ("omitted to fit the message size limit; they are on the record — read them by id "
+               "(r_… with an offset) or ask for less")
 
 
 def _largest_container(obj: dict, exclude: tuple[str, ...] = ()) -> str | None:
