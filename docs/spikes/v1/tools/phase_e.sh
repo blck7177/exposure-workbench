@@ -56,7 +56,7 @@ say "=== RESTORE $(date -u +%FT%T+00:00) ==="
 scripts/battery_fixture.sh stop 2>&1 | tee -a "$LOG"
 scripts/battery_fixture.sh restore "$SNAPSHOT" 2>&1 | tee -a "$LOG"
 say "--- migrations ---"
-for m in v36_actor v36_analyst_reports v39_fact_means; do
+for m in v36_actor v36_analyst_reports v39_fact_means v40_analysis_state; do
   docker exec -i exposure-postgres psql -U exposure -d exposure_battery -q -v ON_ERROR_STOP=1 < infra/migrations/$m.sql 2>&1 | tee -a "$LOG"
 done
 docker exec exposure-postgres psql -U exposure -d exposure_battery -Atc \

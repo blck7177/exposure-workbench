@@ -195,7 +195,7 @@ async def test_a_batch_holds_by_argument_when_the_refusal_names_one():
         def __init__(self):
             self.calls = []
 
-        async def call(self, name, args, *, actor=None):
+        async def call(self, name, args, *, actor=None, task_id=None):
             self.calls.append((name, args))
             if args.get("metric") == "capital_expenditures":
                 return {"error": "metric_not_filed", "held_on": {"metric": "capital_expenditures"}}

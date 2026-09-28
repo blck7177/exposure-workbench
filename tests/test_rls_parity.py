@@ -34,6 +34,9 @@ WORKFLOW_EVENT_PARENTS = {
 }
 
 RLS_VIEWS = ("session_cost", "research_run_cost")
+# V2 P2: the analysis state and the columns it added, in the fresh-database truth
+# and in the migration a live volume gets.
+V40_SQL = _INFRA / "migrations" / "v40_analysis_state.sql"
 
 
 def _sql(path: Path) -> str:
@@ -88,6 +91,24 @@ def test_cost_views_are_security_invoker(view: str):
     assert re.search(
         rf"ALTER VIEW\s+{view}\s+SET \(security_invoker = true\)", migration
     ), f"migration: {view} is never flipped on live volumes"
+
+
+@pytest.mark.parametrize("path", [INIT_SQL, V40_SQL], ids=["init", "v40"])
+def test_analysis_state_is_scoped_by_its_session_in_both_halves(path: Path):
+    """V2 P2. The new table carries the same tenant rule as facts and agent_steps —
+    through the session's owner — and both halves of the policy say so."""
+    using, with_check = _halves(_effective_policy(_sql(path), "analysis_state"))
+    join = "s.id = analysis_state.session_id AND s.owner_id = current_setting('app.user_id', true)"
+    assert join in using and join in with_check, path.name
+    assert re.search(r"ALTER TABLE analysis_state ENABLE ROW LEVEL SECURITY", _sql(path)), path.name
+
+
+@pytest.mark.parametrize("path", [INIT_SQL, V40_SQL], ids=["init", "v40"])
+def test_the_task_state_columns_exist_in_both_files(path: Path):
+    sql = _sql(path)
+    for col in ("requirement_ids", "input_version", "accepted_lines", "attempts", "receipts"):
+        assert re.search(rf"\b{col}\b", sql), f"{path.name}: analyst_reports lacks {col}"
+    assert re.search(r"task_id\s+VARCHAR\(64\)", sql), f"{path.name}: agent_steps lacks task_id"
 
 
 def test_tasks_table_has_no_rls():

@@ -123,6 +123,17 @@ def build_mcp_server(
     # FIRST failure. That preempts the gate — one problem instead of all of them,
     # and no trace step at all, because invoke() is never reached. The single
     # enforcement point has to stay single.
+    def _meta(key: str) -> str | None:
+        """One field of the request's metadata, as a bounded string, or None (V2 P2:
+        `task_id` travels the same way `actor` does, for the same reason — the token
+        says whose turn, the call says who and for which task)."""
+        try:
+            meta = server.request_context.meta
+        except LookupError:
+            return None
+        value = getattr(meta, key, None) if meta is not None else None
+        return str(value)[:64] if value else None
+
     def _actor() -> str | None:
         """Which agent of the turn made this call, when the call says so (V37).
 
@@ -158,7 +169,7 @@ def build_mcp_server(
         scoped = _served(claims.deny)
         async with db_factory() as db:
             result = await R.invoke(scoped, db, claims.session_id, name, arguments or {},
-                                    message_id=claims.message_id, actor=_actor())
+                                    message_id=claims.message_id, actor=_actor(), task_id=_meta("task_id"))
             await db.commit()
         # isError marks a refusal as one for a client that cares, while the
         # structured payload — problems[], budget numbers, the tool's own error —

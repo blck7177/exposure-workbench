@@ -136,7 +136,7 @@ async def test_the_log_rebuilt_from_agent_steps_is_the_log_the_analyst_kept(monk
     class _Face:
         tools = reg.schemas()
 
-        async def call(self, name, args, *, actor=None):
+        async def call(self, name, args, *, actor=None, task_id=None):
             return await R.invoke(reg, _Db(), "sess", name, args, message_id="msg_1", actor=actor)
 
     @asynccontextmanager

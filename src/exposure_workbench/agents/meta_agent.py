@@ -36,7 +36,7 @@ from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import delegation, repeats as rp, sub_analyst
+from exposure_workbench.agents import delegation, delivery, repeats as rp, sub_analyst
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import handbook
@@ -423,12 +423,11 @@ async def handle_message(
         # passed. A reply that changed by one byte goes out however many times it
         # is sent — the bound is on repetition, never on effort.
         repeated = rp.Repeats()
-        read = {"chars": 0, "results": 0}          # what the next completion reads (V36.1, recorded on its row)
+        read = delivery.Delivered()                # what the next completion reads, and the ids in it (V36.1, V2 P2)
 
         def _append(msg: dict) -> None:
             messages.append(msg)
-            read["chars"] += len(str(msg.get("content") or ""))
-            read["results"] += int(msg.get("role") == "tool")
+            read.add(msg)
 
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
@@ -436,10 +435,9 @@ async def handle_message(
                      + ([delegation.OPEN_TOOL] if delegated else [])
                      + ([REPAIR_TOOL] if standing is not None else []))
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
-            content, tool_calls = await llm.chat(messages=messages, tools=tools,
-                                                 note=({"read": dict(read)} if read["chars"] else None),
+            content, tool_calls = await llm.chat(messages=messages, tools=tools, note=read.note(),
                                                  **({"tool_choice": "required"} if standing is not None else {}))
-            read = {"chars": 0, "results": 0}
+            read.reset()
             completions += 1
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
             if tool_calls:

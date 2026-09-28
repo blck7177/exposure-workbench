@@ -116,8 +116,12 @@ class ToolSession:
         self._client = client
         self.tools = [_as_openai_tool(t) for t in mcp_tools]
 
-    async def call(self, name: str, args: dict, *, actor: str | None = None) -> dict:
+    async def call(self, name: str, args: dict, *, actor: str | None = None, task_id: str | None = None) -> dict:
         """One tool call, returning what invoke() returned.
+
+        `task_id` (V2 P2) is which task of the turn the call serves, carried the
+        same way as the actor and for the same reason: the trace answers "which
+        analyst, for which task" without a second identity.
 
         `actor` (V37) is which agent of the turn is calling, carried as request
         metadata rather than in the bearer. It cannot be in the bearer: a turn's
@@ -150,8 +154,9 @@ class ToolSession:
         refused" is a loop burning its budget to arrive nowhere. The turn ends,
         loudly, at the caller.
         """
+        meta = {k: v for k, v in (("actor", actor), ("task_id", task_id)) if v}
         try:
-            out = await self._client.call_tool(name, args, meta={"actor": actor} if actor else None)
+            out = await self._client.call_tool(name, args, meta=meta or None)
         except Exception as exc:  # noqa: BLE001 — see docstring
             logger.warning("tool session call %s failed: %s", name, exc, exc_info=True)
             return {"error": "tool_transport_error", "detail": str(exc)}

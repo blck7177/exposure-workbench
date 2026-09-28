@@ -41,7 +41,7 @@ class _Tools:
         self.result, self.by_name = result or _rows(WEIGHT), by_name or {}
         self.calls, self.records, self.opened = [], [], []
 
-    async def call(self, name, args, *, actor=None):
+    async def call(self, name, args, *, actor=None, task_id=None):
         self.calls.append((name, args, actor))
         res = dict(self.by_name.get(name, self.result))
         self.records += res.pop("_records", [])
@@ -59,7 +59,7 @@ def _ctx(monkeypatch, replies, tools: _Tools):
 
     steps: list[dict] = []
 
-    async def _record(ctx, actor, step_type, tool_name, args, summary, facts=None, status="completed"):
+    async def _record(ctx, actor, step_type, tool_name, args, summary, facts=None, status="completed", task_id=None):
         steps.append({"actor": actor, "type": step_type, "tool": tool_name, "args": args, "status": status,
                       "facts": list(facts or [])})
         tools.records += [F.for_record(f) for f in facts or []]

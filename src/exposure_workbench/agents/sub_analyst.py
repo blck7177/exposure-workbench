@@ -37,7 +37,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from exposure_workbench.agents import delegation as dl, repeats as rp
+from exposure_workbench.agents import delegation as dl, delivery, repeats as rp
 from exposure_workbench.analytics import handbook, registry
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.services import analyst_reports, answer_check, fact_adapters as fa, facts as F, \
@@ -106,6 +106,7 @@ class TurnContext:
     session_id: str
     message_id: str | None
     briefing: dict = field(default_factory=dict)
+    state_version: int | None = None        # V2 P2: the analysis state the task was cut from, for input_version
 
 
 def _coverage_of(task: dl.Task, briefing: dict) -> dict:
@@ -129,13 +130,14 @@ def _face_tools(tools_session, analyst: str) -> list[dict]:
 
 
 async def _record(ctx: TurnContext, actor: str, step_type: str, tool_name: str | None, args: dict,
-                  summary: str, facts: list | None = None, status: str = "completed") -> None:
+                  summary: str, facts: list | None = None, status: str = "completed",
+                  task_id: str | None = None) -> None:
     try:
         async with ctx.db_factory() as db:
             step_id = await trace_service.record_step(
                 db, ctx.session_id, step_type=step_type, tool_name=tool_name, args=args,
                 result_summary=summary, status=status, message_id=ctx.message_id, actor=actor,
-                evidence_refs=[ledger_svc.step_entry(facts)] if facts else [])
+                task_id=task_id, evidence_refs=[ledger_svc.step_entry(facts)] if facts else [])
             for row in ledger_svc.rows_for(facts or [], session_id=ctx.session_id, step_id=step_id,
                                            message_id=ctx.message_id):
                 db.add(row)
@@ -188,7 +190,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
     standing: dl.HandoffVerdict | None = None           # a verdict on a brief, awaiting its replacement
     kept_brief: dict | None = None                       # what that verdict kept (V2 P1.2: the patch contract)
     attempts = nudges = 0
-    read = {"chars": 0, "results": 0}                   # what the next completion reads (V36.1, recorded on its row)
+    read = delivery.Delivered()                         # what the next completion reads, and the ids in it (V36.1, V2 P2)
     # A CALL RE-SENT UNCHANGED IS NOT A SECOND TRY (V37/A2, the V31 rule). The same
     # call gets the same rows, and it cost a slot of the analyst's evidence calls
     # to read them again. The repeat is answered from what the desk already said,
@@ -199,14 +201,13 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
 
     def _append(msg: dict) -> None:
         messages.append(msg)
-        read["chars"] += len(str(msg.get("content") or ""))
-        read["results"] += int(msg.get("role") == "tool")
+        read.add(msg)
 
     for _turn in range(settings.sub_analyst_max_turns):
         content, tool_calls = await llm.chat(
-            messages=messages, tools=tools, note=({"read": dict(read)} if read["chars"] else None),
+            messages=messages, tools=tools, note=read.note(),
             **({"tool_choice": "required"} if standing is not None else {}))
-        read = {"chars": 0, "results": 0}
+        read.reset()
         completions += 1
         msg: dict = {"role": "assistant", "content": content or ""}
         if tool_calls:
@@ -246,7 +247,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                                      f"them returns within your turn — file your brief and put the rest in follow_ups"}
                 else:
                     start_calls += 1
-                    res = await tools_session.call(name, args, actor=actor)
+                    res = await tools_session.call(name, args, actor=actor, task_id=task.task_id)
                     res = res if isinstance(res, dict) else {"error": "tool_transport_error", "detail": str(res)[:200]}
                     started[key] = str(res.get("task_id") or res.get("run_id") or "")
                     result.log.append({"step": len(result.log) + 1, "tool": name, "asked": _asked(args),
@@ -268,7 +269,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                     # issuer analyst, asked about nine names, looked at what each one files — eight
                     # calls — and had eight left for the reading itself (V1 live smoke). The turn
                     # cap still bounds it, and the same `list` twice is answered from before.
-                    res = await tools_session.call(name, args, actor=actor)
+                    res = await tools_session.call(name, args, actor=actor, task_id=task.task_id)
                     res = res if isinstance(res, dict) else {"error": "tool_transport_error", "detail": str(res)[:200]}
                     sent.record({"tool": name, "key": key})
                     last[key] = res
@@ -284,13 +285,13 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                             "error": "analyst_budget",
                             "detail": _BUDGET_STOP.format(n=settings.sub_analyst_evidence_calls)})
                         await _record(ctx, actor, "boundary", name, {"of": "analyst_budget"}, "1 boundary row stated",
-                                      facts=[budget_stop])
+                                      facts=[budget_stop], task_id=task.task_id)
                     res = {"error": "analyst_budget", "rows": [F.line(budget_stop)],
                            "detail": "file your brief with what you have: a line you did not reach is not settled, and "
                                      "this row is its boundary"}
                 else:
                     evidence_calls += 1
-                    res = await tools_session.call(name, args, actor=actor)
+                    res = await tools_session.call(name, args, actor=actor, task_id=task.task_id)
                     res = res if isinstance(res, dict) else {"error": "tool_transport_error", "detail": str(res)[:200]}
                     if isinstance(res.get("made"), str) and res["made"] not in result.made:
                         result.made.append(res["made"])
@@ -324,12 +325,13 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                                    **({"problems": verdict.problems[:20]} if verdict.problems else {})},
                                   ("accepted" if verdict.ok else
                                    f"refused: {len(verdict.problems)} problem(s); {(verdict.problems[0] or {}).get('reason')}"),
-                                  status="completed" if verdict.ok else "rejected")
+                                  status="completed" if verdict.ok else "rejected", task_id=task.task_id)
                     _fill(result, brief, verdict)
                     if verdict.ok or attempts >= 2:
                         result.cost = {"completions": completions, "evidence_calls": evidence_calls,
                                        "starts": start_calls}
-                        result.report_id = await _store_report(ctx, actor, task, result, verdict, led)
+                        result.report_id = await _store_report(ctx, actor, task, result, verdict, led,
+                                                               attempts=attempts, receipts=list(started.values()))
                         done = True
                         res = {"accepted": verdict.ok, "coverage": verdict.coverage}
                     else:
@@ -353,14 +355,17 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
         text = ("the analyst did not file a brief within its turns"
                 if completions >= settings.sub_analyst_max_turns else "the analyst stopped without filing a brief")
         fact = fa.refusal_fact("submit", {"subject": task.subjects[0]}, {"error": "no_brief", "detail": text})
-        await _record(ctx, actor, "boundary", "submit", {"of": "submit"}, "1 boundary row stated", facts=[fact])
-        await _record(ctx, actor, "brief", "submit", {"task_id": task.task_id}, text, status="rejected")
+        await _record(ctx, actor, "boundary", "submit", {"of": "submit"}, "1 boundary row stated", facts=[fact],
+                      task_id=task.task_id)
+        await _record(ctx, actor, "brief", "submit", {"task_id": task.task_id}, text, status="rejected",
+                      task_id=task.task_id)
         result.status = "refused"
         result.lines = [{"n": i, "settled": False, "why": text, "boundary": fact.id}
                         for i in range(1, len(task.lines) + 1)]
         result.coverage = {"asked": len(task.lines), "settled": 0, "unsettled": len(task.lines), "refused": 0}
         result.cost = {"completions": completions, "evidence_calls": evidence_calls, "starts": start_calls}
-        result.report_id = await _store_report(ctx, actor, task, result, None, None)
+        result.report_id = await _store_report(ctx, actor, task, result, None, None,
+                                               attempts=attempts, receipts=list(started.values()))
     result.cost = result.cost or {"completions": completions, "evidence_calls": evidence_calls, "starts": start_calls}
     return result
 
@@ -392,7 +397,8 @@ def _fill(result: dl.AnalystResult, brief: dict, verdict: dl.HandoffVerdict) -> 
 
 
 async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.AnalystResult,
-                        verdict: dl.HandoffVerdict | None, ledger) -> str | None:
+                        verdict: dl.HandoffVerdict | None, ledger, *, attempts: int = 0,
+                        receipts: list[str] | None = None) -> str | None:
     """The analyst's work, on the record: the brief in the shape the page reads,
     and the LOG as the text — what it did and why, built from its calls.
 
@@ -426,14 +432,21 @@ async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.
                 text=dl.log_text(result), blocks=rendered.get("blocks") or [],
                 citations=rendered.get("citations") or [], verified=rendered.get("verified") or {},
                 problems=[] if ok else list((verdict.problems if verdict is not None else [])[:20]),
-                evidence_calls=result.cost.get("evidence_calls"))
+                evidence_calls=result.cost.get("evidence_calls"),
+                # V2 P2: TaskState — what the task was cut from, what it kept, what it started
+                requirement_ids=list(getattr(task, "requirement_ids", ()) or ()),
+                input_version={"state_version": ctx.state_version,
+                               "ledger_rows": len(ledger.shown) if ledger is not None else None},
+                accepted_lines=list(verdict.kept) if verdict is not None else [],
+                attempts=attempts, receipts=[r for r in (receipts or []) if r])
             await db.commit()
     except Exception:  # noqa: BLE001 — a lost record beats a lost turn
         logger.exception("could not store the record of %s in session %s", task.task_id, ctx.session_id)
         return None
     await _record(ctx, actor, "report", "report", {"report_id": report_id, "task_id": task.task_id,
                                                     "status": "verified" if ok else "refused"},
-                  f"{'verified' if ok else 'refused'}: {len(result.log)} call(s), {len(findings)} line(s) settled")
+                  f"{'verified' if ok else 'refused'}: {len(result.log)} call(s), {len(findings)} line(s) settled",
+                  task_id=task.task_id)
     return report_id
 
 

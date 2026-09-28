@@ -536,7 +536,15 @@ def log_from_steps(task: Task, steps: list[dict], status: str) -> str:
         if s.get("step_type") == "report":
             if ((s.get("args") or {}).get("task_id")) == task.task_id:
                 break
-            stretch = []                       # an earlier task of the same analyst ended here
+            # an earlier task of the same analyst ended here: the steps that could only be
+            # attributed by the actor stretch were its; a step tagged with THIS task stays
+            stretch = [x for x in stretch if x.get("task_id")]
+            continue
+        # V2 P2: a step that says which task it belongs to is not read into another
+        # task's stretch; a step written before task_id existed is read by the actor
+        # stretch as before, which is also how two tasks interleaved under one actor
+        # (parallel_analysts) are finally told apart.
+        if s.get("task_id") and s["task_id"] != task.task_id:
             continue
         stretch.append(s)
     calls: list[dict] = []

@@ -69,7 +69,7 @@ def _stub_tools(monkeypatch, result: dict, tools: list | None = None, by_name: d
             self.actors: list[str | None] = []
             self.faces: list[str] = []
 
-        async def call(self, name, args, *, actor=None):
+        async def call(self, name, args, *, actor=None, task_id=None):
             self.calls.append((name, args))
             self.actors.append(actor)
             res = dict((by_name or {}).get(name, result))

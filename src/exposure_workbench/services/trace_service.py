@@ -132,6 +132,10 @@ async def record_step(
     # V2 P0a: the argument keys kept whole (see bound_args). Only the answer step
     # asks for one; a tool call never does.
     unbounded: tuple[str, ...] = (),
+    # V2 P2: the task of the turn this step belongs to (tsk_…). An analyst's own
+    # steps carry it; a tool call carries it from the request's metadata, beside
+    # `actor`. None for the lead's steps.
+    task_id: str | None = None,
 ) -> str:
     """Append one immutable trace row; returns its seq-scoped id."""
     next_seq = (
@@ -148,6 +152,7 @@ async def record_step(
             step_type=step_type,
             tool_name=tool_name,
             actor=actor,
+            task_id=task_id,
             args=_jsonable(bound_args(redact_args(args), unbounded)),
             result_summary=(result_summary or "")[:MAX_SUMMARY_CHARS],
             evidence_refs=evidence_refs or [],

@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_CHARS = 6_000
 
 _FIELDS = ("message_id", "task_id", "domain", "status", "title", "brief", "text", "blocks",
-           "citations", "verified", "problems", "prompt_tokens", "completion_tokens", "evidence_calls")
+           "citations", "verified", "problems", "prompt_tokens", "completion_tokens", "evidence_calls",
+           # V2 P2: TaskState
+           "requirement_ids", "input_version", "accepted_lines", "attempts", "receipts")
 
 
 async def store(db: AsyncSession, session_id: str, **cols) -> str:
@@ -53,6 +55,9 @@ def as_dict(row: AnalystReport) -> dict:
             "citations": row.citations or [], "verified": row.verified or {}, "problems": row.problems or [],
             "cost": {"prompt_tokens": row.prompt_tokens, "completion_tokens": row.completion_tokens,
                      "evidence_calls": row.evidence_calls},
+            # V2 P2: TaskState — read by follow_up_of and by the analysis state
+            "requirement_ids": row.requirement_ids or [], "input_version": row.input_version or {},
+            "accepted_lines": row.accepted_lines or [], "attempts": row.attempts, "receipts": row.receipts or [],
             "created_at": row.created_at.isoformat() if row.created_at else None}
 
 

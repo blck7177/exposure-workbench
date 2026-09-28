@@ -420,6 +420,15 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v39_fact_means.sql
 
+# v40_analysis_state.sql (V2 P2) adds the analysis_state table — one row per turn:
+# the requirements the lead declared, the scope, the findings and gaps that passed
+# the fact boundary — plus the TaskState columns on analyst_reports and
+# agent_steps.task_id. Additive and idempotent; every new column has a default,
+# so a row written before it reads as empty. Nothing is backfilled: no turn
+# before V2 declared a requirement or tagged a step with its task.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v40_analysis_state.sql
+
 docker compose up -d
 
 # Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry

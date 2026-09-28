@@ -28,7 +28,7 @@ class _Session:
         self.default = default or {"ok": True, "table": {"x": 1}}
         self.calls: list[tuple[str, dict]] = []
 
-    async def call(self, name, args, *, actor=None):
+    async def call(self, name, args, *, actor=None, task_id=None):
         self.calls.append((name, args))
         answer = self.by_name.get(name, self.default)
         return answer(args) if callable(answer) else answer

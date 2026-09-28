@@ -210,6 +210,7 @@ async def invoke(
     *,
     message_id: str | None = None,
     actor: str | None = None,
+    task_id: str | None = None,
 ) -> dict:
     """Run one LLM-driven tool call with budget + trace enforcement.
 
@@ -222,6 +223,10 @@ async def invoke(
     Nothing here enforces anything with it: who may call what is the face and
     the bearer, decided at the door (tools/mcp_server, apps/mcp/middleware), and
     a value the caller declares about itself could not be an authorisation.
+
+    `task_id` (V2 P2) is the same kind of thing one level down: which TASK of the
+    turn the call serves, for the trace, carried in the request's metadata beside
+    the actor so two tasks of one analyst can be told apart on the steps.
     """
     started = time.monotonic()
     _session_ctx.set(session_id)          # so calc tools stamp ledger.invoked_by
@@ -231,7 +236,7 @@ async def invoke(
         await trace_service.record_step(
             db, session_id, step_type="tool_call", tool_name=tool_name, args=args,
             result_summary=f"unknown tool {tool_name!r}", evidence_refs=[], status="error",
-            actor=actor,
+            actor=actor, task_id=task_id,
         )
         return {"error": "unknown_tool", "tool": tool_name}
 
@@ -251,12 +256,12 @@ async def invoke(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
             result_summary=f"invalid arguments: {len(problems)} problem(s)", evidence_refs=[],
             status="rejected", duration_ms=int((time.monotonic() - started) * 1000),
-            message_id=message_id, actor=actor,
+            message_id=message_id, actor=actor, task_id=task_id,
         )
         if tool.rows:
             return await _refused_as_a_row(db, session_id, tool, args,
                                            {"error": "invalid_arguments", "problems": problems},
-                                           message_id=message_id, actor=actor)
+                                           message_id=message_id, actor=actor, task_id=task_id)
         # V27: a name that failed an enum but IS a name the desk has — a method
         # written as a metric, a filed line written as a method — is told what
         # it is and the call that takes it. Same table as the catalogue's rows.
@@ -292,12 +297,12 @@ async def invoke(
                 db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
                 result_summary=str(e), evidence_refs=[], status="rejected",
                 duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
-                actor=actor,
+                actor=actor, task_id=task_id,
             )
             refused = {"error": "budget_exceeded", "kind": e.kind, "used": e.used, "limit": e.limit}
             if tool.rows:
                 return await _refused_as_a_row(db, session_id, tool, args, refused,
-                                               message_id=message_id, actor=actor)
+                                               message_id=message_id, actor=actor, task_id=task_id)
             return refused
 
     # 3) run the fn, catching failures as structured results
@@ -383,7 +388,7 @@ async def invoke(
             db, session_id, step_type=_step_type(tool), tool_name=tool_name, args=args,
             result_summary=said, evidence_refs=refs, status=status,
             duration_ms=int((time.monotonic() - started) * 1000), message_id=message_id,
-            actor=actor,
+            actor=actor, task_id=task_id,
         )
         if recorded:
             # `recorded`, not `shown`: the table indexes what the call made, so a
@@ -400,7 +405,7 @@ async def invoke(
 
 
 async def _refused_as_a_row(db: AsyncSession, session_id: str, tool: Tool, args: dict, refused: dict, *,
-                            message_id: str | None, actor: str | None) -> dict:
+                            message_id: str | None, actor: str | None, task_id: str | None = None) -> dict:
     """A primitive refused BEFORE it ran — arguments that do not fit, a budget
     spent — says so as a row, like every other refusal it makes (V1). The
     rejected step above keeps the audit; this second step is `completed` because
@@ -413,7 +418,7 @@ async def _refused_as_a_row(db: AsyncSession, session_id: str, tool: Tool, args:
         step_id = await trace_service.record_step(
             db, session_id, step_type="boundary", tool_name=tool.name, args=None,
             result_summary=fa.came_back(presented, [fact]), evidence_refs=[ledger_svc.step_entry([fact])],
-            status="completed", message_id=message_id, actor=actor)
+            status="completed", message_id=message_id, actor=actor, task_id=task_id)
         for row in ledger_svc.rows_for([fact], session_id=session_id, step_id=step_id, message_id=message_id):
             db.add(row)
         await db.flush()
