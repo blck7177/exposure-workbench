@@ -95,12 +95,9 @@ def test_a_candidate_pair_is_a_hypothesis_about_tags_not_a_claim_about_an_issuer
     """`revenue`/`total_revenues` are one line for NVDA and two for XOM. The pair
     list cannot say which; only the filings can, which is why nothing reads it
     except the derivation."""
-    import subprocess
     import pathlib
     root = pathlib.Path(__file__).resolve().parents[1] / "src"
-    hits = subprocess.run(["grep", "-rln", "--include=*.py", "SUPERSESSION_CANDIDATES", str(root)],
-                          capture_output=True, text=True).stdout.split()
-    readers = {pathlib.Path(h).name for h in hits} - {"concept_mapping.py"}
+    readers = {p.name for p in root.rglob("*.py") if "SUPERSESSION_CANDIDATES" in p.read_text(encoding="utf-8")} - {"concept_mapping.py"}
     assert readers <= {"lineage_service.py", "absence_service.py"}, readers
 
 

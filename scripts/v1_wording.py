@@ -159,6 +159,8 @@ def render() -> str:
               _block("\n".join(said_in(meta_agent, "_refusal_message"))),
               "循环里的其他回话 `meta_agent.handle_message`，与原样重发的提示 `repeats.nudge`：\n",
               _block("\n".join([*said_under_keys(meta_agent, "handle_message"), *said_in(repeats, "nudge")])),
+              "要求声明检查 `delegation.parse_requirements`（首次 ask 不可省略）：\n",
+              _block("\n".join(said_in(delegation, "parse_requirements"))),
               "回复留下未覆盖的要求时 `meta_agent._coverage_message`（V2 P3；不是句子修复，主分析师可再问再写）：\n",
               _block("\n".join(said_in(meta_agent, "_coverage_message"))),
               "读者读到的固定句 `meta_agent._PARTIAL_TEXT`（runtime 写，附在 partial 回复之后）：\n",

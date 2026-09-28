@@ -119,6 +119,11 @@ def _stub_desk(monkeypatch, session):
     async def _no_record(*_a, **_k):
         return None
 
+    async def _state(_db, sid, mid, question, brief):
+        return meta_agent.AS.new_turn(sid, mid, question, brief)
+
+    monkeypatch.setattr(meta_agent, "_open_state", _state)
+    monkeypatch.setattr(meta_agent, "_save_state", _no_record)
     monkeypatch.setattr(meta_agent, "_briefing", _no_briefing)
     monkeypatch.setattr(meta_agent, "_load_ledger", _ledger)
     async def _sub_ledger(_ctx):
@@ -135,11 +140,12 @@ def _stub_desk(monkeypatch, session):
 WHY = "line 1 asks how big the name is in the book; its weight is on the holdings table"
 
 
-def _delegate(*tasks):
+def _delegate(*tasks, anchor="MSFT"):
     """What the lead writes: an analyst, subjects, and lines in its own words."""
-    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], **t}
+    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], "for": ["R1"], **t}
             for t in (tasks or [{}])]
-    return [{"id": "c1", "function": {"name": delegation.ASK_TOOL_NAME, "arguments": json.dumps({"tasks": full})}}]
+    return [{"id": "c1", "function": {"name": delegation.ASK_TOOL_NAME, "arguments": json.dumps(
+        {"tasks": full, "requirements": [{"id": "R1", "anchor": anchor}]})}}]
 
 
 def _submit(*findings):
@@ -226,7 +232,7 @@ async def test_an_invented_number_is_refused_and_the_turn_ends_on_the_bar(monkey
 async def test_a_loop_that_never_writes_an_answer_says_so_in_the_same_words(monkeypatch):
     async def _always_delegates(**_kw):
         return ("", _delegate({"analyst": "issuer", "subjects": ["NVDA"],
-                               "lines": ["how revenue did over the trailing twelve months"]}))
+                               "lines": ["how revenue did over the trailing twelve months"]}, anchor="NVDA"))
 
     _stub_llm(monkeypatch, _always_delegates)
     session = _stub_tools(monkeypatch, _run_result())
@@ -356,14 +362,15 @@ async def test_the_lead_never_sees_a_figure_that_did_not_pass_the_handoff(monkey
     (line,) = handed["returns"][0]["lines"]
     assert "finding" not in line and "rows" not in line
     assert "did not pass the desk's check" in line["refused"] and "mark_mismatch" in line["refused"]
-    assert out["text"] == "The desk could not settle it."
+    assert out["text"].startswith("The desk could not settle it.")
+    assert out["meta"]["completion"] == "partial"
     assert out["meta"]["delegations"][0]["status"] == "refused"
 
 
 @pytest.mark.asyncio
 async def test_a_delegation_the_roster_cannot_take_is_told_to_the_lead(monkeypatch):
     chat, lead, _sub = _two_loops(
-        lead_replies=[("", _delegate({"analyst": "no_such_desk"})), ("Hello.", None)],
+        lead_replies=[("", _delegate({"analyst": "no_such_desk"}, anchor="hi")), ("Hello.", None)],
         sub_replies=[("", None)])
     _stub_llm(monkeypatch, chat)
     session = _stub_tools(monkeypatch, {"noted": True})
@@ -546,8 +553,8 @@ async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
         recorded.append(("open", "row" if "row" in result else result.get("error"), ref))
 
     chat, lead, _sub = _two_loops(
-        lead_replies=[("", _delegate({"analyst": "no_such_desk"})),
-                      ("", _delegate()),
+        lead_replies=[("", _delegate({"analyst": "no_such_desk"}, anchor="hi")),
+                      ("", _delegate(anchor="hi")),
                       ("", [{"id": "o1", "function": {"name": delegation.OPEN_TOOL_NAME,
                                                       "arguments": json.dumps({"id": "f_wmsft0001"})}}]),
                       ("", [{"id": "o2", "function": {"name": delegation.OPEN_TOOL_NAME,
@@ -561,7 +568,7 @@ async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
     monkeypatch.setattr(meta_agent, "_record_open", _opened)
     out = await handle_message(_factory([]), "sess_rec", "hi", max_turns=8)
 
-    assert out["text"] == "Hello."
+    assert out["text"].startswith("Hello.") and out["meta"]["completion"] == "partial"
     assert recorded[0][:2] == ("ask", "rejected") and "analysts" in recorded[0][2]
     assert recorded[1] == ("open", "row", "f_wmsft0001")                 # what is on the record opens as its row
     assert recorded[2] == ("open", "not_on_the_record", "f_never_shown")  # and nothing else can be pulled this way

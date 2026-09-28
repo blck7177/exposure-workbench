@@ -50,7 +50,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from exposure_workbench.agents.meta_agent import handle_message   # noqa: E402
 from exposure_workbench.auth.context import current_user_ctx      # noqa: E402
 from exposure_workbench.services import agent_session_service as sess   # noqa: E402
-from exposure_workbench.services.trace_service import MAX_ARG_CHARS, MAX_SUMMARY_CHARS   # noqa: E402
 from exposure_workbench.utils.ids import new_id                    # noqa: E402
 
 URL = os.getenv("DATABASE_URL_RLS",
@@ -61,44 +60,23 @@ URL = os.getenv("DATABASE_URL_RLS",
 FIXTURE_URL = URL.replace("/exposure_workbench", "/" + os.getenv("BATTERY_DB", "exposure_battery"))
 FIXTURE_MCP = f"http://127.0.0.1:{os.getenv('BATTERY_MCP_PORT', '8105')}"
 
-# A BOUND AGAINST A RUNAWAY ROW, not a display convenience — and the previous
-# caps were neither. `left(args, 300)` was sized when one question was many short
-# addressed calls: `compute`'s longest argument list across both V26 rounds is
-# 298 characters, so the per-call protocol never met the cut. V30 replaced it
-# with ONE program per question, 179 of 202 `run` calls run past 300, and a rank
-# node comes after the vector it orders — so the cut removed exactly what the
-# counters read. It broke two of them silently:
-#
-#   superlative_without_rank   reported 37 of 52 on V26_C3 where the full
-#                              arguments, still in `agent_steps` and never
-#                              truncated at the write, say 14.
-#   the answer-mark counter    json.loads of a truncated `respond` payload
-#                              raised on 273 of 280 turns and fell back to the
-#                              rendered text its own comment says not to read.
-#
-# Cost of the wider cap, measured over the 110 sessions of both rounds: 1119 kB
-# of arguments against 361 kB, on spike files that are already 3.4 MB and 4.6 MB.
-# The cap is not what makes the ordering question answerable — `run` now records
-# the kinds it declared (tools/registry._declared_nodes), and battery_counters
-# reads that instead of the program text. What the cap buys is every OTHER reading
-# of a trace: the mark counter's payload, a replay, a forensic recount. Rounds
-# already on disk keep the cut they were written with; a round before the
-# declaration existed is reported as undeclared, never guessed.
-# V2 P0a: the export is as wide as the row. The trace bounds each string argument and the
-# summary itself (trace_service); a cap below that here made the battery's JSON a second,
-# shorter record of the same step, and round E reads the JSON.
-_ARGS_CAP, _RESULT_CAP = MAX_ARG_CHARS, MAX_SUMMARY_CHARS
-
-# `problems` is read on its own: jsonb orders keys by length, so inside `args` the answer's text
-# comes before the list of what the check refused in it, and a long answer pushed that list past
-# the cap — the one thing a counter of refusals by rule has to read (V1 step 7).
+# Export the complete stored row. Trace limits apply per argument, not to the
+# enclosing JSON; answer drafts deliberately bypass those limits. Applying a
+# second text cap here corrupts JSON and loses the evidence behind refusals.
 _STEPS = text(
-    f"SELECT seq, step_type, tool_name, actor, status, left(result_summary, {_RESULT_CAP}) AS result, "
-    f"       left(args::text, {_ARGS_CAP}) AS args, left((args->'problems')::text, {_ARGS_CAP}) AS problems, "
+    "SELECT id, seq, step_type, tool_name, actor, task_id, status, result_summary AS result, "
+    "       args::text AS args, (args->'problems')::text AS problems, evidence_refs, "
     "       prompt_tokens, completion_tokens "
     "FROM agent_steps WHERE session_id = :s AND message_id = :m ORDER BY seq")
 
 _RELEASE = text("UPDATE agent_sessions SET turn_started_at = NULL WHERE id = :s")
+
+
+async def export_steps(db, session_id: str, message_id: str) -> list[dict]:
+    """Export the stored record whole, including unbounded refused reply drafts.
+    Trace limits apply per argument at write time, never to the enclosing JSON.
+    """
+    return [dict(r) for r in (await db.execute(_STEPS, {"s": session_id, "m": message_id})).mappings().all()]
 
 
 async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tuple[str, ...] = ()) -> dict:
@@ -132,7 +110,7 @@ async def _run_conversation(mk, owner: str, tag: str, turns: list[str], deny: tu
         steps = []
         if mid:
             async with mk() as db:
-                steps = [dict(r) for r in (await db.execute(_STEPS, {"s": sid, "m": mid})).mappings().all()]
+                steps = await export_steps(db, sid, mid)
         meta = res.get("meta", {})
         out.append({"turn": i, "q": q, "message_id": mid, "error": error, "answer": res.get("text"),
                     "citations": res.get("citations", []), "blocks": meta.get("blocks"),

@@ -9,8 +9,8 @@ design's answer is a small persistent record — requirements, scope, findings,
 gaps, tasks — that the runtime writes and projects, and that the lead reads as
 a block (P3) instead of re-deriving.
 
-THE ONE RULE. A sentence a model wrote reaches this record through `propose`
-and nowhere else, and `propose` is the same check a finding passes
+THE ONE RULE. A standalone model proposal reaches this record through `propose`,
+which applies the same check a finding passes
 (services/answer_check against the session ledger). A proposal that fails is an
 agent_steps row (`state_proposal`, rejected) and nothing here: not a finding,
 not a summary, not the next turn's context (acceptance A3). Findings from an
@@ -19,15 +19,19 @@ analyst's brief arrive through `merge_task`, already checked at the handoff
 candidate / hypothesis / unverified are not statuses that exempt anything —
 there is no such status here.
 
-WHAT IS MECHANICAL HERE. Requirement status is a count over findings and gaps;
+WHAT IS MECHANICAL HERE. Requirement status counts every registered task line,
+accepted finding and active gap;
 a gap's type is a table over the boundary row's registry reason; a conflict is
 two accepted rows of one measure, subject and period whose displayed values
-differ; a stale finding is one whose subjects fell outside the scope. Nothing
+differ; restored text must match the request/snapshot scope and evidence
+fingerprints and pass the fact check again. Nothing
 here reads meaning.
 """
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
@@ -50,6 +54,8 @@ REQUIREMENT_STATUS = ("unresolved", "covered", "boundary")
 GAP_TYPES = ("data_missing", "method_unsupported", "policy_boundary", "execution_failed",
              "delivery_missing", "evidence_conflict", "needs_clarification")
 COMPLETION = ("completed", "completed_with_boundaries", "partial")
+BOUNDARY_VERSION = 1
+CLOSING_GAPS = frozenset(("data_missing", "method_unsupported", "policy_boundary"))
 
 # A gap's type is read off the boundary row's reason (analytics/registry.ABSENCE_REASONS),
 # never off the analyst's words. A reason not here is `cannot`: the desk stopped.
@@ -91,35 +97,68 @@ class State:
 
 # ── a turn opens ─────────────────────────────────────────────────────────────
 
-def scope_of(briefing: dict) -> dict:
-    """The scope the runtime fixes from the desk's map: the subjects the question
-    names, the books, and the latest run's date where there is one."""
+def scope_of(briefing: dict, question: str | None = None) -> dict:
+    """Conservative request scope plus the catalogue's book and issuer snapshots.
+    Dates not represented structurally remain part of the literal request.
+    """
     subs = (briefing or {}).get("subjects") or {}
     books = [*(subs.get("portfolios") or []), *(subs.get("runs") or [])]
-    as_of = None
+    snapshots = {}
     for pid, d in ((briefing or {}).get("portfolios") or {}).items():
-        latest = ((d or {}).get("runs") or {}).get("latest") or {}
-        if latest.get("as_of"):
-            as_of = latest["as_of"]
+        snapshots[pid] = {k: copy.deepcopy((d or {}).get(k)) for k in ("runs", "positions_as_of")}
+    dates = sorted({str(v["as_of"]) for d in snapshots.values() for v in (d.get("runs") or {}).values()
+                    if isinstance(v, dict) and v.get("as_of")})
     return {"subjects": sorted(str(t).upper() for t in (subs.get("tickers") or [])),
-            "books": sorted(str(b) for b in books), "as_of": as_of}
+            "books": sorted(str(b) for b in books), "as_of": dates[-1] if dates else None,
+            "snapshots": snapshots,
+            "issuers": {tk: {k: copy.deepcopy(d.get(k)) for k in ("latest_period_end", "filings", "prices")}
+                        for tk, d in ((briefing or {}).get("issuers") or {}).items() if isinstance(d, dict)},
+            # No semantic date parser: a differently worded request must explicitly
+            # re-read evidence. This also covers changed periods absent from the map.
+            "request": " ".join((question or "").split())}
+
+
+def _signature(rec: dict) -> str:
+    return hashlib.sha256(json.dumps(rec, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def validation_context(scope: dict, refs: Iterable[str], ledger: Ledger | None) -> dict:
+    rows = getattr(ledger, "by_id", {}) if ledger is not None else {}
+    return {"version": BOUNDARY_VERSION, "scope": copy.deepcopy(scope),
+            "facts": {fid: _signature(rows[fid]) for fid in refs if fid in rows}}
+
+
+def reusable(text: str, refs: Iterable[str], validation: dict | None, scope: dict, ledger: Ledger | None,
+             question: str, *, channel: str = "finding") -> bool:
+    """Recheck both provenance and the same factual boundary before restoring text.
+    Old records without a stamp are audit records, not automatically trusted memory.
+    """
+    refs = list(refs)
+    if ledger is None or not refs or not validation or validation.get("version") != BOUNDARY_VERSION:
+        return False
+    if validation.get("scope") != scope or set(validation.get("facts") or {}) != set(refs):
+        return False
+    if any(fid not in ledger.by_id or _signature(ledger.by_id[fid]) != validation["facts"][fid] for fid in refs):
+        return False
+    return fact_boundary.check_text(channel, text, ledger, question=question).ok
 
 
 def new_turn(session_id: str, message_id: str | None, question: str, briefing: dict,
-             previous: "State | None" = None) -> State:
-    """A turn's state, version 0. Findings of the session's previous state whose
-    subjects are all inside this turn's scope come along as `inherited` — with
-    their refs, which are on the session's ledger — and nothing else does:
+             previous: "State | None" = None, *, ledger: Ledger | None = None) -> State:
+    """A turn's state, version 0. Previously accepted findings with matching
+    scope and evidence come along as `inherited` only after revalidation:
     requirements and gaps are this turn's own (design §07: a new user turn is a
     new unit of work that may explicitly inherit what still applies)."""
     state = State(id=new_id("ast_"), session_id=session_id, message_id=message_id, question=question or "",
-                  scope=scope_of(briefing))
+                  scope=scope_of(briefing, question))
     if previous is not None:
         within = set(state.scope.get("subjects") or []) | set(state.scope.get("books") or [])
         for f in previous.accepted():
             subjects = {str(s).upper() for s in f.get("subjects") or []}
-            if subjects and subjects <= {s.upper() for s in within}:
-                state.findings.append({**f, "status": "inherited", "requirement_ids": []})
+            if (subjects and subjects <= {s.upper() for s in within}
+                    and reusable(f["text"], f.get("refs") or [], f.get("validation"),
+                                 state.scope, ledger, state.question)):
+                state.findings.append({**copy.deepcopy(f), "status": "inherited", "requirement_ids": []})
     return state
 
 
@@ -161,14 +200,16 @@ async def propose(db_factory, state: State, channel: str, text: str, ledger: Led
 
 
 def add_finding(state: State, text: str, *, refs: Iterable[str], ledger: Ledger | None,
-                requirement_ids: Iterable[str] = (), task_id: str | None = None, source: str = "finding") -> dict:
+                requirement_ids: Iterable[str] = (), task_id: str | None = None, source: str = "finding",
+                n: int | None = None) -> dict:
     """A checked sentence becomes a finding. Callers are the two doors: `propose`
     (a model's own sentence, just checked) and `merge_task` (a brief's line,
     checked at the handoff). Nothing else appends to `findings`."""
     ids = list(dict.fromkeys(r for r in refs if F.is_fact_id(r)))
     subjects = sorted({str(s) for s in (_subject(ledger, fid) for fid in ids) if s})
     finding = {"text": text, "refs": ids, "subjects": subjects, "requirement_ids": list(requirement_ids),
-               "task_id": task_id, "status": "accepted", "source": source, "state_version": state.version}
+               "task_id": task_id, "n": n, "status": "accepted", "source": source, "state_version": state.version,
+               "validation": validation_context(state.scope, ids, ledger)}
     state.findings.append(finding)
     _recompute_requirements(state)
     return finding
@@ -187,27 +228,71 @@ def gap_type_of(ledger: Ledger | None, boundary: str) -> str:
     return GAP_OF_REASON.get(str(reason), "execution_failed")
 
 
+def start_tasks(state: State, tasks: Iterable) -> None:
+    """Register obligations before dispatch. An explicit follow-up replaces only
+    the named requirements of its predecessor; unrelated work stays open.
+    """
+    for task in tasks:
+        if any(t["task_id"] == task.task_id for t in state.tasks):
+            continue
+        served = set(getattr(task, "requirement_ids", ()) or ())
+        prior = getattr(task, "follow_up_of", None)
+        if prior and served:
+            for entry in [*state.findings, *state.gaps]:
+                if entry.get("task_id") == prior:
+                    entry["requirement_ids"] = [r for r in entry.get("requirement_ids") or [] if r not in served]
+                    if not entry["requirement_ids"]:
+                        entry["status"] = "superseded"
+            for old in state.tasks:
+                if old["task_id"] == prior:
+                    for line in old.get("lines") or []:
+                        line["for"] = [r for r in line["for"] if r not in served]
+        of_line = getattr(task, "requirements_of_line", None)
+        state.tasks.append({"task_id": task.task_id, "analyst": task.analyst, "status": "running",
+                            "lines": [{"n": n, "for": list(of_line(n) if callable(of_line) else served),
+                                       "status": "unresolved"} for n in range(1, len(task.lines) + 1)]})
+    state.completion = None
+    _recompute_requirements(state)
+
+
+def active_gaps(state: State) -> list[dict]:
+    return [g for g in state.gaps if g.get("status") not in ("superseded", "stale")]
+
+
 def merge_task(state: State, task, result, ledger: Ledger | None) -> None:
     """The lines that passed the handoff check become findings, the unsettled ones
-    gaps typed by their boundary row; a refused line reaches neither (its record
-    is analyst_reports.problems). `task.requirement_ids` (P3) is what the
-    findings and gaps are mapped to; empty until the lead declares requirements."""
+    gaps typed by their boundary row. Refused or missing lines leave a runtime
+    execution_failed gap, never the rejected prose (kept in the report audit).
+    Every registered line retains its requirement mapping until explicitly
+    superseded by a follow-up serving those requirements.
+    """
+    start_tasks(state, [task])
+    record = next(t for t in state.tasks if t["task_id"] == task.task_id)
+    # A second merge of this task replaces its outcomes; it does not accumulate
+    # an old failed attempt beside the accepted repair.
+    state.findings = [f for f in state.findings if f.get("task_id") != task.task_id]
+    state.gaps = [g for g in state.gaps if g.get("task_id") != task.task_id]
     refused = {x["n"] for x in (getattr(result, "refused", None) or [])}
-    of_line = getattr(task, "requirements_of_line", None)
-    for e in getattr(result, "lines", None) or []:
-        if e.get("n") in refused:
-            continue
-        req_ids = list(of_line(int(e.get("n") or 0)) if callable(of_line) else (getattr(task, "requirement_ids", ()) or ()))
-        if e.get("settled"):
+    entries = {e.get("n"): e for e in getattr(result, "lines", None) or []}
+    for obligation in record["lines"]:
+        n, req_ids = obligation["n"], obligation["for"]
+        e = entries.get(n)
+        if e is None or n in refused:
+            obligation["status"] = "unresolved"
+            state.gaps.append({"type": "execution_failed", "requirement_ids": req_ids, "task_id": task.task_id,
+                               "n": n, "why": "the analyst did not return an accepted result for this line"})
+        elif e.get("settled"):
             add_finding(state, e["finding"], refs=e.get("facts") or [], ledger=ledger,
-                        requirement_ids=req_ids, task_id=task.task_id, source="brief")
+                        requirement_ids=req_ids, task_id=task.task_id, source="brief", n=n)
+            obligation["status"] = "covered"
         else:
-            state.gaps.append({"type": gap_type_of(ledger, e.get("boundary") or ""), "requirement_ids": req_ids,
+            kind = gap_type_of(ledger, e.get("boundary") or "")
+            obligation["status"] = "boundary" if kind in CLOSING_GAPS else "unresolved"
+            state.gaps.append({"type": kind, "requirement_ids": req_ids,
                                "boundary": e.get("boundary"), "why": e.get("why"), "task_id": task.task_id,
-                               "n": e.get("n")})
-    state.tasks.append({"task_id": task.task_id, "analyst": task.analyst, "status": getattr(result, "status", None),
-                        "coverage": dict(getattr(result, "coverage", None) or {}),
-                        "made": list(getattr(result, "made", None) or [])})
+                               "n": n})
+    record.update(status=getattr(result, "status", None), coverage=dict(getattr(result, "coverage", None) or {}),
+                  made=list(getattr(result, "made", None) or []), cost=dict(getattr(result, "cost", None) or {}))
     _recompute_requirements(state)
 
 
@@ -217,7 +302,7 @@ def mark_delivery_missing(state: State, ledger: Ledger, delivered: Iterable[str]
     call, naming a few of the rows, so the lead opens the call rather than asks
     again. Replaces the gaps of this type from an earlier pass."""
     seen = set(delivered)
-    resting = {r for f in state.findings for r in f.get("refs") or []}
+    resting = {r for f in state.accepted() for r in f.get("refs") or []}
     by_pull: dict[str, list[str]] = {}
     for fid, rec in ledger.shown.items():
         if fid in seen or fid in resting or rec.get("kind") == F.ABSENCE:
@@ -243,58 +328,80 @@ def conflicts(state: State, ledger: Ledger) -> list[dict]:
             rec = ledger.by_id.get(fid)
             if not rec or rec.get("kind") != F.SCALAR or not isinstance(rec.get("value"), (int, float)):
                 continue
-            key = (rec.get("measure"), rec.get("subject"), rec.get("as_of"), json.dumps(rec.get("window"), sort_keys=True))
+            params = rec.get("params") or {}
+            key = (rec.get("measure"), rec.get("subject"), rec.get("as_of"), json.dumps(rec.get("window"), sort_keys=True),
+                   params.get("book") or params.get("of"))
             groups.setdefault(key, {})[fid] = rec
     state.gaps = [g for g in state.gaps if g.get("type") != "evidence_conflict"]
     made = []
     for key, recs in groups.items():
         shown = {(dc.display(float(r["value"]), r["unit"]) if r.get("unit") else repr(r["value"])) for r in recs.values()}
         if len(shown) > 1:
-            gap = {"type": "evidence_conflict", "requirement_ids": [], "measure": key[0], "subject": key[1],
+            reqs = sorted({r for f in state.accepted() if set(f.get("refs") or []) & recs.keys()
+                           for r in f.get("requirement_ids") or []})
+            gap = {"type": "evidence_conflict", "requirement_ids": reqs, "measure": key[0], "subject": key[1],
                    "refs": sorted(recs)}
             state.gaps.append(gap)
             made.append(gap)
+    _recompute_requirements(state)
     return made
 
 
 def invalidate(state: State, new_scope: dict) -> list[dict]:
-    """The scope moved (another book, other names, another as-of): a finding whose
-    subjects are no longer all inside it is `stale` and is not projected (A4). The
-    record keeps it; nothing is deleted."""
+    """A scope change invalidates findings and boundaries and reopens the work.
+    Stale results remain on the audit record but are not projected (A4).
+    """
     within = {str(s).upper() for s in (new_scope.get("subjects") or [])} | {str(b) for b in (new_scope.get("books") or [])}
     stale = []
     for f in state.findings:
         if f.get("status") not in ("accepted", "inherited"):
             continue
         subjects = {str(s) for s in f.get("subjects") or []}
-        if subjects and not {s.upper() for s in subjects} <= {s.upper() for s in within}:
+        if ((f.get("validation") or {}).get("scope") != new_scope
+                or (subjects and not {s.upper() for s in subjects} <= {s.upper() for s in within})):
             f["status"] = "stale"
             stale.append(f)
-    state.scope = dict(new_scope)
+    if state.scope != new_scope:
+        for gap in state.gaps:
+            if gap.get("status") != "superseded":
+                gap["status"] = "stale"
+        for task in state.tasks:
+            for line in task.get("lines") or []:
+                line["status"] = "unresolved"
+    state.scope = copy.deepcopy(new_scope)
+    state.completion = None
     _recompute_requirements(state)
     return stale
 
 
 def _recompute_requirements(state: State) -> None:
     covered = {r for f in state.accepted() for r in f.get("requirement_ids") or []}
-    bounded = {r for g in state.gaps for r in g.get("requirement_ids") or []}
+    gaps = active_gaps(state)
+    bounded = {r for g in gaps if g["type"] in CLOSING_GAPS for r in g.get("requirement_ids") or []}
+    blocked = {r for g in gaps if g["type"] not in CLOSING_GAPS for r in g.get("requirement_ids") or []}
+    blocked |= {r for task in state.tasks for line in task.get("lines") or []
+                if line.get("status") == "unresolved" for r in line.get("for") or []}
     for req in state.requirements:
-        req["status"] = ("covered" if req["id"] in covered else "boundary" if req["id"] in bounded else "unresolved")
+        rid = req["id"]
+        req["status"] = ("unresolved" if rid in blocked else "boundary" if rid in bounded
+                         else "covered" if rid in covered else "unresolved")
         req["evidence"] = [f["refs"][0] for f in state.accepted() if req["id"] in (f.get("requirement_ids") or []) and f.get("refs")]
-        req["boundary"] = next((g.get("boundary") for g in state.gaps if req["id"] in (g.get("requirement_ids") or []) and g.get("boundary")), None)
+        req["boundary"] = next((g.get("boundary") for g in gaps if rid in (g.get("requirement_ids") or []) and g.get("boundary")), None)
 
 
 def unaddressed(state: State, cited: Iterable[str]) -> list[dict]:
-    """The declared requirements a reply does not reach (V2 P3): a requirement is
-    addressed when the reply points at a row of one of its findings, or at the
-    boundary row of one of its gaps. One with neither a finding nor a gap on the
-    record is unaddressed whatever the reply says. A lookup over ids."""
+    """A reply must reach each mapped finding and closing boundary. Execution
+    failures, conflicts and unresolved obligations cannot close a requirement,
+    even when the reply cites a successful sibling result. A lookup over ids.
+    """
     refs = set(cited or ())
     out = []
     for req in state.requirements:
-        rows = {r for f in state.accepted() if req["id"] in (f.get("requirement_ids") or []) for r in f.get("refs") or []}
-        bounds = {g.get("boundary") for g in state.gaps if req["id"] in (g.get("requirement_ids") or []) and g.get("boundary")}
-        if not (refs & (rows | bounds)):
+        findings = [f for f in state.accepted() if req["id"] in (f.get("requirement_ids") or [])]
+        gaps = [g for g in active_gaps(state) if req["id"] in (g.get("requirement_ids") or [])]
+        if (req.get("status") == "unresolved" or not (findings or gaps)
+                or any(not refs.intersection(f.get("refs") or []) for f in findings)
+                or any(g["type"] not in CLOSING_GAPS or g.get("boundary") not in refs for g in gaps)):
             out.append(req)
     return out
 
@@ -330,7 +437,7 @@ def view(state: State, ledger: Ledger | None) -> dict:
                  **({"inherited": True} if f.get("status") == "inherited" else {})}
                 for f in state.accepted()[:VIEW_FINDINGS]]
     gaps = []
-    for g in state.gaps[:VIEW_GAPS]:
+    for g in active_gaps(state)[:VIEW_GAPS]:
         entry: dict = {"type": g["type"]}
         if g.get("requirement_ids"):
             entry["for"] = g["requirement_ids"]
@@ -350,9 +457,9 @@ def view(state: State, ledger: Ledger | None) -> dict:
     return {"state_version": state.version, "scope": state.scope,
             "requirements": [{"id": r["id"], "anchor": r.get("anchor"), "status": r.get("status")} for r in state.requirements],
             "findings": findings, "gaps": gaps,
-            "tasks": [{k: t.get(k) for k in ("task_id", "analyst", "status", "coverage", "made") if t.get(k) not in (None, [], {})}
+            "tasks": [{k: t.get(k) for k in ("task_id", "analyst", "status", "coverage", "made", "lines", "cost") if t.get(k) not in (None, [], {})}
                       for t in state.tasks],
-            "budget": state.budget, "completion": completion_of(state)}
+            "budget": state.budget, "completion": state.completion if state.completion is not None else completion_of(state)}
 
 
 # ── the record ───────────────────────────────────────────────────────────────
@@ -360,7 +467,8 @@ def view(state: State, ledger: Ledger | None) -> dict:
 def _fields(state: State) -> dict:
     return {"session_id": state.session_id, "message_id": state.message_id, "question": state.question,
             "requirements": state.requirements, "scope": state.scope, "findings": state.findings,
-            "gaps": state.gaps, "tasks": state.tasks, "budget": state.budget, "completion": completion_of(state)}
+            "gaps": state.gaps, "tasks": state.tasks, "budget": state.budget,
+            "completion": state.completion if state.completion is not None else completion_of(state)}
 
 
 def _from_row(row: AnalysisState) -> State:

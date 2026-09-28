@@ -131,12 +131,16 @@ async def test_the_prose_is_bounded_at_the_store_not_at_the_reader():
     assert len((await analyst_reports.load(db, "sess_a", rid))["text"]) == analyst_reports.MAX_TEXT_CHARS
 
 
-def test_the_lead_can_open_the_record_only_once_something_is_on_it():
-    """The tool is offered after an ask and not before: a tool whose every
-    argument would be invented is a tool that invites inventing one."""
-    import inspect
-    src = inspect.getsource(meta_agent.handle_message)
-    assert "OPEN_TOOL] if delegated else []" in src
+@pytest.mark.asyncio
+async def test_an_empty_first_turn_has_no_record_to_open(monkeypatch):
+    from tests.test_meta_agent_gate import _factory, _stub_desk, _stub_llm, _stub_tools
+    session = _stub_tools(monkeypatch, {})
+    _stub_desk(monkeypatch, session)
+    async def chat(messages, tools, **_):
+        assert dl.OPEN_TOOL_NAME not in [t["function"]["name"] for t in tools]
+        return "Hello.", None
+    _stub_llm(monkeypatch, chat)
+    await meta_agent.handle_message(_factory([]), "sess", "hi")
 
 
 def test_the_table_is_owned_by_the_session_and_erased_with_it():

@@ -15,7 +15,7 @@ import pytest
 from exposure_workbench.agents import delegation as dl, sub_analyst as sa
 from exposure_workbench.agents.tool_session import ToolSession
 from exposure_workbench.tools import primitives as P, registry as R
-from tests.mcp_mount import RecordingDb, connected, mounted
+from tests.mcp_mount import RecordingDb, connected, mounted, use_secret
 from tests.test_mcp_identity_binding import FACE, FACE_TOOLS, _registry
 from tests.test_v1_analyst import SETTLED, _Tools, _ctx, _read, _submit, TASK
 
@@ -59,7 +59,8 @@ async def test_the_client_carries_the_task_beside_the_actor():
     assert seen == [{"actor": "sub:issuer", "task_id": "tsk_1"}, None]
 
 
-async def test_the_task_reaches_the_trace_through_the_real_mount():
+async def test_the_task_reaches_the_trace_through_the_real_mount(monkeypatch):
+    use_secret(monkeypatch)
     db = RecordingDb()
     async with mounted(_registry(), FACE_TOOLS, face_name=FACE, db_factory=lambda: db) as door:
         async with connected(door, face_name=FACE, user_id="user_a", session_id="sess_a", message_id="msg_a") as client:
@@ -85,7 +86,11 @@ async def test_the_analyst_names_its_task_on_its_calls_and_its_own_steps(monkeyp
     assert result.status == "settled"
     assert tools.task_ids == [TASK.task_id]
     # _record is faked in this harness without a task_id column; the report carries TaskState
-    assert stored[0]["accepted_lines"] == [SETTLED] and stored[0]["attempts"] == 1
+    [accepted] = stored[0]["accepted_lines"]
+    assert {k: v for k, v in accepted.items() if k != "validation"} == SETTLED
+    assert accepted["validation"]["version"] == sa.AS.BOUNDARY_VERSION
+    assert set(accepted["validation"]["facts"]) == set(SETTLED["facts"])
+    assert stored[0]["attempts"] == 1
     assert stored[0]["input_version"]["ledger_rows"] == 1 and stored[0]["receipts"] == []
 
 

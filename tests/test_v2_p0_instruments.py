@@ -50,14 +50,28 @@ class _RecDb:
 
 # ── the battery exports the row at the row's own width ───────────────────────
 
-def test_the_battery_export_is_as_wide_as_the_trace_row():
-    """`left(args::text, 4000)` and `left(result_summary, 1000)` were a second,
-    shorter record of the step. The cap is the trace's own constant now, read
-    from the one module that writes the row (imported, not retyped)."""
-    src = (ROOT / "scripts" / "conversation_battery.py").read_text(encoding="utf-8")
-    assert "from exposure_workbench.services.trace_service import MAX_ARG_CHARS, MAX_SUMMARY_CHARS" in src
-    assert re.search(r"^_ARGS_CAP, _RESULT_CAP = MAX_ARG_CHARS, MAX_SUMMARY_CHARS$", src, re.M)
-    assert trace_service.MAX_ARG_CHARS == 4096 and trace_service.MAX_SUMMARY_CHARS == 2000
+@pytest.mark.asyncio
+async def test_the_battery_exports_full_json_and_task_provenance():
+    from tests.test_v32_instrument import _script
+    battery = _script("conversation_battery")
+    rows = []
+    draft = "x" * 10000
+    await trace_service.record_step(_RecDb(rows), "sess", step_type="answer", tool_name="answer",
+                                    args={"text": draft, "problems": [{"reason": "unsourced_figure"}]},
+                                    result_summary="refused", evidence_refs=["f_w1a2b3c4d5e6"],
+                                    task_id="tsk_1", unbounded=("text",))
+    row = rows[0]
+    class ExportDb:
+        async def execute(self, stmt, params):
+            query = str(stmt).lower()
+            assert "left(" not in query and "substring(" not in query
+            assert "args::text as args" in query and "task_id" in query and "evidence_refs" in query
+            assert params == {"s": "sess", "m": "msg"}
+            return SimpleNamespace(mappings=lambda: SimpleNamespace(all=lambda: [
+                {"args": json.dumps(row.args), "task_id": row.task_id, "evidence_refs": row.evidence_refs}]))
+    [exported] = await battery.export_steps(ExportDb(), "sess", "msg")
+    assert json.loads(exported["args"])["text"] == draft
+    assert exported["task_id"] == "tsk_1" and exported["evidence_refs"] == ["f_w1a2b3c4d5e6"]
 
 
 def test_the_battery_mints_the_turn_id_and_keeps_it_on_an_exception():

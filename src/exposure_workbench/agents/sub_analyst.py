@@ -40,7 +40,7 @@ from typing import Any, Callable
 from exposure_workbench.agents import delegation as dl, delivery, repeats as rp
 from exposure_workbench.analytics import handbook, registry
 from exposure_workbench.app_state.settings import get_settings
-from exposure_workbench.services import analyst_reports, answer_check, fact_adapters as fa, facts as F, \
+from exposure_workbench.services import analysis_state as AS, analyst_reports, answer_check, fact_adapters as fa, facts as F, \
     ledger as ledger_svc, style_guide, trace_service
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
@@ -112,6 +112,7 @@ class TurnContext:
     message_id: str | None
     briefing: dict = field(default_factory=dict)
     state_version: int | None = None        # V2 P2: the analysis state the task was cut from, for input_version
+    question: str = ""
 
 
 def _coverage_of(task: dl.Task, briefing: dict) -> dict:
@@ -183,8 +184,14 @@ async def _prior_block(task: dl.Task, ctx: TurnContext) -> str:
     if not rep:
         return ""
     led = await _ledger(ctx)
+    scope = AS.scope_of(ctx.briefing, ctx.question)
     settled, not_settled = [], []
     for e in rep.get("accepted_lines") or []:
+        refs = (e.get("facts") or []) if e.get("settled") else [e.get("boundary")]
+        text = e.get("finding") if e.get("settled") else e.get("why")
+        if not AS.reusable(text or "", refs, e.get("validation"), scope, led, ctx.question,
+                           channel="finding" if e.get("settled") else "why"):
+            continue
         if e.get("settled"):
             settled.append({"n": e.get("n"), "finding": e.get("finding"),
                             "rows": [F.line(led.by_id[fid]) for fid in e.get("facts") or [] if fid in led.by_id]})
@@ -240,6 +247,7 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
         read.add(msg)
 
     for _turn in range(settings.sub_analyst_max_turns):
+        read.project(messages)
         content, tool_calls = await llm.chat(
             messages=messages, tools=tools, note=read.note(),
             **({"tool_choice": "required"} if standing is not None else {}))
@@ -471,9 +479,12 @@ async def _store_report(ctx: TurnContext, actor: str, task: dl.Task, result: dl.
                 evidence_calls=result.cost.get("evidence_calls"),
                 # V2 P2: TaskState — what the task was cut from, what it kept, what it started
                 requirement_ids=list(getattr(task, "requirement_ids", ()) or ()),
-                input_version={"state_version": ctx.state_version,
+                input_version={"state_version": ctx.state_version, "scope": AS.scope_of(ctx.briefing, ctx.question),
+                               "boundary_version": AS.BOUNDARY_VERSION,
                                "ledger_rows": len(ledger.shown) if ledger is not None else None},
-                accepted_lines=list(verdict.kept) if verdict is not None else [],
+                accepted_lines=[{**e, "validation": AS.validation_context(
+                    AS.scope_of(ctx.briefing, ctx.question), e.get("facts") if e.get("settled") else [e.get("boundary")],
+                    ledger)} for e in verdict.kept] if verdict is not None else [],
                 attempts=attempts, receipts=[r for r in (receipts or []) if r])
             await db.commit()
     except Exception:  # noqa: BLE001 — a lost record beats a lost turn

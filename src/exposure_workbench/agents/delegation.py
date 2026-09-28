@@ -255,10 +255,13 @@ def parse_requirements(args: dict, question: str | None, known: list[dict] | Non
     verbatim span of the question — the one thing about a decomposition that is
     mechanical — and requirements are declared once: a second declaration is
     refused rather than merged, so the denominator cannot quietly move. Returns
-    the declared list ([] when the ask declares none)."""
-    declared = (args or {}).get("requirements")
+    the declared list ([] only on later asks that keep the original declaration)."""
+    declared = args.get("requirements") if isinstance(args, dict) else None
     if not declared:
-        return []
+        if known:
+            return []
+        raise BadDelegation("declare the question's requirements on the first ask, with an id and an anchor "
+                            "copied from the user's question; say which requirements each task is for")
     if known:
         raise BadDelegation("the question's requirements are declared once, on the first ask; they stand as "
                             f"{', '.join(r['id'] for r in known)} — say which of them each task is for")

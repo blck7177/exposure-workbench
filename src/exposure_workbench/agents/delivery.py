@@ -1,25 +1,20 @@
-"""What a completion was actually handed (V2 P2, design v0.4 §07: "facts/ledger 的
-存在与某 actor 的实际收到分别记录").
+"""Record the actual prompt supplied to a completion, including STATE and PRIOR.
 
-The ledger says what a turn PUT ON THE RECORD; it does not say what the model
-read. Until V2 the llm_call row carried only how many characters and how many
-tool results the completion read (V36.1). It now carries the ids inside them —
-every fact row (`f_…`) and every call (`r_…`) named in the content appended
-since the last completion — so a round can tell "on the ledger" from "handed to
-the lead", which is the difference between a figure that was available and a
-figure that was delivered (a gap of type delivery_missing, P3).
-
-Read off the appended content by pattern, not off the ledger: what the model was
-shown is exactly the text that went into the messages array, and the same
-pattern that finds an id in a reply finds it here.
+The ledger records existence; this collector records receipt. `facts` contains
+rendered row headers outside assistant messages, while `mentioned` also keeps
+bare pointers and model-authored mentions. Page ranges are separate from ids:
+seeing a series id is not evidence of receiving all its points. The legacy
+`read` counters still measure content appended since the previous completion.
 """
 
 from __future__ import annotations
 
+import json
 import re
 
 _FACT_ID = re.compile(r"\bf_[A-Za-z0-9_]{4,}\b")
 _PULL_ID = re.compile(r"\br_[A-Za-z0-9]{6,}\b")
+_ROW = re.compile(r'(?:^|[\n"]|\\n)\[(f_[A-Za-z0-9_]{4,})\]\s')
 
 
 class Delivered:
@@ -33,19 +28,49 @@ class Delivered:
         self.results = 0
         self.facts: set[str] = set()
         self.pulls: set[str] = set()
+        self.mentioned: set[str] = set()
+        self.ranges: list[dict] = []
+        self.prompt_chars = 0
 
     def add(self, msg: dict) -> None:
         content = str(msg.get("content") or "")
         self.chars += len(content)
         self.results += int(msg.get("role") == "tool")
-        self.facts.update(_FACT_ID.findall(content))
+        self.mentioned.update(_FACT_ID.findall(content))
+        if msg.get("role") != "assistant":
+            self.facts.update(_ROW.findall(content))
         self.pulls.update(_PULL_ID.findall(content))
+
+    def project(self, messages: list[dict]) -> None:
+        """Record the assembled prompt, including replaced STATE and initial PRIOR.
+        Mentioning an id is not delivery of its row or of an entire series.
+        """
+        self.facts.clear()
+        self.pulls.clear()
+        self.mentioned.clear()
+        self.ranges = []
+        self.prompt_chars = sum(len(str(m.get("content") or "")) for m in messages)
+        for msg in messages:
+            content = str(msg.get("content") or "")
+            self.mentioned.update(_FACT_ID.findall(content))
+            if msg.get("role") == "assistant":
+                continue
+            self.facts.update(_ROW.findall(content))
+            self.pulls.update(_PULL_ID.findall(content))
+            if msg.get("role") == "tool":
+                try:
+                    payload = json.loads(content)
+                except (ValueError, TypeError):
+                    continue
+                if isinstance(payload, dict) and payload.get("id") and "shown" in payload and "total" in payload:
+                    self.ranges.append({k: payload[k] for k in ("id", "shown", "total")})
 
     def note(self) -> dict | None:
         """The llm_call row's args, or None when nothing was read since the last one."""
-        if not self.chars:
+        if not self.chars and not self.prompt_chars:
             return None
         out: dict = {"read": {"chars": self.chars, "results": self.results}}
-        if self.facts or self.pulls:
-            out["delivered"] = {"facts": sorted(self.facts), "pulls": sorted(self.pulls)}
+        out["delivered"] = {"facts": sorted(self.facts), "pulls": sorted(self.pulls),
+                            "mentioned": sorted(self.mentioned), "ranges": self.ranges,
+                            "prompt_chars": self.prompt_chars}
         return out

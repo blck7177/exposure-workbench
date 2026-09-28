@@ -39,6 +39,9 @@ from exposure_workbench.agents.meta_agent import _GATE_EXHAUSTED_TEXT, handle_me
 
 def _stub_desk(monkeypatch, session):
     from exposure_workbench.services.ledger import Ledger
+    from tests.test_meta_agent_gate import _stub_desk as stub_loop
+
+    stub_loop(monkeypatch, session)
 
     async def _no_briefing(_f, _t):
         return {"subjects": {}}

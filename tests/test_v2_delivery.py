@@ -20,7 +20,9 @@ def test_delivered_collects_the_ids_in_what_was_appended():
     note = d.note()
     assert note["read"] == {"chars": len("r_11a34f628851 filings_read(…) → 1 row\n[f_26cba3a106a8] Revenue, AAPL …")
                                      + len("point at f_policy_no_forecast or drop it"), "results": 1}
-    assert note["delivered"] == {"facts": ["f_26cba3a106a8", "f_policy_no_forecast"], "pulls": ["r_11a34f628851"]}
+    assert note["delivered"]["facts"] == ["f_26cba3a106a8"]
+    assert note["delivered"]["mentioned"] == ["f_26cba3a106a8", "f_policy_no_forecast"]
+    assert note["delivered"]["pulls"] == ["r_11a34f628851"]
     d.reset()
     assert d.note() is None
 
@@ -47,6 +49,6 @@ async def test_the_lead_completion_after_an_ask_records_the_rows_it_was_handed(m
     _stub_desk(monkeypatch, session)
     out = await meta_agent.handle_message(_factory([]), "sess_1", "how big is MSFT in the book?")
     assert out["text"].startswith("MSFT weighs 16.0%")
-    assert notes[0] is None, "nothing was read before the first completion"
+    assert notes[0]["delivered"]["prompt_chars"] > 0, "the first completion also records its context"
     assert "f_wmsft0001" in notes[1]["delivered"]["facts"], "the Return's rows were handed to the lead"
     assert notes[1]["read"]["results"] == 1

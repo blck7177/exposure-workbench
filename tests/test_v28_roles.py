@@ -169,7 +169,7 @@ def _loads_run_by_id(tree: ast.AST) -> bool:
 def test_every_reader_of_a_run_goes_through_the_one_door():
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
-        rel = str(path.relative_to(SRC))
+        rel = path.relative_to(SRC).as_posix()
         if rel in _RUN_LOADER_ALLOWLIST:
             continue
         if _loads_run_by_id(ast.parse(path.read_text())):

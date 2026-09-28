@@ -1,7 +1,7 @@
 # IMPLEMENTATION PLAN V2 — 分析状态、可恢复交接与确定性边界（2026-09-28，草稿）
 
 > 依据：`dev_note/exposure/architecture-and-repair-plan.md` v0.4（2026-09-27，"基于 origin/desk-v1 的修订设计稿"，下称「设计」）。设计审的是 `b4f979f`；本计划的起点是 `desk-v1@6d40614`，比它多两个提交：`f34b54d`（V1 步骤 6，风格指南单源，措辞 A–F 已过目）与 `6d40614`（V1 步骤 7 的跨族系列与仪器）。这两个提交分别关掉了设计 G8 的前半句，并给了 P0 要用的仪器。设计要求"为完整取证先改仪器，须单独提交并记录新基线"——这一条已经照做。
-> 状态：待 boss 拍板后执行；未实施；本文不代表已有能力。
+> 状态：P0a、P1–P3 及部分 P4/P5 已实施，执行记录见 §3a；基于 `afcce47` 的审阅修复见 `docs/REVIEW_FIXES_V2.md`。离线通过不代表实例验收完成，P0b 的独立 oracle、E 轮与 P6 仍待执行。
 > 读法：每个工作包一组提交、一个机械验收；实测期冻结代码（phase_e.sh 有 tracked 改动即拒绝测量）；按节点沟通表分析；发给模型的文字改动一律走措辞过目（§5 单列）。V1 计划 `docs/IMPLEMENTATION_PLAN_V1.md` 继续作为步骤 1–7 的执行记录；它的步骤 7（E 轮）就是本计划的 P0。
 
 ## 0. 一句话，与不变量
@@ -68,7 +68,7 @@
 
 **P0b · 独立规格与数值 oracle（不依赖 P0a，可并行）**：
 
-1. 验收矩阵进仓库：`docs/spikes/v1/acceptance_matrix.json`，20 题 × 65 项要求，每项 `{question_id, requirement_id, anchor（用户原文片段）, deliverable, constraints{subject, period, method}, prelabel}`，`prelabel ∈ {supported, implementation_gap, data_missing, method_boundary, policy}`。来源是评审者本机的 `test-acceptance-matrix.json`（拍板：请评审者交付；仓库里没有）。设计 §12 要求 prelabel 在评分前填好；`policy` 与 `method_boundary` 只有经确认才可作为允许输出。
+1. 验收矩阵进仓库：`docs/spikes/v1/acceptance_matrix.json`，20 题 × 65 项要求，每项 `{question_id, requirement_id, anchor（用户原文片段）, deliverable, constraints{subject, period, method}, prelabel}`，`prelabel ∈ {supported, implementation_gap, data_missing, method_boundary, policy}`。原始来源 `test-acceptance-matrix.json` 已作为 `docs/spikes/v1/acceptance_matrix.draft.json` 交付；需转换到此处的目标 schema 并独立验证，不能将规划草稿当作 gold。设计 §12 要求 prelabel 在评分前填好；`policy` 与 `method_boundary` 只有经确认才可作为允许输出。
 2. 数值 oracle：`scripts/gold_derive.py v1` → `tests/battery/gold_v1.json`。对矩阵里每一项带数字交付的要求，在 `exposure_gold`（同一快照 + v36/v39 迁移 + v5 remap）上从原始表直接算，不经过工具与登记簿（设计 §10："独立原始数据 oracle 和方法不变量仍然必需"）。现有 `scripts/gold/v24.py` 是形状参考。
 3. 逐要求评分脚本：`docs/spikes/v37/tools/v37c_audit.py` 现在按题给 ANSWERED / EXHAUSTED / ERROR；加一个 `scripts/requirement_score.py`，读矛阵、答案、账本与 gold，对每项要求给 `delivered_correct | delivered_wrong | boundary_ok | boundary_unjustified | silent_omission | not_answered`。这是设计 §12 "验收分母使用原始用户要求"的实现。
 
@@ -224,7 +224,7 @@ P1 完成证据：三组真实函数回归 + 通道测试；`v1_wording.py` 重�
 | P5 | `cd67b37` | `services/fact_boundary.check_text` 单一入口 + `CHANNELS` 封闭表，六处调用改走它；`_words` 读所有格（"MSFT's" 名 MSFT）；`evals/semantic_review/{corpus,review,score}.py` 顶层目录、只写 `evals/reports/`；A1 测试：src/apps/scripts 不 import evals、Dockerfile 不 COPY、三模块不碰产品与库 | `test_v2_boundary_channels` 扩到六通道 + 所有格；`test_v2_audit` +3；3058 绿 |
 
 **没做、为什么**：
-- P0b 验收矩阵与 gold_v1：矩阵在评审者本机，仓库没有；`requirement_score.py` 也依赖它的 schema。等文件。
+- P0b 验收矩阵与 gold_v1：审阅修复已交付原始规划矩阵 `docs/spikes/v1/acceptance_matrix.draft.json`（20 题、65 项要求，保留原始版本与基线说明）。它还不是本计划 §P0b 的最终 schema；anchor/constraints/prelabel、独立 gold_v1 与评分脚本仍待完成。
 - P0c E 轮：是测量不是修改，且要在冻结基线上跑；基线 `fe8a447` 已定，`phase_e.sh` 可从该提交的 worktree 起跑（当前 HEAD 含 P1–P5，不是未改行为）。需要 OpenAI 额度与一小时以上。
 - P4-1/2（book.analysis 拆分、批量算术）、P4-6/7（XOM、LLY 在 fixture 上核对）：等 E 轮数据。
 - P4-4 行业来源、P4-8 历史时点统计、天数单位类、Q20、withheld：计划里没给推荐，仍是拍板项。

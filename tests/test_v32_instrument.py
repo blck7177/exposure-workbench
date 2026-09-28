@@ -124,13 +124,7 @@ def test_the_battery_reads_arguments_wide_enough_for_one_program_per_question():
     to the rendered text its own comment says not to read."""
     src = (ROOT / "scripts" / "conversation_battery.py").read_text()
     assert "left(args::text, 300)" not in src
-    # V2 P0a: the caps are the trace's own constants now (a name, not a literal), so the
-    # export is exactly as wide as the row; the floor this test always asked for still holds.
-    from exposure_workbench.services import trace_service
-    caps = re.search(r"_ARGS_CAP, _RESULT_CAP = (\w+), (\w+)", src)
-
-    def _width(token: str) -> int:
-        return int(token) if token.isdigit() else int(getattr(trace_service, token))
-
-    assert caps and _width(caps.group(1)) >= 4000 and _width(caps.group(2)) >= 1000
-
+    from tests.test_v32_instrument import _script
+    query = str(_script("conversation_battery")._STEPS).lower()
+    assert "left(" not in query and "substring(" not in query
+    assert "args::text as args" in query and "result_summary as result" in query

@@ -1,0 +1,855 @@
+{
+  "schema_version": "planning-draft-4",
+  "status": "基于 desk-v1 的目标验收规格；当前 HEAD 未在本次运行完整 20 题；不是已执行评分器",
+  "repository": "blck7177/exposure-workbench",
+  "branch": "desk-v1",
+  "review_ref": "b4f979f7c8da797797269b1fe870c85d9d6cb9d3",
+  "baseline_tested_ref": "b79354fe9256f1f5d5ab6b51dc04f20b30c7e6cb",
+  "fixture": "backups/battery/battery-2026-09-13.sql.gz",
+  "grading_rules": {
+    "denominator": "原始用户要求，禁止用模型自定 wants 或最终输出条数替代",
+    "accepted_outcomes": [
+      "answered_with_verified_evidence",
+      "expected_boundary_with_verified_reason"
+    ],
+    "unacceptable_outcomes": [
+      "silent_omission",
+      "implementation_failure_disguised_as_boundary",
+      "unsupported_factual_claim",
+      "incorrect_value_or_scope",
+      "required_action_not_started"
+    ],
+    "numeric_oracles": "全部待恢复固定数据库后，从原始数据及独立算式建立；不得复用被测公式产生期望值",
+    "boundary_policy": "逐要求预先登记 evidence 与理由。当前工具不支持本身不是自动通过理由；先决定补能力还是保留真实方法/数据边界，评测失败后不能静默放宽。",
+    "current_contract_vs_product_objective": "当前接口按设计正确拒绝，不自动等于用户目标完成；按能力支持、实现缺口、数据缺失、方法边界、政策待定分别登记。"
+  },
+  "cases": [
+    {
+      "id": "Q01",
+      "tag": "Q01-amzn-earnings-quality",
+      "original_prompt": "Is Amazon's earnings quality deteriorating? Put operating cash flow beside net income for the last eight quarters, show the accruals ratio trend, tell me whether receivables and inventory are growing faster than revenue over the same windows, and say what that means for the size of our AMZN position.",
+      "requirements": [
+        {
+          "id": "Q01.R1",
+          "expectation": "最近八个季度 OCF 与净利润同窗列示",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q01.R2",
+          "expectation": "明确公式与分母的应计比率趋势",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q01.R3",
+          "expectation": "应收、库存、收入采用一致窗口计算增长并比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q01.R4",
+          "expectation": "结合实际 AMZN 权重给出有条件的仓位含义",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "从原始财报季度流量及期末余额独立计算；检查窗口、重述、零或负分母。",
+      "current_code_assessment": "待冻结 E 轮核实；不可继续把 V37 错误数量当本分支现状。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q02",
+      "tag": "Q02-xom-room-if-oil-falls",
+      "original_prompt": "How much room does Exxon have if oil falls? Give net debt to EBITDA, EBIT interest coverage and FCF to debt for the latest four quarters against the same four a year earlier, read what the 10-K says about debt maturities and floating-rate exposure, and relate that to our XOM weight and the book's beta to USO.",
+      "requirements": [
+        {
+          "id": "Q02.R1",
+          "expectation": "最近四个季度与一年前对应四季度的净债务/EBITDA、EBIT 利息覆盖、FCF/债务",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q02.R2",
+          "expectation": "10-K 债务到期与浮息敞口的有出处摘述",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q02.R3",
+          "expectation": "XOM 实际持仓权重与组合对 USO 的 beta",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P2",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "审计债务组件完整性与存量/流量口径；组合 beta 不得用 XOM 自身 beta 代替。",
+      "current_code_assessment": "V38 已补 debt/lease 映射和组成传播；需要验证 fixture 的 remap 与当前行展示。原来的短债问题不再作为未修复事实。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q03",
+      "tag": "Q03-nvda-where-cash-goes",
+      "original_prompt": "Where does NVIDIA's cash go? Capex, buybacks, dividends and SBC over the trailing twelve months, each as a share of operating cash flow, how each share has moved over three years, and whether the filing states how much buyback authorization remains.",
+      "requirements": [
+        {
+          "id": "Q03.R1",
+          "expectation": "TTM capex、回购、股息、SBC 金额及各自占 OCF 的比例",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q03.R2",
+          "expectation": "上述资金用途比例过去三年的变化",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q03.R3",
+          "expectation": "在财报中核实剩余回购授权，并标明文件日期",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "三年变化指各项占 OCF 的比例变化；不得用股数变化替代。优先核查最新相关披露，明确授权截至日。",
+      "current_code_assessment": "V1 已提供类型化财务期间与按行来源；三年用途份额和最新回购授权仍需当前 E 轮验证。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q04",
+      "tag": "Q04-lly-margin-pricing-mix-cost",
+      "original_prompt": "Is Lilly's margin expansion pricing, mix or cost? Gross, operating and net margin over the last twelve quarters, the gap between gross and operating margin, and what Item 7 attributes the change to. Then compare against Merck, and if Merck is not on the desk, get it ready and tell me what you can say now.",
+      "requirements": [
+        {
+          "id": "Q04.R1",
+          "expectation": "LLY 最近十二季度毛利率、营业利润率、净利率",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q04.R2",
+          "expectation": "毛利率与营业利润率差额及趋势",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q04.R3",
+          "expectation": "Item 7 对价格、产品组合、成本变化的归因",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q04.R4",
+          "expectation": "与 MRK 比较；缺数据时实际启动准备并交付当前可得信息",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "收入减成本的毛利备用路径须同主体同期间同口径；启动动作应有任务回执。",
+      "current_code_assessment": "gross_margin 命名公式仍只依赖 gross_profit/revenue；read/calc 是否可正确完成替代路径需实测。保留取证-归因-同业准备的迭代切片。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q05",
+      "tag": "Q05-aapl-risk-and-concentration",
+      "original_prompt": "What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?",
+      "requirements": [
+        {
+          "id": "Q05.R1",
+          "expectation": "AAPL 主要业务风险的财报依据",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q05.R2",
+          "expectation": "产品及地域收入集中度及适用期间",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q05.R3",
+          "expectation": "清楚区分已有结构化 figures、可从披露验证的表格值和仍无数据的项",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "人工核对表头、单位、列日期、合计及原始单元格；不能因为缺预置 metric 就推断文件无数据。",
+      "current_code_assessment": "V1 已有 accession、字符偏移和 section 分页；表格单位和行列语义的正确性仍需独立验证。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q06",
+      "tag": "Q06-jpm-riskier-than-a-year-ago",
+      "original_prompt": "Is the market treating JPMorgan as riskier than a year ago? Thirty-day volatility, beta to SPY and distance from the 52-week high now and twelve months ago, beside interest expense and the pretax-to-net-income gap over three years. Note where the desk's issuer methods do not apply to a bank.",
+      "requirements": [
+        {
+          "id": "Q06.R1",
+          "expectation": "当前与十二个月前同定义的 30 日波动率、SPY beta、距 52 周高点距离",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q06.R2",
+          "expectation": "过去三年利息费用及税前利润减净利润",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q06.R3",
+          "expectation": "明确哪些发行人方法不适用于银行",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "历史 as-of 截止点不能读取未来数据；改变 window_days 不等于回到一年前。不支持的历史方法必须独立列为能力缺口或经确认的验收边界。",
+      "current_code_assessment": "历史价格点读取已存在；历史波动率、beta、距高点需逐方法核对，不能由历史价格点支持推导全部统计已支持。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q07",
+      "tag": "Q07-tech-cash-conversion-rank",
+      "original_prompt": "Rank our five technology holdings by cash conversion, operating cash flow over net income, for the trailing twelve months and by the change in that ratio against the prior twelve months. Which name has the weakest conversion, and is it also the one whose weight in the book grew most since the previous run?",
+      "requirements": [
+        {
+          "id": "Q07.R1",
+          "expectation": "核实持仓及科技行业范围，指出与题设五家不一致的事实",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q07.R2",
+          "expectation": "按 TTM OCF/净利润和相对前 TTM 的变化分别排序",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q07.R3",
+          "expectation": "识别最弱现金转化者",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q07.R4",
+          "expectation": "与前次 run 相比权重增加最大者比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P2",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "rank 的 metric、universe、方向、期间一致；权重水平排序不能证明权重变化排序。",
+      "current_code_assessment": "当前有 calc rank 及自带含义的事实行；应以当前正确/错误比较的回放检验，不能直接沿用 V37 误报次数。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q08",
+      "tag": "Q08-capex-roic-three-way",
+      "original_prompt": "Compare the capex intensity and ROIC of Microsoft, Alphabet and Amazon over the last three fiscal years. Who spends the most relative to revenue and earns the least on it, and how does that sit with the book's exposure to QQQ?",
+      "requirements": [
+        {
+          "id": "Q08.R1",
+          "expectation": "MSFT、GOOGL、AMZN 最近三个财年的 capex/revenue 与 ROIC",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q08.R2",
+          "expectation": "按同窗证据比较最高投入强度及最低回报",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q08.R3",
+          "expectation": "组合 QQQ 敞口及其与比较结果的关系",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "保留财年语义和 ROIC 定义；未实现 QQQ beta 不得把 equity_down 或其他组合指标改名替代。",
+      "current_code_assessment": "旧程序语言已退役；使用 V1 metric/read/calc 验证比较、组合 QQQ 能力及边界。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q09",
+      "tag": "Q09-aapl-working-capital-cycle",
+      "original_prompt": "Track Apple's days sales outstanding, days inventory, days payable and cash conversion cycle over the last twelve quarters. Where is the cycle now against its three-year low and high, and did the latest 10-K change its wording on supplier financing compared with the previous 10-K?",
+      "requirements": [
+        {
+          "id": "Q09.R1",
+          "expectation": "最近十二季度 DSO、DIO、DPO、CCC",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q09.R2",
+          "expectation": "当前 CCC 与同一三年窗口极值比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q09.R3",
+          "expectation": "最新和前一份 10-K 的供应链融资措辞比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "按登记的期间天数约定与对应流量独立计算；当前为 nominal days（季度91/全年365等），不得误称仍固定×365；CCC=DSO+DIO-DPO，极值具有窗口身份。若改变天数口径，另行版本化并重新建立期望值。",
+      "current_code_assessment": "固定 ×365 已修为 nominal days；季度91、半年182、九个月274、全年365是当前约定，是否改为实际天数是另一个方法决策。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q10",
+      "tag": "Q10-msft-leverage-and-rates",
+      "original_prompt": "Has Microsoft's leverage story changed? Total debt, net debt and net debt to EBITDA at each of the last five fiscal year-ends, interest coverage, and what the latest 10-K says about commercial paper. Then: if rates rose 100bp, what does the rates_shock_up scenario say happens to the book?",
+      "requirements": [
+        {
+          "id": "Q10.R1",
+          "expectation": "最近五个财年末的总债务、净债务、净债务/EBITDA",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q10.R2",
+          "expectation": "适当期间的利息覆盖与最新 10-K 商业票据说明",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q10.R3",
+          "expectation": "rates_shock_up 下组合影响，或经确认的方法边界",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "财年末存量匹配相应流量；情景标识不能当证券代码。若方法尚未验证，不能简单解除 withheld 来取得数值。",
+      "current_code_assessment": "财务 at/window 错配在 V38 已修；当前类型化期间需回归。rates_shock_up 的方法可用性和风险输出边界需独立裁定。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q11",
+      "tag": "Q11-closest-to-issuer-limit",
+      "original_prompt": "Which position is closest to its issuer-concentration warning, how much room is left, and what percentage move in that name alone would take it to the breach tier with everything else fixed? If we capped any single issuer at 8%, who would be over?",
+      "requirements": [
+        {
+          "id": "Q11.R1",
+          "expectation": "按距 issuer warning 的余量识别最近者并给出余量",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q11.R2",
+          "expectation": "仅该证券价格改变、其他持仓不变时达到 breach 所需涨跌幅",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q11.R3",
+          "expectation": "列出超过 8% 单一发行人上限者",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "独立重算发行人聚合、不同阈值及价格变化导致的组合分母变化；warning 与 breach 的排序不得混用。",
+      "current_code_assessment": "仓库 V1 smoke 记录 book.analysis 可发现性和重复相减耗尽预算问题；当前算术与完整阈值推导能力需 E 轮测量。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q12",
+      "tag": "Q12-jpm-vs-peers-not-on-desk",
+      "original_prompt": "How does JPMorgan's ROE and equity multiplier compare with Bank of America and Goldman Sachs over the last three years, and is JPM the most levered of the three? If you do not have them, start preparing them and tell me what you can say today.",
+      "requirements": [
+        {
+          "id": "Q12.R1",
+          "expectation": "JPM、BAC、GS 三年 ROE 与 equity multiplier 比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q12.R2",
+          "expectation": "证据充分时判断 JPM 是否最具杠杆",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q12.R3",
+          "expectation": "缺同业数据时实际启动 BAC/GS 准备并返回当前 JPM 信息",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "缺少同业不支持三方排序；启动只算启动成功，不能宣称同业数据已到齐。",
+      "current_code_assessment": "沿用已提供的 start 回执和财务期间；补任务恢复与同业缺口跟踪，不将启动成功当数据已准备完成。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q13",
+      "tag": "Q13-sell-half-nvda-into-tlt",
+      "original_prompt": "If we sell half our NVIDIA and put the proceeds into TLT, what happens to gross exposure, Technology sector concentration, the book's beta to QQQ and the stress loss under tech_selloff? Which limit gets tighter and which gets better?",
+      "requirements": [
+        {
+          "id": "Q13.R1",
+          "expectation": "卖出一半 NVDA，并将所得全额投入 TLT 的完整双腿情景",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q13.R2",
+          "expectation": "情景前后 gross exposure、Technology 集中度、组合 QQQ beta",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q13.R3",
+          "expectation": "tech_selloff 压力损失及方法边界",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q13.R4",
+          "expectation": "哪些限额变紧或改善",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "双腿以同一快照原子计算，或明确整项失败；ETF 类型不能强塞公司行业，卖出腿不能冒充完整交易。",
+      "current_code_assessment": "当前 ordered trades 仍拒绝已有持仓加仓，卖出资金离开组合、买入资金来自外部；缺少原题要求的销售所得再配置语义。已用合成数据隔离复核。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q14",
+      "tag": "Q14-worst-drawdown-episode",
+      "original_prompt": "Explain our worst drawdown episode of the last year: when it started and troughed, how deep, how much was the market against what we held, and which three names contributed most. Did any of those three have a filing in that window?",
+      "requirements": [
+        {
+          "id": "Q14.R1",
+          "expectation": "最近一年最差回撤的起始、谷底及深度",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q14.R2",
+          "expectation": "同一回撤区间的市场与持仓影响分解",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q14.R3",
+          "expectation": "同区间贡献最差的三个名字",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q14.R4",
+          "expectation": "该区间相关公司的财报发布及内容",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "区间归因不能替换为最新日 run；贡献排名不能替换成收益率排名；10-Q MD&A 应识别 Item 2。",
+      "current_code_assessment": "V1 事实行已增强 peak/trough 等期间含义；完整区间归因和贡献排序仍需当前数据验证。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q15",
+      "tag": "Q15-liquidity-and-limits",
+      "original_prompt": "How liquid is the book? For each holding, position value against 20-day average dollar volume, days to liquidate at 20% of ADV, which names take longest, and whether those are the same names sitting near their issuer limits.",
+      "requirements": [
+        {
+          "id": "Q15.R1",
+          "expectation": "每个持仓的价值及 20 日平均美元成交额",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q15.R2",
+          "expectation": "按 20% ADV 计算清仓天数",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q15.R3",
+          "expectation": "流动性最差者的排序及与发行人限额余量的比较",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "单位、交易日数、参与率和空头/零 ADV 规则明确；限额比较沿用正确 issuer 聚合与阈值。",
+      "current_code_assessment": "原语单步算术的调用成本、排名及限额比较需冻结 E 轮验证，不默认恢复旧程序语言。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q16",
+      "tag": "Q16-book-beta-change-since-prev",
+      "original_prompt": "What is the book exposed to, name by name: each holding's beta to SPY and to QQQ over one year, the book's net beta, and how the net beta changed since the previous run. Is the book riskier now, and which name drove the change?",
+      "requirements": [
+        {
+          "id": "Q16.R1",
+          "expectation": "每个持仓一年窗口 SPY 与 QQQ beta",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q16.R2",
+          "expectation": "组合 net beta 的当前和前次 run 值",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q16.R3",
+          "expectation": "变化幅度、风险含义与驱动名字",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P2",
+        "P3",
+        "P5"
+      ],
+      "oracle_notes": "current_run_id 与 previous_run_id 固定且不同；两期相等、变化方向与最大驱动必须由同窗差分或归因支持。",
+      "current_code_assessment": "V38 已修两个 run 的显示与身份，V1 beta 已为 MULTIPLE；当前重点是 open 完整读取、事实性 caveat、任务状态和范围恢复。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q17",
+      "tag": "Q17-events-touching-holdings",
+      "original_prompt": "Anything in the last two weeks that touches something we hold? Search for material news on our top five by weight, and for each say whether the price already moved: ten-day window return against SPY and distance from the 52-week high.",
+      "requirements": [
+        {
+          "id": "Q17.R1",
+          "expectation": "按快照权重识别前五持仓",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q17.R2",
+          "expectation": "搜索近两周材料性新闻并记录日期与出处",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q17.R3",
+          "expectation": "每家最近十个交易日收益、同期 SPY 对比、距 52 周高点距离",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "冻结测试时钟及回放新闻；实际十个交易日与价格截至日一致。另设实时搜索验收，不能以缓存通过证明实时可靠。",
+      "current_code_assessment": "当前有 web_search 和新的价格字段接口；按固定时钟测新闻与交易日窗口，实时搜索另行测量。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q18",
+      "tag": "Q18-attribution-reconcile",
+      "original_prompt": "Does the book's attribution add up? Reconcile factor contributions plus alpha and residual to the portfolio return on the latest run, state the gap, name the largest and smallest contributing factor, and say whether HYG's own drawdown over the period matches the sign of its contribution.",
+      "requirements": [
+        {
+          "id": "Q18.R1",
+          "expectation": "同次 run 的因子贡献+alpha+residual 对组合收益的核对",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q18.R2",
+          "expectation": "给出差额、最大和最小因子贡献",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q18.R3",
+          "expectation": "同期间 HYG 自身表现/回撤与其贡献符号的比较并解释口径",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "positions 贡献和不能冒充 factors 贡献和；因子、持仓、alpha、残差类型必须可区分；回撤与期间收益不可悄悄互换。",
+      "current_code_assessment": "V38 已补因子合计身份；当前对账行名称、范围、符号与解释需在 E 轮核实。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q19",
+      "tag": "Q19-aws-share-explains-return",
+      "original_prompt": "What share of Amazon's revenue is AWS, how has that share moved over three years, and how much of our AMZN return over the last year relative to SPY does that explain?",
+      "requirements": [
+        {
+          "id": "Q19.R1",
+          "expectation": "AWS 占 AMZN 收入及过去三年变化",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q19.R2",
+          "expectation": "AMZN 一年收益与同期 SPY 对比",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q19.R3",
+          "expectation": "对 AWS 收入占比能否解释超额收益给出有依据的边界",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P1",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "从披露单元格做确定性除法；收入份额不能直接推导超额收益的因果份额，不能把心算份额塞进 mul 字面量当来源。",
+      "current_code_assessment": "任意结果命名已移除，但 scale.factor 仍接受数值；明确常量来源与披露单元格计算，因果份额不靠收入份额直接推断。",
+      "live_verification_status": "pending_at_review_ref"
+    },
+    {
+      "id": "Q20",
+      "tag": "Q20-lly-margins-next-year",
+      "original_prompt": "Will Lilly's margins keep expanding next year?",
+      "requirements": [
+        {
+          "id": "Q20.R1",
+          "expectation": "可验证的 LLY 当前利润率趋势和经营依据",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q20.R2",
+          "expectation": "对下一年利润率给出条件性判断、推动因素及反向风险",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        },
+        {
+          "id": "Q20.R3",
+          "expectation": "区分事实、管理层指引和模型推断",
+          "oracle_status": "pending_independent_verification",
+          "expected_boundary": null
+        }
+      ],
+      "work_packages": [
+        "P0",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "oracle_notes": "不要求确定预测；不能用无法预测未来作为理由省略当前数据和有条件分析。",
+      "current_code_assessment": "需将目标中的条件性前瞻与现有 f_policy_no_forecast 的政策含义对齐；不自动删除政策或把整题拒答算作完成。",
+      "live_verification_status": "pending_at_review_ref"
+    }
+  ],
+  "architecture_plan": "architecture-and-repair-plan.md",
+  "architecture_plan_version": "0.4",
+  "work_package_catalog": {
+    "P0": "当前基线、完整取证和独立规格",
+    "P1": "当前交接与结果读取契约",
+    "P2": "最小持久状态与 context",
+    "P3": "按状态推进的主 agent loop",
+    "P4": "逐题能力与机械调用负担",
+    "P5": "确定性边界与风格指南统一；离线语义测量",
+    "P6": "全量、泛化、恢复与对照"
+  },
+  "previous_review_ref": "0986dca2631479bced46cd5ed4e314caf11adf93",
+  "baseline_tested_ref_role": "历史 V37 轮次代码，仅用于回归取证；不是 desk-v1 完整验收成绩",
+  "latest_full_battery_at_review_ref": null,
+  "fixture_preparation": "恢复隔离库后核实 V36/V39 相关迁移、v5 概念 remap、数据版本与测试时钟；不以旧 SQL 文件名单独代表条件一致",
+  "architecture_invariants": {
+    "status": "设计与验收规格；尚未实现或执行，不代表测试通过",
+    "semantic_reviewer": {
+      "mode": "offline_shadow_only",
+      "input": "运行结束后归档、冻结的标注语料中的问题、输出和出处；人工标签由评分器持有，不输入被测 reviewer",
+      "output": "独立离线评测产物",
+      "forbidden_runtime_effects": [
+        "同步或异步请求调用",
+        "放行或拒绝",
+        "修复路由",
+        "任务排序",
+        "状态迁移",
+        "最终判定",
+        "agent context 回填"
+      ],
+      "no_post_p5_gate_option": true,
+      "grading": "相对人工标签报告误报、漏检、未决率；独立于确定性门质量，不作为发布结果唯一裁判",
+      "permitted_use": "人工审阅报告后形成代码、工具或测试变更"
+    },
+    "lease": {
+      "policy": "保留 V2-E 宽裕固定 lease、到期自愈、不续期、不心跳",
+      "existing_defaults_seconds": {
+        "task": 1800,
+        "turn": 900
+      },
+      "preserve": "现有配置方式、claimed_at 释放保护、任务完成/失败 fencing、调度与重试策略",
+      "new_renewal_or_write_fencing": false,
+      "requeueable_types": [
+        "company_readiness",
+        "market_data_sync"
+      ],
+      "fail_without_automatic_replay": [
+        "exposure_update",
+        "issuer_research"
+      ],
+      "state_recovery_is_not_task_reexecution": true
+    },
+    "analysis_state": {
+      "writers": "主 agent/分析师只提出更新，runtime 校验后合并",
+      "factual_boundary": "与 finding 共用确定性检查入口和规则，包括引用、账本关系、主体、期间、单位、scope",
+      "covered_text": [
+        "结论",
+        "假设的事实前提",
+        "支持/反驳证据摘要",
+        "冲突描述",
+        "缺口原因",
+        "caveat",
+        "why",
+        "follow_up"
+      ],
+      "label_exemptions": [],
+      "accepted_state": "仅通过相同事实边界且 scope 有效的内容；附证据 refs 与 scope/校验版本；不宣称已证明全部语义正确",
+      "pending_or_rejected": "可保存原始审计，不合入有效分析状态，也不自动进入默认、摘要、追问或恢复 context",
+      "diagnostic_exception": "定向修复或显式审计读取保留失败身份，不自动回写为发现",
+      "non_factual_tasks": "问题与动作可保存为任务结构；其中事实前提仍须通过同一边界",
+      "dependencies": "P2 分析记忆上线依赖 P1 共用事实校验；不得延期到 P5",
+      "no_new_claims_dsl": true
+    }
+  },
+  "architecture_acceptance_cases": [
+    {
+      "id": "A1",
+      "work_packages": [
+        "P5",
+        "P6"
+      ],
+      "input": "给同一冻结 trace 相反的 reviewer 离线意见，或移除评测组件",
+      "expected": "运行时依赖/调用图不可达 reviewer；确定性放行、路由、状态与 context 不受意见影响；不能用两次随机 LLM 输出恰好相同作为证明",
+      "execution_status": "not_executed"
+    },
+    {
+      "id": "A2",
+      "work_packages": [
+        "P1",
+        "P2"
+      ],
+      "input": "同句无据事实跨 finding、hypothesis 前提、反驳摘要、缺口原因、caveat、why、follow_up 迁移；改角色/候选标签，并提供有据对照句",
+      "expected": "相同事实边界判定；标签不豁免；对照句不因字段迁移误拒；走真实状态写入路径",
+      "execution_status": "not_executed"
+    },
+    {
+      "id": "A3",
+      "work_packages": [
+        "P2",
+        "P3"
+      ],
+      "input": "拒绝提案后继续对话、摘要、follow-up、重启恢复，并显式打开原始审计",
+      "expected": "默认 context 和有效分析状态不含被拒提案；修复/审计保留失败身份；不回写为发现；走真实 context 投影路径",
+      "execution_status": "not_executed"
+    },
+    {
+      "id": "A4",
+      "work_packages": [
+        "P2",
+        "P3"
+      ],
+      "input": "改变已接受记录的主体、期间或 scope 后恢复",
+      "expected": "重新核查适用范围，旧接受标记不使过期记录成为当前结论",
+      "execution_status": "not_executed"
+    },
+    {
+      "id": "A5",
+      "work_packages": [
+        "P2",
+        "P6"
+      ],
+      "input": "复用既有 lease 回归：同 session 并发、过期接管、旧持有者释放、重排白名单内外任务过期",
+      "expected": "保留 409、到期恢复、旧释放保护和重排白名单；非幂等 task/run 失败；无新增续期或心跳；不据此重构 lease",
+      "execution_status": "not_executed"
+    }
+  ]
+}

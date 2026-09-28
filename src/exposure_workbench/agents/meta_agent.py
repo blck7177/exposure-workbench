@@ -240,7 +240,7 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
         if rec.get("kind") == F.SERIES and len(points) > F.SERIES_POINTS_INLINE:
             # the row shows a thinned series; the record holds every point, and here they are, paged
             paged = _page(points, offset, F.SERIES_POINTS_INLINE, "points")
-            return paged if paged.get("error") else {**out, **paged}
+            return paged if paged.get("error") else {"id": ref, **out, **paged}
         return out
     if ref.startswith(("r_", "calc_")):
         rows = [F.line(r) for r in led.shown.values()
@@ -248,7 +248,7 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
                            (r.get("params") or {}).get("of"), (r.get("params") or {}).get("book"))]
         if not rows:
             return {"error": "not_on_the_record", "detail": f"no row of this conversation came from {ref}"}
-        return _page(rows, offset, OPEN_PAGE_ROWS, "rows")
+        return {"id": ref, **_page(rows, offset, OPEN_PAGE_ROWS, "rows")}
     return {"error": "unknown_id", "detail": "open takes the id of a row (f_…), a call (r_…), a task, or a built book (calc_…)"}
 
 
@@ -392,7 +392,8 @@ async def _open_state(db_factory, session_id: str, message_id: str, question: st
             previous = await AS.load_latest(db, session_id)
     except Exception:  # noqa: BLE001
         logger.exception("could not read the analysis state of %s", session_id)
-    state = AS.new_turn(session_id, message_id, question, brief if isinstance(brief, dict) else {}, previous)
+    led = await _load_ledger(db_factory, session_id)
+    state = AS.new_turn(session_id, message_id, question, brief if isinstance(brief, dict) else {}, previous, ledger=led)
     await _save_state(db_factory, state)
     return state
 
@@ -400,14 +401,12 @@ async def _open_state(db_factory, session_id: str, message_id: str, question: st
 async def _save_state(db_factory, state: AS.State) -> None:
     try:
         async with db_factory() as db:
-            try:
-                await AS.save(db, state)
-            except AS.StaleState:
-                # somebody moved the row: take its version and write ours over it, once
-                fresh = await AS.load(db, state.id)
-                state.version = fresh.version if fresh else 0
-                await AS.save(db, state)
+            await AS.save(db, state)
             await db.commit()
+    except AS.StaleState:
+        # A conflicting record must be reconciled by its owner. Never borrow its
+        # version to overwrite it with this turn's stale contents.
+        raise
     except Exception:  # noqa: BLE001
         logger.exception("could not save the analysis state of %s", state.session_id)
 
@@ -487,7 +486,7 @@ async def handle_message(
     async with llm_session(db_factory, session_id, message_id) as llm:
         ctx = sub_analyst.TurnContext(open_tools=_open_tools, llm=llm, db_factory=db_factory,
                                       session_id=session_id, message_id=message_id, briefing=brief,
-                                      state_version=state.version)
+                                      state_version=state.version, question=user_text)
 
         nudges = 0
         # A REPLY RE-SENT UNCHANGED IS NOT A SECOND ATTEMPT (V37/A2, the V31 rule
@@ -509,13 +508,17 @@ async def handle_message(
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
             tools = ([delegation.ASK_TOOL]
-                     + ([delegation.OPEN_TOOL] if delegated else [])
+                     + ([delegation.OPEN_TOOL] if delegated or led.shown or state.findings else [])
                      + ([REPAIR_TOOL] if standing is not None else []))
+            state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
+            AS.mark_delivery_missing(state, led, handed | read.facts)
             messages[state_at] = {"role": "system", "content": _state_block(state, led)}
+            read.project(messages)
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
             content, tool_calls = await llm.chat(messages=messages, tools=tools, note=read.note(),
                                                  **({"tool_choice": "required"} if standing is not None else {}))
             handed |= read.facts
+            AS.mark_delivery_missing(state, led, handed)
             read.reset()
             completions += 1
             assistant_msg: dict = {"role": "assistant", "content": content or ""}
@@ -541,6 +544,8 @@ async def handle_message(
                         else:
                             if declared:
                                 state.requirements = declared
+                            AS.start_tasks(state, tasks)
+                            await _save_state(db_factory, state)
                             ctx.state_version = state.version
                             await _record_delegate(db_factory, session_id, message_id, tasks)
                             got = await sub_analyst.run_tasks(tasks, ctx)
@@ -684,6 +689,8 @@ async def handle_message(
     # that went out leaving a requirement unaddressed is partial whatever else it settled,
     # and the reader is told, in the user's own words, what stayed open.
     completion = AS.completion_of(state)
+    if reply_text is None and state.requirements:
+        completion = "partial"
     if reply_text is not None and forced_partial:
         completion = "partial"
         open_anchors = [r.get("anchor") or r["id"] for r in AS.unaddressed(state, reply_citations)]
@@ -692,6 +699,7 @@ async def handle_message(
         if reply_blocks is not None:
             reply_blocks = [*reply_blocks, {"type": "paragraph", "runs": [tail]}]
     state.completion = completion
+    state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
     await _save_state(db_factory, state)
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,

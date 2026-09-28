@@ -24,7 +24,9 @@ def test_anchors_are_the_users_words_and_ids_are_r_numbers():
         dl.parse_requirements({"requirements": [{"id": "req-1", "anchor": "How big is MSFT"}]}, Q)
     with pytest.raises(dl.BadDelegation, match="declared twice"):
         dl.parse_requirements({"requirements": [REQS[0], REQS[0]]}, Q)
-    assert dl.parse_requirements({"tasks": []}, Q) == [], "an ask that declares none declares none"
+    with pytest.raises(dl.BadDelegation, match="first ask"):
+        dl.parse_requirements({"tasks": []}, Q)
+    assert dl.parse_requirements({"tasks": []}, Q, known=declared) == []
 
 
 def test_requirements_are_declared_once():

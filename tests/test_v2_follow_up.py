@@ -6,10 +6,13 @@ Offline, on the analyst-loop harness.
 from __future__ import annotations
 
 import json
+import copy
 
 import pytest
 
 from exposure_workbench.agents import delegation as dl, sub_analyst as sa
+from exposure_workbench.services import analysis_state as S
+from exposure_workbench.services.ledger import Ledger
 from tests.test_v1_analyst import FINDING, SETTLED, WEIGHT, _Tools, _ctx, _read, _submit
 
 FOLLOW = dl.Task("tsk_2", "risk", ("port_001",), ("and the sector it sits in",), follow_up_of="tsk_1")
@@ -26,7 +29,11 @@ async def test_the_follow_up_reads_what_the_prior_task_settled_and_not_what_was_
     tools.records.append(dict(WEIGHT))                      # the prior task's row is on the session ledger
 
     async def _load_by_task(db, session_id, task_id):
-        return PRIOR if task_id == "tsk_1" else None
+        prior = copy.deepcopy(PRIOR)
+        for entry in prior["accepted_lines"]:
+            entry["validation"] = S.validation_context(S.scope_of(ctx.briefing, ctx.question),
+                                                       entry.get("facts") or [entry["boundary"]], Ledger.of([WEIGHT]))
+        return prior if task_id == "tsk_1" else None
 
     monkeypatch.setattr(sa.analyst_reports, "load_by_task", _load_by_task)
     await sa.run_sub_analyst(FOLLOW, ctx)

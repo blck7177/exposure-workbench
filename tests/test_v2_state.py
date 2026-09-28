@@ -43,7 +43,7 @@ POLICY = {"n": 3, "settled": False, "why": "the desk does not forecast", "bounda
 
 def test_a_turn_opens_with_the_scope_the_runtime_fixed():
     st = S.new_turn("sess", "msg", "how big is MSFT?", BRIEFING)
-    assert st.version == 0 and st.scope == {"subjects": ["MSFT"], "books": ["port_001"], "as_of": "2026-09-10"}
+    assert st.version == 0 and st.scope == S.scope_of(BRIEFING, "how big is MSFT?")
     assert st.findings == [] and st.gaps == [] and S.completion_of(st) is None
 
 
@@ -92,7 +92,7 @@ def test_a_scope_change_marks_what_fell_outside_stale_and_the_view_drops_it():
 def test_a_new_turn_inherits_only_what_is_inside_its_scope():
     first = S.new_turn("sess", "m1", "q1", BRIEFING)
     S.merge_task(first, TASK, _result(SETTLED), LEDGER)
-    same_scope = S.new_turn("sess", "m2", "and its beta?", BRIEFING, previous=first)
+    same_scope = S.new_turn("sess", "m2", "q1", BRIEFING, previous=first, ledger=LEDGER)
     assert [f["status"] for f in same_scope.findings] == ["inherited"] and same_scope.gaps == []
     other = S.new_turn("sess", "m3", "what about AAPL?", {"subjects": {"tickers": ["AAPL"], "portfolios": [], "runs": []}},
                        previous=first)
@@ -110,13 +110,13 @@ def test_undelivered_rows_become_one_gap_per_call_and_conflicts_are_found_by_loo
     [conflict] = S.conflicts(st, LEDGER)
     assert conflict["type"] == "evidence_conflict" and conflict["refs"] == ["f_w1a2b3c4d5e6", "f_w2b3c4d5e6f7"]
     shown = S.view(st, LEDGER)
-    assert shown["gaps"][0]["rows"][0].startswith("[f_w1a2b3c4d5e6]")
+    assert next(g for g in shown["gaps"] if g["type"] == "evidence_conflict")["rows"][0].startswith("[f_w1a2b3c4d5e6]")
 
 
 def test_requirement_status_and_completion_are_counts():
     st = S.new_turn("sess", "msg", "q", BRIEFING)
     st.requirements = [{"id": "R1", "anchor": "how big MSFT is"}, {"id": "R2", "anchor": "its beta"}, {"id": "R3", "anchor": "next year"}]
-    task = dl.Task("tsk_1", "risk", ("port_001",), ("a", "b", "c"), requirements=(("R1", "how big MSFT is"),))
+    task = dl.Task("tsk_1", "risk", ("port_001",), ("a",), requirements=(("R1", "how big MSFT is"),))
     S.merge_task(st, task, _result(SETTLED), LEDGER)
     assert [r["status"] for r in st.requirements] == ["covered", "unresolved", "unresolved"] and S.completion_of(st) == "partial"
     st.gaps.append({"type": "policy_boundary", "requirement_ids": ["R2", "R3"], "boundary": "f_policy_no_forecast"})
