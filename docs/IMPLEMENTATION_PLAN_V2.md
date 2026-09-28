@@ -208,6 +208,31 @@ P1 完成证据：三组真实函数回归 + 通道测试；`v1_wording.py` 重�
 - **对照臂**（设计 §11）：同配置下 (A) 现行三位分析师；(B) P4 之后的原语粒度/批量；(C) 仅当 V1 步骤 7 决策规则触发时的"面由任务组合"更少 worker。"主 agent 直调高层工具"不在这里跑，需要独立实验与决策记录。
 - **报告字段**（设计 §12）：完整完成题数、逐要求正确率、真实边界、静默遗漏、错误事实、误拒/漏检、恢复成功、工具调用及机械算术比例、重试、token 与耗时、实际配置；基础设施失败单列不剔除；Q17 冻结新闻回放与实时检索分开。
 
+## 3a. 执行记录（2026-09-28，分支 `desk-v2-wip`，从 `6d40614` 开出；boss 当日"都同意，按推荐开始，直接执行全部修改"）
+
+每包一个提交，提交前该树跑全套离线套件；措辞未过目，因此全部落在 `desk-v2-wip`，过目后快进到 `desk-v1`。
+
+| 包 | 提交 | 做了什么 | 验收 |
+|---|---|---|---|
+| 计划 | `a3c8f48` | 本文件 | — |
+| P0a | `fe8a447` | 电池导出与 trace 同宽（4096/2000，导入常量）；answer step 的 `text` 免截断（`record_step(unbounded=)`）；路由先铸 message_id 传入 `handle_message`，503/413/500 各落一行 `turn_error` 步并在错误体返回 message_id；电池自铸 message_id，异常后仍按它读 steps；phase_e.sh 记 `git describe` | `tests/test_v2_p0_instruments.py`（7）；2990 绿；措辞单无差异。**E 轮基线 = `fe8a447`** |
+| P1 | `4a7d57a` | G1：C6 caveat / C7 why / C8 follow_up 走 `answer_check`，未过的不进 for_lead、不进报告，unsettled 的 why 不过则该行 refused；G2：`merge_brief` patch 契约，重交只替换点名的条目；G3：`open(offset)`，r_/calc_ 分页给 total/shown/next_offset，序列行"k of n points shown"，`open(f_序列, offset)` 翻点；P1.4 截断句给出路；`battery_counters` 按通道计数 | `test_v2_boundary_channels`（10）、`test_v2_handoff_repair`（3）、`test_v2_open_paging`（4）；3007 绿 |
+| P2a | `444b68a` | `v40_analysis_state.sql` + init.sql + RLS parity + PRODUCTION.md + 删除脚本 + 审计表：`analysis_state` 表、`analyst_reports` 加 requirement_ids/input_version/accepted_lines/attempts/receipts、`agent_steps.task_id`；task_id 经 MCP 请求 meta 与 actor 同路（tool_session → mcp_server → invoke 7 处 → record_step）；`log_from_steps` 按 tag 分开两任务；`agents/delivery.Delivered` 把每次 completion 读到的 f_/r_ id 记在 llm_call 步的 args | `test_v2_task_id`（5）、`test_v2_delivery`（2）、parity +4；3018 绿 |
+| P2b | `3684e46` | `services/analysis_state.py`：State、`new_turn`（scope 内继承）、`propose`（唯一写入口，失败落 `state_proposal` rejected 步）、`merge_task`（缺口按边界行 reason 映射类型）、`mark_delivery_missing`、`conflicts`、`invalidate`、`view`、版本化 `save`；`sub_analyst` 的 `<prior>` 块只带通过的条目与行 | `test_v2_state`（9）、`test_v2_follow_up`（2）；3029 绿 |
+| P3 | `5c87c06` | `ask` 加 `requirements[{id, anchor}]`（anchor 必须逐字来自用户原话，只声明一次）与每任务 `for`（整任务或一行一列表）；`<state>` 块每次 completion 前由记录重新渲染；每次 ask 后 merge/delivery/conflicts/save；回复通过句检但留下未覆盖要求 → 退回一次（`_coverage_message`，不是句子修复），第二次放行为 partial 并附 `_PARTIAL_TEXT`；completed / completed_with_boundaries / partial 写进 meta；事实 id 允许下划线（政策行可被引用）；旧 gate 的 standalone 规则放过缺席 | `test_v2_requirements`（4）、`test_v2_loop_state`（4）；3037 绿 |
+| P4 | `b02c55d` | Q13：`scenario(funding=external|proceeds)`，默认不变；proceeds 模式卖出所得付买入、可增持已持有、`insufficient_proceeds` / `already_above_target`；常量：`calc` 的 factor 与写出的 level 必带 `source ∈ {user_assumption, method_constant}`，行的 basis 带词；序列行带 `filed_in`；book.position 行带 `book`（渲染 "on run_…"，open(run_) 可找到）；READS 天数读法（无数字）；risk 章 Q19 一句 | `test_v2_p4_capabilities`（7）；发行人面描述面积 14,477 < 14,500；3046 绿 |
+| P5 | `cd67b37` | `services/fact_boundary.check_text` 单一入口 + `CHANNELS` 封闭表，六处调用改走它；`_words` 读所有格（"MSFT's" 名 MSFT）；`evals/semantic_review/{corpus,review,score}.py` 顶层目录、只写 `evals/reports/`；A1 测试：src/apps/scripts 不 import evals、Dockerfile 不 COPY、三模块不碰产品与库 | `test_v2_boundary_channels` 扩到六通道 + 所有格；`test_v2_audit` +3；3058 绿 |
+
+**没做、为什么**：
+- P0b 验收矩阵与 gold_v1：矩阵在评审者本机，仓库没有；`requirement_score.py` 也依赖它的 schema。等文件。
+- P0c E 轮：是测量不是修改，且要在冻结基线上跑；基线 `fe8a447` 已定，`phase_e.sh` 可从该提交的 worktree 起跑（当前 HEAD 含 P1–P5，不是未改行为）。需要 OpenAI 额度与一小时以上。
+- P4-1/2（book.analysis 拆分、批量算术）、P4-6/7（XOM、LLY 在 fixture 上核对）：等 E 轮数据。
+- P4-4 行业来源、P4-8 历史时点统计、天数单位类、Q20、withheld：计划里没给推荐，仍是拍板项。
+- P5.2 同公司跨期身份的误拦：按计划等 E 轮标注语料；所有格那一处已修。
+- P6：全部是测量。
+
+**措辞**：P1、P2b、P3、P4 改了发给模型的文字，全部在 `docs/WORDING_V1.md` 里（`scripts/v1_wording.py` 已扩到新块），未过目；过目后快进。
+
 ## 4. 验收总表（机械，红了就是越界）
 
 设计 §12 的 A1–A5 与分层验收，落到测试或脚本：
