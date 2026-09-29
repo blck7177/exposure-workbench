@@ -60,3 +60,78 @@ def test_a_scope_written_now_is_the_scope_a_later_turn_reads_back():
     now = AS.scope_of(BRIEFING, "the same words")
     stored = json.loads(json.dumps(now))
     assert stored == AS.scope_of(BRIEFING, "the same words")
+
+
+UNSOURCED = "NVDA weighs 42% of the book."
+
+
+def _repair(text: str):
+    return [{"id": "r1", "function": {"name": meta_agent.REPAIR_TOOL_NAME,
+                                      "arguments": json.dumps({"replacements": [{"tag": "S1", "text": text}]})}}]
+
+
+@pytest.mark.asyncio
+async def test_a_repair_that_passes_and_is_refused_for_coverage_still_leaves_the_lead_its_reply(monkeypatch):
+    """Q01 / Q10: one refused sentence, a repair that passed every check, then the coverage
+    refusal — and the turn ended on the bar. The coverage refusal is once per turn, and
+    the sentence attempts are the sentence attempts."""
+    _no_db_state(monkeypatch)
+    chat, lead, _sub = _script(
+        [("", _ask(REQS, {"for": ["R1"]})), (UNSOURCED, None), ("", _repair(ROW)), (ROW, None)],
+        [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}]))])
+    _stub_llm(monkeypatch, chat)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+
+    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
+
+    assert "gate" not in out["meta"], out["text"]
+    assert out["meta"]["completion"] == "partial"
+    assert out["text"].startswith("MSFT weighs 16.0%") and "Still open: “what will its weight be next year”" in out["text"]
+    # four lead completions: the ask, the refused reply, the repair, the reply that went out —
+    # the third was told its sentence, the fourth was told the requirement (as the tool's result)
+    assert len(lead) == 4
+    assert "42%" in lead[2][-1]["content"] and "partial answer" not in lead[2][-1]["content"]
+    assert lead[3][-1]["role"] == "tool" and "[R2] what will its weight be next year" in lead[3][-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_a_coverage_refusal_first_does_not_cost_the_sentence_repair(monkeypatch):
+    """Q07, Q09, Q12, Q17, Q20: refused for coverage, then one refused sentence — and no
+    repair was left. With the coverage refusal outside the count, the repair is."""
+    _no_db_state(monkeypatch)
+    chat, lead, _sub = _script(
+        [("", _ask(REQS, {"for": ["R1"]})), (ROW, None), (UNSOURCED, None), ("", _repair(ROW))],
+        [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}]))])
+    _stub_llm(monkeypatch, chat)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+
+    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
+
+    assert "gate" not in out["meta"], out["text"]
+    assert out["meta"]["completion"] == "partial"
+    assert out["text"].startswith("MSFT weighs 16.0%") and "Still open" in out["text"]
+    # the ask, the reply refused for coverage, the reply refused for its sentence, the repair that went out
+    assert len(lead) == 4
+    assert lead[2][-1]["role"] == "user" and "[R2] what will its weight be next year" in lead[2][-1]["content"]
+    assert lead[3][-1]["role"] == "user" and "42%" in lead[3][-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_two_refused_sentences_still_end_the_turn(monkeypatch):
+    """The bound on sentence attempts is what it was: the coverage refusal moved out of
+    the count, not the count."""
+    _no_db_state(monkeypatch)
+    chat, _lead, _sub = _script(
+        [("", _ask(REQS, {"for": ["R1"]})), (ROW, None), (UNSOURCED, None), ("", _repair(UNSOURCED + " Really.")),
+         (ROW, None)],
+        [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}]))])
+    _stub_llm(monkeypatch, chat)
+    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, session)
+
+    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
+
+    assert out["meta"].get("gate") == "exhausted"
+    assert out["meta"]["gate_refusals"] == ["requirement_unaddressed", "unsourced_figure", "unsourced_figure"]

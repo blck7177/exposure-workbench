@@ -576,9 +576,12 @@ async def handle_message(
                         unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
                         if verdict.ok and unaddressed and coverage_refusals == 0:
                             # V2 P3: the sentences pass and a requirement has neither a finding nor a
-                            # boundary in the reply — refused once, as a reply and not as sentences
+                            # boundary in the reply — refused once, as a reply and not as sentences,
+                            # AND NOT AS ONE OF THE SENTENCE ATTEMPTS (V2E_mini, 2026-09-29): it was,
+                            # and with two attempts a coverage refusal after one refused sentence ended
+                            # the turn on the bar — Q01 and Q10 went out as "no answer" with a repaired
+                            # reply that had passed every check and said what stayed open.
                             coverage_refusals += 1
-                            attempts += 1
                             gate_refusals.append("requirement_unaddressed")
                             verdict.error, verdict.detail = "requirement_unaddressed", ", ".join(r["id"] for r in unaddressed)
                             verdict.problems = [{"reason": "requirement_unaddressed", "where": r["id"],
@@ -650,13 +653,15 @@ async def handle_message(
             led = await _load_ledger(db_factory, session_id)
             verdict = fact_boundary.check_text("answer", text, led, question=user_text)
             unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
-            if verdict.ok and unaddressed and coverage_refusals == 0 and attempts < MAX_ANSWER_ATTEMPTS - 1:
+            if verdict.ok and unaddressed and coverage_refusals == 0:
                 # V2 P3 (design v0.4 §06): structural coverage. The reply's sentences pass, and a
                 # declared requirement has no finding and no boundary among what the reply points
                 # at. Refused once — no verdict stands, the lead may ask and write anew; the second
-                # such reply goes out as partial, with the reader told what stayed open.
+                # such reply goes out as partial, with the reader told what stayed open. Once per
+                # turn and never counted as a sentence attempt (V2E_mini, 2026-09-29): counted, it
+                # left the lead one sentence repair instead of two, and five of the round's ten
+                # exhaustions were a coverage refusal followed by one refused sentence.
                 coverage_refusals += 1
-                attempts += 1
                 gate_refusals.append("requirement_unaddressed")
                 verdict.error, verdict.detail = "requirement_unaddressed", ", ".join(r["id"] for r in unaddressed)
                 verdict.problems = [{"reason": "requirement_unaddressed", "where": r["id"],
