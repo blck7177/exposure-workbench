@@ -233,6 +233,18 @@ P1 完成证据：三组真实函数回归 + 通道测试；`v1_wording.py` 重�
 
 **措辞**：P1、P2b、P3、P4 改了发给模型的文字，全部在 `docs/WORDING_V1.md` 里（`scripts/v1_wording.py` 已扩到新块），未过目；过目后快进。
 
+## 3b. V2E_mini 之后的三处修复（2026-09-29，boss："修 1 2 3 然后复测"）
+
+第一臂实测（`docs/spikes/v1/ACCEPTANCE_V2E_mini.md`，HEAD `e3a450f`，全 gpt-5.4-mini：20 题 10 答 / 10 耗尽）读出三件压住读数的东西，各一个提交，都不动发给模型的文字（措辞单 `--check` 无差异）：
+
+| 修 | 提交 | 做了什么 | 验收 |
+|---|---|---|---|
+| 1 date 进 JSONB | `c5f0f8c` | `analysis_state.scope_of` 经 `_plain()` 把目录里的 date/datetime 写成 ISO 字符串（书的 `positions_as_of`、发行人的 `latest_period_end`/filings/prices）；分析师报告的 `input_version`/`accepted_lines.validation` 走同一函数 | `tests/test_v2e_mini_findings.py`：真实形状的 briefing → `json.dumps(_fields(state))` 成立、`json.loads(json.dumps(scope)) == scope`（恢复的 scope 与新算的相等，`reusable` 才可能命中） |
+| 2 覆盖退回吃掉修复机会 | `25ebf6e` | `requirement_unaddressed` 每 turn 至多一次、不计入 `MAX_ANSWER_ATTEMPTS`，文本回复路径与 `repair_answer` 路径同一规则（原先 repair 路径无守卫、两条路径都把它计为一次尝试） | 同文件三条：句检退回→repair 通过→覆盖退回后仍能出 partial；覆盖退回在前不吃掉 repair；两次句检退回仍耗尽 |
+| 3 夹具无 worker | 本提交 | `battery_fixture.sh worker`（同一 worker 代码跑在夹具库上）；`restore` 停表：`schedules` 全部 `is_active=false`、快照遗留的 pending 任务置 failed；`phase_e.sh` 起 worker、两个系列 `--deny submit_brief --deny start`（冻结的桌子不准备发行人、不重跑真书；worker 完成的只有本轮 `scenario` 自己入队的假想书 run） | 复测的 run log：`could not save` / `could not store` 为 0；`scenario` 的 run 在 worker 上完成；FREEZE CHECK 干净 |
+
+复测标签 `V2E2_mini`，同一快照、同一模型、同一并发；读法与第一臂相同。
+
 ## 4. 验收总表（机械，红了就是越界）
 
 设计 §12 的 A1–A5 与分层验收，落到测试或脚本：

@@ -18,8 +18,11 @@
 # the twenty on the same fixture (a scenario's book and a `start`'s task are new rows; neither moves
 # the latest run the series reads).
 #
-# NOT RUN YET (2026-09-20): written with the series it adds. The procedure is phase_d.sh's, which
-# was itself never run; the one step added to it is the v39 migration (facts.means, plan step 1).
+# First run 2026-09-29 as V2E_mini (docs/spikes/v1/ACCEPTANCE_V2E_mini.md). The procedure is
+# phase_d.sh's, which was itself never run; the steps added to it: the v39 and v40 migrations, and
+# after that round a worker over the fixture (battery_fixture.sh worker) so a scenario's book gets
+# its run, with `start` denied — the frozen desk neither prepares issuers nor re-runs its books, so
+# what the worker completes is the round's own scenario books and nothing that moves the latest run.
 set -uo pipefail
 cd /home/ubuntu/exposure-workbench
 TOOLS=docs/spikes/v37/tools
@@ -70,18 +73,20 @@ say "=== FACE $(date -u +%FT%T+00:00) ==="
 scripts/battery_fixture.sh serve 2>&1 | tee -a "$LOG" || exit 5
 sleep 2
 grep -E "mcp mount /mcp/" /tmp/battery_mcp_8105.log | tail -5 | tee -a "$LOG"
+say "--- the worker: a scenario's book gets its run; nothing else is enqueued with start denied ---"
+scripts/battery_fixture.sh worker 2>&1 | tee -a "$LOG" || exit 5
 
 say ""
 say "=== ROUND E, the twenty $(date -u +%FT%T+00:00) ==="
-say "cmd: conversation_battery questions_v33.json ${TAG}.json --fixture --concurrency 5 --deny submit_brief"
+say "cmd: conversation_battery questions_v33.json ${TAG}.json --fixture --concurrency 5 --deny submit_brief --deny start"
 BATTERY_OWNER_ID=$OWNER $PY scripts/conversation_battery.py \
-  docs/spikes/v33/questions_v33.json $D/${TAG}.json --fixture --concurrency 5 --deny submit_brief 2>&1 | tee -a "$LOG"
+  docs/spikes/v33/questions_v33.json $D/${TAG}.json --fixture --concurrency 5 --deny submit_brief --deny start 2>&1 | tee -a "$LOG"
 
 say ""
 say "=== ROUND E, the cross-family series $(date -u +%FT%T+00:00) ==="
-say "cmd: conversation_battery questions_cross_family.json ${TAG}_X.json --fixture --concurrency 4 --deny submit_brief"
+say "cmd: conversation_battery questions_cross_family.json ${TAG}_X.json --fixture --concurrency 4 --deny submit_brief --deny start"
 BATTERY_OWNER_ID=$OWNER $PY scripts/conversation_battery.py \
-  $CROSS $D/${TAG}_X.json --fixture --concurrency 4 --deny submit_brief 2>&1 | tee -a "$LOG"
+  $CROSS $D/${TAG}_X.json --fixture --concurrency 4 --deny submit_brief --deny start 2>&1 | tee -a "$LOG"
 
 say ""
 say "=== FORENSICS $(date -u +%FT%T+00:00) ==="
