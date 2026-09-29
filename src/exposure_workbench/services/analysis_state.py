@@ -31,6 +31,7 @@ here reads meaning.
 from __future__ import annotations
 
 import copy
+import datetime
 import hashlib
 import json
 import logging
@@ -97,21 +98,42 @@ class State:
 
 # ── a turn opens ─────────────────────────────────────────────────────────────
 
+def _plain(value):
+    """The scope AS THE RECORD HOLDS IT. The catalogue hands the briefing `date`
+    objects (a book's `positions_as_of`, an issuer's `latest_period_end`, a filing's
+    date, the span of its prices); the record is a JSONB column, and json.dumps
+    has no word for a date. V2E_mini (2026-09-29): every save of a book-scoped
+    state and every analyst report store raised `date is not JSON serializable`
+    and was swallowed — 14 of 20 turns never persisted a state, 13 of 46 reports
+    were stored. The same string form is also what `reusable` compares a restored
+    scope against, so a scope is written in it from the start, not at the door."""
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    if isinstance(value, (set, frozenset)):
+        return sorted(_plain(v) for v in value)
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return value.isoformat()
+    return value
+
+
 def scope_of(briefing: dict, question: str | None = None) -> dict:
     """Conservative request scope plus the catalogue's book and issuer snapshots.
     Dates not represented structurally remain part of the literal request.
+    Every date in it is an ISO string (`_plain`): the scope is a record.
     """
     subs = (briefing or {}).get("subjects") or {}
     books = [*(subs.get("portfolios") or []), *(subs.get("runs") or [])]
     snapshots = {}
     for pid, d in ((briefing or {}).get("portfolios") or {}).items():
-        snapshots[pid] = {k: copy.deepcopy((d or {}).get(k)) for k in ("runs", "positions_as_of")}
+        snapshots[pid] = {k: _plain((d or {}).get(k)) for k in ("runs", "positions_as_of")}
     dates = sorted({str(v["as_of"]) for d in snapshots.values() for v in (d.get("runs") or {}).values()
                     if isinstance(v, dict) and v.get("as_of")})
     return {"subjects": sorted(str(t).upper() for t in (subs.get("tickers") or [])),
             "books": sorted(str(b) for b in books), "as_of": dates[-1] if dates else None,
             "snapshots": snapshots,
-            "issuers": {tk: {k: copy.deepcopy(d.get(k)) for k in ("latest_period_end", "filings", "prices")}
+            "issuers": {tk: {k: _plain(d.get(k)) for k in ("latest_period_end", "filings", "prices")}
                         for tk, d in ((briefing or {}).get("issuers") or {}).items() if isinstance(d, dict)},
             # No semantic date parser: a differently worded request must explicitly
             # re-read evidence. This also covers changed periods absent from the map.
