@@ -142,10 +142,10 @@ WHY = "line 1 asks how big the name is in the book; its weight is on the holding
 
 def _delegate(*tasks, anchor="MSFT"):
     """What the lead writes: an analyst, subjects, and lines in its own words."""
-    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], "for": ["R1"], **t}
+    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], **t}
             for t in (tasks or [{}])]
     return [{"id": "c1", "function": {"name": delegation.ASK_TOOL_NAME, "arguments": json.dumps(
-        {"tasks": full, "requirements": [{"id": "R1", "anchor": anchor}]})}}]
+        {"tasks": full})}}]
 
 
 def _submit(*findings):
@@ -331,11 +331,12 @@ async def test_a_delegation_is_answered_and_the_figure_it_returned_can_be_stated
     assert shown["rows"] == [F.line(_W_MSFT)] and "_records" not in shown
     assert shown["rows"][0].startswith("[f_wmsft0001] issuer exposures: weight, MSFT, as of 2026-09-10: 16.0%")
     handed = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
-    (line,) = handed["returns"][0]["lines"]
-    assert line == {"n": 1, "asked": "how big MSFT is in the book", "finding": _FINDING[1],
-                    "rows": [F.line(_W_MSFT)]}                       # the desk's own row, not a transcription
-    assert set(handed) == {"returns"}                               # no legend travels with it
-    assert handed["returns"][0]["analyst"] == "risk" and handed["returns"][0]["status"] == "settled"
+    from tests.test_v2_loop_state import _state_of
+    line, = _state_of(lead[1])["findings"]
+    assert line["text"] == _FINDING[1] and line["rows"] == [F.line(_W_MSFT)]
+    assert "lines" not in handed["returns"][0]
+    assert handed["returns"][0]["analyst"] == "risk"
+    assert handed["returns"][0]["brief_status"] == "settled"
     assert out["text"] == "MSFT is 16.0% of the book."              # as the reader sees it
     assert out["citations"] == ["f_wmsft0001"]
     assert out["meta"]["format"] == "blocks" and out["meta"]["verified"]["figures"] == 1
@@ -359,11 +360,13 @@ async def test_the_lead_never_sees_a_figure_that_did_not_pass_the_handoff(monkey
     out = await handle_message(_factory([]), "sess_handoff", "how big is MSFT?", max_turns=4)
 
     handed = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
-    (line,) = handed["returns"][0]["lines"]
-    assert "finding" not in line and "rows" not in line
-    assert "did not pass the desk's check" in line["refused"] and "mark_mismatch" in line["refused"]
+    from tests.test_v2_loop_state import _state_of
+    state = _state_of(lead[1])
+    assert state["findings"] == [] and handed["returns"][0]["accepted_findings"] == 0
+    assert "mark_mismatch" in state["gaps"][0]["rejections"]
+    assert "1.5%" not in json.dumps(state) and "1.5%" not in json.dumps(handed)
     assert out["text"].startswith("The desk could not settle it.")
-    assert out["meta"]["completion"] == "partial"
+    assert out["meta"]["completion"] is None
     assert out["meta"]["delegations"][0]["status"] == "refused"
 
 
@@ -549,7 +552,7 @@ async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
     async def _bad(_f, _s, _m, args, detail):
         recorded.append(("ask", "rejected", detail))
 
-    async def _opened(_f, _s, _m, ref, result):
+    async def _opened(_f, _s, _m, ref, result, offset=0):
         recorded.append(("open", "row" if "row" in result else result.get("error"), ref))
 
     chat, lead, _sub = _two_loops(
@@ -568,7 +571,7 @@ async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
     monkeypatch.setattr(meta_agent, "_record_open", _opened)
     out = await handle_message(_factory([]), "sess_rec", "hi", max_turns=8)
 
-    assert out["text"].startswith("Hello.") and out["meta"]["completion"] == "partial"
+    assert out["text"].startswith("Hello.") and out["meta"]["completion"] is None
     assert recorded[0][:2] == ("ask", "rejected") and "analysts" in recorded[0][2]
     assert recorded[1] == ("open", "row", "f_wmsft0001")                 # what is on the record opens as its row
     assert recorded[2] == ("open", "not_on_the_record", "f_never_shown")  # and nothing else can be pulled this way

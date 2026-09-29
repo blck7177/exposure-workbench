@@ -57,9 +57,14 @@ class Delivered:
                 continue
             self.facts.update(_ROW.findall(content))
             self.pulls.update(_PULL_ID.findall(content))
-            if msg.get("role") == "tool":
+            # S1's initial page is in the replaced STATE block; subsequent
+            # pages are tool results. Record both ranges as actually delivered.
+            state_page = (msg.get("role") == "system" and content.startswith("<state ")
+                          and content.endswith("\n</state>"))
+            if msg.get("role") == "tool" or state_page:
                 try:
-                    payload = json.loads(content)
+                    body = content.split("\n", 1)[1].rsplit("\n</state>", 1)[0] if state_page else content
+                    payload = json.loads(body)
                 except (ValueError, TypeError):
                     continue
                 if isinstance(payload, dict) and payload.get("id") and "shown" in payload and "total" in payload:

@@ -19,13 +19,12 @@ analyst's brief arrive through `merge_task`, already checked at the handoff
 candidate / hypothesis / unverified are not statuses that exempt anything —
 there is no such status here.
 
-WHAT IS MECHANICAL HERE. Requirement status counts every registered task line,
-accepted finding and active gap;
-a gap's type is a table over the boundary row's registry reason; a conflict is
-two accepted rows of one measure, subject and period whose displayed values
-differ; restored text must match the request/snapshot scope and evidence
-fingerprints and pass the fact check again. Nothing
-here reads meaning.
+S1 projects findings, execution records and tool results without requirement
+statuses or completion claims. Requirement helpers and storage fields remain
+for interpreting historical records, not for controlling the new loop. A
+conflict is two accepted rows of one measure, subject and period whose displayed
+values differ; restored text must match the request/snapshot scope and evidence
+fingerprints and pass the fact check again. Nothing here reads meaning.
 """
 
 from __future__ import annotations
@@ -67,9 +66,9 @@ GAP_OF_REASON: dict[str, str] = {
     "param_out_of_range": "execution_failed", "cannot": "execution_failed", "not_on_this_face": "execution_failed",
 }
 
-# What the lead's view shows of a long list. The record keeps everything.
-VIEW_FINDINGS = 40
-VIEW_GAPS = 40
+# Whole-card pages of the lead's work view. The record keeps everything.
+VIEW_PAGE_ITEMS = 40
+VIEW_PAGE_CHARS = 24_000  # soft bound: one complete card is never cut in half
 DELIVERY_ROWS_NAMED = 8
 
 
@@ -179,7 +178,9 @@ def new_turn(session_id: str, message_id: str | None, question: str, briefing: d
             subjects = {str(s).upper() for s in f.get("subjects") or []}
             if (subjects and subjects <= {s.upper() for s in within}
                     and reusable(f["text"], f.get("refs") or [], f.get("validation"),
-                                 state.scope, ledger, state.question)):
+                                 state.scope, ledger, state.question)
+                    and all(fact_boundary.check_text("caveat", text, ledger, question=state.question).ok
+                            for text in f.get("caveats") or [])):
                 state.findings.append({**copy.deepcopy(f), "status": "inherited", "requirement_ids": []})
     return state
 
@@ -251,8 +252,8 @@ def gap_type_of(ledger: Ledger | None, boundary: str) -> str:
 
 
 def start_tasks(state: State, tasks: Iterable) -> None:
-    """Register obligations before dispatch. An explicit follow-up replaces only
-    the named requirements of its predecessor; unrelated work stays open.
+    """Register work before dispatch. S1 tasks carry no requirements and do not
+    supersede previous findings. Historical tasks retain their old mapping logic.
     """
     for task in tasks:
         if any(t["task_id"] == task.task_id for t in state.tasks):
@@ -271,6 +272,7 @@ def start_tasks(state: State, tasks: Iterable) -> None:
                         line["for"] = [r for r in line["for"] if r not in served]
         of_line = getattr(task, "requirements_of_line", None)
         state.tasks.append({"task_id": task.task_id, "analyst": task.analyst, "status": "running",
+                            "subjects": list(task.subjects), "asked": list(task.lines),
                             "lines": [{"n": n, "for": list(of_line(n) if callable(of_line) else served),
                                        "status": "unresolved"} for n in range(1, len(task.lines) + 1)]})
     state.completion = None
@@ -302,19 +304,30 @@ def merge_task(state: State, task, result, ledger: Ledger | None) -> None:
         if e is None or n in refused:
             obligation["status"] = "unresolved"
             state.gaps.append({"type": "execution_failed", "requirement_ids": req_ids, "task_id": task.task_id,
-                               "n": n, "why": "the analyst did not return an accepted result for this line"})
+                               "n": n, "why": "the analyst did not return an accepted result for this line",
+                               "rejections": sorted({p["reason"] for r in getattr(result, "refused", [])
+                                                     if r["n"] == n for p in r.get("problems") or []
+                                                     if p.get("reason")})})
         elif e.get("settled"):
-            add_finding(state, e["finding"], refs=e.get("facts") or [], ledger=ledger,
-                        requirement_ids=req_ids, task_id=task.task_id, source="brief", n=n)
+            caveats = [c["text"] for c in getattr(result, "caveats", []) if c["line"] == n]
+            refs = list(e.get("facts") or [])
+            for text in caveats:
+                refs.extend(fact_boundary.check_text("caveat", text, ledger, question=state.question).refs)
+            finding = add_finding(state, e["finding"], refs=refs, ledger=ledger,
+                                  requirement_ids=req_ids, task_id=task.task_id, source="brief", n=n)
+            if caveats:
+                finding["caveats"] = caveats
             obligation["status"] = "covered"
         else:
             kind = gap_type_of(ledger, e.get("boundary") or "")
             obligation["status"] = "boundary" if kind in CLOSING_GAPS else "unresolved"
             state.gaps.append({"type": kind, "requirement_ids": req_ids,
                                "boundary": e.get("boundary"), "why": e.get("why"), "task_id": task.task_id,
-                               "n": n})
+                               "n": n, "caveats": [c["text"] for c in getattr(result, "caveats", []) if c["line"] == n]})
     record.update(status=getattr(result, "status", None), coverage=dict(getattr(result, "coverage", None) or {}),
-                  made=list(getattr(result, "made", None) or []), cost=dict(getattr(result, "cost", None) or {}))
+                  made=list(getattr(result, "made", None) or []), cost=dict(getattr(result, "cost", None) or {}),
+                  follow_ups=list(getattr(result, "follow_ups", None) or []),
+                  report_id=getattr(result, "report_id", None))
     _recompute_requirements(state)
 
 
@@ -429,7 +442,8 @@ def unaddressed(state: State, cited: Iterable[str]) -> list[dict]:
 
 
 def completion_of(state: State) -> str | None:
-    """Mechanical: every requirement covered → completed; none unresolved but some
+    """Legacy record interpretation, never an S1 runtime completion verdict.
+    Mechanical: every requirement covered → completed; none unresolved but some
     bounded → completed_with_boundaries; any unresolved → partial. None when no
     requirement was declared (there is nothing to be complete against)."""
     if not state.requirements:
@@ -449,39 +463,73 @@ def _line(ledger: Ledger | None, fid: str | None) -> str | None:
     return F.line(rec) if rec else None
 
 
-def view(state: State, ledger: Ledger | None) -> dict:
-    """The AnalysisView: requirements with their status, accepted findings with the
-    desk's rows under them, gaps by type with their boundary row, the tasks, the
-    budget, the versions. Nothing refused, nothing stale, no measure key, no verb."""
-    findings = [{"text": f["text"], "rows": [ln for fid in f.get("refs") or [] if (ln := _line(ledger, fid))],
-                 **({"for": f["requirement_ids"]} if f.get("requirement_ids") else {}),
-                 **({"task": f["task_id"]} if f.get("task_id") else {}),
-                 **({"inherited": True} if f.get("status") == "inherited" else {})}
-                for f in state.accepted()[:VIEW_FINDINGS]]
-    gaps = []
-    for g in active_gaps(state)[:VIEW_GAPS]:
-        entry: dict = {"type": g["type"]}
-        if g.get("requirement_ids"):
-            entry["for"] = g["requirement_ids"]
-        if g.get("why"):
-            entry["why"] = g["why"]
+def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
+    """One paged work view, newest task first; no semantic completion verdict.
+
+    Checked prose lives here, not in ask receipts too. Keep whole findings with
+    their caveats. A single oversized card may exceed the soft character bound;
+    it is marked and never silently truncated. All remaining cards are reachable
+    through open(state.id, next_offset), including inherited findings.
+    """
+    entries: list[tuple[str, dict]] = []
+    for f in state.accepted():
+        entry = {"text": f["text"], "refs": list(f.get("refs") or []),
+                 "rows": [ln for fid in f.get("refs") or [] if (ln := _line(ledger, fid))]}
+        for key, target in (("task_id", "task"), ("n", "line"), ("caveats", "caveats")):
+            if f.get(key) is not None:
+                entry[target] = f[key]
+        if f.get("status") == "inherited":
+            entry["inherited"] = True
+        entries.append(("findings", entry))
+    for g in active_gaps(state):
+        # A boundary describes the operation that returned it. Its reason family
+        # does not certify that the user's question is unanswerable.
+        entry = {"type": "tool_result" if g.get("boundary") else g["type"]}
+        for key, target in (("why", "why"), ("task_id", "task"), ("n", "line"), ("caveats", "caveats"),
+                            ("rejections", "rejections")):
+            if g.get(key):
+                entry[target] = g[key]
         if g.get("boundary"):
-            entry["boundary"] = _line(ledger, g["boundary"]) or g["boundary"]
+            fid = g["boundary"]
+            entry["boundary"] = _line(ledger, fid) or fid
+            rec = (getattr(ledger, "by_id", {}) or {}).get(fid) or {}
+            entry["operation"] = {k: (rec.get("params") or {}).get(k)
+                                  for k in ("tool", "error", "pull") if (rec.get("params") or {}).get(k)}
         if g.get("pull"):
-            entry["call"] = g["pull"]
-            entry["rows_not_handed_to_you"] = g.get("count")
-            entry["some_of_them"] = [ln for fid in g.get("refs") or [] if (ln := _line(ledger, fid))]
+            entry.update(call=g["pull"], rows_not_handed_to_you=g.get("count"),
+                         some_of_them=[ln for fid in g.get("refs") or [] if (ln := _line(ledger, fid))])
         if g["type"] == "evidence_conflict":
             entry["rows"] = [ln for fid in g.get("refs") or [] if (ln := _line(ledger, fid))]
-        if g.get("task_id"):
-            entry["task"] = g["task_id"]
-        gaps.append(entry)
-    return {"state_version": state.version, "scope": state.scope,
-            "requirements": [{"id": r["id"], "anchor": r.get("anchor"), "status": r.get("status")} for r in state.requirements],
-            "findings": findings, "gaps": gaps,
-            "tasks": [{k: t.get(k) for k in ("task_id", "analyst", "status", "coverage", "made", "lines", "cost") if t.get(k) not in (None, [], {})}
-                      for t in state.tasks],
-            "budget": state.budget, "completion": state.completion if state.completion is not None else completion_of(state)}
+        entries.append(("gaps", entry))
+    for task in state.tasks:
+        entry = {"task": task["task_id"], "analyst": task["analyst"],
+                 "execution": "running" if task.get("status") == "running" else "returned",
+                 "brief_status": task.get("status")}
+        entry.update({k: task[k] for k in ("subjects", "asked", "made", "cost", "follow_ups", "report_id") if task.get(k)})
+        entries.append(("tasks", entry))
+    recent = {t["task_id"]: i for i, t in enumerate(reversed(state.tasks))}
+    entries.sort(key=lambda item: recent.get(item[1].get("task"), len(recent)))
+    offset = max(0, offset)
+    if offset >= len(entries) and offset:
+        return {"error": "invalid_offset", "total": len(entries), "detail": "offset is beyond the current work view"}
+    out = {"id": state.id, "state_version": state.version, "question": state.question,
+           "scope": {k: state.scope.get(k) for k in ("subjects", "books", "as_of")},
+           "findings": [], "gaps": [], "tasks": [], "budget": state.budget,
+           "total": len(entries), "shown": None, "next_offset": None}
+    size, count = len(json.dumps(out, ensure_ascii=False)), 0
+    for category, entry in entries[offset:]:
+        chars = len(json.dumps(entry, ensure_ascii=False))
+        if count and (count >= VIEW_PAGE_ITEMS or size + chars > VIEW_PAGE_CHARS):
+            break
+        out[category].append(entry)
+        size += chars
+        count += 1
+    if count:
+        out["shown"] = [offset, offset + count]  # half-open, like row and series pages
+        out["next_offset"] = offset + count if offset + count < len(entries) else None
+    if size > VIEW_PAGE_CHARS:
+        out["oversized_card"] = True
+    return out
 
 
 # ── the record ───────────────────────────────────────────────────────────────

@@ -132,7 +132,8 @@ def test_final_partial_survives_persistence_reload_and_projection():
     st.completion = "partial"  # evidence was collected, but the final reply omitted it
     saved = S._fields(st)
     restored = S._from_row(SimpleNamespace(id=st.id, version=2, **saved))
-    assert saved["completion"] == restored.completion == S.view(restored, LEDGER)["completion"] == "partial"
+    assert saved["completion"] == restored.completion == "partial"
+    assert "completion" not in S.view(restored, LEDGER), "historical metadata is not a new semantic verdict"
 
 
 @pytest.mark.asyncio
@@ -154,12 +155,6 @@ async def test_save_conflict_never_borrows_a_new_version_to_overwrite(monkeypatc
     with pytest.raises(S.StaleState):
         await meta_agent._save_state(Db, st)
     assert calls == [("save", 3)] and st.version == 3
-
-
-@pytest.mark.parametrize("args", [{}, {"requirements": None}, {"requirements": []}])
-def test_first_ask_cannot_bypass_requirements(args):
-    with pytest.raises(dl.BadDelegation, match="first ask"):
-        dl.parse_requirements(args, "how big is MSFT?")
 
 
 def test_delivery_counts_state_prior_rows_and_page_ranges_separately_from_mentions():
@@ -194,7 +189,7 @@ async def test_legacy_or_changed_scope_reports_are_not_prior_context(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_final_reply_partial_is_saved_even_when_all_evidence_is_collected(monkeypatch):
+async def test_final_delivery_does_not_certify_that_all_evidence_was_used(monkeypatch):
     from tests.test_meta_agent_gate import _delegate, _factory, _run, _run_result, _stub_desk, _stub_llm, _stub_tools, _submit, _two_loops, _W_MSFT
     chat, lead, _ = _two_loops(
         [("", _delegate()), ("The desk has checked the book.", None)],
@@ -206,9 +201,9 @@ async def test_final_reply_partial_is_saved_even_when_all_evidence_is_collected(
     async def save(_, st): saved.append(copy.deepcopy(S._fields(st)))
     monkeypatch.setattr(meta_agent, "_save_state", save)
     out = await meta_agent.handle_message(_factory([]), "sess", "how big is MSFT?")
-    assert out["meta"]["requirements"][0]["status"] == "covered"
-    assert out["meta"]["completion"] == saved[-1]["completion"] == "partial"
-    assert "Still open" in out["text"]
+    assert "requirements" not in out["meta"]
+    assert out["meta"]["completion"] is saved[-1]["completion"] is None
+    assert out["meta"]["delivery"] == "answered" and "Still open" not in out["text"]
     assert saved[-1]["budget"]["lead_completions_used"] == len(lead)
 
 

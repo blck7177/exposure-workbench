@@ -1,10 +1,5 @@
-"""V2 P3 (design v0.4 §06, acceptance A3): the lead's loop runs on the analysis
-state — requirements declared on the first ask, the STATE block refreshed before
-every completion, a reply that leaves a requirement unaddressed refused once and
-then delivered as partial with the reader told what stayed open, a bounded
-requirement counted as completed_with_boundaries. Offline, on the gate harness:
-the check, the protocol, the ledger and the state are real; the provider and the
-tool face are scripted.
+"""S1 loop: receipt + canonical work view, fact checking without coverage gates.
+Provider, tools and persistence are scripted; the protocol/check/state are real.
 """
 
 from __future__ import annotations
@@ -23,8 +18,10 @@ ROW = "MSFT weighs 16.0% [f_wmsft0001] of the book."
 
 
 def _ask(requirements, *tasks):
-    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"], **t} for t in tasks]
-    args = {"tasks": full, **({"requirements": requirements} if requirements else {})}
+    # Legacy test callers may still pass a requirement list; it is not sent.
+    full = [{"analyst": "risk", "subjects": ["port_001"], "lines": ["how big MSFT is in the book"],
+             **{k: v for k, v in t.items() if k != "for"}} for t in tasks]
+    args = {"tasks": full}
     return [{"id": "c1", "function": {"name": delegation.ASK_TOOL_NAME, "arguments": json.dumps(args)}}]
 
 
@@ -62,93 +59,71 @@ def _state_of(messages) -> dict:
     return json.loads(block.split("\n", 1)[1].rsplit("\n</state>", 1)[0])
 
 
+
 @pytest.mark.asyncio
-async def test_a_reply_that_leaves_a_requirement_is_refused_once_and_then_goes_out_partial(monkeypatch):
+async def test_checked_answer_is_delivered_without_claiming_completeness(monkeypatch):
     _no_db_state(monkeypatch)
-    chat, lead, _sub = _script(
-        [("", _ask(REQS, {"for": ["R1"]})), (ROW, None), (ROW, None)],
+    chat, lead, _ = _script(
+        [("", _ask(None, {})), (ROW, None)],
         [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}]))])
     _stub_llm(monkeypatch, chat)
-    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
-    _stub_desk(monkeypatch, session)
-
-    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
-
-    assert out["meta"]["completion"] == "partial"
-    assert [(r["id"], r["status"]) for r in out["meta"]["requirements"]] == [("R1", "covered"), ("R2", "unresolved")]
-    assert out["text"].startswith("MSFT weighs 16.0%") and "Still open: “what will its weight be next year”" in out["text"]
-    assert out["meta"]["blocks"][-1] == {"type": "paragraph", "runs": [out["text"].split("\n\n")[-1]]}
-    assert out["meta"]["gate_refusals"] if "gate_refusals" in out["meta"] else True
-    # the first reply was refused for coverage, not for its sentences: the lead was told in words and asked again
-    told = lead[2][-1]["content"]
-    assert "[R2] what will its weight be next year" in told and "partial answer" in told
-    # the STATE block was in every completion and said what stood: R1 covered with its row, R2 unresolved
-    before, after = _state_of(lead[0]), _state_of(lead[1])
-    assert before["requirements"] == [] and before["findings"] == []
-    assert [(r["id"], r["status"]) for r in after["requirements"]] == [("R1", "covered"), ("R2", "unresolved")]
-    assert after["findings"][0]["rows"][0].startswith("[f_wmsft0001] issuer exposures: weight, MSFT")
-    assert after["tasks"][0]["status"] == "settled"
+    tools = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, tools)
+    out = await meta_agent.handle_message(_factory([]), "sess", Q)
+    assert len(lead) == 2 and out["meta"]["delivery"] == "answered"
+    assert out["meta"]["completion"] is None and "requirements" not in out["meta"]
+    assert "Still open" not in out["text"] and "gate" not in out["meta"]
+    view = _state_of(lead[1])
+    assert view["question"] == Q and "requirements" not in view and "completion" not in view
+    assert view["findings"][0]["text"] == ROW
+    assert view["findings"][0]["rows"][0].startswith("[f_wmsft0001]")
+    receipt = json.loads(lead[1][-1]["content"])
+    assert receipt["returns"][0]["accepted_findings"] == 1
+    assert ROW not in lead[1][-1]["content"]
+    assert sum(ROW in m.get("content", "") for m in lead[1]) == 1
 
 
 @pytest.mark.asyncio
-async def test_a_requirement_the_desk_cannot_settle_is_a_boundary_and_the_turn_completes_with_boundaries(monkeypatch):
-    _no_db_state(monkeypatch)
-    reply = ROW + " The desk does not forecast next year's weight [f_policy_no_forecast]."
-    chat, lead, _sub = _script(
-        [("", _ask(REQS, {"for": [["R1"], ["R2"]], "lines": ["how big MSFT is in the book", "MSFT's weight next year"]})),
-         (reply, None)],
-        [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]},
-                                     {"n": 2, "settled": False, "why": "the desk does not forecast",
-                                      "boundary": "f_policy_no_forecast"}]))])
+async def test_policy_result_is_visible_without_becoming_a_completion_certificate(monkeypatch):
+    chat, lead, _ = _script(
+        [("", _ask(None, {"lines": ["MSFT weight next year"]})),
+         ("The desk does not forecast [f_policy_no_forecast].", None)],
+        [("", _submit([{"n": 1, "settled": False, "why": "the desk does not forecast",
+                         "boundary": "f_policy_no_forecast"}]))])
     _stub_llm(monkeypatch, chat)
-    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
-    _stub_desk(monkeypatch, session)
-
-    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
-
-    assert out["meta"]["completion"] == "completed_with_boundaries"
-    assert [(r["id"], r["status"]) for r in out["meta"]["requirements"]] == [("R1", "covered"), ("R2", "boundary")]
-    assert "Still open" not in out["text"]
-    state = _state_of(lead[1])
-    assert state["gaps"][0]["type"] == "policy_boundary" and state["gaps"][0]["for"] == ["R2"]
-    assert state["gaps"][0]["boundary"].startswith("[f_policy_no_forecast] absent:")
+    tools = _stub_tools(monkeypatch, {})
+    _stub_desk(monkeypatch, tools)
+    out = await meta_agent.handle_message(_factory([]), "sess", Q)
+    assert out["meta"]["completion"] is None
+    assert _state_of(lead[1])["gaps"][0]["type"] == "tool_result"
+    assert "forecast" in _state_of(lead[1])["gaps"][0]["boundary"]
 
 
 @pytest.mark.asyncio
-async def test_what_the_handoff_refused_never_reaches_the_state_block(monkeypatch):
-    """A3 on the real write-and-project path: the analyst's refused line — an
-    invented forecast — is on the record as refused and appears in no STATE block."""
-    _no_db_state(monkeypatch)
-    invented = {"n": 2, "settled": True, "finding": "MSFT will weigh 20.0% of the book next year.", "facts": ["f_wmsft0001"]}
-    chat, lead, _sub = _script(
-        [("", _ask(REQS, {"for": [["R1"], ["R2"]], "lines": ["how big MSFT is in the book", "MSFT's weight next year"]})),
-         (ROW, None), (ROW, None)],
-        [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}, invented])),
-         ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}, invented]))])
+async def test_refused_analyst_text_never_enters_work_view_or_receipt(monkeypatch):
+    bad = {"n": 2, "settled": True, "finding": "MSFT will weigh 20.0% of the book next year.", "facts": ["f_wmsft0001"]}
+    good = {"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}
+    chat, lead, _ = _script(
+        [("", _ask(None, {"lines": ["weight", "forecast"]})), (ROW, None)],
+        [("", _run()), ("", _submit([good, bad])), ("", _submit([bad]))])
     _stub_llm(monkeypatch, chat)
-    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
-    _stub_desk(monkeypatch, session)
-
-    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
-
-    state = _state_of(lead[1])
-    assert "20.0%" not in json.dumps(state) and state["findings"][0]["text"] == ROW
-    assert out["meta"]["delegations"][0]["status"] == "partial", "the brief half passed"
-    assert out["meta"]["completion"] == "partial", "R2 has neither a finding nor a boundary"
+    tools = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, tools)
+    out = await meta_agent.handle_message(_factory([]), "sess", Q)
+    assert "20.0%" not in json.dumps(_state_of(lead[1]))
+    assert "20.0%" not in lead[1][-1]["content"]
+    assert _state_of(lead[1])["findings"][0]["text"] == ROW
+    assert out["meta"]["delegations"][0]["status"] == "partial"
 
 
 @pytest.mark.asyncio
-async def test_a_bad_declaration_is_answered_not_ended(monkeypatch):
-    _no_db_state(monkeypatch)
-    bad = [{"id": "R1", "anchor": "MSFT's forecast weight"}]
-    chat, lead, _sub = _script(
-        [("", _ask(bad, {"for": ["R1"]})), ("", _ask(REQS, {"for": ["R1"]})), (ROW, None), (ROW, None)],
+async def test_bad_task_can_be_revised_without_declaration_transaction(monkeypatch):
+    chat, lead, _ = _script(
+        [("", _ask(None, {"analyst": "unknown"})), ("", _ask(None, {})), (ROW, None)],
         [("", _run()), ("", _submit([{"n": 1, "settled": True, "finding": ROW, "facts": ["f_wmsft0001"]}]))])
     _stub_llm(monkeypatch, chat)
-    session = _stub_tools(monkeypatch, _run_result(_W_MSFT))
-    _stub_desk(monkeypatch, session)
-
-    out = await meta_agent.handle_message(_factory([]), "sess_1", Q)
-    told = json.loads(lead[1][-1]["content"])
-    assert told["error"] == "invalid_ask" and "not a span of the user's words" in told["detail"]
-    assert out["text"].startswith("MSFT weighs 16.0%")
+    tools = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, tools)
+    out = await meta_agent.handle_message(_factory([]), "sess", Q)
+    assert json.loads(lead[1][-1]["content"])["error"] == "invalid_ask"
+    assert out["citations"] == ["f_wmsft0001"]

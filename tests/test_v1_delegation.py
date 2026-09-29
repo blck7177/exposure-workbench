@@ -33,8 +33,8 @@ TASK = dl.Task("tsk_1", "risk", ("port_001",), ("how big MSFT is in the book", "
 def test_the_lead_asks_one_of_three_analysts_in_financial_language():
     task = dl.ASK_TOOL["function"]["parameters"]["properties"]["tasks"]["items"]
     assert task["properties"]["analyst"]["enum"] == ["issuer", "market", "risk"]
-    # V2 P3: `for` names the declared requirements a task serves; still no measure, verb or window
-    assert set(task["properties"]) == {"analyst", "subjects", "lines", "context", "follow_up_of", "for"}
+    # S1: work requests, without a requirement mapping or low-level tool schema
+    assert set(task["properties"]) == {"analyst", "subjects", "lines", "context", "follow_up_of"}
     # no field invites arithmetic in words, a measure's name or a window to be parsed
     assert not {"facts_to_derive", "constraints", "measures", "window"} & set(task["properties"])
 
@@ -122,24 +122,24 @@ def _result(**kw):
     return dl.AnalystResult(task=TASK, status="partial", lines=[SETTLED, UNSETTLED, POLICY], **kw)
 
 
-def test_the_lead_is_handed_the_desks_rows_not_a_transcription():
-    out = dl.for_lead([_result(caveats=[{"line": 1, "text": "as of the latest run"}], made=["calc_after"])], LEDGER)
-    assert set(out) == {"returns"}                                     # no legend travels with it
-    (ret,) = out["returns"]
-    assert set(ret) == {"task_id", "analyst", "status", "lines", "made"}
-    settled, unsettled, policy = ret["lines"]
-    assert settled == {"n": 1, "asked": TASK.lines[0], "finding": SETTLED["finding"], "rows": [F.line(WEIGHT)],
-                       "caveats": ["as of the latest run"]}            # the caveat sits on the line it qualifies
-    assert unsettled == {"n": 2, "asked": TASK.lines[1], "why": "too little price history",
-                         "boundary": F.line(REFUSED)}
-    assert "The desk does not forecast" in policy["boundary"]
-    assert not {"shown", "coverage", "how_to_cite", "cost"} & set(ret)
+def test_receipt_and_work_view_separate_execution_from_checked_content():
+    from exposure_workbench.services import analysis_state as S
+    result = _result(caveats=[{"line": 1, "text": "as of the latest run"}], made=["calc_after"])
+    receipt = dl.for_lead([result], LEDGER)["returns"][0]
+    assert receipt == {"task_id": "tsk_1", "analyst": "risk", "brief_status": "partial",
+                       "accepted_findings": 1, "made": ["calc_after"]}
+    state = S.new_turn("sess", "msg", "q", {})
+    S.merge_task(state, TASK, result, LEDGER)
+    view = S.view(state, LEDGER)
+    assert view["findings"][0]["rows"] == [F.line(WEIGHT)]
+    assert view["findings"][0]["caveats"] == ["as of the latest run"]
+    assert view["gaps"][0]["boundary"] == F.line(REFUSED)
 
 
-def test_a_finding_the_check_refused_is_said_to_be_refused_and_shows_nothing():
-    r = _result(refused=[{"n": 1, "finding": "x", "problems": [{"reason": "mark_mismatch"}]}])
-    line = dl.for_lead([r], LEDGER)["returns"][0]["lines"][0]
-    assert set(line) == {"n", "asked", "refused"} and "mark_mismatch" in line["refused"]
+def test_a_refused_finding_is_not_copied_into_the_receipt():
+    r = _result(refused=[{"n": 1, "finding": "invented prose", "problems": [{"reason": "mark_mismatch"}]}])
+    receipt = dl.for_lead([r], LEDGER)["returns"][0]
+    assert receipt["accepted_findings"] == 0 and "invented prose" not in str(receipt)
 
 
 def test_the_log_is_the_calls_in_order_each_with_why():

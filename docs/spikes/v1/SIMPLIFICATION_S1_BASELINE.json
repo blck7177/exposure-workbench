@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "purpose": "Descriptive baseline only, not independent correctness acceptance",
+  "review_base": "e5d4b45003c593ea42730110a837a010c2a7f725",
+  "tested_ref": "68a52e1",
+  "model": "gpt-5.4-mini-2026-03-17",
+  "acceptance_spec": {
+    "path": "docs/spikes/v1/acceptance_matrix.draft.json",
+    "sha256": "8e3eaf6009179ee3b74b665529a901f3a71f0ba81e65e76d536535d28fbe21cf",
+    "cases": 20,
+    "original_requirements": 65,
+    "status": "planning draft; independent numeric oracle and boundary prelabels still pending"
+  },
+  "main": {
+    "source": {
+      "path": "docs/spikes/v1/V2E2_mini.json",
+      "sha256": "3e0cf7bf84c4f73e65453e4c9703890f09922946833ed0b1fc09d59eca805a55"
+    },
+    "all_turns": {
+      "turns": 20,
+      "runtime_requirements_total": 75,
+      "runtime_requirements_by_status": {
+        "boundary": 12,
+        "covered": 13,
+        "unresolved": 50
+      }
+    },
+    "answered_turns": {
+      "turns": 14,
+      "runtime_requirements_total": 48,
+      "runtime_requirements_by_status": {
+        "boundary": 7,
+        "covered": 12,
+        "unresolved": 29
+      }
+    },
+    "outcomes": {
+      "answered": 14,
+      "exhausted": 6
+    },
+    "cases": [
+      {
+        "tag": "Q01-amzn-earnings-quality",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q02-xom-room-if-oil-falls",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q03-nvda-where-cash-goes",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q04-lly-margin-pricing-mix-cost",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 7
+      },
+      {
+        "tag": "Q05-aapl-risk-and-concentration",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q06-jpm-riskier-than-a-year-ago",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q07-tech-cash-conversion-rank",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 2
+      },
+      {
+        "tag": "Q08-capex-roic-three-way",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 5
+      },
+      {
+        "tag": "Q09-aapl-working-capital-cycle",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q10-msft-leverage-and-rates",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 6
+      },
+      {
+        "tag": "Q11-closest-to-issuer-limit",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q12-jpm-vs-peers-not-on-desk",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 2
+      },
+      {
+        "tag": "Q13-sell-half-nvda-into-tlt",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q14-worst-drawdown-episode",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q15-liquidity-and-limits",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "Q16-book-beta-change-since-prev",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 5
+      },
+      {
+        "tag": "Q17-events-touching-holdings",
+        "turn": 1,
+        "outcome": "exhausted",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q18-attribution-reconcile",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 5
+      },
+      {
+        "tag": "Q19-aws-share-explains-return",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "Q20-lly-margins-next-year",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 1
+      }
+    ]
+  },
+  "cross_resource": {
+    "source": {
+      "path": "docs/spikes/v1/V2E2_mini_X.json",
+      "sha256": "aaeabf474ed79cda66b5b9e5bd3ddb408be7171526ba3bdef0472c9810129875"
+    },
+    "all_turns": {
+      "turns": 9,
+      "runtime_requirements_total": 27,
+      "runtime_requirements_by_status": {
+        "boundary": 4,
+        "covered": 16,
+        "unresolved": 7
+      }
+    },
+    "answered_turns": {
+      "turns": 9,
+      "runtime_requirements_total": 27,
+      "runtime_requirements_by_status": {
+        "boundary": 4,
+        "covered": 16,
+        "unresolved": 7
+      }
+    },
+    "outcomes": {
+      "answered": 9
+    },
+    "cases": [
+      {
+        "tag": "X01-largest-weight-then-its-cash",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "completed",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "X02-weakest-fcf-margin-then-sell-it",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 4
+      },
+      {
+        "tag": "X03-furthest-below-high-then-filings",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "X04-thinnest-coverage-then-its-price",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 5
+      },
+      {
+        "tag": "X05-biggest-drag-then-its-tape",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 2
+      },
+      {
+        "tag": "X06-weakest-momentum-then-trim-it",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "X07-drawdown-repeated-in-dollars",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "completed",
+        "runtime_requirements": 3
+      },
+      {
+        "tag": "X08-two-turns-high-then-filings",
+        "turn": 1,
+        "outcome": "answered",
+        "completion_as_recorded": "partial",
+        "runtime_requirements": 2
+      },
+      {
+        "tag": "X08-two-turns-high-then-filings",
+        "turn": 2,
+        "outcome": "answered",
+        "completion_as_recorded": "completed",
+        "runtime_requirements": 2
+      }
+    ]
+  }
+}

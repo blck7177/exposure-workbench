@@ -30,6 +30,7 @@ History is persisted as agent_messages so a session survives across turns.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 from typing import Sequence
@@ -63,14 +64,16 @@ You pull no figure yourself. The desk has three analysts, each reading one famil
 each answers, what it can be asked for and what is absent there. `ask` is how you ask: pick the analyst by the evidence a \
 line turns on, name the subjects from the DESK block — or a book an analyst built this turn, by its id — and write what you \
 want to know as short, separate lines, one thing per line, in financial language: say the period, and say what is set \
-against what where the line is a comparison. A question may need several analysts: ask them in one call. Ask again only for \
+against what where the line is a comparison. Ask independent work together; read a prerequisite result before asking \
+work that depends on it. Ask again only for \
 what the answer still lacks. Check the question's premises against the DESK block first (which holdings are in which sector, \
 what the desk holds): a premise the user asserts is checked against the desk's figure and corrected with it before the \
-question is answered, and one the desk holds no figure for is neither agreed with nor denied. Take the question apart \
-before you ask: on your first ask, declare its requirements — each a span of the user's own words, copied exactly — and \
-say which of them every task is for. The STATE block keeps their standing: what has been settled and on which rows, what \
-stopped the rest and on which row, and which rows were pulled but never handed to you; read it before you ask again, \
-and open what is there instead of asking for it twice.
+question is answered, and one the desk holds no figure for is neither agreed with nor denied. Keep the user's original \
+question in view as you learn and revise what you ask. The STATE block holds the checked findings with their evidence, \
+what was tried, actual failures and your remaining budget. An ask returns a receipt; read the results in STATE. Open \
+another page using its id and next_offset when needed. Neither an accepted finding nor a tool's refusal settles the \
+whole question by itself. Decide what the evidence supports, what still needs work, and explain any remaining limits \
+in your answer.
 
 What comes back is, for each numbered line, one of three things: a finding with the desk's rows under it; why the line \
 could not be settled, with the desk's own row that says so; or that the analyst's finding did not pass the desk's check. A \
@@ -133,19 +136,11 @@ ROSTER_TAG = ('<roster source="the desk\'s handbook" use="pick the analyst by th
 # was read under. The handbook holds the two apart; the lead is given the meaning.
 READINGS_TAG = ('<readings source="the desk\'s handbook" use="what the desk\'s readings mean in finance, and what the '
                 'desk does not say: write implications from these, never a figure">')
-# V2 P3: THE STATE. What the runtime has established this turn — the requirements and
-# their standing, the findings with their rows, the gaps with their boundary rows, the
-# tasks, the budget — projected from the record (services/analysis_state) and refreshed
-# before every completion. Nothing refused and nothing stale is ever in it.
-STATE_TAG = ('<state source="the desk\'s record of this analysis" trust="rows and boundaries the desk\'s checks passed; '
-             'nothing here is a figure you may write without its row" use="see which requirements stand unresolved, what '
-             'was already settled, and what was pulled but never handed to you; ask only for what is still missing">')
-
-# THE READER'S FIXED SENTENCE WHEN A TURN ENDS PARTIAL (V2 P3, design v0.4 §06). Written by
-# the runtime, never by the model, appended after an accepted reply that leaves a requirement
-# unaddressed on its second attempt; it names the user's own words for what was not settled.
-_PARTIAL_TEXT = ("Not everything asked was settled. Still open: {anchors}. What is written above is what the desk can "
-                 "stand behind.")
+# One current work view. Execution records and checked findings are not a
+# semantic completion certificate; the original question stays in the view.
+STATE_TAG = ('<state source="the desk\'s execution record and checked findings" '
+             'trust="checked findings and evidence; task requests are instructions, not facts" '
+             'use="decide the next step against the original question; read more with open(id, offset)">')
 
 # C — THE REPAIR IS A TOOL. Round G: 18 refused replies got a second chance, one
 # used the tagged-lines protocol, four re-sent the refused text byte for byte and
@@ -206,9 +201,10 @@ def _page(items: list, offset: int, size: int, key: str) -> dict:
     return out
 
 
-async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: int = 0) -> dict:
+async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: int = 0,
+                state: AS.State | None = None, work_views: dict | None = None) -> dict:
     """ANYTHING ALREADY ON THE RECORD, BY ITS ID (V1): a row, the rows one call
-    pulled, an analyst's log, a book a scenario built. It reads the session's own
+    pulled, an analyst's log, a book a scenario built, or a work-view page. It reads the session's own
     ledger and its analysts' records — nothing here can pull a figure nobody
     pulled, which is the whole of the lead's relation to the desk's data.
 
@@ -218,6 +214,13 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
     ref = (ref or "").strip()
     if not ref:
         return {"error": "no_id", "detail": "open takes the id of a row (f_…), a call (r_…), a task, or a built book (calc_…)"}
+    if ref.startswith("ast_"):
+        if ref in (work_views or {}):
+            snapshot, ledger = work_views[ref]
+            return AS.view(snapshot, ledger, offset=offset)
+        if state is None or ref != state.id:
+            return {"error": "unknown_state", "detail": "open the current STATE id; other analysis records are not exposed"}
+        return AS.view(state, await _load_ledger(db_factory, session_id), offset=offset)
     if ref.startswith("tsk_"):
         mine = next((r for r in delegated if r.task.task_id == ref), None)
         if mine is not None:
@@ -283,16 +286,18 @@ async def _record_bad_delegate(db_factory, session_id: str, message_id: str, arg
         logger.exception("could not record the rejected delegate step for %s", session_id)
 
 
-async def _record_open(db_factory, session_id: str, message_id: str, ref: str, result: dict) -> None:
+async def _record_open(db_factory, session_id: str, message_id: str, ref: str, result: dict, offset: int = 0) -> None:
     """The lead opening something on the record, as a step."""
     try:
         async with db_factory() as db:
             await trace_service.record_step(
-                db, session_id, step_type="open", tool_name="open", args={"id": ref}, evidence_refs=[],
+                db, session_id, step_type="open", tool_name="open",
+                args={"id": ref, **({"offset": offset} if offset else {})}, evidence_refs=[],
                 result_summary=(f"{result.get('error')}: {str(result.get('detail') or '')[:160]}" if result.get("error")
                                 else f"{len(result.get('rows') or [])} row(s) of {result.get('total')}, "
                                      f"shown {result.get('shown')}" if "rows" in result
                                 else f"a row, {len(result.get('points') or [])} of {result.get('total')} points" if "points" in result
+                                else f"work view: {result.get('total')} cards, shown {result.get('shown')}" if ref.startswith("ast_")
                                 else "a row" if "row" in result else "a log"),
                 status="rejected" if result.get("error") else "completed", message_id=message_id)
             await db.commit()
@@ -348,20 +353,6 @@ def _refusal_message(verdict) -> str:
         lines.append(f"      {p['reason']}: {p.get('way_out') or p.get('detail') or ''}")
     lines += ["", "Call repair_answer with a replacement for each tag above (an empty text drops the sentence). "
                   "Ask for the evidence you lack first if a fix needs a figure you were not shown."]
-    return "\n".join(lines)
-
-
-def _coverage_message(unaddressed: list[dict]) -> str:
-    """What the lead is told when its reply passed every check on its sentences and
-    still left a declared requirement without a finding or a boundary (V2 P3). Not a
-    sentence repair — there is no failed sentence — so no verdict stands and the lead
-    may ask again and write a new reply. The second such reply goes out as partial."""
-    lines = [f"Your reply is written to the style guide, and it leaves {len(unaddressed)} requirement(s) of the question "
-             f"unaddressed:"]
-    for r in unaddressed:
-        lines.append(f"  [{r['id']}] {r.get('anchor')}")
-    lines += ["", "Ask for what settles them, or point at the row that says why they cannot be settled. A reply that "
-                  "leaves them goes out as a partial answer, and the reader is told which requirements stayed open."]
     return "\n".join(lines)
 
 
@@ -472,8 +463,10 @@ async def handle_message(
     delegated: list = []                   # every AnalystResult this turn produced
     answer, standing = "", None            # the reply being repaired, and the verdict naming its sentences
     handed: set[str] = set()               # every row id a completion of this turn was handed (V2 P3)
-    coverage_refusals = 0                  # a reply that left a requirement unaddressed: refused once, then partial
-    forced_partial = False
+    # One immutable projection per completion, bounded by max_turns. Opening a
+    # page changes receipt diagnostics; it must not shift the cursor being read.
+    # These snapshots are turn-local, not a new persisted state store.
+    work_views: dict = {}
 
     # THE LEAD HOLDS NO TOOL FACE (V1). Each analyst opens the mount of its own
     # family for its own task, on this turn's session and message, so what it pulls
@@ -508,11 +501,14 @@ async def handle_message(
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
             tools = ([delegation.ASK_TOOL]
-                     + ([delegation.OPEN_TOOL] if delegated or led.shown or state.findings else [])
+                     + ([delegation.OPEN_TOOL] if delegated or led.shown or state.findings or state.gaps else [])
                      + ([REPAIR_TOOL] if standing is not None else []))
             state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
             AS.mark_delivery_missing(state, led, handed | read.facts)
-            messages[state_at] = {"role": "system", "content": _state_block(state, led)}
+            snapshot = copy.deepcopy(state)
+            snapshot.id = f"{state.id}_view{completions}"
+            work_views[snapshot.id] = (snapshot, led)
+            messages[state_at] = {"role": "system", "content": _state_block(snapshot, led)}
             read.project(messages)
             prompt_peak = max(prompt_peak, context_budget.count_prompt(messages, tools))
             content, tool_calls = await llm.chat(messages=messages, tools=tools, note=read.note(),
@@ -536,14 +532,11 @@ async def handle_message(
                         args = {}
                     if name == delegation.ASK_TOOL_NAME:
                         try:
-                            declared = delegation.parse_requirements(args, user_text, known=state.requirements)
-                            tasks = delegation.parse_tasks(args, new_id, requirements=state.requirements or declared)
+                            tasks = delegation.parse_tasks(args, new_id)
                         except delegation.BadDelegation as exc:
                             result: dict = {"error": "invalid_ask", "detail": str(exc)}
                             await _record_bad_delegate(db_factory, session_id, message_id, args, str(exc))
                         else:
-                            if declared:
-                                state.requirements = declared
                             AS.start_tasks(state, tasks)
                             await _save_state(db_factory, state)
                             ctx.state_version = state.version
@@ -566,39 +559,19 @@ async def handle_message(
                             offset = int((args or {}).get("offset") or 0)
                         except (TypeError, ValueError):
                             offset = 0
-                        result = await _open(db_factory, session_id, ref, delegated, offset)
-                        await _record_open(db_factory, session_id, message_id, ref, result)
+                        result = await _open(db_factory, session_id, ref, delegated, offset,
+                                             state=state, work_views=work_views)
+                        await _record_open(db_factory, session_id, message_id, ref, result, offset)
                     elif name == REPAIR_TOOL_NAME and standing is not None:
                         repl, unknown = _parse_replacements(args, standing)
                         led = await _load_ledger(db_factory, session_id)
                         text = answer_check.repair(answer, standing, repl) if repl else answer
                         verdict = fact_boundary.check_text("answer", text, led, question=user_text)
-                        unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
-                        if verdict.ok and unaddressed and coverage_refusals == 0:
-                            # V2 P3: the sentences pass and a requirement has neither a finding nor a
-                            # boundary in the reply — refused once, as a reply and not as sentences,
-                            # AND NOT AS ONE OF THE SENTENCE ATTEMPTS (V2E_mini, 2026-09-29): it was,
-                            # and with two attempts a coverage refusal after one refused sentence ended
-                            # the turn on the bar — Q01 and Q10 went out as "no answer" with a repaired
-                            # reply that had passed every check and said what stayed open.
-                            coverage_refusals += 1
-                            gate_refusals.append("requirement_unaddressed")
-                            verdict.error, verdict.detail = "requirement_unaddressed", ", ".join(r["id"] for r in unaddressed)
-                            verdict.problems = [{"reason": "requirement_unaddressed", "where": r["id"],
-                                                 "way_out": f"ask for what settles {r['id']} ({r.get('anchor')}), or point at "
-                                                            f"the row that says why it cannot be settled"} for r in unaddressed]
-                            await _record_answer(db_factory, session_id, message_id, text, verdict)
-                            answer, standing = "", None
-                            result = {"accepted": False, "refusal": _coverage_message(unaddressed)}
-                            _append({"role": "tool", "tool_call_id": tc["id"],
-                                     "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
-                            continue
                         await _record_answer(db_factory, session_id, message_id, text, verdict)
                         if verdict.ok:
                             acc = answer_check.accepted(text, verdict, led)
                             reply_text, reply_citations = acc["text"], acc["citations"]
                             reply_verified, reply_blocks = acc["verified"], acc["blocks"]
-                            forced_partial = bool(unaddressed)
                             result = {"accepted": True}
                         else:
                             again = repeated.record({"text": text})
@@ -628,10 +601,11 @@ async def handle_message(
                         result = {"error": "unknown_tool",
                                   "detail": f"your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and "
                                             f"{REPAIR_TOOL_NAME}; the answer is your reply text"}
-                    # A TOOL RESULT KEEPS ITS OWN SHAPE, and needs no legend: each line of a
-                    # return is one of three shapes, and a row says what it is (V1).
+                    # Work-view pages are already bounded by whole cards. A generic
+                    # character cap could separate a finding from its caveat.
                     _append({"role": "tool", "tool_call_id": tc["id"],
-                             "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT)})
+                             "content": (json.dumps(result, ensure_ascii=False) if name == delegation.OPEN_TOOL_NAME
+                                         and result.get("id") in work_views else ejson.dumps_capped(result, TOOL_RESULT_LIMIT))})
                 if ended or reply_text is not None or attempts >= MAX_ANSWER_ATTEMPTS:
                     break
                 continue
@@ -652,30 +626,11 @@ async def handle_message(
                 continue
             led = await _load_ledger(db_factory, session_id)
             verdict = fact_boundary.check_text("answer", text, led, question=user_text)
-            unaddressed = AS.unaddressed(state, verdict.refs) if verdict.ok else []
-            if verdict.ok and unaddressed and coverage_refusals == 0:
-                # V2 P3 (design v0.4 §06): structural coverage. The reply's sentences pass, and a
-                # declared requirement has no finding and no boundary among what the reply points
-                # at. Refused once — no verdict stands, the lead may ask and write anew; the second
-                # such reply goes out as partial, with the reader told what stayed open. Once per
-                # turn and never counted as a sentence attempt (V2E_mini, 2026-09-29): counted, it
-                # left the lead one sentence repair instead of two, and five of the round's ten
-                # exhaustions were a coverage refusal followed by one refused sentence.
-                coverage_refusals += 1
-                gate_refusals.append("requirement_unaddressed")
-                verdict.error, verdict.detail = "requirement_unaddressed", ", ".join(r["id"] for r in unaddressed)
-                verdict.problems = [{"reason": "requirement_unaddressed", "where": r["id"],
-                                     "way_out": f"ask for what settles {r['id']} ({r.get('anchor')}), or point at the row "
-                                                f"that says why it cannot be settled"} for r in unaddressed]
-                await _record_answer(db_factory, session_id, message_id, text, verdict)
-                _append({"role": "user", "content": _coverage_message(unaddressed)})
-                continue
             await _record_answer(db_factory, session_id, message_id, text, verdict)
             if verdict.ok:
                 acc = answer_check.accepted(text, verdict, led)
                 reply_text, reply_citations = acc["text"], acc["citations"]
                 reply_verified, reply_blocks = acc["verified"], acc["blocks"]
-                forced_partial = bool(unaddressed)
                 break
             again = repeated.record({"text": text})
             if again > rp.STOP:
@@ -690,27 +645,15 @@ async def handle_message(
             _append({"role": "user", "content": _refusal_message(verdict)
                      + (f"\n\n{rp.nudge('your reply', verdict.as_refusal())}" if again == rp.STOP else "")})
 
-    # V2 P3: completion is the runtime's word, from the requirements' standing; a reply
-    # that went out leaving a requirement unaddressed is partial whatever else it settled,
-    # and the reader is told, in the user's own words, what stayed open.
-    completion = AS.completion_of(state)
-    if reply_text is None and state.requirements:
-        completion = "partial"
-    if reply_text is not None and forced_partial:
-        completion = "partial"
-        open_anchors = [r.get("anchor") or r["id"] for r in AS.unaddressed(state, reply_citations)]
-        tail = _PARTIAL_TEXT.format(anchors="; ".join(f"“{a}”" for a in open_anchors) or "the requirements named in the record")
-        reply_text = f"{reply_text}\n\n{tail}"
-        if reply_blocks is not None:
-            reply_blocks = [*reply_blocks, {"type": "paragraph", "runs": [tail]}]
-    state.completion = completion
+    # S1: the runtime records delivery, not semantic completeness. Keep the
+    # nullable legacy column for historical readers; do not infer a verdict.
+    state.completion = None
     state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
     await _save_state(db_factory, state)
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
-                  "completion": completion, "state_version": state.version,
-                  "requirements": [{"id": r["id"], "anchor": r.get("anchor"), "status": r.get("status")}
-                                   for r in state.requirements],
+                  "protocol": "simplified-s1", "completion": None, "state_version": state.version,
+                  "delivery": "answered" if reply_text is not None else "not_answered",
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,
                                    "coverage": r.coverage, "cost": r.cost} for r in delegated],
                   # the page's report chip: `verified` is its word for a brief that passed

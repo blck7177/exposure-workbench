@@ -235,9 +235,13 @@ async def test_an_analyst_that_files_nothing_leaves_a_boundary_the_lead_can_poin
     assert boundary["status"] == "completed" and brief["status"] == "rejected"   # the ledger reads completed steps
     fid = result.lines[0]["boundary"]
     assert boundary["facts"][0].id == fid and boundary["facts"][0].kind == F.ABSENCE
-    line = dl.for_lead([result], Ledger.of(tools.records))["returns"][0]["lines"][0]
-    assert line["boundary"].startswith(f"[{fid}] absent:") and "did not file a brief" in line["boundary"]
-    assert "shown" not in dl.for_lead([result], Ledger.of(tools.records))["returns"][0]   # no bypass around the brief
+    from exposure_workbench.services import analysis_state as S
+    state=S.new_turn("sess","msg","q",{})
+    S.merge_task(state,result.task,result,Ledger.of(tools.records))
+    assert S.view(state,Ledger.of(tools.records))["gaps"][0]["boundary"]
+    receipt=dl.for_lead([result])["returns"][0]
+    assert receipt["accepted_findings"] == 0 and "lines" not in receipt
+
 
 
 async def test_a_verb_it_does_not_have_is_answered_not_dispatched(monkeypatch):

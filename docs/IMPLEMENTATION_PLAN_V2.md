@@ -1,5 +1,7 @@
 # IMPLEMENTATION PLAN V2 — 分析状态、可恢复交接与确定性边界（2026-09-28，草稿）
 
+> 2026-09-29 后续设计：用户批准 [Agent loop 简化计划](SIMPLIFICATION_PLAN.md)。[S1 实施记录](SIMPLIFICATION_S1.md) 替代本文 P3 的强制 requirements/for、覆盖阻断和运行时 completed 判定；旧计划与 §3a 保留为历史记录。事实边界、角色工具面、数据库与 lease 约束继续有效。
+
 > 依据：`dev_note/exposure/architecture-and-repair-plan.md` v0.4（2026-09-27，"基于 origin/desk-v1 的修订设计稿"，下称「设计」）。设计审的是 `b4f979f`；本计划的起点是 `desk-v1@6d40614`，比它多两个提交：`f34b54d`（V1 步骤 6，风格指南单源，措辞 A–F 已过目）与 `6d40614`（V1 步骤 7 的跨族系列与仪器）。这两个提交分别关掉了设计 G8 的前半句，并给了 P0 要用的仪器。设计要求"为完整取证先改仪器，须单独提交并记录新基线"——这一条已经照做。
 > 状态：P0a、P1–P3 及部分 P4/P5 已实施，执行记录见 §3a；基于 `afcce47` 的审阅修复见 `docs/REVIEW_FIXES_V2.md`。离线通过不代表实例验收完成，P0b 的独立 oracle、E 轮与 P6 仍待执行。
 > 读法：每个工作包一组提交、一个机械验收；实测期冻结代码（phase_e.sh 有 tracked 改动即拒绝测量）；按节点沟通表分析；发给模型的文字改动一律走措辞过目（§5 单列）。V1 计划 `docs/IMPLEMENTATION_PLAN_V1.md` 继续作为步骤 1–7 的执行记录；它的步骤 7（E 轮）就是本计划的 P0。

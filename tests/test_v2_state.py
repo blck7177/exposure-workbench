@@ -151,4 +151,4 @@ def test_the_view_carries_rows_and_no_refused_text():
     v = S.view(st, LEDGER)
     assert v["findings"][0]["rows"][0].startswith("[f_w1a2b3c4d5e6] issuer exposures: weight, MSFT")
     assert v["gaps"][0]["boundary"].startswith("[f_no1a2b3c4d5e] absent:")
-    assert v["completion"] is None and v["state_version"] == 0
+    assert "completion" not in v and v["state_version"] == 0
