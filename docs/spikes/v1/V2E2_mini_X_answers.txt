@@ -1,0 +1,69 @@
+## X01-largest-weight-then-its-cash  session=sess_b31fe7dfec1b  ANSWERED
+Q: Which holding carries the largest weight in the book? For that company, where is the cash going: capital expenditure as a share of revenue and free cash flow margin over the last three fiscal years, and how many times over does it cover its interest?
+The largest holding in the book is MSFT, at 16.0%.
+For MSFT, capital expenditure was 13.3% of revenue in 2023-06-30, 18.1% in 2024-06-30, and 22.9% in 2025-06-30. That says cash deployment is getting heavier against revenue.
+Free cash flow margin was 28.1% in 2023-06-30, 30.2% in 2024-06-30, and 25.4% in 2025-06-30. Cash still confirms earnings, though the margin slipped in the latest year.
+MSFT’s EBIT / interest coverage was 52.84× for 2024-07-01 to 2025-06-30, so interest is covered many times over.
+
+## X02-weakest-fcf-margin-then-sell-it  session=sess_72dcfb4c6d39  ANSWERED
+Q: Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?
+I’m blocked on both parts by the desk’s current record.
+For R1, the issuer task already failed desk validation, so there is no accepted finding to rank Apple, Microsoft and NVIDIA on fiscal-2025 free-cash-flow conversion. The open log shows the analyst tried to pull free-cash-flow and revenue rows and then a ranked ordering, but the desk rejected the result.
+For R2 to R4, the risk record says the scenario book does not hold the Technology sector exposure row after the sale, and it does not hold the issuer concentration row or the Technology sector concentration row needed to say which checks loosen or tighten. Those are the rows that would settle the post-sale answer, and they are absent from the book.
+So the question remains partially unanswerable on the current desk record: the missing item for R1 is an accepted issuer ranking, and the missing items for R2 through R4 are the post-sale Technology exposure and concentration rows.
+
+Not everything asked was settled. Still open: “which turned the smallest share of its fiscal 2025 revenue into free cash flow”; “If we sold that position entirely”; “what happens to the Technology sector weight”; “to the concentration checks: which loosen, and does anything tighten”. What is written above is what the desk can stand behind.
+
+## X03-furthest-below-high-then-filings  session=sess_7f46bf338af6  ANSWERED
+Q: Which of our equity holdings sits furthest below its 52-week high? For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+GOOGL sits furthest below its 52-week high among the portfolio’s equity holdings, at -17.3%.
+Its latest 10-K and 10-Q say the main things that can go wrong are content-quality failures, privacy and security breaches, cyberattacks, election interference, fraud, misleading or harmful content, dilution from the ATM program and preferred-stock conversions, uncertainty around repurchases and dividends, and restrictions on internet access. The 10-K says those issues could hurt reputation, trigger litigation and regulation, and damage financial condition and operating results; the 10-Q says dilution could depress the stock price, while repurchases and dividends could increase volatility and reduce cash reserves.
+Its operating margin does not show a steady slip over the last four quarters. The sequence was 30.5%, 31.6%, 36.1%, and 34.0%. So the latest quarter is below the prior quarter, but the four-quarter path is not monotonic.
+
+Not everything asked was settled. Still open: “For that company”; “has its operating margin slipped over the last four quarters?”. What is written above is what the desk can stand behind.
+
+## X04-thinnest-coverage-then-its-price  session=sess_466f7dcb618a  ANSWERED
+Q: Of Amazon, Lilly and Exxon, which covered its interest bill the fewest times over in fiscal 2025? Is the market marking that stock down: its return over the past year against SPY, its deepest drawdown in that year with the dates, and how far it sits below its 52-week high?
+The desk would not settle Lilly’s deepest trailing-year drawdown with dates. The market analyst’s finding for that line did not pass the desk's check [r_9da8e219c6ee].
+
+Not everything asked was settled. Still open: “which covered its interest bill the fewest times over in fiscal 2025”; “Is the market marking that stock down”; “its return over the past year against SPY”; “its deepest drawdown in that year with the dates”; “how far it sits below its 52-week high”. What is written above is what the desk can stand behind.
+
+## X05-biggest-drag-then-its-tape  session=sess_dcacc18b9f8a  ANSWERED
+Q: Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?
+I can’t settle R1 from the record I have. The desk returned a boundary on the risk line: the superlative was not tied to a ranked row in the filing. That is why the book-level detractor cannot be named yet.
+The market side is already settled for the held names:
+- AAPL: 34.9% momentum; 13.8% drawdown from peak 2025-12-02 to trough 2026-01-20; -3.89% from the 52-week high as of 2026-09-10.
+- AMZN: 18.2%; 21.7% from peak 2025-11-03 to trough 2026-02-13; -11.3%.
+- GOOGL: 44.0%; 21.0% from peak 2026-05-13 to trough 2026-07-23; -17.3%.
+- JPM: 22.8%; 15.5% from peak 2026-01-06 to trough 2026-03-27; -3.18%.
+- LLY: 61.8%; 23.2% from peak 2025-11-25 to trough 2026-04-29; -12.3%.
+- MSFT: 1.33%; 34.5% from peak 2025-10-28 to trough 2026-06-25; -8.41%.
+- NVDA: 22.8%; 20.2% from peak 2025-10-29 to trough 2026-03-30, recovered 2026-04-24; -7.16%.
+- XOM: 45.2%; 20.1% from peak 2026-03-30 to trough 2026-06-29; -2.36%.
+- HYG: 3.77%; 2.34% from peak 2026-02-20 to trough 2026-03-27, recovered 2026-04-09; -1.09%.
+- TLT: -4.58%; 8.67% from peak 2026-02-27 to trough 2026-09-10; -8.67%.
+If you want the exact holding that took the most off the book’s return, I need the ranked contribution row the risk analyst said is missing.
+
+Not everything asked was settled. Still open: “Which holding took the most off the book's return on the latest run's day?”. What is written above is what the desk can stand behind.
+
+## X06-weakest-momentum-then-trim-it  session=sess_56019094043b  ANSWERED
+Q: Which of our equity holdings has the weakest 12-1 momentum? If we sold half of that position, where does its weight land, and which concentration checks loosen or tighten?
+I need to settle the half-sale result for the actual weakest-momentum name, MSFT, and to re-run the concentration checks on that specific trade. The opened trade rows on record are for XOM, so they do not answer your question as asked.
+
+Not everything asked was settled. Still open: “Which of our equity holdings has the weakest 12-1 momentum?”; “If we sold half of that position, where does its weight land,”; “which concentration checks loosen or tighten?”. What is written above is what the desk can stand behind.
+
+## X07-drawdown-repeated-in-dollars  session=sess_4b9f3bc0ef1e  ANSWERED
+Q: If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?
+If NVIDIA repeated its deepest drawdown of the past year from here, the position would lose $44.14 per share, based on a 20.2% trailing-year drawdown from the 2025-10-29 peak of $206.55 to the 2026-03-30 trough of $164.79.
+Against the book’s latest market value of $10.75M, that is the share implied by the position-loss figure above.
+
+## X08-two-turns-high-then-filings  session=sess_a2396f76669b  ANSWERED
+Q: Which of our equity holdings sits furthest below its 52-week high, and when was that high set?
+Among the portfolio’s equity holdings, GOOGL sits furthest below its 52-week high, at -17.3%. Its 52-week high was set on 2026-05-13.
+
+Not everything asked was settled. Still open: “Which of our equity holdings sits furthest below its 52-week high”. What is written above is what the desk can stand behind.
+
+## X08-two-turns-high-then-filings  session=sess_a2396f76669b  ANSWERED
+Q: For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+For GOOGL, the latest 10-K says security and privacy issues, system errors, vulnerabilities, and breaches could lead to “significant legal, financial, and reputational harm,” including “government inquiries, enforcement actions, litigation, and negative publicity,” and that these consequences could harm “business, reputation, financial condition, and operating results”. The latest 10-Q adds that expanding investment in new businesses, products, services, and technologies is risky, may not be commercially viable, may not produce an adequate return, and could create unanticipated liabilities from new regulatory requirements.
+Operating margin over the last four quarters was 30.5%, 31.6%, 36.1%, and 34.0%. It did slip in the latest quarter versus the prior quarter, though it remains above the first two readings in the sequence.

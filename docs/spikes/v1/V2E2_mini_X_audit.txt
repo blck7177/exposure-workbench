@@ -1,0 +1,150 @@
+## X01-largest-weight-then-its-cash  session=sess_b31fe7dfec1b
+Q: Which holding carries the largest weight in the book? For that company, where is the cash going: capital expenditure as a share of revenue and free cash flow margin over the last three fiscal years, and how many times over does it cover its interest?
+ANSWER (as the gate accepted it, brackets kept):
+The largest holding in the book is MSFT, at 16.0% [f_ba239a3daad7].
+
+For MSFT, capital expenditure was 13.3% [f_dc91d790cdd8] of revenue in 2023-06-30, 18.1% [f_dc91d790cdd8] in 2024-06-30, and 22.9% [f_dc91d790cdd8] in 2025-06-30. That says cash deployment is getting heavier against revenue.
+
+Free cash flow margin was 28.1% [f_ef8d07b9410a] in 2023-06-30, 30.2% [f_ef8d07b9410a] in 2024-06-30, and 25.4% [f_ef8d07b9410a] in 2025-06-30. Cash still confirms earnings, though the margin slipped in the latest year.
+
+MSFT’s EBIT / interest coverage was 52.84× [f_923b8e82b3ae] for 2024-07-01 to 2025-06-30, so interest is covered many times over.
+--- the facts it cited ---
+  f_ba239a3daad7  scalar  issuer_exposures.weight  MSFT  0.16039  RATIO  2026-09-10  place=1 of=10 op=rank
+  f_dc91d790cdd8  series  capex_intensity  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+  f_923b8e82b3ae  scalar  ebit_interest_coverage  MSFT  52.8352  MULTIPLE  2025-06-30  window={"end":"2025-06-30","start":"2024-07-01"}  method=ebit_interest_coverage
+  f_ef8d07b9410a  series  fcf_margin  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+
+## X02-weakest-fcf-margin-then-sell-it  session=sess_72dcfb4c6d39
+Q: Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?
+ANSWER (as the gate accepted it, brackets kept):
+I’m blocked on both parts by the desk’s current record.
+
+For R1, the issuer task already failed desk validation, so there is no accepted finding to rank Apple, Microsoft and NVIDIA on fiscal-2025 free-cash-flow conversion. The open log shows the analyst tried to pull free-cash-flow and revenue rows and then a ranked ordering, but the desk rejected the result.
+
+For R2 to R4, the risk record says the scenario book does not hold the Technology sector exposure row after the sale, and it does not hold the issuer concentration row or the Technology sector concentration row needed to say which checks loosen or tighten. Those are the rows that would settle the post-sale answer, and they are absent from the book.
+
+So the question remains partially unanswerable on the current desk record: the missing item for R1 is an accepted issuer ranking, and the missing items for R2 through R4 are the post-sale Technology exposure and concentration rows.
+--- the facts it cited ---
+
+## X03-furthest-below-high-then-filings  session=sess_7f46bf338af6
+Q: Which of our equity holdings sits furthest below its 52-week high? For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+ANSWER (as the gate accepted it, brackets kept):
+GOOGL sits furthest below its 52-week high among the portfolio’s equity holdings, at -17.3% [f_81ed05a9269a].
+
+Its latest 10-K and 10-Q say the main things that can go wrong are content-quality failures, privacy and security breaches, cyberattacks, election interference, fraud, misleading or harmful content, dilution from the ATM program and preferred-stock conversions, uncertainty around repurchases and dividends, and restrictions on internet access. The 10-K says those issues could hurt reputation, trigger litigation and regulation, and damage financial condition and operating results; the 10-Q says dilution could depress the stock price, while repurchases and dividends could increase volatility and reduce cash reserves [f_b448945f9641] [f_9d2e57d664ea].
+
+Its operating margin does not show a steady slip over the last four quarters. The sequence was 30.5% [f_7c56caf9da7a], 31.6% [f_7c56caf9da7a], 36.1% [f_7c56caf9da7a], and 34.0% [f_7c56caf9da7a]. So the latest quarter is below the prior quarter, but the four-quarter path is not monotonic.
+--- the facts it cited ---
+  f_b448945f9641  passage  10-K Item 1A  GOOGL  'low-quality and irrelevant content websites, including content farms, which are websites that generate large q'  2026-02-05
+  f_9d2e57d664ea  passage  10-Q Part II, Item 1A  GOOGL  'n June 2026, we established an ATM Program, pursuant to which we may offer and sell up to $40 billion of share'  2026-07-23
+  f_81ed05a9269a  scalar  distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  place=1 of=8 op=rank
+  f_7c56caf9da7a  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
+
+## X04-thinnest-coverage-then-its-price  session=sess_466f7dcb618a
+Q: Of Amazon, Lilly and Exxon, which covered its interest bill the fewest times over in fiscal 2025? Is the market marking that stock down: its return over the past year against SPY, its deepest drawdown in that year with the dates, and how far it sits below its 52-week high?
+ANSWER (as the gate accepted it, brackets kept):
+The desk would not settle Lilly’s deepest trailing-year drawdown with dates. The market analyst’s finding for that line did not pass the desk's check [r_9da8e219c6ee].
+--- the facts it cited ---
+
+## X05-biggest-drag-then-its-tape  session=sess_dcacc18b9f8a
+Q: Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?
+ANSWER (as the gate accepted it, brackets kept):
+I can’t settle R1 from the record I have. The desk returned a boundary on the risk line: the superlative was not tied to a ranked row in the filing. That is why the book-level detractor cannot be named yet.
+
+The market side is already settled for the held names:
+- AAPL: 34.9% [f_c5ba88598222] momentum; 13.8% [f_7df8c9299aad] drawdown from peak 2025-12-02 to trough 2026-01-20; -3.89% [f_0d934f55f6a3] from the 52-week high as of 2026-09-10.
+- AMZN: 18.2% [f_431dde494661]; 21.7% [f_7d62ab6394bd] from peak 2025-11-03 to trough 2026-02-13; -11.3% [f_c4c4df220189].
+- GOOGL: 44.0% [f_cccbc5b1d257]; 21.0% [f_86b0c69e00ea] from peak 2026-05-13 to trough 2026-07-23; -17.3% [f_0b9d3fda2cd3].
+- JPM: 22.8% [f_125b46446070]; 15.5% [f_32c581ab31d3] from peak 2026-01-06 to trough 2026-03-27; -3.18% [f_fdf89789f376].
+- LLY: 61.8% [f_c3cdc58661c2]; 23.2% [f_b210cd2233ad] from peak 2025-11-25 to trough 2026-04-29; -12.3% [f_0d4a5b6af073].
+- MSFT: 1.33% [f_55e09ae0a005]; 34.5% [f_9a59136ccb84] from peak 2025-10-28 to trough 2026-06-25; -8.41% [f_de5de55beab7].
+- NVDA: 22.8% [f_ba9d070ddc3e]; 20.2% [f_5fb79f105f2e] from peak 2025-10-29 to trough 2026-03-30, recovered 2026-04-24; -7.16% [f_fc5ed5a31f3d].
+- XOM: 45.2% [f_d42c28369e75]; 20.1% [f_388eb33e632a] from peak 2026-03-30 to trough 2026-06-29; -2.36% [f_b170ee671de5].
+- HYG: 3.77% [f_a1c411546aa6]; 2.34% [f_1eb81b71dbbe] from peak 2026-02-20 to trough 2026-03-27, recovered 2026-04-09; -1.09% [f_23dad6ffbc45].
+- TLT: -4.58% [f_a30515bc6a94]; 8.67% [f_6de7cb5f1ae7] from peak 2026-02-27 to trough 2026-09-10; -8.67% [f_69d37c716f51].
+
+If you want the exact holding that took the most off the book’s return, I need the ranked contribution row the risk analyst said is missing.
+--- the facts it cited ---
+  f_c5ba88598222  scalar  AAPL.momentum_12_1  AAPL  0.349426  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_7df8c9299aad  scalar  AAPL.drawdown.depth  AAPL  0.137985  RATIO  2026-09-10  window={"name":"1y"}
+  f_090d965dd7e3  scalar  AAPL.drawdown.peak  AAPL  285.413  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_0d934f55f6a3  scalar  AAPL.distance_from_52w_high  AAPL  -0.0388976  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_01f409626421  scalar  observations  XOM  253  COUNT  2026-09-10  window={"name":"1y"}
+  f_431dde494661  scalar  AMZN.momentum_12_1  AMZN  0.182087  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_7d62ab6394bd  scalar  AMZN.drawdown.depth  AMZN  0.217362  RATIO  2026-09-10  window={"name":"1y"}
+  f_1db1c2a8ea5a  scalar  AMZN.drawdown.depth  AMZN  0.217362  RATIO  2026-09-10  window={"name":"1y"}
+  f_c4c4df220189  scalar  AMZN.distance_from_52w_high  AMZN  -0.113126  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_cccbc5b1d257  scalar  GOOGL.momentum_12_1  GOOGL  0.440284  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_86b0c69e00ea  scalar  GOOGL.drawdown.depth  GOOGL  0.210472  RATIO  2026-09-10  window={"name":"1y"}
+  f_072354e33377  scalar  GOOGL.drawdown.trough  GOOGL  317.486  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_0b9d3fda2cd3  scalar  GOOGL.distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_125b46446070  scalar  JPM.momentum_12_1  JPM  0.227677  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_32c581ab31d3  scalar  JPM.drawdown.depth  JPM  0.154717  RATIO  2026-09-10  window={"name":"1y"}
+  f_0d0a1fa4e596  scalar  JPM.drawdown.fall  JPM  51.2754  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_fdf89789f376  scalar  JPM.distance_from_52w_high  JPM  -0.0318199  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_c3cdc58661c2  scalar  LLY.momentum_12_1  LLY  0.617945  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_b210cd2233ad  scalar  LLY.drawdown.depth  LLY  0.231823  RATIO  2026-09-10  window={"name":"1y"}
+  f_04a0e6b98d7c  scalar  LLY.drawdown.peak  LLY  1104.6  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_0d4a5b6af073  scalar  LLY.distance_from_52w_high  LLY  -0.122889  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_55e09ae0a005  scalar  MSFT.momentum_12_1  MSFT  0.0132516  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_9a59136ccb84  scalar  MSFT.drawdown.depth  MSFT  0.344984  RATIO  2026-09-10  window={"name":"1y"}
+  f_3844286fd7df  scalar  MSFT.drawdown.trough  MSFT  352.167  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_de5de55beab7  scalar  MSFT.distance_from_52w_high  MSFT  -0.084082  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_ba9d070ddc3e  scalar  NVDA.momentum_12_1  NVDA  0.22816  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_5fb79f105f2e  scalar  NVDA.drawdown.depth  NVDA  0.202144  RATIO  2026-09-10  window={"name":"1y"}
+  f_11adf107fbc4  scalar  NVDA.drawdown.trough  NVDA  164.793  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_fc5ed5a31f3d  scalar  NVDA.distance_from_52w_high  NVDA  -0.0716081  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_d42c28369e75  scalar  XOM.momentum_12_1  XOM  0.452209  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_388eb33e632a  scalar  XOM.drawdown.depth  XOM  0.201122  RATIO  2026-09-10  window={"name":"1y"}
+  f_b170ee671de5  scalar  XOM.distance_from_52w_high  XOM  -0.023569  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_a1c411546aa6  scalar  HYG.momentum_12_1  HYG  0.0377261  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_1eb81b71dbbe  scalar  HYG.drawdown.depth  HYG  0.0233806  RATIO  2026-09-10  window={"name":"1y"}
+  f_1d87e7f309b3  scalar  HYG.drawdown.trough  HYG  76.3856  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_23dad6ffbc45  scalar  HYG.distance_from_52w_high  HYG  -0.0108751  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_a30515bc6a94  scalar  TLT.momentum_12_1  TLT  -0.0458264  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_6de7cb5f1ae7  scalar  TLT.drawdown.depth  TLT  0.0867084  RATIO  2026-09-10  window={"name":"1y"}
+  f_09025bbdc221  scalar  TLT.drawdown.peak  TLT  88.4493  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_69d37c716f51  scalar  TLT.distance_from_52w_high  TLT  -0.0867084  RATIO  2026-09-10  method=price.distance_from_52w_high
+
+## X06-weakest-momentum-then-trim-it  session=sess_56019094043b
+Q: Which of our equity holdings has the weakest 12-1 momentum? If we sold half of that position, where does its weight land, and which concentration checks loosen or tighten?
+ANSWER (as the gate accepted it, brackets kept):
+I need to settle the half-sale result for the actual weakest-momentum name, MSFT, and to re-run the concentration checks on that specific trade. The opened trade rows on record are for XOM, so they do not answer your question as asked.
+--- the facts it cited ---
+
+## X07-drawdown-repeated-in-dollars  session=sess_4b9f3bc0ef1e
+Q: If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?
+ANSWER (as the gate accepted it, brackets kept):
+If NVIDIA repeated its deepest drawdown of the past year from here, the position would lose $44.14 [f_df6f9632fea9] per share, based on a 20.2% [f_a927f62a2448] trailing-year drawdown from the 2025-10-29 peak of $206.55 [f_c0467a775320] to the 2026-03-30 trough of $164.79 [f_05faa8d8c50d].
+
+Against the book’s latest market value of $10.75M [f_bb4506652db5], that is the share implied by the position-loss figure above.
+--- the facts it cited ---
+  f_df6f9632fea9  scalar  NVDA.adj_close.multiply.NVDA.drawdown.depth  NVDA  44.1402  MONEY_PER_SHARE  2026-09-10  window={"instant":"2026-09-10"}  op=multiply
+  f_a927f62a2448  scalar  NVDA.drawdown.depth  NVDA  0.202144  RATIO  2026-09-10  window={"name":"1y"}
+  f_05faa8d8c50d  scalar  NVDA.drawdown.trough  NVDA  164.793  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_c0467a775320  scalar  NVDA.drawdown.peak  NVDA  206.545  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_bb4506652db5  scalar  exposure_metrics.portfolio_market_value  run_e2945c5ebd5a  1.07459e+07  MONEY  2026-09-10
+
+## X08-two-turns-high-then-filings  session=sess_a2396f76669b
+Q: Which of our equity holdings sits furthest below its 52-week high, and when was that high set?
+ANSWER (as the gate accepted it, brackets kept):
+For GOOGL, the latest 10-K says security and privacy issues, system errors, vulnerabilities, and breaches could lead to “significant legal, financial, and reputational harm,” including “government inquiries, enforcement actions, litigation, and negative publicity,” and that these consequences could harm “business, reputation, financial condition, and operating results” [f_3a4c490a4e7b]. The latest 10-Q adds that expanding investment in new businesses, products, services, and technologies is risky, may not be commercially viable, may not produce an adequate return, and could create unanticipated liabilities from new regulatory requirements [f_d669131f7433].
+
+Operating margin over the last four quarters was 30.5% [f_e0a5cef42084], 31.6% [f_e0a5cef42084], 36.1% [f_e0a5cef42084], and 34.0% [f_e0a5cef42084]. It did slip in the latest quarter versus the prior quarter, though it remains above the first two readings in the sequence [f_e0a5cef42084].
+--- the facts it cited ---
+  f_74ad90a05b89  scalar  GOOGL.distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_ccfae8cf2e71  scalar  distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  place=1 of=8 op=rank
+  f_3a4c490a4e7b  passage  10-K Item 1A  GOOGL  'local governments). Geopolitical tensions or armed conflicts, such as the ongoing conflict in the Middle East '  2026-02-05
+  f_d669131f7433  passage  10-Q Part II, Item 1A  GOOGL  'ITEM 1A.RISK FACTORS\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\n\nOur operations and financial results are subject to various risks and un'  2026-07-23
+  f_e0a5cef42084  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
+
+## X08-two-turns-high-then-filings  session=sess_a2396f76669b
+Q: For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+ANSWER (as the gate accepted it, brackets kept):
+For GOOGL, the latest 10-K says security and privacy issues, system errors, vulnerabilities, and breaches could lead to “significant legal, financial, and reputational harm,” including “government inquiries, enforcement actions, litigation, and negative publicity,” and that these consequences could harm “business, reputation, financial condition, and operating results” [f_3a4c490a4e7b]. The latest 10-Q adds that expanding investment in new businesses, products, services, and technologies is risky, may not be commercially viable, may not produce an adequate return, and could create unanticipated liabilities from new regulatory requirements [f_d669131f7433].
+
+Operating margin over the last four quarters was 30.5% [f_e0a5cef42084], 31.6% [f_e0a5cef42084], 36.1% [f_e0a5cef42084], and 34.0% [f_e0a5cef42084]. It did slip in the latest quarter versus the prior quarter, though it remains above the first two readings in the sequence [f_e0a5cef42084].
+--- the facts it cited ---
+  f_3a4c490a4e7b  passage  10-K Item 1A  GOOGL  'local governments). Geopolitical tensions or armed conflicts, such as the ongoing conflict in the Middle East '  2026-02-05
+  f_d669131f7433  passage  10-Q Part II, Item 1A  GOOGL  'ITEM 1A.RISK FACTORS\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\n\nOur operations and financial results are subject to various risks and un'  2026-07-23
+  f_e0a5cef42084  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
