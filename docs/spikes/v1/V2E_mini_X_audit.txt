@@ -1,0 +1,33 @@
+## X03-furthest-below-high-then-filings  session=sess_f206a62adc84
+Q: Which of our equity holdings sits furthest below its 52-week high? For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+ANSWER (as the gate accepted it, brackets kept):
+GOOGL sits furthest below its 52-week high among the portfolio’s equity holdings, at -17.3% [f_fd4f6a9fdb1c].
+
+On what can go wrong, its latest 10-K says acquisitions and other strategic arrangements can create unforeseen operating difficulties and expenditures, and that security and privacy issues can produce legal, financial, and reputational harm [f_cad235eabb9f], [f_577831c8c0c1]. Its latest 10-Q says revenue can be affected by foreign exchange, pricing, general economic conditions, new product launches, seasonality, and advertising-specific factors [f_c50749e868f1].
+
+Its operating margin was 30.5% [f_35faf5dd7ed1], 31.6% [f_35faf5dd7ed1], 36.1% [f_35faf5dd7ed1], and 34.0% [f_35faf5dd7ed1] over the last four reported quarters. It did not slip in the first two steps, then slipped in the latest quarter versus the prior quarter [f_35faf5dd7ed1].
+--- the facts it cited ---
+  f_cad235eabb9f  passage  10-K Item 1A  GOOGL  'es could result in operating difficulties, dilution, and other consequences that could harm our business, fina'  2026-02-05
+  f_577831c8c0c1  passage  10-K Item 1A  GOOGL  'local governments). Geopolitical tensions or armed conflicts, such as the ongoing conflict in the Middle East '  2026-02-05
+  f_c50749e868f1  passage  10-Q Part I, Item 2  GOOGL  'Notes to Consolidated Financial Statements included in Part II, Item 8 in our Annual Report on Form 10-K for t'  2026-07-23
+  f_35faf5dd7ed1  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
+  f_fd4f6a9fdb1c  scalar  distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  place=1 of=8 op=rank
+
+## X05-biggest-drag-then-its-tape  session=sess_cc8caa68900c
+Q: Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?
+ANSWER (as the gate accepted it, brackets kept):
+I can settle one part from the desk: NVDA was -7.16% [f_a2660cb455e7] below its trailing 52-week high as of 2026-09-10, and that high was set on 2026-05-14 [f_a2660cb455e7].
+
+The rest is still open on the record. The desk refused the book-level worst contributor line because it needs a ranked superlative and the returned finding did not pass the check (mark_mismatch, superlative_without_rank). It also refused the 12-1 momentum line for the same reason, and the trailing-year drawdown line because the analyst’s result conflicted with the desk’s change logic.
+
+So the question is only partially answerable from what is currently handed over: the market desk has the 52-week-high distance, but the risk desk has not yet delivered an accepted ranking for the worst one-day contributor, and the market desk has not yet delivered accepted momentum and drawdown rows.
+--- the facts it cited ---
+  f_a2660cb455e7  scalar  NVDA.distance_from_52w_high  NVDA  -0.0716081  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_06b3aaaef4ba  scalar  return_conventions.difference  run_e2945c5ebd5a  1.23e-06  RATIO  2026-09-10
+  f_8c96dd77c322  scalar  NVDA.momentum_12_1  NVDA  0.22816  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+
+## X08-two-turns-high-then-filings  session=sess_3e911a9036d8
+Q: For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+ANSWER (as the gate accepted it, brackets kept):
+The desk already has the row that says why both requirements cannot be settled: the issuer identifier is not recognized, so there is no issuer to prepare. That boundary is on the task record for both R1 and R2, and it blocks both the filing-risk read and the operating-margin trend read.
+--- the facts it cited ---

@@ -1,0 +1,166 @@
+## Q03-nvda-where-cash-goes  session=sess_5c2443f2e163
+Q: Where does NVIDIA's cash go? Capex, buybacks, dividends and SBC over the trailing twelve months, each as a share of operating cash flow, how each share has moved over three years, and whether the filing states how much buyback authorization remains.
+ANSWER (as the gate accepted it, brackets kept):
+The desk could not settle the three-year movement for all four cash uses, so that requirement remains open.
+
+What it did settle is that, for the trailing twelve months ended 2026-07-26, NVIDIA spent 5.47% [f_e4dc485be6e1] of cash from operations on capital expenditure, 41.2% [f_4de032a580e1] on share repurchases, 5.01% [f_c61a0a5f9f5a] on dividends paid, and 5.39% [f_05ed41737000] on share-based compensation, against cash from operations of $134B [f_d52c7040b06d].
+
+For the missing three-year comparison, the desk returned a boundary rather than a figure: it said the needed trailing-twelve-month repurchase ratio row was not yet returned, and the comparable earlier capex and dividends-paid ratio rows were also not yet returned [f_policy_no_estimate]. It also returned one settled trend: share-based compensation was 5.39% [f_05ed41737000] of cash from operations, down from 25.7% [f_ad450ce51b62] three years earlier.
+
+The filing does state remaining buyback authorization: as of July 26, 2026, NVIDIA was authorized to repurchase up to $99.3 billion [f_40c8adbc2631], after an additional $80.0 billion authorization approved on May 18, 2026 [f_40c8adbc2631].
+--- the facts it cited ---
+  f_policy_no_estimate   <<< NOT IN FACTS TABLE (ledger holds it: no)
+  f_40c8adbc2631  passage  10-Q Part II, Item 2  NVDA  'Item 2. Unregistered Sales of Equity Securities and Use of Proceeds\n\nIssuer Purchases of Equity Securities\n\nWe'  2026-08-26
+  f_05ed41737000  scalar  sbc.divide.operating_cash_flow  NVDA  0.0538925  RATIO  2026-07-26  window={"end":"2026-07-26","start":"2025-07-28"}  op=divide
+  f_e4dc485be6e1  scalar  capex.divide.operating_cash_flow  NVDA  0.0547336  RATIO  2026-07-26  window={"end":"2026-07-26","start":"2025-07-28"}  op=divide
+  f_4de032a580e1  scalar  buybacks.divide.operating_cash_flow  NVDA  0.411692  RATIO  2026-07-26  window={"end":"2026-07-26","start":"2025-07-28"}  op=divide
+  f_c61a0a5f9f5a  scalar  dividends_paid.divide.operating_cash_flow  NVDA  0.0500819  RATIO  2026-07-26  window={"end":"2026-07-26","start":"2025-07-28"}  op=divide
+  f_d52c7040b06d  scalar  operating_cash_flow  NVDA  1.3436e+11  MONEY  2026-07-26  window={"end":"2026-07-26","start":"2025-07-28"}
+  f_ad450ce51b62  scalar  sbc.divide.operating_cash_flow  NVDA  0.25708  RATIO  2023-07-30  window={"end":"2023-07-30","start":"2022-08-01"}  op=divide
+
+## Q05-aapl-risk-and-concentration  session=sess_a7518f32a931
+Q: What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?
+ANSWER (as the gate accepted it, brackets kept):
+I cannot settle the three requirements from the material now on the record.
+
+What is on record for Apple is the latest Item 1A risk passage, which says the company’s biggest risks are macroeconomic weakness, geopolitical and trade disruption, concentrated and fragile supply chains, competitive pressure and rapid technological change, and legal/regulatory and intellectual-property risk [f_70cc56dd6cc8]. That settles R1.
+
+What is not yet on record is the Item 8 product table and the Item 8 geographic table, so I cannot state product or geography revenue concentration as figures from this turn. Those are still required to settle R2.
+
+For R3, the desk does not hold product or geography concentration as derived figures on the evidence now shown; it only holds quoted filing text about the risks and concentration themes. To say it as a figure would require the missing Item 8 tables, which are not yet in the record.
+
+If you want the question fully settled, the next step is to pull the latest Item 8 product and geography disclosure rows.
+--- the facts it cited ---
+  f_70cc56dd6cc8  passage  10-K Item 1A  AAPL  'Item 1A.\xa0\xa0\xa0\xa0Risk Factors\n\nThe following summarizes factors that could have a material adverse effect on the Co'  2025-10-31
+  f_14aef38938e1  passage  10-K Item 1  AAPL  ' future on reasonable terms or at all.\n\nBusiness Seasonality and Product Introductions\n\nThe Company has histor'  2025-10-31
+  f_2247896f7182  passage  10-K Item 8  AAPL  'Financing activities:\n\nPayments for taxes related to net share settlement of equity awards(5,960)(5,441)(5,431'  2025-10-31
+
+## Q06-jpm-riskier-than-a-year-ago  session=sess_c496b54aef6d
+Q: Is the market treating JPMorgan as riskier than a year ago? Thirty-day volatility, beta to SPY and distance from the 52-week high now and twelve months ago, beside interest expense and the pretax-to-net-income gap over three years. Note where the desk's issuer methods do not apply to a bank.
+ANSWER (as the gate accepted it, brackets kept):
+The issuer side is settled, but the market side still is not. The desk can say the pretax-to-net-income gap was $12.06B [f_1de714d42617] in 2023, $16.61B [f_1de714d42617] in 2024, and $15.55B [f_1de714d42617] in 2025, so the gap widened in 2024 and then narrowed slightly in 2025. It can also say interest expense was $5.55B [f_90c1abfef32e], $26.10B [f_90c1abfef32e], and $81.32B [f_90c1abfef32e] for 2021-12-31, 2022-12-31, and 2023-12-31.
+
+For a bank, the desk does not apply EBIT, EBITDA, free cash flow, total debt, net debt, EBIT / interest coverage, debt / EBITDA, debt / cash from operations, free cash flow / debt, current ratio, gross margin, operating margin, net margin, days sales outstanding, days inventory, days payable, NOPAT, invested capital, ROIC, quick assets, quick ratio, free cash flow margin, capex intensity, net debt / EBITDA, or cash conversion cycle because each is marked not for a financial issuer; asset turnover is also not applied because JPM is missing revenue for that measure [f_44d12c89cf06].
+
+What still prevents the main question from being answered is the market comparison itself. The desk did not return a year-ago 30-session volatility reading for JPM, and it refused the year-ago beta-to-SPY and distance-from-52-week-high lines on check grounds, so there is no settled row to show whether JPM was being treated as riskier than a year ago.
+--- the facts it cited ---
+  f_44d12c89cf06  absence  interest_expense  JPM  'filings_read: a series runs on the issuer\'s own fiscal years or quarters, ending at the latest: ask it with {"'  n/a
+  f_1de714d42617  series  JPM  MONEY  2025-12-31  window={"end":"2025-12-31","start":"2023-12-31"}  series n=3 spacing=annual 2023-12-31..2025-12-31  op=subtract
+  f_02a4338abd5e  series  net_income  JPM  MONEY  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+  f_90c1abfef32e  series  interest_expense  JPM  MONEY  2023-12-31  window={"months":12}  series n=3 spacing=annual 2021-12-31..2023-12-31
+
+## Q08-capex-roic-three-way  session=sess_0829d774c36c
+Q: Compare the capex intensity and ROIC of Microsoft, Alphabet and Amazon over the last three fiscal years. Who spends the most relative to revenue and earns the least on it, and how does that sit with the book's exposure to QQQ?
+ANSWER (as the gate accepted it, brackets kept):
+The desk does not hold a QQQ exposure row for this book, so that part cannot be settled on the record. The risk desk instead says the book’s exposure is to equity down, rates up and credit spreads widen, and no QQQ factor row is provided.
+
+On the issuer side, the record already shows the three-year capex intensity and ROIC series for all three names. Microsoft capex intensity was 13.3% [f_f3b2f9e2cbdd] in 2023-06-30, 18.1% [f_f3b2f9e2cbdd] in 2024-06-30 and 22.9% [f_f3b2f9e2cbdd] in 2025-06-30. Alphabet was 10.5% [f_f0a1fb653672], 15.0% [f_f0a1fb653672] and 22.7% [f_f0a1fb653672]. Amazon was 9.17% [f_7e6a9667867f], 13.0% [f_7e6a9667867f] and 18.4% [f_7e6a9667867f].
+
+Microsoft ROIC was 32.8% [f_aa6b68a76d6c] in 2023-06-30, 29.7% [f_aa6b68a76d6c@2024-06-30] in 2024-06-30 and 29.7% [f_aa6b68a76d6c@2025-06-30] in 2025-06-30. Alphabet was 26.6% [f_591cac9ed14d], 29.7% [f_591cac9ed14d] and 24.8% [f_591cac9ed14d]. Amazon was 15.2% [f_6d198676b070], 22.3% [f_6d198676b070] and 16.2% [f_6d198676b070].
+
+The answer to who spends the most relative to revenue and earns the least on it is Amazon on the “earns the least” half, because its ROIC is the weakest of the three at the latest year. On “spends the most relative to revenue,” Microsoft is slightly ahead of Alphabet by the latest year, with both well above Amazon. That means the book’s QQQ question cannot be tied to a QQQ row, but if you want the practical reading, the issuer mix is most supportive of the growth-tech complex that QQQ stands for rather than a defensive offset.
+--- the facts it cited ---
+  f_f3b2f9e2cbdd  series  capex_intensity  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+  f_aa6b68a76d6c  series  roic  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+  f_a40d543c91d4  series  RATIO  2025-06-30  window={"end":"2025-06-30","start":"2024-06-30"}  series n=2 spacing=annual 2024-06-30..2025-06-30  op=yoy
+  f_f0a1fb653672  series  capex_intensity  GOOGL  RATIO  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+  f_7e6a9667867f  series  capex_intensity  AMZN  RATIO  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+  f_591cac9ed14d  series  roic  GOOGL  RATIO  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+  f_6d198676b070  series  roic  AMZN  RATIO  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+
+## Q13-sell-half-nvda-into-tlt  session=sess_91dfc8bc5eb7
+Q: If we sell half our NVIDIA and put the proceeds into TLT, what happens to gross exposure, Technology sector concentration, the book's beta to QQQ and the stress loss under tech_selloff? Which limit gets tighter and which gets better?
+ANSWER (as the gate accepted it, brackets kept):
+The desk could not settle the trade because the scenario run needed to revalue the book is still pending. The row that says so is [f_d40104ca5b1d]: “scenario: run run_74d9c5372cf7 is pending: its figures are not readable until it completes” [r_69ae4d5dbf2d].
+
+That means the desk still cannot give the post-trade gross exposure, Technology sector concentration, beta to QQQ, stress loss under tech_selloff, or the post-trade nearest limit and room. Those remain unresolved for the same reason: the after-book figures are not readable until the scenario completes [f_d40104ca5b1d].
+--- the facts it cited ---
+  f_d40104ca5b1d  absence  scenario  run_74d9c5372cf7  'scenario: run run_74d9c5372cf7 is pending: its figures are not readable until it completes'  n/a
+
+## Q14-worst-drawdown-episode  session=sess_bc4cedd8e793
+Q: Explain our worst drawdown episode of the last year: when it started and troughed, how deep, how much was the market against what we held, and which three names contributed most. Did any of those three have a filing in that window?
+ANSWER (as the gate accepted it, brackets kept):
+I couldn’t finish the drawdown analysis because I don’t yet have the risk run’s figures for the episode itself.
+
+What is already settled is the filing question: AAPL, MSFT and NVDA each had recent filing items in the window. Apple’s 10-Q includes Item 2 as filed on 2026-05-01 [f_068d4798f91d], Microsoft’s 10-Q includes Item 5 as filed on 2026-04-29 [f_e76d1b898a04], and NVIDIA’s 10-Q includes Items 6 and 1 as filed on 2026-08-26 and 2026-05-20 [f_f7fb905f7c4d] [f_d58f21195cf9] [f_5c2b3255aa37].
+
+I still need the book-level risk rows for:
+- when the worst drawdown started and troughed,
+- how deep it was,
+- how much was market versus holdings,
+- and the top three name contributors.
+
+If you want, I can ask the risk analyst for just those book figures next.
+--- the facts it cited ---
+  f_068d4798f91d  passage  10-Q Part I, Item 2  AAPL  'Item 2.\xa0\xa0\xa0\xa0Management’s Discussion and Analysis of Financial Condition and Results of Operations\n\nThis Item an'  2026-05-01
+  f_e76d1b898a04  passage  10-Q Part II, Item 5  MSFT  'ading arrangement” or a “non-Rule 10b5-1 trading arrangement,” as defined in Item 408 of Regulation S-K, durin'  2026-04-29
+  f_f7fb905f7c4d  passage  10-Q Part II, Item 6  NVDA  '101.PRE*Inline XBRL Taxonomy Extension Presentation Linkbase Document\n\n104Cover Page Interactive Data File - t'  2026-08-26
+  f_d58f21195cf9  passage  10-Q Part II, Item 6  NVDA  'Item 6. Exhibits\n\nIncorporated by Reference\n\nExhibit No.\xa0Exhibit Description\n\nSchedule/FormExhibitFiling Date\n'  2026-05-20
+  f_5c2b3255aa37  passage  10-Q Part II, Item 1  NVDA  'Item 1. Legal Proceedings\n\nRefer to Note 10\xa0of the Notes to Condensed Consolidated Financial Statements in Par'  2026-08-26
+  f_79f94ca63fd2  passage  10-Q Part II, Item 6  MSFT  'ITEM 6. EXHIBITS\n\n     Incorporated by Reference\n\n     Exhibit\n\nNumber\n\n     Exhibit Description\n\n     Filed \n'  2026-04-29
+  f_321e37b91aef  passage  10-K Item 1  NVDA  'rs that file electronically with the SEC. Our web site and the information on it or connected to it are not a '  2026-02-25
+
+## Q15-liquidity-and-limits  session=sess_1e98ba0c2f51
+Q: How liquid is the book? For each holding, position value against 20-day average dollar volume, days to liquidate at 20% of ADV, which names take longest, and whether those are the same names sitting near their issuer limits.
+ANSWER (as the gate accepted it, brackets kept):
+The desk still cannot settle the liquidity question from the run on record. The missing figures are not merely unpulled; the desk says the requested run is pending, so its figures are not readable until it completes [f_27ca211df21b], and the days-to-liquidate table is likewise unavailable until the run’s liquidity table is readable [f_2f8a1686b156].
+
+So the answer to how liquid the book is remains open on three parts of your question: the position value against 20-day average dollar volume, the days to liquidate at 20% of ADV, and which names take longest. The only desk-supported statement is that those measures cannot yet be settled from the pending run, not that the book is liquid or illiquid.
+--- the facts it cited ---
+  f_27ca211df21b  absence  issuer_exposures  run_8dc012b04fde  'book_read: run run_8dc012b04fde is pending: its figures are not readable until it completes'  n/a
+  f_2f8a1686b156  absence  count  run_8dc012b04fde  'book_read: run run_8dc012b04fde is pending: its figures are not readable until it completes'  n/a
+  f_020402abc484  scalar  XOM.adv_shares.20d  XOM  1.3827e+07  COUNT_PER_DAY  2026-09-10  window={"end":"2026-09-10","start":"2026-08-13"}
+
+## Q16-book-beta-change-since-prev  session=sess_9d2db59c635a
+Q: What is the book exposed to, name by name: each holding's beta to SPY and to QQQ over one year, the book's net beta, and how the net beta changed since the previous run. Is the book riskier now, and which name drove the change?
+ANSWER (as the gate accepted it, brackets kept):
+The desk can settle the book-level part, but not the per-holding beta lines.
+
+The book’s net beta to SPY is 0.01× [f_19f78736d731] in the latest run and 0.01× [f_44de03db27b5] in the prior run, so it is unchanged. The desk also says the book-level beta that did move was to credit spreads, from -0.25× [f_8690515e88eb] to -0.24× [f_ed60027fb8e6], but that is not the SPY or QQQ beta you asked for.
+
+I cannot give each holding’s beta to SPY or QQQ because the desk does not hold those per-holding columns for these runs [f_07f133841b38] [f_d2d8296236db] [f_684579d0e9c5]. I also cannot identify a single holding that drove the change, because the desk says the factor betas are collinear and no single named driver is determined [f_9ec9733dc615].
+
+So the reading is: the book is not meaningfully more or less exposed at the SPY level on the desk’s measure, and the change is too small and too collinear to assign to one name from the figures currently exposed.
+--- the facts it cited ---
+  f_07f133841b38  absence  issuer_exposures  run_e2945c5ebd5a  "book_read: issuer_exposures has no column 'beta to SPY' on run_e2945c5ebd5a"  n/a
+  f_d2d8296236db  absence  issuer_exposures  run_4ee5ca92b926  "book_read: issuer_exposures has no column 'beta to QQQ' on run_4ee5ca92b926"  n/a
+  f_684579d0e9c5  absence  issuer_exposures  run_e2945c5ebd5a  "book_read: issuer_exposures has no column 'beta to QQQ' on run_e2945c5ebd5a"  n/a
+  f_9ec9733dc615  absence  factor_attributions.market.beta  run_e2945c5ebd5a  'these factors are collinear, so no single one is determined; their sum is determined, and this run holds it on'  n/a
+  f_19f78736d731  scalar  portfolio.integration.net_beta.rates_up  run_e2945c5ebd5a  0.00857874  MULTIPLE  2026-09-10  method=book.analysis
+  f_44de03db27b5  scalar  portfolio.integration.net_beta.rates_up  run_4ee5ca92b926  0.0089198  MULTIPLE  2026-09-09  method=book.analysis
+  f_8690515e88eb  scalar  portfolio.integration.net_beta.credit_spread  run_4ee5ca92b926  -0.248205  MULTIPLE  2026-09-09  method=book.analysis
+  f_ed60027fb8e6  scalar  portfolio.integration.net_beta.credit_spread  run_e2945c5ebd5a  -0.238776  MULTIPLE  2026-09-10  method=book.analysis
+
+## Q18-attribution-reconcile  session=sess_3523faa9291f
+Q: Does the book's attribution add up? Reconcile factor contributions plus alpha and residual to the portfolio return on the latest run, state the gap, name the largest and smallest contributing factor, and say whether HYG's own drawdown over the period matches the sign of its contribution.
+ANSWER (as the gate accepted it, brackets kept):
+I can’t say that the attribution adds up in full on the latest run, because the desk does not expose alpha or residual in the factor-attributions table. It does show the factor sum of contributions, but not the full bridge to portfolio return, so the reconciliation gap cannot be stated from the rows available [f_bedd14f3abd4].
+
+The largest and smallest contributing factor cannot be named either, because the individual factor contributions are withheld as collinear; only their sum is determined [f_d1fb071132b4].
+
+For HYG, the desk has no row in the latest factor-attributions table, so I cannot match HYG’s own drawdown over the period to the sign of its contribution [f_563af0ed9490].
+
+If you want, I can ask the desk again for any additional run-level rows that would let us check the bridge another way, but with the current record the attribution does not close all the way.
+--- the facts it cited ---
+  f_bedd14f3abd4  absence  factor_attributions  run_e2945c5ebd5a  "book_read: factor_attributions has no column 'alpha' on run_e2945c5ebd5a"  n/a
+  f_d1fb071132b4  absence  factor_attributions.market.contribution  run_e2945c5ebd5a  'these factors are collinear, so no single one is determined; their sum is determined, and this run holds it on'  n/a
+  f_563af0ed9490  absence  factor_attributions  run_e2945c5ebd5a  "book_read: factor_attributions has no row 'HYG' on run_e2945c5ebd5a"  n/a
+
+## Q19-aws-share-explains-return  session=sess_f163b9fca8da
+Q: What share of Amazon's revenue is AWS, how has that share moved over three years, and how much of our AMZN return over the last year relative to SPY does that explain?
+ANSWER (as the gate accepted it, brackets kept):
+Amazon’s AWS mix is visible in the filing, but the desk will not turn the passage into a computed percentage here. The filing shows AWS net sales of $90,757 [f_f09e4b114e9d], $107,556 [f_f09e4b114e9d], and $128,725 [f_f09e4b114e9d] against consolidated net sales of $574,785 [f_f09e4b114e9d], $637,959 [f_f09e4b114e9d], and $716,924 [f_f09e4b114e9d] for 2023, 2024, and 2025. The desk’s own boundary says the filing gives the inputs but not the share, and that the figure “can be pointed at, not combined” [f_23d65b95033f].
+
+So, on the evidence available, I can say AWS is a material and rising part of Amazon’s revenue, but I cannot state the share numerically or quantify the three-year move from this record alone.
+
+On the market side, AMZN’s return over the last year versus SPY was -8.12% [f_4a549c6d2bbb]. The one-year market-factor fit explains 27.8% [f_02268a2b5c2b] of AMZN’s return versus SPY; the fit is incomplete.
+
+Implication for the book: the relative underperformance was only partly market-driven, so there is still a meaningful name-specific component. What I would change my reading on is the business-mix angle: if AWS’s share is confirmed to be rising, that supports a stronger cloud mix and a different earnings-quality read than if it is flat or slipping.
+--- the facts it cited ---
+  f_9c5f7cbf4aec  absence  divide  'calc: f_e345cff251ab is passage — it can be pointed at, not combined'  n/a
+  f_23d65b95033f  absence  divide  'calc: f_862c672d1065 is passage — it can be pointed at, not combined'  n/a
+  f_f09e4b114e9d  passage  10-K Item 8  AMZN  'Operating income (loss)$(2,656)$3,792\xa0$4,750\xa0\n\nAWS\n\nNet sales$90,757\xa0$107,556\xa0$128,725\xa0\n\nOperating expenses66,'  2026-02-06
+  f_0b685faa5db9  passage  10-K Item 7  AMZN  'Table of Contents\n\nItem\xa07.Management’s Discussion and Analysis of Financial Condition and Results of Operation'  2026-02-06
+  f_0ed2949651a7  passage  10-Q Part I, Item 1  AMZN  'tomer usage and our performance in accordance with contractual obligations, which can extend beyond the origin'  2026-04-30
+  f_4a549c6d2bbb  scalar  window_return.relative  AMZN  -0.0812116  RATIO  2026-09-10  window={"end":"2026-09-10","start":"2025-09-10"}  method=price.window_return
+  f_02268a2b5c2b  scalar  AMZN.r2.SPY  AMZN  0.277566  RATIO  window={"name":"1y"}

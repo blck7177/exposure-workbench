@@ -1,0 +1,106 @@
+turns                                    9
+no_answer                                0
+gate_exhausted                           6
+round_trips_median                       18
+round_trips_p90                          25
+tool_calls_median                        18
+tool_calls_p90                           26
+respond_attempts_mean                    2
+requests_mean                            0
+type_errors                              0
+writer_calls                             0
+answer_refusals                          15
+prompt_tokens_median                     123953
+prompt_tokens_p90                        243067
+elapsed_s_median                         24.9
+elapsed_s_p90                            54.7
+figures_median                           0
+answers_with_double_figure_artifact      1
+answers_with_passage_mark_as_figure      0
+superlative_claims                       1
+superlative_without_rank                 1
+superlative_rank_undeclared              0
+delegate_calls_mean                      1.44
+delegates_rejected                       12
+read_reports                             0
+analysts                                 20
+analysts_by_status                       partial 8, refused 1, settled 6, unsettled 5
+coverage                                 asked 42, done 18, not_done 13, refused 11
+coverage_done_share                      0.43
+submits                                  30
+submits_rejected                         18
+submits_per_analyst                      1.5
+handoff_refusals                         id_in_prose 2, mark_mismatch 4, superlative_without_rank 6, unpointed_figure 2, unsourced_figure 4
+reports_by_status                        verified 1
+boundaries_minted                        2
+lead_completions_median                  4
+sub_completions_median                   13
+sub_completions_total                    117
+lead_prompt_peak_median                  8803
+lead_prompt_peak_p90                     13441
+tasks_per_turn_mean                      2.22
+evidence_calls_per_task_median           4.0
+evidence_calls_per_task_p90              10
+analyst_calls                            155
+analyst_calls_refused                    25
+analyst_calls_not_run                    0
+analyst_calls_refused_share              0.16
+why_words_median                         18
+why_missing                              0
+why_names_a_line_share                   1.0
+analyst_prompt_peak_median               11564
+analyst_prompt_peak_p90                  14439
+check_problems_by_rule                   1 47, 2 12, 3 8, 5 3, 8 2, shape 21
+check_problems_by_channel                finding 52, answer 35, follow_up 3, why 3
+sense_conflicts                          0
+status_conflicts                         0
+check_problems_by_reason                 requirement_unaddressed 21, unpointed_figure 18, id_in_prose 13, superlative_without_rank 12, unsourced_figure 11, mark_mismatch 5, change_conflict 5, direction_conflict 3, unverified_quote 3, subject_mismatch 1, measure_mismatch 1
+absences                                 25
+absences_by_code                         invalid_params 10, unknown_name 6, not_run 2, not_listed 2, input_unavailable 1, window_not_derivable 1, not_a_quantity 1, not_alone 1, operands 1
+absences_by_verb                         metric 11, book_read 7, calc 2, scenario 2, start 2, filings_read 1
+absences_arithmetic_share                0.04
+absences_from_calc                       2
+completions_by_model                     lead {'gpt-5.4-mini-2026-03-17': 45}, analysts {'gpt-5.4-mini-2026-03-17': 117}
+handoff_shapes                           one_family 2, together 6, in_sequence 1
+asks_with_follow_up                      2
+asks_carrying_ids                        0
+asks_unreadable                          0
+re_pulled_calls                          0
+tasks_returned_empty                     8
+analyst_budget_stops                     2
+lead_opens                               3
+handoffs_expected_by_outcome             up_front 3, carried 2, shotgun 1, not_carried 1, wrong_name 1
+by domain (a domain the lead keeps reaching for and which cannot execute is a skill problem):
+  domain                              delega   asked    done  not_do  refuse  comple  eviden  starts    runs   clean  type_e  with_a  other_
+  risk                                     6      10       4       1       5      46      41       2       0       0       0       0       0
+  market                                   8      19      10       4       5      42      20      18       0       0       0       0       0
+  issuer                                   6      13       4       8       1      29      38      12       0       0       0       0       0
+by analyst (V1: every call, how it came back, and by verb):
+  analyst          calls      read   refused   not_run    errors  unstated book_read      calc filings_r filings_s      list    metric prices_re  scenario     start
+  issuer              62        48        14         0         0         0         0         5         3        11        12        19         0         0        12
+  market              47        46         1         0         0         0         0         1         0         0         9        14         5         0        18
+  risk                46        36        10         0         0         0        31         3         0         0         3         5         0         2         2
+by shape (V1: how a turn reached its families — `in_sequence` went through the lead between two of them):
+  shape              turns      asks  lead_cmp  ev_calls   elapsed   settled   not_acc empty_ret  re_pulls  bdg_stop
+  one_family             2       1.5       3.5       0.0     16.05       0.0         1         3         0         0
+  together               6      1.33       4.0      16.030.599999999999998      0.57         5         3         0         2
+  in_sequence            1         2         7        15      46.7      0.17         0         2         0         0
+by question (the asks in order; what a later ask named that the first did not; what was carried by id):
+  question                              t  asks                    shape        carried down  ids  f-up  empty  re-pull  stops  settled  answer    expected
+  X01-largest-weight-then-its-cash      1  issuer+risk             together     -             0    0     1      0        0      1/4      refused   up_front
+  X02-weakest-fcf-margin-then-sell-it   1  issuer+risk             together     -             0    0     0      0        0      2/5      refused   up_front
+  X03-furthest-below-high-then-filings  1  issuer+market → issuer  together     -             0    0     1      0        1      3/5      accepted  carried
+  X04-thinnest-coverage-then-its-price  1  issuer+market → market  together     -             0    1     0      0        0      8/11     refused   shotgun
+  X05-biggest-drag-then-its-tape        1  risk → market+risk      in_sequence  NVDA          0    0     2      0        0      1/6      accepted  carried
+  X06-weakest-momentum-then-trim-it     1  market+risk             together     -             0    0     1      0        1      1/2      refused   up_front
+  X07-drawdown-repeated-in-dollars      1  market+risk             together     -             0    0     0      0        0      2/3      refused   not_carried
+  X08-two-turns-high-then-filings       1  market → market         one_family   -             0    1     2      0        0      0/4      refused
+  X08-two-turns-high-then-filings       2  issuer                  one_family   -             0    0     1      0        0      0/2      accepted  wrong_name
+refusals by class (count / turns / per turn):
+  algebra                          1     1   0.11
+  data                             3     3   0.33
+  gate                             8     6   0.89
+  other:not_run                    2     2   0.22
+  other:requirement_unaddressed     7     7   0.78
+  other:window_not_derivable       1     1   0.11
+  spelling                        18     5   2.00
