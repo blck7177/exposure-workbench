@@ -1,0 +1,552 @@
+{
+ "turns": 9,
+ "no_answer": 0,
+ "gate_exhausted": 3,
+ "round_trips_median": 15,
+ "round_trips_p90": 38,
+ "tool_calls_median": 12,
+ "tool_calls_p90": 49,
+ "respond_attempts_mean": 1.67,
+ "requests_mean": 0,
+ "type_errors": 0,
+ "writer_calls": 0,
+ "answer_refusals": 9,
+ "prompt_tokens_median": 120874,
+ "prompt_tokens_p90": 511507,
+ "elapsed_s_median": 28.6,
+ "elapsed_s_p90": 82.1,
+ "figures_median": 2,
+ "answers_with_double_figure_artifact": 2,
+ "answers_with_passage_mark_as_figure": 0,
+ "superlative_claims": 3,
+ "superlative_without_rank": 3,
+ "superlative_rank_undeclared": 0,
+ "delegate_calls_mean": 1.89,
+ "delegates_rejected": 1,
+ "read_reports": 0,
+ "analysts": 20,
+ "analysts_by_status": {
+  "returned": 10,
+  "stopped": 10
+ },
+ "coverage": {
+  "asked": 0,
+  "done": 0,
+  "not_done": 0,
+  "refused": 0
+ },
+ "legacy_coverage_tasks": 0,
+ "evidence_handoffs": {
+  "tasks": 20,
+  "selected_evidence": 141,
+  "available_evidence": 817,
+  "accepted_notes": 21,
+  "rejected_items": 15
+ },
+ "coverage_done_share": null,
+ "submits": 26,
+ "submits_rejected": 16,
+ "submits_per_analyst": 1.3,
+ "handoff_refusals": {
+  "mark_mismatch": 2,
+  "not_on_ledger": 4,
+  "passage_requires_pointer": 1,
+  "superlative_without_rank": 7,
+  "unsourced_figure": 2
+ },
+ "reports_by_status": {
+  "returned": 10,
+  "stopped": 10
+ },
+ "boundaries_minted": 8,
+ "by_domain": {
+  "issuer": {
+   "delegations": 8,
+   "asked": 0,
+   "done": 0,
+   "not_done": 0,
+   "refused": 0,
+   "completions": 55,
+   "evidence_calls": 86,
+   "starts": 0
+  },
+  "market": {
+   "delegations": 7,
+   "asked": 0,
+   "done": 0,
+   "not_done": 0,
+   "refused": 0,
+   "completions": 33,
+   "evidence_calls": 18,
+   "starts": 0
+  },
+  "risk": {
+   "delegations": 5,
+   "asked": 0,
+   "done": 0,
+   "not_done": 0,
+   "refused": 0,
+   "completions": 28,
+   "evidence_calls": 34,
+   "starts": 0
+  }
+ },
+ "lead_completions_median": 5,
+ "sub_completions_median": 10,
+ "sub_completions_total": 116,
+ "lead_prompt_peak_median": 11663,
+ "lead_prompt_peak_p90": 13541,
+ "refusals": {
+  "data": {
+   "count": 9,
+   "turns": 5,
+   "per_turn": 1.0
+  },
+  "gate": {
+   "count": 9,
+   "turns": 5,
+   "per_turn": 1.0
+  },
+  "other:not_run": {
+   "count": 1,
+   "turns": 1,
+   "per_turn": 0.11
+  },
+  "other:window_not_derivable": {
+   "count": 3,
+   "turns": 2,
+   "per_turn": 0.33
+  },
+  "spelling": {
+   "count": 19,
+   "turns": 4,
+   "per_turn": 2.11
+  }
+ },
+ "tasks_per_turn_mean": 2.22,
+ "evidence_calls_per_task_median": 4.0,
+ "evidence_calls_per_task_p90": 16,
+ "analyst_calls": 182,
+ "analyst_calls_refused": 30,
+ "analyst_calls_not_run": 5,
+ "analyst_calls_refused_share": 0.19,
+ "why_words_median": 16.0,
+ "why_missing": 0,
+ "why_names_a_line_share": 0.0,
+ "analyst_prompt_peak_median": 11560,
+ "analyst_prompt_peak_p90": 18673,
+ "check_problems_by_rule": {
+  "1": 60,
+  "2": 13,
+  "3": 3,
+  "4": 1,
+  "8": 1
+ },
+ "check_problems_by_channel": {
+  "shape": 64,
+  "answer": 14
+ },
+ "sense_conflicts": 0,
+ "status_conflicts": 0,
+ "check_problems_by_reason": {
+  "unsourced_figure": 21,
+  "superlative_without_rank": 13,
+  "mark_mismatch": 13,
+  "not_on_ledger": 10,
+  "passage_requires_pointer": 7,
+  "unpointed_figure": 4,
+  "ambiguous_reference": 3,
+  "change_conflict": 3,
+  "id_in_prose": 2,
+  "date_expected": 1,
+  "measure_mismatch": 1
+ },
+ "absences": 30,
+ "absences_by_code": {
+  "invalid_params": 11,
+  "not_held": 4,
+  "unknown_name": 4,
+  "window_not_derivable": 3,
+  "input_unavailable": 2,
+  "no_price_data": 2,
+  "company_not_found": 1,
+  "operands": 1,
+  "unknown_operand": 1,
+  "not_run": 1
+ },
+ "absences_by_verb": {
+  "metric": 17,
+  "book_read": 4,
+  "filings_read": 3,
+  "list": 3,
+  "calc": 2,
+  "scenario": 1
+ },
+ "absences_arithmetic_share": 0.0,
+ "absences_from_calc": 2,
+ "completions_by_model": {
+  "lead": {
+   "gpt-5.4-mini-2026-03-17": 60
+  },
+  "analysts": {
+   "gpt-5.4-mini-2026-03-17": 116
+  }
+ },
+ "by_analyst": {
+  "issuer": {
+   "calls": 94,
+   "verb.metric": 44,
+   "refused": 22,
+   "read": 67,
+   "verb.list": 8,
+   "verb.filings_read": 14,
+   "verb.filings_search": 8,
+   "verb.filings_section": 5,
+   "verb.calc": 4,
+   "not_run": 5,
+   "verb.web_search": 11
+  },
+  "market": {
+   "calls": 46,
+   "verb.list": 28,
+   "read": 44,
+   "verb.metric": 13,
+   "verb.calc": 3,
+   "refused": 2,
+   "verb.prices_read": 2
+  },
+  "risk": {
+   "calls": 42,
+   "verb.list": 8,
+   "read": 36,
+   "verb.book_read": 23,
+   "verb.metric": 8,
+   "refused": 6,
+   "verb.calc": 2,
+   "verb.scenario": 1
+  }
+ },
+ "handoff_shapes": {
+  "one_family": 2,
+  "in_sequence": 7
+ },
+ "handoff_by_shape": {
+  "one_family": {
+   "turns": 2,
+   "asks_mean": 1,
+   "lead_completions_median": 2.0,
+   "evidence_calls_median": 3.5,
+   "elapsed_s_median": 8.85,
+   "settled_share": 0,
+   "answers_not_accepted": 0,
+   "empty_returns": 0,
+   "re_pulls": 0,
+   "budget_stops": 0
+  },
+  "in_sequence": {
+   "turns": 7,
+   "asks_mean": 2.14,
+   "lead_completions_median": 6,
+   "evidence_calls_median": 11,
+   "elapsed_s_median": 40.6,
+   "settled_share": 0,
+   "answers_not_accepted": 3,
+   "empty_returns": 0,
+   "re_pulls": 8,
+   "budget_stops": 3
+  }
+ },
+ "asks_with_follow_up": 3,
+ "asks_carrying_ids": 0,
+ "asks_unreadable": 0,
+ "re_pulled_calls": 8,
+ "tasks_returned_empty": 0,
+ "analyst_budget_stops": 3,
+ "lead_opens": 30,
+ "handoffs_expected": {
+  "X01-largest-weight-then-its-cash": "carried",
+  "X02-weakest-fcf-margin-then-sell-it": "shotgun",
+  "X03-furthest-below-high-then-filings": "shotgun",
+  "X04-thinnest-coverage-then-its-price": "shotgun",
+  "X05-biggest-drag-then-its-tape": "wrong_name",
+  "X06-weakest-momentum-then-trim-it": "wrong_name",
+  "X07-drawdown-repeated-in-dollars": "not_carried",
+  "X08-two-turns-high-then-filings": "carried"
+ },
+ "handoffs_expected_by_outcome": {
+  "shotgun": 3,
+  "carried": 2,
+  "wrong_name": 2,
+  "not_carried": 1
+ },
+ "handoff_turns": [
+  {
+   "tag": "X01-largest-weight-then-its-cash",
+   "turn": 1,
+   "chain": "risk \u2192 issuer",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 2,
+   "families": [
+    "issuer",
+    "risk"
+   ],
+   "later_subjects": [
+    "MSFT"
+   ],
+   "follow_ups": 1,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 0,
+   "lead_completions": 3,
+   "evidence_calls": 5,
+   "elapsed_s": 16.8,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 2,
+   "answer": "accepted",
+   "expected": "carried"
+  },
+  {
+   "tag": "X02-weakest-fcf-margin-then-sell-it",
+   "turn": 1,
+   "chain": "issuer\u00d73 \u2192 risk",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 4,
+   "families": [
+    "issuer",
+    "risk"
+   ],
+   "later_subjects": [
+    "port_001"
+   ],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 8,
+   "budget_stops": 2,
+   "opens": 3,
+   "lead_completions": 6,
+   "evidence_calls": 57,
+   "elapsed_s": 102.0,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 4,
+   "answer": "accepted",
+   "expected": "shotgun"
+  },
+  {
+   "tag": "X03-furthest-below-high-then-filings",
+   "turn": 1,
+   "chain": "market \u2192 issuer \u2192 issuer+market",
+   "shape": "in_sequence",
+   "asks": 3,
+   "tasks": 4,
+   "families": [
+    "issuer",
+    "market"
+   ],
+   "later_subjects": [
+    "AAPL",
+    "AMZN",
+    "GOOGL",
+    "JPM",
+    "LLY",
+    "MSFT",
+    "NVDA",
+    "XOM"
+   ],
+   "follow_ups": 2,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 1,
+   "opens": 13,
+   "lead_completions": 16,
+   "evidence_calls": 29,
+   "elapsed_s": 82.1,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 4,
+   "answer": "refused",
+   "expected": "shotgun"
+  },
+  {
+   "tag": "X04-thinnest-coverage-then-its-price",
+   "turn": 1,
+   "chain": "issuer \u2192 market",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 2,
+   "families": [
+    "issuer",
+    "market"
+   ],
+   "later_subjects": [],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 2,
+   "lead_completions": 7,
+   "evidence_calls": 13,
+   "elapsed_s": 40.6,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 2,
+   "answer": "refused",
+   "expected": "shotgun"
+  },
+  {
+   "tag": "X05-biggest-drag-then-its-tape",
+   "turn": 1,
+   "chain": "risk \u2192 market",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 2,
+   "families": [
+    "market",
+    "risk"
+   ],
+   "later_subjects": [
+    "AAPL"
+   ],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 1,
+   "lead_completions": 5,
+   "evidence_calls": 7,
+   "elapsed_s": 24.2,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 2,
+   "answer": "accepted",
+   "expected": "wrong_name"
+  },
+  {
+   "tag": "X06-weakest-momentum-then-trim-it",
+   "turn": 1,
+   "chain": "market \u2192 risk",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 2,
+   "families": [
+    "market",
+    "risk"
+   ],
+   "later_subjects": [
+    "port_001"
+   ],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 11,
+   "lead_completions": 15,
+   "evidence_calls": 11,
+   "elapsed_s": 43.9,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 2,
+   "answer": "refused",
+   "expected": "wrong_name"
+  },
+  {
+   "tag": "X07-drawdown-repeated-in-dollars",
+   "turn": 1,
+   "chain": "market \u2192 risk",
+   "shape": "in_sequence",
+   "asks": 2,
+   "tasks": 2,
+   "families": [
+    "market",
+    "risk"
+   ],
+   "later_subjects": [
+    "port_001"
+   ],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 0,
+   "lead_completions": 4,
+   "evidence_calls": 9,
+   "elapsed_s": 28.6,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 2,
+   "answer": "accepted",
+   "expected": "not_carried"
+  },
+  {
+   "tag": "X08-two-turns-high-then-filings",
+   "turn": 1,
+   "chain": "market",
+   "shape": "one_family",
+   "asks": 1,
+   "tasks": 1,
+   "families": [
+    "market"
+   ],
+   "later_subjects": [],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 0,
+   "lead_completions": 2,
+   "evidence_calls": 3,
+   "elapsed_s": 7.2,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 1,
+   "answer": "accepted"
+  },
+  {
+   "tag": "X08-two-turns-high-then-filings",
+   "turn": 2,
+   "chain": "issuer",
+   "shape": "one_family",
+   "asks": 1,
+   "tasks": 1,
+   "families": [
+    "issuer"
+   ],
+   "later_subjects": [],
+   "follow_ups": 0,
+   "ids_carried": 0,
+   "unreadable": 0,
+   "re_pulls": 0,
+   "budget_stops": 0,
+   "opens": 0,
+   "lead_completions": 2,
+   "evidence_calls": 4,
+   "elapsed_s": 10.5,
+   "asked": 0,
+   "settled": 0,
+   "empty_returns": 0,
+   "evidence_handoff_tasks": 1,
+   "answer": "accepted",
+   "expected": "carried"
+  }
+ ]
+}

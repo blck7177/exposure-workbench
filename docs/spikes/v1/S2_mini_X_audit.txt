@@ -1,0 +1,89 @@
+## X01-largest-weight-then-its-cash  session=sess_9c3620c24836
+Q: Which holding carries the largest weight in the book? For that company, where is the cash going: capital expenditure as a share of revenue and free cash flow margin over the last three fiscal years, and how many times over does it cover its interest?
+ANSWER (as the gate accepted it, brackets kept):
+MSFT [f_02b57c2dc359] is the largest holding in the book.
+
+For MSFT, capex intensity was 13.3% [f_93c4ac41fe10] in 2023-06-30, 18.1% [f_93c4ac41fe10] in 2024-06-30, and 22.9% [f_93c4ac41fe10] in 2025-06-30. Free cash flow margin was 28.1% [f_dc694ef6e9a2] in 2023-06-30, 30.2% [f_dc694ef6e9a2] in 2024-06-30, and 25.4% [f_dc694ef6e9a2] in 2025-06-30. EBIT / interest coverage was 52.84× [f_efee41d31b7e] for 2024-07-01 to 2025-06-30.
+
+That says cash is being pushed more into capital expenditure over the three years, while free cash flow margin remains healthy but has eased in the latest year. Interest coverage is very strong, so the company covers its interest many times over.
+--- the facts it cited ---
+  f_02b57c2dc359  scalar  issuer_exposures.weight  MSFT  0.16039  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_93c4ac41fe10  series  capex_intensity  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+  f_dc694ef6e9a2  series  fcf_margin  MSFT  RATIO  2025-06-30  window={"months":12}  series n=3 spacing=annual 2023-06-30..2025-06-30
+  f_efee41d31b7e  scalar  ebit_interest_coverage  MSFT  52.8352  MULTIPLE  2025-06-30  window={"end":"2025-06-30","start":"2024-07-01"}  method=ebit_interest_coverage
+
+## X02-weakest-fcf-margin-then-sell-it  session=sess_4182e4f5c87f
+Q: Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?
+ANSWER (as the gate accepted it, brackets kept):
+I can’t answer this cleanly yet because the desk returned evidence for the issuer part, but the portfolio part is still incomplete in the record I can open. I do have one confirmed portfolio point from the prior work: Technology is 35.3% [f_f123125e7472] as of 2026-09-10, and Apple’s current weight is 15.2% [f_b9aa8e95eb8b]. The latest risk task then stopped without submitting usable rows, so I do not yet have the checked post-sale Technology weight or the concentration-check rerun needed to say what loosens or tightens.
+
+On the issuer side, the desk is set up to compare fiscal 2025 free cash flow as a share of fiscal 2025 revenue for Apple, Microsoft and NVIDIA, but those rows are not yet open in the record I can cite. Because of that, I can’t responsibly name which one was smallest from the evidence currently available to me.
+
+If you want, I can continue by pulling the submitted issuer findings and the completed risk scenario results, then give you the full answer with the cited figures and the specific checks that move.
+--- the facts it cited ---
+  f_f123125e7472  scalar  sector_exposures.weight  Technology  0.352981  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_0063ad5dd4fa  scalar  issuer_exposures.weight  LLY  0.130718  RATIO  2026-09-10
+  f_b9aa8e95eb8b  scalar  issuer_exposures.weight  AAPL  0.151951  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_0113675bc1d8  scalar  free_cash_flow  MSFT  7.1611e+10  MONEY  2025-06-30  window={"end":"2025-06-30","start":"2024-07-01"}
+
+## X05-biggest-drag-then-its-tape  session=sess_779a3049fe6c
+Q: Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?
+ANSWER (as the gate accepted it, brackets kept):
+AAPL [f_f810df66094a] was the holding that took the most off the book’s return on the latest run’s day; the desk also identifies it as the largest position contribution on that date, but the row shown is a positive contribution, so the desk does not support the “largest negative contribution” phrasing as written [f_f810df66094a].
+
+On the trading side, AAPL’s 12-1 momentum over 2025-09-10 to 2026-08-11 was 34.9% [f_fcbb4795f796]. Its deepest drawdown over the trailing 1 year ending 2026-09-10 was 13.8% [f_962bfc9ccd12], from the $285.41 [f_1797e65a4592] peak on 2025-12-02 [f_1797e65a4592] to the $246.03 [f_ff8b58a80603] trough on 2026-01-20 [f_ff8b58a80603]. As of 2026-09-10, it was -3.89% [f_518d1393cb67] below its 52-week high set on 2026-07-28 [f_518d1393cb67].
+
+What this says for the book is that the day’s biggest name-level drag was not actually supported as a negative contribution by the checked row; the evidence instead points to AAPL as the largest position contribution entry, with a positive sign. The stock itself has strong trailing momentum, a moderate past-year drawdown, and is trading just below its 52-week high. If you want, I can next check whether another holding was the true negative contributor on that day.
+--- the facts it cited ---
+  f_f810df66094a  scalar  largest_position_contribution.contribution  AAPL  0.00524463  RATIO  2026-09-10
+  f_1797e65a4592  scalar  AAPL.drawdown.peak  AAPL  285.413  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_ff8b58a80603  scalar  AAPL.drawdown.trough  AAPL  246.03  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_518d1393cb67  scalar  AAPL.distance_from_52w_high  AAPL  -0.0388976  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_fcbb4795f796  scalar  AAPL.momentum_12_1  AAPL  0.349426  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_085728bc2440  scalar  skipped_recent_sessions  AAPL  21  COUNT  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}
+  f_022172a41578  scalar  AAPL.drawdown.fall  AAPL  39.3828  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}
+  f_962bfc9ccd12  scalar  AAPL.drawdown.depth  AAPL  0.137985  RATIO  2026-09-10  window={"name":"1y"}
+
+## X07-drawdown-repeated-in-dollars  session=sess_812e77b2c1ca
+Q: If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?
+ANSWER (as the gate accepted it, brackets kept):
+If NVIDIA repeated its deepest drawdown of the past year from here, our position would lose $52.22K [f_04dfd4a0f78f]. That is 4.06% [f_a3537195b26e] of the book.
+--- the facts it cited ---
+  f_04dfd4a0f78f  scalar  issuer_exposures.market_value.multiply.deepe  NVDA  52218  MONEY  2026-09-10  window={"end":"2026-09-10","start":"2025-09-10"}  op=multiply
+  f_a3537195b26e  scalar  issuer_exposures.weight  NVDA  0.0406405  RATIO  2026-09-10  of=run_e2945c5ebd5a
+
+## X08-two-turns-high-then-filings  session=sess_35271dab3313
+Q: Which of our equity holdings sits furthest below its 52-week high, and when was that high set?
+ANSWER (as the gate accepted it, brackets kept):
+The latest 10-K says GOOGL can run into operating difficulties from acquisitions and other strategic arrangements, including failed approvals or integration problems, and that those could harm business, financial condition, and operating results [f_5e6b1b091b49]. It also says supply-chain disruptions, shortages, price increases, and limited-source components could delay infrastructure upgrades or product availability [f_2774ff0f0b59], and that security and privacy breaches could lead to legal, financial, and reputational harm [f_223bd5d8afc9].
+
+The latest 10-Q adds that its operations and financial results remain subject to risks and uncertainties that could hurt business, reputation, financial condition, and operating results [f_112722493658]. It says investments in new businesses, products, services, and technologies may not be commercially viable or earn adequate returns [f_112722493658], that capital-markets access or debt-management problems could impair strategy and financial flexibility [f_f2c947f73f4c], and that AI-related products and other new offerings can raise ethical, technological, legal, regulatory, and other challenges that could hurt brands and demand [f_e881e8952c74].
+
+Operating margin over the last four reported quarters was 30.5% [f_fba88e7cd1c0], 31.6% [f_fba88e7cd1c0], 36.1% [f_fba88e7cd1c0], and 34.0% [f_fba88e7cd1c0]. It rose through the third quarter, then slipped in the latest quarter versus the prior quarter, but it is still above the first quarter in the series [f_fba88e7cd1c0].
+--- the facts it cited ---
+  f_0c6365a3d993  scalar  GOOGL.distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  method=price.distance_from_52w_high
+  f_f5530d46f88e  scalar  distance_from_52w_high  GOOGL  -0.172886  RATIO  2026-09-10  place=1 of=8 op=rank
+  f_5e6b1b091b49  passage  10-K Item 1A  GOOGL  'es could result in operating difficulties, dilution, and other consequences that could harm our business, fina'  2026-02-05
+  f_2774ff0f0b59  passage  10-K Item 1A  GOOGL  'ontinue to provide high-quality, trustworthy, innovative products and services that are truly useful and play '  2026-02-05
+  f_223bd5d8afc9  passage  10-K Item 1A  GOOGL  'local governments). Geopolitical tensions or armed conflicts, such as the ongoing conflict in the Middle East '  2026-02-05
+  f_112722493658  passage  10-Q Part II, Item 1A  GOOGL  'ITEM 1A.RISK FACTORS\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\n\nOur operations and financial results are subject to various risks and un'  2026-07-23
+  f_f2c947f73f4c  passage  10-Q Part II, Item 1A  GOOGL  'urance can be given that such strategies and offerings will be successful or will not harm our reputation, fin'  2026-07-23
+  f_e881e8952c74  passage  10-Q Part II, Item 1A  GOOGL  'ild new products, and seek partners to deliver localized services in other countries, and we may not be able t'  2026-07-23
+  f_fba88e7cd1c0  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
+
+## X08-two-turns-high-then-filings  session=sess_35271dab3313
+Q: For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+ANSWER (as the gate accepted it, brackets kept):
+The latest 10-K says GOOGL can run into operating difficulties from acquisitions and other strategic arrangements, including failed approvals or integration problems, and that those could harm business, financial condition, and operating results [f_5e6b1b091b49]. It also says supply-chain disruptions, shortages, price increases, and limited-source components could delay infrastructure upgrades or product availability [f_2774ff0f0b59], and that security and privacy breaches could lead to legal, financial, and reputational harm [f_223bd5d8afc9].
+
+The latest 10-Q adds that its operations and financial results remain subject to risks and uncertainties that could hurt business, reputation, financial condition, and operating results [f_112722493658]. It says investments in new businesses, products, services, and technologies may not be commercially viable or earn adequate returns [f_112722493658], that capital-markets access or debt-management problems could impair strategy and financial flexibility [f_f2c947f73f4c], and that AI-related products and other new offerings can raise ethical, technological, legal, regulatory, and other challenges that could hurt brands and demand [f_e881e8952c74].
+
+Operating margin over the last four reported quarters was 30.5% [f_fba88e7cd1c0], 31.6% [f_fba88e7cd1c0], 36.1% [f_fba88e7cd1c0], and 34.0% [f_fba88e7cd1c0]. It rose through the third quarter, then slipped in the latest quarter versus the prior quarter, but it is still above the first quarter in the series [f_fba88e7cd1c0].
+--- the facts it cited ---
+  f_5e6b1b091b49  passage  10-K Item 1A  GOOGL  'es could result in operating difficulties, dilution, and other consequences that could harm our business, fina'  2026-02-05
+  f_2774ff0f0b59  passage  10-K Item 1A  GOOGL  'ontinue to provide high-quality, trustworthy, innovative products and services that are truly useful and play '  2026-02-05
+  f_223bd5d8afc9  passage  10-K Item 1A  GOOGL  'local governments). Geopolitical tensions or armed conflicts, such as the ongoing conflict in the Middle East '  2026-02-05
+  f_112722493658  passage  10-Q Part II, Item 1A  GOOGL  'ITEM 1A.RISK FACTORS\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0\n\nOur operations and financial results are subject to various risks and un'  2026-07-23
+  f_f2c947f73f4c  passage  10-Q Part II, Item 1A  GOOGL  'urance can be given that such strategies and offerings will be successful or will not harm our reputation, fin'  2026-07-23
+  f_e881e8952c74  passage  10-Q Part II, Item 1A  GOOGL  'ild new products, and seek partners to deliver localized services in other countries, and we may not be able t'  2026-07-23
+  f_fba88e7cd1c0  series  operating_margin  GOOGL  RATIO  2026-06-30  window={"months":3}  series n=4 spacing=quarterly 2025-09-30..2026-06-30
