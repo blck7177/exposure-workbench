@@ -1,0 +1,46 @@
+## X02-weakest-fcf-margin-then-sell-it  session=sess_f3ae210884a4
+Q: Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?
+ANSWER (as the gate accepted it, brackets kept):
+Apple turned the smallest share of fiscal 2025 revenue into free cash flow: 23.7% [f_45a1bbe371f1], versus 25.4% [f_7a222b15e152] for Microsoft and 46.6% [f_e8440ce44e3a] for NVIDIA.
+
+On the portfolio side, I cannot state the post-sale Technology sector weight or which concentration checks would loosen or tighten from the held book rows alone. The desk’s current book rows show Technology at 35.3% [f_2645c6724868], gross exposure at 100.0% [f_86fe38f80e5f], AAPL issuer concentration at 15.2% [f_6666630333f6], MSFT at 16.0% [f_503b04dfc955], NVDA at 4.06% [f_e40bfeb5384f], Technology sector concentration at 35.3% [f_a34bf1e057b4], daily_loss at -0.38% [f_4abff85af07c], and rolling_volatility_30d at 12.5% [f_37bbead09378]. Those are the only checked figures I can rely on here.
+
+What I can say is directional only: selling AAPL entirely would remove a Technology holding from the book, so the Technology sector’s weight would fall, and the AAPL issuer-concentration check would loosen. I do not have a checked post-trade book row to say whether any other check tightens or whether the Technology sector or gross exposure moves to a new warning tier.
+--- the facts it cited ---
+  f_10b2f666aa59  scalar  fcf_margin  MSFT  0.254188  RATIO  2025-06-30  window={"end":"2025-06-30","start":"2024-07-01"}  method=fcf_margin
+  f_45a1bbe371f1  scalar  fcf_margin  AAPL  0.237329  RATIO  2025-09-27  place=1 of=3 op=rank
+  f_7a222b15e152  scalar  fcf_margin  MSFT  0.254188  RATIO  2025-06-30  place=2 of=3 op=rank
+  f_e8440ce44e3a  scalar  fcf_margin  NVDA  0.466317  RATIO  2025-01-26  place=3 of=3 op=rank
+  f_2645c6724868  scalar  sector_exposures.weight  Technology  0.352981  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_86fe38f80e5f  scalar  limit_checks.current_value  gross_exposure  1  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_6666630333f6  scalar  limit_checks.current_value  issuer_concentration:AAPL  0.151951  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_503b04dfc955  scalar  limit_checks.current_value  issuer_concentration:MSFT  0.16039  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_e40bfeb5384f  scalar  limit_checks.current_value  issuer_concentration:NVDA  0.0406405  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_a34bf1e057b4  scalar  limit_checks.current_value  sector_concentration:Technology  0.352981  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_4abff85af07c  scalar  limit_checks.current_value  daily_loss  -0.00375733  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_37bbead09378  scalar  limit_checks.current_value  rolling_volatility_30d  0.125067  RATIO  2026-09-10  of=run_e2945c5ebd5a
+
+## X06-weakest-momentum-then-trim-it  session=sess_c1d9c51fce37
+Q: Which of our equity holdings has the weakest 12-1 momentum? If we sold half of that position, where does its weight land, and which concentration checks loosen or tighten?
+ANSWER (as the gate accepted it, brackets kept):
+MSFT has the weakest 12-1 momentum in the equity book: 1.33% [f_2ef676d45219]. If we sold half that position, its weight would land at 8.02% [f_ad01019162e7].
+
+On concentration, MSFT is currently in warning at 16.0% [f_292e56495678], above the 15.0% [f_745502b2b73e] warning tier but below the 20.0% [f_e5be94ae0520] breach tier. Halving the position would move it to 8.02% [f_ad01019162e7], which would clear that warning and materially loosen the issuer-concentration check. The Technology sector remains clear at 35.3% [f_32536dc9dca5] against a 40.0% [f_9d21e4f5bbc5] warning tier, so that sector check would also loosen. No concentration check tightens from this trade.
+--- the facts it cited ---
+  f_01c9ae905825  scalar  JPM.momentum_12_1  JPM  0.227677  RATIO  2026-08-11  window={"end":"2026-08-11","start":"2025-09-10"}  method=price.momentum_12_1
+  f_2ef676d45219  scalar  momentum_12_1  MSFT  0.0132516  RATIO  2026-08-11  place=1 of=8 op=rank
+  f_ad01019162e7  scalar  issuer_exposures.weight.scale  MSFT  0.080195  RATIO  2026-09-10  window={"instant":"2026-09-10"}  op=scale
+  f_292e56495678  scalar  limit_checks.current_value  issuer_concentration:MSFT  0.16039  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_745502b2b73e  scalar  limit_checks.warning_level  issuer_concentration:MSFT  0.15  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_e5be94ae0520  scalar  limit_checks.breach_level  issuer_concentration:MSFT  0.2  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_32536dc9dca5  scalar  limit_checks.current_value  sector_concentration:Technology  0.352981  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_9d21e4f5bbc5  scalar  limit_checks.warning_level  sector_concentration:Technology  0.4  RATIO  2026-09-10  of=run_e2945c5ebd5a
+
+## X07-drawdown-repeated-in-dollars  session=sess_36cddbb66dbd
+Q: If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?
+ANSWER (as the gate accepted it, brackets kept):
+If NVIDIA repeated its 1-year drawdown of 20.2% [f_446a1b1d47bd] from here, our NVDA position would lose $88.28K [f_bc5588edddc6]. That is 20.2% [f_394d18427459] of the book’s market value.
+--- the facts it cited ---
+  f_446a1b1d47bd  scalar  NVDA.drawdown.depth  NVDA  0.202144  RATIO  2026-09-10  window={"name":"1y"}
+  f_bc5588edddc6  scalar  issuer_exposures.market_value.multiply.NVDA.  NVDA  88280.4  MONEY  2026-09-10  window={"instant":"2026-09-10"}  op=multiply
+  f_394d18427459  scalar  issuer_exposures.market_value.multiply.NVDA.  NVDA  0.202144  RATIO  2026-09-10  window={"instant":"2026-09-10"}  op=divide

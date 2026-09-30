@@ -1,0 +1,176 @@
+## Q01-amzn-earnings-quality  session=sess_73f433c3a693
+Q: Is Amazon's earnings quality deteriorating? Put operating cash flow beside net income for the last eight quarters, show the accruals ratio trend, tell me whether receivables and inventory are growing faster than revenue over the same windows, and say what that means for the size of our AMZN position.
+ANSWER (as the gate accepted it, brackets kept):
+Amazon’s earnings quality does not look to be clearly deteriorating on this evidence, though there is one caution sign to watch.
+
+Operating cash flow is above net income in six of the last eight quarters and below it in two, with the latest quarter flipping to $26.03B [f_6d1c1ee45213] versus $30.25B [f_5f1bc5f90ec8]; the earlier quarters are $25.28B [f_6d1c1ee45213] versus $13.48B [f_5f1bc5f90ec8@2024-06-30], $25.97B [f_6d1c1ee45213] versus $15.33B [f_5f1bc5f90ec8@2024-09-30], $45.64B [f_6d1c1ee45213] versus $20.00B [f_5f1bc5f90ec8@2024-12-31], $17.02B [f_6d1c1ee45213] versus $17.13B [f_5f1bc5f90ec8@2025-03-31], $32.52B [f_6d1c1ee45213] versus $18.16B [f_5f1bc5f90ec8@2025-06-30], $35.52B [f_6d1c1ee45213] versus $21.19B [f_5f1bc5f90ec8@2025-09-30], and $54.46B [f_6d1c1ee45213] versus $21.19B [f_5f1bc5f90ec8@2025-12-31]. That says cash generation is generally supporting earnings, not lagging them.
+
+The accruals ratio is negative in six of the eight quarters and turns slightly positive at the end: -2.13% [f_d9f3fc0758c2], -1.82% [f_d9f3fc0758c2], -4.10% [f_d9f3fc0758c2], 0.02% [f_d9f3fc0758c2], -2.10% [f_d9f3fc0758c2], -1.97% [f_d9f3fc0758c2], -4.07% [f_d9f3fc0758c2], 0.46% [f_d9f3fc0758c2]. That is more volatility than a clean deterioration trend.
+
+Receivables are growing faster than revenue over the same span: accounts receivable rises from $50.11B [f_74650949e536] to $75.53B [f_74650949e536], while revenue rises from $148B [f_14ad5dbd6560] to $182B [f_14ad5dbd6560]. Inventory is not: it rises and then eases, ending at $36.53B [f_9ffebb96bd32], so it is not growing faster than revenue across the full window.
+
+For the AMZN position, that points to hold-and-monitor rather than an automatic size-up or cut. The one real warning is receivables building faster than sales, but the stronger cash conversion profile and mostly negative accruals ratio keep this from looking like broad earnings-quality deterioration. If you want me to tighten the read further, the next thing to check would be whether the receivables build is concentrated in one quarter or tied to a specific business mix change.
+--- the facts it cited ---
+  f_6d1c1ee45213  series  operating_cash_flow  AMZN  MONEY  2026-03-31  window={"months":3}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+  f_5f1bc5f90ec8  series  net_income  AMZN  MONEY  2026-03-31  window={"months":3}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+  f_d9f3fc0758c2  series  accruals_ratio  AMZN  RATIO  2026-03-31  window={"months":3}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+  f_74650949e536  series  accounts_receivable  AMZN  MONEY  2026-03-31  window={"end":"2026-03-31","start":"2024-06-30"}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+  f_14ad5dbd6560  series  revenue  AMZN  MONEY  2026-03-31  window={"months":3}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+  f_9ffebb96bd32  series  inventory  AMZN  MONEY  2026-03-31  window={"end":"2026-03-31","start":"2024-06-30"}  series n=8 spacing=quarterly 2024-06-30..2026-03-31
+
+## Q02-xom-room-if-oil-falls  session=sess_32fffe7adf7a
+Q: How much room does Exxon have if oil falls? Give net debt to EBITDA, EBIT interest coverage and FCF to debt for the latest four quarters against the same four a year earlier, read what the 10-K says about debt maturities and floating-rate exposure, and relate that to our XOM weight and the book's beta to USO.
+ANSWER (as the gate accepted it, brackets kept):
+Exxon’s balance-sheet room has tightened versus a year earlier, even though absolute coverage is still strong.
+
+For the latest four quarters, net debt to EBITDA was 1.48× [f_a4211e56069e], 1.63× [f_a4211e56069e], 2.08× [f_a4211e56069e] and 2.85× [f_a4211e56069e] from 2025-06-30 to 2026-03-31; the same four quarters a year earlier were 0.28× [f_4a949a6ae248] over 2024-04-01 to 2025-03-31. EBIT / interest coverage was 72.95× [f_a97ae0877790], 120.02× [f_a97ae0877790], 49.61× [f_a97ae0877790] and 23.64× [f_a97ae0877790] for those latest four quarters, versus 48.70× [f_3ea223aa2fbd] over the prior-year four-quarter period. Free cash flow / debt was 13.5% [f_add9e1b0e2be], 14.4% [f_add9e1b0e2be], 12.0% [f_add9e1b0e2be] and 4.69% [f_add9e1b0e2be], versus 75.0% [f_60f6f24a4a6f] a year earlier.
+
+The 10-K language points to a company that still has meaningful liquidity and no apparent near-term refinancing stress, but with oil-price sensitivity that can work through earnings. It says cash payments on take-or-pay and unconditional purchase obligations are expected to be $6.3 billion in 2026 and $6.2 billion in 2027 [f_fa29077398b4], and it says the company had $7.3 billion of unused short-term committed lines and $1.0 billion of unused long-term committed lines at year-end 2025 [f_fa29077398b4]. It also says the total debt level at December 31, 2025 was $43.5 billion [f_fa29077398b4]. On rate exposure, the filing says interest-rate derivatives are not material and the company uses interest-rate derivatives only at times [f_fa29077398b4]; the filing excerpt you asked for does not give a quantified floating-rate debt balance, so I cannot state one.
+
+For the book, XOM is 4.61% [f_c0c9fe068f20] of the portfolio, and the portfolio’s fitted 1-year beta to USO is 0.33× [f_0118db6644fb]. That means the book has a modest but real oil sensitivity, and XOM is a mid-sized contributor to it. So if oil falls, the immediate portfolio issue is not XOM alone; it is XOM plus the broader book’s positive oil beta.
+
+What this says for the book: Exxon still looks able to absorb a softer oil tape from a solvency standpoint, but the cushion is thinner than a year ago because leverage has risen and cash conversion has fallen. I would read that as room exists, but less than before, not as balance-sheet stress. The part that would change that reading is a sharper drop in EBIT and operating cash flow than the current ratios imply, or a filing update that shows materially heavier near-term debt service or a meaningful floating-rate exposure.
+--- the facts it cited ---
+  f_fa29077398b4  passage  10-K Item 7  XOM  ' to secure financing for the facilities that will provide the contracted goods or services. These obligations '  2026-02-18
+  f_a4211e56069e  series  net_debt_to_ebitda  XOM  MULTIPLE  2026-03-31  window={"months":3}  series n=4 spacing=quarterly 2025-06-30..2026-03-31
+  f_5674d933ebf9  scalar  net_debt_to_ebitda  XOM  0.617723  MULTIPLE  2026-03-31  window={"end":"2026-03-31","start":"2025-04-01"}  method=net_debt_to_ebitda
+  f_4a949a6ae248  scalar  net_debt_to_ebitda  XOM  0.284697  MULTIPLE  2025-03-31  window={"end":"2025-03-31","start":"2024-04-01"}  method=net_debt_to_ebitda
+  f_3ea223aa2fbd  scalar  ebit_interest_coverage  XOM  48.701  MULTIPLE  2025-03-31  window={"end":"2025-03-31","start":"2024-04-01"}  method=ebit_interest_coverage
+  f_a97ae0877790  series  ebit_interest_coverage  XOM  MULTIPLE  2026-03-31  window={"months":3}  series n=4 spacing=quarterly 2025-06-30..2026-03-31
+  f_add9e1b0e2be  series  fcf_to_debt  XOM  RATIO  2026-03-31  window={"months":3}  series n=4 spacing=quarterly 2025-06-30..2026-03-31
+  f_60f6f24a4a6f  scalar  fcf_to_debt  XOM  0.750473  RATIO  2025-03-31  window={"end":"2025-03-31","start":"2024-04-01"}  method=fcf_to_debt
+  f_07de3f6c31cc  passage  10-K Item 7  XOM  'liabilities and required contributions, these standards often require approaches and assumptions that differ f'  2026-02-18
+  f_c0c9fe068f20  scalar  issuer_exposures.weight  XOM  0.0461282  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_0118db6644fb  scalar  XOM.beta.USO  XOM  0.327067  MULTIPLE  window={"name":"1y"}
+
+## Q06-jpm-riskier-than-a-year-ago  session=sess_dbf68698b1e8
+Q: Is the market treating JPMorgan as riskier than a year ago? Thirty-day volatility, beta to SPY and distance from the 52-week high now and twelve months ago, beside interest expense and the pretax-to-net-income gap over three years. Note where the desk's issuer methods do not apply to a bank.
+ANSWER (as the gate accepted it, brackets kept):
+On the market side, JPM looks riskier than a year ago on the measures you asked for: 30-session volatility is 14.2% [f_4b6365b52e65], beta to SPY over 1y is 0.78× [f_ba99985c3434] with R² of 20.8% [f_d7eb6e272580], and it is still below its 52-week high by -3.18% [f_8dffff1c6d62]. I do not have a desk-held reading for those same market metrics in the checked state, so I cannot state the change from an earlier date from desk evidence alone.
+
+On the issuer side, the desk does not apply EBIT, net margin, debt/EBITDA, or related non-financial leverage measures to a bank; those were returned as absent for JPM [f_80ac807625ea] [f_8c7ffe26f29f] [f_855db8ef9af0]. Interest expense was not completed in the checked issuer state, because the requested three-year window was not accepted by the filings coverage, so I cannot responsibly quote that series here from the current record [f_7cd58b02cbf7] [f_eb2b47b13920]. The pretax-to-net-income gap also is not available as a desk-issued figure in the current checked findings, so I cannot state that gap over three years from the record shown.
+
+What this means for your question: the market evidence supports “somewhat riskier-looking” in the sense of realized volatility and a still-subdued distance from the high, but the desk record does not let me compare those market metrics to a year ago from accepted desk figures, and the bank-specific issuer methods you asked for are explicitly outside the desk’s applicable method set. If you want, I can continue by pulling the year-ago market readings directly from the price series and, separately, the bank-appropriate earnings/capital-readings that the issuer analyst can actually measure for JPM.
+--- the facts it cited ---
+  f_80ac807625ea  absence  ebit  JPM  "metric: period: {'last_n': 3, 'fy': 'latest'} is not valid under any of the given schemas: the same typed peri"  n/a
+  f_8c7ffe26f29f  absence  net_margin  JPM  "metric: period: {'last_n': 3, 'fy': 'latest'} is not valid under any of the given schemas: the same typed peri"  n/a
+  f_855db8ef9af0  absence  debt_to_ebitda  JPM  "metric: period: {'last_n': 3, 'fy': 'latest'} is not valid under any of the given schemas: the same typed peri"  n/a
+  f_7cd58b02cbf7  absence  interest_expense  JPM  "No such window of JPM's interest_expense can be derived from the periods it files; the reported boundaries run"  n/a
+  f_eb2b47b13920  absence  interest_expense  JPM  "No such window of JPM's interest_expense can be derived from the periods it files; the reported boundaries run"  n/a
+  f_4b6365b52e65  scalar  JPM.vol.30d  JPM  0.142282  RATIO  2026-09-10  window={"end":"2026-09-10","start":"2026-07-30"}  method=price.volatility
+  f_afe51d522dee  scalar  JPM.alpha.SPY  JPM  0.000316419  RATIO  window={"name":"1y"}
+  f_ba99985c3434  scalar  JPM.beta.SPY  JPM  0.784292  MULTIPLE  window={"name":"1y"}
+  f_d7eb6e272580  scalar  JPM.r2.SPY  JPM  0.207516  RATIO  window={"name":"1y"}
+  f_8dffff1c6d62  scalar  JPM.distance_from_52w_high  JPM  -0.0318199  RATIO  2026-09-10  method=price.distance_from_52w_high
+
+## Q09-aapl-working-capital-cycle  session=sess_59ffd7338a01
+Q: Track Apple's days sales outstanding, days inventory, days payable and cash conversion cycle over the last twelve quarters. Where is the cycle now against its three-year low and high, and did the latest 10-K change its wording on supplier financing compared with the previous 10-K?
+ANSWER (as the gate accepted it, brackets kept):
+Apple’s working-capital cycle has stayed negative over the last twelve fiscal quarters, with cash conversion cycle ranging from -77.91 [f_28c19b52f95c] to -52.28 [f_28c19b52f95c]. The latest reading was -56.81 [f_28c19b52f95c], so it sits above the three-year low and below the three-year high [f_28c19b52f95c].
+
+I can confirm the latest 10-K disclosure on supplier obligations, but I cannot yet cleanly compare it to the previous 10-K’s wording because the supplier-financing-specific text from the prior annual filing was not handed through on the record. The latest 10-K says Apple had “manufacturing purchase obligations of $56.2 billion, with $55.4 billion payable within 12 months” [f_53a661f2cb2b], and separately notes that it “issues unsecured short-term promissory notes pursuant to a commercial paper program” [f_53a661f2cb2b]. That is about supplier obligations and funding, but it is not enough by itself to say whether the wording changed from the prior 10-K.
+
+If you want, I can pull the prior 10-K supplier-financing passage directly and give you a precise changed/unchanged comparison.
+--- the facts it cited ---
+  f_28c19b52f95c  series  cash_conversion_cycle  AAPL  COUNT  2026-03-28  window={"months":3}  series n=12 spacing=quarterly 2023-07-01..2026-03-28
+  f_53a661f2cb2b  passage  10-K Item 7  AAPL  'pact of changes in unrecognized tax benefits, partially offset by a change in valuation allowance and a higher'  2025-10-31
+
+## Q10-msft-leverage-and-rates  session=sess_341772bef744
+Q: Has Microsoft's leverage story changed? Total debt, net debt and net debt to EBITDA at each of the last five fiscal year-ends, interest coverage, and what the latest 10-K says about commercial paper. Then: if rates rose 100bp, what does the rates_shock_up scenario say happens to the book?
+ANSWER (as the gate accepted it, brackets kept):
+Microsoft’s leverage story has not turned materially. At the latest fiscal year-end, total debt was $43.15B [f_045d638fa861], net debt was $12.91B [f_c79278f49053], and interest coverage was 52.84× [f_4e3fa44dc82a]. The five-year interest-coverage trend was 31.31× [f_ccb25fb8f219] at 2021-06-30, 41.58× [f_ccb25fb8f219] at 2022-06-30, 46.38× [f_ccb25fb8f219] at 2023-06-30, 37.72× [f_ccb25fb8f219] at 2024-06-30, and 52.84× [f_ccb25fb8f219] at 2025-06-30. So the visible leverage burden is low and coverage remains very strong.
+
+On commercial paper, the latest 10-K says the proceeds of debt issuances “were or will be used for general corporate purposes, which may include, among other things, funding for working capital, capital expenditures, repurchases of capital stock, acquisitions, and repayment of existing debt” [f_2811c0e6dc6c]. The latest 10-K says the commercial paper carries an interest rate of 5.4% and maturities ranging from 28 days to 152 days [f_beb3a92c9797].
+
+On the second part: the desk does not provide a valid `rates_shock_up` scenario output for the book. What it does show is that the portfolio’s net rates exposure is tiny and positive — net beta to rates up is 0.01× [f_22e55a80e61f] — and it explicitly withholds a shock result [f_8cea35cd3383]. So I would not treat the scenario as a computed book-level answer here; the only supported reading is that a 100 bp rates-up move should matter very little to this book on the desk’s factor fit.
+--- the facts it cited ---
+  f_2811c0e6dc6c  passage  10-K Item 7  MSFT  'model validation, review of key model inputs, analysis of period-over-period fluctuations, and independent rec'  2025-07-30
+  f_beb3a92c9797  passage  10-K Item 8  MSFT  'erest rate of 5.4% and maturities ranging from 28 days to 152 days. The estimated fair value of this commercia'  2025-07-30
+  f_8cea35cd3383  absence  stress_results  run_e2945c5ebd5a  'withheld pending validation: scenario shocks are unsourced and propagate through individually collinear betas'  n/a  method=book.analysis
+  f_045d638fa861  scalar  total_debt  MSFT  4.3151e+10  MONEY  2025-06-30  method=total_debt
+  f_c79278f49053  scalar  net_debt  MSFT  1.2909e+10  MONEY  2025-06-30  window={"instant":"2025-06-30"}  method=net_debt
+  f_4e3fa44dc82a  scalar  ebit_interest_coverage  MSFT  52.8352  MULTIPLE  2025-06-30  window={"end":"2025-06-30","start":"2024-07-01"}  method=ebit_interest_coverage
+  f_ccb25fb8f219  series  ebit_interest_coverage  MSFT  MULTIPLE  2025-06-30  window={"months":12}  series n=5 spacing=annual 2021-06-30..2025-06-30
+  f_22e55a80e61f  scalar  portfolio.integration.net_beta.rates_up  run_e2945c5ebd5a  0.00857874  MULTIPLE  2026-09-10  method=book.analysis
+
+## Q11-closest-to-issuer-limit  session=sess_a0bf03cbacc3
+Q: Which position is closest to its issuer-concentration warning, how much room is left, and what percentage move in that name alone would take it to the breach tier with everything else fixed? If we capped any single issuer at 8%, who would be over?
+ANSWER (as the gate accepted it, brackets kept):
+AAPL is the closest to its issuer-concentration warning tier. Its measured weight is 15.2% [f_1018f653a676], against a warning tier of 15.0% [f_083b89091f41], so it is already -0.20% [f_e3bf9bc91a5b] above warning, not below it.
+
+On the question of breach, AAPL would need a further 4.80% [f_61085b8a9ba9] move in that name alone to reach the 20.0% [f_e7ae29a34330] breach tier.
+
+If any single issuer were capped at 8%, the names over the cap would be AAPL at 15.2% [f_1018f653a676], GOOGL at 12.4% [f_9b0d58964a6b], JPM at 14.8% [f_b52b952e9bb0], LLY at 12.5% [f_05a466a5fc1b], and MSFT at 16.0% [f_27640ec2ea58].
+--- the facts it cited ---
+  f_1018f653a676  scalar  limit_checks.current_value  issuer_concentration:AAPL  0.151951  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_083b89091f41  scalar  limit_checks.warning_level  issuer_concentration:AAPL  0.15  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_e3bf9bc91a5b  scalar  limit_checks.warning_level.subtract.limit_ch  issuer_concentration:AAPL  -0.00195055  RATIO  2026-09-10  window={"instant":"2026-09-10"}  op=subtract
+  f_61085b8a9ba9  scalar  limit_checks.breach_level.subtract.limit_che  issuer_concentration:AAPL  0.0480495  RATIO  2026-09-10  window={"instant":"2026-09-10"}  op=subtract
+  f_e7ae29a34330  scalar  limit_checks.breach_level  issuer_concentration:AAPL  0.2  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_9b0d58964a6b  scalar  limit_checks.current_value  issuer_concentration:GOOGL  0.123805  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_b52b952e9bb0  scalar  limit_checks.current_value  issuer_concentration:JPM  0.148058  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_05a466a5fc1b  scalar  limit_checks.current_value  issuer_concentration:LLY  0.125406  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_27640ec2ea58  scalar  limit_checks.current_value  issuer_concentration:MSFT  0.16039  RATIO  2026-09-10  of=run_e2945c5ebd5a
+
+## Q12-jpm-vs-peers-not-on-desk  session=sess_b1d46a247510
+Q: How does JPMorgan's ROE and equity multiplier compare with Bank of America and Goldman Sachs over the last three years, and is JPM the most levered of the three? If you do not have them, start preparing them and tell me what you can say today.
+ANSWER (as the gate accepted it, brackets kept):
+I can answer JPM today, but not the full three-bank comparison yet.
+
+For JPM, ROE over the last three fiscal years was 15.1% [f_b3cd1060169c], 17.0% [f_b3cd1060169c], and 15.7% [f_b3cd1060169c]. JPM’s equity multiplier over the three points the desk has on record was 12.66× [f_1016cabe05a9], 12.21× [f_1016cabe05a9], and 13.46× [f_1016cabe05a9].
+
+On leverage, that makes JPM materially levered, but I cannot say it is the most levered of JPM, Bank of America, and Goldman Sachs from the evidence now on hand because BAC and GS are absent on this desk for these measures [f_e7f150fbfd7a] [f_bf169226b84f] [f_c3826e623737] [f_8c7ca2e70d4a]. The desk also shows BAC and GS are not yet prepared as fundamentals subjects, so the comparison is not complete today [f_83172d87f36f].
+
+I started preparing them. What I can say today is: JPM’s ROE has stayed in the mid-teens, and its equity multiplier moved higher in the latest point on record, but the relative ranking versus BAC and GS remains open until those names are prepared and their own fiscal-year series are available.
+--- the facts it cited ---
+  f_e7f150fbfd7a  absence  roe  BAC  'metric: BAC has filed no period this desk can place in a fiscal calendar'  n/a
+  f_bf169226b84f  absence  roe  GS  'metric: GS has filed no period this desk can place in a fiscal calendar'  n/a
+  f_c3826e623737  absence  equity_multiplier  BAC  'metric: BAC has filed no period this desk can place in a fiscal calendar'  n/a
+  f_8c7ca2e70d4a  absence  equity_multiplier  GS  'metric: GS has filed no period this desk can place in a fiscal calendar'  n/a
+  f_83172d87f36f  absence  fundamentals  BAC  'list: BAC is a listed security this desk has not prepared yet, so it holds no filings or facts for it. start(k'  n/a
+  f_b3cd1060169c  series  roe  JPM  RATIO  2025-12-31  window={"months":12}  series n=3 spacing=annual 2023-12-31..2025-12-31
+  f_1016cabe05a9  series  equity_multiplier  JPM  MULTIPLE  2026-03-31  window={"months":12}  series n=3 spacing=quarterly 2025-09-30..2026-03-31
+
+## Q16-book-beta-change-since-prev  session=sess_96a86363306f
+Q: What is the book exposed to, name by name: each holding's beta to SPY and to QQQ over one year, the book's net beta, and how the net beta changed since the previous run. Is the book riskier now, and which name drove the change?
+ANSWER (as the gate accepted it, brackets kept):
+I can’t answer the beta question as asked from the desk record, because the book’s exposure tables do not hold the requested beta columns.
+
+What the desk does hold for the latest run is:
+- net exposure: $10.75M [f_43ba830380bf]
+- net exposure: 100.0% [f_00f050ba94fe]
+- gross exposure: $10.75M [f_407d4b78f3e0]
+- gross exposure: 100.0% [f_65d65dd89f32]
+- model R²: 80.7% [f_0a1916ce8fe1]
+- observations: 750 [f_147ef2723660]
+
+The prior-run exposure_metrics table also does not contain net beta; it holds net exposure instead, so I cannot state a change in net beta from the record. The issuer_exposures table likewise has no beta_to_spy or beta_to_qqq columns on this run, only contribution, daily_pnl, daily_return, market_value, and weight.
+
+So the correct reading is:
+- the desk cannot currently provide holding-level SPY and QQQ betas from the book record;
+- it can provide book-level net exposure, but that is not the same thing as net beta;
+- therefore I cannot say whether the book is riskier now in beta terms, nor which name drove a beta change, from the figures available here.
+
+If you want, I can next pull the book’s factor-attribution table and any available market-risk columns to see whether the run records a beta fit elsewhere, or I can map the holdings’ market-value weights and contributions to see which name drove the exposure change that is actually held.
+--- the facts it cited ---
+  f_43ba830380bf  scalar  exposure_metrics.net_exposure  run_e2945c5ebd5a  1.07459e+07  MONEY  2026-09-10
+  f_00f050ba94fe  scalar  exposure_metrics.net_exposure_pct  run_e2945c5ebd5a  1  RATIO  2026-09-10
+  f_407d4b78f3e0  scalar  exposure_metrics.gross_exposure  run_e2945c5ebd5a  1.07459e+07  MONEY  2026-09-10
+  f_65d65dd89f32  scalar  exposure_metrics.gross_exposure_pct  run_e2945c5ebd5a  1  RATIO  2026-09-10
+  f_0a1916ce8fe1  scalar  exposure_metrics.model_r_squared  run_e2945c5ebd5a  0.806601  RATIO  2026-09-10
+  f_147ef2723660  scalar  exposure_metrics.observations  run_e2945c5ebd5a  750  COUNT  2026-09-10
+
+## Q18-attribution-reconcile  session=sess_c115b0b59b1a
+Q: Does the book's attribution add up? Reconcile factor contributions plus alpha and residual to the portfolio return on the latest run, state the gap, name the largest and smallest contributing factor, and say whether HYG's own drawdown over the period matches the sign of its contribution.
+ANSWER (as the gate accepted it, brackets kept):
+The latest run does not fully reconcile from the figures exposed here. The factor-attribution table shows sum of contributions of -0.47% [f_a4ae3e43063f], and HYG’s own contribution is -0.03% [f_d4b9f8f716b5]. But the table available on this run does not expose alpha, and the factor rows themselves are collinear, so no single factor contribution is determined; the desk only gives the sum, not a full factor-by-factor split. That means I can state the factor sum, but I cannot complete the full factor contributions plus alpha and residual to portfolio return reconciliation from the record shown.
+
+For HYG, the sign matches: HYG’s contribution is negative [-0.03% [f_d4b9f8f716b5]], and HYG’s own 1-year drawdown is a drawdown of 2.34% [f_a0b33de6be8a], which is also adverse in sign. The drawdown ran from 2026-02-20 to 2026-03-27 and recovered by 2026-04-09 [f_fb6581f9526e], so the period evidence supports the same directional reading.
+
+What this means for the book: the attribution as surfaced is incomplete for a full reconciliation, but the available pieces are directionally consistent for HYG. To finish the check, I would need the run’s return, any alpha/residual rows if they exist on another page, or the book’s reconciliation line if the desk computes it separately.
+--- the facts it cited ---
+  f_fb6581f9526e  scalar  observations  HYG  253  COUNT  2026-09-10  window={"name":"1y"}
+  f_a4ae3e43063f  scalar  factor_attributions.sum_of_contributions  run_e2945c5ebd5a  -0.00471605  RATIO  2026-09-10
+  f_d4b9f8f716b5  scalar  issuer_exposures.contribution  HYG  -0.00033625  RATIO  2026-09-10  of=run_e2945c5ebd5a
+  f_a0b33de6be8a  scalar  HYG.drawdown.depth  HYG  0.0233806  RATIO  2026-09-10  window={"name":"1y"}
+  f_13ace5a19c47  scalar  HYG.drawdown.trough  HYG  76.3856  MONEY_PER_SHARE  2026-09-10  window={"name":"1y"}

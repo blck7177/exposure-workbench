@@ -1,0 +1,38 @@
+## X01-largest-weight-then-its-cash  session=sess_6e02efc6c02b  EXHAUSTED
+Q: Which holding carries the largest weight in the book? For that company, where is the cash going: capital expenditure as a share of revenue and free cash flow margin over the last three fiscal years, and how many times over does it cover its interest?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## X02-weakest-fcf-margin-then-sell-it  session=sess_f3ae210884a4  ANSWERED
+Q: Of our three technology holdings, Apple, Microsoft and NVIDIA, which turned the smallest share of its fiscal 2025 revenue into free cash flow? If we sold that position entirely, what happens to the Technology sector weight and to the concentration checks: which loosen, and does anything tighten?
+Apple turned the smallest share of fiscal 2025 revenue into free cash flow: 23.7%, versus 25.4% for Microsoft and 46.6% for NVIDIA.
+On the portfolio side, I cannot state the post-sale Technology sector weight or which concentration checks would loosen or tighten from the held book rows alone. The desk’s current book rows show Technology at 35.3%, gross exposure at 100.0%, AAPL issuer concentration at 15.2%, MSFT at 16.0%, NVDA at 4.06%, Technology sector concentration at 35.3%, daily_loss at -0.38%, and rolling_volatility_30d at 12.5%. Those are the only checked figures I can rely on here.
+What I can say is directional only: selling AAPL entirely would remove a Technology holding from the book, so the Technology sector’s weight would fall, and the AAPL issuer-concentration check would loosen. I do not have a checked post-trade book row to say whether any other check tightens or whether the Technology sector or gross exposure moves to a new warning tier.
+
+## X03-furthest-below-high-then-filings  session=sess_08d7dbe5ea32  EXHAUSTED
+Q: Which of our equity holdings sits furthest below its 52-week high? For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## X04-thinnest-coverage-then-its-price  session=sess_338a4e37e9a9  EXHAUSTED
+Q: Of Amazon, Lilly and Exxon, which covered its interest bill the fewest times over in fiscal 2025? Is the market marking that stock down: its return over the past year against SPY, its deepest drawdown in that year with the dates, and how far it sits below its 52-week high?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## X05-biggest-drag-then-its-tape  session=sess_226fb6c600f8  EXHAUSTED
+Q: Which holding took the most off the book's return on the latest run's day? How has that stock been trading: its 12-1 momentum, its deepest drawdown of the past year with the dates, and its distance from the 52-week high?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## X06-weakest-momentum-then-trim-it  session=sess_c1d9c51fce37  ANSWERED
+Q: Which of our equity holdings has the weakest 12-1 momentum? If we sold half of that position, where does its weight land, and which concentration checks loosen or tighten?
+MSFT has the weakest 12-1 momentum in the equity book: 1.33%. If we sold half that position, its weight would land at 8.02%.
+On concentration, MSFT is currently in warning at 16.0%, above the 15.0% warning tier but below the 20.0% breach tier. Halving the position would move it to 8.02%, which would clear that warning and materially loosen the issuer-concentration check. The Technology sector remains clear at 35.3% against a 40.0% warning tier, so that sector check would also loosen. No concentration check tightens from this trade.
+
+## X07-drawdown-repeated-in-dollars  session=sess_36cddbb66dbd  ANSWERED
+Q: If NVIDIA repeated its deepest drawdown of the past year from here, how many dollars would our position lose, and what share of the book's market value is that?
+If NVIDIA repeated its 1-year drawdown of 20.2% from here, our NVDA position would lose $88.28K. That is 20.2% of the book’s market value.
+
+## X08-two-turns-high-then-filings  session=sess_e973eec9ff59  EXHAUSTED
+Q: Which of our equity holdings sits furthest below its 52-week high, and when was that high set?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
+
+## X08-two-turns-high-then-filings  session=sess_e973eec9ff59  EXHAUSTED
+Q: For that company, what do its latest 10-K and 10-Q say can go wrong, and has its operating margin slipped over the last four quarters?
+I could not produce an answer I can stand behind for this turn — everything I state has to trace back to evidence I actually retrieved, and I did not get there. Ask again, or narrow the question to one issuer or one metric.
