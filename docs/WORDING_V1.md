@@ -624,8 +624,8 @@ f'{len(failed)} sentence(s) of your reply did not pass. Everything else is KEPT 
 ```text
 [lead_budget] 'direct evidence calls exhausted; use the evidence already retrieved'
 [nothing_to_repair] 'no verdict stands on a reply; write the answer'
-[unknown_tool] f"your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and {REPAIR_TOOL_NAME}, plus {', '.join(sorted(direct_names))}; the answer is your reply text"
-f"That {name} call was byte-identical to the one refused before it, and the gate returned the same {result.get('error')!r}. It does not change its mind: sent a third time it is refused a third time. "
+[unknown_tool] f'your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and {REPAIR_TOOL_NAME}, plus {', '.join(sorted(direct_names))}; the answer is your reply text'
+f'That {name} call was byte-identical to the one refused before it, and the gate returned the same {result.get('error')!r}. It does not change its mind: sent a third time it is refused a third time. '
 'Change those, or drop the figure and say it in prose the ledger can account for.'
 ```
 
@@ -633,13 +633,13 @@ S1 委派形状检查 `delegation.parse_tasks`（不再声明 requirements 或 f
 
 ```text
 'ask takes {tasks: [{analyst, subjects, lines, …}]}'
-f"ask has no field(s) {', '.join(sorted(extra))}; provide tasks only"
+f'ask has no field(s) {', '.join(sorted(extra))}; provide tasks only'
 f'at most {MAX_TASKS} tasks in one call; ask the rest after you read these'
 f'tasks[{i}] is not an object'
-f"tasks[{i}] has no field(s) {', '.join(sorted(extra))}"
+f'tasks[{i}] has no field(s) {', '.join(sorted(extra))}'
 f"tasks[{i}].analyst {analyst!r} is not one of the desk's analysts: {', '.join(ANALYSTS)}"
 f"tasks[{i}].subjects names at least one ticker or one book's id"
-f"the {analyst} analyst is asked twice about {', '.join(subjects)} in one call; put every line for them in one task"
+f'the {analyst} analyst is asked twice about {', '.join(subjects)} in one call; put every line for them in one task'
 f'tasks[{i}].lines is a non-empty list of things you want to know'
 f'tasks[{i}].lines has more than {MAX_LINES} lines; that is more than one task'
 f'tasks[{i}].input_refs is a list of at most {MAX_INPUT_REFS} existing f_ row ids'
@@ -669,7 +669,7 @@ this task's {n} evidence calls are used; what was not read by then was not reach
 f'That {name} call was the same as one you already made, and the desk answered it the same way. It is not charged, and it will not change: ask for something else, or file what you have.' if again <= rp.STOP else 'Sent unchanged again. The desk will not answer differently; submit your evidence and notes.'
 [analyst_budget] 'submit the evidence and notes you have; this row records an execution budget limit'
 'Unchanged submission: repair or withdraw the named items.'
-[unknown_tool] f"your tools are {', '.join(verbs)} and submit"
+[unknown_tool] f'your tools are {', '.join(verbs)} and submit'
 ```
 
 ### 9.3 两道检查的出路句（方括号里是 reason；规则号见第 8 组）
@@ -701,23 +701,23 @@ _SHORT_BARE = {ids} holds these digits, but a short number written bare is not t
 [not_on_ledger] "refs must name rows on this session's ledger"
 [ambiguous_reference] 'split the note into narrower refs, or give this figure an explicit dated pointer'
 [passage_requires_pointer] "quote the passage's exact words, or use its stated unit and an explicit passage pointer"
-[period_mismatch] f"the sentence says {claim['as_written']!r}; the readings it points at are {F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request the series the question asked for"
-[superlative_without_rank] f"{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: " + '; '.join((f"{s['place']} of {s['of']} on {s['measure']}" for s in seats[:3])) + '. Point at the figure whose place you mean, or say it without the superlative'
+[period_mismatch] f'the sentence says {claim['as_written']!r}; the readings it points at are {F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request the series the question asked for'
+[superlative_without_rank] f'{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: ' + '; '.join((f'{s['place']} of {s['of']} on {s['measure']}' for s in seats[:3])) + '. Point at the figure whose place you mean, or say it without the superlative'
 [subject_mismatch] f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"
 [benchmark_mismatch] 'use a beta computed against the stated benchmark'
 [measure_mismatch] f"the sentence says '{phrase}' but the figure beside it is {', '.join(sorted({str(r.get('measure')) for _t, recs in linked for r in recs})[:3])}; the ledger holds {' / '.join(sorted(measures)[:2])} as its own fact — write that value, or drop the phrase"
-[superlative_without_rank] 'this figure holds no such place in an ordering the desk built — ' + ("the desk's ordering holds the same reading as " + ', '.join((f"[{c['id']}]" for c in ranked[:3])) + ': point at that one, or drop the word' if ranked else 'have the figures ranked and point at the ranked row, or drop the word')
+[superlative_without_rank] 'this figure holds no such place in an ordering the desk built — ' + ("the desk's ordering holds the same reading as " + ', '.join((f'[{c['id']}]' for c in ranked[:3])) + ': point at that one, or drop the word' if ranked else 'have the figures ranked and point at the ranked row, or drop the word')
 [subject_mismatch] f"this figure is {rec.get('subject')}'s own ({rec.get('measure')}); the sentence says it is the book's — name the issuer, or request the book-level figure"
 [date_expected] f"'{dw}' introduces a date; this figure is not one — the date is on the facts' window (start/end) or as_of"
 [tier_mismatch] f'the sentence says warning; the tier figure here is the {sorted(kinds)[0]} tier'
 [tier_mismatch] f'the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier'
 [change_conflict] 'the two figures are one reading written twice: point at the other reading, or say it without the change'
-[direction_conflict] f"the figure moved {('up' if moved_up else 'down')}; the sentence says the opposite"
-[direction_conflict] f"{a.get('subject')} is {('above' if first_higher else 'below')} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite"
-[change_conflict] f"{a.get('measure')} and {b.get('measure')} are two different quantities: point at two readings of one of them, or say it without the change"
-[direction_conflict] f"this change is {('negative' if val < 0 else 'positive')}; the sentence points the other way"
-[sense_conflict] f"the row says {registry.DIRECTION[r['means']['direction']]}; the sentence says the opposite — say what the row says, or drop the word"
-[status_conflict] f"the check here is {registry.STATUS[r['means']['status']]}; the sentence says {' and '.join(claimed)}"
+[direction_conflict] f'the figure moved {('up' if moved_up else 'down')}; the sentence says the opposite'
+[direction_conflict] f'{a.get('subject')} is {('above' if first_higher else 'below')} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite'
+[change_conflict] f'{a.get('measure')} and {b.get('measure')} are two different quantities: point at two readings of one of them, or say it without the change'
+[direction_conflict] f'this change is {('negative' if val < 0 else 'positive')}; the sentence points the other way'
+[sense_conflict] f'the row says {registry.DIRECTION[r['means']['direction']]}; the sentence says the opposite — say what the row says, or drop the word'
+[status_conflict] f'the check here is {registry.STATUS[r['means']['status']]}; the sentence says {' and '.join(claimed)}'
 ```
 
 ### 9.4 两个循环都读到的截断提示 `utils/json._CAP_DETAIL`（工具结果或回单超出读入上限时，`truncated.detail`）
