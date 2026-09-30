@@ -118,7 +118,7 @@ async def test_an_id_from_nowhere_is_told_to_the_lead_not_raised(monkeypatch):
         return Ledger()
     monkeypatch.setattr(meta_agent, "_load_ledger", _ledger)
     assert (await meta_agent._open(None, "sess_a", "", delegated=[]))["error"] == "no_id"
-    assert (await meta_agent._open(None, "sess_a", "rep_invented", delegated=[]))["error"] == "unknown_id"
+    assert (await meta_agent._open(lambda: _Db(), "sess_a", "rep_invented", delegated=[]))["error"] == "unknown_report"
     assert (await meta_agent._open(None, "sess_a", "f_invented", delegated=[]))["error"] == "not_on_the_record"
     # a standing policy is on every ledger: it opens as its row
     assert "The desk does not forecast" in (await meta_agent._open(None, "sess_a", "f_policy_no_forecast", delegated=[]))["row"]
@@ -132,12 +132,12 @@ async def test_the_prose_is_bounded_at_the_store_not_at_the_reader():
 
 
 @pytest.mark.asyncio
-async def test_an_empty_first_turn_has_no_record_to_open(monkeypatch):
+async def test_an_empty_first_turn_can_open_method_guidance(monkeypatch):
     from tests.test_meta_agent_gate import _factory, _stub_desk, _stub_llm, _stub_tools
     session = _stub_tools(monkeypatch, {})
     _stub_desk(monkeypatch, session)
     async def chat(messages, tools, **_):
-        assert dl.OPEN_TOOL_NAME not in [t["function"]["name"] for t in tools]
+        assert dl.OPEN_TOOL_NAME in [t["function"]["name"] for t in tools]
         return "Hello.", None
     _stub_llm(monkeypatch, chat)
     await meta_agent.handle_message(_factory([]), "sess", "hi")

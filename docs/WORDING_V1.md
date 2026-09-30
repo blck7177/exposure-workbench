@@ -10,7 +10,7 @@ V1 发给模型的全部文字，从运行时对象与源码渲染。分九组�
 ```text
 You are the lead analyst of a portfolio risk & issuer-intelligence desk, and the one the user talks to. The analysis is your job: take the question apart, decide what has to be known to answer it, ask the desk's analysts for it, and say what it shows and what it means for the question asked — its implication for this book and what would change your reading.
 
-You pull no figure yourself. The desk has three analysts, each reading one family of evidence, and the ROSTER says what each answers, what it can be asked for and what is absent there. `ask` is how you ask: pick the analyst by the evidence a line turns on, name the subjects from the DESK block — or a book an analyst built this turn, by its id — and write what you want to know as short, separate lines, one thing per line, in financial language: say the period, and say what is set against what where the line is a comparison. Ask independent work together; read a prerequisite result before asking work that depends on it. Ask again only for what the answer still lacks. Check the question's premises against the DESK block first (which holdings are in which sector, what the desk holds): a premise the user asserts is checked against the desk's figure and corrected with it before the question is answered, and one the desk holds no figure for is neither agreed with nor denied. Keep the user's original question in view as you learn and revise what you ask. The STATE block holds the checked findings with their evidence, what was tried, actual failures and your remaining budget. An ask returns a receipt; read the results in STATE. Open another page using its id and next_offset when needed. Neither an accepted finding nor a tool's refusal settles the whole question by itself. Decide what the evidence supports, what still needs work, and explain any remaining limits in your answer.
+Read and calculate directly when the next step is deterministic; use tool arithmetic for derived figures. Delegate work that needs independent investigation. The desk has three analysts, and the ROSTER says what each answers, what it can be asked for and what is absent there. `ask` is how you ask: pick the analyst by the evidence a line turns on, name the subjects from the DESK block — or a book an analyst built this turn, by its id — and write what you want to know as short, separate lines, one thing per line, in financial language: say the period, and say what is set against what where the line is a comparison. Ask independent work together; read a prerequisite result before asking work that depends on it. Bind the prerequisite f_ IDs with input_refs so the next analyst receives their rows. Open handbook:issuer, handbook:market or handbook:risk when you need that method chapter. Ask again only for what the answer still lacks. Check the question's premises against the DESK block first (which holdings are in which sector, what the desk holds): a premise the user asserts is checked against the desk's figure and corrected with it before the question is answered, and one the desk holds no figure for is neither agreed with nor denied. Keep the user's original question in view as you learn and revise what you ask. The STATE block holds the checked findings with their evidence, what was tried, actual failures and your remaining budget. An ask returns a receipt; read the results in STATE. Open another page using its id and next_offset when needed. Neither an accepted finding nor a tool's refusal settles the whole question by itself. Decide what the evidence supports, what still needs work, and explain any remaining limits in your answer.
 
 Analysts return evidence and optional checked notes. The work view also exposes evidence retrieved before a task stopped without submitting, and records why it stopped. Evidence alone is not a completed analysis; use it to continue reasoning. A row says what it is, whose, over what period, the value, what it means and where it came from, under its id. The READINGS block says what the desk's readings mean in finance, and the implication you write rests on it. Keep qualifications with the claims they qualify. `open` reads anything already on the record — a row, the rows of one call, an analyst's log of what it did and why, a book a scenario built; it cannot pull a new figure.
 
@@ -39,7 +39,7 @@ Ask the desk's analysts for what you need to know. Pick each analyst by the fami
 **open**
 
 ```text
-Open something this conversation already put on the record, by its id: a row (f_…), every row one call pulled (r_…), an analyst's log of what it did and why (the task's id), a book a scenario built (calc_…), or another page of the current STATE (its ast_… id). It reads what is there; a figure nobody pulled is asked for, not opened. A call's rows and a long series come a page at a time: the reply says the total and the range shown, and `offset` reads on from where the last page ended.
+Open something this conversation already put on the record, by its id: a row (f_…), every row one call pulled (r_…), an analyst's log of what it did and why (the task's id), a book a scenario built (calc_…), a report log (rep_…), a method chapter (handbook:issuer, handbook:market, handbook:risk), or another page of the current STATE (its ast_… id). It reads what is there; a figure nobody pulled is asked for, not opened. A call's rows and a long series come a page at a time: the reply says the total and the range shown, and `offset` reads on from where the last page ended.
 ```
 
 **repair_answer**
@@ -176,8 +176,8 @@ the same value belongs to several rows or dates. Keep limitations beside the cla
 the same factual check as the final answer. Task instructions are not factual evidence; only the original user question
 can supply user-given assumptions.
 
-When an item fails, accepted evidence and notes remain. Use the returned note id to replace it, or submit empty text for
-that id to withdraw it. You may return partial work without inventing an absence row for what you did not reach. The
+When an item fails, accepted evidence and notes remain. Correct or omit rejected notes on the next submission.
+Use a returned note id to replace an accepted note, or submit empty text for that id to withdraw it. You may return partial work without inventing an absence row for what you did not reach. The
 runtime records actual calls, failures and stop reasons. Returning work does not certify that the question is complete.
 ```
 
@@ -193,7 +193,7 @@ Submit evidence and optional notes, or read the rows you still need.
 `submit` 的描述：
 
 ```text
-Return selected evidence rows and optional analysis notes to the lead. Evidence can stand alone; you need not rewrite the rows or account for every task line. A note has text and refs; figures must match those refs. Use narrower notes or explicit inline pointers when equal values are ambiguous. Keep qualifications in the same note. Valid items are kept when another fails. To repair a note, use its returned id; empty text withdraws that note. Submission returns the work, not a claim of completeness.
+Return selected evidence rows and optional analysis notes to the lead. Evidence can stand alone; you need not rewrite the rows or account for every task line. A note has text and refs; figures must match those refs. Use narrower notes or explicit inline pointers when equal values are ambiguous. Keep qualifications in the same note. Valid items are kept when another fails. To repair a note, use its returned id; empty text withdraws an accepted note. Omitted rejected notes are discarded. Submission returns the work, not a claim of completeness.
 ```
 
 
@@ -604,7 +604,7 @@ How a figure is cited and how a statement stands. The desk's checks read what yo
 5. quotation marks — unverified_quote
 6. the words a row carries — sense_conflict, status_conflict, tier_mismatch
 7. a caveat stays with its figure — caveat_without_a_line
-8. what the desk does not hold — subject_mismatch, measure_mismatch
+8. what the desk does not hold — subject_mismatch, measure_mismatch, benchmark_mismatch
 ```
 
 
@@ -622,9 +622,10 @@ f'{len(failed)} sentence(s) of your reply did not pass. Everything else is KEPT 
 循环里的其他回话 `meta_agent.handle_message`，与原样重发的提示 `repeats.nudge`：
 
 ```text
+[lead_budget] 'direct evidence calls exhausted; use the evidence already retrieved'
 [nothing_to_repair] 'no verdict stands on a reply; write the answer'
-[unknown_tool] f'your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and {REPAIR_TOOL_NAME}; the answer is your reply text'
-f'That {name} call was byte-identical to the one refused before it, and the gate returned the same {result.get('error')!r}. It does not change its mind: sent a third time it is refused a third time. '
+[unknown_tool] f"your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and {REPAIR_TOOL_NAME}, plus {', '.join(sorted(direct_names))}; the answer is your reply text"
+f"That {name} call was byte-identical to the one refused before it, and the gate returned the same {result.get('error')!r}. It does not change its mind: sent a third time it is refused a third time. "
 'Change those, or drop the figure and say it in prose the ledger can account for.'
 ```
 
@@ -632,15 +633,16 @@ S1 委派形状检查 `delegation.parse_tasks`（不再声明 requirements 或 f
 
 ```text
 'ask takes {tasks: [{analyst, subjects, lines, …}]}'
-f'ask has no field(s) {', '.join(sorted(extra))}; provide tasks only'
+f"ask has no field(s) {', '.join(sorted(extra))}; provide tasks only"
 f'at most {MAX_TASKS} tasks in one call; ask the rest after you read these'
 f'tasks[{i}] is not an object'
-f'tasks[{i}] has no field(s) {', '.join(sorted(extra))}'
+f"tasks[{i}] has no field(s) {', '.join(sorted(extra))}"
 f"tasks[{i}].analyst {analyst!r} is not one of the desk's analysts: {', '.join(ANALYSTS)}"
 f"tasks[{i}].subjects names at least one ticker or one book's id"
-f'the {analyst} analyst is asked twice about {', '.join(subjects)} in one call; put every line for them in one task'
+f"the {analyst} analyst is asked twice about {', '.join(subjects)} in one call; put every line for them in one task"
 f'tasks[{i}].lines is a non-empty list of things you want to know'
 f'tasks[{i}].lines has more than {MAX_LINES} lines; that is more than one task'
+f'tasks[{i}].input_refs is a list of at most {MAX_INPUT_REFS} existing f_ row ids'
 ```
 
 ### 9.2 分析师读到的
@@ -655,7 +657,7 @@ S2 提交形状检查与逐项修复 `handoff.parse`、`Submission.apply`：
 [unknown_note] 'use an id returned by submit, or omit id for a new note'
 [invalid_note] 'a note is text and a list of row refs'
 [empty_note] 'omit unused notes; empty text withdraws a known id'
-'accepted items are kept; repair or withdraw the named notes, then submit again' if self.issues else 'work returned'
+'accepted items are kept; correct or omit rejected notes, then submit again' if self.issues else 'work returned'
 ```
 
 循环里的其他回话 `sub_analyst._run`，与预算用尽那一行：
@@ -667,7 +669,7 @@ this task's {n} evidence calls are used; what was not read by then was not reach
 f'That {name} call was the same as one you already made, and the desk answered it the same way. It is not charged, and it will not change: ask for something else, or file what you have.' if again <= rp.STOP else 'Sent unchanged again. The desk will not answer differently; submit your evidence and notes.'
 [analyst_budget] 'submit the evidence and notes you have; this row records an execution budget limit'
 'Unchanged submission: repair or withdraw the named items.'
-[unknown_tool] f'your tools are {', '.join(verbs)} and submit'
+[unknown_tool] f"your tools are {', '.join(verbs)} and submit"
 ```
 
 ### 9.3 两道检查的出路句（方括号里是 reason；规则号见第 8 组）
@@ -699,22 +701,23 @@ _SHORT_BARE = {ids} holds these digits, but a short number written bare is not t
 [not_on_ledger] "refs must name rows on this session's ledger"
 [ambiguous_reference] 'split the note into narrower refs, or give this figure an explicit dated pointer'
 [passage_requires_pointer] "quote the passage's exact words, or use its stated unit and an explicit passage pointer"
-[period_mismatch] f'the sentence says {claim['as_written']!r}; the readings it points at are {F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request the series the question asked for'
-[superlative_without_rank] f'{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: ' + '; '.join((f'{s['place']} of {s['of']} on {s['measure']}' for s in seats[:3])) + '. Point at the figure whose place you mean, or say it without the superlative'
+[period_mismatch] f"the sentence says {claim['as_written']!r}; the readings it points at are {F_spacing(points) or 'not one cadence'} — say the period the desk showed, or request the series the question asked for"
+[superlative_without_rank] f"{', '.join(sorted(named))} holds no end place in any ordering the desk built for this reading: " + '; '.join((f"{s['place']} of {s['of']} on {s['measure']}" for s in seats[:3])) + '. Point at the figure whose place you mean, or say it without the superlative'
 [subject_mismatch] f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"
+[benchmark_mismatch] 'use a beta computed against the stated benchmark'
 [measure_mismatch] f"the sentence says '{phrase}' but the figure beside it is {', '.join(sorted({str(r.get('measure')) for _t, recs in linked for r in recs})[:3])}; the ledger holds {' / '.join(sorted(measures)[:2])} as its own fact — write that value, or drop the phrase"
-[superlative_without_rank] 'this figure holds no such place in an ordering the desk built — ' + ("the desk's ordering holds the same reading as " + ', '.join((f'[{c['id']}]' for c in ranked[:3])) + ': point at that one, or drop the word' if ranked else 'have the figures ranked and point at the ranked row, or drop the word')
+[superlative_without_rank] 'this figure holds no such place in an ordering the desk built — ' + ("the desk's ordering holds the same reading as " + ', '.join((f"[{c['id']}]" for c in ranked[:3])) + ': point at that one, or drop the word' if ranked else 'have the figures ranked and point at the ranked row, or drop the word')
 [subject_mismatch] f"this figure is {rec.get('subject')}'s own ({rec.get('measure')}); the sentence says it is the book's — name the issuer, or request the book-level figure"
 [date_expected] f"'{dw}' introduces a date; this figure is not one — the date is on the facts' window (start/end) or as_of"
 [tier_mismatch] f'the sentence says warning; the tier figure here is the {sorted(kinds)[0]} tier'
 [tier_mismatch] f'the sentence says breach; the tier figure here is the {sorted(kinds)[0]} tier'
 [change_conflict] 'the two figures are one reading written twice: point at the other reading, or say it without the change'
-[direction_conflict] f'the figure moved {('up' if moved_up else 'down')}; the sentence says the opposite'
-[direction_conflict] f'{a.get('subject')} is {('above' if first_higher else 'below')} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite'
-[change_conflict] f'{a.get('measure')} and {b.get('measure')} are two different quantities: point at two readings of one of them, or say it without the change'
-[direction_conflict] f'this change is {('negative' if val < 0 else 'positive')}; the sentence points the other way'
-[sense_conflict] f'the row says {registry.DIRECTION[r['means']['direction']]}; the sentence says the opposite — say what the row says, or drop the word'
-[status_conflict] f'the check here is {registry.STATUS[r['means']['status']]}; the sentence says {' and '.join(claimed)}'
+[direction_conflict] f"the figure moved {('up' if moved_up else 'down')}; the sentence says the opposite"
+[direction_conflict] f"{a.get('subject')} is {('above' if first_higher else 'below')} {b.get('subject')} on {a.get('measure')}; the sentence says the opposite"
+[change_conflict] f"{a.get('measure')} and {b.get('measure')} are two different quantities: point at two readings of one of them, or say it without the change"
+[direction_conflict] f"this change is {('negative' if val < 0 else 'positive')}; the sentence points the other way"
+[sense_conflict] f"the row says {registry.DIRECTION[r['means']['direction']]}; the sentence says the opposite — say what the row says, or drop the word"
+[status_conflict] f"the check here is {registry.STATUS[r['means']['status']]}; the sentence says {' and '.join(claimed)}"
 ```
 
 ### 9.4 两个循环都读到的截断提示 `utils/json._CAP_DETAIL`（工具结果或回单超出读入上限时，`truncated.detail`）

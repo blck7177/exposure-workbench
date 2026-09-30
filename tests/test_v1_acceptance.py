@@ -70,7 +70,7 @@ def test_the_scan_can_go_red():
 
 # ── everything the lead is sent, not only its role text ─────────────────────
 
-def test_nothing_the_lead_is_sent_holds_a_verb_a_measure_key_or_the_old_words():
+def test_core_role_does_not_duplicate_tool_schemas_or_method_keys():
     sent = "\n".join([meta_agent._SYSTEM, meta_agent.BRIEFING_TAG, meta_agent.ROSTER_TAG, meta_agent.READINGS_TAG,
                       json.dumps(handbook.roster(), ensure_ascii=False), handbook.meaning_layer(),
                       json.dumps([dl.ASK_TOOL, dl.OPEN_TOOL, meta_agent.REPAIR_TOOL], ensure_ascii=False),
@@ -79,7 +79,7 @@ def test_nothing_the_lead_is_sent_holds_a_verb_a_measure_key_or_the_old_words():
     assert not [v for v in verbs if re.search(rf"(?<![\w.]){v}(?![\w.])", sent)]
     keys = [k for k in desk.METHODS if "_" in k or "." in k]
     assert not [k for k in keys if re.search(rf"(?<![\w.]){re.escape(k)}(?![\w.])", sent)]
-    assert not re.search(r"\b(?:[Dd]elegate|program|node|digest|legend)\b", sent)
+    assert not re.search(r"\b(?:program|node|digest|legend)\b", sent)
 
 
 # ── the log grows out of the calls ───────────────────────────────────────────

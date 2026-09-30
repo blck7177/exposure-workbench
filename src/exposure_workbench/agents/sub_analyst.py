@@ -38,7 +38,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from exposure_workbench.agents import delegation as dl, delivery, handoff, repeats as rp
+from exposure_workbench.agents import evidence_context, delegation as dl, delivery, handoff, repeats as rp
 from exposure_workbench.analytics import handbook, registry
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.services import analysis_state as AS, analyst_reports, answer_check, fact_boundary, fact_adapters as fa, facts as F, \
@@ -69,8 +69,8 @@ the same value belongs to several rows or dates. Keep limitations beside the cla
 the same factual check as the final answer. Task instructions are not factual evidence; only the original user question
 can supply user-given assumptions.
 
-When an item fails, accepted evidence and notes remain. Use the returned note id to replace it, or submit empty text for
-that id to withdraw it. You may return partial work without inventing an absence row for what you did not reach. The
+When an item fails, accepted evidence and notes remain. Correct or omit rejected notes on the next submission.
+Use a returned note id to replace an accepted note, or submit empty text for that id to withdraw it. You may return partial work without inventing an absence row for what you did not reach. The
 runtime records actual calls, failures and stop reasons. Returning work does not certify that the question is complete."""
 
 _WRITE_OR_ASK = "Submit evidence and optional notes, or read the rows you still need."
@@ -224,6 +224,20 @@ async def run_sub_analyst(task: dl.Task, ctx: TurnContext) -> dl.AnalystResult:
         return await _run(task, ctx, tools_session)
 
 
+async def _inputs_block(task: dl.Task, ctx: TurnContext) -> str:
+    if not task.input_refs:
+        return ""
+    led = await _ledger(ctx)
+    missing = [fid for fid in task.input_refs if not led.holds(fid)]
+    if missing:
+        raise dl.BadDelegation("input_refs not on this session's ledger: " + ", ".join(missing))
+    # Scalar identity travels beside the task, never a model's copied value.
+    # Large evidence is previewed with explicit cursors into the ledger.
+    return ('\n<input_evidence source="session ledger" trust="recorded evidence">\n'
+            + json.dumps([evidence_context.fact_page(led, fid, preview=True) for fid in task.input_refs], ensure_ascii=False)
+            + "\nOpen a row id with next_offset to read the rest of a paged input.\n</input_evidence>")
+
+
 async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResult:
     settings = get_settings()
     actor = f"sub:{task.analyst}"
@@ -241,13 +255,16 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
          + "\n</coverage>\n<question source=\"the user\">\n" + ctx.question + "\n</question>"
          + await _prior_block(task, ctx)},
     ]
+    inputs = await _inputs_block(task, ctx)
+    if inputs:
+        messages.append({"role": "system", "content": inputs})
     face = _face_tools(tools_session, task.analyst)
     verbs = [t["function"]["name"] for t in face]
-    tools = face + [dl.SUBMIT_TOOL]
+    tools = face + [dl.SUBMIT_TOOL] + ([dl.OPEN_TOOL] if task.input_refs else [])
     standing = False
     submission = handoff.Submission()
     submission_reply: dict = {}
-    collected_ids: set[str] = set()
+    collected_ids: set[str] = set(task.input_refs)
     pulls: set[str] = set()
     phase = "provider"
 
@@ -318,7 +335,14 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                 except json.JSONDecodeError:
                     args = {}
 
-                if name == START_TOOL and name in verbs:
+                if name == dl.OPEN_TOOL_NAME and task.input_refs:
+                    try:
+                        offset = int(args.get("offset") or 0)
+                    except (TypeError, ValueError):
+                        offset = 0
+                    res = evidence_context.fact_page(await _ledger(ctx), str(args.get("id") or ""), offset)
+                    await _record(ctx, actor, "open", name, args, "opened recorded evidence", task_id=task.task_id)
+                elif name == START_TOOL and name in verbs:
                     # A START IS NOT EVIDENCE. It enqueues work that finishes after the
                     # turn and returns an id, never a row — counted apart, and once per
                     # subject: the same start twice is the same task.
@@ -414,7 +438,9 @@ async def _run(task: dl.Task, ctx: TurnContext, tools_session) -> dl.AnalystResu
                 else:
                     res = {"error": "unknown_tool", "detail": f"your tools are {', '.join(verbs)} and submit"}
 
-                _append({"role": "tool", "tool_call_id": tc["id"], "content": ejson.dumps_capped(res, room, keep=("rows",))})
+                _append({"role": "tool", "tool_call_id": tc["id"],
+                         "content": (json.dumps(res, ensure_ascii=False) if name == dl.OPEN_TOOL_NAME
+                                     else ejson.dumps_capped(res, room, keep=("rows",)))})
                 if done:
                     break
             if done:
@@ -543,6 +569,7 @@ async def _store_evidence_report(ctx, actor, task, result, ledger, *, attempts):
                 citations=refs, verified={"checked_notes": len(result.notes)}, problems=result.diagnostics,
                 evidence_calls=result.cost.get("evidence_calls"), requirement_ids=[],
                 input_version={"protocol": handoff.PROTOCOL, "state_version": ctx.state_version, "scope": scope,
+                               "input_refs": list(task.input_refs),
                                "boundary_version": AS.BOUNDARY_VERSION,
                                "ledger_rows": len(ledger.shown),
                                "evidence_validation": AS.validation_context(scope, refs, ledger)},

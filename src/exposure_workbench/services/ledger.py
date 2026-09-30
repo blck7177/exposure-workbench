@@ -361,7 +361,7 @@ class Ledger:
         core = re.sub(r"[$,%]", "", tok).strip()
         if not core or self._MARKED.search(tok) or len(re.sub(r"\D", "", core)) >= self._MIN_BARE_DIGITS:
             return []
-        pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?![\d])")
+        pat = re.compile(r"(?<![\d.])" + re.escape(core) + r"(?!\d|[.,]\d)")
         return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
 
     def dates_in_passages(self, iso: str, cited: Sequence[str]) -> list[str]:
@@ -384,8 +384,23 @@ class Ledger:
         parts = re.findall(r"\d[\d.]*|[A-Za-z]+", core)
         if not parts:
             return []
-        pat = re.compile(r"(?<![\d.])" + r"\s*".join(re.escape(x) for x in parts) + r"(?![\d])", re.IGNORECASE)
-        return [pid for pid in cited if pid in self.passages and pat.search(self.passages[pid])]
+        pat = re.compile(r"(?<![\d.])" + r"\s*".join(re.escape(x) for x in parts) + r"(?!\d|[.,]\d)", re.IGNORECASE)
+        def matches(text):
+            normalized = text.replace(",", "").replace("\\n", "\n")
+            for match in pat.finditer(normalized):
+                # A percent and a currency are different quantities, even when
+                # their digits agree. Never turn 16% into a match for $16.5bn.
+                before, after = normalized[:match.start()], normalized[match.end():]
+                if "%" in tok and not re.match(r"\s*(?:%|percent\b|per cent\b)", after, re.I):
+                    # A local, explicit percentage table header also supplies
+                    # the unit. Stop at a paragraph break or currency marker.
+                    if not re.search(r"\(percent\)[^$%]{0,512}$", before.rsplit("\n\n", 1)[-1], re.I):
+                        continue
+                if "$" in tok and not re.search(r"\$\s*$", before):
+                    continue
+                return True
+            return False
+        return [pid for pid in cited if pid in self.passages and matches(self.passages[pid])]
 
 
 # ── loading ───────────────────────────────────────────────────────────────────

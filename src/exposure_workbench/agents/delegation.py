@@ -61,6 +61,7 @@ ANALYSTS: tuple[str, ...] = handbook.ANALYSTS
 MAX_TASKS = 4
 # Lines in one task. A task with more is two tasks or a question not yet taken apart.
 MAX_LINES = 8
+MAX_INPUT_REFS = 16
 
 
 ASK_TOOL = {"type": "function", "function": {
@@ -86,8 +87,11 @@ ASK_TOOL = {"type": "function", "function": {
                           "description": "one thing you want to know per line, in your own words"},
                 "context": {"type": ["string", "null"],
                             "description": "one sentence on what the answer is for, when it changes what matters"},
+                "input_refs": {"type": "array", "maxItems": MAX_INPUT_REFS,
+                               "items": {"type": "string"},
+                               "description": "existing f_ IDs this work depends on, including another analyst's results; runtime supplies their authoritative rows"},
                 "follow_up_of": {"type": ["string", "null"],
-                                 "description": "the task this follows up, when asking the same analyst again"}},
+                                 "description": "the task this follows up; input_refs explicitly binds evidence needed across analysts"}},
             "required": ["analyst", "subjects", "lines"], "additionalProperties": False}}},
         "required": ["tasks"], "additionalProperties": False}}}
 
@@ -128,6 +132,7 @@ OPEN_TOOL = {"type": "function", "function": {
     "description": (
         "Open something this conversation already put on the record, by its id: a row (f_…), every row one call "
         "pulled (r_…), an analyst's log of what it did and why (the task's id), a book a scenario built (calc_…), "
+        "a report log (rep_…), a method chapter (handbook:issuer, handbook:market, handbook:risk), "
         "or another page of the current STATE (its ast_… id). "
         "It reads what is there; a figure nobody pulled is asked for, not opened. A call's rows and a long series "
         "come a page at a time: the reply says the total and the range shown, and `offset` reads on from where the "
@@ -154,6 +159,7 @@ class Task:
     # said which line serves which (`line_requirements`, one tuple per line).
     requirements: tuple[tuple[str, str], ...] = ()
     line_requirements: tuple[tuple[str, ...], ...] = ()
+    input_refs: tuple[str, ...] = ()
 
     @property
     def requirement_ids(self) -> tuple[str, ...]:
@@ -174,6 +180,8 @@ class Task:
     def as_dict(self) -> dict:
         out: dict = {"task_id": self.task_id, "analyst": self.analyst, "subjects": list(self.subjects),
                      "lines": [f"{i}. {w}" for i, w in enumerate(self.lines, 1)]}
+        if self.input_refs:
+            out["input_refs"] = list(self.input_refs)
         if self.context:
             out["context"] = self.context
         if self.follow_up_of:
@@ -250,7 +258,7 @@ def parse_tasks(args: dict, new_id) -> list[Task]:
     for i, t in enumerate(args["tasks"]):
         if not isinstance(t, dict):
             raise BadDelegation(f"tasks[{i}] is not an object")
-        extra = set(t) - {"analyst", "subjects", "lines", "context", "follow_up_of"}
+        extra = set(t) - {"analyst", "subjects", "lines", "context", "follow_up_of", "input_refs"}
         if extra:
             raise BadDelegation(f"tasks[{i}] has no field(s) {', '.join(sorted(extra))}")
         analyst = str(t.get("analyst") or "").strip()
@@ -275,8 +283,13 @@ def parse_tasks(args: dict, new_id) -> list[Task]:
             raise BadDelegation(f"tasks[{i}].lines is a non-empty list of things you want to know")
         if len(lines) > MAX_LINES:
             raise BadDelegation(f"tasks[{i}].lines has more than {MAX_LINES} lines; that is more than one task")
+        refs = t.get("input_refs", [])
+        if (not isinstance(refs, list) or len(refs) > MAX_INPUT_REFS
+                or not all(isinstance(fid, str) and fid.startswith("f_") for fid in refs)):
+            raise BadDelegation(f"tasks[{i}].input_refs is a list of at most {MAX_INPUT_REFS} existing f_ row ids")
         out.append(Task(task_id=new_id("tsk_"), analyst=analyst, subjects=tuple(subjects), lines=tuple(lines),
-                        context=(t.get("context") or None), follow_up_of=(t.get("follow_up_of") or None)))
+                        context=(t.get("context") or None), follow_up_of=(t.get("follow_up_of") or None),
+                        input_refs=tuple(dict.fromkeys(refs))))
     return out
 
 

@@ -54,7 +54,7 @@ REQUIREMENT_STATUS = ("unresolved", "covered", "boundary")
 GAP_TYPES = ("data_missing", "method_unsupported", "policy_boundary", "execution_failed",
              "delivery_missing", "evidence_conflict", "needs_clarification")
 COMPLETION = ("completed", "completed_with_boundaries", "partial")
-BOUNDARY_VERSION = 1
+BOUNDARY_VERSION = 2  # S3: unit/citation scope and explicit beta qualifiers changed.
 CLOSING_GAPS = frozenset(("data_missing", "method_unsupported", "policy_boundary"))
 
 # A gap's type is read off the boundary row's reason (analytics/registry.ABSENCE_REASONS),
@@ -279,6 +279,7 @@ def start_tasks(state: State, tasks: Iterable) -> None:
         of_line = getattr(task, "requirements_of_line", None)
         state.tasks.append({"task_id": task.task_id, "analyst": task.analyst, "status": "running",
                             "subjects": list(task.subjects), "asked": list(task.lines),
+                            "input_refs": list(getattr(task, "input_refs", ())),
                             "lines": [{"n": n, "for": list(of_line(n) if callable(of_line) else served),
                                        "status": "unresolved"} for n in range(1, len(task.lines) + 1)]})
     state.completion = None
@@ -481,7 +482,7 @@ def _line(ledger: Ledger | None, fid: str | None) -> str | None:
 
 
 def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
-    """One paged work view, newest task first; no semantic completion verdict.
+    """One paged work view, selected results first; no semantic completion verdict.
 
     Checked prose lives here, not in ask receipts too. Keep whole findings with
     their caveats. A single oversized card may exceed the soft character bound;
@@ -525,7 +526,7 @@ def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
         if task.get("protocol") == "evidence-v2":
             entry.pop("brief_status", None)
             entry["execution"] = task["status"]
-        entry.update({k: task[k] for k in ("subjects", "asked", "made", "cost", "follow_ups", "report_id", "protocol",
+        entry.update({k: task[k] for k in ("subjects", "asked", "input_refs", "made", "cost", "follow_ups", "report_id", "protocol",
                                          "stop_reason", "diagnostics", "operations", "receipts") if task.get(k)})
         entries.append(("tasks", entry))
         shown_in_notes = {fid for f in state.accepted() if f.get("task_id") == task["task_id"] for fid in f.get("refs") or []}
@@ -534,7 +535,14 @@ def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
                 entries.append(("evidence", {"task": task["task_id"], "id": fid, "row": row,
                                               "selected": fid in (task.get("evidence") or [])}))
     recent = {t["task_id"]: i for i, t in enumerate(reversed(state.tasks))}
-    entries.sort(key=lambda item: (recent.get(item[1].get("task"), len(recent)), item[0] != "tasks"))
+    def priority(item):
+        category, entry = item
+        # Selected evidence from an earlier prerequisite must outrank a later
+        # task's bulk unselected retrieval. Whole cards keep their limitations.
+        tier = (0 if category == "findings" or (category == "evidence" and entry["selected"])
+                else 1 if category == "tasks" else 2 if category == "gaps" else 3)
+        return tier, recent.get(entry.get("task"), len(recent))
+    entries.sort(key=priority)
     offset = max(0, offset)
     if offset >= len(entries) and offset:
         return {"error": "invalid_offset", "total": len(entries), "detail": "offset is beyond the current work view"}

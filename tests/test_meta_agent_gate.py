@@ -223,8 +223,8 @@ async def test_an_invented_number_is_refused_and_the_turn_ends_on_the_bar(monkey
     assert out["citations"] == []
     assert out["meta"]["gate"] == "exhausted"
     assert out["meta"]["gate_refusals"] == ["unsourced_figure", "malformed_repair"]
-    assert seen[0] == {"tools": [delegation.ASK_TOOL_NAME], "tool_choice": None}
-    assert seen[1] == {"tools": [delegation.ASK_TOOL_NAME, meta_agent.REPAIR_TOOL_NAME], "tool_choice": "required"}
+    assert seen[0] == {"tools": sorted(faces.FACE_LEAD_READ) + ["ask", "open"], "tool_choice": None}
+    assert seen[1] == {"tools": sorted(faces.FACE_LEAD_READ) + ["ask", "open", meta_agent.REPAIR_TOOL_NAME], "tool_choice": "required"}
     assert len(seen) == 3, "one nudge, then the bar"
 
 
@@ -324,7 +324,7 @@ async def test_a_delegation_is_answered_and_the_figure_it_returned_can_be_stated
     _stub_desk(monkeypatch, session)
     out = await handle_message(_factory([]), "sess_6", "how big is MSFT in the book?", max_turns=4)
 
-    assert session.faces == ["risk"]                                # the analyst opened its OWN face
+    assert session.faces == ["meta", "risk"]                                # the analyst opened its OWN face
     assert [n for n, _ in session.calls] == ["book_read"]           # and made one call, saying why
     assert session.calls[0][1]["why"] == WHY
     shown = json.loads([m for m in sub[1] if m.get("role") == "tool"][0]["content"])
@@ -576,6 +576,7 @@ async def test_a_rejected_ask_and_an_open_are_steps(monkeypatch):
     assert recorded[1] == ("open", "row", "f_wmsft0001")                 # what is on the record opens as its row
     assert recorded[2] == ("open", "not_on_the_record", "f_never_shown")  # and nothing else can be pulled this way
     opened = json.loads([m for m in lead[3] if m.get("role") == "tool"][-1]["content"])
-    assert opened == {"row": F.line(_W_MSFT)}
+    assert opened["row"] == F.line(_W_MSFT)
+    assert opened["identity"]["subject"] == "MSFT"
     # what the lead read between completions is measured on the way in
     assert all("note" not in m for m in lead[1])         # the note is the row's, not the prompt's

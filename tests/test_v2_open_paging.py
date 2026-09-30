@@ -57,7 +57,9 @@ async def test_a_thinned_series_says_so_on_its_row_and_open_pages_its_points(mon
     page = await meta_agent._open(None, "sess", long.id, [], 60)
     assert (page["total"], len(page["points"]), page["shown"]) == (90, 30, [60, 90]) and "row" in page
     whole = await meta_agent._open(None, "sess", short.id, [], 0)
-    assert set(whole) == {"row"}, "a short series is its row and nothing more"
+    assert whole["points"] == [list(p) for p in short.points]
+    assert whole["total"] == 12 and whole["next_offset"] is None
+    assert whole["identity"]["subject"] == "AAPL"
 
 
 def test_the_open_tool_takes_an_offset_and_says_what_it_is_for():

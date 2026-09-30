@@ -59,6 +59,16 @@ class Delivered:
             self.pulls.update(_PULL_ID.findall(content))
             # S1's initial page is in the replaced STATE block; subsequent
             # pages are tool results. Record both ranges as actually delivered.
+            # Initial bound inputs also have explicit preview ranges. They
+            # are runtime-generated in their own block, apart from TASK text.
+            for block in re.findall(r'<input_evidence[^>]*>\n([^\n]+)\n', content):
+                try:
+                    pages = json.loads(block)
+                except (ValueError, TypeError):
+                    continue
+                for page in pages if isinstance(pages, list) else []:
+                    if isinstance(page, dict) and page.get("id") and "shown" in page and "total" in page:
+                        self.ranges.append({k: page[k] for k in ("id", "shown", "total")})
             state_page = (msg.get("role") == "system" and content.startswith("<state ")
                           and content.endswith("\n</state>"))
             if msg.get("role") == "tool" or state_page:

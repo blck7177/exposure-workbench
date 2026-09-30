@@ -21,7 +21,7 @@ SUBMIT_TOOL = {"type": "function", "function": {
         "you need not rewrite the rows or account for every task line. A note has text and refs; figures must "
         "match those refs. Use narrower notes or explicit inline pointers when equal values are ambiguous. "
         "Keep qualifications in the same note. Valid items are kept when another fails. To repair a note, "
-        "use its returned id; empty text withdraws that note. Submission returns the work, not a claim of completeness."),
+        "use its returned id; empty text withdraws an accepted note. Omitted rejected notes are discarded. Submission returns the work, not a claim of completeness."),
     "parameters": {"type": "object", "properties": {
         "evidence": {"type": "array", "maxItems": 256, "items": {"type": "string"},
                      "description": "ids of existing ledger rows to hand to the lead"},
@@ -65,8 +65,9 @@ class Submission:
         note_ids = []
         # Evidence is additive. An invalid id is a rejected item in this attempt,
         # not a permanent obligation to select that nonexistent row next time.
-        self.issues = {k: v for k, v in self.issues.items()
-                       if not k.startswith(("evidence[", "invalid_note["))}
+        # Refusals describe this candidate, not obligations for later candidates.
+        # Accepted items remain; omitting a previously rejected note withdraws it.
+        self.issues = {}
         for index, fid in enumerate(payload["evidence"]):
             if not isinstance(fid, str) or not ledger.holds(fid):
                 self.issues[f"evidence[{index}]"] = [{"reason": "not_on_ledger",
@@ -109,7 +110,7 @@ class Submission:
         return {"accepted": self.ok, "evidence": list(self.evidence), "note_ids": note_ids,
                 "kept_notes": list(self.notes),
                 "problems": [{"item": item, **p} for item, errors in self.issues.items() for p in errors],
-                "detail": "accepted items are kept; repair or withdraw the named notes, then submit again" if self.issues else "work returned"}
+                "detail": "accepted items are kept; correct or omit rejected notes, then submit again" if self.issues else "work returned"}
 
     def diagnostics(self) -> list[dict]:
         """Only codes cross to the lead. Rejected text remains in the audit."""

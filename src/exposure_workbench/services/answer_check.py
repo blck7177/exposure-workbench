@@ -282,7 +282,9 @@ def _measure_words(measure: str | None) -> list[str]:
     reads as both quantities the sentence may name."""
     if not measure:
         return []
-    tail = re.split(r"[.:]", measure)[-1] if "(" not in measure else measure
+    # Preserve qualifiers such as net_beta.rates_up. Remove only a ticker
+    # prefix; a dot also separates financial concepts, not just namespaces.
+    tail = re.sub(r"^[A-Z]{1,6}\.", "", measure)
     return [w for w in re.split(r"[^A-Za-z0-9]+", tail) if w]
 
 
@@ -352,6 +354,9 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
         ws = _measure_words(r.get("measure"))
         if len(ws) >= 2 and r.get("measure"):
             phrases.setdefault(" ".join(ws).lower(), set()).add(r["measure"])
+            tail = _measure_words(re.split(r"[.:]", r["measure"])[-1])
+            if len(tail) >= 2:
+                phrases.setdefault(" ".join(tail).lower(), set()).add(r["measure"])
 
     for i, (para_at, para) in enumerate(paras):
         # G5 — the marks
@@ -516,17 +521,22 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
             if _core(tok) in asked:
                 v.links[(i, start)] = {"to": "question", "ids": [], "as_written": tok}
                 continue
-            pids = ledger.resolve_in_passages(tok, all_passages)
+            # Explicit citations constrain this sentence's passage evidence.
+            # An unrelated filing elsewhere in the session cannot rescue it.
+            sentence_passages = [m.group(1) for m in _CITATION.finditer(sentence)
+                                 if m.group(1) in ledger.passages]
+            passage_scope = sentence_passages or all_passages
+            pids = ledger.resolve_in_passages(tok, passage_scope)
             if not pids and kind == "num":
                 # A SPAN OF TIME A CITED PASSAGE STATES IN THE SAME WORDS: "payable within 12
                 # months", "over the next 12 months". Bare, "12" is a short number and is not
                 # matched against a filing; with its unit it is the passage's own phrase, and
                 # it cost the issuer analyst its whole brief twice (V1 live smoke).
-                pids = _time_span_in(ledger, tok, blanked, end, all_passages)
+                pids = _time_span_in(ledger, tok, blanked, end, passage_scope)
             if not pids and kind == "date" and A.iso_date(tok):
                 # the filing says "December 31, 2025" and the analyst who read it wrote
                 # 2025-12-31: one date, and the passage states it (V1 live smoke)
-                pids = ledger.dates_in_passages(A.iso_date(tok), all_passages)
+                pids = ledger.dates_in_passages(A.iso_date(tok), passage_scope)
             if pids:
                 v.links[(i, start)] = {"to": "passage", "ids": pids, "as_written": tok}
                 continue
@@ -972,6 +982,33 @@ def _check_sentence(v: Verdict, i: int, sentence: str, offset: int, words: set[s
                 v.problems.append({"at": at, "reason": "subject_mismatch", "figure": t["token"], "id": recs[0]["id"],
                                    "figure_subject": recs[0].get("subject"), "sentence_names": sorted(named)[:6],
                                    "way_out": f"this figure is {recs[0].get('subject')}'s ({recs[0].get('measure')}); the sentence names {', '.join(sorted(named)[:3])}"})
+
+    # Explicit beta benchmarks can be checked without a semantic reviewer.
+    # Keep the check local to the figure's clause so comparisons remain valid.
+    for token, recs in linked:
+        record = recs[0]
+        measure = str(record.get("measure") or "").lower()
+        if "beta" not in measure:
+            continue
+        local = sentence[:max(0, token["start"] - offset)]
+        local = re.split(r"[;,]|\b(?:while|whereas)\b", local, flags=re.I)[-1]
+        labels = list(re.finditer(r"\b(?:to|against|versus|vs\.?)\s+(?:the\s+)?([A-Z]{2,6})\b", local))
+        if not labels or not re.search(r"\bbetas?\b", local, re.I):
+            continue
+        named_benchmark = labels[-1]
+        # An earlier labelled number does not label every later number in a
+        # comparison. Require an explicit local label for this reading.
+        if "[f_" in local[named_benchmark.end():]:
+            continue
+        want = named_benchmark.group(1).lower()
+        actual = (record.get("params") or {}).get("benchmark")
+        named_measure = re.search(r"(?:^|\.)(?:net_beta|beta)\.([a-z0-9_]+)$", measure)
+        if actual is None and named_measure:
+            actual = named_measure.group(1)
+        if actual and str(actual).lower() != want:
+            v.problems.append({"at": at, "reason": "benchmark_mismatch", "id": record["id"],
+                               "figure": token["token"], "benchmark": actual, "sentence_names": want,
+                               "way_out": "use a beta computed against the stated benchmark"})
 
     # A MEASURE THE SENTENCE NAMES IS THE MEASURE OF A FIGURE IN IT, or one the
     # figure is built from. The phrase's words must be among the linked measure's

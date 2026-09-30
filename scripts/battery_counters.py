@@ -285,7 +285,7 @@ def calls_by_analyst(steps: list[dict]) -> dict[str, collections.Counter]:
     out: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for s in steps:
         actor = str(s.get("actor") or "")
-        if not actor.startswith("sub:") or s.get("step_type") not in ("tool_call", "delegation"):
+        if (not actor.startswith("sub:") and actor != "meta") or s.get("step_type") not in ("tool_call", "delegation"):
             continue
         result = s.get("result") or ""
         # the first V1 turns (2026-09-19, before a step said what its call got) summarised every
@@ -293,7 +293,7 @@ def calls_by_analyst(steps: list[dict]) -> dict[str, collections.Counter]:
         unstated = result.startswith("keys: pull, head")
         if not (_V1_STEP.match(result) or unstated or s.get("status") == "rejected" or result.startswith("error")):
             continue                                  # a call of the surface before V1: runs_by_domain reads those
-        c = out[actor[4:]]
+        c = out[actor[4:] if actor.startswith("sub:") else "meta"]
         c["calls"] += 1
         c[f"verb.{s.get('tool_name')}"] += 1
         if unstated:
@@ -349,6 +349,7 @@ def asks_of(steps: list[dict]) -> list[list[dict]]:
                 if isinstance(got, dict):
                     t["text"] = " ".join([*(str(w) for w in got.get("lines") or []), str(got.get("context") or "")])
                     t["follow_up_of"] = got.get("follow_up_of") or None
+                    t["input_refs"] = list(got.get("input_refs") or [])
         if tasks:
             out.append(tasks)
     return out
@@ -419,14 +420,16 @@ def handoff_of(tag: str, t: dict) -> dict:
         # what a later ask named that the first did not: the subject the lead carried across
         "later_subjects": sorted({sub for x in later for sub in x["subjects"]} - first),
         "follow_ups": sum(1 for x in tasks if x["follow_up_of"]),
-        "ids_carried": sum(1 for x in tasks if x["text"] and _FACT_ID.search(x["text"])),
+        "ids_carried": sum(1 for x in tasks if x.get("input_refs") or (x["text"] and _FACT_ID.search(x["text"]))),
+        "bound_input_refs": sum(len(x.get("input_refs") or []) for x in tasks),
+        "lead_evidence_calls": int(meta.get("lead_evidence_calls") or 0),
         "unreadable": sum(1 for x in tasks if x["text"] is None),
         "re_pulls": re_pulls(steps),
         "budget_stops": sum(1 for s in steps if s.get("step_type") == "boundary" and "analyst_budget" in str(s.get("args") or "")),
         "opens": sum(1 for s in steps if s.get("step_type") == "open"),
         "lead_completions": sum(1 for s in steps if s.get("step_type") == "llm_call"
                                 and not str(s.get("actor") or "").startswith("sub:")),
-        "evidence_calls": sum(int((d.get("cost") or {}).get("evidence_calls") or 0) for d in meta.get("delegations") or []),
+        "evidence_calls": int(meta.get("lead_evidence_calls") or 0) + sum(int((d.get("cost") or {}).get("evidence_calls") or 0) for d in meta.get("delegations") or []),
         "elapsed_s": t.get("elapsed_s") or 0,
         "asked": sum(int(c.get("asked") or 0) for c in cov),
         "settled": sum(int(c.get("settled", c.get("done")) or 0) for c in cov),

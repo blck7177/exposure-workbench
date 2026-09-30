@@ -401,7 +401,7 @@ def test_a_figure_a_passage_states_resolves_through_the_passage():
     """V33E Q19 marked each segment revenue with the filing it came from and was
     refused 25 times. The passage states the figure; no pointer is needed."""
     led = Ledger.of([*_C_LEDGER.by_id.values(),
-                     _passage("f_seg01", "AMZN", "Net sales: AWS 90,757 and 107,556 in the two years shown.")])
+                     _passage("f_seg01", "AMZN", "Net sales: AWS $90,757 and $107,556 in the two years shown.")])
     assert ac.check("Amazon's filings show AWS net sales of $90,757.", led).ok
     v = ac.check("Amazon's filings show AWS net sales of $91,999.", led)
     assert {p["reason"] for p in v.problems} == {"unsourced_figure"}
@@ -579,7 +579,7 @@ def test_a_figure_a_passage_states_may_point_at_the_passage():
     """Round I Q04/Q19: "$65,179 million [f_passage]" — the passage states it; the
     pointer is a lookup in that passage. A figure the passage does not state is
     a mismatch that says so."""
-    led = Ledger.of([*_C_LEDGER.by_id.values(), _passage("f_seg01", "AMZN", "Net sales: AWS 90,757 and 107,556 in the two years shown.")])
+    led = Ledger.of([*_C_LEDGER.by_id.values(), _passage("f_seg01", "AMZN", "Net sales: AWS $90,757 and $107,556 in the two years shown.")])
     v = ac.check("AWS net sales were $107,556 [f_seg01] million in the later year.", led)
     assert v.ok, v.problems
     link = next(iter(v.links.values()))

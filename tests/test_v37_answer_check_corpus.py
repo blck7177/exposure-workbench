@@ -49,6 +49,10 @@ CORPUS = Path(__file__).resolve().parent / "data" / "v36b_accepted.json.gz"
 ADDED_SINCE_THE_ROUND = {
     "Q02": {"period_mismatch": 3, "subject_mismatch": 1},
     "Q04": {"period_mismatch": 1},
+    # S3: eight table values had no currency mark at the selected location.
+    # The old matcher discarded the dollar sign; quantities extracted with
+    # table headers/scale are required to support those monetary assertions.
+    "Q05": {"mark_mismatch": 8},
     "Q06": {"id_in_prose": 1},
     "Q09": {"period_mismatch": 1},
     "Q11": {"superlative_without_rank": 1},

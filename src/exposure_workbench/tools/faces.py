@@ -25,11 +25,14 @@ from __future__ import annotations
 # run, … — and `run` took a program in a language of its own; that language and
 # the tools it replaced are retired, and the verbs below are what remains.
 #
-# The lead analyst holds NO face: it asks analysts (agents/delegation) and reads
-# the record, in-process. The mount named "meta" survives as the debug door a
-# person opens from a terminal (apps/mcp/server): every verb, no agent behind it.
+# The meta mount serves the full debug surface. S3 gives the lead a read/calc
+# subset through a narrowed bearer; specialists retain their resource faces.
 FACE_META_AGENT = ["list", "filings_read", "prices_read", "book_read", "metric", "calc",
                    "filings_search", "filings_section", "web_search", "scenario", "start"]
+
+# Lead deterministically reads/combines evidence through the existing meta mount.
+# The bearer denies the remainder at the server, not merely in the prompt.
+FACE_LEAD_READ = ["list", "filings_read", "prices_read", "book_read", "metric", "calc"]
 
 # The research run writes an Issuer Risk Brief: an issuer from its filings and
 # its price. The issuer analyst's verbs, the price read, both families' measures

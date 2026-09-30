@@ -101,6 +101,7 @@ class Typed:
     # (the ticker, the sector, the check) rides in `issuers`, so rank can label
     # it and the double-count rules can tell two rows of one run apart.
     base: str | None = None
+    subject: str | None = None
 
     def basis(self) -> dict:
         if self.instant:
@@ -113,6 +114,7 @@ class Typed:
         return {"unit_class": self.unit_class, "basis": self.basis(),
                 "quantity": self.quantity, "source_id": self.source_id,
                 "issuers": list(self.issuers),
+                **({"subject": self.subject} if self.subject else {}),
                 **({"base": self.base} if self.base else {})}
 
 
@@ -200,7 +202,7 @@ async def _resolve_fact_ref(db: AsyncSession, fid: str) -> Typed | dict:
     if not issuer and isinstance(subject, str) and subject.startswith("run_"):
         base = base or subject
     return Typed(value=float(rec["value"]), unit_class=unit, instant=instant, interval=interval,
-                 quantity=rec.get("measure"), source_id=fid, issuers=issuer,
+                 quantity=rec.get("measure"), source_id=fid, issuers=issuer, subject=subject,
                  base=base if (rec.get("measure") or "").startswith(("issuer_exposures", "sector_exposures", "limit_checks",
                                                                         "exposure_metrics", "factor_attributions", "risk_alerts",
                                                                         "portfolio.", "trade.")) else None)
@@ -267,7 +269,7 @@ async def _resolve_named(db: AsyncSession, rid: str, name: str, ref: str) -> Typ
     base, as_of = ctx
     quantity, entity = _parse_book_name(name)
     return Typed(value=float(q.value), unit_class=unit, instant=as_of, quantity=quantity,
-                 source_id=ref, issuers=(entity,) if entity else (), base=base)
+                 source_id=ref, issuers=(entity,) if entity else (), base=base, subject=entity or base)
 
 
 async def _resolve_point(db: AsyncSession, rid: str, name: str, q, ref: str) -> Typed | dict:
@@ -437,7 +439,7 @@ async def _resolve(db: AsyncSession, ref: str) -> Typed | dict:
             interval=(date.fromisoformat(basis["interval"][0]),
                       date.fromisoformat(basis["interval"][1])) if basis.get("interval") else None,
             quantity=t.get("quantity"), source_id=ref, recorded_basis=basis or None,
-            issuers=owned, base=t.get("base") or None,
+            issuers=owned, base=t.get("base") or None, subject=t.get("subject"),
         )
     if ref.startswith(("chunk_", "src_")):
         # V11-A. Asked what share of Lilly's revenue its top products make up,
@@ -591,6 +593,16 @@ def _book_rule(op: str, a: Typed, b: Typed) -> dict | None:
 
 
 def _check(op: str, a: Typed, b: Typed) -> dict | None:
+    if op == "multiply":
+        for depth, amount in ((a, b), (b, a)):
+            q = depth.quantity or ""
+            if (q.endswith("drawdown.depth") or q == "deepest.depth") and amount.unit_class == MONEY:
+                owner = depth.subject or (depth.issuers[0] if len(depth.issuers) == 1 else None)
+                target = amount.subject or (amount.issuers[0] if len(amount.issuers) == 1 else None)
+                if owner and target and owner != target:
+                    return _err("subject_mismatch", f"{depth.source_id} measures {owner}'s historical drawdown; "
+                                f"{amount.source_id} belongs to {target}. Read {target}'s drawdown for its historical loss; "
+                                "a proxy shock is a separate assumption, not this historical measurement.")
     refusal = _book_rule(op, a, b)
     if refusal:
         return refusal
@@ -779,7 +791,7 @@ def _result_base(op: str, a: Typed, b: Typed) -> str | None:
 
 def _result_type(op: str, a: Typed, b: Typed, value: float) -> Typed:
     t = _result_type_inner(op, a, b, value)
-    return replace(t, base=_result_base(op, a, b))
+    return replace(t, base=_result_base(op, a, b), subject=a.subject if a.subject == b.subject else None)
 
 
 def _result_type_inner(op: str, a: Typed, b: Typed, value: float) -> Typed:
@@ -919,6 +931,8 @@ async def calculate(db: AsyncSession, op: str, a: str, b: str,
           # the lineage name read "w.add.w.add.w.add.w.add.w" (V1 smoke).
           "quantity": as_quantity or result.quantity or default_quantity or _derived_name(op, left, right),
           "issuers": list(result.issuers)}
+    if result.subject:
+        rt["subject"] = result.subject
     if result.base:
         rt["base"] = result.base
     if named_by and as_quantity:
@@ -966,6 +980,7 @@ async def scale(db: AsyncSession, ref: str, factor: float, *, unit_class: str,
     rt = {"unit_class": unit_class, "basis": left.basis(),
           "quantity": quantity or f"{left.quantity or ref}.scale",
           "issuers": list(left.issuers),
+          **({"subject": left.subject} if left.subject else {}),
           **({"base": left.base} if left.base else {})}
     calc_id = await cs._record(
         db, None, "calc.scalar.scale",

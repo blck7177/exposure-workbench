@@ -1,5 +1,7 @@
 # Agent loop 简化：实现提案
 
+> 2026-09-29 更新：S3 的 lead 直接读取/计算、显式证据输入和恢复契约以 [ARCHITECTURE_S3.md](ARCHITECTURE_S3.md) 为准；下文的 S1/S2 决策保留为实施历史。
+
 2026-09-29。核对代码：`origin/desk-v2-wip@e5d4b45003c593ea42730110a837a010c2a7f725`。实例依据：V2E2_mini，受测代码 `68a52e1`。本文保留实施前的设计；用户已批准开始修改，第一批 S1、第二批 S2 的实际范围与验证分别见 [SIMPLIFICATION_S1.md](SIMPLIFICATION_S1.md) 和 [SIMPLIFICATION_S2.md](SIMPLIFICATION_S2.md)。S3 能力补齐与 S4 实例验收尚未完成。
 
 **目标：减少模型维护协议、转写证据、解释程序状态的负担，让主 agent 可以迭代分析，同时保留事实来源、计算与执行边界。** 验收对象仍是用户原问题；模型自己声明的要求数、runtime 的 completed、出答案率都不能代替验收。

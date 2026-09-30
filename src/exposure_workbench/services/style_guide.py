@@ -84,7 +84,7 @@ _RULE_OF: dict[str, int] = {
     "unverified_quote": 5,
     "sense_conflict": 6, "status_conflict": 6, "tier_mismatch": 6,
     "caveat_without_a_line": 7,
-    "subject_mismatch": 8, "measure_mismatch": 8,
+    "subject_mismatch": 8, "measure_mismatch": 8, "benchmark_mismatch": 8,
 }
 
 

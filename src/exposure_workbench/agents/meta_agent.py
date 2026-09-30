@@ -1,31 +1,12 @@
-"""The lead analyst (V36) — the single conversational entity the user talks to.
+"""Lead analysis loop: choose work, obtain evidence and write a checked answer.
 
-Three jobs have shared this loop over three versions. V33 took the transcription
-out of it (the program, the claims list, the ids); V36 takes out the last one
-that was never its own — deciding, in the desk's language, what would settle the
-question. That belonged to nobody: the loop was a generalist, the domain
-knowledge was pushed to it as text, and the compiler behind it read fields. Round
-J's Q11 asked for "room to warning and breach" in a field the compiler did not
-read, subtracted the room in prose, and was refused for it, twice.
-
-So the lead decides and writes, and the desk's domain analysts do the rest:
-
-    read : the role and one rule; the BRIEFING (the desk's map for the subjects
-           the question names — names, dates, coverage, never a figure); the
-           ROSTER (which analyst can be asked what); the briefs that come back
-    write: delegate(tasks) — subjects and numbered lines of what it wants to
-           know, in its own words; then prose
-
-agents/sub_analyst runs each domain analyst INSIDE this turn, on the same
-session and the same tool-face token, so everything they fetch is on the ledger
-the answer check reads. agents/delegation holds the protocol and the check at
-the boundary: a brief reaches this loop only if every line is accounted for and
-every figure in it points at a fact. The answer check (services/answer_check)
-then reads the prose against that ledger and refuses with every problem at once;
-the lead gets one rewrite. Nothing reaches the user that the check did not
-accept.
-
-History is persisted as agent_messages so a session survives across turns.
+S3 permits deterministic reads/calculations through a narrowed MCP meta face.
+Independent investigation can be delegated with explicit input_refs; runtime
+resolves those refs from this session's ledger before a specialist reasons.
+Specialists retain resource-specific faces, and their accepted notes/evidence
+enter the existing versioned analysis state. Returned work is not a semantic
+completion verdict. The final answer and notes use the same factual boundary;
+broader correctness and completeness remain offline evaluation concerns.
 """
 
 from __future__ import annotations
@@ -37,7 +18,7 @@ from typing import Sequence
 
 from sqlalchemy import update
 
-from exposure_workbench.agents import delegation, delivery, repeats as rp, sub_analyst
+from exposure_workbench.agents import evidence_context, delegation, delivery, repeats as rp, sub_analyst
 from exposure_workbench.agents.llm_session import llm_session
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import handbook
@@ -46,6 +27,7 @@ from exposure_workbench.db.models import AgentMessage, AgentSession
 from exposure_workbench.services import analysis_state as AS, analyst_reports, answer_check, \
     briefing as briefing_svc, context_budget, fact_boundary, facts as F, ledger as ledger_svc, style_guide, \
     trace_service
+from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
 from exposure_workbench.utils.ids import new_id
 
@@ -60,12 +42,14 @@ The analysis is your job: take the question apart, decide what has to be known t
 it, and say what it shows and what it means for the question asked — its implication for this book and what would change \
 your reading.
 
-You pull no figure yourself. The desk has three analysts, each reading one family of evidence, and the ROSTER says what \
+Read and calculate directly when the next step is deterministic; use tool arithmetic for derived figures. Delegate work \
+that needs independent investigation. The desk has three analysts, and the ROSTER says what \
 each answers, what it can be asked for and what is absent there. `ask` is how you ask: pick the analyst by the evidence a \
 line turns on, name the subjects from the DESK block — or a book an analyst built this turn, by its id — and write what you \
 want to know as short, separate lines, one thing per line, in financial language: say the period, and say what is set \
 against what where the line is a comparison. Ask independent work together; read a prerequisite result before asking \
-work that depends on it. Ask again only for \
+work that depends on it. Bind the prerequisite f_ IDs with input_refs so the next analyst receives their rows. \
+Open handbook:issuer, handbook:market or handbook:risk when you need that method chapter. Ask again only for \
 what the answer still lacks. Check the question's premises against the DESK block first (which holdings are in which sector, \
 what the desk holds): a premise the user asserts is checked against the desk's figure and corrected with it before the \
 question is answered, and one the desk holds no figure for is neither agreed with nor denied. Keep the user's original \
@@ -108,6 +92,7 @@ TOOL_RESULT_LIMIT = 28_000
 # V2 P1.3 (design v0.4 G3): `open` reads a call's rows a page at a time and says
 # the total and the range, instead of the first 80 with nothing said of the rest.
 OPEN_PAGE_ROWS = 80
+LEAD_EVIDENCE_CALLS = 16
 
 # The rewrites an answer gets: the first refusal lists every problem, the
 # second ends the turn. Decided 2026-09-13 with the natural-language exit.
@@ -206,7 +191,7 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
     """ANYTHING ALREADY ON THE RECORD, BY ITS ID (V1): a row, the rows one call
     pulled, an analyst's log, a book a scenario built, or a work-view page. It reads the session's own
     ledger and its analysts' records — nothing here can pull a figure nobody
-    pulled, which is the whole of the lead's relation to the desk's data.
+    pulled. New evidence is obtained through the lead's read/calc tools or ask.
 
     `offset` (V2 P1.3) reads on: a call's rows come OPEN_PAGE_ROWS at a time, a
     series' points SERIES_POINTS_INLINE at a time, each page saying the total,
@@ -214,6 +199,16 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
     ref = (ref or "").strip()
     if not ref:
         return {"error": "no_id", "detail": "open takes the id of a row (f_…), a call (r_…), a task, or a built book (calc_…)"}
+    if ref.startswith("handbook:"):
+        analyst = ref.partition(":")[2]
+        return ({"chapter": handbook.chapter_text(analyst), "source": "method guidance, not factual evidence"}
+                if analyst in delegation.ANALYSTS else {"error": "unknown_handbook"})
+    if ref.startswith("rep_"):
+        async with db_factory() as db:
+            rep = await analyst_reports.load(db, session_id, ref)
+        # Only the operation log; persisted prose is revalidated by follow_up_of.
+        return ({"id": ref, "task_id": rep["task_id"], "log": rep["text"]}
+                if rep else {"error": "unknown_report", "detail": "no such report in this conversation"})
     if ref.startswith("ast_"):
         if ref in (work_views or {}):
             snapshot, ledger = work_views[ref]
@@ -235,16 +230,7 @@ async def _open(db_factory, session_id: str, ref: str, delegated: list, offset: 
                                                  "detail": f"{ref} is not a task of this conversation"}
     led = await _load_ledger(db_factory, session_id)
     if ref.startswith("f_"):
-        rec = led.by_id.get(ref)
-        if not rec:
-            return {"error": "not_on_the_record", "detail": f"{ref} is not a row this conversation was shown"}
-        out: dict = {"row": F.line(rec)}
-        points = [[str(p[0]), p[1]] for p in (rec.get("points") or []) if isinstance(p, (list, tuple)) and len(p) == 2]
-        if rec.get("kind") == F.SERIES and len(points) > F.SERIES_POINTS_INLINE:
-            # the row shows a thinned series; the record holds every point, and here they are, paged
-            paged = _page(points, offset, F.SERIES_POINTS_INLINE, "points")
-            return paged if paged.get("error") else {"id": ref, **out, **paged}
-        return out
+        return evidence_context.fact_page(led, ref, offset)
     if ref.startswith(("r_", "calc_")):
         rows = [F.line(r) for r in led.shown.values()
                 if ref in ((r.get("params") or {}).get("pull"), r.get("subject"), *(r.get("sources") or []),
@@ -468,15 +454,21 @@ async def handle_message(
     # These snapshots are turn-local, not a new persisted state store.
     work_views: dict = {}
 
-    # THE LEAD HOLDS NO TOOL FACE (V1). Each analyst opens the mount of its own
-    # family for its own task, on this turn's session and message, so what it pulls
-    # lands on the ledger the answer check reads (D3).
+    # Direct operations and specialists share the session ledger. The lead
+    # receives a server-enforced read/calc subset of the existing meta mount.
     user_id = current_user_id()
 
     def _open_tools(face: str):
         return tool_session(face, session_id=session_id, user_id=user_id, message_id=message_id, deny=deny)
 
-    async with llm_session(db_factory, session_id, message_id) as llm:
+    lead_deny = tuple(dict.fromkeys([*deny, *(n for n in faces.FACE_META_AGENT if n not in faces.FACE_LEAD_READ)]))
+    async with llm_session(db_factory, session_id, message_id) as llm, tool_session(
+            faces.FACE_NAME_META, session_id=session_id, user_id=user_id,
+            message_id=message_id, deny=lead_deny) as lead_tools:
+        direct_tools = [t for t in lead_tools.tools if t["function"]["name"] in faces.FACE_LEAD_READ
+                        and t["function"]["name"] not in lead_deny]
+        direct_names = {t["function"]["name"] for t in direct_tools}
+        direct_calls = 0
         ctx = sub_analyst.TurnContext(open_tools=_open_tools, llm=llm, db_factory=db_factory,
                                       session_id=session_id, message_id=message_id, briefing=brief,
                                       state_version=state.version, question=user_text)
@@ -500,10 +492,10 @@ async def handle_message(
 
         for _turn in range(max_turns):
             # while a verdict stands the turn is a tool call: a repair or a delegation
-            tools = ([delegation.ASK_TOOL]
-                     + ([delegation.OPEN_TOOL] if delegated or led.shown or state.findings or state.gaps else [])
+            tools = (direct_tools + [delegation.ASK_TOOL, delegation.OPEN_TOOL]
                      + ([REPAIR_TOOL] if standing is not None else []))
-            state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
+            state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns, "lead_evidence_calls": direct_calls,
+                            "lead_evidence_calls_limit": LEAD_EVIDENCE_CALLS}
             AS.mark_delivery_missing(state, led, handed | read.facts)
             snapshot = copy.deepcopy(state)
             snapshot.id = f"{state.id}_view{completions}"
@@ -533,6 +525,10 @@ async def handle_message(
                     if name == delegation.ASK_TOOL_NAME:
                         try:
                             tasks = delegation.parse_tasks(args, new_id)
+                            led = await _load_ledger(db_factory, session_id)
+                            missing = sorted({fid for task in tasks for fid in task.input_refs if not led.holds(fid)})
+                            if missing:
+                                raise delegation.BadDelegation("input_refs not on this session's ledger: " + ", ".join(missing))
                         except delegation.BadDelegation as exc:
                             result: dict = {"error": "invalid_ask", "detail": str(exc)}
                             await _record_bad_delegate(db_factory, session_id, message_id, args, str(exc))
@@ -553,6 +549,15 @@ async def handle_message(
                             AS.mark_delivery_missing(state, led, handed)
                             AS.conflicts(state, led)
                             await _save_state(db_factory, state)
+                    elif name in direct_names:
+                        if name != "list" and direct_calls >= LEAD_EVIDENCE_CALLS:
+                            result = {"error": "lead_budget", "detail": "direct evidence calls exhausted; use the evidence already retrieved"}
+                        else:
+                            direct_calls += int(name != "list")
+                            result = await lead_tools.call(name, args, actor="meta")
+                        led = await _load_ledger(db_factory, session_id)
+                        AS.conflicts(state, led)
+                        await _save_state(db_factory, state)
                     elif name == delegation.OPEN_TOOL_NAME:
                         ref = str((args or {}).get("id") or "")
                         try:
@@ -600,7 +605,7 @@ async def handle_message(
                     else:
                         result = {"error": "unknown_tool",
                                   "detail": f"your tools are {delegation.ASK_TOOL_NAME}, {delegation.OPEN_TOOL_NAME} and "
-                                            f"{REPAIR_TOOL_NAME}; the answer is your reply text"}
+                                            f"{REPAIR_TOOL_NAME}, plus {', '.join(sorted(direct_names))}; the answer is your reply text"}
                     # Work-view pages are already bounded by whole cards. A generic
                     # character cap could separate a finding from its caveat.
                     _append({"role": "tool", "tool_call_id": tc["id"],
@@ -648,11 +653,12 @@ async def handle_message(
     # S1: the runtime records delivery, not semantic completeness. Keep the
     # nullable legacy column for historical readers; do not infer a verdict.
     state.completion = None
-    state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns}
+    state.budget = {"lead_completions_used": completions, "lead_completions_limit": max_turns, "lead_evidence_calls": direct_calls,
+                    "lead_evidence_calls_limit": LEAD_EVIDENCE_CALLS}
     await _save_state(db_factory, state)
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
-                  "protocol": "simplified-s2", "completion": None, "state_version": state.version,
+                  "protocol": "simplified-s3", "lead_evidence_calls": direct_calls, "completion": None, "state_version": state.version,
                   "delivery": "answered" if reply_text is not None else "not_answered",
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,
                                    "handoff": delegation.metrics(r), "cost": r.cost} for r in delegated],
