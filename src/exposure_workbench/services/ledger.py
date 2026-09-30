@@ -181,6 +181,20 @@ class Ledger:
     def of_facts(cls, facts: Iterable[F.Fact]) -> "Ledger":
         return cls.of(F.for_record(f) for f in facts)
 
+    def restricted(self, ids: Iterable[str]) -> "Ledger":
+        """An explicit reference scope, including policies only when named."""
+        out = Ledger()
+        out.by_id.clear()
+        out.passages.clear()
+        out._tokens.clear()
+        out._scalars.clear()
+        out._series.clear()
+        out._tol.clear()
+        for fid in dict.fromkeys(ids):
+            if fid in self.by_id:
+                out.add(self.by_id[fid])
+        return out
+
     # ── G1 / G2 ──
     def holds(self, fid: str) -> bool:
         return fid in self.by_id

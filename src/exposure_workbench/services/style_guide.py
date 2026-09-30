@@ -37,9 +37,10 @@ class Rule:
 
 RULES: tuple[Rule, ...] = (
     Rule(1, "a figure points at its row", "written exactly as the row shows it",
-         "Every number you write is one a row showed you this turn, written exactly as the row shows it and followed "
-         "by the row's id in brackets: 16.0% [f_2592baab170e]. The bracket is what lets a reader open the figure. A "
-         "figure without one is refused, and so is one worked out in your head: nothing stands behind it."),
+         "Every number you write is one a row showed you this turn, written exactly as the row shows it. In the final "
+         "answer, follow it with the row's id in brackets: 16.0% [f_2592baab170e]. In a submitted note, refs may supply "
+         "that pointer only when the reading is unambiguous; otherwise use an explicit pointer. A figure without "
+         "a matching source is refused, as is one worked out in your head."),
     Rule(2, "a superlative stands on an ordering", "rests on an ordering the desk computed",
          "A superlative — largest, smallest, nearest — rests on an ordering the desk computed: the row it points at "
          "carries its place."),
@@ -76,7 +77,7 @@ def text() -> str:
 # and carries no rule.
 _RULE_OF: dict[str, int] = {
     **{r: 1 for r in ("not_on_ledger", "unknown_node", "id_in_prose", "mark_mismatch", "unsourced_figure",
-                      "unpointed_figure", "ambiguous_point")},
+                      "unpointed_figure", "ambiguous_point", "ambiguous_reference", "passage_requires_pointer")},
     "superlative_without_rank": 2,
     "change_conflict": 3, "direction_conflict": 3,
     "period_mismatch": 4, "date_expected": 4,

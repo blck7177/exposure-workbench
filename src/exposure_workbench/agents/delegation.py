@@ -17,7 +17,7 @@ WHAT CROSSES, AND WHAT DOES NOT.
         name, not a verb, not an id the desk did not hand over — and no field
         that invites arithmetic in words: what is compared with what is part of
         the line, and the analyst has one verb for one operation.
-  up    S1: `ask` returns a receipt. The STATE work view holds the checked
+  up    `ask` returns a receipt. The STATE work view holds the checked
         findings, caveats, evidence rows and actual failures. There is one
         current projection of the results, with recoverable pages, rather than
         duplicate result bodies in receipts and state.
@@ -25,18 +25,13 @@ WHAT CROSSES, AND WHAT DOES NOT.
         the rows of one call, an analyst's log, a book a scenario built, or a
         page of the work view. It reads; it cannot pull a new figure.
 
-S1 RETAINS THE ANALYST BRIEF UNTIL S2. An entry is settled (a
-finding and the ids it rests on) or it is not (why, and the id of the boundary
-the desk stated) — a settled line without a fact, an unsettled one without a
-boundary, or an entry that is both, never reaches the check: `parse_submission`
-refuses it. An analyst always HAS a boundary to point at, because every refusal
-a tool makes is a row and the three policies stand on every ledger
-(tools/registry, analytics/registry.POLICY_ABSENCES).
+S2 SUBMIT selects ledger evidence and optional notes (agents/handoff). Notes
+pass the shared factual boundary individually; a rejected item cannot erase
+accepted items. No line accounting claims to close the user's question.
 
-The brief's line accounting describes this handoff, never completeness of the
-user's question. Every figure in a finding is resolved against the ledger the
-answer check will read — a brief whose numbers the lead cannot cite costs the
-lead its turn.
+LEGACY_SUBMIT_TOOL, parse_submission, handoff_check and merge_brief retain the
+old settled/finding or why/boundary contract for historical adapters and tests.
+They are not offered to the current analyst loop.
 
 THE LOG IS NOT WRITTEN. Every tool call carries `why` (tools/primitives), so an
 analyst's log is its calls read in order; there is no prose report to keep in
@@ -49,6 +44,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from exposure_workbench.analytics import handbook
+from exposure_workbench.agents import handoff
 from exposure_workbench.services import fact_boundary
 from exposure_workbench.services import facts as F
 from exposure_workbench.services import style_guide
@@ -75,8 +71,8 @@ ASK_TOOL = {"type": "function", "function": {
         "name the subjects it concerns, and write what you want to know as short, separate lines, one thing per line, "
         "in financial language: say the period, and say what is to be set against what where the line is a "
         "comparison. Ask several analysts in one call when a question spans them; several issuers studied in depth "
-        "are one task each. Every line comes back settled — a finding with the desk's rows under it — or with what "
-        "stopped it. Ask independent work together; when a task depends on an earlier result, read that result "
+        "are one task each. Analysts return selected evidence and optional checked notes, with actual execution "
+        "and stop records. Ask independent work together; when a task depends on an earlier result, read that result "
         "before asking the next task. Revise what you ask as you learn. The STATE block holds the checked results; "
         "the call returns a receipt, not another copy of them."),
     "parameters": {"type": "object", "properties": {
@@ -108,7 +104,7 @@ _UNSETTLED = {"type": "object", "properties": {
     "boundary": {"type": "string", "description": "the f_… id of the absence row that says so — a tool's refusal, or a standing policy"}},
     "required": ["n", "settled", "why", "boundary"], "additionalProperties": False}
 
-SUBMIT_TOOL = {"type": "function", "function": {
+LEGACY_SUBMIT_TOOL = {"type": "function", "function": {
     "name": SUBMIT_TOOL_NAME,
     "description": (
         "File your brief: one entry per numbered line of the task, and an entry is one of two things. SETTLED: a "
@@ -122,6 +118,9 @@ SUBMIT_TOOL = {"type": "function", "function": {
             "description": "where a finding is not quite the line asked: another date, another spacing, a proxy"},
         "follow_ups": {"type": "array", "items": {"type": "string"}, "description": "what you would ask next"}},
         "required": ["lines"], "additionalProperties": False}}}
+
+
+SUBMIT_TOOL = handoff.SUBMIT_TOOL
 
 
 OPEN_TOOL = {"type": "function", "function": {
@@ -205,6 +204,14 @@ class AnalystResult:
     report_id: str | None = None
     coverage: dict = field(default_factory=dict)
     cost: dict = field(default_factory=dict)
+    protocol: str = "legacy-v1"     # historical objects only; the live loop uses evidence-v2
+    evidence: list[str] = field(default_factory=list)
+    available_evidence: list[str] = field(default_factory=list)
+    notes: list[dict] = field(default_factory=list)
+    diagnostics: list[dict] = field(default_factory=list)
+    stop_reason: str | None = None
+    operations: list[dict] = field(default_factory=list)
+    receipts: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -485,13 +492,24 @@ def for_lead(results: list[AnalystResult], ledger: Ledger | None = None) -> dict
     S1), never whether the user's question has been answered. The ledger
     argument remains accepted for callers reading historical records.
     """
-    return {"returns": [{"task_id": r.task.task_id, "analyst": r.task.analyst,
+    return {"returns": [({"task_id": r.task.task_id, "analyst": r.task.analyst,
+                          "protocol": r.protocol, "execution": r.status, "stop_reason": r.stop_reason,
+                          "evidence": r.evidence, "available_evidence": len(r.available_evidence),
+                          "notes": [n["id"] for n in r.notes], "report_id": r.report_id, "made": r.made}
+                         if r.protocol == handoff.PROTOCOL else {"task_id": r.task.task_id, "analyst": r.task.analyst,
                          "brief_status": r.status,
                          "accepted_findings": sum(e.get("settled", False) and e.get("n") not in
                                                   {x["n"] for x in r.refused} for e in r.lines),
                          **({"report_id": r.report_id} if r.report_id else {}),
-                         **({"made": r.made} if r.made else {})}
+                         **({"made": r.made} if r.made else {})})
                         for r in results]}
+
+
+def metrics(result: AnalystResult) -> dict:
+    """Descriptive handoff counts, never task-line or question coverage."""
+    return {"protocol": result.protocol, "selected_evidence": len(result.evidence),
+            "available_evidence": len(result.available_evidence), "accepted_notes": len(result.notes),
+            "rejected_items": len(result.diagnostics), "stop_reason": result.stop_reason}
 
 
 def asked_of(args: dict) -> str:

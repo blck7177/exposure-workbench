@@ -410,6 +410,8 @@ def handoff_of(tag: str, t: dict) -> dict:
     later = [x for ask in asks[1:] for x in ask]
     first = {sub for x in (asks[0] if asks else []) for sub in x["subjects"]}
     cov = [d.get("coverage") or {} for d in meta.get("delegations") or []]
+    evidence_handoffs = [d["handoff"] for d in meta.get("delegations") or []
+                         if (d.get("handoff") or {}).get("protocol") == "evidence-v2"]
     answers = [s for s in steps if s.get("step_type") == "answer"]
     return {
         "tag": tag, "turn": t.get("turn"), "chain": chain_of(asks), "shape": shape_of(asks),
@@ -430,7 +432,10 @@ def handoff_of(tag: str, t: dict) -> dict:
         "settled": sum(int(c.get("settled", c.get("done")) or 0) for c in cov),
         # a task that came back with no line settled: the family asked did not hold it, or could
         # not reach it — in a turn `in_sequence`, the round trip that found out who does
-        "empty_returns": sum(1 for c in cov if int(c.get("asked") or 0) and not int(c.get("settled", c.get("done")) or 0)),
+        "empty_returns": (sum(1 for c in cov if int(c.get("asked") or 0) and not int(c.get("settled", c.get("done")) or 0))
+                          + sum(1 for h in evidence_handoffs if not any(h.get(k) for k in
+                                ("selected_evidence", "available_evidence", "accepted_notes")))),
+        "evidence_handoff_tasks": len(evidence_handoffs),
         "answer": ("accepted" if any(s.get("status") == "completed" for s in answers)
                    else "refused" if answers else "none"),
         "_asks": asks,
@@ -542,6 +547,8 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
     report_status: collections.Counter = collections.Counter()
     handoff: collections.Counter = collections.Counter()
     coverage: collections.Counter = collections.Counter()
+    evidence_handoff_counts: collections.Counter = collections.Counter()
+    legacy_coverage_tasks = 0
     # V1
     sub_peak, per_task_calls, why_words = [], [], []
     why_missing = why_lines = v1_calls = v1_refused = v1_not_run = v1_unstated = 0
@@ -596,6 +603,13 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
                 for d in meta.get("delegations") or []:
                     analysts += 1
                     analyst_status[d.get("status") or "unstated"] += 1
+                    h = d.get("handoff") or {}
+                    if h.get("protocol") == "evidence-v2":
+                        evidence_handoff_counts["tasks"] += 1
+                        for key in ("selected_evidence", "available_evidence", "accepted_notes", "rejected_items"):
+                            evidence_handoff_counts[key] += int(h.get(key) or 0)
+                    elif d.get("coverage"):
+                        legacy_coverage_tasks += 1
                     # one series under two spellings: V36 filed lines `done / not_done`, V1 `settled / unsettled`
                     cov = d.get("coverage") or {}
                     cov = {"asked": cov.get("asked"), "refused": cov.get("refused"),
@@ -731,7 +745,10 @@ def tally(paths: list[str], questions: str | None = None) -> dict:
         "analysts": analysts,
         "analysts_by_status": dict(sorted(analyst_status.items())),
         "coverage": {k: coverage[k] for k in ("asked", "done", "not_done", "refused")},
-        "coverage_done_share": round(coverage["done"] / coverage["asked"], 2) if coverage["asked"] else 0,
+        "legacy_coverage_tasks": legacy_coverage_tasks,
+        "evidence_handoffs": dict(evidence_handoff_counts),
+        "coverage_done_share": (round(coverage["done"] / coverage["asked"], 2) if coverage["asked"]
+                                else None if evidence_handoff_counts["tasks"] else 0),
         "submits": submits, "submits_rejected": submits_rejected,
         "submits_per_analyst": round(submits / analysts, 2) if analysts else 0,
         "handoff_refusals": dict(sorted(handoff.items())),

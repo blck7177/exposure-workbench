@@ -862,15 +862,13 @@ class FactRecord(Base):
 # ─── Runtime: Agent Steps (APPEND-ONLY audit trail) ─────────────────────────────
 
 class AnalystReport(Base):
-    """One domain analyst's full reading (V36).
+    """An analyst's persisted handoff, distinguished by input_version.protocol.
 
-    The brief is what the lead reads inside the turn — short, line by line, and
-    already spent by the time the answer is written. This is what is left: the
-    analyst's own prose, checked against the same session ledger the answer is,
-    so a reader opening it is opening something that passed the same bar. A
-    report the check refused keeps its problems and not its prose, because a
-    heading that says "the analyst's reading" over unchecked text is the one
-    thing this table must never be.
+    S2 evidence-v2 stores retrieved evidence and individually checked notes.
+    A returned/stopped status describes execution, never question completeness;
+    stopped work can still have accepted blocks. Historical verified/refused
+    briefs retain their original representation. Rejected note prose stays in
+    the execution trace rather than the current report or reusable context.
     """
     __tablename__ = "analyst_reports"
 
@@ -880,7 +878,7 @@ class AnalystReport(Base):
     message_id: Mapped[str | None] = mapped_column(String(64))
     task_id: Mapped[str | None] = mapped_column(String(64))
     domain: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False)      # verified | refused
+    status: Mapped[str] = mapped_column(String(16), nullable=False)      # returned | stopped; legacy verified | refused
     title: Mapped[str | None] = mapped_column(Text)
     brief: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     text: Mapped[str | None] = mapped_column(Text)

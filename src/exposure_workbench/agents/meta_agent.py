@@ -75,11 +75,11 @@ another page using its id and next_offset when needed. Neither an accepted findi
 whole question by itself. Decide what the evidence supports, what still needs work, and explain any remaining limits \
 in your answer.
 
-What comes back is, for each numbered line, one of three things: a finding with the desk's rows under it; why the line \
-could not be settled, with the desk's own row that says so; or that the analyst's finding did not pass the desk's check. A \
+Analysts return evidence and optional checked notes. The work view also exposes evidence retrieved before a task stopped \
+without submitting, and records why it stopped. Evidence alone is not a completed analysis; use it to continue reasoning. A \
 row says what it is, whose, over what period, the value, what it means and where it came from, under its id. The READINGS \
-block says what the desk's readings mean in finance, and the implication you write rests on it. A caveat comes back on the \
-line it qualifies. `open` reads anything already on the record — a row, the rows of one call, an analyst's log of what it \
+block says what the desk's readings mean in finance, and the implication you write rests on it. Keep qualifications with \
+the claims they qualify. `open` reads anything already on the record — a row, the rows of one call, an analyst's log of what it \
 did and why, a book a scenario built; it cannot pull a new figure.
 
 Your reply is plain prose, written to the desk's style guide below. A table or a chart is [table: <id>] or [chart: <id>], \
@@ -652,14 +652,13 @@ async def handle_message(
     await _save_state(db_factory, state)
 
     meta: dict = {"prompt_tokens": prompt_peak, "completions": completions,
-                  "protocol": "simplified-s1", "completion": None, "state_version": state.version,
+                  "protocol": "simplified-s2", "completion": None, "state_version": state.version,
                   "delivery": "answered" if reply_text is not None else "not_answered",
                   "delegations": [{"domain": r.task.domain, "task_id": r.task.task_id, "status": r.status,
-                                   "coverage": r.coverage, "cost": r.cost} for r in delegated],
-                  # the page's report chip: `verified` is its word for a brief that passed
+                                   "handoff": delegation.metrics(r), "cost": r.cost} for r in delegated],
+                  # Report chips describe execution, never semantic completion.
                   "reports": [{"domain": r.task.domain, "report_id": r.report_id,
-                               "status": "verified" if r.status in ("settled", "partial", "unsettled") and not r.refused
-                                         else "refused",
+                               "status": r.status,
                                "title": f"the {r.task.analyst} analyst on {', '.join(r.task.subjects)}"}
                               for r in delegated if r.report_id],
                   "briefing_subjects": brief.get("subjects") if isinstance(brief, dict) else None}

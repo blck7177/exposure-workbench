@@ -585,6 +585,61 @@ def check(text: str, ledger: Ledger, question: str | None = None) -> Verdict:
     return v
 
 
+def check_block(text: str, refs: list[str], ledger: Ledger, question: str | None = None) -> tuple[str, Verdict]:
+    """Adapt block references to the existing inline checker, never a new gate.
+
+    Only one unambiguous scalar/series reading can supply an implicit pointer.
+    Explicit pointers, quotes, identity tokens and passage rules still pass
+    through check(). The scoped pass prevents borrowing another row; the full
+    pass retains subject/measure comparisons with the session's vocabulary.
+    """
+    problems = [{"reason": "not_on_ledger", "id": fid,
+                 "way_out": "refs must name rows on this session's ledger"}
+                for fid in refs if not ledger.holds(fid)]
+    scoped = ledger.restricted(refs)
+    asked = {_core(t["token"]) for t in A.tokens_in(question or "")}
+    inserts = []
+    for para_match in re.finditer(r"[^\n]+", text or ""):
+        para = para_match.group(0)
+        spans = [(m.start(), m.end()) for m in _CITATION.finditer(para)]
+        spans += [(m.start(), m.end()) for m in MARK_BLOCK.finditer(para)]
+        spans += [(para.find(q), para.find(q) + len(q)) for q in quoted_spans(para)]
+        for token in A.tokens_in(para):
+            start, end, tok = token["start"], token["end"], token["token"]
+            if (token["kind"] != "num" or any(s <= start < e for s, e in spans)
+                    or _POINTER_AFTER.match(para, end)
+                    or _compound_before(para, start) or _compound_after(para, end)):
+                continue
+            if scoped.resolve_identity(tok) or _core(tok) in asked:
+                continue
+            hits = list(dict.fromkeys(scoped.readings(tok)))
+            if len(hits) == 1:
+                fid, period = hits[0]
+                tail = re.match(_UNIT_TAIL, para[end:])
+                at = para_match.start() + end + (tail.end() if tail else 0)
+                inserts.append((at, f" [{fid}{'@' + str(period) if period else ''}]"))
+            elif len(hits) > 1:
+                problems.append({"reason": "ambiguous_reference", "figure": tok,
+                                 "candidates": [{"id": fid, "period": period} for fid, period in hits],
+                                 "way_out": "split the note into narrower refs, or give this figure an explicit dated pointer"})
+            elif scoped.resolve_in_passages(tok, list(scoped.passages)):
+                problems.append({"reason": "passage_requires_pointer", "figure": tok,
+                                 "way_out": "quote the passage's exact words, or use its stated unit and an explicit passage pointer"})
+    canonical = text or ""
+    for at, pointer in sorted(inserts, reverse=True):
+        canonical = canonical[:at] + pointer + canonical[at:]
+    verdict = check(canonical, scoped, question=question)
+    if verdict.ok:
+        full = check(canonical, ledger, question=question)
+        if not full.ok:
+            verdict = full
+    if problems:
+        verdict.problems.extend(style_guide.ruled(p) for p in problems)
+        verdict.error = verdict.error or problems[0]["reason"]
+        verdict.detail = "block references did not resolve uniquely; no note was accepted"
+    return canonical, verdict
+
+
 def _one_line(p: dict) -> str:
     what = p.get("figure") or p.get("id") or p.get("node") or p.get("quote") or p.get("word") or ""
     return (f"{p['at']} " + (f"rule {p['rule']} — " if p.get("rule") else "") + p["reason"]

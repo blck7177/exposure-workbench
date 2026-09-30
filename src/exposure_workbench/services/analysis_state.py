@@ -149,11 +149,8 @@ def validation_context(scope: dict, refs: Iterable[str], ledger: Ledger | None) 
             "facts": {fid: _signature(rows[fid]) for fid in refs if fid in rows}}
 
 
-def reusable(text: str, refs: Iterable[str], validation: dict | None, scope: dict, ledger: Ledger | None,
-             question: str, *, channel: str = "finding") -> bool:
-    """Recheck both provenance and the same factual boundary before restoring text.
-    Old records without a stamp are audit records, not automatically trusted memory.
-    """
+def evidence_reusable(refs: Iterable[str], validation: dict | None, scope: dict, ledger: Ledger | None) -> bool:
+    """Revalidate evidence provenance without pretending a row is a conclusion."""
     refs = list(refs)
     if ledger is None or not refs or not validation or validation.get("version") != BOUNDARY_VERSION:
         return False
@@ -161,7 +158,14 @@ def reusable(text: str, refs: Iterable[str], validation: dict | None, scope: dic
         return False
     if any(fid not in ledger.by_id or _signature(ledger.by_id[fid]) != validation["facts"][fid] for fid in refs):
         return False
-    return fact_boundary.check_text(channel, text, ledger, question=question).ok
+    return True
+
+
+def reusable(text: str, refs: Iterable[str], validation: dict | None, scope: dict, ledger: Ledger | None,
+             question: str, *, channel: str = "finding") -> bool:
+    """Scope, fingerprints and the same fact check protect inherited prose."""
+    return (evidence_reusable(refs, validation, scope, ledger)
+            and fact_boundary.check_text(channel, text, ledger, question=question).ok)
 
 
 def new_turn(session_id: str, message_id: str | None, question: str, briefing: dict,
@@ -179,6 +183,8 @@ def new_turn(session_id: str, message_id: str | None, question: str, briefing: d
             if (subjects and subjects <= {s.upper() for s in within}
                     and reusable(f["text"], f.get("refs") or [], f.get("validation"),
                                  state.scope, ledger, state.question)
+                    and (f.get("source") != "note" or fact_boundary.check_block(
+                        "finding", f["text"], f.get("refs") or [], ledger, question=state.question)[1].ok)
                     and all(fact_boundary.check_text("caveat", text, ledger, question=state.question).ok
                             for text in f.get("caveats") or [])):
                 state.findings.append({**copy.deepcopy(f), "status": "inherited", "requirement_ids": []})
@@ -284,11 +290,10 @@ def active_gaps(state: State) -> list[dict]:
 
 
 def merge_task(state: State, task, result, ledger: Ledger | None) -> None:
-    """The lines that passed the handoff check become findings, the unsettled ones
-    gaps typed by their boundary row. Refused or missing lines leave a runtime
-    execution_failed gap, never the rejected prose (kept in the report audit).
-    Every registered line retains its requirement mapping until explicitly
-    superseded by a follow-up serving those requirements.
+    """Store S2 evidence, checked notes and execution metadata without line closure.
+    Historical results retain their original line/gap representation. Rejected
+    prose never enters either state shape, and a new follow-up does not withdraw
+    an earlier task's accepted work.
     """
     start_tasks(state, [task])
     record = next(t for t in state.tasks if t["task_id"] == task.task_id)
@@ -296,6 +301,18 @@ def merge_task(state: State, task, result, ledger: Ledger | None) -> None:
     # an old failed attempt beside the accepted repair.
     state.findings = [f for f in state.findings if f.get("task_id") != task.task_id]
     state.gaps = [g for g in state.gaps if g.get("task_id") != task.task_id]
+    if getattr(result, "protocol", None) == "evidence-v2":
+        record.pop("lines", None)
+        for note in result.notes:
+            finding = add_finding(state, note["text"], refs=note["refs"], ledger=ledger,
+                                  task_id=task.task_id, source="note")
+            finding.update(note_id=note["id"], raw_text=note["raw_text"])
+        record.update(protocol=result.protocol, status=result.status, stop_reason=result.stop_reason,
+                      evidence=list(result.evidence), available_evidence=list(result.available_evidence),
+                      diagnostics=list(result.diagnostics), operations=list(result.operations),
+                      receipts=list(result.receipts), made=list(result.made), cost=dict(result.cost),
+                      report_id=result.report_id)
+        return
     refused = {x["n"] for x in (getattr(result, "refused", None) or [])}
     entries = {e.get("n"): e for e in getattr(result, "lines", None) or []}
     for obligation in record["lines"]:
@@ -475,7 +492,7 @@ def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
     for f in state.accepted():
         entry = {"text": f["text"], "refs": list(f.get("refs") or []),
                  "rows": [ln for fid in f.get("refs") or [] if (ln := _line(ledger, fid))]}
-        for key, target in (("task_id", "task"), ("n", "line"), ("caveats", "caveats")):
+        for key, target in (("task_id", "task"), ("n", "line"), ("note_id", "id"), ("caveats", "caveats")):
             if f.get(key) is not None:
                 entry[target] = f[key]
         if f.get("status") == "inherited":
@@ -505,16 +522,25 @@ def view(state: State, ledger: Ledger | None, *, offset: int = 0) -> dict:
         entry = {"task": task["task_id"], "analyst": task["analyst"],
                  "execution": "running" if task.get("status") == "running" else "returned",
                  "brief_status": task.get("status")}
-        entry.update({k: task[k] for k in ("subjects", "asked", "made", "cost", "follow_ups", "report_id") if task.get(k)})
+        if task.get("protocol") == "evidence-v2":
+            entry.pop("brief_status", None)
+            entry["execution"] = task["status"]
+        entry.update({k: task[k] for k in ("subjects", "asked", "made", "cost", "follow_ups", "report_id", "protocol",
+                                         "stop_reason", "diagnostics", "operations", "receipts") if task.get(k)})
         entries.append(("tasks", entry))
+        shown_in_notes = {fid for f in state.accepted() if f.get("task_id") == task["task_id"] for fid in f.get("refs") or []}
+        for fid in dict.fromkeys([*(task.get("evidence") or []), *(task.get("available_evidence") or [])]):
+            if fid not in shown_in_notes and (row := _line(ledger, fid)):
+                entries.append(("evidence", {"task": task["task_id"], "id": fid, "row": row,
+                                              "selected": fid in (task.get("evidence") or [])}))
     recent = {t["task_id"]: i for i, t in enumerate(reversed(state.tasks))}
-    entries.sort(key=lambda item: recent.get(item[1].get("task"), len(recent)))
+    entries.sort(key=lambda item: (recent.get(item[1].get("task"), len(recent)), item[0] != "tasks"))
     offset = max(0, offset)
     if offset >= len(entries) and offset:
         return {"error": "invalid_offset", "total": len(entries), "detail": "offset is beyond the current work view"}
     out = {"id": state.id, "state_version": state.version, "question": state.question,
            "scope": {k: state.scope.get(k) for k in ("subjects", "books", "as_of")},
-           "findings": [], "gaps": [], "tasks": [], "budget": state.budget,
+           "findings": [], "gaps": [], "tasks": [], "evidence": [], "budget": state.budget,
            "total": len(entries), "shown": None, "next_offset": None}
     size, count = len(json.dumps(out, ensure_ascii=False)), 0
     for category, entry in entries[offset:]:

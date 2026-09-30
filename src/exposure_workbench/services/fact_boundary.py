@@ -37,3 +37,15 @@ def check_text(channel: str, text: str, ledger: Ledger, question: str | None = N
         p.setdefault("where", channel)
         p.setdefault("channel", channel)
     return verdict
+
+
+def check_block(channel: str, text: str, refs: list[str], ledger: Ledger,
+                question: str | None = None) -> tuple[str, answer_check.Verdict]:
+    """The same boundary with explicitly scoped block references."""
+    if channel not in CHANNELS:
+        raise ValueError(f"{channel!r} is not a fact-boundary channel")
+    canonical, verdict = answer_check.check_block(text, refs, ledger, question=question)
+    for problem in verdict.problems:
+        problem.setdefault("where", channel)
+        problem.setdefault("channel", channel)
+    return canonical, verdict

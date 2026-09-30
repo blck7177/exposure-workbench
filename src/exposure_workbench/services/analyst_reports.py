@@ -1,15 +1,13 @@
-"""A domain analyst's report, stored and read back (V36).
+"""Persist analyst reports and read them within their session.
 
-The brief answers the task and is spent inside the turn. The report is what is
-left of the analyst's reading, and the reason it is worth storing is that it has
-passed the same check the answer did, against the same session ledger: opening
-it is opening something held to the bar the answer was held to, with every
-figure still pointing at its fact.
+S2 evidence-v2 reports hold retrieved evidence, individually checked notes and
+actual execution metadata. Their returned/stopped status never certifies that
+the question is complete. A stopped report can still contain accepted blocks;
+rejected note text belongs only in the trace. Scope and evidence fingerprints
+are rechecked by the follow-up reader before reusing either evidence or notes.
 
-A report the check refused is stored too, marked, with its problems and without
-its blocks. Dropping it would lose the record of what was tried; showing its
-prose under a heading that implies it was checked is the failure this module
-exists to make impossible.
+Historical brief reports retain their original schema and verified/refused
+status; readers select the adapter using input_version/brief.protocol.
 
 Tenant rule is the session's, as for `facts` and `agent_steps`: the policy is on
 the table (infra/init.sql) and nothing here re-implements it.

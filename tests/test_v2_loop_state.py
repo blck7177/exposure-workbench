@@ -26,7 +26,9 @@ def _ask(requirements, *tasks):
 
 
 def _submit(lines):
-    return [{"id": "s1", "function": {"name": delegation.SUBMIT_TOOL_NAME, "arguments": json.dumps({"lines": lines})}}]
+    return [{"id": "s1", "function": {"name": delegation.SUBMIT_TOOL_NAME, "arguments": json.dumps({"evidence": list(dict.fromkeys(
+        fid for e in lines for fid in (e.get("facts") or [e["boundary"]]))),
+        "notes": [{"text": e.get("finding") or e["why"], "refs": e.get("facts") or [e["boundary"]]} for e in lines]})}}]
 
 
 def _no_db_state(monkeypatch):
@@ -78,7 +80,7 @@ async def test_checked_answer_is_delivered_without_claiming_completeness(monkeyp
     assert view["findings"][0]["text"] == ROW
     assert view["findings"][0]["rows"][0].startswith("[f_wmsft0001]")
     receipt = json.loads(lead[1][-1]["content"])
-    assert receipt["returns"][0]["accepted_findings"] == 1
+    assert len(receipt["returns"][0]["notes"]) == 1
     assert ROW not in lead[1][-1]["content"]
     assert sum(ROW in m.get("content", "") for m in lead[1]) == 1
 
@@ -95,8 +97,8 @@ async def test_policy_result_is_visible_without_becoming_a_completion_certificat
     _stub_desk(monkeypatch, tools)
     out = await meta_agent.handle_message(_factory([]), "sess", Q)
     assert out["meta"]["completion"] is None
-    assert _state_of(lead[1])["gaps"][0]["type"] == "tool_result"
-    assert "forecast" in _state_of(lead[1])["gaps"][0]["boundary"]
+    assert "forecast" in _state_of(lead[1])["findings"][0]["rows"][0]
+    assert _state_of(lead[1])["gaps"] == []
 
 
 @pytest.mark.asyncio
@@ -113,7 +115,7 @@ async def test_refused_analyst_text_never_enters_work_view_or_receipt(monkeypatc
     assert "20.0%" not in json.dumps(_state_of(lead[1]))
     assert "20.0%" not in lead[1][-1]["content"]
     assert _state_of(lead[1])["findings"][0]["text"] == ROW
-    assert out["meta"]["delegations"][0]["status"] == "partial"
+    assert out["meta"]["delegations"][0]["status"] == "stopped"
 
 
 @pytest.mark.asyncio
@@ -127,3 +129,31 @@ async def test_bad_task_can_be_revised_without_declaration_transaction(monkeypat
     out = await meta_agent.handle_message(_factory([]), "sess", Q)
     assert json.loads(lead[1][-1]["content"])["error"] == "invalid_ask"
     assert out["citations"] == ["f_wmsft0001"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("submitted", [False, True])
+async def test_lead_receives_and_uses_evidence_without_an_analyst_note(monkeypatch, submitted):
+    from exposure_workbench.agents import sub_analyst
+    _no_db_state(monkeypatch)
+    monkeypatch.setattr(sub_analyst.get_settings(), "sub_analyst_max_turns", 2 if submitted else 1)
+    sub_replies = [("", _run())]
+    if submitted:
+        sub_replies.append(("", [{"id": "s1", "function": {"name": "submit",
+            "arguments": json.dumps({"evidence": ["f_wmsft0001"]})}}]))
+    chat, lead, _ = _script([("", _ask(None, {})), (ROW, None)], sub_replies)
+    receipts = []
+    async def capture(messages, tools, **kwargs):
+        if delegation.ASK_TOOL_NAME in [t["function"]["name"] for t in tools]:
+            receipts.append(kwargs.get("note"))
+        return await chat(messages, tools, **kwargs)
+    _stub_llm(monkeypatch, capture)
+    tools = _stub_tools(monkeypatch, _run_result(_W_MSFT))
+    _stub_desk(monkeypatch, tools)
+    out = await meta_agent.handle_message(_factory([]), "sess", "How big is MSFT in the book?")
+    view = _state_of(lead[1])
+    assert not view["findings"] and view["evidence"][0]["id"] == "f_wmsft0001"
+    assert view["tasks"][0]["execution"] == ("returned" if submitted else "stopped")
+    assert "f_wmsft0001" in receipts[1]["delivered"]["facts"]
+    assert out["citations"] == ["f_wmsft0001"] and out["meta"]["delivery"] == "answered"
+    assert out["meta"]["completion"] is None

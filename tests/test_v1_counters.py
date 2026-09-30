@@ -115,6 +115,18 @@ def test_a_v1_turn_is_read_for_what_step_seven_measures(tmp_path):
     assert out["completions_by_model"] == {"lead": {"gpt-5.6-sol": 3}, "analysts": {"gpt-5.4-mini": 4}}
 
 
+def test_s2_evidence_handoffs_are_not_counted_as_unsettled_legacy_lines(tmp_path):
+    turn = {"turn": 1, "steps": [], "answer": "x", "meta": {"delegations": [
+        {"domain": "risk", "status": "stopped", "handoff": {"protocol": "evidence-v2",
+         "selected_evidence": 1, "available_evidence": 3, "accepted_notes": 1, "rejected_items": 1}}]}}
+    out = _tally(tmp_path, [turn])
+    assert out["evidence_handoffs"] == {"tasks": 1, "selected_evidence": 1,
+        "available_evidence": 3, "accepted_notes": 1, "rejected_items": 1}
+    assert out["legacy_coverage_tasks"] == 0 and out["coverage_done_share"] is None
+    mixed = _tally(tmp_path, [turn, V1_TURN])
+    assert mixed["legacy_coverage_tasks"] == 1 and mixed["coverage_done_share"] == 1.0
+
+
 def test_a_round_from_before_v1_reads_as_zeros_here_and_keeps_its_own_series(tmp_path):
     old = {"turn": 1, "answer": "x", "steps": [
         {"step_type": "llm_call", "status": "completed", "actor": None, "prompt_tokens": 5000},

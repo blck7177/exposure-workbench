@@ -151,7 +151,7 @@ def _delegate(*tasks, anchor="MSFT"):
 def _submit(*findings):
     """What an analyst files: every line settled, with the ids it rests on."""
     return [{"id": "s1", "function": {"name": delegation.SUBMIT_TOOL_NAME, "arguments": json.dumps(
-        {"lines": [{"n": i, "settled": True, "facts": f[0], "finding": f[1]} for i, f in enumerate(findings, 1)]})}}]
+        {"evidence": list(dict.fromkeys(fid for f in findings for fid in f[0])), "notes": [{"text": f[1], "refs": f[0]} for f in findings]})}}]
 
 
 def _run(**args):
@@ -336,12 +336,12 @@ async def test_a_delegation_is_answered_and_the_figure_it_returned_can_be_stated
     assert line["text"] == _FINDING[1] and line["rows"] == [F.line(_W_MSFT)]
     assert "lines" not in handed["returns"][0]
     assert handed["returns"][0]["analyst"] == "risk"
-    assert handed["returns"][0]["brief_status"] == "settled"
+    assert handed["returns"][0]["execution"] == "returned"
     assert out["text"] == "MSFT is 16.0% of the book."              # as the reader sees it
     assert out["citations"] == ["f_wmsft0001"]
     assert out["meta"]["format"] == "blocks" and out["meta"]["verified"]["figures"] == 1
     assert "gate" not in out["meta"]
-    assert out["meta"]["delegations"][0]["status"] == "settled"
+    assert out["meta"]["delegations"][0]["status"] == "returned"
 
 
 @pytest.mark.asyncio
@@ -362,12 +362,12 @@ async def test_the_lead_never_sees_a_figure_that_did_not_pass_the_handoff(monkey
     handed = json.loads([m for m in lead[1] if m.get("role") == "tool"][0]["content"])
     from tests.test_v2_loop_state import _state_of
     state = _state_of(lead[1])
-    assert state["findings"] == [] and handed["returns"][0]["accepted_findings"] == 0
-    assert "mark_mismatch" in state["gaps"][0]["rejections"]
+    assert state["findings"] == [] and handed["returns"][0]["notes"] == []
+    assert "mark_mismatch" in state["tasks"][0]["diagnostics"][0]["reasons"]
     assert "1.5%" not in json.dumps(state) and "1.5%" not in json.dumps(handed)
     assert out["text"].startswith("The desk could not settle it.")
     assert out["meta"]["completion"] is None
-    assert out["meta"]["delegations"][0]["status"] == "refused"
+    assert out["meta"]["delegations"][0]["status"] == "stopped"
 
 
 @pytest.mark.asyncio

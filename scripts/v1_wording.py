@@ -15,7 +15,7 @@ import inspect
 import sys
 from pathlib import Path
 
-from exposure_workbench.agents import delegation, meta_agent, repeats, research_session, sub_analyst
+from exposure_workbench.agents import delegation, handoff, meta_agent, repeats, research_session, sub_analyst
 from exposure_workbench.analytics import handbook, registry
 from exposure_workbench.services import answer_check, facts, style_guide
 from exposure_workbench.tools import faces, primitives
@@ -161,12 +161,12 @@ def render() -> str:
               _block("\n".join([*said_under_keys(meta_agent, "handle_message"), *said_in(repeats, "nudge")])),
               "S1 委派形状检查 `delegation.parse_tasks`（不再声明 requirements 或 for）：\n",
               _block("\n".join(said_in(delegation, "parse_tasks"))),
-              "### 9.2 分析师读到的\n", "简报被退回 `delegation.refusal_message`、`parse_submission` 的形状拒绝：\n",
-              _block("\n".join([*said_in(delegation, "refusal_message"), *said_in(delegation, "parse_submission")])),
+              "### 9.2 分析师读到的\n", "S2 提交形状检查与逐项修复 `handoff.parse`、`Submission.apply`：\n",
+              _block("\n".join([*said_in(handoff, "parse"), *said_under_keys(handoff)])),
               "循环里的其他回话 `sub_analyst._run`，与预算用尽那一行：\n",
               _block("\n".join([sub_analyst._BUDGET_STOP, *said_under_keys(sub_analyst, "_run")])),
-              "### 9.3 两道检查的出路句（方括号里是 reason；规则号见第 8 组）\n", "交接检查 `delegation.handoff_check`：\n",
-              _block("\n".join(said_under_keys(delegation, "handoff_check", keys=("way_out",)))),
+              "### 9.3 两道检查的出路句（方括号里是 reason；规则号见第 8 组）\n", "S2 交接检查 `handoff`：\n",
+              _block("\n".join(said_under_keys(handoff, keys=("way_out",)))),
               "答案检查 `services/answer_check`（`_SHORT_BARE` 是其中两句共用的模板）：\n",
               _block("\n".join([f"_SHORT_BARE = {answer_check._SHORT_BARE}", *said_under_keys(answer_check, keys=("way_out",))])),
               "### 9.4 两个循环都读到的截断提示 `utils/json._CAP_DETAIL`（工具结果或回单超出读入上限时，`truncated.detail`）\n",

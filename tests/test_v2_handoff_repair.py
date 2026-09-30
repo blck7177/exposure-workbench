@@ -18,33 +18,48 @@ WRONG2 = {"n": 2, "settled": True, "finding": "MSFT will weigh 20.0% of the book
 FIXED2 = {"n": 2, "settled": False, "why": "the desk does not forecast", "boundary": "f_policy_no_forecast"}
 
 
+async def run_repair(monkeypatch, replace_good=False):
+    tools = _Tools()
+    ctx, _, steps, stored = _ctx(monkeypatch, [], tools)
+    from tests.test_v1_analyst import _call
+    reads = []
+    async def chat(messages, **kwargs):
+        reads.append(messages)
+        if len(reads) == 1:
+            return "", _read()
+        if len(reads) == 2:
+            return "", _call("submit", evidence=SETTLED["facts"], notes=[
+                {"text": SETTLED["finding"], "refs": SETTLED["facts"]},
+                {"text": WRONG2["finding"], "refs": WRONG2["facts"]}])
+        reply = json.loads(messages[-1]["content"])
+        good_id, bad_id = [n["id"] for n in reply["note_ids"]]
+        notes = [{"id": bad_id, "text": FIXED2["why"], "refs": [FIXED2["boundary"]]}]
+        if replace_good:
+            notes.append({"id": good_id, "text": SETTLED["finding"].rstrip(".") + ", the largest name.",
+                          "refs": SETTLED["facts"]})
+        return "", _call("submit", evidence=[], notes=notes)
+    ctx.llm.chat = chat
+    return await sa.run_sub_analyst(TASK2, ctx), steps, stored
+
+
 @pytest.mark.asyncio
 async def test_resubmitting_only_the_named_entry_keeps_the_passing_line(monkeypatch):
-    tools = _Tools()
-    ctx, seen, steps, stored = _ctx(monkeypatch, [("", _read()), ("", _submit(SETTLED, WRONG2)), ("", _submit(FIXED2))], tools)
-    result = await sa.run_sub_analyst(TASK2, ctx)
+    result, steps, stored = await run_repair(monkeypatch)
     assert [s["status"] for s in steps if s["type"] == "brief"] == ["rejected", "completed"]
-    assert sorted(e["n"] for e in result.lines) == [1, 2], "line 1 was not resent and is still in the brief"
-    assert result.coverage == {"asked": 2, "settled": 1, "unsettled": 1, "refused": 0}
-    assert result.status == "partial"
-    told = json.loads([m for m in seen[2]["messages"] if m.get("role") == "tool"][-1]["content"])
-    assert "only the entries named above" in told["refusal"], "the words and the code say the same thing"
-    assert stored[0]["status"] == "verified" and [f["want"] for f in stored[0]["brief"]["findings"]] == [1]
+    assert len(result.notes) == 2 and result.notes[0]["text"] == SETTLED["finding"]
+    assert result.notes[1]["text"] == FIXED2["why"]
+    assert result.coverage == {} and result.status == "returned"
+    assert stored[0]["status"] == "returned" and len(stored[0]["accepted_lines"]) == 2
 
 
 @pytest.mark.asyncio
-async def test_a_named_entry_is_replaced_and_an_unnamed_one_is_untouched(monkeypatch):
-    tools = _Tools()
-    better1 = {**SETTLED, "finding": "MSFT weighs 16.0% [f_w1a2b3c4d5e6] of the book, the largest name."}
-    ctx, _seen, steps, _stored = _ctx(monkeypatch, [("", _read()), ("", _submit(SETTLED, WRONG2)),
-                                                    ("", _submit(better1, FIXED2))], tools)
-    result = await sa.run_sub_analyst(TASK2, ctx)
-    line1 = next(e for e in result.lines if e["n"] == 1)
-    # "largest" with no ordering behind it: the resent line 1 is checked again, and refused again
+async def test_a_bad_revision_does_not_remove_the_previous_accepted_note(monkeypatch):
+    result, steps, _ = await run_repair(monkeypatch, replace_good=True)
     assert [s["status"] for s in steps if s["type"] == "brief"] == ["rejected", "rejected"]
-    assert line1["finding"].endswith("the largest name.")
-    assert [x["n"] for x in result.refused] == [1]
-    assert next(e for e in result.lines if e["n"] == 2) == FIXED2
+    assert result.notes[0]["text"] == SETTLED["finding"]
+    assert result.notes[1]["text"] == FIXED2["why"]
+    assert result.status == "stopped"
+    assert "superlative_without_rank" in result.diagnostics[0]["reasons"]
 
 
 def test_merge_brief_keeps_passing_caveats_and_takes_new_follow_ups():

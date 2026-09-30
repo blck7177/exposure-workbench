@@ -160,9 +160,8 @@ async def test_the_log_rebuilt_from_agent_steps_is_the_log_the_analyst_kept(monk
             ledger_facts[:] = [rec for s in steps for rec in L.facts_in(s.get("evidence_refs") or [])]
             weight = next(r for r in ledger_facts if r["measure"] == "issuer_exposures.weight")
             boundary = next(r for r in ledger_facts if r["kind"] == F.ABSENCE)
-            return "", [_call("submit", lines=[
-                {"n": 1, "settled": True, "finding": f"MSFT is 16.0% [{weight['id']}] of the book.", "facts": [weight["id"]]},
-                {"n": 2, "settled": False, "why": "the after-book was built and not read", "boundary": boundary["id"]}])]
+            return "", [_call("submit", evidence=[weight["id"], boundary["id"]], notes=[
+                {"text": f"MSFT is 16.0% [{weight['id']}] of the book.", "refs": [weight["id"]]}])]
         return "", nxt
 
     async def _ledger(ctx):

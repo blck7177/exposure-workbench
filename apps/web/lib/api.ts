@@ -128,7 +128,7 @@ export type AnalystReport = {
   blocks: unknown[];
   citations: string[];
   verified: Record<string, unknown>;
-  problems: { reason?: string }[];
+  problems: { reason?: string; item?: string; reasons?: string[] }[];
   created_at: string | null;
 };
 

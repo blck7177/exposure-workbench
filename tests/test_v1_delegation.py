@@ -77,8 +77,8 @@ def test_an_entry_that_is_neither_state_never_reaches_the_check(entry):
         dl.parse_submission({"lines": [entry]})
 
 
-def test_the_schema_the_model_reads_says_the_same_two_states():
-    one_of = dl.SUBMIT_TOOL["function"]["parameters"]["properties"]["lines"]["items"]["oneOf"]
+def test_the_historical_schema_keeps_its_two_state_contract():
+    one_of = dl.LEGACY_SUBMIT_TOOL["function"]["parameters"]["properties"]["lines"]["items"]["oneOf"]
     assert [sorted(x["required"]) for x in one_of] == [["facts", "finding", "n", "settled"],
                                                        ["boundary", "n", "settled", "why"]]
     assert "report" not in dl.SUBMIT_TOOL["function"]["parameters"]["properties"]     # the log is not written

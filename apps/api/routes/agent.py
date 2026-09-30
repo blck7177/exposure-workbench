@@ -337,7 +337,9 @@ async def list_agent_sessions(
 class ReportOut(BaseModel):
     """A domain analyst's full reading (V36).
 
-    `status` is what the answer check said about it, and the page reads it: a
+    S2 reports carry evidence-v2 in brief.protocol and status returned/stopped;
+    blocks contain only individually checked notes, not a completion verdict.
+    For historical reports, `status` is what the answer check said about it: a
     refused report shows its problems, not its prose. `blocks` is the same shape
     the answer uses, so the drawer renders it with the component the reply
     already has and every figure opens the fact it equals."""

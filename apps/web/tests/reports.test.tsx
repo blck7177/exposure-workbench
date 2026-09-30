@@ -65,6 +65,33 @@ describe("panelFor — whose panel opens", () => {
 });
 
 describe("ReportPanelView", () => {
+  it("shows evidence-only handoffs without claiming an analysis was completed", () => {
+    const full = report({ status: "returned", brief: { protocol: "evidence-v2", stop_reason: "submitted",
+      evidence: [{ id: "f_weight1234", row: "[f_weight1234] MSFT weight: 16.0%, latest run" }], notes: [] }, blocks: [] });
+    const html = renderToStaticMarkup(<ReportPanelView report={{ ...verified, status: "returned" }} full={full}
+      error={null} onClose={noop} onOpenFact={noop} />);
+    expect(html).toContain(">returned</span>");
+    expect(html).toContain("MSFT weight: 16.0%, latest run");
+    expect(html).toContain("may still need further analysis");
+    expect(html).not.toContain("not checked");
+    expect(html).not.toContain("did not accept this reading");
+  });
+
+  it("keeps checked notes and evidence visible after another item failed", () => {
+    const full = report({ status: "stopped", brief: { protocol: "evidence-v2", stop_reason: "submission_rejected",
+      evidence: [{ id: "f_weight1234", row: "[f_weight1234] MSFT weight: 16.0%" }],
+      notes: [{ id: "nte_bad", text: "untrusted raw text is never a rendering source" }] },
+      blocks: [{ type: "paragraph", runs: ["A checked observation with its qualification."] }],
+      problems: [{ item: "nte_bad", reasons: ["unsourced_figure"] }] });
+    const html = renderToStaticMarkup(<ReportPanelView report={{ ...verified, status: "stopped" }} full={full}
+      error={null} onClose={noop} onOpenFact={noop} />);
+    expect(html).toContain("A checked observation with its qualification.");
+    expect(html).toContain("MSFT weight: 16.0%");
+    expect(html).toContain("Some submitted items did not pass checks");
+    expect(html).not.toContain("untrusted raw text");
+    expect(html).not.toContain(">checked</span>");
+  });
+
   it("says it is opening until the report arrives, and names the domain from the chip meanwhile", () => {
     const html = renderToStaticMarkup(
       <ReportPanelView report={verified} full={null} error={null} onClose={noop} onOpenFact={noop} />);

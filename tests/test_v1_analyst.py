@@ -103,7 +103,12 @@ def _read(**args):
 
 
 def _submit(*lines, **more):
-    return _call("submit", lines=list(lines), **more)
+    # Historical fixture notation is converted before entering the live S2 loop.
+    if any(e.get("settled") and not e.get("facts") for e in lines):
+        return _call("submit", evidence="not a list")
+    return _call("submit", evidence=list(dict.fromkeys(
+        fid for e in lines for fid in (e.get("facts") or [e["boundary"]]))),
+        notes=[{"text": e.get("finding") or e["why"], "refs": e.get("facts") or [e["boundary"]]} for e in lines])
 
 
 SETTLED = {"n": 1, "settled": True, "finding": FINDING, "facts": ["f_w1a2b3c4d5e6"]}
@@ -132,7 +137,7 @@ async def test_it_opens_its_own_face_and_is_given_that_faces_verbs_only(monkeypa
     assert "filings_read" not in seen[0]["tools"] and "prices_read" not in seen[0]["tools"]
     user = seen[0]["messages"][1]["content"]
     assert sa.TASK_TAG in user and sa.COVERAGE_TAG in user and '"1. how big MSFT is in the book"' in user
-    assert result.status == "settled" and result.lines == [SETTLED]
+    assert result.status == "returned" and result.notes[0]["text"] == FINDING
     assert tools.calls[0][2] == "sub:risk"
 
 
@@ -146,8 +151,8 @@ async def test_every_call_says_why_and_the_log_is_made_of_those(monkeypatch):
                            "asked": 'book="port_001", table="issuer_exposures", column="weight"',
                            "why": WHY, "got": "1 rows"}]
     (record,) = stored                                           # what the page and `open` read
-    assert record["domain"] == "risk" and record["status"] == "verified" and record["task_id"] == "tsk_1"
-    assert record["brief"]["findings"] == [{"want": 1, "finding": FINDING}]
+    assert record["domain"] == "risk" and record["status"] == "returned" and record["task_id"] == "tsk_1"
+    assert record["brief"]["notes"][0]["text"] == FINDING
     assert record["text"] == dl.log_text(result) and f"why: {WHY}" in record["text"]
 
 
@@ -188,7 +193,7 @@ async def test_a_start_is_not_evidence_and_is_made_once_per_subject(monkeypatch)
     assert [c[0] for c in tools.calls] == ["start"] and result.cost == {"completions": 3, "evidence_calls": 0, "starts": 1}
     told = json.loads([m for m in seen[2]["messages"] if m.get("role") == "tool"][-1]["content"])
     assert told["already_started"] == "task_9"
-    assert result.status == "unsettled"                         # a brief that passed and settled nothing is not a success
+    assert result.status == "returned" and result.stop_reason == "submitted"                         # a brief that passed and settled nothing is not a success
 
 
 async def test_a_book_a_scenario_built_travels_back_by_its_id(monkeypatch):
@@ -208,9 +213,9 @@ async def test_an_entry_in_neither_state_is_sent_back_without_spending_an_attemp
     ctx, seen, steps, _stored = _ctx(monkeypatch, [("", _read()), ("", _submit(neither)), ("", _submit(SETTLED))], tools)
     result = await sa.run_sub_analyst(TASK, ctx)
     told = json.loads([m for m in seen[2]["messages"] if m.get("role") == "tool"][-1]["content"])
-    assert told["error"] == "malformed_brief" and "ids of the rows" in told["detail"]
-    assert [s["status"] for s in steps if s["type"] == "brief"] == ["completed"]     # one attempt, and it passed
-    assert result.status == "settled"
+    assert told["error"] == "malformed_submission" and "list" in told["detail"]
+    assert [s["status"] for s in steps if s["type"] == "brief"] == ["rejected", "completed"]     # malformed calls are audited, not charged
+    assert result.status == "returned"
 
 
 async def test_a_refused_brief_gets_one_repair_and_then_the_lead_is_told_what_failed(monkeypatch):
@@ -221,27 +226,23 @@ async def test_a_refused_brief_gets_one_repair_and_then_the_lead_is_told_what_fa
     result = await sa.run_sub_analyst(TASK, ctx)
     assert seen[2]["tool_choice"] == "required"                        # while a verdict stands the turn is a tool call
     assert [s["status"] for s in steps if s["type"] == "brief"] == ["rejected", "rejected"]
-    assert result.status == "refused" and result.refused[0]["n"] == 1
-    assert stored[0]["status"] == "refused" and stored[0]["blocks"] == []   # kept, marked, never rendered as passed
+    assert result.status == "stopped" and result.diagnostics and not result.notes
+    assert stored[0]["status"] == "stopped" and stored[0]["blocks"] == []   # kept, marked, never rendered as passed
 
 
-async def test_an_analyst_that_files_nothing_leaves_a_boundary_the_lead_can_point_at(monkeypatch):
+async def test_an_analyst_that_files_nothing_returns_evidence_and_its_stop_reason(monkeypatch):
     monkeypatch.setattr(get_settings(), "sub_analyst_max_turns", 2, raising=False)
     tools = _Tools()
-    ctx, _seen, steps, _stored = _ctx(monkeypatch, [("", _read()), ("", _read(column="market_value"))], tools)
+    ctx, _, steps, _ = _ctx(monkeypatch, [("", _read()), ("", _read(column="market_value"))], tools)
     result = await sa.run_sub_analyst(TASK, ctx)
-    assert result.status == "refused" and len(result.lines) == 1 and not result.lines[0]["settled"]
-    boundary, brief = [s for s in steps if s["type"] in ("boundary", "brief")]
-    assert boundary["status"] == "completed" and brief["status"] == "rejected"   # the ledger reads completed steps
-    fid = result.lines[0]["boundary"]
-    assert boundary["facts"][0].id == fid and boundary["facts"][0].kind == F.ABSENCE
+    assert result.status == "stopped" and result.stop_reason == "turn_limit"
+    assert result.lines == [] and result.available_evidence == [WEIGHT["id"]]
+    assert not any(s["type"] in ("boundary", "brief") for s in steps)
     from exposure_workbench.services import analysis_state as S
-    state=S.new_turn("sess","msg","q",{})
-    S.merge_task(state,result.task,result,Ledger.of(tools.records))
-    assert S.view(state,Ledger.of(tools.records))["gaps"][0]["boundary"]
-    receipt=dl.for_lead([result])["returns"][0]
-    assert receipt["accepted_findings"] == 0 and "lines" not in receipt
-
+    state = S.new_turn("sess", "msg", "q", {})
+    S.merge_task(state, result.task, result, Ledger.of(tools.records))
+    assert S.view(state, Ledger.of(tools.records))["evidence"][0]["row"] == F.line(WEIGHT)
+    assert dl.for_lead([result])["returns"][0]["notes"] == []
 
 
 async def test_a_verb_it_does_not_have_is_answered_not_dispatched(monkeypatch):

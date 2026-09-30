@@ -83,11 +83,12 @@ async def test_the_analyst_names_its_task_on_its_calls_and_its_own_steps(monkeyp
     tools = _TaggedTools()
     ctx, _seen, steps, stored = _ctx(monkeypatch, [("", _read()), ("", _submit(SETTLED))], tools)
     result = await sa.run_sub_analyst(TASK, ctx)
-    assert result.status == "settled"
+    assert result.status == "returned"
     assert tools.task_ids == [TASK.task_id]
     # _record is faked in this harness without a task_id column; the report carries TaskState
     [accepted] = stored[0]["accepted_lines"]
-    assert {k: v for k, v in accepted.items() if k != "validation"} == SETTLED
+    assert accepted["text"] == SETTLED["finding"] and accepted["refs"] == SETTLED["facts"]
+    assert accepted["kind"] == "note" and accepted["validation"]
     assert accepted["validation"]["version"] == sa.AS.BOUNDARY_VERSION
     assert set(accepted["validation"]["facts"]) == set(SETTLED["facts"])
     assert stored[0]["attempts"] == 1
