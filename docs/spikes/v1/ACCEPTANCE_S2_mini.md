@@ -52,9 +52,9 @@ V2E2 里耗尽的 Q14、Q15、Q16 这次出了答案；V2E2 出答案的 Q02、Q
 |---|---|---|---|
 | Q16 | "The book's net beta to SPY is 0.01× [f_b8d750fbe551], unchanged from 0.01× [f_11907145462f]" | 两行都是 `portfolio.integration.net_beta.rates_up`（对利率上行的净 beta），桌子不持有书级 SPY 净 beta | 句子里的 "SPY" 没有被对到行的度量名 `rates_up`。**V2E2 的 Q16 答案里是同一句话，当时没查出来** |
 | X07 | "our position would lose $52.22K [f_04dfd4a0f78f]. That is 4.06% [f_a3537195b26e] of the book" | $52.22K = 仓位市值 × 最深回撤，对；4.06% 是 NVDA 的**权重**，不是损失占书的份额（≈0.8%） | 数字与行一致，句子把权重说成了损失份额——度量词没被检查 |
-| Q19 | "AWS was 17% [passage] of Amazon's revenue in the latest filed annual period, after 17% in the prior year and 16% in the year before that [passage]" | 同一段落的 Net Sales Mix 表：2024 = 17%，**2025 = 18%**；段落只有两年，没有 16% | 最新年取错列；"16%" 不在段落里却通过了"段落陈述该数"检查——疑似子串匹配（段落里有 "161,894"） |
+| Q19 | "AWS was 17% [passage] of Amazon's revenue in the latest filed annual period, after 17% in the prior year and 16% in the year before that [passage]" | 同一段落的 Net Sales Mix 表：2024 = 17%，**2025 = 18%**；段落只有两年，没有 16% | 最新年取错列；"16%" 所指段落里没有——离线只放这一段落该句被拒（unsourced_figure）；实测放行是因为账本上另一段业绩指引写着 "$16.5 billion"，"账本能对上这个数"的检查按数字串 16 在任一段落里出现放行，不看所指行、不看单位（离线加上那段后复现放行） |
 
-X07 的计数器判 `not_carried`（书的市值行没带过去）与此一致。这三处在 V37 的口径里都是"通过答案里的假陈述"；没有做全量审计，65 项独立 oracle 仍不存在。
+X07 的计数器判 `not_carried`（书的市值行没带过去）与此一致。这三处在 V37 的口径里都是"通过答案里的假陈述"；没有做全量审计，65 项独立 oracle 仍不存在。 机制（离线复现）：度量词按度量名的点号尾部比对（`net_beta.rates_up` 只剩 "rates up"，句子里的 "SPY" 无人核对）；段落数字按数字串在账本任一段落里出现放行。
 
 ## 4. X 系列
 
