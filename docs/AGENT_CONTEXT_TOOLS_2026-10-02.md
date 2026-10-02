@@ -346,6 +346,7 @@ export MCP_INTERNAL_SECRET=offline PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=$A
 | 两个目录里的 `wire.jsonl` | 每次模型请求的原样请求体和完整响应，每次工具调用的原样参数和结果 |
 | `transcript.md`、`timeline.txt` | 逐次的可读版；一行一个事件的时间线 |
 | `battery_out.json` | 这一轮存下的步骤、答案和元数据 |
+| `run.log` | 这一轮的控制台输出：起止时间、运行条件、一行结果摘要 |
 | `run_live.py`、`render_wire.py` | 包装脚本，只在模型请求和工具调用两处挂钩，仓库不动；把 `wire.jsonl` 渲染成上面两个文件的脚本 |
 | `freeze_before.txt`、`freeze_after.txt` | 运行前后仓库树和夹具库的状态 |
 | `q07_live/gate_probe.py` | 离线复跑答案检查 |
