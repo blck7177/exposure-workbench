@@ -1,0 +1,18 @@
+=== FREEZE AFTER 2026-10-02T13:12:33+00:00 ===
+65747188ed29e45d614b80d9a93c3bc37bc3dad7
+b6f13e032c58b46b0aa45986b8c7830ecb0815dd
+codex/simplify-agent-loop-s2
+--- tracked changes (must be empty) ---
+--- untracked (must be empty) ---
+--- src tests scripts apps infra newer than freeze-before (must be empty) ---
+--- fixture face still the same process ---
+2972320 Wed Sep 30 02:58:29 2026 .venv/bin/python -m uvicorn apps.mcp.http:app --host 127.0.0.1 --port 8105
+--- fixture db (read only) ---
+agent_sessions 2680 latest started_at 2026-10-02 13:11:16.159908+00
+agent_messages 3338
+agent_steps 22618
+facts 44493
+analysis_state 31
+analyst_reports 41
+tasks pending/running 0
+sessions started today: sess_42257a70e102, sess_40295edf3298

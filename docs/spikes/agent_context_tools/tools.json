@@ -1,0 +1,947 @@
+[
+ {
+  "type": "function",
+  "function": {
+   "name": "list",
+   "description": "What the desk holds, as names and dates — never a figure. `metrics`: the measures you may ask for by name, each with what it is and the params it takes. The others take a `subject` and list what is there for it: filed lines and how far each is filed; filings and the Items indexed; the span of prices; a book's holdings, runs, tables and rows (no subject: the desk's books); a book's checks.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "what": {
+      "type": "string",
+      "enum": [
+       "metrics",
+       "fundamentals",
+       "filings",
+       "prices",
+       "book",
+       "checks"
+      ]
+     },
+     "subject": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "a ticker, or a port_/run_/calc_ id"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "what",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "filings_read",
+   "description": "One filed line of one issuer — or of several, one row each — as filed (a restatement supersedes what it restates), for one `period`: a flow over a fiscal year, a fiscal quarter, twelve months to a date or N months to a date; a balance at a date (asked for a window, it is read at the window's end). A fiscal year or quarter is the issuer's own, so the same `period` asks each issuer the same question. `last_n` gives the last N of them as one series. `line` omitted: every balance at one date. The row states the period it HAS and the filing it came from. Refused: a line this issuer does not file (the lines it does are named); a flow asked `at` a date; a year, a quarter or a window the filings do not hold (the ones they do are named).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "ticker": {
+      "type": [
+       "string",
+       "array"
+      ],
+      "items": {
+       "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 12,
+      "description": "a ticker, or a list of them to read the same line for each"
+     },
+     "line": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "revenue",
+       "total_revenues",
+       "revenue_including_assessed_tax",
+       "gross_profit",
+       "cost_of_revenue",
+       "operating_income",
+       "pretax_income",
+       "net_income",
+       "net_income_including_noncontrolling",
+       "operating_cash_flow",
+       "capex",
+       "cash_and_equivalents",
+       "cash_and_restricted_cash",
+       "long_term_debt_total",
+       "long_term_debt_noncurrent",
+       "current_portion_long_term_debt",
+       "debt_current_total",
+       "short_term_borrowings",
+       "long_term_debt_and_leases_noncurrent",
+       "current_portion_long_term_debt_and_leases",
+       "interest_expense",
+       "interest_expense_nonoperating",
+       "interest_paid",
+       "income_tax_expense",
+       "depreciation_amortization",
+       "depreciation",
+       "amortization_of_intangibles",
+       "total_assets",
+       "total_liabilities",
+       "stockholders_equity",
+       "stockholders_equity_including_noncontrolling",
+       "noncontrolling_interest",
+       "accounts_receivable",
+       "inventory",
+       "accounts_payable",
+       "commercial_paper",
+       "operating_lease_liability_total",
+       "operating_lease_liability_current",
+       "operating_lease_liability_noncurrent",
+       "current_assets",
+       "current_liabilities",
+       "eps_diluted",
+       "eps_basic",
+       "shares_diluted_weighted",
+       "shares_basic_weighted",
+       "shares_outstanding",
+       "buybacks",
+       "dividends_paid",
+       "sbc",
+       null
+      ]
+     },
+     "period": {
+      "description": "the period, said ONE way — {\"fy\": 2025} the issuer's own fiscal year · {\"quarter\": \"2026Q2\"} its fiscal quarter · {\"ttm_to\": \"2025-06-30\"} the twelve months ending there · {\"months\": 6, \"end\": \"2025-06-30\"} N months ending there · {\"at\": \"2025-06-30\"} a date, for a balance. A date is YYYY-MM-DD; any of them may be \"latest\". Omitted: the latest — a flow's latest twelve months, a balance's latest date.",
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "fy": {
+          "oneOf": [
+           {
+            "type": "integer",
+            "minimum": 1990,
+            "maximum": 2100
+           },
+           {
+            "const": "latest"
+           }
+          ]
+         }
+        },
+        "required": [
+         "fy"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "quarter": {
+          "type": "string",
+          "pattern": "^(\\d{4}Q[1-4]|latest)$"
+         }
+        },
+        "required": [
+         "quarter"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "ttm_to": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "ttm_to"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "months": {
+          "type": "integer",
+          "enum": [
+           3,
+           6,
+           9,
+           12
+          ]
+         },
+         "end": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "months",
+         "end"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "at": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "at"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "last_n": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 40,
+      "description": "the last N as ONE series: N fiscal years with {\"fy\": \"latest\"}, N fiscal quarters with {\"quarter\": \"latest\"}, a balance's last N filed dates with {\"at\": \"latest\"}"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "ticker",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "prices_read",
+   "description": "One field of a name's daily prices: `close` is the as-traded price (market value, display), `adj_close` the split- and dividend-adjusted level returns are measured on, `volume` the shares traded in a session. Over a named `window` it is one series; with `date` (or neither) it is one session's reading. A price STATISTIC (volatility, beta, a drawdown, average daily volume) is a measure: ask `metric` for it by name. Refused: a name with no price history here; volume for a name followed only as a factor instrument.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "ticker": {
+      "type": "string",
+      "description": "a ticker, e.g. NVDA"
+     },
+     "field": {
+      "type": "string",
+      "enum": [
+       "close",
+       "adj_close",
+       "volume"
+      ]
+     },
+     "window": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "1m",
+       "3m",
+       "6m",
+       "1y",
+       "3y",
+       null
+      ]
+     },
+     "date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "YYYY-MM-DD; omitted = the latest session"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "ticker",
+     "field",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "book_read",
+   "description": "Figures of a book, off the table they sit on: one `column` for every row, one `row` across its columns, one cell, or the whole table. A port_… id reads its latest completed run (`which`='prior': the one before); a run_… or a scenario's calc_… id reads that book. A check's figures say where the check stands; a coefficient of a collinear fit is withheld, with the figure that IS determined named. Refused: a table, column or row the book does not hold (what it does hold is named).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "book": {
+      "type": "string",
+      "description": "a book: a port_… id (its latest completed run), a run_… id, or the calc_… id of a book a scenario built"
+     },
+     "table": {
+      "type": "string",
+      "enum": [
+       "exposure_metrics",
+       "issuer_exposures",
+       "sector_exposures",
+       "factor_attributions",
+       "risk_alerts",
+       "limit_checks",
+       "count",
+       "trade"
+      ]
+     },
+     "column": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "row": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "a row's label as `list` shows it: a ticker, a sector, a check"
+     },
+     "which": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "latest",
+       "prior",
+       null
+      ]
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "book",
+     "table",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "metric",
+   "description": "A measure of this desk's registry, by name, over one subject or a list of them (one row each, or each one's own refusal). The definition is the registry's: what it was built on, which filed line stood in for which, and what a composed total left out come back on the row. A measure built on filed lines takes a `period` — the same one `filings_read` takes, each issuer's own fiscal year or quarter — and `last_n` for a series; a price or book measure is over its own window and takes `params`. `list(what='metrics')` names every measure you may ask for and what each takes. Refused: a subject the measure has no meaning for, an input not filed, too little history, a measure over a window asked at a date — each with its reason.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "enum": [
+       "ebit",
+       "ebitda",
+       "free_cash_flow",
+       "total_debt",
+       "net_debt",
+       "ebit_interest_coverage",
+       "debt_to_ebitda",
+       "debt_to_operating_cash_flow",
+       "fcf_to_debt",
+       "current_ratio",
+       "gross_margin",
+       "operating_margin",
+       "net_margin",
+       "days_sales_outstanding",
+       "days_inventory",
+       "days_payable",
+       "roe",
+       "roa",
+       "tax_burden",
+       "nopat",
+       "invested_capital",
+       "roic",
+       "asset_turnover",
+       "equity_multiplier",
+       "quick_assets",
+       "quick_ratio",
+       "fcf_margin",
+       "capex_intensity",
+       "net_debt_to_ebitda",
+       "cash_conversion_cycle",
+       "accruals",
+       "accruals_ratio",
+       "issuer.panel",
+       "book.position",
+       "price.volatility",
+       "price.beta",
+       "price.momentum_12_1",
+       "price.distance_from_52w_high",
+       "price.adv",
+       "price.drawdown",
+       "price.window_return",
+       "book.analysis",
+       "book.reconcile",
+       "book.drawdown_episodes",
+       "book.explain_episode"
+      ],
+      "description": "ebit = EBIT; ebitda = EBITDA; free_cash_flow = free cash flow; total_debt = total debt; net_debt = net debt; ebit_interest_coverage = EBIT / interest coverage; debt_to_ebitda = debt / EBITDA; debt_to_operating_cash_flow = debt / cash from operations; fcf_to_debt = free cash flow / debt; current_ratio = current ratio; gross_margin = gross margin; operating_margin = operating margin; net_margin = net margin; days_sales_outstanding = days sales outstanding; days_inventory = days inventory; days_payable = days payable; roe = ROE; roa = ROA; tax_burden = tax burden; nopat = NOPAT; invested_capital = invested capital; roic = ROIC; asset_turnover = asset turnover; equity_multiplier = equity multiplier; quick_assets = quick assets; quick_ratio = quick ratio; fcf_margin = free cash flow margin; capex_intensity = capex intensity; net_debt_to_ebitda = net debt / EBITDA; cash_conversion_cycle = cash conversion cycle; accruals = accruals (net income − cash from operations); accruals_ratio = accruals ratio; issuer.panel = every issuer measure at once; book.position = the name's place in the book; price.volatility = annualised volatility; price.beta = beta to a benchmark; price.momentum_12_1 = 12-1 momentum; price.distance_from_52w_high = distance from the 52-week high; price.adv = average daily volume; price.drawdown = deepest drawdown; price.window_return = return over a window; book.analysis = the book's net exposures and room to its tiers; book.reconcile = one day's move, reconciled; book.drawdown_episodes = the book's drawdown episodes; book.explain_episode = what one drawdown episode was made of"
+     },
+     "subject": {
+      "type": [
+       "string",
+       "array"
+      ],
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 40,
+      "description": "a ticker, a run_/port_ id, or a list of them — what the measure says it is over"
+     },
+     "period": {
+      "description": "the period, said ONE way — {\"fy\": 2025} the issuer's own fiscal year · {\"quarter\": \"2026Q2\"} its fiscal quarter · {\"ttm_to\": \"2025-06-30\"} the twelve months ending there · {\"months\": 6, \"end\": \"2025-06-30\"} N months ending there · {\"at\": \"2025-06-30\"} a date, for a balance. A date is YYYY-MM-DD; any of them may be \"latest\". Omitted: the latest — a flow's latest twelve months, a balance's latest date.",
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "fy": {
+          "oneOf": [
+           {
+            "type": "integer",
+            "minimum": 1990,
+            "maximum": 2100
+           },
+           {
+            "const": "latest"
+           }
+          ]
+         }
+        },
+        "required": [
+         "fy"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "quarter": {
+          "type": "string",
+          "pattern": "^(\\d{4}Q[1-4]|latest)$"
+         }
+        },
+        "required": [
+         "quarter"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "ttm_to": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "ttm_to"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "months": {
+          "type": "integer",
+          "enum": [
+           3,
+           6,
+           9,
+           12
+          ]
+         },
+         "end": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "months",
+         "end"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "at": {
+          "type": "string",
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+         }
+        },
+        "required": [
+         "at"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "last_n": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 40,
+      "description": "a measure over its last N fiscal years or quarters, as one series"
+     },
+     "params": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "only the keys the measure takes — book.position — book: a port_… or run_… id; omitted = every book that holds the name ‖ price.volatility — window_days = 21 | 30 | 63 | 126 | 252: sessions in the window (default 30) ‖ price.beta — benchmark: benchmark ticker (default SPY); a factor ETF such as TLT gives the name's sensitivity to that factor; window = 1m | 3m | 6m | 1y | 3y: named span (default 1y) ‖ price.adv — window_days = 20 | 30 | 60: sessions in the window (default 20) ‖ price.drawdown — window = 1m | 3m | 6m | 1y | 3y: named span (default 1y) ‖ price.window_return — window = 1m | 3m | 6m | 1y: default 1y; benchmark: benchmark ticker for the relative return; null for none ‖ book.drawdown_episodes — span = 3m | 6m | 1y | 3y: default 1y ‖ book.explain_episode — peak (required): YYYY-MM-DD; trough (required): YYYY-MM-DD ‖ every other measure — no params: its window is `period`"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "name",
+     "subject",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "calc",
+   "description": "ONE operation over figures you were already shown, named by their f_ ids — never a number typed in. add/multiply take two or more; subtract/divide exactly two, or a list each combined with `by`; scale takes one and `factor`; rank orders two or more (`direction`), top keeps its first `n`; filter keeps those `cmp` a `level` (an f_ id, or a figure written as the desk shows one: 8%, $1.5M); sum/avg/min/max/std/abs are over a set; yoy/qoq/pct/cagr/latest over ONE series. A typed-in factor or level says whose it is (`source`). The result is a new figure with what it was made of. Refused: units, periods or books that do not combine — it says which; a typed number with no source.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "op": {
+      "type": "string",
+      "enum": [
+       "add",
+       "subtract",
+       "multiply",
+       "divide",
+       "scale",
+       "rank",
+       "top",
+       "filter",
+       "sum",
+       "avg",
+       "min",
+       "max",
+       "std",
+       "abs",
+       "yoy",
+       "qoq",
+       "pct",
+       "cagr",
+       "latest"
+      ]
+     },
+     "inputs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 40
+     },
+     "by": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "factor": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "direction": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "highest",
+       "lowest",
+       null
+      ]
+     },
+     "n": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 40
+     },
+     "cmp": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       ">",
+       ">=",
+       "<",
+       "<=",
+       "==",
+       "!=",
+       null
+      ]
+     },
+     "level": {
+      "type": [
+       "string",
+       "number",
+       "null"
+      ]
+     },
+     "source": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "user_assumption",
+       "method_constant",
+       null
+      ],
+      "description": "whose a typed-in factor or level is: the user's own figure, or a constant of the method"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "op",
+     "inputs",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "filings_search",
+   "description": "Passages of one issuer's filings that match a query, each quotable verbatim under its id, with the form, Item, accession and the characters of the Item it spans. Narrow with `item`, `form` or `filed_after`. A figure stated only in prose is quoted from here, never computed. Refused: filings not indexed.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "ticker": {
+      "type": "string",
+      "description": "a ticker, e.g. NVDA"
+     },
+     "query": {
+      "type": "string",
+      "minLength": 3
+     },
+     "item": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "'1A', '7', '7A', …"
+     },
+     "form": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "10-K",
+       "10-Q",
+       "10-K/A",
+       "10-Q/A",
+       null
+      ],
+      "description": "narrow to one form; omit for any"
+     },
+     "filed_after": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "YYYY-MM-DD"
+     },
+     "k": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 5
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "ticker",
+     "query",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "filings_section",
+   "description": "One Item of one filing, verbatim, a page at a time from `offset`: `next_offset` comes back while there is more. `filing` is an accession — the one a found passage shows, or one from the filings list; omitted, the latest filing that has the Item. A found passage shows where in its Item it sits, so reading on from there is this verb with that offset. Refused: an Item the filing does not have.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "ticker": {
+      "type": "string",
+      "description": "a ticker, e.g. NVDA"
+     },
+     "item": {
+      "type": "string",
+      "description": "'1', '1A', '7', '7A', '8', …"
+     },
+     "filing": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "an accession number, e.g. 0000034088-26-000012"
+     },
+     "form": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "10-K",
+       "10-Q",
+       "10-K/A",
+       "10-Q/A",
+       null
+      ],
+      "description": "narrow to one form; omit for any"
+     },
+     "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "ticker",
+     "item",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "web_search",
+   "description": "What the filings cannot hold: recent items about one issuer from the web, each a source quotable under its id with its publisher and date. Refused: a name that is not a listed SEC filer.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "ticker": {
+      "type": "string",
+      "description": "a ticker, e.g. NVDA"
+     },
+     "query": {
+      "type": "string",
+      "minLength": 3
+     },
+     "days": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 365
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "ticker",
+     "query",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scenario",
+   "description": "The book after a list of trades, applied in the order given: weights, sector weights, market value, and every concentration and exposure check re-run — a NEW book, returned by its id (`made`), which `book_read` and `scenario` take. `funding` says where a purchase's money comes from: omitted or `external`, from outside the book — a sale's proceeds leave it, and a name already held is not bought again; `proceeds`, from the sales in this trade — a purchase may then add to a held name, and what the sales did not fund leaves the book. It re-prices and re-checks; it does not re-fit betas, volatility or P&L. Refused: a name not held or sold twice, a weight outside (0, 1), a name with no sector on this desk, a purchase the proceeds do not cover.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "book": {
+      "type": "string",
+      "description": "a book: a port_… id (its latest completed run), a run_… id, or the calc_… id of a book a scenario built"
+     },
+     "trades": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+       "oneOf": [
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "sell"
+         ],
+         "properties": {
+          "sell": {
+           "type": "string",
+           "description": "the ticker of a name the book holds"
+          },
+          "fraction": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "exclusiveMinimum": 0,
+           "maximum": 1,
+           "description": "share of the position sold; omitted = all of it"
+          }
+         }
+        },
+        {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "buy",
+          "weight"
+         ],
+         "properties": {
+          "buy": {
+           "type": "string",
+           "description": "the ticker of a name the book does not hold"
+          },
+          "weight": {
+           "type": "number",
+           "exclusiveMinimum": 0,
+           "exclusiveMaximum": 1,
+           "description": "its share of the book right AFTER this purchase"
+          }
+         }
+        }
+       ]
+      }
+     },
+     "funding": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "enum": [
+       "external",
+       "proceeds",
+       null
+      ],
+      "description": "where a purchase's money comes from; omitted = external"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "book",
+     "trades",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "start",
+   "description": "Background preparation, returning an id at once and NEVER evidence: `readiness` puts a listed SEC filer on the desk (filings, facts, prices — a couple of minutes); `exposure_run` runs a book as it is. Once per subject is enough; say it is being prepared.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "readiness",
+       "exposure_run"
+      ]
+     },
+     "subject": {
+      "type": "string",
+      "description": "a ticker (readiness) or a port_… id (exposure_run)"
+     },
+     "as_of_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "YYYY-MM-DD; exposure_run only"
+     },
+     "why": {
+      "type": "string",
+      "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+     }
+    },
+    "required": [
+     "kind",
+     "subject",
+     "why"
+    ],
+    "additionalProperties": false
+   }
+  }
+ }
+]

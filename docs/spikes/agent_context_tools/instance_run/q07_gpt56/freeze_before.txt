@@ -1,0 +1,23 @@
+=== FREEZE BEFORE 2026-10-02T13:11:04+00:00 ===
+65747188ed29e45d614b80d9a93c3bc37bc3dad7
+b6f13e032c58b46b0aa45986b8c7830ecb0815dd
+codex/simplify-agent-loop-s2
+--- tracked changes (must be empty) ---
+--- untracked count ---
+0
+--- fixture face ---
+serving on :8105 (pid 2972320)
+fixture db: 1
+2972320 Wed Sep 30 02:58:29 2026 .venv/bin/python -m uvicorn apps.mcp.http:app --host 127.0.0.1 --port 8105
+--- fixture db (read only) ---
+agent_sessions 2679 latest started_at 2026-10-02 12:28:40.54041+00
+agent_messages 3336
+agent_steps 22548
+facts 44412
+analysis_state 30
+analyst_reports 39
+tasks pending/running 0
+sessions started today: sess_42257a70e102
+--- credit probe ---
+credits ok: gpt-5.4-mini-2026-03-17 12/4 tok
+exit=0

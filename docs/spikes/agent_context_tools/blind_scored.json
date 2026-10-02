@@ -1,0 +1,1550 @@
+[
+ {
+  "qid": "Q01",
+  "question": "What is my largest exposure right now?",
+  "reading": "用户问账本(port_001, 最新完成的 run 2026-09-11)里现在最大的敞口是什么。按手册 Chapter 3 的 composition and drift, 我需要知道: 权重最大的名字(连同亚军和差距)、最大的行业、最大几只的合计占比, 各自相对前一个 run 的变化; 因为 exposure 一词也可能指因子敞口, 再补一眼账本的净因子敞口。",
+  "steps": [
+   {
+    "tool": "list",
+    "args": {
+     "what": "book",
+     "subject": "port_001",
+     "why": "Composition question: see which tables, rows and columns port_001 holds before reading figures off them."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "确认 port_001 有哪些表、行标签(以及希望能看到列名), 因为 book_read 的 column/row 是自由字符串, context 里没有列名清单。",
+    "basis": "list 的 description: \"a book's holdings, runs, tables and rows\"; role 段: \"`list` shows the rest: ... a book's tables, rows and checks\"; what 枚举含 book, subject 接受 port_ id。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "issuer_exposures",
+     "column": "weight",
+     "why": "Largest exposure by name: read every holding's weight in the latest completed run."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 1 返回的表/列名(若列名不是 weight 则改用它显示的名字)",
+    "purpose": "读最新 run 里 10 个持仓各自的权重, 每个一行、各带 f_ id。",
+    "basis": "book_read description: \"one `column` for every row\", \"A port_… id reads its latest completed run\"; 列名 weight 是从手册 \"issuer exposures: weight\" 和 book.position 的 \"its weight, market value and contribution\" 推出来的, schema 没有列名枚举。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_weight_of_AAPL",
+      "f_weight_of_MSFT",
+      "f_weight_of_NVDA",
+      "f_weight_of_AMZN",
+      "f_weight_of_GOOGL",
+      "f_weight_of_JPM",
+      "f_weight_of_XOM",
+      "f_weight_of_LLY",
+      "f_weight_of_TLT",
+      "f_weight_of_HYG"
+     ],
+     "direction": "highest",
+     "why": "Order the ten weights to name the largest position, the runner-up and the largest few without mental arithmetic."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 2 返回的 10 个权重行的 f_ id",
+    "purpose": "用工具排序得出最大名字、亚军、前几名。",
+    "basis": "calc description: \"rank orders two or more (`direction`)\"; role 段: \"Use tool arithmetic, not mental arithmetic\"; 手册 composition and drift: \"the largest name against the runner-up\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "issuer_exposures",
+     "column": "weight",
+     "which": "prior",
+     "why": "Drift: read the same weights on the prior run so the largest name's change since the prior run can be stated."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 2 确认的列名",
+    "purpose": "读前一个 run (2026-09-10) 的权重, 用来算变化。",
+    "basis": "book_read description: \"(`which`='prior': the one before)\"; 手册: \"each with its change since the prior run\"; DESK 块里 prev run 是 run_2b8e5d10a6c3。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "subtract",
+     "inputs": [
+      "f_weight_of_NVDA",
+      "f_prior_weight_of_NVDA"
+     ],
+     "why": "Change in the largest name's weight since the prior run."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "3 次: 最大名字 最新−前一 run; 最大−亚军的差距; 最大行业 最新−前一 run(用步骤 7 的 id)",
+    "depends_on": "步骤 3 的排序结果(哪个 ticker 最大, 这里用 NVDA 作示例)和步骤 2、4 的 f_ id",
+    "purpose": "最大名字的权重相对前一个 run 的变化; 同样的减法再用于最大与亚军的差距。",
+    "basis": "calc description: \"subtract/divide exactly two\"; 手册 3.HOW THEY READ: \"two books' weights are compared by difference, never summed\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "sum",
+     "inputs": [
+      "f_weight_of_NVDA",
+      "f_weight_of_MSFT",
+      "f_weight_of_AAPL"
+     ],
+     "why": "Share of the largest few names, for the shape of the book."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次: 最新 run 一次, 前一个 run 一次(再用一次 subtract 得变化)",
+    "depends_on": "步骤 3 排出的前三名的 f_ id(示例 ticker)",
+    "purpose": "最大几只(我取前三)的合计占比。",
+    "basis": "calc description: \"sum/avg/min/max/std/abs are over a set\"; 手册 Close: \"the shape in three figures — the largest name, the share of the largest few, the largest sector\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "sector_exposures",
+     "column": "weight",
+     "why": "Largest exposure by sector: read every sector's weight in the latest completed run."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次: 最新 run 一次, which='prior' 一次",
+    "depends_on": "步骤 1 的表/列名",
+    "purpose": "读各行业权重, 找最大行业。",
+    "basis": "book_read 的 table 枚举含 sector_exposures; 手册: \"the sectors they add up to\", \"the largest sector\"; 列名 weight 为推测。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_sector_weight_Technology",
+      "f_sector_weight_Consumer_Discretionary",
+      "f_sector_weight_Communication_Services",
+      "f_sector_weight_Financials",
+      "f_sector_weight_Energy",
+      "f_sector_weight_Healthcare",
+      "f_sector_weight_Fixed_Income"
+     ],
+     "direction": "highest",
+     "why": "Order the sector weights to name the largest sector."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 7 的行业权重 f_ id",
+    "purpose": "用工具排出最大行业。",
+    "basis": "同步骤 3; DESK 块列出 7 个行业。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.position",
+     "subject": "NVDA",
+     "params": {
+      "book": "port_001"
+     },
+     "why": "What is at stake in the largest name: its market value and where its issuer-weight check stands against its tiers."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 3 得出的最大 ticker(NVDA 为示例值)",
+    "purpose": "最大名字的市值、贡献, 以及它的 issuer-concentration check 和档位。",
+    "basis": "手册 Ch.1 measures: \"the name's place in the book: ... its weight, market value and contribution, and the issuer-concentration check on it with its tiers\"; metric params: \"book.position — book: a port_… or run_… id\"。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.analysis",
+     "subject": "port_001",
+     "why": "Exposure may also mean risk exposure: read the book's net exposures per risk and the room from each check to its tiers."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "如果用户的 exposure 指的是风险/因子敞口: 取账本对股票、利率、信用的净敞口, 以及各 check 到档位的余量。",
+    "basis": "手册 Ch.3 measures: \"the book's net exposures and room to its tiers: one run's factor exposures netted per risk ... and the room from every limit check to its warning and breach tiers\"; metric subject: \"a ticker, a run_/port_ id\"; params 描述里 book.analysis 不带参数。"
+   }
+  ],
+  "reference": "book_read → calc → book_read",
+  "answer_shape": "纯文字, 每个数字照行上写法并在后面带 [f_…]。第一句直接回答: 截至最新完成的 run(2026-09-11), 权重最大的名字是哪只、权重和市值多少; 接着亚军与差距、相对 9-10 那个 run 的变化。第二句: 最大行业及其权重和变化, 前三只合计占比及变化。第三句: 这只名字的 Issuer weight check 现在站在哪一档、离 warning/breach 还有多少余量(只摆数, 不下\"过高\"的判断, 因为手册说 No measure carries a threshold)。最后一句说明我把 exposure 读成了持仓集中度, 并补一句账本层面的净因子敞口(股票/利率/信用各自方向与大小, 拟合若共线则只说净值); 如果用户要的是 VaR 类风险贡献, 说明桌子把它们 withheld。",
+  "cannot": "",
+  "unclear": [
+   "用户的 \"exposure\" 指什么 context 没定: 单名权重、行业权重、因子净敞口(book.analysis)、还是 limit_checks 里的 \"Gross exposure\" / exposure_metrics 表, 都说得通; 我按手册 composition and drift 的三个数来答并补因子敞口, 这是猜的优先级。",
+   "book_read 的 column 是自由字符串, schema 没有枚举, list 的 description 只说给出 \"holdings, runs, tables and rows\", 没承诺给列名; \"weight\" 是我从手册小标题 \"issuer exposures: weight\" 推的, 市值列叫什么(market_value?)、sector_exposures 的权重列叫什么都不知道, 只能靠拒绝行里 \"what it does hold is named\" 兜底。",
+   "一行到底是一个数字还是一条多列记录不清楚: role 段说 \"A row carries its id ... the value\", 而 book_read 又说 \"one `row` across its columns\" 和 \"the whole table\"。如果整行只有一个 f_ id 却含权重/市值/贡献多个值, calc 用这个 id 时取哪个值无从指定, 所以我只敢用 column 读法。",
+   "calc 的 rank/top 返回什么不清楚: rank 是返回带原 id 的顺序还是新 id; top \"keeps its first `n`\" 是按输入顺序还是按 direction 排序后取, top 需不需要同时给 direction。",
+   "calc subtract/divide 的操作数顺序没写(inputs[0] − inputs[1] 还是反过来), `by` 参数的含义和取值(是 f_ id 吗)也没有 description。",
+   "最新 run 与前一 run 的权重相减会不会被 calc 以 \"periods or books that do not combine\" 拒绝不确定; 手册说 \"two books' weights are compared by difference\", 但没说同一个 port 的两个 run 算不算可相减。也不知道表里是否已有 \"相对前一 run 的变化\" 这一列。",
+   "\"the share of the largest few\" 的 few 是几只没有定义(前三? 前五?), 我取了前三。",
+   "\"right now\": context 里没有当前日期, 只知道最新 run 和 positions_as_of 都是 2026-09-11, 无法判断它是否已过时, 也不知道该不该先 start(kind='exposure_run'); start 的说明只说 \"runs a book as it is\" 且 \"NEVER evidence\"。",
+   "exposure_metrics、risk_alerts、count、trade 四张表里是什么 context 完全没说; \"Gross exposure\" 这个 check 量的是什么也没定义, 所以我没法判断 \"最大敞口\" 是否该从 exposure_metrics 读。",
+   "book.analysis 落在 params 描述的 \"every other measure — no params: its window is `period`\" 里, 但账本度量没有财报期; 不确定 period 该省略还是会被要求, subject 该给 port_001 还是 run_7f3a9c21d4e8。",
+   "which='prior' 与 DESK 块里的 \"prev\" 用词不一致, 我假定是同一个 run(run_2b8e5d10a6c3); 直接传 run_ id 是否等价没有明说。",
+   "若最大持仓是 TLT 或 HYG: 它们在 holdings 里但不在 issuers_on_desk 里, book.position 对它们是否可用 context 没说。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q02",
+  "question": "Why did the book move on the last run?",
+  "reading": "用户问 port_001 最近一次 run(run_7f3a9c21d4e8, as_of 2026-09-11)那天账本为什么动。按手册第 3 章 drawdown and attribution, 要知道三件事: 当天账本收益多少、各持仓的贡献(谁造成的)、因子解释份额对残差(市场 vs 账本自身)。",
+  "steps": [
+   {
+    "tool": "list",
+    "args": {
+     "what": "metrics",
+     "why": "The question is why the book moved on its last run; the day's reconciliation is the measure for that, and I need to see what book.reconcile takes before asking for it."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "确认 book.reconcile 接受什么 subject / params。metric 的 params 说明里没有列 book.reconcile 的键, 只能先看清单。",
+    "basis": "list 的 schema: what 枚举含 metrics, 必填只有 what 和 why; metric 描述原话 \"`list(what='metrics')` names every measure you may ask for and what each takes\"。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.reconcile",
+     "subject": "run_7f3a9c21d4e8",
+     "why": "Why the book moved on the last run: reconcile that day's move into position contributions against the day's return and the factor-explained share against the residual."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "第 1 步: 如果清单显示 book.reconcile 要日期类 params 或要 port_ id 作 subject, 按清单改写(例如 subject 换成 port_001)。",
+    "purpose": "拿当天账本收益、持仓贡献与当天收益的对账、因子解释份额与残差份额(市场 vs 自身)。",
+    "basis": "手册第 3 章 2. THE MEASURES \"one day's move, reconciled\"; 1. THE QUESTIONS 的 drawdown and attribution \"how much of a day's move was the market and how much was what was held\"; metric.name 枚举含 book.reconcile; subject 描述 \"a ticker, a run_/port_ id\"; DESK 块给出 latest run id。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "run_7f3a9c21d4e8",
+     "table": "issuer_exposures",
+     "why": "Which names made the move: read every holding's weight, market value and contribution on the latest run, to set each contribution against its weight."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "整表读出每个持仓的权重、市值、贡献, 用于\"谁伤得比自己的权重更多\"。不指定 column 是因为 context 没给列名。",
+    "basis": "book_read 描述 \"one `column` for every row, one `row` across its columns, one cell, or the whole table\"; table 枚举含 issuer_exposures; 手册 \"the name's place in the book\" 说该表有 weight, market value and contribution; COMPARE \"each holding's contribution against its weight: who hurt more than their size\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "run_7f3a9c21d4e8",
+     "table": "factor_attributions",
+     "why": "What drove the move on the market side: read the factor fit's contributions for the latest run, since a move is read off the factor contributions and the residual."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "读因子贡献(SPY/QQQ/IWM/TLT/HYG/GLD/USO), 看市场那部分来自哪个因子; 如拟合共线, 记下哪些系数被扣留、哪个数是确定的。",
+    "basis": "book_read.table 枚举含 factor_attributions; 手册 COMPARE \"what drove a move is read off the factor contributions and the residual\"; book_read 描述 \"a coefficient of a collinear fit is withheld, with the figure that IS determined named\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_contribution_of_AAPL",
+      "f_contribution_of_MSFT",
+      "f_contribution_of_NVDA",
+      "f_contribution_of_AMZN",
+      "f_contribution_of_GOOGL",
+      "f_contribution_of_JPM",
+      "f_contribution_of_XOM",
+      "f_contribution_of_LLY",
+      "f_contribution_of_TLT",
+      "f_contribution_of_HYG"
+     ],
+     "direction": "lowest",
+     "why": "Order the holdings by their contribution to the day's move so the names that made it are named in order, by tool arithmetic rather than by eye."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "inputs 是第 3 步 issuer_exposures 各行贡献格的 f_ id; direction 取决于第 2 步当天收益的符号(账本跌用 lowest, 涨用 highest)。",
+    "purpose": "按贡献排序, 得出造成当天变动的名字的顺序。",
+    "basis": "calc 描述 \"rank orders two or more (`direction`)\"; SYSTEM 1 \"Use tool arithmetic, not mental arithmetic\"; 手册 Close \"then the names that made it\"。"
+   },
+   {
+    "tool": "web_search",
+    "args": {
+     "ticker": "NVDA",
+     "query": "NVDA share price move news",
+     "days": 7,
+     "why": "The residual share is the book's own: for the largest contributor, look for a dated item that the price moved on, so the specific part of the move has a source."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "0 到 2 次: 只对贡献最大的一两个名字做; TLT/HYG 是 ETF, 可能因 \"not a listed SEC filer\" 被拒, 不对它们做。",
+    "depends_on": "ticker 来自第 5 步排序的第一名(NVDA 是示例值); 是否执行取决于第 2 步的残差份额。days=7 是猜的: context 没有\"今天\"的日期, 不知道 9 月 11 日距今几天。",
+    "purpose": "仅当残差(账本自身)份额大时, 给最大贡献名找一条有日期和出处的事件; 找不到就报\"没找到\", 不编。",
+    "basis": "SYSTEM 1 \"what the filings cannot hold: web_search\"; 手册第 1 章 recent events 的 Close \"a search that returns nothing specific is reported as nothing found\"; web_search schema 必填 ticker, query, why。"
+   }
+  ],
+  "reference": "metric → book_read → book_read → book_read → calc",
+  "answer_shape": "白话段落, 每个数字照行上的写法并带 [f_…]。结构按手册 Close:\n1. 一句话: latest run(2026-09-11)当天账本收益多少、方向。\n2. 造成它的名字: 按贡献排序列前几名, 每个贡献旁放它的权重, 指出谁的贡献大于其权重份量。\n3. 市场对自身: 因子解释份额对残差份额, 说明\"份额不是收益也不是损失\"; 因子侧哪个工具贡献最大。拟合共线时只引用净值, 不引用单腿。\n4. 残差部分由什么构成: 能给的只有按名字的贡献; 如搜到带日期和出处的事件就附上, 没有就说没找到。\n5. 如果 reconcile 因持仓恒等式不成立被拒, 明说桌子对这天不报任何份额, 只给持仓贡献。\n不给价格去向的观点, 不重建 VaR。",
+  "cannot": "没有哪件事按 context 判断必然做不了, 但有两处有条件的缺口。一是手册原话 \"Not meaningful when: the position identity does not hold within tolerance — then no share of the move is reported at all\": 若 reconcile 被拒, 我会对用户说桌子对这天不报市场/自身的份额, 只给各持仓贡献。二是 \"correlations between holdings and hidden common bets are not measures on this desk\" 以及 book-level fit \"says nothing per name\": 我会说残差能按贡献落到名字, 但桌子不持有按名字拆的因子/残差分解, 也不说明名字之间的共同押注。",
+  "unclear": [
+   "metric 的 params 说明没有列 book.reconcile(也没有 book.analysis)的键, 只有一句 \"every other measure — no params: its window is `period`\", 而 period 的写法全是财年/季度/财报窗口。\"哪一天\"怎么指定不清楚: 是靠 subject 传 run id, 还是有日期参数, 还是用 period {\"at\": ...}。",
+   "book.reconcile 的 subject 该写 port_001 还是 run_7f3a9c21d4e8 不确定: subject 描述两种都允许, 手册只说 \"a day without a completed run has no reconciliation\"。",
+   "用户说的 \"move\" 有歧义, context 没定义: 可以是 9 月 11 日当天收益, 也可以是 9 月 10 日 run 到 9 月 11 日 run 之间的变化(市值、权重、敞口漂移)。我按当天收益读。",
+   "book_read 各表的列名 context 里完全没有。手册只在行文里提到 weight、market value、contribution; list 的描述说它列 \"holdings, runs, tables and rows\", 没说列。所以只能整表读, 不敢写 column。",
+   "factor_attributions 表里是什么没说明: 是 beta、当天各因子贡献还是别的, 覆盖什么窗口, 都不知道。也不知道共线时\"确定的那个数\"是什么。",
+   "exposure_metrics、risk_alerts、count、trade 四张表在 context 里没有任何解释。账本当天收益或总市值是否在 exposure_metrics 里不知道, 只能指望 book.reconcile 的行带回当天收益。",
+   "手册 Close 要求 \"what the unexplained share is made of, by name\", 但没有任何工具被说明能给出按名字的残差; 同章又说 book-level fit \"says nothing per name\"。只能用按名字的贡献近似, 不确定这是否是手册的本意。",
+   "issuer_exposures 的 contribution 是哪一天的、什么单位(账本收益的百分点?), 以及与 book.reconcile 用的是否同一口径, context 没说。",
+   "手册要把账本的变动同市场同期比, 但 price.window_return 最短窗口是 1m, 没有单日收益的 measure。只能 prices_read 两个日期再 calc 两步。calc 的 pct 没有定义(只说 \"over ONE series\"), 不敢用。",
+   "web_search 的 days 从\"现在\"往回数, 但 context 没有当前日期, 只知道 run 的 as_of。",
+   "DESK 块自称带 \"how far each name's filings and prices reach\", 实际 JSON 里 \"issuers\": {} 是空的, 没有任何覆盖范围信息。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q03",
+  "question": "Which limits am I closest to breaching, and how much room is left on each?",
+  "reading": "用户问的是 port_001(desk 块里唯一的 book, 最新 run 为 run_7f3a9c21d4e8, as_of 2026-09-11)的 20 个 mandate check 里, 哪些离 breach tier 最近, 各剩多少 room。按手册 Chapter 3 的 limits and triggers, 需要每个 check 的读数、warning/breach 两档、room(权重点、美元、单名 check 再换成价格变动), 以及和 prior run 比的方向。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.analysis",
+     "subject": "port_001",
+     "why": "Limits and triggers: the handbook names this measure for the room from every mandate check to its warning and breach tiers on the latest completed run."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取最新 run 上每个 limit check 到 warning 档和 breach 档的 room, 这是题目的核心数据。",
+    "basis": "手册 Ch3 §1 'limits and triggers ... Measured by: the book's net exposures and room to its tiers'; metric 的 name 枚举里 'book.analysis = the book's net exposures and room to its tiers'; subject 描述 'a ticker, a run_/port_ id'; params 说明里 book.analysis 没有列出任何键, 所以不传 params。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "limit_checks",
+     "why": "Limits and triggers: read every check's own value, its warning and breach tiers and where it stands, straight off the latest run's table."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "整表读 limit_checks: 每个 check 自己的读数、两档 tier、当前状态(含未运行的 check), 用来和 room 并排说。",
+    "basis": "book_read 描述 '... or the whole table'、'A check's figures say where the check stands'; 手册 Ch3 §2 'the checks' own values ... are the run's columns and are read off the run'; table 枚举含 limit_checks。不知道列名, 所以不传 column, 整表读。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.analysis",
+     "subject": "run_2b8e5d10a6c3",
+     "why": "Limits and triggers: the same checks' room on the prior run, to say which direction each nearest check is moving."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取 prior run(2026-09-10)同一批 check 的 room, 用于判断方向(room 在缩还是在扩)。",
+    "basis": "手册 Ch3 §4 'limits and triggers — compare: ... the same check on the prior run, for direction'; desk 块 runs.prev.id = run_2b8e5d10a6c3; metric 的 subject 接受 run_ id。context 没明说 prev 是否 completed, 所以写 likely。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_room_breach_gross_exposure",
+      "f_room_breach_issuer_weight_AAPL",
+      "f_room_breach_issuer_weight_AMZN",
+      "f_room_breach_issuer_weight_GOOGL",
+      "f_room_breach_issuer_weight_HYG",
+      "f_room_breach_issuer_weight_JPM",
+      "f_room_breach_issuer_weight_LLY",
+      "f_room_breach_issuer_weight_MSFT",
+      "f_room_breach_issuer_weight_NVDA",
+      "f_room_breach_issuer_weight_TLT",
+      "f_room_breach_issuer_weight_XOM",
+      "f_room_breach_one_day_loss",
+      "f_room_breach_sector_weight_Communication_Services",
+      "f_room_breach_sector_weight_Consumer_Discretionary",
+      "f_room_breach_sector_weight_Energy",
+      "f_room_breach_sector_weight_Financials",
+      "f_room_breach_sector_weight_Fixed_Income",
+      "f_room_breach_sector_weight_Healthcare",
+      "f_room_breach_sector_weight_Technology",
+      "f_room_breach_volatility_30_sessions"
+     ],
+     "direction": "lowest",
+     "why": "Limits and triggers: order the checks by smallest room to the breach tier so the nearest check comes first, using tool arithmetic."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次: 一次排到 breach 档的 room, 一次排到 warning 档的 room(手册要求两档都说)。",
+    "depends_on": "inputs 全部来自第 1 步 book.analysis 返回的各 check 到 breach 档的 room 行 id(占位)。如果某个 check 未运行、没有 room 行, 就不放进 inputs。",
+    "purpose": "把各 check 到 breach 档的 room 从小到大排, 得到“最接近 breach”的顺序。",
+    "basis": "手册 Ch3 §4 'the nearest check first, by smallest room'; role 段 'Use tool arithmetic, not mental arithmetic'; calc 描述 'rank orders two or more (`direction`)'。写 likely 是因为 calc 会拒绝 'units ... that do not combine', 而 Gross exposure / One-day loss / Volatility 的 room 单位可能和权重类 check 不同; 被拒就按单位分组各排一次。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "exposure_metrics",
+     "why": "Limits and triggers: the book's market value is needed to turn a room in weight points into dollars."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿 book 的总市值, 用来把权重点 room 换算成美元。",
+    "basis": "手册 Ch3 §4 'room in weight points, in dollars — the book's market value times the room'; Ch3 §5 'the run's own figures'。调用本身符合 schema, 但 book 总市值是否在 exposure_metrics 表上是我猜的(context 没说它在哪张表), 所以整表读、不指定 column。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "multiply",
+     "inputs": [
+      "f_room_breach_issuer_weight_NVDA",
+      "f_book_market_value"
+     ],
+     "why": "Limits and triggers: the room of a nearest check in dollars is the book's market value times the room."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "对排在最前的几个权重类 check 各一次(预计 3 到 5 次), 只对以权重计的 check 做。",
+    "depends_on": "第一个 input 来自第 1 步的 room 行(示例用 NVDA, 实际是第 4 步排序后最靠前的 check); 第二个来自第 5 步的 book 总市值行。",
+    "purpose": "把最接近的几个权重类 check 的 room 换成美元。",
+    "basis": "手册 Ch3 §4 'in dollars — the book's market value times the room'; Ch3 §3 'a tier in dollars is the book's market value times the tier'; calc 'add/multiply take two or more'。百分比乘美元是否被 calc 视为可组合单位没有明说。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "divide",
+     "inputs": [
+      "f_room_breach_issuer_weight_NVDA",
+      "f_value_issuer_weight_NVDA"
+     ],
+     "why": "Limits and triggers: for a single-name check, the price move that closes its room is the room over the name's weight."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "对最接近的几个 check 里属于 Issuer weight 的各一次; sector、gross exposure 等非单名 check 不做。",
+    "depends_on": "分子来自第 1 步的 room 行; 分母是该名字的权重, 取第 2 步 limit_checks 里 'Issuer weight: NVDA' 这个 check 自己的读数行(若该表不给读数, 改用 book_read issuer_exposures 的该名字行)。NVDA 只是示例 ticker。",
+    "purpose": "单名(Issuer weight)check 的 room 换算成“该名字涨多少会吃掉 room”。",
+    "basis": "手册 Ch3 §4 'for a single-name check, as the price move that closes it: the room over the name's weight'; calc 'subtract/divide exactly two'。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "subtract",
+     "inputs": [
+      "f_room_breach_issuer_weight_NVDA",
+      "f_room_breach_issuer_weight_NVDA_prior"
+     ],
+     "why": "Limits and triggers: the change in a nearest check's room since the prior run gives its direction."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "对最接近的几个 check 各一次(预计 3 到 5 次)。",
+    "depends_on": "第一个 input 来自第 1 步(最新 run), 第二个来自第 3 步(prior run)同一 check 的 room 行。",
+    "purpose": "最新 run 的 room 减 prior run 的 room, 说明该 check 是在靠近还是远离 tier。",
+    "basis": "手册 Ch3 §4 'the same check on the prior run, for direction'; Ch3 §3 'two books' weights are compared by difference, never summed'。calc 会拒绝 'books that do not combine', 两个 run 相减是否算可组合没有明说。"
+   }
+  ],
+  "reference": "metric → calc",
+  "answer_shape": "纯散文, 每个数字照行上的写法并在后面跟 [f_…]。开头一句说明这是 US Growth & Income Portfolio (port_001) 在 2026-09-11 这次 run 上的读数。然后按到 breach 档 room 从小到大逐个讲最接近的几个 check: check 名、当前读数、warning 档和 breach 档、到两档的 room(权重点)、room 折成美元、如果是单名 check 再给出关掉 room 所需的价格变动、相对 2026-09-10 那次 run 的 room 变化方向。已经越过 warning 档或 breach 档的 check 直接照行上的状态说。最后一句按手册的 close 说“哪个 check 先触发、因什么触发”。另外单列: 未运行的 check 说成 not run 而不是 clear(手册点名 VaR 等被 withheld, One-day loss 可能属于这类); mandate 没定义的限额没有 check、也没有 room。不给“危险/安全”的阈值判断, 不预测。",
+  "cannot": "",
+  "unclear": [
+   "book_read 的 column 参数: 整份 context 没有任何一张表的列名。list 的描述只说会列出 'a book's holdings, runs, tables and rows', 没说列; 所以我只能整表读, 没法精确取一个单元格(比如 limit_checks 的 breach tier 列、issuer_exposures 的权重列叫什么都不知道)。",
+   "book 的总市值在哪张表: 手册要求 'in dollars — the book's market value times the room', 但没说总市值是 exposure_metrics 的一行、issuer_exposures 的合计, 还是 book.analysis 自带。我猜 exposure_metrics。",
+   "book.analysis 返回的形状: room 是每个 check 每档一行(各有自己的 f_ id), 还是一行里带两档? 已越档时 room 是负数还是另有标记? 这决定 calc rank 的 inputs 怎么写。",
+   "room 的单位是否跨 check 可比: Issuer/Sector weight 是权重点, 但 Gross exposure、One-day loss、Volatility 30 sessions 的 room 单位没说。手册只说 'by smallest room', 没说不同单位的 check 怎么排在同一个序里(绝对 room 还是 room 占 tier 的比例); calc 又会拒绝单位不可组合的输入。",
+   "One-day loss 这个 check 是否真的运行了: 手册说 VaR、expected shortfall、stress 结果 'withheld pending validation', 又说 'a check that did not run because its input is withheld is listed as not run'。没法从 context 判断 One-day loss 属于哪种, 也不知道未运行的 check 在 book.analysis 里有没有 room 行。",
+   "book_read 的 table 枚举里 'count' 和 'trade' 两张表没有任何解释; 'risk_alerts' 和 'limit_checks' 的区别也没说(题目问 limits, 我只读了 limit_checks, 不确定 risk_alerts 是否也该读)。",
+   "book_read 的 row 标签: 描述说 'a row's label as `list` shows it: a ticker, a sector, a check', desk 块里 check 写成 'Issuer weight: AAPL'。我推测这就是行标签, 但没有确认, 所以避开了 row 参数。",
+   "prior run 的取法有两条路(book_read 的 which='prior', 或 metric 直接传 run_2b8e5d10a6c3), context 没说 book.analysis 的 room 能否用前者; 也没说 prev run 是否是 completed 状态。",
+   "跨 run 相减是否被 calc 接受: calc 拒绝 'books that do not combine', 手册又说两个 book 的权重 'compared by difference'。两个 run 算不算两个 book、能不能相减, 没有明说。",
+   "“价格变动”的计算: 手册给的是 'the room over the name's weight', 没说分母用 limit_checks 的 check 读数还是 issuer_exposures 的 weight, 也没说 calc 对“权重点除以权重”会给出什么单位。",
+   "各 check 的方向: 是否所有 check 都是上限(超过即 breach)? Gross exposure、One-day loss 的 breach 方向 context 没说。",
+   "每个工具必填的 why 字段要求写 'which line of your task this step serves', 但 context 里没有任何带行号或条目的 task, 不清楚它指什么; 我按“这一步服务于手册哪个问题”来写。",
+   "用户说的 'closest to breaching' 是只看 breach 档, 还是 warning 档也算: 手册要求两档都说, 我两档都排了, 但“最接近”以哪档为准没有规定。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q04",
+  "question": "Put MSFT, AAPL and GOOGL 2025 full-year net income side by side in a table.",
+  "reading": "用户要 MSFT、AAPL、GOOGL 三家 2025 全年净利润并排成表。需要的只是同一条 filed line(net_income)在各自 2025 财年的三个数,每个带行 id 和各自的期间;不需要比率或排序。",
+  "steps": [
+   {
+    "tool": "filings_read",
+    "args": {
+     "ticker": [
+      "MSFT",
+      "AAPL",
+      "GOOGL"
+     ],
+     "line": "net_income",
+     "period": {
+      "fy": 2025
+     },
+     "why": "The user asks for 2025 full-year net income of three issuers side by side; filings_read reads one filed line for several issuers in one call, one row each, each over its own fiscal year 2025."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "一次取三家 FY2025 的 net_income,每家一行,行上带各自实际覆盖的期间和来源 filing。",
+    "basis": "filings_read 的 description:'One filed line of one issuer — or of several, one row each ... A fiscal year or quarter is the issuer's own, so the same `period` asks each issuer the same question';ticker 允许数组(maxItems 12);line 枚举含 net_income;period 的 {\"fy\": 2025} 形式;DESK 里三家 status 都是 ready。"
+   }
+  ],
+  "reference": "filings_read",
+  "answer_shape": "一句引言加一张三列小表(公司 / 财年期间 / 净利润),每个数字按行上显示的原样写,后面跟 [f_…] 行 id。表下一句话说明三家财年不同(DESK: MSFT 财年末 Jun 30、AAPL Sep 27、GOOGL Dec 31),所以三个 'FY2025' 覆盖的十二个月并不重合,具体期间以各行自己写的为准。如果某家被拒(例如该财年不在库里),就照拒绝行给的理由和出路说明那一格缺什么,不填近似数。不做排序、不加评论,因为用户只要并排。",
+  "cannot": "",
+  "unclear": [
+   "'2025 full-year' 是各家自己的 2025 财年还是日历年 2025,context 没法判定。三家财年末不同(Jun 30 / Sep 27 / Dec 31),{\"fy\":2025} 得到的是三个不同的十二个月。我按财年走,依据是 filings_read 说 'the same `period` asks each issuer the same question',但这句话没有说用户口中的 'full-year' 就该这样读。",
+   "如果要对齐到日历年,只能用 {\"ttm_to\":\"2025-12-31\"},但 AAPL 的季度末不是 12-31(财年末 Sep 27,季度末大概在 12 月下旬)。context 没说 ttm_to 给的日期不落在该发行人季度末时,是就近对齐、还是拒绝。",
+   "fy 整数的编号规则没有写:财年按结束所在年份编号,还是按开始年份?对 MSFT(Jul–Jun)和 AAPL(Oct–Sep)这会差一整年。只能靠返回行上 'the period it HAS' 事后核对。",
+   "DESK 每家只给了 10-K/10-Q 的 'latest' 日期,没有给 filings 往回覆盖到哪一年。MSFT 最新 10-K 是 2026-07-30(应是 FY2026),FY2025 是否在库里从 DESK 看不出来;system 说 DESK 写了 'how far each name's filings ... reach',实际只有最近一端。",
+   "line 枚举里同时有 net_income 和 net_income_including_noncontrolling,context 没说用户说的 'net income' 默认对哪一个,也没说三家各自 file 的是哪一个(要 list(what='fundamentals') 才知道)。我选 net_income。",
+   "回答格式有冲突:system 的 YOUR ANSWER 写 'Plain prose, to the user',用户明确要 'in a table'。context 没说能不能输出表格,也没说表格单元格里 '数值 [f_id]' 的写法是否算合规。我会按用户要求出表。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q05",
+  "question": "Add up AAPL's debt — long-term, current portion, short-term — then net the cash off so I have net debt.",
+  "reading": "用户要 AAPL 最新资产负债表日的三段债务(长期、一年内到期部分、短期)相加得总债务,再减现金得净债务。需要知道:AAPL 实际申报了哪几条债务行、它们在同一日期的值、现金及等价物,以及桌子自己的 total_debt / net_debt 口径与用户这三段相加是否一致。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "total_debt",
+     "subject": "AAPL",
+     "period": {
+      "at": "latest"
+     },
+     "why": "The user wants AAPL's debt added up; the desk's total debt measure says which filed debt lines it was built from and what it left out, so I know which components do not overlap."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿桌子口径的总债务,并从行上读出它由哪些申报行组成、漏了什么,用来判断用户说的三段是否重叠或不全。",
+    "basis": "handbook 第1章 2.THE MEASURES “total debt: the widest non-overlapping set of reported debt components”;3.HOW THEY READ “the row says what it was built from and what was left out at the date — say it with the figure”;metric schema 的 name enum 含 total_debt,period 允许 {\"at\":\"latest\"};DESK 里 AAPL measures_not_computable 为空。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "net_debt",
+     "subject": "AAPL",
+     "period": {
+      "at": "latest"
+     },
+     "why": "The user wants net debt; the registry's net debt (total debt less cash and equivalents) is the desk's own figure to set beside the sum I build from the three lines."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿桌子口径的净债务,作为与手工三段相加结果的对照。",
+    "basis": "handbook “net debt: total debt − cash and equivalents”;第4节 leverage and coverage “gross and net leverage side by side, with the cash that was netted”;metric schema name enum 含 net_debt。"
+   },
+   {
+    "tool": "filings_read",
+    "args": {
+     "ticker": "AAPL",
+     "line": null,
+     "period": {
+      "at": "latest"
+     },
+     "why": "The user named three debt components and cash; reading every balance at the latest date gives each filed debt line and cash as its own row at one date, so they can be added."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "一次取回最新日期的全部余额行,从中挑出长期债务(非流动)、一年内到期部分、短期(商业票据或短期借款)和现金及等价物各自的 f_ id。",
+    "basis": "filings_read 描述 “`line` omitted: every balance at one date”;line 的 type 含 null;period 的 {\"at\":...} 用于 balance,可为 \"latest\"。不确定的是返回是否每条余额各一行各带 id。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "add",
+     "inputs": [
+      "f_long_term_debt_noncurrent_AAPL",
+      "f_current_portion_long_term_debt_AAPL",
+      "f_commercial_paper_AAPL"
+     ],
+     "why": "The user asked for long-term, current portion and short-term debt added up; add is the one operation that sums these three rows."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "三个 id 来自第3步 filings_read 返回的余额行;选哪三条(尤其“短期”是 commercial_paper 还是 short_term_borrowings)取决于第1步 total_debt 行上写的组成和第3步实际有哪些行。",
+    "purpose": "按用户说的三段相加得到总债务。",
+    "basis": "calc 描述 “add/multiply take two or more”,inputs 为 f_ id;system 1 “Use tool arithmetic, not mental arithmetic”。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "subtract",
+     "inputs": [
+      "f_sum_three_debt_lines_AAPL",
+      "f_cash_and_equivalents_AAPL"
+     ],
+     "why": "The user wants the cash netted off the summed debt to get net debt; subtract takes exactly these two rows."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "f_sum_three_debt_lines_AAPL 来自第4步的结果;f_cash_and_equivalents_AAPL 来自第3步余额行里的 cash_and_equivalents。",
+    "purpose": "三段债务之和减现金及等价物,得用户口径的净债务。",
+    "basis": "calc 描述 “subtract/divide exactly two”;handbook “net debt: total debt − cash and equivalents”。被减数在前是我的猜测。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "subtract",
+     "inputs": [
+      "f_net_debt_measure_AAPL",
+      "f_net_debt_from_three_lines_AAPL"
+     ],
+     "why": "If the registry's net debt differs from the three-line sum less cash, the gap tells the user what the measure included that the three lines did not."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "0 或 1 次:两者相等就不做。",
+    "depends_on": "第2步 metric net_debt 的行 id 和第5步的结果 id。",
+    "purpose": "只有当桌子口径的净债务和手工结果不一致时才做,用来把差额写成一个有 id 的数。",
+    "basis": "handbook “the row says what it was built from and what was left out at the date — say it with the figure”;calc 描述 subtract。"
+   }
+  ],
+  "reference": "filings_read → calc → calc → metric",
+  "answer_shape": "平铺直叙的一段话。先给日期(行上写的资产负债表日和来源申报文件),然后逐项列三段债务各自的值加 [f_ id],三段之和 [id],现金及等价物 [id],净债务 [id]。接着一句对照:桌子自己的 total debt / net debt 是多少 [id],由哪些行组成、漏了什么(照行上说的写);一致就说一致,不一致就说差额 [id] 以及差在哪条行。最后注明口径:净掉的只是“现金及等价物”这一条申报行,不含其它投资类资产;不给“杠杆高或低”的判断(handbook POLICY:No measure carries a threshold)。可顺带提一句可以再给一年前同口径读数作对比。",
+  "cannot": "",
+  "unclear": [
+   "AAPL 实际申报了哪些债务行在 context 里没有:DESK 只给了 coverage.lines_ending_early: null,没有逐行清单。用户说的“short-term”在 line enum 里可能对应 short_term_borrowings、commercial_paper 或 debt_current_total,必须等 list(what='fundamentals') 或读数/拒绝返回后才知道。",
+   "债务行之间的包含关系没有任何地方定义:long_term_debt_total 与 long_term_debt_noncurrent + current_portion_long_term_debt 是否总分关系、debt_current_total 是否已包含一年内到期部分和商业票据。handbook 只说 “widest non-overlapping set” 和 “without double-counting a total and its parts”,没说哪条是总、哪条是分,所以用户的三段相加会不会重复或漏项只能靠 total_debt 行返回的文字判断。",
+   "total_debt 的 “reported debt components” 是否包含租赁类行(long_term_debt_and_leases_noncurrent、operating_lease_liability_*)没有说明,所以桌子口径和用户三段口径可能本来就不同,事前无法判断。",
+   "metric 行上说的“what it was built on”是只在行的文字里,还是组成部分各自作为带 f_ id 的行返回、可直接喂给 calc?如果是后者,第3步 filings_read 就多余了。",
+   "{\"at\":\"latest\"} 的解析粒度不清楚:是发行人最新资产负债表日,还是每条行各自最后一次申报的日期?metric 和 filings_read 解析出的日期是否保证相同?calc 会拒绝 “periods ... that do not combine”,所以这一点直接决定加减能不能做。DESK 里 latest_period_end 是 2026-06-27,而 10-Q latest 是 2026-08-01(看上去是申报日,但字段没标明是申报日还是期末日)。",
+   "filings_read 的 line 省略时返回形态不明:是每条余额各一行各带 id,还是一张合并的行?省略 key 和显式传 null 是否等价也只能从 schema 的 type 含 null 推测。",
+   "calc subtract 的 inputs 顺序没写(谁减谁);“or a list each combined with `by`” 这句的含义我看不懂——by 是一个 f_ id 吗?是 list 中每个都减去 by 吗?",
+   "“cash”该用 cash_and_equivalents 还是 cash_and_restricted_cash:handbook 的 net debt 定义用 “cash and equivalents”,但用户只说 “the cash”。另外 line enum 里没有有价证券/短期投资这类行,handbook 的 Absent 清单也没提这一点,我不确定是否该向用户说明净掉的现金不含这些。",
+   "两个口径不一致时该把哪个叫“net debt”不明确:POLICY 说 “never a nearby figure under the asked-for name”,但用户自己给了组成方法,registry 也有同名 measure。我打算两个都给并各自标明,但 context 没说该以谁为准。",
+   "每个工具必填的 why 要求写 “which line of your task this step serves”,但 context 里没有任何分行的 “task” 或任务清单,不知道 “line of your task” 指什么,只能按用户问题的某一部分来写。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q06",
+  "question": "How has NVDA's revenue grown over the last four quarters?",
+  "reading": "需要 NVDA 最近四个财季各自的营收(按申报值),以及每个季度的增长率:环比(对上一季)和同比(对去年同季)。\"over the last four quarters\" 也可以理解成最近十二个月合计对上一年同期,我按\"逐季的水平和增速\"来读,并在回答里说明这个读法。",
+  "steps": [
+   {
+    "tool": "filings_read",
+    "args": {
+     "ticker": "NVDA",
+     "line": "total_revenues",
+     "period": {
+      "quarter": "latest"
+     },
+     "last_n": 8,
+     "why": "Revenue growth over the last four quarters needs NVDA's quarterly revenue as filed; eight fiscal quarters give each of the last four both a prior quarter and a year-ago quarter, and filings_read is the verb for a filed line."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取 NVDA 最近 8 个财季的营收序列:最近 4 季是题目要的,再往前 4 季用来算这 4 季的同比,第 5 季用来算最早一季的环比。",
+    "basis": "filings_read 的 schema:last_n 描述 \"N fiscal quarters with {\\\"quarter\\\": \\\"latest\\\"}\";period 的 quarter pattern 允许 \"latest\";line 枚举里有 total_revenues。DESK 块 NVDA.coverage.lines_ending_early 说 revenue 止于 2022-01-30,continues_as total_revenues 到 2026-07-26,所以选仍在申报的那个标签。不确定点是该写 revenue 还是 total_revenues,以及财年 Q4 是否有单季值。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "qoq",
+     "inputs": [
+      "f_NVDA_total_revenues_last8q"
+     ],
+     "why": "Quarter-over-quarter growth of NVDA revenue for each of the last four quarters, computed by the desk's arithmetic over the series already read rather than in my head."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "第 1 步 filings_read 返回的季度营收序列的 id(占位 f_NVDA_total_revenues_last8q);如果返回的是每季一行,就把 8 个行 id 按时间顺序全部放进 inputs。",
+    "purpose": "对季度营收序列算环比增速,取最近四个季度的环比。",
+    "basis": "系统消息 1:\"Use tool arithmetic, not mental arithmetic\";calc 描述:\"yoy/qoq/pct/cagr/latest over ONE series\",输入必须是 f_ id。不确定的是一条序列是一个 id 还是每季一个 id。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "yoy",
+     "inputs": [
+      "f_NVDA_total_revenues_last8q"
+     ],
+     "why": "Year-over-year growth of NVDA revenue for each of the last four quarters against the same fiscal quarter a year earlier, to separate trend from seasonality, using tool arithmetic over the series already read."
+    },
+    "problems": [],
+    "certainty": "guess",
+    "repeat": "",
+    "depends_on": "第 1 步 filings_read 返回的季度营收序列的 id(同上占位符)。",
+    "purpose": "对同一序列算同比增速(每季对去年同季),取最近四个季度的同比。",
+    "basis": "calc 描述:\"yoy/qoq/pct/cagr/latest over ONE series\"。context 没说 yoy 作用在季度序列上是\"对 4 期之前\"还是别的,也没说序列里有缺口(财年 Q4)时怎么处理,所以标 guess。"
+   }
+  ],
+  "reference": "filings_read → calc",
+  "answer_shape": "纯文字,一段到两段。先逐季列出最近四个财季的营收(每个数字按行上显示的写法,后面跟该行 id,并写明财季截止日期和来源申报文件),然后每季给出环比增速和同比增速(各带 calc 结果行的 id)。接着一句话说形状:增速是在加快、放缓还是持平,最近一季相对四季前的变化是多少(即最近一季的同比)。说明营收读的是 total_revenues 这条线(与旧 revenue 标签是同一条线,DESK 块如此标注)。如果某一季(尤其财年 Q4)在序列里是缺口,就照实说\"该季未单独申报,桌子不补\",不自己用年报减前三季去推。不做预测,不给\"好/坏\"的门槛判断。",
+  "cannot": "",
+  "unclear": [
+   "filings_read 的 line 参数:DESK 块说 NVDA 的 revenue 止于 2022-01-30、continues_as total_revenues、read_as_one_line: true,但没说调用时该写哪个名字——写 \"revenue\" 会不会自动接到 total_revenues 上,还是会因为\"止于 2022\"被拒;写 \"total_revenues\" 是否就是那条被合并的线。我选了 total_revenues,是猜的。",
+   "last_n 返回的\"ONE series\"是一行一个 f_ id,还是每个季度一行各有 id,context 没说。这直接决定 calc 的 inputs 怎么写(一个 id 还是 8 个 id)。",
+   "calc 的 yoy / qoq / pct 的精确语义没有定义:yoy 作用在季度序列上是不是对 4 期之前的同季;qoq 返回的是每一期一个增速(一条新序列)还是只返回最新一期;pct 是首尾变化率还是别的。也没说要算\"最近四季各自的增速\"需要给多少期的序列。",
+   "财年第四季度:NVDA 的 Q4 只在 10-K 里以全年数出现,手册说 \"a quarter the issuer did not file stays a gap in the series, never closed over\"。context 没说 {\"quarter\":\"latest\"}+last_n 的序列里 Q4 是缺口,还是桌子已用\"全年减前九个月\"得出;如果是缺口,用 {\"months\":3,\"end\":\"…\"} 能不能取到也不清楚,而缺口会让 qoq/yoy 怎么算也没说。",
+   "财季标签约定没说明:{\"quarter\":\"2026Q2\"} 里的年份是发行人自己的财年编号(NVDA 截至 2026-07-26 的季度是它自称的 fiscal 2027 Q2)还是日历年。我用 \"latest\" 绕开了,但如果要点名某一季就得猜。",
+   "手册第 1 章的 THE QUESTIONS 里没有\"营收增长\"这一类问题(只在 earnings quality 里提到应收等\"是否比 revenue 增长更快\"),metric 枚举里也没有营收增长的度量,所以没有对应的 compare/close 指引,增长只能靠 filings_read + calc 自己拼;这是我的推断,context 没有明说应该这么做。",
+   "如果用户的意思是\"最近十二个月合计对上一年\",需要 {\"ttm_to\": 日期} 两次;但 context 没说 ttm_to 的日期必须是确切的期末日,还是会就近取,而上一年同期的确切期末日 DESK 块没给(只给了 latest_period_end 2026-07-26)。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q07",
+  "question": "Search the web for the latest news on LLY from the past week and tell me what happened.",
+  "reading": "用户要 LLY 过去一周的网络新闻并说明发生了什么。按手册 Chapter 1 的 recent events, 除了网络条目本身(出处、日期), 还要知道 LLY 是否被持有以及仓位多大, 才能说每条新闻牵涉多少。",
+  "steps": [
+   {
+    "tool": "web_search",
+    "args": {
+     "ticker": "LLY",
+     "query": "Eli Lilly latest news",
+     "days": 7,
+     "why": "The user asks what happened to LLY in the past week; web_search is the verb for recent web items about one issuer, limited to the last 7 days."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "1 次。若返回的条目笼统、没有具体事件, 可能换一个更具体的 query 再搜 1–2 次; 仍无具体内容就按手册报告“nothing found”。",
+    "depends_on": "",
+    "purpose": "取 LLY 最近 7 天的网络条目, 每条带出处 id、发布方和日期, 这是回答“发生了什么”的主体证据。",
+    "basis": "SYSTEM 1 的 WHAT YOU CAN DO: “what the filings cannot hold: web_search”; web_search schema 必填 ticker/query/why, days 为 1–365 的整数; DESK 块 subjects.tickers 是 [\"LLY\"] 且 status 为 ready。query 的措辞是我自己拟的, schema 只要求不少于 3 个字符。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.position",
+     "subject": "LLY",
+     "why": "Recent events are set against the position's weight; book.position gives LLY's weight, market value and its issuer-concentration check in every book that holds it."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "不依赖 step 1 的返回, 可与 step 1 并行发出。",
+    "purpose": "取 LLY 在账本里的权重、市值和发行人集中度检查, 用来说明每条新闻牵涉的仓位有多大。",
+    "basis": "手册 Chapter 1 §1 recent events: “whether the name is held, and the size of the position an item touches. Measured by: the name's place in the book”; §4: “each item against the position's weight: what is at stake”; metric 的 params 说明: “book.position — book: a port_… or run_… id; omitted = every book that holds the name”; DESK 块 LLY.held_in 为 port_001 (as_of 2026-09-11)。"
+   }
+  ],
+  "reference": "web_search",
+  "answer_shape": "纯散文, 对用户直接说。(1) 先交代搜索范围: web_search、过去 7 天, 以及返回条目实际覆盖的日期。(2) 按重要性逐条写发生了什么, 每条带发布方、日期和该条的出处 id, 关键句引用原文, 不改写成自己的判断。(3) 每条对照 LLY 在 port_001 的仓位: 权重和市值按行原样写并在后面用方括号带行 id, 说明这条牵涉多大仓位; 不牵涉持仓的条目明说不牵涉。(4) 如果搜索没有返回具体事件, 就如实说没找到, 不写成泛泛的头条。(5) 不给价格走向的看法, 不做预测; 顺带说明桌上最新的申报文件是 2026-08-07 的 10-Q, 网络条目是申报文件之外的补充。",
+  "cannot": "",
+  "unclear": [
+   "context 里没有“今天”的日期。DESK 只给出 LLY 价格到 2026-09-11、持仓 as_of 2026-09-11; “过去一周”相对哪一天、web_search 的 days 从哪一天往回数, 都没有说明。",
+   "web_search 的 days 参数在 schema 里没有 description: 只能猜它是“往回看多少天”; 也不知道传 null 或省略时的默认范围。",
+   "web_search 的 query 该怎么写没有说明: ticker 已经限定了发行人, query 是否还要带公司名、“latest news”这种泛查询能否得到按日期排序的最新条目, 都不清楚。",
+   "web_search 没有条数参数(filings_search 有 k), 一次返回多少条、按什么排序都不知道。",
+   "网络条目的引用格式不清楚: SYSTEM 1 只规定了数字的写法(值加方括号里的 f_ 行 id); web_search 说“each a source quotable under its id”, 但这个 id 是不是 f_ 开头、非数字的新闻条目在答案里怎么引用, 没有说。",
+   "手册说 recent events 包括“recent filing items and web items”, 但申报文本工具的 form 枚举只有 10-K/10-Q 及其修订, 没有 8-K; 一周内的申报类事件(如 8-K)桌上能不能看到没有说明。我按用户原话只搜网络。",
+   "手册“whether it is already in the price”要看事件前后窗口的回报, 但 price.window_return 的 window 最短是 1m, 没有一周或自定义事件窗口; 如果想核对某条新闻是否已反映在价格里, 不清楚该怎么取一周的回报。本题没有用到这一步。",
+   "book.position 返回的是一行还是多行(weight、market value、contribution、检查各自有行 id)没有说明, 影响答案里引用哪个 id。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q08",
+  "question": "If I sold half of my largest position, what would the book look like and which checks would change?",
+  "reading": "用户要一个假设交易: 把 port_001 里权重最大的持仓卖掉一半, 看卖后账本的样子(各名字权重、行业权重、市值)以及哪些 mandate check 相对卖前变了。需要先确定最大持仓是谁(及亚军), 取卖前的 check, 跑 scenario, 再读卖后账本逐项对比。",
+  "steps": [
+   {
+    "tool": "list",
+    "args": {
+     "what": "book",
+     "subject": "port_001",
+     "why": "Hypothetical trade: see which tables, rows and columns port_001 holds before reading the before-book."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "确认表、行标签和(希望有)列名。",
+    "basis": "list description: \"a book's holdings, runs, tables and rows\"; what 枚举含 book。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "issuer_exposures",
+     "column": "weight",
+     "why": "Find the largest position: read every holding's weight in the latest completed run, which is also the before-book's weights."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 1 显示的列名",
+    "purpose": "卖前各持仓权重, 既用于找最大持仓, 也作为卖前基线。",
+    "basis": "book_read: \"one `column` for every row\", \"A port_… id reads its latest completed run\"; 列名 weight 由手册 \"issuer exposures: weight\" 推得。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_weight_of_AAPL",
+      "f_weight_of_MSFT",
+      "f_weight_of_NVDA",
+      "f_weight_of_AMZN",
+      "f_weight_of_GOOGL",
+      "f_weight_of_JPM",
+      "f_weight_of_XOM",
+      "f_weight_of_LLY",
+      "f_weight_of_TLT",
+      "f_weight_of_HYG"
+     ],
+     "direction": "highest",
+     "why": "Name the largest position and the runner-up, since the trade is chosen on weight."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 2 的 10 个 f_ id",
+    "purpose": "用工具确定最大持仓和亚军。",
+    "basis": "calc: \"rank orders two or more (`direction`)\"; 手册 a hypothetical trade: \"the candidate against the runner-up on the measure the choice rests on\"。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.position",
+     "subject": "NVDA",
+     "params": {
+      "book": "port_001"
+     },
+     "why": "Before the trade: the largest name's market value and where its own issuer-weight check stands against its tiers."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 3 得出的最大 ticker(NVDA 为示例)",
+    "purpose": "最大持仓卖前的市值、权重、它自己的 issuer check 与档位。",
+    "basis": "手册 measures: \"the name's place in the book ... its weight, market value and contribution, and the issuer-concentration check on it with its tiers\"; params: \"book.position — book: a port_… or run_… id\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "limit_checks",
+     "why": "Before-book's checks: every mandate check's reading and tiers, to compare against the after-book."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "卖前全部 20 个 check 的读数、档位和所处位置。",
+    "basis": "book_read: \"or the whole table\", \"A check's figures say where the check stands\"; table 枚举含 limit_checks; 手册: \"the after-book's checks against the before-book's\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "sector_exposures",
+     "why": "Before-book's sector weights, to set against the after-book."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "卖前行业权重基线。",
+    "basis": "table 枚举含 sector_exposures; 整表读法见 book_read description。"
+   },
+   {
+    "tool": "scenario",
+    "args": {
+     "book": "port_001",
+     "trades": [
+      {
+       "sell": "NVDA",
+       "fraction": 0.5
+      }
+     ],
+     "why": "The user's trade: sell half of the largest position and re-run every concentration and exposure check."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "步骤 3 得出的最大 ticker(NVDA 为示例)",
+    "purpose": "生成卖掉一半后的新账本(calc_ id); funding 省略, 即卖出所得离开账本。",
+    "basis": "scenario schema: sell + fraction (\"share of the position sold\", 0<fraction≤1); description: \"omitted or `external` ... a sale's proceeds leave it\", \"a NEW book, returned by its id (`made`)\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "calc_after_half_sale",
+     "table": "issuer_exposures",
+     "why": "What the book looks like after the sale: every holding's weight and market value in the after-book."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 7 返回的 made (calc_ id)",
+    "purpose": "卖后各持仓的权重和市值, 包括最大持仓落在多少。",
+    "basis": "book_read: \"a scenario's calc_… id reads that book\"; scenario: \"weights, sector weights, market value ... re-run\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "calc_after_half_sale",
+     "table": "sector_exposures",
+     "why": "What the book looks like after the sale: sector weights in the after-book."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 7 的 calc_ id",
+    "purpose": "卖后行业权重。",
+    "basis": "同上; scenario 说 sector weights 被重算。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "calc_after_half_sale",
+     "table": "limit_checks",
+     "why": "Which checks change: every check re-run on the after-book, to set against the before-book's."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 7 的 calc_ id",
+    "purpose": "卖后全部 check 的读数和所处位置, 以及哪些被标为未重测。",
+    "basis": "scenario: \"every concentration and exposure check re-run\"; 手册 Close: \"what else the trade touches, from the after-book's checks\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "calc_after_half_sale",
+     "table": "exposure_metrics",
+     "why": "The after-book's own figures such as its market value, to say how much smaller the book is once the proceeds leave."
+    },
+    "problems": [],
+    "certainty": "guess",
+    "repeat": "2 次: calc_ 账本一次, port_001 一次",
+    "depends_on": "步骤 7 的 calc_ id",
+    "purpose": "卖后账本的总市值等账本级数字(卖前同表也读一次)。",
+    "basis": "table 枚举含 exposure_metrics; 手册 WHAT THE DESK HOLDS: \"the run's own figures\"; 但这张表里有什么 context 没说, 账本总市值在不在这里是猜的。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "scale",
+     "inputs": [
+      "f_market_value_of_NVDA"
+     ],
+     "factor": 0.5,
+     "source": "user_assumption",
+     "why": "Dollars sold: half of the largest position's market value, the half being the user's own figure."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "步骤 4 返回的市值行 f_ id",
+    "purpose": "卖出的美元金额。",
+    "basis": "calc: \"scale takes one and `factor`\", \"A typed-in factor or level says whose it is (`source`)\"; 手册 Close: \"the dollars to sell and the weight it lands at\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "subtract",
+     "inputs": [
+      "f_after_check_issuer_weight_NVDA",
+      "f_before_check_issuer_weight_NVDA"
+     ],
+     "why": "How far a check's reading moved between the before-book and the after-book."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "最多 18 次: 10 个 Issuer weight、7 个 Sector weight、Gross exposure 各一次(One-day loss 和 Volatility 不重测则不算); 若调用数吃紧, 只对站位变了或最接近档位的几项做",
+    "depends_on": "步骤 5 和步骤 10 的 check 行 f_ id",
+    "purpose": "逐个 check 算卖后减卖前的变化, 分出收紧的和放松的。",
+    "basis": "calc: \"subtract/divide exactly two\"; 手册: \"what tightens and what loosens against the book before\", \"two books' weights are compared by difference, never summed\"。"
+   }
+  ],
+  "reference": "book_read → calc → scenario → book_read → book_read → book_read",
+  "answer_shape": "纯文字, 数字带 [f_…]。先一句说明交易: 最大持仓是哪只(相对亚军的差距), 卖一半即卖出多少美元, 卖出所得离开账本。再说卖后账本的样子: 该名字落在多少权重, 账本总市值变成多少, 其余名字权重因分母变小而上升, 行业权重如何变(它所在行业下降, 其他上升)。然后分三组讲 check: 放松的(该名字的 Issuer weight、其行业的 Sector weight, 卖前卖后读数和到档位的余量); 收紧的(其他名字和行业的 check, 点出卖后最接近档位的那一项, 以及是否有哪一项跨档); 没有重测的(Volatility, 30 sessions 和 One-day loss 说成未测, 不说成没变)。全程只摆读数与档位, 不替用户下\"该不该卖\"的结论。",
+  "cannot": "整体能做, 但有两处桌子给不了。(1) 卖后的波动率和单日损失两项 check 无法重测: scenario 的说明是 \"It re-prices and re-checks; it does not re-fit betas, volatility or P&L\", 手册是 \"it does not re-fit betas, volatility or profit and loss, which are stated unmeasured\", 且 \"a check that did not run because its input is withheld is listed as not run, never as clear\"。我会对用户说: \"Volatility, 30 sessions\" 和 \"One-day loss\" 在这笔假设交易后没有重新测量, 是未测, 不是没变也不是通过。(2) 无法呈现卖出所得作为现金留在账本里的样子: \"omitted or `external`, from outside the book — a sale's proceeds leave it\"。我会说明这里的卖后账本是所得离开后的账本, 所以总市值变小、其余权重随之上升。",
+  "unclear": [
+   "卖出所得的去向: scenario 只有 external(\"a sale's proceeds leave it\")和 proceeds(给本次买入用)两种, 账本里没有现金这一项; 用户可能以为钱留在账本里。桌子似乎没法表达\"卖了留现金\", 我只能按所得离开账本来算并明说, 这会让其余所有权重机械上升。",
+   "scenario 的返回形状不清楚: 只说返回新账本的 id (`made`), 没说是否同时把卖后的权重/check 行或前后对比直接返回; 如果已经返回, 步骤 8–10 的 book_read 就多余。",
+   "calc_ 账本里有哪些表不清楚: limit_checks、sector_exposures、exposure_metrics 是否都在; 枚举里的 `trade` 和 `count` 两张表 context 没有任何解释(trade 可能就是这笔交易的明细, 我没敢依赖)。",
+   "不重测的 check 在卖后账本里怎么呈现不清楚: scenario 说 \"does not re-fit betas, volatility or P&L\", 手册说 \"stated unmeasured\"; \"Volatility, 30 sessions\" 和 \"One-day loss\" 在 calc_ 的 limit_checks 里是缺行、标 not run、还是沿用旧值, 没说。",
+   "\"Gross exposure\" 这个 check 量的是什么没有定义, 所以不知道卖出且所得离开账本后它该变还是不变, 也不知道它算不算 \"exposure check\" 而被重跑。",
+   "limit_checks 的列名和内容未知(读数、warning 档、breach 档、状态?); \"which checks would change\" 是指读数变了还是站位(未触发→warning→breach)变了, 用户没说, context 也没给状态列的名字。",
+   "book_read 的 column 没有枚举, list 也没承诺列出列名; weight、market value 的确切列名是从手册措辞猜的。",
+   "一行是一个数字还是多列记录不清楚(\"A row carries its id ... the value\" 对 \"one `row` across its columns\"); 整表读回来的每个数字是否各有自己的 f_ id, 决定了我能不能把它们喂给 calc。",
+   "逐项前后对比的成本: calc 的 subtract 是 \"exactly two, or a list each combined with `by`\", `by` 没有 description, 看起来是一组各减同一个数, 做不了成对相减; 20 个 check 要十几次调用, 而 context 没说一轮有没有调用次数上限。",
+   "calc 对 port_ 账本和 calc_ 账本的数字相减会不会以 \"books that do not combine\" 拒绝不确定; 手册只说两个账本的权重 \"compared by difference\"。subtract 的操作数顺序也没写。",
+   "calc 的 rank/top 的返回形式不清楚(是否保留原 id、并列时如何处理), 影响我如何引用\"最大\"与\"亚军\"。",
+   "\"最大持仓\"按权重还是按市值: 同一账本内两者排序相同, 我按权重; 若最大的是 TLT/HYG(不在 issuers_on_desk), book.position 对它是否可用 context 没说。",
+   "context 没有当前日期, 卖前基线只能是 2026-09-11 的最新完成 run; 是否过时无从判断。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q09",
+  "question": "How many days would it take to sell each of my holdings if I traded 20% of its average daily volume?",
+  "reading": "用户要 port_001 每个持仓按其日均成交量的 20% 卖出需要多少天。按手册 liquidity: 天数 = 持仓市值 ÷ (参与率 × 日均成交金额), 所以要每个名字的美元 ADV、持仓市值, 参与率 20% 是用户给的。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "price.adv",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMZN",
+      "GOOGL",
+      "JPM",
+      "XOM",
+      "LLY",
+      "TLT",
+      "HYG"
+     ],
+     "params": {
+      "window_days": 20
+     },
+     "why": "Days to liquidate each holding needs the dollars a day each name trades: average daily volume over 20 sessions for all ten holdings, one row each."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿 10 个持仓各自的日均成交量(股数和美元), 窗口 20 个交易日。",
+    "basis": "metric.name 枚举含 price.adv; params 描述 \"price.adv — window_days = 20 | 30 | 60: sessions in the window (default 20)\"; subject 可为列表 \"one row each, or each one's own refusal\"; 持仓清单来自 DESK 块 holdings; 手册 liquidity \"Measured by: average daily volume\"。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "issuer_exposures",
+     "why": "Days to liquidate is the position's market value over the dollars tradable a day: read every holding's market value and weight on the latest completed run."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "整表读每个持仓的市值和权重。不写 column 是因为不知道市值列的确切列名。",
+    "basis": "book_read 描述 \"A port_… id reads its latest completed run\" 和 \"or the whole table\"; 手册 \"the name's place in the book\" 说该表有 weight、market value; COMPARE \"days against the position's weight\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "scale",
+     "inputs": [
+      "f_adv_dollars_of_AAPL"
+     ],
+     "factor": 0.2,
+     "source": "user_assumption",
+     "why": "The user trades 20% of average daily volume: scale AAPL's dollar ADV by the user's participation rate to get the dollars sellable a day."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "10 次, 每个持仓一次(被拒的名字跳过): scale 一次只接受一个输入。",
+    "depends_on": "inputs 是第 1 步 price.adv 行里美元 ADV 的 f_ id。",
+    "purpose": "参与率 × 美元 ADV = 每天可卖出的金额。",
+    "basis": "calc 描述 \"scale takes one and `factor`\" 和 \"A typed-in factor or level says whose it is (`source`)\"; source 枚举含 user_assumption; 手册 \"the participation rate is the reader's\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "divide",
+     "inputs": [
+      "f_market_value_of_AAPL",
+      "f_sellable_per_day_of_AAPL"
+     ],
+     "why": "Days to liquidate AAPL: its position's market value over the participation rate times its dollar ADV, as the handbook defines days."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "10 次, 每个持仓一次: divide 的列表形式只能共用一个 `by`, 而每个名字的分母不同, 没法一次算完。",
+    "depends_on": "第一个输入是第 2 步该名字市值格的 f_ id, 第二个是第 3 步的结果 id。",
+    "purpose": "持仓市值 ÷ 每日可卖金额 = 清仓天数。",
+    "basis": "calc 描述 \"subtract/divide exactly two\"; 手册 COMPARE \"days to liquidate: the position's market value over the participation rate times the dollars a day the name trades — market value over the daily dollars alone is not days\"。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_days_of_AAPL",
+      "f_days_of_MSFT",
+      "f_days_of_NVDA",
+      "f_days_of_AMZN",
+      "f_days_of_GOOGL",
+      "f_days_of_JPM",
+      "f_days_of_XOM",
+      "f_days_of_LLY",
+      "f_days_of_TLT",
+      "f_days_of_HYG"
+     ],
+     "direction": "highest",
+     "why": "Order the holdings by days to liquidate, longest first, so the names that would hurt come first."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "inputs 是第 4 步各次 divide 的结果 id; 未测出的名字不进排序。",
+    "purpose": "按天数从长到短排序。",
+    "basis": "calc 描述 \"rank orders two or more (`direction`)\"; 手册 COMPARE \"names ordered by days, longest first\"。"
+   }
+  ],
+  "reference": "book_read → metric → calc×10 → calc×10 → calc",
+  "answer_shape": "白话段落, 每个数字照行上的写法并带 [f_…]。\n1. 先说口径: 天数 = 持仓市值 ÷ (20% × 日均成交金额); 20% 是用户给的参与率, ADV 取最近 20 个交易日, 市值取 latest run(2026-09-11)。天数是交易日。\n2. 逐个列出 10 个持仓, 最长在前: 天数 [id], 旁边给市值 [id]、美元 ADV [id]、权重 [id]。\n3. 把天数和权重放一起读: 权重大但天数少是\"规模\", 不是流动性差; 指出问题在某一个名字还是整个账本。\n4. 被拒的名字(如 TLT/HYG 无成交量或不足 20 个交易日)写\"未测出\", 不写成流动性好; 并说明 ETF 的天数只看 ETF 自身成交, 不穿透到底层债券。\n5. 不给\"多少天算太久\"的阈值判断。",
+  "cannot": "桌子能做这件事(手册 liquidity 一节原话 \"days to liquidate each name at a stated share of its daily volume\")。两处边界我会对用户明说。一是 \"an instrument's underlying liquidity is not looked through; a name with fewer sessions of volume than the window asks for is unmeasured, not liquid\": TLT/HYG 的天数只反映 ETF 自身成交量, 成交量不足或被拒的名字报\"未测出\"。二是 \"intraday prices and an order book are not held\": 这个天数是按日均成交量的粗算, 不含冲击成本或盘口深度。",
+  "unclear": [
+   "price.adv 一行同时给股数和美元两个量, 但 context 说 \"A row carries its id\": 美元 ADV 有没有自己单独的 f_ id 不清楚。若一行只有一个 id, calc 引用它时取哪个量不确定。",
+   "TLT、HYG 既是持仓又是因子工具。prices_read 说 \"Refused: volume for a name followed only as a factor instrument\", 手册又说 held names 和 factor instruments 都有 volume。price.adv 对这两个会不会被拒不确定。",
+   "issuer_exposures 的列名 context 里没有(手册只在行文里说 weight、market value、contribution), list 也只说列 \"tables and rows\"。所以整表读, 没法只取市值一列。",
+   "calc 做 美元 ÷ (美元/交易日) 时, 结果会不会被标成\"天\", 还是因 \"units … that do not combine\" 被拒, context 没说。",
+   "时点不一致: 市值是 2026-09-11 那次 run 的, ADV 是\"最近 20 个交易日\"。手册说价格统计 \"cannot be asked as of a past date\", 而价格数据到哪天 context 没给(DESK 的 \"issuers\": {} 是空的)。calc 可能因 \"periods … that do not combine\" 拒绝。",
+   "ADV 窗口用户没指定(20/30/60 可选)。我取默认 20。手册建议 \"the same name over a longer span of sessions, when the recent one may be unusual\", 但没说怎么判断\"异常\", 所以没加 60 日对照。",
+   "手册 Close 要求给 \"what the book could clear in a day\", 但没定义算法: 是各名字 20%×ADV 之和, 还是对每个名字取 min(持仓市值, 20%×ADV) 再求和。用户没问, 我没算。",
+   "calc 没有成对运算: divide 的列表形式只能共用一个 `by`, scale 只接受一个输入, 所以 10 个名字要 20 次 calc。不确定有没有更省的写法; 也不确定桌子有没有调用次数上限。",
+   "账本是否有持股数量的列不知道。若有, 也可以用 股数 ÷ (20% × 股数 ADV), 与市值口径可能略有出入; 我按手册的市值口径。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q10",
+  "question": "Has MSFT become more volatile lately, or is it just the market?",
+  "reading": "用户想知道 MSFT 的波动率最近是否上升, 以及这个上升是 MSFT 自己的还是市场整体的。按手册 Chapter 2 的 'whether it has become more volatile', 需要 MSFT 和指数各自的短窗口与长窗口年化波动率, 以及各自的短/长比值。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "price.volatility",
+     "subject": [
+      "MSFT",
+      "SPY"
+     ],
+     "params": {
+      "window_days": 30
+     },
+     "why": "Whether it has become more volatile: the short-window annualised volatility for the name and for the index, the window that reacts."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取 MSFT 和 SPY 最近 30 个交易日的年化波动率(短窗口, 反映“最近”)。",
+    "basis": "手册 Ch2 §1 'whether it has become more volatile: volatility over a short window and over a long one, for a name and for the index. Measured by: annualised volatility'; metric 的 params 说明 'price.volatility — window_days = 21 | 30 | 63 | 126 | 252 ... (default 30)'; subject 可为列表 '(one row each, or each one's own refusal)'; 手册 'SPY is the S&P 500 ETF, standing for the broad US equity market'。写 likely 是因为 desk 块没有列出 SPY 的价格覆盖, 只有手册一句 'daily closes, adjusted closes and volume for the held names and the factor instruments'。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "price.volatility",
+     "subject": [
+      "MSFT",
+      "SPY"
+     ],
+     "params": {
+      "window_days": 252
+     },
+     "why": "Whether it has become more volatile: the long-window annualised volatility for the name and for the index, the baseline the short window is set against."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取 MSFT 和 SPY 252 个交易日的年化波动率(长窗口, 作基线)。",
+    "basis": "同上; 手册 Ch2 §2 'a short window reacts, a long one is the baseline'; desk 块 MSFT prices from 2023-09-11 to 2026-09-11, 足够 252 个交易日。SPY 的历史长度未在 desk 块给出。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "divide",
+     "inputs": [
+      "f_vol_MSFT_30d",
+      "f_vol_MSFT_252d"
+     ],
+     "why": "Whether it has become more volatile: the ratio of the short window to the long says whether volatility has risen, by tool arithmetic."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次: MSFT 一次, SPY 一次。",
+    "depends_on": "分子来自第 1 步该名字的 30 日波动率行, 分母来自第 2 步同一名字的 252 日波动率行。",
+    "purpose": "算短窗口波动率 ÷ 长窗口波动率, 比值说明波动率是否上升; MSFT 和 SPY 各一个比值, 再并排比较。",
+    "basis": "手册 Ch2 §4 'the short window against the long ... so their ratio says whether volatility has risen; the name's rise against the index's over the same windows: market-wide or specific'; calc 'subtract/divide exactly two'; role 段 'Use tool arithmetic, not mental arithmetic'。calc 会拒绝 'periods ... that do not combine', 30 日和 252 日两个窗口相除是否算可组合没有明说。"
+   }
+  ],
+  "reference": "metric → metric → calc → calc",
+  "answer_shape": "纯散文, 数字照行上的写法并跟 [f_…]。先给 MSFT: 30 日年化波动率、252 日年化波动率、两者比值, 并说明窗口长度和截止的最新交易日。再给 SPY 同样三个数。然后按手册的 close 回答: 谁的波动率升了, 指数是否跟着升 —— 两个比值都高于 1 且相近是市场整体; MSFT 的比值明显高于 SPY 的是 MSFT 自身; 两个都没升就照实说没升。说明 SPY 在这里代表“市场”, 窗口是我选的(30 对 252)。不给阈值式结论, 把数字摆出来让读者判断幅度; 不预测之后的波动。如果 SPY 被拒绝, 照拒绝行的原因和出路说, 并说明“是否只是市场”这一半暂时答不了。",
+  "cannot": "",
+  "unclear": [
+   "短窗口和长窗口具体取哪两个: 手册只说 'a short window and a long one', price.volatility 可选 21/30/63/126/252, 没规定“lately”对应哪个、基线用哪个。我选了 30(默认值)对 252, 这是我自己的判断。",
+   "“the index”是哪个 ticker: 手册 Ch2 一直说 'the index', 但只在因子工具列表里说 SPY 代表 broad US equity market, 没有直接说 the index = SPY。MSFT 是科技股, 用 QQQ 也说得通; 用户说的 'the market' 我按 SPY 处理。",
+   "SPY 能否作为 price.volatility 的 subject: desk 块的 subjects 和 issuers 里只有 MSFT, 没有 SPY 的价格跨度; issuers_on_desk 也不含 SPY。只有手册一句“因子工具有日线价格”支持, 没有任何地方确认 SPY 的历史长度够 252 个交易日。",
+   "一次 metric 调用传两个 subject 加同一组 params 时, 返回是否每个名字一行、各有自己的 f_ id: 描述说 'one row each', 我按这个理解, 但一行里除了波动率还带什么(窗口内的 session 数、截止日期)没说。",
+   "calc divide 对两个不同窗口的波动率行是否接受: calc 拒绝 'periods ... that do not combine', 而手册的方法恰恰要求短窗口除以长窗口。两处读起来有冲突的可能。",
+   "手册要求用比值判断“是否上升”, 但 POLICY 又说 'No measure carries a threshold ... the reading belongs to the reader'。用户问的是“是/否”型问题, 比值高出多少才能说“变得更波动”, context 没有给, 我只能摆数字、定性描述。",
+   "'a price statistic is measured over its latest window: it cannot be asked as of a past date' —— 所以没法直接比“现在的 30 日波动率”和“一个月前的 30 日波动率”; 只能用短对长这个间接比法, 而 252 日窗口本身包含最近 30 日, 比值会被稀释。手册没提这点怎么对用户说明。",
+   "desk 块显示 MSFT 被 port_001 持有。Ch2 这个问题的方法没有要求带出持仓权重, Ch3 的 market risk 却有类似的“book 对 index”的比较。不确定这道题是否应该顺带说持仓, 我没有加。",
+   "每个工具必填的 why 字段要求写 'which line of your task this step serves', 但 context 里没有带条目的 task, 不清楚指什么; 我按“服务于手册哪个问题”来写。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q11",
+  "question": "Is JPM more levered than it was a year ago?",
+  "reading": "用户问 JPM 的杠杆是否比一年前高。JPM 是金融发行人,桌子以债务和利息为基础的杠杆度量对它一律拒绝,所以要知道的是:桌子对银行还能给出哪种杠杆读数(资产/权益的 equity multiplier),它在最新日期和一年前各是多少、变化由资产还是权益驱动,以及 filing 自己陈述的监管杠杆率原话。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "equity_multiplier",
+     "subject": "JPM",
+     "period": {
+      "quarter": "latest"
+     },
+     "last_n": 5,
+     "why": "The question is whether JPM is more levered than a year ago; debt-based leverage is not computable for a financial issuer, so I read assets over equity for the last five fiscal quarters, which spans the latest reading and the one a year earlier."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿到 JPM 最近 5 个财季末的 equity multiplier(总资产 ÷ 股东权益)序列,两端分别是最新(2026-06-30)和一年前(2025-06-30)。",
+    "basis": "DESK 的 JPM.coverage.measures_not_computable 列了 total_debt、net_debt、debt_to_ebitda、ebit_interest_coverage 等,但没有列 equity_multiplier;handbook 第 1 章 MEASURES 'equity multiplier: total assets ÷ stockholders' equity' 没有 'Not for a financial issuer';metric 的 schema: period 与 filings_read 相同,last_n = 'a measure over its last N fiscal years or quarters, as one series'。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "yoy",
+     "inputs": [
+      "f_equity_multiplier_JPM_series"
+     ],
+     "why": "The question is the change against a year ago; yoy over the one series gives the year-on-year change in the equity multiplier by tool arithmetic."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "第 1 步返回的 equity multiplier 序列的行 id(占位 f_equity_multiplier_JPM_series)。如果序列是每个点一个 id 而不是整条一个 id,就改成对首尾两个 id 做 subtract。",
+    "purpose": "用工具算 equity multiplier 的同比变化,不心算。",
+    "basis": "calc 的 description:'yoy/qoq/pct/cagr/latest over ONE series';system message 1:'Use tool arithmetic, not mental arithmetic'。"
+   },
+   {
+    "tool": "filings_read",
+    "args": {
+     "ticker": "JPM",
+     "line": "total_assets",
+     "period": {
+      "at": "latest"
+     },
+     "last_n": 5,
+     "why": "To say why the equity multiplier moved I need its two parts over the same dates; this reads the balance's last five filed dates as one series."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次:line 分别为 total_assets 和 stockholders_equity。",
+    "depends_on": "",
+    "purpose": "取 equity multiplier 的两个组成项(总资产、股东权益)在同样日期上的序列,用来判断变化来自资产扩张还是权益变动。",
+    "basis": "filings_read 的 last_n 描述:'a balance's last N filed dates with {\"at\": \"latest\"}';line 枚举含 total_assets、stockholders_equity;handbook 第 1 章 COMPARE AND CLOSE 的 leverage 一条:'against the issuer's own prior periods first'。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "yoy",
+     "inputs": [
+      "f_total_assets_JPM_series"
+     ],
+     "why": "To tell whether the change in leverage came from assets or from equity, I need each one's year-on-year change, computed by the tool."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "2 次:总资产序列、股东权益序列各一次。",
+    "depends_on": "第 3 步两次调用返回的序列 id(占位 f_total_assets_JPM_series、f_stockholders_equity_JPM_series)。",
+    "purpose": "分别算总资产和股东权益的同比变化,哪个涨得快就是 multiplier 变动的原因。",
+    "basis": "calc 的 description:'yoy ... over ONE series';handbook 的 profitability compare:'the one that moved is the reason'(同样的分解思路)。"
+   },
+   {
+    "tool": "filings_search",
+    "args": {
+     "ticker": "JPM",
+     "query": "Tier 1 leverage ratio supplementary leverage ratio",
+     "form": "10-Q",
+     "filed_after": "2026-07-01",
+     "k": 5,
+     "why": "A bank's own stated leverage ratios are not filed lines on this desk, so the latest 10-Q's own sentences are quoted for what the filing says about its leverage."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "从最新 10-Q(DESK: 2026-08-04)里引用 JPM 自己陈述的监管杠杆率原话,作为 equity multiplier 之外的佐证。",
+    "basis": "filings_search 的 description:'A figure stated only in prose is quoted from here, never computed';handbook 第 1 章 WHAT THE DESK HOLDS:'the text of each filing, by Item, searchable and quotable verbatim';DESK 的 JPM.filings.10-Q.latest = 2026-08-04。"
+   },
+   {
+    "tool": "filings_search",
+    "args": {
+     "ticker": "JPM",
+     "query": "Tier 1 leverage ratio supplementary leverage ratio June 30, 2025",
+     "form": "10-Q",
+     "k": 10,
+     "why": "To set the filing's own stated leverage ratio against the reading a year earlier, I look for the passage in the 10-Q for the quarter ended June 30, 2025."
+    },
+    "problems": [],
+    "certainty": "guess",
+    "repeat": "",
+    "depends_on": "第 5 步的结果:如果最新 10-Q 的段落已经同时给出一年前的对照值,这一步就不需要。",
+    "purpose": "找一年前那份 10-Q 里同一比率的原话,和最新的对照。",
+    "basis": "filings_search 只有 filed_after,没有 filed_before 或 accession 过滤,只能靠 query 文本和加大 k 去碰一年前的那份;handbook business risk compare:'the filing's stated shares across years, where both years state one'(同一陈述跨年对照的做法)。"
+   }
+  ],
+  "reference": "metric → calc",
+  "answer_shape": "先一句话说明边界:JPM 是金融发行人,桌子的 debt/EBITDA、net debt、利息覆盖等杠杆度量对它按政策不适用,所以不给这些数。然后给桌子能给的读数:equity multiplier 最新值和一年前的值,各带日期和 [f_…] id,加上工具算出的同比变化,直接回答 '更高 / 更低 / 基本没变'。再一句说明原因:总资产和股东权益各自的同比变化(带 id),哪一个动得多。如果搜到了,附上 filing 自己陈述的监管杠杆率原话(带段落 id、form、日期),最新和一年前各一句;搜不到一年前的就明说没找到。不设阈值、不判断 '高不高',只说相对一年前的方向和幅度;'一年前' 用的具体日期写明。",
+  "cannot": "部分做不了。以债务和利息为基础的杠杆度量对 JPM 不适用。依据一,handbook 第 1 章 'Absent here':'leverage and coverage built on interest are refused for a financial issuer — interest is a bank's operating cost and deposits its raw material; returns on equity and assets and the accruals ratio do apply (by policy)'。依据二,DESK 的 JPM.coverage.measures_not_computable 把 total_debt、net_debt、debt_to_ebitda、net_debt_to_ebitda、debt_to_operating_cash_flow、ebit_interest_coverage、fcf_to_debt 等都标为 'not for a financial issuer'。依据三,POLICY:'A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate'。我会对用户说:桌子不给银行算 debt/EBITDA、净债务和利息覆盖,因为利息是银行的经营成本、存款是它的原料;桌子能给的是资产负债表口径的杠杆(总资产 ÷ 股东权益)在最新日期和一年前的读数,以及 filing 自己陈述的监管杠杆率原话,并明确这不是债务/盈利口径的杠杆。",
+  "unclear": [
+   "对金融发行人,'levered' 该用哪个度量,handbook 没有说。leverage and coverage 这一族的度量(total debt、net debt、debt/EBITDA、coverage、FCF/debt、current/quick ratio)在 DESK 的 measures_not_computable 里全部是 'not for a financial issuer';政策句只说 'returns on equity and assets and the accruals ratio do apply',没有提 equity multiplier。我是从 '它不在 not_computable 列表里' 反推它可用的。",
+   "equity multiplier 在 handbook 里归在 profitability(ROE 的分解项),不在 leverage 一族。把它当作 '杠杆' 来回答,是否违反 POLICY 的 'never a nearby figure under the asked-for name',context 没法判定。",
+   "银行的监管资本/杠杆率(CET1、Tier 1 leverage、SLR)不在 filings_read 的 line 枚举里,handbook 的 'Absent here' 也没有专门一条说它们 '不持有、只能引用'(只对 segment、debt maturities、covenants 这样说了)。我按类比去 filings_search 引用,但这是推断。",
+   "metric 的 last_n 写的是 'last N fiscal years or quarters',filings_read 的 last_n 写的是 'a balance's last N filed dates with {\"at\": \"latest\"}'。对 equity_multiplier 这种纯余额度量,取序列时 period 该写 {\"quarter\":\"latest\"} 还是 {\"at\":\"latest\"},两处说法不一致。",
+   "last_n 返回的 'ONE series' 是整条序列一个 f_ id,还是每个点各一个 id,context 没说。这决定 calc 的 inputs 怎么写,也决定回答里两端的数字各引用哪个 id。",
+   "calc 的 yoy 作用在季度序列上时,是和 4 个季度前比,还是和序列上一个点比,没有说明;5 个季度点是否刚好够它算一个同比也不确定。",
+   "如果改用两个单点再 subtract:calc 写 'Refused: units, periods or books that do not combine'。同一度量在两个不同日期的值相减,算不算 'periods that do not combine',没法判断。",
+   "'a year ago' 的基准没有定义:是最新余额日(DESK: latest_period_end 2026-06-30)对 2025-06-30,还是最新财年(FY2025)对 FY2024。我取前者。",
+   "filings_search 只能用 filed_after 往后收窄,没有 filed_before,也不能按 accession 限定,所以没法干净地只搜一年前那份 10-Q。替代路线是 list(what='filings') 拿 accession 再用 filings_section 翻页,但不知道要翻多少页。",
+   "10-Q 的 item 写法不清楚:DESK 的 items_indexed 有 'Item 2',10-Q 的 MD&A 是 Part I Item 2,而 Part II 也有 Item 2;filings_search 的 item 参数示例只有 '1A'、'7'、'7A',没说 10-Q 的两个 Item 2 怎么区分,所以我没有加 item 过滤。",
+   "handbook 的政策句说被拒的是 'leverage and coverage built on interest',但 DESK 里 gross_margin、net_margin、current_ratio、capex_intensity 这类不建立在利息上的度量也标了 'not for a financial issuer'。两处的范围不一致,向用户解释拒绝理由时不知道该引用哪一种说法。",
+   "说 '桌子不持有某度量' 时,是否需要真的调一次 metric(例如 debt_to_ebitda)拿到拒绝行的 id 来引用,还是引用 DESK 的 measures_not_computable 就够,YOUR ANSWER 一节只规定了 figure 的引用方式,没规定 absence 的。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q12",
+  "question": "What is the book's value at risk, and how much would it lose in a stress scenario?",
+  "reading": "用户要 port_001 这本账的 VaR 数值和压力情景下的损失金额。要先弄清桌子是否给得出这两个数;按 handbook 它们被扣住不发,所以实际要知道的是:run 里相关检查处于什么状态,以及桌子在市场风险上确实持有、可以按自己名字给出的东西。",
+  "steps": [
+   {
+    "tool": "list",
+    "args": {
+     "what": "checks",
+     "subject": "port_001",
+     "why": "The user asks for value at risk and a stress loss; listing the book's checks shows which of them ran and which are listed as not run because their input is withheld."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "看 port_001 最新 run 的各项检查哪些跑了、哪些被列为 not run(预期 One-day loss 属于后者)。",
+    "basis": "list 描述 “a book's checks”,what enum 含 checks,subject 为 port_ id;handbook 第3章第5节 “a check that did not run because its input is withheld is listed as not run, never as clear”。"
+   },
+   {
+    "tool": "book_read",
+    "args": {
+     "book": "port_001",
+     "table": "limit_checks",
+     "row": "One-day loss",
+     "why": "The One-day loss check is the mandate check closest to value at risk; reading its row says where that check stands, or that it did not run, with an id I can cite."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "读 One-day loss 这条检查的行,拿到它的状态(或拒绝行)作为可引用的依据。",
+    "basis": "book_read 描述 “A check's figures say where the check stands”,table enum 含 limit_checks,row 是 “a row's label as `list` shows it: a ticker, a sector, a check”;DESK 的 checks 列表里有 “One-day loss”。它是否就是 VaR 检查是我的推测。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.analysis",
+     "subject": "port_001",
+     "why": "Value at risk and stress results are withheld, so the book's net exposures per risk and the room to its tiers are what the desk does hold about market risk for this book."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "拿桌子确实持有的市场风险证据:对股票下跌、利率上行、信用利差走阔的净敞口(含方向),以及各检查离警戒/突破档的余量。",
+    "basis": "handbook 第3章 1.THE QUESTIONS “market risk: the book's netted exposure to an equity fall, to rates rising and to credit spreads widening ... Measured by: the book's net exposures and room to its tiers”;metric 的 name enum 含 book.analysis,subject “a ticker, a run_/port_ id”。params 说明里没有列 book.analysis 的任何键,所以不传 params 也不传 period。"
+   }
+  ],
+  "reference": "metric → book_read",
+  "answer_shape": "三段平铺的话。第一段直接回答:VaR 和压力结果由 run 计算但在验证完成前被扣住,桌子不发这两个数,我也不会用别的数字去重建或估算;One-day loss 检查的状态照行上写的说(预期是 not run 而不是 clear),附行 id。第二段说桌子持有的东西,并明确它们不是 VaR 也不是压力损失:截至 2026-09-11 的 run 对股票、利率、信用各自的净敞口及方向 [id],拟合是否共线、哪些风险未测量(未测量不等于零),以及离档位最近的检查的余量 [id]。第三段说还能看什么:按今天持仓回放的历史回撤事件(是历史事实,不是压力测试)、各持仓对 SPY/TLT/HYG 的 beta 和波动率;不给阈值判断,也不把敞口乘一个冲击幅度当成损失数字。",
+  "cannot": "做不了的是给出 VaR 数值和压力情景损失金额。依据(handbook 第3章第5节 Absent here):“value at risk, expected shortfall and the stress results are computed by the run and withheld pending validation: say so if asked, and do not rebuild them from other figures (withheld)”。同节还有 “a check that did not run because its input is withheld is listed as not run, never as clear”。POLICY:“A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate.” scenario 工具也替代不了:它的描述是 “It re-prices and re-checks; it does not re-fit betas, volatility or P&L”,trades 只接受 sell / buy。我会对用户说:这本账的 VaR 和压力结果在 run 里算了,但在验证完成前被扣住,桌子现在不发这两个数,我也不会拿别的数字去拼一个出来;相关的 One-day loss 检查应读作“未运行”而不是“通过”。我能给的是这本账对股票、利率、信用的净敞口和方向,以及各项检查离档位的余量,它们是敏感度和余量,不是损失估计。",
+  "unclear": [
+   "“One-day loss” 检查是不是基于 VaR 的那条检查,context 没有说:handbook 只说有检查会因输入被扣而 “listed as not run”,没点名是哪一条,我是从名字猜的。",
+   "VaR / expected shortfall / stress 结果本来放在哪张表哪一列没有说明:book_read 的 table 有 enum(exposure_metrics、risk_alerts 等),但 column 是自由字符串,任何表的列名都不在 context 里,要先 list(what='book') 才知道。table enum 里的 “count” 和 “trade” 是什么也没解释。",
+   "“withheld pending validation” 没有任何后续信息:谁在验证、何时放开、用户能否从别处拿到。system 1 说拒绝行会带 “the way out”,但对被扣住的数字出路是什么我不知道,没法告诉用户下一步。",
+   "“do not rebuild them from other figures” 的边界不清:handbook 同时说桌子可以回答 “the book's netted exposure to an equity fall, to rates rising and to credit spreads widening”。如果用户自己给一个冲击幅度(例如股市跌 20%),用 calc scale(source=user_assumption) 把净 beta 乘上去算损失,算不算“重建压力结果”?context 没有划这条线,我按不做处理。",
+   "POLICY 说 “never a nearby figure under the asked-for name”,但没说在说明缺失之后,是否应该主动给出相邻的、以自己名字标明的数字(净敞口、回撤事件)。我按“可以给,但要标明不是 VaR/压力损失”处理,这是我的判断而不是 context 明说的。",
+   "book.analysis 该怎么传参不确定:params 说明没列它,落在 “every other measure — no params: its window is `period`”,这意味着它要 period;但 metric 描述又说 “a price or book measure is over its own window and takes `params`”。两句矛盾,我选择 period 和 params 都不传。subject 该用 port_001 还是 run_7f3a9c21d4e8 也没明说,只说 “a ticker, a run_/port_ id”。",
+   "净 beta 的单位没定义:handbook 说 “the book's move per unit of the risk it names”,但 “per unit” 是 SPY 的 1%、利率的 1bp 还是别的没有说,只能指望行上自带解释,否则没法向用户说清这个数的含义。",
+   "工具名 scenario 与用户说的 “stress scenario” 撞名:从描述看它只做交易后的账本重定价,和压力测试无关,但名字容易让人以为能用它做压力情景。",
+   "list(what='checks') 是否显示每条检查的运行状态不确定:list 描述说 “as names and dates — never a figure”,而 handbook 说未运行的检查 “is listed as not run”,两者是否指同一个 list 输出不清楚,所以我又加了一步 book_read。",
+   "拒绝行或 not run 行在答案里怎么引用没有规定:system 1 的答案格式只讲了 “Write a figure as its row shows it, with the row's id in brackets”,对一个缺失/被扣的数字是否带 id、带哪个 id 没说。",
+   "DESK 里上一个 run 的键叫 “prev”,而 book_read 的 which 取值是 “prior”;另外 subjects.runs 是空的而 portfolios.port_001.runs 有两个 run,“subjects” 这一块代表什么(是从问题里抽出的主体吗)没有解释。",
+   "每个工具必填的 why 要求写 “which line of your task this step serves”,但 context 里没有分行的 task,不知道指什么。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q13",
+  "question": "How does TSLA's net margin compare with AAPL's over the last fiscal year?",
+  "reading": "需要 AAPL 和 TSLA 各自最近一个完整财年的净利率(net income ÷ revenue),并排比较谁高、差多少。前提检查:DESK 块里桌子上的发行人没有 TSLA,所以 TSLA 那一半现在取不到。",
+  "steps": [
+   {
+    "tool": "start",
+    "args": {
+     "kind": "readiness",
+     "subject": "TSLA",
+     "why": "The comparison needs TSLA's filed net income and revenue, but TSLA is not among the issuers on the desk, so it has to be put in preparation before any of its figures can be read."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "TSLA 不在桌子上,启动后台准备(申报文件、事实、价格),之后才可能读到它的净利率。这一步只返回一个 id,不是证据。",
+    "basis": "DESK 块 desk.issuers_on_desk 列表里没有 TSLA,issuers_preparing 为空,subjects.tickers 只有 AAPL。start 的描述:\"`readiness` puts a listed SEC filer on the desk (filings, facts, prices — a couple of minutes)… Once per subject is enough; say it is being prepared.\" 手册 1 章 5 节:\"a name the desk has not prepared is put in preparation in the background and said to be in preparation; nothing is estimated for it meanwhile\"。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "net_margin",
+     "subject": "AAPL",
+     "period": {
+      "fy": "latest"
+     },
+     "why": "AAPL's net margin over its latest fiscal year is the half of the comparison the desk already holds; net_margin is a registry measure so metric is the verb."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "取 AAPL 最近一个完整财年的净利率(行上会带它用的营收线和所属期间)。",
+    "basis": "metric 的 schema:name 枚举含 net_margin,period 允许 {\"fy\":\"latest\"},描述说 \"A measure built on filed lines takes a `period` — the same one `filings_read` takes, each issuer's own fiscal year\"。手册 1 章 2 节:\"net margin: net income ÷ revenue\"。DESK 块:AAPL status ready,measures_not_computable 为空,最新 10-K 申报于 2025-10-31。"
+   }
+  ],
+  "reference": "metric → start",
+  "answer_shape": "纯文字,短。先给 AAPL 最近财年的净利率,按行显示的写法并带行 id,写明财年截止日期和除的是哪条营收线。然后直说:TSLA 目前不在桌子上,已启动准备,需要几分钟;在此之前不给 TSLA 的任何数字,也不估算、不拿网上数字顶替。请用户稍后再问一次,届时把两家并排给出:各自的水平、谁高、差距多少(差值用 calc 算),并提醒两家财年截止日不同(AAPL 截至 9 月底,TSLA 的以其行上所写期间为准),比较的是各自的财年而不是同一段日历时间。",
+  "cannot": "桌子现在给不出 TSLA 的净利率,所以这轮做不了完整比较。依据:DESK 块 \"issuers_on_desk\": [AAPL, AMZN, GOOGL, JPM, KO, LLY, MSFT, NVDA, XOM] 里没有 TSLA,\"issuers_preparing\": [] 也没有;手册 1 章 5 节 \"a name the desk has not prepared is put in preparation in the background and said to be in preparation; nothing is estimated for it meanwhile\";start 的描述 \"returning an id at once and NEVER evidence\";POLICY \"A figure the desk does not hold is an absence, said as such with its reason — never a nearby figure under the asked-for name, never an estimate.\" 我会对用户说:AAPL 最近财年的净利率是多少(带行 id);TSLA 还不在桌子上,我已经让它开始准备,大约几分钟,在那之前不给它的数字也不估;请稍后再问,我再把两家并排比较。这只是\"现在不能\",不是\"永远不能\"。",
+  "unclear": [
+   "手册说未准备的名字 \"is put in preparation in the background\"(被动句),没说是桌子自动做,还是要我调 start(readiness);如果是自动的,我再调一次 start 是否重复或被拒也不清楚(start 只说 \"Once per subject is enough\")。",
+   "start 之后没有任何等待或查询准备进度的手段:list 的 what 枚举里没有\"发行人状态\"一项,DESK 块是这一题开头的静态快照。所以同一轮里我无法知道 TSLA 什么时候就绪,也不知道过一会儿重试 metric 会不会成功。context 没说该在本轮重试,还是直接回答并让用户再问。",
+   "start 返回的 id 是什么形态(是不是 f_ 开头的行、要不要在回答里引用)没有说明;只说 \"returning an id at once and NEVER evidence\"。",
+   "context 没有任何地方确认 TSLA 是 \"a listed SEC filer\"(start 和 web_search 都以此为接受条件);我是按常识认为它是,桌子怎么判定不清楚。",
+   "{\"fy\":\"latest\"} 的\"latest\"指的是最近一个已申报 10-K 的完整财年(AAPL 应是截至 2025 年 9 月的那一年),这是我从 DESK 块的 10-K 日期推的,schema 只写了 \"any of them may be 'latest'\",没有明说。如果要写整数财年,编号约定(按财年结束所在年份还是别的)也没说。",
+   "对一个不在桌子上的名字调 metric(例如 subject 写成 [\"AAPL\",\"TSLA\"])会得到什么样的拒绝行、它会不会顺带触发准备,context 没说;我因此没把 TSLA 放进 metric 的 subject,这是一个取舍而不是 context 指定的做法。"
+  ],
+  "only_given_files": true
+ },
+ {
+  "qid": "Q14",
+  "question": "Which of my holdings has the weakest 12-1 momentum, and how big is it in the book?",
+  "reading": "需要知道 port_001 的 10 个持仓各自的 12-1 动量, 找出最低的那个, 再读出它在账本里的权重和市值。",
+  "steps": [
+   {
+    "tool": "metric",
+    "args": {
+     "name": "price.momentum_12_1",
+     "subject": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMZN",
+      "GOOGL",
+      "JPM",
+      "XOM",
+      "LLY",
+      "TLT",
+      "HYG"
+     ],
+     "why": "The user asks which holding has the weakest 12-1 momentum; metric returns the registry's 12-1 momentum for each holding of port_001, one row each."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "",
+    "purpose": "一次取全部 10 个持仓的 12-1 动量, 每个持仓一行(或它自己的拒绝行)。",
+    "basis": "手册 Chapter 2 §1 “where the price sits … Measured by: … 12-1 momentum”; metric 的 name 枚举含 price.momentum_12_1; subject 可为列表(maxItems 40, “one row each, or each one's own refusal”); params 说明里没有给 price.momentum_12_1 列任何键, 所以不传 params 也不传 period; 持仓清单来自 DESK 块 port_001.holdings。"
+   },
+   {
+    "tool": "calc",
+    "args": {
+     "op": "rank",
+     "inputs": [
+      "f_momentum_AAPL",
+      "f_momentum_MSFT",
+      "f_momentum_NVDA",
+      "f_momentum_AMZN",
+      "f_momentum_GOOGL",
+      "f_momentum_JPM",
+      "f_momentum_XOM",
+      "f_momentum_LLY",
+      "f_momentum_TLT",
+      "f_momentum_HYG"
+     ],
+     "direction": "lowest",
+     "why": "Order the holdings' 12-1 momentum from lowest to find the weakest and the runner-up with tool arithmetic rather than by eye."
+    },
+    "problems": [],
+    "certainty": "likely",
+    "repeat": "",
+    "depends_on": "inputs 是 step 1 返回的各持仓动量行的 f_ id; 被拒绝的持仓(例如历史不足 200 个交易日)不放进 inputs。",
+    "purpose": "把各持仓的动量从低到高排序, 得到最弱的那个和次弱的那个。",
+    "basis": "SYSTEM 1: “Use tool arithmetic, not mental arithmetic”; calc 描述: “rank orders two or more (`direction`)”, direction 枚举为 highest/lowest; 手册 Chapter 2 §4 compare: “the name against the book's other holdings on the same measure”。"
+   },
+   {
+    "tool": "metric",
+    "args": {
+     "name": "book.position",
+     "subject": "XOM",
+     "params": {
+      "book": "port_001"
+     },
+     "why": "The second half of the question is how big the weakest-momentum holding is in the book; book.position gives its weight, market value and issuer-concentration check in port_001's latest completed run."
+    },
+    "problems": [],
+    "certainty": "certain",
+    "repeat": "",
+    "depends_on": "subject 的 ticker 来自 step 2 排序结果的第一名(动量最低者); “XOM”只是示例值。",
+    "purpose": "读出动量最弱的那个持仓在 port_001 最新完成 run 里的权重、市值、贡献, 以及它的发行人集中度检查和档位。",
+    "basis": "手册 Chapter 1 §2 “the name's place in the book: a name's own rows in the latest completed run of each book that holds it: its weight, market value and contribution, and the issuer-concentration check on it with its tiers”; metric 的 params 说明: “book.position — book: a port_… or run_… id”; DESK 块 subjects.portfolios 为 [\"port_001\"]。"
+   }
+  ],
+  "reference": "metric → calc → book_read",
+  "answer_shape": "纯散文。(1) 第一句直接回答: 动量最弱的是哪个持仓, 动量值按行原样写并带行 id, 同时点出次弱的那个及其数值。(2) 说明口径: 12-1 动量是约 12 个月前到 21 个交易日前的累计调整后回报, 跳过最近一个月, 按最新窗口计。(3) 它在账本里多大: 在 port_001(run as_of 2026-09-11)的权重和市值, 各带行 id, 并说它的发行人集中度检查处于什么位置。(4) 如果有持仓的动量被拒绝(历史不足)或被标记(形成期不足 252 个交易日), 明说哪几个未测或被标记, “最弱”只在已测的持仓里成立。(5) 不对价格走向给看法, 数字不附阈值判断。",
+  "cannot": "",
+  "unclear": [
+   "price.momentum_12_1 到底接受什么参数: metric 的 params 说明没有给它列任何键, 它只能落到“every other measure — no params: its window is `period`”这一句; 但同一段又说价格类指标“is over its own window and takes `params`”, 手册还说价格统计不能按过去日期询问。我的做法是 params 和 period 都不传, 但传了 period 会不会被拒、不传会不会被要求, 都没有明说。",
+   "本题的 DESK 块 issuers 为空, 看不到各持仓的价格覆盖范围; 12-1 动量需要至少 200 个交易日, 哪些持仓会被拒绝事先不知道。",
+   "TLT 和 HYG 既是持仓又是因子工具, 它们能不能算 12-1 动量没有明说(只说了因子工具的 volume 会被拒); 用户说的“my holdings”是否包含这两个 ETF 也只能按持仓清单理解为包含。",
+   "calc 的 rank 语义不清: direction 为“lowest”是否表示最低的排第一; 返回的是一行排序结果还是多行; 拒绝行能不能作为输入。",
+   "“最弱”用 rank 还是 min 都可以, context 没有指明哪一个; 我选 rank 是为了同时得到次弱者。",
+   "手册提到“a formation window under 252 sessions is flagged”, 但被标记的读数能不能参与排序、答案里该怎么处理, 没有说明。",
+   "book.position 返回的是一行还是多行(weight、market value、contribution、检查各有 id)没有说明; “how big”该答权重、市值还是两者, 我按两者都给处理。",
+   "动量按各名字最新价格窗口计, 而持仓是 2026-09-11 的; 两者日期是否对齐, context 没有给出各持仓价格的截止日。"
+  ],
+  "only_given_files": true
+ }
+]

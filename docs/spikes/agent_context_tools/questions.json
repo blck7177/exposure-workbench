@@ -1,0 +1,58 @@
+[
+ {
+  "qid": "Q01",
+  "question": "What is my largest exposure right now?"
+ },
+ {
+  "qid": "Q02",
+  "question": "Why did the book move on the last run?"
+ },
+ {
+  "qid": "Q03",
+  "question": "Which limits am I closest to breaching, and how much room is left on each?"
+ },
+ {
+  "qid": "Q04",
+  "question": "Put MSFT, AAPL and GOOGL 2025 full-year net income side by side in a table."
+ },
+ {
+  "qid": "Q05",
+  "question": "Add up AAPL's debt \u2014 long-term, current portion, short-term \u2014 then net the cash off so I have net debt."
+ },
+ {
+  "qid": "Q06",
+  "question": "How has NVDA's revenue grown over the last four quarters?"
+ },
+ {
+  "qid": "Q07",
+  "question": "Search the web for the latest news on LLY from the past week and tell me what happened."
+ },
+ {
+  "qid": "Q08",
+  "question": "If I sold half of my largest position, what would the book look like and which checks would change?"
+ },
+ {
+  "qid": "Q09",
+  "question": "How many days would it take to sell each of my holdings if I traded 20% of its average daily volume?"
+ },
+ {
+  "qid": "Q10",
+  "question": "Has MSFT become more volatile lately, or is it just the market?"
+ },
+ {
+  "qid": "Q11",
+  "question": "Is JPM more levered than it was a year ago?"
+ },
+ {
+  "qid": "Q12",
+  "question": "What is the book's value at risk, and how much would it lose in a stress scenario?"
+ },
+ {
+  "qid": "Q13",
+  "question": "How does TSLA's net margin compare with AAPL's over the last fiscal year?"
+ },
+ {
+  "qid": "Q14",
+  "question": "Which of my holdings has the weakest 12-1 momentum, and how big is it in the book?"
+ }
+]

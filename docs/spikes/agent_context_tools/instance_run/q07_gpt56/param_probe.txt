@@ -1,0 +1,6 @@
+<stdin>:20: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+probe 2026-10-02T13:10:19.951137Z
+  gpt-5.6-sol {} -> BadRequestError: Error code: 400 - {'error': {'message': "Function tools with reasoning_effort are not supported for gpt-5.6-sol in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", 'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}}
+  gpt-5.6-sol {'reasoning_effort': 'none'} -> OK served=gpt-5.6-sol finish=tool_calls tool_calls=['echo{"word":"ok"}'] prompt=128 completion=16 reasoning=0
+  gpt-5.6-sol {'reasoning_effort': 'low'} -> BadRequestError: Error code: 400 - {'error': {'message': "Function tools with reasoning_effort are not supported for gpt-5.6-sol in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", 'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}}
+  gpt-5.4-mini {} -> OK served=gpt-5.4-mini-2026-03-17 finish=tool_calls tool_calls=['echo{"word":"ok"}'] prompt=128 completion=16 reasoning=0
