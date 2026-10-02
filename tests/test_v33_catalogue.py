@@ -1,7 +1,7 @@
 """V33 Phase 4 — the catalogue tells prepared from preparing, and the section a
 describe call opened is the last the result cap drops.
 
-The B round (docs/spikes/v33) saw `start` register MRK/BAC/GS as investigable
+The B round (`git show 152375f:docs/spikes/v33`) saw `start` register MRK/BAC/GS as investigable
 and another session's describe() list them as prepared the same minute, with
 nothing filed; and describe(ticker, expand='methods') reach the model as
 `methods: {}` because expanding made that section the largest and the cap

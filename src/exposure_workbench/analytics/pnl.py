@@ -71,8 +71,8 @@ def calc_pnl(
     What this does NOT fix: `positions.quantity` is a snapshot and is not
     split-adjusted either, so on a split day the market value is still computed
     from a pre-split share count. That is a holdings-data problem, not a price
-    one, and it is named in docs/IMPLEMENTATION_PLAN_V5.md rather than papered
-    over here.
+    one, and it is named in docs/archive/plans/IMPLEMENTATION_PLAN_V5.md rather
+    than papered over here.
     """
     as_of = pd.Timestamp(as_of_date)
     prev_date = as_of - pd.tseries.offsets.BDay(1)  # previous business day

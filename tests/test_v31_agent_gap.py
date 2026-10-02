@@ -1,7 +1,7 @@
 """V31 — the three things the V26 traces said cost the agent its work.
 
-Read off `docs/spikes/v29/V26_R2.json` (140 turns, pinned at `e6c290b`, which is
-what production runs) and written up in `docs/AGENT_GAP_2026-09-10.md`:
+Read off `git show 152375f:docs/spikes/v29/V26_R2.json` (140 turns, pinned at `e6c290b`, which is
+what production runs) and written up in `git show 152375f:docs/AGENT_GAP_2026-09-10.md`:
 
   1. an exit refused and re-sent UNCHANGED, up to eight times in one turn;
   2. a batch that held three correct calls behind a sibling's bad parameter;

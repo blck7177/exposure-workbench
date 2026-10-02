@@ -1,7 +1,7 @@
 """V33 Phase 2 / V35 — the natural-language answer against the ledger (offline).
 
 Each case is one of the twelve reader-visible false statements the 20-question
-round let through (docs/spikes/v33/FINDINGS_V33.md), rebuilt over a hand-made
+round let through (`git show 152375f:docs/spikes/v33/FINDINGS_V33.md`), rebuilt over a hand-made
 ledger, and the sentence a careful analyst would have written beside it.
 
 V35: THE FIGURES POINT. A figure is written as the desk showed it, followed by

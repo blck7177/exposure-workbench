@@ -34,9 +34,11 @@ the run finish. So a green run can legitimately show a red step, and
 
 | Type | Triggered by | Handler |
 |------|-------------|---------|
-| `exposure_update` | `POST /api/exposure-runs` | `handlers/exposure_update.py` |
+| `exposure_update` | `POST /api/exposure-runs`, or the risk analyst's `start` (kind `exposure_run`) | `handlers/exposure_update.py` |
 | `market_data_sync` | `POST /api/market-data/sync` | `handlers/market_data_sync.py` |
 | `scheduled_update` | APScheduler / schedule API | `handlers/scheduled_update.py` |
+| `company_readiness` | `POST /api/companies/{ticker}/ensure-ready`, or an analyst's `start` (kind `readiness`) | `handlers/company_readiness.py` |
+| `issuer_research` | `POST /api/research-runs` | `handlers/issuer_research.py` |
 
 ## Run Status Lifecycle
 

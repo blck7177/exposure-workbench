@@ -3,7 +3,7 @@
 WHY THIS EXISTS. The exit it replaces (services/claims.py) asked the model to
 type its own assertions — eleven relations over fact ids, `{cN}` placeholders
 kept in step with a claims list by hand — and the 20-question round
-(docs/spikes/v33) showed what that bought: 61 respond calls, 42 refused, and
+(`git show 152375f:docs/spikes/v33`) showed what that bought: 61 respond calls, 42 refused, and
 twelve of the nineteen accepted answers false to a reader anyway, because the
 gate checked the pointers and never the sentence. Q08 stated two superlatives
 backwards over six legal `series` claims; Q17 shifted ten figures onto the

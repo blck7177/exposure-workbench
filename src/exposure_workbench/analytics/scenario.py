@@ -7,7 +7,7 @@ a share of a market value that just shrank — nine renormalisations and a set o
 limit checks over the result. That is a new book, and the desk had no object
 for one: the evidence stores what IS, and the one scenario machinery it had
 (stress) was withheld in V20. C01#t3 of the conversation battery died on it
-eight refusals deep (docs/spikes/V21_CONVERSATIONS.md §2).
+eight refusals deep (`git show 152375f:docs/spikes/V21_CONVERSATIONS.md` §2).
 
 So this is a PRIMITIVE, not a derivation: one parametric entry that mints a
 run-shaped object, after which every reader that knows a run (the namer, the

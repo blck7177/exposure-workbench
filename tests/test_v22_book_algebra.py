@@ -1,7 +1,7 @@
 """V22 — the book's figures enter the typed algebra; the panel is the algebra;
 a sale is a primitive (offline).
 
-WHY THIS FILE. The conversation battery (docs/spikes/V21_CONVERSATIONS.md)
+WHY THIS FILE. The conversation battery (`git show 152375f:docs/spikes/V21_CONVERSATIONS.md`)
 measured a desk with two worlds of values and one algebra. An issuer's figures
 had operators (calculate, rank), methods as data (formulas.py) and a refusal
 that reached the trace when a method was missing. The book's figures — weights,

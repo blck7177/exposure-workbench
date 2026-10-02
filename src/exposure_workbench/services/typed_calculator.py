@@ -37,7 +37,7 @@ it is trusted.
 THE BOOK'S QUANTITIES (V22). Until V22 the operands were fact_ and calc_ ids
 only, and a run's own figures — a weight, a market value, a limit level, a net
 beta — were terminal: readable, citable, never combinable. The conversation
-battery (docs/spikes/V21_CONVERSATIONS.md §2) measured what that costs: "how
+battery (`git show 152375f:docs/spikes/V21_CONVERSATIONS.md` §2) measured what that costs: "how
 much must I sell to get back under the limit" is (weight − limit) × market
 value, two operations over four figures the run already holds, and no tool
 could perform either. So an operand may now be a NAMED FIGURE ON A ROW —

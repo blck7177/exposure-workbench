@@ -1,6 +1,6 @@
 """Freeze a round into a corpus the judge can read without a database.
 
-    python -m evals.semantic_review.corpus docs/spikes/v1/V1E.json evals/corpus/V1E.jsonl
+    python -m evals.semantic_review.corpus docs/spikes/v1/S3_mini.json evals/corpus/S3_mini.jsonl
 
 One line per turn: the question, the reply's text and its sentences, the check's
 refusals with their reasons, and the meta the loop recorded (completion, the

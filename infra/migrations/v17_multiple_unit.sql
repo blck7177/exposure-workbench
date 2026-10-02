@@ -6,7 +6,7 @@
 -- way to say so — so every coverage, turnover and leverage ratio on this desk
 -- was displayed by the percent rule. A debt/EBITDA of 2.30 reached the reader
 -- as "230.0%", a current ratio of 1.85 as "185.0%", and an OLS beta of -0.543
--- as "-54.3%" (the G7 residual in docs/spikes/V16_COVERAGE.md §1).
+-- as "-54.3%" (the G7 residual in `git show 152375f:docs/spikes/V16_COVERAGE.md` §1).
 --
 -- WHAT THIS FILE DOES AND DOES NOT DO. It corrects the recorded READING of
 -- rows that already exist. No value is touched, no operand, no basis, no input

@@ -26,7 +26,7 @@ from exposure_workbench.services.ledger import Ledger
 CORPUS = Path(__file__).resolve().parent / "data" / "v36b_accepted.json.gz"
 
 # WHAT THE RULES ADDED SINCE ROUND B REFUSE, by question and reason. Every entry
-# is a sentence `docs/spikes/v36/ACCEPTANCE_V36B.md` §4 named as false; every
+# is a sentence `git show 152375f:docs/spikes/v36/ACCEPTANCE_V36B.md` §4 named as false; every
 # question absent from this table was accepted then and is accepted now.
 #
 #   V4 · period_mismatch — the period a sentence claims, against its readings' dates

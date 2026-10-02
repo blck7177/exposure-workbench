@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Score a brief battery: what the briefs rendered, against what the desk holds.
 
-    python scripts/brief_score.py docs/spikes/v31/BRIEF_R1.json [more.json …]
+    python scripts/brief_score.py <brief battery output>.json [more.json …]
 
 Two things, kept apart because they answer different questions.
 

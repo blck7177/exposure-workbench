@@ -2,7 +2,7 @@
 
 THE CLASS THIS ENDS. The gate is not a negotiation. Given the same claims and
 the same prose it returns the same refusal, and it costs a provider round trip
-to say so again. Three turns of the V26 baseline (`docs/spikes/v29/V26_R2.json`)
+to say so again. Three turns of the V26 baseline (`git show 152375f:docs/spikes/v29/V26_R2.json`)
 sent one byte-identical `respond` EIGHT times and ended on the gate-exhausted
 text — the reader told the desk could not answer, on turns where it could:
 

@@ -91,13 +91,11 @@ npm run test              # the pure decisions: delta labels, sorts, focus, gaps
 npx next build            # the production build the image runs
 ```
 
-plus two Python guards that read this directory as text, so the two languages
+plus a Python guard that reads this directory as text, so the two languages
 cannot drift apart silently:
 
 - `tests/test_error_vocabulary.py` — every code `lib/errors.ts` explains is one
   the API actually raises.
-- `tests/test_ui_surface.py` — the reader's layer renders no internal ids and no
-  transport strings (V13).
 
 ## Local
 

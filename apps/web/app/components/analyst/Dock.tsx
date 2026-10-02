@@ -97,9 +97,11 @@ type ChatMsg = {
  *  be unanswerable is worse than none. */
 function suggestionsFor(context: DockContext): string[] {
   // Every question here was asked of the deployed desk on 2026-09-02 and
-  // answered with figures on the table (docs/spikes/V20_COVERAGE.md and the
-  // R20 battery). A question that leans on a withheld measure (VaR, stress)
-  // or on a shape the model still gets wrong (ranking run rows) is not here.
+  // answered with figures on the table (V20_COVERAGE.md and the R20 battery:
+  // `git show 152375f:docs/spikes/V20_COVERAGE.md`,
+  // `git show 152375f:docs/spikes/R20.json`).
+  // A question that leans on a withheld measure (VaR, stress) or on a shape
+  // the model still gets wrong (ranking run rows) is not here.
   if (context.kind === "issuer") {
     const t = context.ticker;
     return [

@@ -9,7 +9,7 @@ reply to the reader.
 The scripted models in these tests accepted any list of messages. So the
 lead's repair branch, which asked again with a `repair_answer` call left
 unanswered, passed offline for a whole version, and round C's Q13 crashed on
-it (`docs/spikes/v37/V37C_run.log`, NOTE ON Q13). Every scripted `chat` that
+it (`git show 152375f:docs/spikes/v37/V37C_run.log`, NOTE ON Q13). Every scripted `chat` that
 stands in for the provider checks its request here first, so a loop that
 builds a request the provider would refuse fails the test that drives it.
 """

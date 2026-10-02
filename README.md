@@ -3,14 +3,17 @@
 A **database-backed portfolio risk + issuer intelligence application**. On top of the
 original deterministic exposure workflow it adds, per issuer: SEC filing + XBRL fact
 ingestion, deterministic financial analytics on an append-only calc ledger,
-pgvector filing retrieval, an evidence-gated Issuer Risk Brief, and a single
-meta-agent the user talks to — every factual answer traceable to a fact, a
-calculation, a filing passage or a research source.
+pgvector filing retrieval, an evidence-gated Issuer Risk Brief, and a lead
+analyst the user talks to, which reads the desk directly and asks three analysts
+(issuer, market, risk — one per family of evidence) for independent work — every
+factual answer traceable to a fact, a calculation, a filing passage or a research
+source.
 
 Every LLM-generated tool call travels over MCP to a container of its own.
 `exposure-mcp` is resident — streamable HTTP, stateless, reachable only on the
-compose network — and serves one mount per face: `/mcp/meta` for the meta-agent,
-`/mcp/research` for the research subagent, each with its own registry built from
+compose network — and serves one mount per face: `/mcp/meta` for the lead analyst,
+`/mcp/issuer`, `/mcp/market` and `/mcp/risk` for the three analysts, `/mcp/research`
+for the research run, each with its own registry built from
 the one set of tool definitions and budget / schema / citation / audit
 enforcement in a single wrapper below the transport. The loops are clients: the
 api mints an internal 30-minute bearer per chat turn, the worker per research
@@ -18,12 +21,12 @@ run, and a middleware in front of each mount verifies it and binds that
 request's tenant —
 identity travels with the request, because a server that outlives the turn
 cannot hold the turn's tenant. The face an agent sees is the mount it reached
-minus whatever its token denies, so a skip flag takes `search_external_research`
+minus whatever its token denies, so a skip flag takes `web_search`
 out of the tool list rather than leaving a tool that refuses. The LLM call stays
 in the loop and never crosses MCP. Deterministic code (recipes, REST wrappers)
 calls the same functions through the same wrapper directly, in process, and a
 standing parity test pins that both produce identical trace rows.
-See docs/archive/plans/MCP_PLAN.md (historical; the current plan is docs/IMPLEMENTATION_PLAN_V1.md).
+See docs/archive/plans/MCP_PLAN.md (historical; the current design documents are listed below).
 
 ## Quick Start
 
@@ -69,11 +72,20 @@ Each account gets a daily allowance (chat turns, analysis runs, research runs)
 visible at `GET /api/me/usage` and in the chat panel's header. Limits, tenancy,
 concurrency and audit are described in [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
-Current plan and design: [docs/IMPLEMENTATION_PLAN_V1.md](docs/IMPLEMENTATION_PLAN_V1.md); every sentence
-sent to a model is in [docs/WORDING_V1.md](docs/WORDING_V1.md). Earlier plans are archived under
+Current design, in the order it was built: the tool and knowledge layers in
+[docs/IMPLEMENTATION_PLAN_V1.md](docs/IMPLEMENTATION_PLAN_V1.md); the analysis state in
+[docs/IMPLEMENTATION_PLAN_V2.md](docs/IMPLEMENTATION_PLAN_V2.md), whose header names the parts later
+replaced; the agent loop in [docs/SIMPLIFICATION_PLAN.md](docs/SIMPLIFICATION_PLAN.md),
+[S1](docs/SIMPLIFICATION_S1.md), [S2](docs/SIMPLIFICATION_S2.md) and
+[docs/ARCHITECTURE_S3.md](docs/ARCHITECTURE_S3.md) (results in
+[docs/ARCHITECTURE_S3_RESULTS.md](docs/ARCHITECTURE_S3_RESULTS.md)). Every sentence sent to a model is
+in [docs/WORDING_V1.md](docs/WORDING_V1.md). Measurement rounds are under docs/spikes/; what is kept
+there is in [docs/spikes/README.md](docs/spikes/README.md). Earlier plans are archived under
 docs/archive/plans/ and are not read. The v3 target architecture, the module notes (M1–M30) and the
 2026-09-15 as-built snapshot were removed on 2026-09-19 when the tool and agent layers they described
-were replaced; they are in git history (`git show f8a51c0:docs/MODULE_NOTES.md`).
+were replaced; they are in git history (`git show f8a51c0:docs/MODULE_NOTES.md`). The June
+architecture note, two September analyses and the V13 wording sheet went the same way on
+2026-10-02 (`git show 152375f:docs/<name>.md`).
 
 A stdio debug door onto the same tool face runs via
 `MCP_STDIO_USER_ID=user_... python -m apps.mcp.server` — the same server
@@ -99,17 +111,16 @@ request arrives with.
                       ├── analytics/
                       └── agents/ (LLM report)
 
-     FastAPI and Worker ──Bearer──▶ exposure-mcp (the agent tool face:
-        /mcp/meta + /mcp/research; compose network, plus a loopback-only
-        host port so the live parity guard can reach it)
+     FastAPI and Worker ──Bearer──▶ exposure-mcp (the agent tool faces:
+        /mcp/meta, /mcp/issuer, /mcp/market, /mcp/risk, /mcp/research;
+        compose network, plus a loopback-only host port so the live
+        parity guard can reach it)
 ```
 
 In production the UI and the API share one origin, so the browser never makes a
 cross-origin request and there is no CORS to configure. Locally there is no proxy
 and the UI is built with an explicit API base — which is why that value is a
 build argument, not a runtime setting.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full design.
 
 ## Stack
 
