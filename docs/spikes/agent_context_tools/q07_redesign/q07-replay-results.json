@@ -1,0 +1,718 @@
+{
+  "q07_live": {
+    "answers": [
+      {
+        "seq": 47,
+        "text": "I can’t yet answer the ranking because the issuer task returned no submitted rows for the operating-cash-flow-over-net-income ratio or its prior-year comparison.\n\nWhat I can already check from the desk is the second half of your question only for AAPL: its weight rose from 14.7% [f_3cadceee57b0] to 15.2% [f_62182bb1b39d], a +0.5 percentage point move. I do not yet have the same book-weight change for MSFT, NVDA, AMZN, or GOOGL, so I can’t say whether AAPL was the largest gainer.\n\nIf you want, I can continue and pull:\n- the five technology holdings’ trailing-twelve-month cash conversion,\n- the prior-twelve-month ratio,\n- the change between them,\n- and the weight change for all five names against the prior run.",
+        "ok": false,
+        "problems": [
+          {
+            "at": "prose[1]",
+            "reason": "unpointed_figure",
+            "figure": "+0.5",
+            "candidates": [
+              {
+                "id": "f_26fd824a1dcb",
+                "measure": "debt_to_operating_cash_flow",
+                "subject": "GOOGL",
+                "as_of": "2026-06-30"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S2",
+            "rule": 1
+          }
+        ]
+      },
+      {
+        "seq": 49,
+        "text": "I can’t yet answer the ranking because the issuer task returned no submitted rows for the operating-cash-flow-over-net-income ratio or its prior-year comparison.\n\nWhat I can already check from the desk is the second half of your question only for AAPL: its weight rose from 14.7% [f_3cadceee57b0] to 15.2% [f_62182bb1b39d]. I do not yet have the same book-weight change for MSFT, NVDA, AMZN, or GOOGL, so I can’t say whether AAPL was the largest gainer.\n\nIf you want, I can continue and pull:\n- the five technology holdings’ trailing-twelve-month cash conversion,\n- the prior-twelve-month ratio,\n- the change between them,\n- and the weight change for all five names against the prior run.",
+        "ok": true,
+        "problems": []
+      }
+    ],
+    "submissions": []
+  },
+  "q07_gpt56": {
+    "answers": [
+      {
+        "seq": 68,
+        "text": "The premise needs correcting: the portfolio has three Technology holdings, not five—AAPL, MSFT and NVDA.\n\n**Latest trailing-twelve-month cash conversion, highest to lowest**\n\n1. **MSFT:** 135.9%, for 2025-04-01 to 2026-03-31 [f_c5a453ac476b]  \n2. **AAPL:** 114.4%, for 2025-03-30 to 2026-03-28 [f_e8af6af3d232]  \n3. **NVDA:** 69.7%, for 2025-07-28 to 2026-07-26 [f_bec2822665ec]\n\n**Change from each issuer’s prior trailing twelve months, highest to lowest**\n\n1. **AAPL:** up 1.79% [f_805822715083]  \n2. **MSFT:** up 0.62% [f_5ce8bdf74b97]  \n3. **NVDA:** down 19.3% [f_6684a3331586]\n\n**Conclusion:** NVDA has the weakest conversion and the sharpest deterioration. It is **not** the Technology holding whose portfolio weight grew most. AAPL had the largest weight increase, up 0.47% between the prior and latest runs [f_46c495c5cb5d]. NVDA’s weight instead fell 0.11% [f_2e47a053e1c7].",
+        "ok": false,
+        "problems": [
+          {
+            "at": "prose[2]",
+            "reason": "unpointed_figure",
+            "figure": "135.9%",
+            "candidates": [
+              {
+                "id": "f_49676d9b31e6",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "MSFT",
+                "as_of": "2026-03-31"
+              },
+              {
+                "id": "f_c5a453ac476b",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "MSFT",
+                "as_of": "2026-03-31"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S3",
+            "rule": 1
+          },
+          {
+            "at": "prose[3]",
+            "reason": "unpointed_figure",
+            "figure": "114.4%",
+            "candidates": [
+              {
+                "id": "f_69c3e5451fc9",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "AAPL",
+                "as_of": "2026-03-28"
+              },
+              {
+                "id": "f_e8af6af3d232",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "AAPL",
+                "as_of": "2026-03-28"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S4",
+            "rule": 1
+          },
+          {
+            "at": "prose[4]",
+            "reason": "unpointed_figure",
+            "figure": "69.7%",
+            "candidates": [
+              {
+                "id": "f_44cbcbadf306",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "NVDA",
+                "as_of": "2026-07-26"
+              },
+              {
+                "id": "f_bec2822665ec",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "NVDA",
+                "as_of": "2026-07-26"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S5",
+            "rule": 1
+          },
+          {
+            "at": "prose[8]",
+            "reason": "mark_mismatch",
+            "figure": "19.3%",
+            "id": "f_6684a3331586",
+            "holds": "-19.3%",
+            "candidates": [],
+            "way_out": "f_6684a3331586 holds -19.3%, not this figure: write the figure as the desk showed it, or point at the fact that holds it",
+            "sentence": "S9",
+            "rule": 1
+          },
+          {
+            "at": "prose[9]",
+            "reason": "unpointed_figure",
+            "figure": "0.47%",
+            "candidates": [
+              {
+                "id": "f_fbb857355c90",
+                "measure": "issuer_exposures.weight.subtract.issuer_exposures.weight",
+                "subject": "AAPL",
+                "as_of": "2026-09-10"
+              },
+              {
+                "id": "f_46c495c5cb5d",
+                "measure": "issuer_exposures.weight.subtract.issuer_exposures.weight",
+                "subject": "AAPL",
+                "as_of": "2026-09-10"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S12",
+            "rule": 1
+          },
+          {
+            "at": "prose[9]",
+            "reason": "mark_mismatch",
+            "figure": "0.11%",
+            "id": "f_2e47a053e1c7",
+            "holds": "-0.11%",
+            "candidates": [],
+            "way_out": "f_2e47a053e1c7 holds -0.11%, not this figure: write the figure as the desk showed it, or point at the fact that holds it",
+            "sentence": "S13",
+            "rule": 1
+          }
+        ]
+      },
+      {
+        "seq": 70,
+        "text": "The premise needs correcting: the portfolio has three Technology holdings, not five—AAPL, MSFT and NVDA.\n\n**Latest trailing-twelve-month cash conversion, highest to lowest**\n\n1. **MSFT:** 135.9% [f_c5a453ac476b], for 2025-04-01 to 2026-03-31.\n2. **AAPL:** 114.4% [f_e8af6af3d232], for 2025-03-30 to 2026-03-28.\n3. **NVDA:** 69.7% [f_bec2822665ec], for 2025-07-28 to 2026-07-26.\n\n**Change from each issuer’s prior trailing twelve months, highest to lowest**\n\n1. **AAPL:** up 1.79% [f_805822715083] \n2. **MSFT:** up 0.62% [f_5ce8bdf74b97] \n3. **NVDA:** -19.3% [f_6684a3331586].\n\n**Conclusion:** NVDA has the weakest conversion and the sharpest deterioration. It is **not** the Technology holding whose portfolio weight grew most. AAPL had the largest weight increase, 0.47% [f_46c495c5cb5d], between the prior and latest runs. NVDA’s weight instead changed by -0.11% [f_2e47a053e1c7].",
+        "ok": true,
+        "problems": []
+      }
+    ],
+    "submissions": [
+      {
+        "seq": 28,
+        "result": {
+          "accepted": true,
+          "evidence": [
+            "f_37af5fd29223",
+            "f_bf466227946a",
+            "f_793c5ac81549",
+            "f_45fa16052e82",
+            "f_cbf02b0b417d",
+            "f_ab4e69d0c272",
+            "f_7e3541d558bc",
+            "f_97fe5fa80ff2",
+            "f_856741d4c2a1",
+            "f_1b1ffd335e56",
+            "f_090f69ea6cde",
+            "f_09961e67366f",
+            "f_d0376b978e5e"
+          ],
+          "note_ids": [
+            {
+              "index": 0,
+              "id": "nte_31811d630e0a"
+            },
+            {
+              "index": 1,
+              "id": "nte_865dc65aef53"
+            }
+          ],
+          "kept_notes": [
+            "nte_31811d630e0a",
+            "nte_865dc65aef53"
+          ],
+          "problems": [],
+          "detail": "work returned"
+        },
+        "retained_notes": [
+          {
+            "id": "nte_31811d630e0a",
+            "raw_text": "The desk reached complete operating-cash-flow and net-income inputs for AAPL and MSFT across the latest and prior comparable trailing-twelve-month windows. For NVDA, it reached only latest trailing-twelve-month operating cash flow before the execution budget stopped further reads. The requested five-name ranking therefore cannot be completed from this task run; only three Technology subjects were supplied, and one of those remains incomplete.",
+            "text": "The desk reached complete operating-cash-flow and net-income inputs for AAPL and MSFT across the latest and prior comparable trailing-twelve-month windows. For NVDA, it reached only latest trailing-twelve-month operating cash flow before the execution budget stopped further reads. The requested five-name ranking therefore cannot be completed from this task run; only three Technology subjects were supplied, and one of those remains incomplete.",
+            "refs": [
+              "f_37af5fd29223",
+              "f_bf466227946a",
+              "f_793c5ac81549",
+              "f_45fa16052e82",
+              "f_cbf02b0b417d",
+              "f_ab4e69d0c272",
+              "f_7e3541d558bc",
+              "f_97fe5fa80ff2",
+              "f_856741d4c2a1",
+              "f_d0376b978e5e"
+            ],
+            "blocks": [
+              {
+                "type": "paragraph",
+                "runs": [
+                  "The desk reached complete operating-cash-flow and net-income inputs for AAPL and MSFT across the latest and prior comparable trailing-twelve-month windows. For NVDA, it reached only latest trailing-twelve-month operating cash flow before the execution budget stopped further reads. The requested five-name ranking therefore cannot be completed from this task run; only three Technology subjects were supplied, and one of those remains incomplete."
+                ]
+              }
+            ],
+            "verified": {
+              "figures": 0,
+              "sources": 0,
+              "sentences": {
+                "checked": 0,
+                "unchecked": 3,
+                "judgement": [
+                  "The desk reached complete operating-cash-flow and net-income inputs for AAPL and MSFT across the latest and prior comparable trailing-twelve-month windows.",
+                  "For NVDA, it reached only latest trailing-twelve-month operating cash flow before the execution budget stopped further reads.",
+                  "The requested five-name ranking therefore cannot be completed from this task run; only three Technology subjects were supplied, and one of those remains incomplete."
+                ]
+              },
+              "matches": []
+            }
+          },
+          {
+            "id": "nte_865dc65aef53",
+            "raw_text": "The latest completed book run provides current weights for AAPL, MSFT and NVDA, but these rows do not provide previous-run weights, so the largest weight increase cannot be identified from the evidence reached.",
+            "text": "The latest completed book run provides current weights for AAPL, MSFT and NVDA, but these rows do not provide previous-run weights, so the largest weight increase cannot be identified from the evidence reached.",
+            "refs": [
+              "f_1b1ffd335e56",
+              "f_090f69ea6cde",
+              "f_09961e67366f"
+            ],
+            "blocks": [
+              {
+                "type": "paragraph",
+                "runs": [
+                  "The latest completed book run provides current weights for AAPL, MSFT and NVDA, but these rows do not provide previous-run weights, so the largest weight increase cannot be identified from the evidence reached."
+                ]
+              }
+            ],
+            "verified": {
+              "figures": 0,
+              "sources": 0,
+              "sentences": {
+                "checked": 0,
+                "unchecked": 1,
+                "judgement": [
+                  "The latest completed book run provides current weights for AAPL, MSFT and NVDA, but these rows do not provide previous-run weights, so the largest weight increase cannot be identified from the evidence reached."
+                ]
+              },
+              "matches": []
+            }
+          }
+        ]
+      },
+      {
+        "seq": 45,
+        "result": {
+          "accepted": false,
+          "evidence": [
+            "f_f6fd7ebc42cf",
+            "f_b817a6fca72a",
+            "f_6dc03ea3d65e",
+            "f_108bc4230555",
+            "f_a71a955ad684",
+            "f_f0841ce65cec",
+            "f_46c495c5cb5d",
+            "f_56408206b346",
+            "f_2e47a053e1c7"
+          ],
+          "note_ids": [
+            {
+              "index": 0,
+              "id": "nte_0f353d387d47"
+            },
+            {
+              "index": 1,
+              "id": "nte_d781875122fe"
+            }
+          ],
+          "kept_notes": [
+            "nte_d781875122fe"
+          ],
+          "problems": [
+            {
+              "item": "nte_0f353d387d47",
+              "at": "prose[0]",
+              "reason": "unsourced_figure",
+              "figure": "2026-09-09",
+              "way_out": "a date no fact of this turn carries: the desk's dates are the facts' own as_of and window — quote the words that state this one, or drop it",
+              "sentence": "S2",
+              "rule": 1,
+              "where": "finding",
+              "channel": "finding"
+            }
+          ],
+          "detail": "accepted items are kept; correct or omit rejected notes, then submit again"
+        },
+        "retained_notes": [
+          {
+            "id": "nte_d781875122fe",
+            "raw_text": "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence.",
+            "text": "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence.",
+            "refs": [],
+            "blocks": [
+              {
+                "type": "paragraph",
+                "runs": [
+                  "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence."
+                ]
+              }
+            ],
+            "verified": {
+              "figures": 0,
+              "sources": 0,
+              "sentences": {
+                "checked": 0,
+                "unchecked": 2,
+                "judgement": [
+                  "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here.",
+                  "Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence."
+                ]
+              },
+              "matches": []
+            }
+          }
+        ]
+      },
+      {
+        "seq": 47,
+        "result": {
+          "accepted": true,
+          "evidence": [
+            "f_f6fd7ebc42cf",
+            "f_b817a6fca72a",
+            "f_6dc03ea3d65e",
+            "f_108bc4230555",
+            "f_a71a955ad684",
+            "f_f0841ce65cec",
+            "f_46c495c5cb5d",
+            "f_56408206b346",
+            "f_2e47a053e1c7"
+          ],
+          "note_ids": [
+            {
+              "index": 0,
+              "id": "nte_0f353d387d47"
+            }
+          ],
+          "kept_notes": [
+            "nte_d781875122fe",
+            "nte_0f353d387d47"
+          ],
+          "problems": [],
+          "detail": "work returned"
+        },
+        "retained_notes": [
+          {
+            "id": "nte_d781875122fe",
+            "raw_text": "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence.",
+            "text": "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence.",
+            "refs": [],
+            "blocks": [
+              {
+                "type": "paragraph",
+                "runs": [
+                  "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here. Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence."
+                ]
+              }
+            ],
+            "verified": {
+              "figures": 0,
+              "sources": 0,
+              "sentences": {
+                "checked": 0,
+                "unchecked": 2,
+                "judgement": [
+                  "Cash conversion (operating cash flow over net income) and its prior-trailing-twelve-month change cannot be ranked from this desk's available measure registry; no issuer filing measure is available here.",
+                  "Therefore, the weakest cash converter and whether it matches the name with the largest book-weight increase cannot be determined from held evidence."
+                ]
+              },
+              "matches": []
+            }
+          },
+          {
+            "id": "nte_0f353d387d47",
+            "raw_text": "The supplied portfolio catalogue identifies three Technology holdings: AAPL, MSFT, and NVDA. AAPL had the largest issuer-weight change, followed by MSFT and NVDA.",
+            "text": "The supplied portfolio catalogue identifies three Technology holdings: AAPL, MSFT, and NVDA. AAPL had the largest issuer-weight change, followed by MSFT and NVDA.",
+            "refs": [
+              "f_46c495c5cb5d",
+              "f_56408206b346",
+              "f_2e47a053e1c7"
+            ],
+            "blocks": [
+              {
+                "type": "paragraph",
+                "runs": [
+                  "The supplied portfolio catalogue identifies three Technology holdings: AAPL, MSFT, and NVDA. AAPL had the largest issuer-weight change, followed by MSFT and NVDA."
+                ]
+              }
+            ],
+            "verified": {
+              "figures": 0,
+              "sources": 0,
+              "sentences": {
+                "checked": 0,
+                "unchecked": 2,
+                "judgement": [
+                  "The supplied portfolio catalogue identifies three Technology holdings: AAPL, MSFT, and NVDA.",
+                  "AAPL had the largest issuer-weight change, followed by MSFT and NVDA."
+                ]
+              },
+              "matches": []
+            }
+          }
+        ]
+      }
+    ],
+    "probes": {
+      "negative_signed": {
+        "text": "NVDA cash conversion changed by -19.3% [f_6684a3331586].",
+        "ok": true,
+        "problems": []
+      },
+      "negative_natural": {
+        "text": "NVDA cash conversion fell by 19.3 percentage points [f_6684a3331586].",
+        "ok": false,
+        "problems": [
+          {
+            "at": "prose[0]",
+            "reason": "mark_mismatch",
+            "figure": "19.3",
+            "id": "f_6684a3331586",
+            "holds": "-19.3%",
+            "candidates": [],
+            "way_out": "f_6684a3331586 holds -19.3%, not this figure: write the figure as the desk showed it, or point at the fact that holds it",
+            "sentence": "S1",
+            "rule": 1
+          }
+        ]
+      },
+      "positive_pp": {
+        "text": "AAPL cash conversion increased by 1.79 percentage points [f_805822715083].",
+        "ok": false,
+        "problems": [
+          {
+            "at": "prose[0]",
+            "reason": "mark_mismatch",
+            "figure": "1.79",
+            "id": "f_805822715083",
+            "holds": "1.79%",
+            "candidates": [],
+            "way_out": "f_805822715083 holds 1.79%, not this figure: write the figure as the desk showed it, or point at the fact that holds it",
+            "sentence": "S1",
+            "rule": 1
+          }
+        ]
+      },
+      "positive_relative_wrong": {
+        "text": "AAPL cash conversion increased by 1.79% [f_805822715083].",
+        "ok": true,
+        "problems": []
+      },
+      "date_after_number_pointer": {
+        "text": "MSFT: 135.9%, for 2025-04-01 to 2026-03-31 [f_c5a453ac476b].",
+        "ok": false,
+        "problems": [
+          {
+            "at": "prose[0]",
+            "reason": "unpointed_figure",
+            "figure": "135.9%",
+            "candidates": [
+              {
+                "id": "f_49676d9b31e6",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "MSFT",
+                "as_of": "2026-03-31"
+              },
+              {
+                "id": "f_c5a453ac476b",
+                "measure": "operating_cash_flow.divide.net_income",
+                "subject": "MSFT",
+                "as_of": "2026-03-31"
+              }
+            ],
+            "way_out": "a figure the desk showed is written as shown, followed by its id in brackets (16.0% [f_…]); the desk showed this figure under the ids listed",
+            "sentence": "S1",
+            "rule": 1
+          }
+        ]
+      },
+      "date_separate_pointer": {
+        "text": "MSFT: 135.9% [f_c5a453ac476b], for 2025-04-01 to 2026-03-31.",
+        "ok": true,
+        "problems": []
+      }
+    },
+    "recomputed": [
+      {
+        "ticker": "AAPL",
+        "current": 1.1439689985723027,
+        "prior": 1.126030382140728,
+        "difference_pp": 1.7938616431574683,
+        "relative_change_percent": 1.5930845842250685,
+        "input_ids": [
+          "f_37af5fd29223",
+          "f_bf466227946a",
+          "f_793c5ac81549",
+          "f_45fa16052e82"
+        ]
+      },
+      {
+        "ticker": "MSFT",
+        "current": 1.3587800281114235,
+        "prior": 1.3526155119780618,
+        "difference_pp": 0.6164516133361664,
+        "relative_change_percent": 0.4557478513865787,
+        "input_ids": [
+          "f_cbf02b0b417d",
+          "f_ab4e69d0c272",
+          "f_7e3541d558bc",
+          "f_97fe5fa80ff2"
+        ]
+      },
+      {
+        "ticker": "NVDA",
+        "current": 0.6966025331943861,
+        "prior": 0.8895804704550966,
+        "difference_pp": -19.297793726071045,
+        "relative_change_percent": -21.693140044091308,
+        "input_ids": [
+          "f_856741d4c2a1",
+          "f_eb5361c5b0e5",
+          "f_4b5794420084",
+          "f_a7b460e66820"
+        ]
+      }
+    ],
+    "selected_facts": {
+      "f_fbb857355c90": {
+        "id": "f_fbb857355c90",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": "2026-09-10",
+        "group": "derived",
+        "means": {},
+        "value": 0.004680629999999991,
+        "params": {
+          "op": "subtract",
+          "pull": "r_5703a8dd061d",
+          "inputs": [
+            "f_f6fd7ebc42cf",
+            "f_b817a6fca72a"
+          ]
+        },
+        "points": null,
+        "window": {
+          "end": "2026-09-10",
+          "start": "2026-09-10"
+        },
+        "measure": "issuer_exposures.weight.subtract.issuer_exposures.weight",
+        "sources": [
+          "calc_d161b99a20dd"
+        ],
+        "subject": "AAPL",
+        "standalone": true
+      },
+      "f_46c495c5cb5d": {
+        "id": "f_46c495c5cb5d",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": "2026-09-10",
+        "group": "book_derived",
+        "means": {},
+        "value": 0.004680629999999991,
+        "params": {
+          "of": 3,
+          "op": "rank",
+          "pull": "r_804ffdd6185f",
+          "place": 1,
+          "direction": "highest"
+        },
+        "points": null,
+        "window": null,
+        "measure": "issuer_exposures.weight.subtract.issuer_exposures.weight",
+        "sources": [
+          "calc_c954f725b467"
+        ],
+        "subject": "AAPL",
+        "standalone": true
+      },
+      "f_44cbcbadf306": {
+        "id": "f_44cbcbadf306",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": "2026-07-26",
+        "group": "derived",
+        "means": {},
+        "value": 0.6966025331943861,
+        "params": {
+          "op": "divide",
+          "pull": "r_0d2006560841",
+          "inputs": [
+            "f_856741d4c2a1",
+            "f_eb5361c5b0e5"
+          ]
+        },
+        "points": null,
+        "window": {
+          "end": "2026-07-26",
+          "start": "2025-07-28"
+        },
+        "measure": "operating_cash_flow.divide.net_income",
+        "sources": [
+          "calc_030ae2147ba7"
+        ],
+        "subject": "NVDA",
+        "standalone": true
+      },
+      "f_bec2822665ec": {
+        "id": "f_bec2822665ec",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": "2026-07-26",
+        "group": "book_derived",
+        "means": {},
+        "value": 0.6966025331943861,
+        "params": {
+          "of": 3,
+          "op": "rank",
+          "pull": "r_972d2bccf489",
+          "place": 3,
+          "direction": "highest"
+        },
+        "points": null,
+        "window": null,
+        "measure": "operating_cash_flow.divide.net_income",
+        "sources": [
+          "calc_ac29c803ef18"
+        ],
+        "subject": "NVDA",
+        "standalone": true
+      },
+      "f_d42491897bd4": {
+        "id": "f_d42491897bd4",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": null,
+        "group": "derived",
+        "means": {},
+        "value": -0.19297793726071044,
+        "params": {
+          "op": "subtract",
+          "pull": "r_297d271d5944",
+          "inputs": [
+            "f_44cbcbadf306",
+            "f_4d44b735106e"
+          ]
+        },
+        "points": null,
+        "window": {
+          "mixed": "2024-07-29 to 2025-07-27 and 2025-07-28 to 2026-07-26"
+        },
+        "measure": "operating_cash_flow.divide.net_income.subtract.operating_cash_flow.divide.net_income",
+        "sources": [
+          "calc_e16e93a9af03"
+        ],
+        "subject": "NVDA",
+        "standalone": true
+      },
+      "f_6684a3331586": {
+        "id": "f_6684a3331586",
+        "kind": "scalar",
+        "text": null,
+        "unit": "RATIO",
+        "as_of": null,
+        "group": "book_derived",
+        "means": {},
+        "value": -0.19297793726071044,
+        "params": {
+          "of": 3,
+          "op": "rank",
+          "pull": "r_ad4963ac65fa",
+          "place": 3,
+          "direction": "highest"
+        },
+        "points": null,
+        "window": null,
+        "measure": "operating_cash_flow.divide.net_income.subtract.operating_cash_flow.divide.net_income",
+        "sources": [
+          "calc_3e73c3bba2c0"
+        ],
+        "subject": "NVDA",
+        "standalone": true
+      }
+    }
+  }
+}

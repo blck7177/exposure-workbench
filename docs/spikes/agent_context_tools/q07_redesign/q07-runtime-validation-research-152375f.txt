@@ -1,0 +1,322 @@
+Q07：模型每轮工作、交互形式与观察式 validation 研究
+日期：2026-10-03
+代码基线：152375f17e1fd1006e78fda618d772eb15adee12
+状态：代码与录制日志分析、架构建议；未修改产品实现，未运行新的付费模型测试。
+
+资料边界
+只以源码、q07_live / q07_gpt56 的测试脚本、run.log、wire.jsonl、冻结数据及本地回放作为项目证据。没有读取其他仓库 Markdown 设计文档。run.log 只是运行摘要；完整模型输入输出在 wire.jsonl。q07-interaction-map.json 收录两组共 31 次 completion 的输入大小、工具参数、回答和 usage。
+
+一、主要判断
+
+用户提出的责任边界合理：分析模型决定需要什么信息、理解结果、形成结论；runtime 承担数据定位、批量读取、期间解析、配对、执行与记录；validator 从这些自然产生的记录及答案中取得材料。
+
+当前实现已经拥有共享 ledger、类型化计算、部分送达追踪和统一事实检查，因此不必重建全部系统。但主要模型接口仍是资源/单行/事实 ID 层接口，验证接口又要求模型组织引用、提交 evidence、按句子 tag 修补答案。分析模型实际兼任执行编排者和验证材料整理者。
+
+“让 validation 看日志”需要同时满足：日志可重放，事实有真实来源，验证器能理解命题，而且能区分回答正确与任务完成。只有一个阅读普通 run.log 的 LLM judge 不足以替代现有系统。
+
+二、当前每轮的实际输入和输出
+
+Lead 初始模型请求：
+  system：角色要求 + style_guide 文本
+  system：<desk> JSON，目录、主体、日期与覆盖
+  system：<roster> JSON，各 analyst 的任务范围
+  system：<readings> 文本，跨领域含义
+  system：<state> JSON，共享执行状态、findings、evidence、预算
+  history / user：历史与原问题
+  tools：另行传入 function JSON schemas
+
+每轮开始，runtime 在原位置替换 STATE，并计算实际送达哪些 facts、预览范围及提示词大小。不会不断追加多个旧 STATE；但之前 assistant/tool 消息仍留在对话中，下一轮继续输入。缓存命中降低部分费用，不等于信息不再占上下文或不需要处理。
+
+模型输出只有两类：assistant 自然语言，或 function tool_calls（工具名 + JSON 参数字符串）。普通工具经 MCP/runtime 执行，结果作为 role=tool 的 JSON 字符串进入下一轮。工具执行并不是模型在内存里直接操作数据。
+
+ask 的参数由 lead 生成 analyst、subjects、lines、context、可选 input_refs。runtime 创建独立 sub 对话；共享的是数据库、ledger、任务状态，不是同一份模型上下文。Q07 5.6 的两次 ask 位于同一个 lead completion，但代码逐个 await，issuer 完成后才执行 risk。不能因为一次输出两个 ask 就认定它们并行。
+
+Sub 初始请求：
+  system：sub 角色 + style_guide + 该领域完整 handbook chapter
+  user：<task> JSON + <coverage> JSON + 原始用户问题 + 可用 prior
+  system：有 input_refs 时，独立 input_evidence 预览
+  tools：该 resource face 的 schemas + submit，必要时 open
+
+Sub 同样循环收到工具 JSON 并生成下一批参数。自然语言结束不等于正常完成：当前循环会要求 submit；多次只输出文字后以 no_submission 退出。submit 要求 evidence IDs，notes 可选，但每条 note 又有 text 和 refs，经过同一事实 gate。
+
+Sub 结果通过 runtime 合并入 STATE；lead 的 ask 工具回执不是完整 sub transcript。下一次 lead completion 从 STATE 读取选中的证据、说明和执行边界。提交失败不必然抹掉原始事实，已有 evidence 仍可被接手。
+
+Lead 最终自然语言经过 fact_boundary / answer_check：通过则渲染保存；失败则得到带句子 tag 的 verdict，模型被要求调用 repair_answer。该协议允许删掉失败句子，因此少说内容也能让 gate 通过；它不等价于原问题已经完成。
+
+三、context、skill、tools、数据分别是什么
+
+Context：runtime 组装的提示词投影。任务初始目录并不是实时数据库视图。_coverage_of 只从已有 briefing 按主体切片；任务出现新主体时不会自动补齐其 coverage。
+
+Skill：在本代码路径中，模型读到的是 handbook 的 roster、meaning_layer 或完整 chapter；方法 registry 另有 inputs、procedure、executor、参数 schema 等结构。已有可执行方法会运行代码，但模型仍要从说明中选择方法、资源和具体调用。Q07 的 OCF/NI 并无直接对应的注册分析入口；用户已经给出公式，因此不能把本例公式选择直接归因于模型凭空依赖先验知识。
+
+Tools：模型面对 JSON schemas；runtime 校验参数、扣预算、调用 service/DB，再适配结果。某些组合约束直到执行时才拒绝，例如 Q07 的 TTM + last_n=2。合法 JSON 不等于合法分析请求。
+
+Data：工具输出并非只有裸数字。正常 fact 行带 ID、主体、期间、值、含义和来源，数据库保留更完整事实与计算 lineage。因此“主题与数字始终分开传输”不是这次的准确根因。问题主要是分析关系仍需模型重组，部分投影又损失语义，例如排序行没有保留比较期间。
+
+Calculator：已经是类型化执行，不是让模型心算全部数字；但模型仍手工选取 f_ID operands、逐主体 divide/subtract/rank。这些配对指令本身就是机械负担。
+
+State：共享 evidence 和 findings 的模型可见投影。当前只有一部分内容进入默认页；完整 ledger 与实际送达内容必须分开。Q07 5.6 的 lead 接手时选中的 22 条均实际送达，本例不能归因于这些选中证据丢失。
+
+Validation：既是后台检查器，又通过 style_guide、submit、repair_answer 成为模型必须遵守的工作协议。这是用户指出的职责倒置发生之处。
+
+四、输入负担的直接测量
+
+5.6 第一次 lead completion：
+  role + style：4,851 字符
+  DESK：1,886 字符
+  ROSTER：6,601 字符
+  READINGS：3,752 字符
+  STATE：928 字符
+  用户问题：307 字符
+  五个 system block 合计：18,018 字符。
+  API prompt usage：8,719 tokens，包含模型实际请求及 tools 等开销；不能把字符数当 token 数。
+
+issuer 首轮 system 文本 17,758 字符，prompt 7,723 tokens，任务 coverage 却为空 {}。
+risk 首轮 system 文本 15,233 字符，prompt 6,242 tokens。
+lead 接手的 C13 中 STATE 为 21,276 字符，该轮 prompt 17,842 tokens；最终修稿 C18 达到 21,115 prompt tokens。
+
+两组录制合计：mini 13 次、5.6 18 次模型请求。累计 prompt usage 分别为 164,088 和 244,223 tokens，包含缓存；不能据此声称这些 token 全部浪费，或直接换算为未缓存收费。
+
+症结不是单纯“提示词太长”：很多通用知识与协议已经进入上下文，当前任务需要的期间解析、范围绑定和可执行分析入口却仍缺失。
+
+五、q07_gpt56：完整 18 次模型请求
+
+编号采用 completion 顺序；wire seq 是原始 wire.jsonl 的事件序号。一次 completion 可以输出多次工具调用。
+
+C1  [wire 3] lead，8,719 prompt tokens
+    根据目录选 AAPL/MSFT/NVDA，分别 ask issuer 做现金转化、risk 做仓位变化。原题“五家”与目录“三家 Technology”的差异没有得到用户口径确认。
+C2  [wire 5] issuer，7,723
+    先取 book.position，返回多个仓位事实。此时任务 coverage 为空。
+C3  [wire 7] issuer，9,623
+    发出 6 个 TTM + last_n=2 请求，均不支持；另列出 3 家 fundamentals 覆盖。
+C4  [wire 17] issuer，14,313
+    依据披露覆盖填写各公司今期/前期具体日期，发出 12 次 OCF/NI 单行读取；9 次到达工具，最后 3 次 NVDA 请求被本地预算阻止。
+C5  [wire 27] issuer，16,414
+    手工选 AAPL 两条 f_ID 做 divide，仍被预算阻止。
+C6  [wire 28] issuer，16,566
+    整理 13 个 evidence IDs 与两条 text/refs notes，submit 部分工作。
+C7  [wire 30] risk，6,242
+    列 measure registry 与两个 book 的结构；同时尝试判断另一领域的现金转化能力。
+C8  [wire 34] risk，8,220
+    读取两期整个 weight 列。
+C9  [wire 37] risk，9,660
+    手工为三家公司逐一配对两期 f_ID，发出三次 subtract。
+C10 [wire 41] risk，10,306
+    选择三条差值 f_ID，调用 rank。
+C11 [wire 43] risk，10,753
+    submit 两条 notes；带比较日期的排名说明被拒；无数字的“现金转化无法确定”说明被接受。
+C12 [wire 44] risk，11,327
+    删除排名说明中的比较日期，再 submit。模型在适应证据投影/检查器的限制。
+C13 [wire 45] lead，17,842
+    从 STATE 接手；补读 NVDA 三个缺失单元。此前的不可完成说明并未阻止 lead 继续取数。
+C14 [wire 49] lead，17,735
+    手工配对 OCF/NI 的 12 个事实，发出六次 divide。
+C15 [wire 56] lead，18,351
+    手工配对两期比率，发出三次 subtract，并对当前比率 rank。
+C16 [wire 61] lead，19,442
+    对三家变化值再次 rank。
+C17 [wire 63] lead，19,872
+    写自然语言答案；六句被拒：四句引用未紧跟数字，两句方向词加正幅度与负值显示不匹配。
+C18 [wire 65] lead，21,115
+    repair_answer 填六个句子 tag 与替换文本；移动指针，把 down/fell 改成负数形式。通过，但百分比/百分点问题仍在。
+
+这些步骤不是彼此独立的分析问题。C4/C9/C14/C15 大量工作是可由执行层确定的索引、期间与 operands 配对。C6/C11/C12/C18 则含有为提交和校验组织材料的额外负担。
+
+六、q07_live：完整 13 次模型请求
+
+C1  [wire 3] lead，8,720
+    两次 ask 采用重复 analyst task 的结构而被拒；同时直接读取 AAPL 两期仓位。
+C2  [wire 6] lead，9,995
+    合并主体后再次提交重复 analyst task，仍无效。
+C3  [wire 7] lead，10,230
+    合成一个五主体 issuer task，终于进入 sub。
+C4  [wire 9] issuer，7,711
+    五次 list 使用错误的 what=book.position；另取 debt/OCF 批量指标，未直接得到所需 OCF/NI。
+C5  [wire 16] issuer，9,467
+    五次取 accruals_ratio，再五次尝试不支持的 TTM series。
+C6  [wire 27] issuer，11,395
+    五次取 accruals；五次 FY series 已被预算阻止。
+C7  [wire 33] issuer，13,039
+    十次尝试读取 OCF/NI，均被预算阻止。
+C8  [wire 34] issuer，14,422
+    写自然语言部分结果；runtime 要求继续读或 submit，未按正常返回接收。
+C9  [wire 35] issuer，14,791
+    再尝试十次指标/仓位读取，均被预算阻止。
+C10 [wire 36] issuer，16,169
+    第二次自然语言说明边界，仍没有 submit。
+C11 [wire 37] issuer，16,638
+    第三次自然语言说明无法完成，最终 no_submission。
+C12 [wire 38] lead，16,148
+    输出不能完成排名，仅说明 AAPL 两期仓位，并从显示值推导 +0.5pp；该未绑定计算被拒。
+C13 [wire 40] lead，15,363
+    repair_answer 删除 +0.5pp，答案通过；用户要求的排名与最弱者比较仍未完成。
+
+两组结果说明：模型更强可以部分补救工具与交接设计，但通过现有 gate 的答案仍可能任务不完整，或保留单位语义错误。
+
+七、对 validation 的准确判断
+
+不能笼统说当前 validation 只查转写。answer_check 已有主体、含义、期间、方向、排序等检查，也区分 checked 与 unchecked/judgement。问题是它依赖模型提供的指针/refs 和有限语言模式，这种组织方式同时造成负担与盲区。
+
+1. 引用位置成为推理前置义务。正确来源放在句尾，也会因为没紧邻数字被拒。
+2. 显示字符串与数值语义耦合。down 19.3 与 -19.3 的差别可以主导拒绝，而百分比与百分点的实质区别未必拦住。
+3. 原草稿 down 19.3% 本身也有语义错误，不能称为“完全正确却被误拒”；应指出它被以较表面的理由拒绝，修改后仍未解决实际错误。
+4. 原题要求的排名未完成，mini 删除一句后仍能通过答案 gate。事实可支持性和任务完成度必须分开。
+5. 无数字“无法完成”可能被当作 judgement 通过。risk 的局部资源权限/registry 可见性不足，不能证明全局缺乏计算能力。
+6. checked/unchecked 信息没有充分保留到 STATE 的可信度表达中。“accepted finding”不应等于每个命题已经有事实证明。
+7. 排序事实的比较期间投影不足，促使模型删除日期。应补数据语义，不能用删文字来修证据模型。
+
+本地回放的具体反例：AAPL 比率由 1.12603038214 变为 1.14396899857。绝对变化约 +1.79386 个百分点；相对变化约 +1.59308%。现有显示/检查路径可以接受“增加 1.79%”，却拒绝正确的“增加 1.79 percentage points”。
+
+八、research 的设计启发及适用边界
+
+Anthropic 的 agent eval 文章区分 transcript 与真实 outcome，建议按问题组合代码、模型和人工 grader。这里借鉴的是职责分离和 grader 校准；该文章主要讨论开发阶段 eval，不能直接当作生产发布 gate 可靠性的证明。
+来源：https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+
+OpenAI Trace grading 将完整执行轨迹作为评估对象，适合定位流程错误与回归。可采用这一模式而不必使用其托管平台；也不需要取得模型未公开的内部思维链。
+来源：https://developers.openai.com/api/docs/guides/trace-grading
+
+FActScore 从已经生成的文本提取原子事实并核对来源，说明事实结构化工作可以放在评估侧。其研究场景是人物传记，不能把其指标效果直接外推为金融答案验证保证。
+来源：https://aclanthology.org/2023.emnlp-main.741/
+
+Anthropic MCP/code execution 文章指出，工具定义和反复经过模型的中间数据会增加上下文负担，执行环境可以先过滤、聚合。这里采纳“中间数据留在执行层”的原则；默认方案应由注册方法执行，而不是要求本项目模型再编写全部配对程序。
+来源：https://www.anthropic.com/engineering/code-execution-with-mcp
+
+以下为结合本项目的设计建议，不是上述研究直接验证过的产品结论。
+
+九、推荐的模型工作面
+
+模型每轮只需要：原始问题和当前目标；已绑定业务范围及未解决歧义；当前相关方法的短说明；本轮请求返回的分析视图；必要的历史决策与未决问题。
+
+模型负责：
+  - 确认业务范围；例如“五家科技持仓”与分类目录三家的差异。
+  - 选择信息需求；例如当前现金转化、相对前期的变化、仓位变化。
+  - 判断口径是否适合问题，是否需要进一步解释某个异常。
+  - 阅读真正有分析价值的结果与原文，形成结论、解释及不确定性。
+
+runtime 负责：
+  - 从 scope handle 解析实体和权限；不得静默替用户改范围。
+  - 解析 latest / previous_ttm / previous_run 及各 issuer 日历。
+  - 根据注册方法绑定资源、字段、币种/单位、期间和计算步骤。
+  - 批量读取、按实体/期间对齐、计算与排序；避免模型处理逐行 f_ID。
+  - 同时记录实际原始数据、source snapshot、版本、计算 lineage 与模型可见视图。
+  - 自动跟踪任务来源和执行原因关联；不强制每个基础调用重复 why。
+
+示例模型接口：
+  analyze(requests=[
+    {measure: cash_conversion, compare: previous_ttm, rank: true},
+    {measure: portfolio_weight, compare: previous_run, rank: true}
+  ])
+
+当前任务范围已确定时由 runtime 自动绑定；未确定时先返回 scope ambiguity。模型无需提交 table、row、column、run ID、具体日期、join key 或 operands。该入口是可执行 capability 的组合，不是把任意自然语言偷偷交给另一个 planner LLM 再重做所有机械工作。
+
+结果视图返回：对齐的业务表、列口径和期间、排序/并列、覆盖/缺失/不可比、方法版本短说明、可按需展开的来源。完整 evidence ledger 留在后台。跨 domain 仍保留各列自己的时间语义：财务 TTM 与昨日/今日仓位不得被描述成同一个时间窗口。
+
+skill 应分开维护三种内容：给模型的解释/适用边界，给 runtime 的可执行方法，给 validator 的语义不变量和测试样例。三者共享稳定的 measure/version 标识。新增 domain 通过注册能力扩展，不能把 Q07 的公司、公式和调用顺序硬编码进主 agent。
+
+多 resources 不必自动拆多个 analyst。已注册的数据组合由执行层组合；只有需要独立领域判断、探索或相互审查时才委派 sub。sub 可以自然语言结束，runtime 自动附带该任务的结果与执行记录，选择 evidence IDs 不再是完成任务的必经关卡。
+
+十、validation 应从哪里拿输入
+
+建议 runtime 自动产生 ValidationInput，其信息来源是系统观察，不是分析模型自填：
+  original_question：原始问题，避免被子任务改写取代
+  scope_decisions：用户口径、目录冲突、显式范围决策
+  visible_context：每次请求实际输入的视图版本、送达范围、方法/工具定义版本
+  execution：实际工具调用、参数、状态、完整结果的持久化引用
+  evidence：原始数据快照、实体、单位、期间、方法版本、计算 lineage
+  draft：模型正常输出的文本/表格
+  outcome：真实环境状态与完成情况
+
+可以去重存储不可变 blobs 和视图 manifest，不必每一轮复制整个数据库。摘要用于界面展示，不能充当可重放记录本体。记录不可用或被截断时应标注验证覆盖不足。
+
+本项目已有复用点：tools/registry.py 自动记录执行和 facts；delivery.py 区分出现过的 ID 与实际送达行；ledger/calculation 保存输入关系。缺口在于 llm_session.py 的生产 llm_call trace 主要存 usage、read note 和工具数量摘要，trace_service 又有截断；完整 wire 目前主要来自测试 hook。不能直接把现有生产摘要当作 Q07 wire。
+
+特别区分三件事：
+  事实在 ledger 中；事实真的发给了模型；模型实际在答案中作出命题。
+这些集合并不相等。validator 后来查到的证据可以用于复核答案，但须记录为验证器取得，不能声称模型当时看过。也不能把 why 文本当作模型完整内部推理或事实证明。
+
+十一、三处检查的职责
+
+执行时检查：权限、参数类型、资源可用性、单位/期间兼容、分母与方法适用性、预算。必须在执行边界完成；不能等答案写完才发现越权或无效操作。模型不额外准备验证材料。
+
+发布前观察式验证：读自然答案、原题、相关 trace 和来源快照。检查命题事实、比较语义、范围、任务覆盖；产出独立验证记录。只有确实影响答案的事实错误或缺失，才把小段反馈送回分析模型。
+
+离线 eval / 运行监测：阅读更完整 trace，衡量是否完成任务、选择方法是否合理、额外往返、重复读取、成本与回归。不要求每个在线模型请求都为这些评分项填写证明表。
+
+十二、发布前 observer 的内部流程
+
+1. 从草稿提取命题；简单数值与表格用程序解析，复杂语言才交给有界的语义提取器。
+2. 给每条命题解析主体、指标、期间、比较基准、方向、量纲、限定范围。必要的结构化 JSON 由 validator 产生，不由分析模型填写。
+3. 根据语义键查相关来源和 calculation lineage；不能仅按“数字相同”找一个 f_ID 配上。
+4. 可计算部分确定性复算：数值、百分点/相对百分比、实体/时间对应、排序/并列、覆盖范围。
+5. 对解释性、因果性和范围语言进行证据支持检查。事实、分析判断、假设和数据不足分别标注；合理假设不因为无法证明就一律禁止。
+6. 对照原问题单独评估完成度。句句有出处，也可能没回答用户真正的问题。
+7. 记录 supported / contradicted / insufficient evidence / ambiguous / judgement 等状态及检查范围，不压成一个“全都已验证”。
+8. 通过支持检查后，渲染器自动插入来源链接、表格来源说明。引用美化不占用分析模型修稿轮次。
+
+命题例子：模型自然写“NVDA 现金转化率下降约 19.3 个百分点”。validator 应自己识别负方向、绝对百分点变化，核对两期比率与差值，再生成来源关联。模型无需先附 f_ID，亦无需另写同一命题的 JSON。
+
+如果模型写“下降 19.3%”，这是语义差异，不能让渲染器静默改成百分点。应给出普通业务反馈：当前值约 69.66%，前期约 88.96%，绝对变化约 -19.30pp，相对变化约 -21.69%；请明确要表达的变化口径。反馈由已复核证据支持，模型修正分析文字即可，无须 repair_answer 的 tag 表单。
+
+引用位置、链接生成等可自动修；金额、单位、期间、因果结论等不能被当作“格式问题”偷偷改掉。模型能够理解的业务准确性要求仍保留，但无需暴露 checker 的正则表达式或证据组织协议。
+
+十三、必须避免的新失败模式
+
+把机械负担从主模型移到另一个同等循环的 LLM 并不能证明整体更有效。记录自动化；查询、聚合与计算尽量程序执行；语义 judge 只读相关命题和证据，使用增量缓存和明确预算。记录 actor + judge 的总 tokens、成本及延迟。
+
+日志证明发生了什么，不自动证明工具输出正确。来源读取和计算器仍需独立测试、冻结数据重算；validator 若复用同一个有 bug 的算法，也会共同出错。
+
+语义 judge 也会误判，必须用人工确认的正反样例校准。证据不足或无法解析时允许 unknown；不把检查器能力不足直接归责为模型错误。被检查的文本/工具输出是数据，不能成为更改评分规则的指令。
+
+验证不能只偏向少说话。删除所有有争议结论可以降低事实错误，但会降低完成度。分别记录 factuality、task completion 和 analytical usefulness。
+
+十四、与上一版 redesign 的修正关系
+
+保留：高层 analyze、任务范围绑定、方法 registry、执行层配对、AnalysisView、完整精度及期间语义、Responses 适配研究。
+
+进一步修正：
+  - 主模型最终答案不强制数字后紧跟 f_ID；来源映射由 observer 与 renderer 完成。
+  - sub 不必 submit evidence + notes/refs 才能交接；runtime 自动生成任务产物关联。
+  - 不让模型另填 claim graph、validation packet 或逐句证据清单。
+  - 纯引用/排版问题退出模型修稿循环。
+  - repair_answer 的句子 tag 协议改为普通语义反馈；仅真实内容问题需要分析模型处理。
+  - 通过事实 gate 不再自动代表 answered/completed；完成度独立记录。
+
+这些修订已合并至同目录 q07-redesign-plan-152375f.txt，替代旧草案的上述局部要求；尚未在代码里实现。
+
+十五、验收建议
+
+常规注册分析：模型生成单格读取、具体财务日期、逐行 operands 配对和验证证明表的次数为零。业务范围选择与真正的方法选择不计入机械负担。
+
+验证用例至少包含：
+  正确自然语言没有 f_ID；引用放在句尾；负向词搭配正幅度；允许的舍入；
+  百分比/百分点混淆；主体偷换；前后期颠倒；财务窗口不一致；同值不同实体；
+  比较只覆盖三家却声称覆盖五家；rank 并列；局部工具不可用被写成全局无数据；
+  无数字的无依据断言；有明确措辞的合理假设；删除结论后任务未完成；
+  ledger 有但模型未收到的证据；验证器后来取得的证据；损坏/截断 trace；来源或计算器错误。
+
+报告 false accept、false reject、完成率、引用格式导致的模型修稿次数、额外模型轮次、actor/judge 总成本与耗时。记录真实分布，不以“工具调用更少”或“模型 reasoning tokens 更高”单独证明设计有效。
+
+十六、主要源码定位
+
+源码根目录：
+https://github.com/blck7177/exposure-workbench （以下路径均相对于仓库根目录）
+
+src/exposure_workbench/agents/meta_agent.py:423      lead 初始输入
+src/exposure_workbench/agents/meta_agent.py:493      每轮 STATE、模型请求与工具分发
+src/exposure_workbench/agents/meta_agent.py:633      最终答案 gate
+src/exposure_workbench/agents/sub_analyst.py:59      模型角色及 submit/why 要求
+src/exposure_workbench/agents/sub_analyst.py:94      skill chapter + style 注入
+src/exposure_workbench/agents/sub_analyst.py:116     coverage 切片
+src/exposure_workbench/agents/sub_analyst.py:241     sub 循环
+src/exposure_workbench/agents/handoff.py:53         提交与 note 校验
+src/exposure_workbench/analytics/handbook.py:357    skill 文本投影
+src/exposure_workbench/analytics/registry.py:422    Method 结构
+src/exposure_workbench/tools/registry.py:204        工具执行/适配/ledger/trace
+src/exposure_workbench/services/style_guide.py:41  引用格式规则
+src/exposure_workbench/services/answer_check.py:327 验证器主流程
+src/exposure_workbench/services/answer_check.py:598 scoped refs 插入指针
+src/exposure_workbench/services/answer_check.py:1248 checked 与 unchecked
+src/exposure_workbench/services/analysis_state.py:484 模型可见共享状态
+src/exposure_workbench/agents/delivery.py:44        实际送达投影
+src/exposure_workbench/agents/llm_session.py:102    生产模型调用记录
+src/exposure_workbench/services/trace_service.py:59 trace 截断限制

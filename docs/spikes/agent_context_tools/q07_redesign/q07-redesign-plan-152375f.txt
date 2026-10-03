@@ -1,0 +1,466 @@
+Q07 agent redesign：以当前代码为基线的实施方案
+日期：2026-10-03
+基线：152375f17e1fd1006e78fda618d772eb15adee12
+仓库：https://github.com/blck7177/exposure-workbench
+状态：方案；本文中的新接口、模块和验收项尚未实现。
+修订：消除模型承担的机械数据处理；表级算子移入执行层；采用观察式 validation，由系统记录执行、验证器提取命题和查证，取消模型必须整理 refs、submit 证明材料和按 tag 修稿的义务。
+配套材料：q07-runtime-validation-research-152375f.txt（逐轮分析与研究）、q07-interaction-map.json（31 次模型请求）、q07-replay-results.json（已有离线回放）。本文已合并观察式验证修订，不再要求读者自行拼接旧方案和补充说明。
+
+0. 范围与设计结论
+
+依据 q07_live、q07_gpt56 的完整 wire、运行脚本、参数探针、测试结果和当前源码。没有读取仓库其他架构/分析 Markdown，也没有以源码注释中提到的旧方案作为设计依据。分析时 HEAD 为上述基线；本次提交仅包含设计与分析材料。离线回放结果见同目录 q07-replay-results.json。
+
+本轮解决六个关联问题：模型推理被测试配置关闭；动态主体没有上下文；期间与表格配对由模型展开；方法定义不能完整约束执行；事实变换丢失变化/期间语义；文字校验与任务完成脱节。预算耗尽后的退出作为共同运行时问题一并处理。
+
+总体分工：
+  LLM：理解用户范围、选择方法和比较口径、发现歧义、解释结果。
+  Context：为已确定的主体补齐身份、资源能力、快照和期间目录。
+  Method registry / skill：定义方法的适用性、公式、例外和解释规则。
+  Tools / services：解析期间，按键读取、组合、计算、排序，保存来源。
+  Validation：从自然答案、原始问题、实际执行记录和来源提取命题，检查语义、证据支持与任务完成度；由验证器生成结构化验证记录。
+  Runtime：隔离模型会话，控制执行成本，自动保存可重放记录与证据，确定性结束任务；执行时校验权限、参数及方法不变量。
+
+保留当前已经有效的机制：Fact/CalcLedger、MCP 权限边界、input_refs 的内部绑定、共享证据、分页、部分产物保留、逐条保留有效分析、lead 直接接手。新能力接入这些机制；保留内部证据关联不等于要求模型手填关联。
+不恢复逐任务行 settled/requirements 认证协议；不添加一个解决 Q07 的专用 agent；不要求模型输出隐式推理过程；不以开启 reasoning 代替修复数据语义。
+
+0.1 模型负担的明确边界
+  原先让模型依次安排 read_panel、derive、change、join、rank，仍要求它充当数据管道调度者；只有批量化，不足以解决用户指出的 token 浪费。这些步骤现移到确定性执行层。
+  默认分析路径中，LLM 不生成财务期末日期、不按单元格读取、不复制数值、不手工配对分子分母、不填写 join key/列映射/内部 ID/方法版本、不为 citation 反复改语序，也不另写 claim graph、validation packet 或逐句证据清单。
+  LLM 只选择有业务含义的范围、方法、比较口径和必要例外。已从当前任务确定的字段由 runtime 绑定；不能因内部函数需要参数就要求模型重新填写。
+  定量任务默认输入是任务摘要、范围/歧义和相关方法摘要；默认返回是已对齐的分析表、方法与期间说明、重要限制和来源入口。
+  原始记录、调用 trace、完整 schema、全部 handbook、重复 evidence 行保存在系统侧，按需展开；不能把复杂输入从工具结果转移到更大的 STATE。
+  不隐藏会改变结论的限定：缺失主体、负/零分母、不可比期间、来源冲突、范围冲突、截断覆盖必须随主结果返回。
+  对财报解释、方法适用性、矛盾证据等专业判断，模型仍需要读必要原文。这类阅读有分析价值，不把“模型完全不读复杂材料”作为目标。
+
+1. 已核实的现状与复用位置
+
+1.1 Harness
+  llm/client.py:68,88,109：chat_with_tools 只走 Chat Completions，返回 content/tool_calls/usage；无 effort 参数；usage 只保留 model、prompt_tokens、completion_tokens。
+  agents/llm_session.py:50,59,102：统一调用和计费入口已存在，for_actor 建立子会话外壳；未保存 provider 原生续接状态。
+  agents/meta_agent.py:499-509：每轮替换 messages 中的 STATE，并手工重建 assistant 消息。
+  agents/sub_analyst.py:248,309 与 agents/research_session.py:124 也是同一入口的消费者。
+  q07_gpt56/run_live.py:84 显式注入 reasoning_effort=none；param_probe.txt 记录 low/省略 effort 被拒、none 成功。两次运行 13+18 次模型请求均返回 reasoning_tokens=0。
+
+1.2 Context 与期间
+  services/briefing.py:36,61 依据原问题识别 ticker；_issuer 已能构造主体目录。
+  agents/sub_analyst.py:116 的 _coverage_of 只切片旧 briefing。Q07 两次 issuer 初始 coverage={}。
+  services/period_semantics.py:145,157,175,216 已有 FiscalPeriod/FiscalCalendar 和基于披露的财务日历。
+  tools/periods.py:66,113 已有 Asked/resolve；LAST_N_SCHEMA 不表达 TTM 比较。
+  services/fundamentals_service.py:167 的 get_flow 与 analytics/interval_algebra.py 已负责真实窗口组合。
+
+1.3 方法与计算
+  analytics/registry.py:422 的 Method 已有 inputs、procedure、authority、fails_when、executor、params_schema、unit_class。analytics/skill.py 是兼容 re-export，不应新建第二套方法 registry。
+  services/compute_service.py:59 已支持多个 method/subject；算术支持 fold 和共享单分母 broadcast，但缺少按主体/期间配对的两列表运算。
+  services/recipe.py:82 是 Financials 页的标准分析 recipe，不是通用 agent 工作流引擎；不应把所有新分析塞入这个文件。
+  tools/primitives.py:521 的 calc 通过 compute_service 复用 typed_calculator；不应再实现一套浮点计算器。
+
+1.4 证据与回答
+  services/facts.py:67 已定义 Fact；FactRecord.params 与 CalcLedger.params/result 都可保存版本化 JSON。
+  typed_calculator.py:912 附近算术保留了结果类型，但 ratio 的绝对差与相对变化未充分区分。
+  typed_calculator.py:1250 的排名项、fact_adapters.py:903 的 _ranked 没有完整保留原事实的比较窗口。
+  answer_check.py:598 的 check_block 已支持局部 refs；327 的最终正文入口仍以紧邻数字的指针为主。
+  answer_check.py:1193 与 answer.py:433 已能输出前端需要的 paragraph/table/chart blocks。
+  当前源码已记载并体现旧占位符替换的副作用；本方案不重新把所有正文数字替换为事实显示字符串。
+  agents/handoff.py:53,68、analysis_state.py:293 允许部分证据与 note 逐条合并，继续复用。
+
+2. 模型接口：Responses 与原生会话状态
+
+2.1 API 决策
+  为 agent 工具循环新增 Responses adapter，生产目标路径是 Responses；Chat adapter 保留为受控 A/B 对照和旧配置兼容路径。
+  角色配置包含 model、api、reasoning_effort、max_output_tokens。lead 和 analyst 可分别配置；日志同时保存请求模型和实际 served model。
+  不通过模型名称 startswith 的隐藏 hook 改 effort；不兼容组合给出 configuration_error。
+  reasoning_effort=none 表示明确的运行配置，不等于“没有思考能力”；why 为可选业务决策说明，调用与任务的关联由 runtime 自动记录，不逐个基础调用强制生成重复理由。
+
+2.2 内部契约，非 LLM 必须填写的 schema
+  ModelPolicy {api, model, reasoning_effort, max_output_tokens}
+  ModelTurn {text, tool_calls, native_output_items, usage, response_id,
+             status, incomplete_reason, request_id}
+  Usage {input_tokens, output_tokens, cached_input_tokens, reasoning_tokens}
+  未返回的 usage 字段为 null，不能变成 0；reasoning tokens 是 output 的组成部分，不重复相加计费。
+
+  LlmSession.next(input_events, current_context, tools, policy) -> ModelTurn
+  LlmSession.for_actor(actor, task_id) -> 独立 ConversationState
+
+2.3 续接策略
+  第一版采用 Responses store=false + 应用保存并重放原生 output items，便于记录实际请求和控制当前上下文。保存 reasoning 的不透明 encrypted_content，不解释、不改写、不加入 Fact ledger。
+  保存原生 function call 的 call_id，所有调用结果按 call_id 回传；包含多个调用时每个调用都有结果，包括 skipped/cancelled。工具结果的业务顺序不依赖返回数组位置。
+  不同时启用 previous_response_id 链与完整历史重放，以免重复输入。
+
+  当前 STATE 是可替换投影，不是永久追加的对话事实：
+    - ConversationState 保存原生 user/assistant/tool 事件。
+    - 本轮 base instructions + 当前 STATE/预算/能力组成 request instructions/current_context，每次重新提供。
+    - 不把旧 STATE 快照连续追加成互相冲突的系统消息。
+    - 已发生的工具结果和原生 reasoning items 不因 STATE 更新而被删掉。
+    - wire 保存每次真正送达的当前上下文、原生输入/输出和版本，供复现。
+  不再从循环手工重建的 content/tool_calls 反向猜测丢掉的 provider items。
+
+  隔离键至少为 session_id + message_id + task_id；actor 只作角色标签。同一 sub:issuer 的两个任务不能共享 reasoning 历史。证据仍共享原 session ledger。
+  首版按单个任务/用户 turn 保留原生会话；跨用户轮次沿用现有事实/摘要恢复，不声称可以任意裁切 reasoning 项后继续。达到上下文预算时返回部分工作。
+
+2.4 代码与记录
+  修改 llm/client.py、agents/llm_session.py、meta_agent.py、sub_analyst.py、research_session.py、app_state/settings.py。
+  建议新增 llm/contracts.py 与 llm/responses_adapter.py，Chat 适配只在此层转换。
+  AgentStep 增加可空 llm_metadata JSONB，保存有效配置、usage 明细、provider IDs、停止原因、prompt/tool/schema 版本；已有 token 列继续填充供旧报表使用。迁移采用向后兼容 additive SQL。
+  provider error 也写步骤，usage 未知不补零。审计写失败保留现有“回答继续、日志明确报错”的行为。
+  reasoning 的不透明内容仅进入会话/受控 wire，不进入普通步骤摘要或用户 findings。
+  改测试 harness 的正式配置入口，删除 monkeypatch 注入 none；wire hook 只观测，不改变请求。
+
+3. Context：按任务主体绑定；期间由服务解析
+
+3.1 增量绑定
+  在 services/briefing.py 增加 for_subjects(db, subjects, snapshot, capabilities)，复用 _issuer/_portfolio；任务派发前补齐缺失主体，再由 _coverage_of 裁剪。
+  同一 turn 缓存按主体/资源版本的目录，重复 ask 不重复全量读库。目录成本与 evidence 成本分别记录，context 查询也有时间和数量上限。
+  Lead 从组合发现主体后，同一绑定逻辑也适用于 lead 直接 read_panel，不只修 sub 路径。
+  Context 输出：实体 ID 与显示 ticker、主体选择依据、可用数据/工具范围、已固定 book run、期间目录或目录 handle、剩余预算。
+  cap 时保留主体身份和目录 handle，明确 omitted/next_offset；不截断造成空 coverage 而无说明。
+
+3.2 范围对象
+  Scope {subjects, selection_basis, source_refs, expected_count?, resolved_count,
+         scope_status, book_runs, data_snapshot, known_at?}
+  身份由 company/security master 映射；列位置、ticker 展示串都不是跨资源 join 的主键。
+  expected_count=5 但目录 Technology=3 时，scope_status=mismatch。允许先给有条件的三家公司分析并说明范围；不能静默把三家结果标为覆盖原题五家。
+  五大科技业务篮子与行业分类可以各有定义；没有定义时保留歧义，不硬编码 AAPL/MSFT/NVDA/AMZN/GOOGL。
+
+3.3 比较期间
+  扩展 tools/periods.py 与 services/period_semantics.py，新增比较 selector：
+    {kind: "ttm_comparison", anchor: "latest", alignment: "issuer_fiscal",
+     baseline: "previous_comparable_ttm"}
+  返回每个主体的 current/prior 实际 start/end、财年位置、可比性及原因。
+  按披露日历定位上一可比窗口，交给 interval_algebra/get_flow 组合。不得简单减 365 天，也不得从模型输入补造未核实日期。
+  分子、分母共用同一主体的 period binding。最新一期缺少 NI 时，报告缺口；不得悄悄把 NI 回退一期。
+  53 周年、Q4、闰年、非自然财年均保留实际天数；找不到可比窗口返回 scoped unavailable，不猜。
+  fiscal_alignment 与 common_cutoff 是不同策略；首版完整实现前者。后者只有在数据服务能同时约束期间和披露可得时间时开放。
+  period_end、filed_at/known_at、读取快照分开：历史时点问题不能只按 period_end 筛选后使用后来重述数据。无法做 point-in-time 时明确 unsupported。
+
+  旧 filings_read/metric 仍可接受明确期间；last_n 与 TTM 的非法组合在 schema/参数预检阶段给出一致解释和替代 selector。provider schema 不支持全部跨字段约束时，以共享模型校验器执行预检，并在回归中检验 schema 可表达范围，不能声称 JSON schema 本身保证一切。
+
+4. 表级执行与分析入口：把配对、展开和固定调度交回代码
+
+4.1 内部执行能力
+  read_panel(scope, resource, measures, periods|runs, why)
+  analyze_table(op, tables, parameters, why)
+
+  这两个接口是 execution service 的能力，默认不作为 lead/sub 必须编排的模型工具序列。诊断和特殊分析时可按需开放受权限约束的低层入口；常规方法不得以调用它们作为必经路径。
+  read_panel 首版 resource 限 filings / book；prices 等沿用既有工具，按真实测试需要再接入。
+  analyze_table 首版只有 derive、change、rank、join；每个 op 使用互斥参数分支，不要求模型填写一个通用程序。
+    derive：注册 method_ref，或有限的四则 column expression。
+    change：明确 absolute / relative，指定 current 和 baseline 的角色。
+    rank：一列或多列独立排名，明确 universe、direction 和排除规则。
+    join：按 canonical subject_id 的 1:1 连接；多重匹配报错；默认保留请求 universe 的缺失行。
+  新增 services/analysis_tables.py 和 services/table_analysis.py，供下述分析执行器调用；低层调试工具若暴露，放 tools/table_tools.py 并按需注册。
+  内部读取复用 fundamentals_service、run_reads_service；算术和排名复用 typed_calculator。对外分析入口通过现有 registry/MCP 接入，不绕过授权、trace、配额和事实适配。
+
+4.2 数据契约
+  TableView {
+    schema_version, scope, columns, row_key,
+    rows: [{subject_id, period_role, period_ref, cells: {column: fact_id}}],
+    missing_cells: [{subject_id, period_role, measure, reason, source_operation}],
+    coverage, lineage, next_offset
+  }
+  一张表的键是 subject_id + period_role/period_ref；跨资源表连接时仍保留每列自己的期间，不能把财务 TTM 和组合 run 日期混成一个 as_of。
+  表 handle、列名、join key 和映射由执行器维护；只有特殊探索路径才需要模型显式选择表/列。显示数字必须附 cell fact 的身份/期间/单位，不传脱离语义的数值数组。
+  内部表有完整 schema 和分页；默认模型视图只给相关列的可读名称、已显示范围与覆盖。分页影响展示，不影响运算的 universe。
+
+4.3 存储与 lineage
+  使用 CalcLedger 新 operation=analysis.table_manifest 保存不可变视图 manifest，result_type.kind=table；每个数值单元仍引用已有 Fact/CalcLedger。manifest 记录方法、期间绑定、列映射、scope、输入 refs、版本。
+  不在第二套存储中复制未关联的计算值。表 manifest 必须有显式 resolver/adapter；generic harvest 不得把 row_count、版本号等元数据当作金融事实。同步检查 analytics/resources.py 与 services/quantities.py 的操作分类，使 table manifest 不能误入 scalar 算术解析。
+  table_ref 的解析必须检查 session/owner 和所有输入范围；不能因为它是 calc_ ID 就默认可读。open 和 [table: ...] 扩展到该受控 manifest，历史 pull table 继续兼容。
+  派发时 input_refs 保持现有事实通道；增加可选 input_tables，仅传已存在且授权的表 handle。runtime 同步提供 schema/preview；不要求模型复制整张表。
+
+4.4 成本边界
+  panel 初始上限：32 主体、8 个期间、16 列，同时总请求单元不超过 256。超限明确分区建议，不静默截断。
+  分别记录 LLM tool 调用数、底层实际读取/计算数、返回单元数、延迟。减少模型调用不等于底层工作消失。
+  请求合法性预检不消耗 evidence 成功额度，但仍受请求/turn 上限约束；实际执行但查无数据计执行成本。
+  内部 fan-out 有并发/耗时上限，数据库 session 按任务正确隔离；不在同一 AsyncSession 上直接无界 gather。
+
+4.5 默认 LLM 工具：analyze
+  analyze(requests, scope_ref?, why?)
+    requests: [{measure, compare?, rank?}]
+  当前任务只有一个明确范围时 scope 由 runtime 绑定，无须重复传参；多个可能范围时，模型选择一个有业务含义的范围。API call_id、book/run ID、period ID 和映射键由框架管理。
+  measure 从相关方法短目录选择；compare 是 previous_ttm / previous_run 等业务口径。绝对/相对变化按已声明的方法默认值绑定，并在结果中披露；用户明确指定或存在实质歧义时才由模型覆盖/澄清。
+  方法版本、输入指标、资源路由、分子分母对应、日期、计算顺序、列映射、来源与展示格式由 registry + runtime 推导。新方法确需自定义公式时只定义一次，随后对全部主体执行；不要求逐主体写 expression。
+  不把一个任意自然语言字符串交给隐藏 LLM 重新规划，也不提供用户必须编写的通用 DAG/DSL。analyze 使用有限参数 schema，执行器按方法依赖确定性展开。
+  新增 services/analysis_execution.py 与 tools/analysis_tools.py。执行器展开请求为内部 read_panel/derive/change/join/rank，自动去重相同数据依赖，记录每一步而不逐步回调模型。
+  只有业务含义不确定、数据冲突无法按已声明策略解决，或执行能力确实不支持时，返回一个聚焦的 decision_needed / scoped limitation。错误包含影响范围和可选行动，不把内部 traceback/schema 当模型修复任务。
+  此入口通用于已注册指标的多主体、跨期、排名与跨资源对照，不能硬编码 Q07 的公司、结果或固定金融主题。
+  全部 requested capabilities 必须在执行前于 MCP 服务端验证；analyze 聚合服务不得成为绕过 face 权限的通道。
+
+4.6 默认模型视图：AnalysisView
+  AnalysisView {scope_summary, method_summary, period_summary,
+                aligned_table, extrema_and_ties, limitations, detail_refs}
+  同一分析请求中的多个指标按已绑定的 subject_id、scope 和显式比较策略生成对照视图。期间各异时保留每列口径，只有主体/范围可确认一致时合并。
+  Q07 默认直接给：主体、本期现金转化、上期、变化(pp)、对应排名、权重变化(pp)及排名，外加范围和期间说明。模型不必阅读全部底层 OCF/NI 行再自己重建此表。
+  detail_refs 指向真实证据/原文/manifest；按需 open 时保留可验证信息。跨 agent 交接传 AnalysisView + handle，避免将结果重新拆散成几十个无组织事实。
+  大范围分析按目标返回顶部/底部、并列、异常和覆盖摘要，完整表可展开；不能把未展示行视作缺失，也不能只看前几行计算排名。
+  services/analysis_state.py 与 agents/evidence_context.py 优先呈现这类视图。同一数据已在分析视图中出现时，不在默认 STATE 再重复整批底层 evidence；原 ledger 仍完整可打开。
+
+5. 方法定义：扩展现有 registry，按需供给 skill
+
+  扩展 analytics/registry.Method：version、required_capabilities、period_policy、definition_source、comparison_policy、interpretation_policy。输入、公式与失败条件仍使用现有字段和执行器。
+  在 analytics/formulas.py 注册 cash_conversion = operating_cash_flow / net_income，并由 registry 派生指标描述、方法说明和工具目录，避免手写多份同义定义。
+  analyze 示例中的 portfolio_weight 是面向分析的指标别名，绑定既有 book 权重读取及 run 比较能力；不新增另一套权重计算。方法执行清单明确声明两期输出、变化和排名可由哪些既有操作组合。
+  初始方法规则：
+    - 两个输入必须同主体、同实际窗口、同币种/单位；不得以 accruals 或 debt/OCF 代替。
+    - NI=0：不可计算；NI<0：可保存数学比值，但默认不纳入“越低越弱”的普通现金转化排名，并解释不可比性。
+    - change_kind 必须显式；Q07 示例使用绝对差，列标题为百分点。用户要求相对增长时另算。
+    - rank 保留 requested/included/excluded universe；完全覆盖与“已取得数据中的最小”是不同结论。
+  非注册公式走有限 column expression，记录 user_defined/model_proposed 与原问题/决策来源。表达式只允许已授权列/refs和既有四则算子，限制节点数与深度，不执行 Python/eval，不赋予 registry authority。
+  全局 divide 仍允许数学上合法的负数输入；“不适合金融排名”属于方法解释规则，不能污染所有算术。
+  analytics/handbook.py 按需提供方法说明，初始只带相关方法索引/摘要。不把完整章节重复塞进每个模型请求。
+  同一 method/version 分别生成面向模型的解释/适用边界、面向执行器的依赖与计算规则、面向 validator 的语义不变量；共享标识而不要求模型阅读三份内部契约。
+  required_capabilities 由服务推导并在 MCP 服务端校验。skill 可以组合多资源；不能因 skill 加载或选了 method 就扩大权限。现有 face 授权继续有效。
+
+6. 数值语义：贯穿算术、Fact、排序、展示和验证
+
+6.1 单一结构
+  新增 analytics/value_semantics.py，定义内部 QuantitySemantics：
+    {version, quantity_kind: level|absolute_change|relative_change,
+     current_ref?, baseline_ref?, current_period?, baseline_period?,
+     method_ref?, definition_source?, comparability?}
+  保持现有 unit_class 的维度代数；在 CalcLedger.params.result_type 与 Fact.params.semantic 中保存同一结构的序列化结果。所有读写通过统一 helper，不在各模块临时拼不同字典。
+  同步扩展 facts.model_row/line、紧凑行序列化与 ledger 恢复路径：模型实际读到的预览也必须包含 change_kind、比较端点和可读单位。只把语义存进数据库而在 model view 中丢掉，不能算完成。
+  ratio=0.6966 与 ratio 的 absolute_change=-0.193 同为无量纲，但语义不同。
+  相同指标/主体的 ratio level 相减产生 absolute_change；通用跨量相减必须保留实际含义，不一律认成期间变化。
+  relative change 由显式 change 入口计算 (current-baseline)/baseline；基准为零不可计算，负基准适用性由方法声明。
+
+6.2 排名
+  排名是视图，不改变被排事实的含义。rank 项保留 value_ref、原语义、实际窗口、比较端点；只增加 place、direction、universe_ref、included_count、excluded 和 ties。
+  保留现有 competition rank 对精确相等数值的处理；若领域需容差必须显式配置并记录，不能在展示舍入后制造并列。
+  fact_adapters._ranked 不再只依赖 basis 文字反推身份。排序后 open 原值仍可直接取到完整 lineage。
+  财务口径不一致或 universe 不全时，不允许将局部最小值渲染成无范围限定的全局最弱。
+
+6.3 显示及旧数据
+  display_conventions、ledger 数字匹配、answer.fill、前端展示共享语义测试样例：
+    ratio level 0.6966025 -> 69.66%
+    ratio absolute_change -0.1929779 -> -19.30 percentage points
+    ratio relative_change -0.2169314 -> -21.69%
+    weight absolute_change 0.00468063 -> +0.468063 percentage points
+  百分点与 % 不可互换；“下降 19.3 个百分点”可以匹配负绝对差，不能只拿字符串里的正号/负号作判断。
+  旧 Fact 不自动标注为新语义已验证。能从完整 operands/result_type 确定恢复时构造有版本的读取视图；不能恢复时保留 legacy/unknown。旧答案保留原文和原 verdict，不批量改写历史结论。
+  升级 validation version，避免历史 accepted/inherited 标签直接豁免新规则。
+
+7. 观察式 validation：验证器组织材料，模型正常分析与表达
+
+7.1 模型出口与自动交接
+  lead 与 sub 都可用自然语言正常结束；不要求 submit_answer、claim graph、validation packet、逐行完成认证或逐句 evidence/refs。
+  runtime 自动附带本任务产生的 AnalysisView、产物 handles、执行状态与原始记录。sub 的自然结束不再因缺少 submit 而变成 no_submission；工具产生的证据和模型选出的重点仍分别标记。
+  显式引用或重点选择可以作为可选线索，不是答案/交接有效的前置条件。保留旧 submit、repair_answer 仅用于受控旧版本兼容，不将其混入新默认工具面。
+  正常业务准确性要求保留；去除强制指针摆位和句子 tag 协议。纯引用/排版问题由 renderer 处理，实质内容问题才返回普通业务反馈。
+
+7.2 系统自动提供验证输入
+  ValidationInput {original_question, scope_decisions, visible_context,
+                   execution, evidence, draft, outcome}
+  此为 runtime/validator 内部契约，不由分析模型生成。
+  visible_context 记录实际模型请求、工具定义/方法版本、视图与送达范围；execution 关联调用、参数、完整结果、错误和停止原因；evidence 保留授权来源快照、实体、期间、单位与 lineage。
+  复用 tools/registry、Fact/CalcLedger 和 delivery 的记录；扩展 llm_session/trace_service。现有生产 llm_call 的 usage/read 摘要及截断文本不足以代替测试中的完整 wire。
+  采用不可变、可去重的 blob/manifest 保存可重放正文；界面摘要不是记录本体。数据访问权限、凭证脱敏、版本与保留策略沿用服务边界；记录缺失时标明验证覆盖不足。
+  区分 ledger 存在、实际送达、模型作出命题。验证器另行取得的证据标记为验证阶段来源，不能反写成模型已读。why 或 API 未公开的内部推理不是必要证明材料。
+
+7.3 检查分层与 observer 流程
+  执行层在运行时检查权限、schema、期间/单位兼容、分母与方法适用性、预算；这些约束不能延后到最终答案。
+  发布前 observer 从草稿提取命题，解析 subject、measure、period、quantity_kind、direction、baseline 与 universe；简单表格/数值先用程序，复杂语义才调用有界提取器。
+  验证器按语义查询相关授权证据，确定性核对数值、舍入、比较、排序/并列及覆盖；不能只按相同数字找任意 ledger 行，也不能把模型自己选择的 refs 当正确性证明。
+  对解释、因果、假设与否定断言检查支持程度；命题结构、来源关系和 validation record 均由 validator 产生。自然语言提取不可靠时返回 ambiguous/unknown，不强迫分析模型填验证表绕过检查器能力不足。
+  最终状态区分 supported、contradicted、insufficient_evidence、ambiguous、judgement，并保留哪些检查确定完成、哪些仅是模型评估。
+  核验通过后由 renderer 添加来源链接。句末引用、无显式 ID 的正确表达均可通过；主体/期间歧义先利用上下文和来源消解，仍不清楚时要求明确业务含义，不要求手填 f_ID。
+  “下降 19.3 个百分点”应解析成负绝对变化；“下降 19.3%”与之语义不同，必须检查并反馈，不能由 renderer 静默换单位。数字、日期、口径、因果结论不属于可自动美化的格式。
+  真正内容错误返回小段已核实的业务反馈与相关证据；分析模型可正常修订或追加信息请求，不逐句填写 repair_answer tags。设置有界重试，耗尽时保留未解决项，不制造已验证结果。
+  日志证明执行过程，不保证数据/计算器正确；来源与计算规则需独立冻结样例、重算和测试，避免同一错误算法给自己作证。
+  离线 eval/生产监测另行评估完整 trace 的方法选择、效率和回归，不要求每个在线请求填写评分材料。日志/答案始终作为待检数据，不作为改变 grader 规则的指令。
+
+7.4 状态与判断分离
+  ExecutionStatus {task_id, scope, status, stop_reason, collected_refs,
+                   pending_operations, capability_scope, retryable}
+  由 runtime 产生。budget_exhausted/tool_not_available/timeout 不是数据缺失事实，移出金融 absence 主体。
+  data absence 仍由实际读取服务在查询范围内生成，带 resource、subject、measure、period、snapshot。只有这种范围可核对的缺失才支持“此范围没有数据”。
+  note 是从正常分析文本保存的产物；refs 和 validation 分类由 observer/runtime 关联，不让模型自己选择“已验证”。
+  解释性意见可作为 judgement 保存，但不能伪装成已证明事实。全局不可用断言如果只有局部执行失败，标记证据不足，并给出真实能力范围供 lead 继续分析。
+  状态投影保留这个区别，accepted 表示输入被接纳，不再等同于结论为真。已接受数值 note 与无证据观点不能共享同一可信标签。
+
+7.5 完成度与 grader 校准
+  delivery=answered 只表示有最终响应，保留兼容含义；新增独立 numeric_validity、scope_alignment、task_completion、unresolved 输出。
+  对拥有显式 table/operation 结构的分析，用 requested universe、缺失单元及必须的比较结果确定覆盖。
+  自然语言问题的完整任务目标无法普遍由程序证明：用原始问题和结果做独立评估，不以模型自行填写 completed 为证。首版对一般问题返回 unknown/partial，而不是捏造确定性。
+  Q07 的离线 rubric 由测试固定四项义务：当期排名、变化排名、最弱主体、与最大权重增幅主体的比较；另检查五家/三家范围冲突。
+  通用定性评审先 shadow 记录，经人工校准再决定哪些可作为发布 gate；确定性语义错误在发布前处理。证据不足可为 unknown，不把 validator 不会判断直接当模型错误。
+  增量索引与缓存证据，语义 judge 只读相关命题和材料，不每轮重读全部 wire。统计 actor + validator 的总 tokens、费用与耗时；不能只是把机械工作转移到另一个同等循环的 LLM。
+
+8. 预算与结束：保留部分证据，停止无效循环
+
+  子任务每次请求前明确返回剩余 completion/evidence/内部工作预算。
+  evidence 额度耗尽时进入 finalizing；允许自然语言结束和已授权证据 open，不强制 submit；收尾最多占用预留的一次 completion，总数不超原 turn cap。
+  同一批已返回的 tool calls 全部获得对应结果；未执行项记 skipped/budget_exhausted 及真实 subject/params，不伪装为第一个主体缺数据。
+  收尾无文本、模型错误或 turn cap 达到时，runtime 自动返回 available_evidence、已产生的分析及其验证状态、pending_operations、stop_reason。auto-return 标明来源，不伪造模型选择了所有行。
+  下一轮不再暴露不可执行的读取工具。框架不继续让模型发出几十次预算必拒的调用。
+  lead 可以根据剩余能力接手 pending operations，并保留原表键/期间绑定，不重新猜测输入。
+  不强制预算剩余就继续无限工作；当目标已完成、无可执行路径或预算到限时结束，并报告相应完成状态。
+
+9. Q07 的目标执行轨迹（区分模型决策与内部步骤）
+
+  1. 从组合快照解析 scope；暴露“五家”与“三个目录 Technology”的冲突。模型处理这一业务歧义，固定采用的分析范围。
+  2. 模型提交分析意图，示例：
+       analyze(requests=[
+         {measure: "cash_conversion", compare: "previous_ttm", rank: true},
+         {measure: "portfolio_weight", compare: "previous_run", rank: true}
+       ])
+     已确定 scope、方法版本、资源权限和 book snapshot 由 runtime 绑定。
+  3. 程序内部展开为两份 panel 读取、比率派生、两组变化计算、主体连接、排名及对照视图。每个步骤有 trace 和 lineage，不要求模型传输中间 handle 或填写内部参数。
+  4. 返回一份 AnalysisView：对齐后的结果表、最小/最大及并列集合、期间/方法说明和重要限制。模型据此解释结果并回答关系问题。
+  5. runtime 自动向 observer 提供答案与执行记录；observer 提取命题、核对来源及任务覆盖，renderer 生成引用。没有实质错误时，不增加模型填写/修补验证材料的轮次。
+
+  在范围已绑定、数据/方法可用且 lead 拥有所需权限的常规 fixture 中，目标是一条领域分析请求完成此确定性执行链。若权限需要拆任务，则每个获授权子任务各表达一次意图，由 runtime 合并兼容视图；不靠扩大权限满足调用数目标。
+  这是一项待验证的交互设计指标，不是已经达到的成功率或 token/延迟节省承诺；底层读取与计算仍按实际执行计量。
+  若最高/最低存在并列，应按集合比较；若范围或期间不可比，应在主视图中明确，不隐藏在详细日志中。
+  原始材料解释、异常调查和新方法设计仍可触发额外分析。只有任务能独立推进或需要不同专业判断时才拆 agent，不为每个资源创建一个 agent。
+
+10. 实施切片与依赖
+
+  P0：固定回放与测量口径
+    从两个 wire 提取必要的请求、工具响应、四份最终答案、三次提交及参数探针作为紧凑测试 fixture；保留原始日志。
+    固定 baseline 的数字、错误分类、语义口径与模型配置。测试不依赖 live key。
+
+  P1：Responses 会话与可观测性（依赖 P0）
+    实现 contracts/adapter、角色配置、原生历史、动态 STATE、调用结果配对和 usage metadata；迁移三个循环及 harness。
+    保存实际请求/返回及可重放视图引用，区分送达和 ledger 存储。输出：可在相同旧工具下受控比较 Chat none、Responses none、Responses low/medium。
+    不在同一次比较中更换模型、工具或 prompt。
+
+  P2：数值语义与 scoped status（依赖 P0，可与 P1 独立提交）
+    实现 value semantics、rank 元数据保留、pp/relative 展示匹配、validation version、execution status 分离。
+    输出：修复“正确 pp 被拒、错误 % 通过”，且保留现有算术/跨主体/期间边界。
+
+  P3：动态 context + 比较期间（依赖 P2 的语义契约）
+    subjects 绑定、固定快照/运行 ID、财务日历 selector、范围冲突与 schema 预检。
+    输出：issuer 不再得到无说明的空 coverage；Q07 不需模型生成具体 prior 日期。
+
+  P4：分析入口、表级执行与方法（依赖 P2/P3）
+    registry 扩展、cash_conversion 方法、panel/table services、analyze 确定性执行器、AnalysisView、manifest/分页、服务端 capability 校验、input_tables、按需工具目录。
+    输出：Q07 无需模型编排内部七步即可执行，所有数值可追溯到同一 typed engine；默认输入输出不倾倒原始 ledger。
+
+  P5：观察式验证与可靠结束（依赖 P1 的记录契约和 P2/P4；预算部分可提前）
+    runtime ValidationInput、命题提取/语义证据查询、确定性核对、有界语义评审、自动引用、分类与独立完成度；sub 自然结束、finalizing/auto-return、API/UI 独立结果状态。
+    输出：分析模型不准备 refs/证明表、不按 tag 修稿；普通正确表达可验证，实质错误才触发业务反馈；已有产物和未执行项可靠可见。
+
+  P6：回归与受控 live 评估（依赖前述切片）
+    先离线/fixture，再测新旧架构。需要 reasoning 对照时固定其他所有变量；每配置至少 5 次作为初始诊断样本，报告分布而非据单次成功给总体可靠性背书。
+    使用显式的 agent contract version 选择新旧入口；不堆叠多个互相冲突的 fallback。回滚保留新字段/历史数据，旧 renderer 忽略可选字段。
+
+11. 验收测试与发布条件
+
+11.1 Harness
+  - 两次工具续接后原生 reasoning/function_call/output 的对应关系完整；不重建丢项。
+  - 同角色不同 task 不串会话；更新 STATE 后实际请求只有一个当前投影。
+  - 无效 model/api/effort 配置明确失败；没有静默 none fallback。
+  - reasoning/cached usage 不重复计费，未知为 null；请求失败有可识别 trace。
+  - max_output_tokens 用尽/incomplete 与正常 final answer 区分，不把部分文本认证为完成。
+  - 保留 tests/test_llm_cost_trace.py、test_v2_audit.py 的统一入口与计费边界意图，更新旧 tuple 形状断言。
+
+11.2 Context 与期间
+  - 原问题无 ticker、lead 后选主体时，issuer 首个实际请求含所需目录。
+  - AAPL/MSFT/NVDA 不同财年；53 周、Q4、闰年；current/prior 完整窗口；输入缺失不跨期借值。
+  - 五家/三家 mismatch 不被静默抹去；历史 cutoff 不引入后来披露。
+  - schema 接受而预检必拒的已知组合有统一说明；缺目录与无数据可区分。
+
+11.3 表与方法
+  - 输入行顺序打乱不改变结果；缺一家公司仍保留其缺口；重复主键拒绝；分页不改变排名全集。
+  - 跨公司/跨期 numerator-denominator 误配拒绝；每个 cell 仍有 ledger identity。
+  - NI=0、负 NI、部分覆盖、并列、方法版本与 user-defined 来源均可重放。
+  - 两表 join 不丢各自日期；rank 前后 method/period/change_kind 不变。
+  - 新工具不能借 resource 参数越过 MCP face/token 或跨用户读取 manifest。
+  - 沿用 tests/test_arithmetic_closure.py、test_rank.py、test_s3_architecture.py、test_mcp_face_scope.py 的关键边界。
+
+11.4 Q07 数值/文字黄金样例
+  - AAPL：本期 114.396900%，上期 112.603038%，绝对差 +1.793862 pp，相对变化 +1.593085%。
+  - MSFT：本期 135.878003%，上期 135.261551%，绝对差 +0.616452 pp，相对变化 +0.455748%。
+  - NVDA：本期 69.660253%，上期 88.958047%，绝对差 -19.297794 pp，相对变化 -21.693140%。
+  - AAPL 权重绝对差 +0.468063 pp。
+  - 正确的 “fell 19.3 percentage points” 可通过；把上述绝对差写成 “fell 19.3%” 不通过。
+  - 引用放句末、数字后有日期插入语不产生纯摆位拒绝；错误 subject/year/benchmark 仍拒绝。
+  - scope 内资料不足不得冒充全局数据不存在；原日志的 risk 全局否定 note 不进入已支持 findings。
+  - 原 mini 最终文本仍可作为诚实的 partial 回答，但不能在新完成度字段中标 full completion。
+  - 更新 tests/test_s2_handoff.py、test_s3_recorded_replay.py、test_simplified_work_view.py；增加独立 Q07 fixture 回归，不重写旧 wire。
+
+11.5 Runtime 与 UI
+  - evidence 耗尽后不再发起新的读取；最多一次收尾 completion；自然结束和自动结束均返回已收集证据，不依赖 submit。
+  - 一条分析验证失败不抹掉其他有效产物；lead 接手时相关视图与送达范围准确记录，不把内部 handle 出现当作全表送达。
+  - AnswerBlocks 保持旧 paragraph/table/chart 兼容；新语义 pp 与后端相同；旧答案可打开。
+  - 更新 apps/web/tests/answerBlocks.test.ts 和显示共享 fixture；API/类型增加可选的独立验证/完成度字段。
+
+11.6 评估指标
+  semantic_correctness、task_completion、scope_alignment、方法选择、期间正确率、数值正确率、unsupported claims、纯引用格式拒绝数、MCP/底层调用数、模型请求数、缓存/推理 tokens、耗时、修复轮数、预算后无效调用数；同时报告 validator false accept/false reject、actor 与 validator 的分别及总成本/延迟。
+  数值语义/权限/数据对应关系是发布硬条件；live 完成率和成本报告实际样本及分布。表工具目标是消除逐单元模型配对，不以固定 LLM 调用数作为所有任务的正确性标准。
+
+11.7 模型机械负担（新增硬验收）
+  - 常规已注册分析中，模型生成的具体财务日期、单格读取参数、逐行 operands 配对、join key/列映射和运行 ID 的次数为 0；这些来自系统绑定。业务范围选择不计作机械操作。
+  - Q07 在范围已绑定、数据齐备且权限足够的 fixture 中，单个 analyze 请求能产生完整对照表；不能要求模型先后调用 derive/change/join/rank 才算完成。
+  - 主体数从 3 增至 30 时，模型生成的执行参数不随“主体×期间×指标”展开；主体枚举由 scope handle 承载。输出可按问题需要增长，但有明确摘要/分页策略。
+  - 记录每个执行参数来源：user_input / model_decision / runtime_binding，防止把后端必需字段伪装成模型必填字段。
+  - 记录默认模型输入中的原始行数、重复 evidence 字节、方法说明长度和工具 schema tokens；对照旧 wire 评估真实下降，不能仅以 MCP 次数减少宣称节省 token。
+  - AnalysisView 的覆盖/缺失/不可比/范围冲突不可在摘要中丢失；展开可恢复完整数字、期间和来源。
+  - 关闭可选的低层工具后，标准 Q07 仍能完成。陌生指标确需探索时，允许有界降级并记录原因，不把所有问题都降回逐单元操作。
+
+11.8 观察式验证
+  - 分析模型不提供 f_ID、逐句 refs、claim JSON、submit 证明材料或 repair tags，正确自然语言仍能被验证并得到来源链接。
+  - 负方向词搭配正幅度、允许的舍入、句末引用通过；pp/% 混淆、主体偷换、期间颠倒、同值不同实体、错误比较全集被发现。
+  - 无数字的无依据断言不因没有 figure 而自动成为支持事实；明确的合理假设仍可作为 judgement 表达。
+  - 删除结论可以减少事实错误，但任务完成度必须下降，不能因 gate 通过自动 full completion。
+  - 覆盖 ledger 有但未送达、验证阶段才取得证据、trace 缺失/截断、来源/计算器错误、grader 提取歧义等场景；不得伪造模型已读或检查已完成。
+  - 使用独立人工确认的正反样例评估 false accept/false reject；grader shadow 校准后再逐类启用 gate，不以本身判定为自身正确性的证据。
+
+12. 改动地图与兼容边界
+
+  新增（建议位置）：
+    src/exposure_workbench/llm/contracts.py
+    src/exposure_workbench/llm/responses_adapter.py
+    src/exposure_workbench/analytics/value_semantics.py
+    src/exposure_workbench/services/analysis_tables.py
+    src/exposure_workbench/services/table_analysis.py
+    src/exposure_workbench/services/analysis_execution.py
+    src/exposure_workbench/tools/analysis_tools.py
+    src/exposure_workbench/tools/table_tools.py
+    src/exposure_workbench/services/validation_observer.py（命题提取、证据查询与有界语义评审编排，复用既有确定性检查）
+    trace replay/blob manifest 的契约与持久化（优先扩展既有 trace_service，不另建第二套 ledger）
+    对应 contract/period/table/semantic/recorded-replay 测试；一条 additive DB migration。
+
+  修改：
+    llm/client.py；agents/llm_session.py；app_state/settings.py
+    agents/meta_agent.py、sub_analyst.py、research_session.py、delegation.py、handoff.py
+    services/briefing.py、period_semantics.py；tools/periods.py
+    analytics/registry.py、formulas.py、handbook.py、display_conventions.py
+    services/compute_service.py、typed_calculator.py、fact_adapters.py、facts.py、ledger.py、quantities.py
+    analytics/resources.py 的表 manifest 类型分类
+    services/answer_check.py、answer.py、fact_boundary.py、analysis_state.py；agents/evidence_context.py
+    tools/primitives.py、faces.py、registry.py/mcp_server.py 的实际注册入口
+    services/trace_service.py、db/models.py、apps/api/routes/agent.py
+    apps/web/lib/types.ts、app/components/analyst/AnswerBlocks.tsx 与展示测试
+    scripts/agent_battery.py 和 Q07/后续 live harness 的配置/观测入口。
+
+  所有新 Fact 语义通过已有 params JSONB 扩展；历史 facts 不批量重算。CalcLedger 新 manifest operation 需显式分类测试，避免误入算术 resolver。AgentStep llm_metadata 的数据库迁移独立可回滚应用代码。
+  不改变数据读取的 owner/RLS/MCP 边界，不把 resource face 等同为知识边界。公开方法目录不等于可执行授权。
+  不改 Financials 标准 recipe 的默认指标集合；cash_conversion 是否加入该页是独立产品变更，不在本次范围。
+
+13. 仍需通过实现/测试确认的事项
+
+  Responses 的实际端到端效果尚未测量；param_probe 只验证了旧接口的限制。新版 SDK 的可重放项形状、当前模型支持参数应由 adapter contract test 和小规模能力探针验证。
+  当前日历对缺失/冲突披露的处理未被 Q07 全覆盖，不能仅用这三家公司证明期间解析通用可靠。
+  原题五家业务篮子的定义未提供；实施时保留 mismatch，不把某种解释写死为标准答案。
+  自然语言语义检查有边界；无数字观点不是自动真，也不应一律禁止。检查范围与未验证部分必须保留到最终状态。
+
+外部设计依据（只作接口/方法参考，问题判断来自本地代码和 trace）：
+  OpenAI reasoning / stateless continuation：
+  https://developers.openai.com/api/docs/guides/reasoning
+  OpenAI function calling：
+  https://developers.openai.com/api/docs/guides/function-calling
+  Anthropic tool design：
+  https://www.anthropic.com/engineering/writing-tools-for-agents
+  Anthropic Agent Skills：
+  https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
+  OpenAI evaluation best practices：
+  https://developers.openai.com/api/docs/guides/evaluation-best-practices
+  OpenAI trace grading：
+  https://developers.openai.com/api/docs/guides/trace-grading
+  Anthropic agent evals（transcript/outcome 与 grader 校准）：
+  https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+  FActScore（生成后提取原子命题，研究效果不能直接外推金融领域）：
+  https://aclanthology.org/2023.emnlp-main.741/
+  Anthropic MCP/code execution（中间数据留在执行层的原则）：
+  https://www.anthropic.com/engineering/code-execution-with-mcp
