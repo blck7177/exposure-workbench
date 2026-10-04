@@ -18,10 +18,19 @@ class Settings(BaseSettings):
     # gpt-5.x takes max_completion_tokens rather than max_tokens and accepts only
     # the default temperature — see llm/client.py, which branches on the prefix.
     openai_model: str = "gpt-5.4-mini"
-    # V1 step 7: the model is a VARIABLE of a measured round — the lead on one, the analysts on
-    # another (plan §3 步骤 7). Empty means `openai_model`, which is every deployment to date.
+    # WHICH MODEL EACH ROLE SPENDS ON, AND HOW IT THINKS (agents/llm_session.ModelPolicy).
+    # Empty means `openai_model`. The effort is sent as the Responses API's
+    # reasoning.effort; a combination the provider refuses is a configuration
+    # error it raises — nothing here substitutes another.
     lead_model: str = ""
     analyst_model: str = ""
+    research_model: str = ""
+    report_model: str = ""
+    lead_reasoning_effort: str = "medium"
+    analyst_reasoning_effort: str = "low"
+    research_reasoning_effort: str = "medium"
+    report_reasoning_effort: str = "low"
+    max_output_tokens: int = 4096
     embedding_model: str = "text-embedding-3-small"   # 1536-dim, filing_chunks (M5)
 
     # External providers (Issuer Intelligence)
@@ -70,23 +79,18 @@ class Settings(BaseSettings):
     # registry is untouched.
     # V1: an analyst's verbs are single operations (tools/primitives), so a task that was one
     # program is now several calls — and several calls may ride on one completion.
-    sub_analyst_max_turns: int = 10         # completions one analyst may take
-    sub_analyst_evidence_calls: int = 16    # every verb but `start`, per analyst
-    # V36.1: a start is a background task, not evidence — it returns an id and
-    # nothing the turn can use. Round A's Q14 spent all eight evidence calls
-    # starting readiness for eight held names and filed nothing; counted apart.
-    sub_analyst_start_calls: int = 3        # start, per analyst
-    sub_analyst_result_chars: int = 16_000  # of one tool result it reads
-    parallel_analysts: bool = False         # V36 Phase 3; serial until the three preconditions are measured
+    specialist_max_turns: int = 10          # completions one specialist may take on one task
+    specialist_evidence_calls: int = 12     # analyses and reads one specialist may make on one task
+    specialist_result_chars: int = 16_000   # of one tool result it reads
+    lead_max_turns: int = 12                # completions the lead may take in one user turn
+    lead_evidence_calls: int = 10           # analyses the lead may run itself in one user turn
+    observer_feedback_rounds: int = 2       # business feedback a draft may receive before it is delivered as it stands
 
     # V3-B1: refuse a turn whose prompt would exceed this, BEFORE charging quota.
     # Deliberately conservative and measured before it is relaxed: B0 records the
     # real distribution (agent_sessions.last_prompt_tokens) and B3's summarisation
     # is only built if that data says it is needed.
     context_soft_limit_tokens: int = 80_000
-
-    # Agent mode
-    report_agent_mode: str = "direct_llm"
 
     # App
     demo_mode: bool = True

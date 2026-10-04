@@ -1,0 +1,59 @@
+ledger passages for sess_9dd4b75cc33a: 70
+
+1. TOKENIZER vs PARSER on the dollar figures
+   specialist note: 20 dollar tokens, 20 that the parser returns None for (observer.py: `if parsed is None: continue`)
+      e.g. tokens_in -> '$142.263 billion' (kind num); _parse -> None
+   lead answer: 12 dollar tokens, 12 that the parser returns None for (observer.py: `if parsed is None: continue`)
+      e.g. tokens_in -> '$142.263 billion' (kind num); _parse -> None
+
+2. VERDICTS, re-run with the run's passages
+   recorded for the note : {'figures': 10, 'supported': 9, 'contradicted': 0, 'unsourced': 1, 'ambiguous': 0, 'sentences_checked': 2, 'sentences_judgement': 64, 'completion': 'unknown'}
+   re-run on the note    : {'figures': 10, 'supported': 9, 'contradicted': 0, 'unsourced': 1, 'ambiguous': 0, 'sentences_checked': 2, 'sentences_judgement': 64, 'completion': 'unknown'}
+   recorded for answer   : {'figures': 0, 'supported': 0, 'contradicted': 0, 'unsourced': 0, 'ambiguous': 0, 'sentences_checked': 0, 'sentences_judgement': 41, 'completion': 'unknown'}
+   re-run on the answer  : {'figures': 0, 'supported': 0, 'contradicted': 0, 'unsourced': 0, 'ambiguous': 0, 'sentences_checked': 0, 'sentences_judgement': 41, 'completion': 'unknown'}
+
+3. WHAT EACH 'SUPPORTED BY A PASSAGE' PERCENTAGE MATCHED (substring search over all passages)
+
+   '23%'   -> passage f_cbdf5726a0ab
+      the note : ...s year-over-year growth percentages—iPhone **23%**,
+      matched  : ...' expects 66% of total deferred revenue to be realized in less than a year, 23% within one-'
+
+   '15%'   -> passage f_4c9bba4f3c5f
+      the note : ...rowth percentages—iPhone **23%**, Services **15%**,
+      matched  : ...'Percentage of total net sales15%15%14%\n\nRese'
+
+   '7%'    -> passage f_4c9bba4f3c5f
+      the note : ...ges—iPhone **23%**, Services **15%**, iPad **7%**,
+      matched  : ...'sion for income taxes$20719\xa0$29749\xa0$16741\xa0\n\nEffective tax rate15.6%24.1%14.7%\n\nStatutory f'
+
+   '1%'    -> passage f_4c9bba4f3c5f
+      the note : ...*, iPad **7%**, Wearables/Home/Accessories **1%**,
+      matched  : ...'Provision for income taxes$20719\xa0$29749\xa0$16741\xa0\n\nEffective tax rate15.6%24.1%14.7%\n\nStatut'
+
+   '1%'    -> passage f_4c9bba4f3c5f
+      the note : ...bles/Home/Accessories **1%**, and Mac **down 1%**—
+      matched  : ...'Provision for income taxes$20719\xa0$29749\xa0$16741\xa0\n\nEffective tax rate15.6%24.1%14.7%\n\nStatut'
+
+   '11%'   -> passage f_2de73ae2e6dc
+      the note : ...er-year growth rates, not shares: Americas **11%**,
+      matched  : ...'d revenue to be realized in less than a year, 23% within one-to-two years, 11% within two-'
+
+   '14%'   -> passage f_4c9bba4f3c5f
+      the note : ...ates, not shares: Americas **11%**, Europe **14%**,
+      matched  : ...'Percentage of total net sales15%15%14%\n\nResearch a'
+
+   '33%'   -> insufficient_evidence
+      the note : ...cas **11%**, Europe **14%**, Greater China **33%**,
+
+   '21%'   -> passage f_4c9bba4f3c5f
+      the note : ...reater China **33%**, Rest of Asia Pacific **21%**,
+      matched  : ...'6741\xa0\n\nEffective tax rate15.6%24.1%14.7%\n\nStatutory federal income tax rate21%21%21%\n\nThe '
+
+   '9%'    -> passage f_cbdf5726a0ab
+      the note : ...*, Rest of Asia Pacific **21%**, and Japan **9%**.
+      matched  : ...'d revenue to be realized in less than a year, 23% within one-to-two years, 9% within two-t'
+
+4. ONE TABLE ROW, AS THE MODEL READ IT AND AS THE LEDGER KEEPS IT
+   model read  : 'Greater China20,497\xa016,002\xa028\xa0%46,023\xa034,515\xa033\xa0%\n\nJapan8,401\xa07,'
+   ledger keeps: 'Greater China20497\xa016002\xa028\xa0%46023\xa034515\xa033\xa0%\n\nJapan8401\xa07298\xa0'   (f_d91f8dc325d4)
+   the true source of the note's 'Greater China 33%' is the row above: '33\xa0%' in the ledger, so the substring '33%' is not found and the figure was called unsourced

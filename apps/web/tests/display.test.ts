@@ -13,7 +13,7 @@ import { display } from "../lib/display";
  * suites going red. A case added to the fixture binds both at once.
  */
 
-type Case = { value: number; unit_class: string; display: string };
+type Case = { value: number; unit_class: string; kind?: "level" | "absolute_change" | "relative_change"; display: string };
 
 const fixture = path.resolve(__dirname, "../../../tests/fixtures/display_cases.json");
 const cases: Case[] = JSON.parse(readFileSync(fixture, "utf8")).cases;
@@ -23,8 +23,8 @@ describe("display mirrors the Python conventions", () => {
     expect(cases.length).toBeGreaterThan(0);
   });
   for (const c of cases) {
-    it(`${c.value} ${c.unit_class} → ${c.display}`, () => {
-      expect(display(c.value, c.unit_class)).toBe(c.display);
+    it(`${c.value} ${c.unit_class} ${c.kind ?? "level"} → ${c.display}`, () => {
+      expect(display(c.value, c.unit_class, c.kind ?? "level")).toBe(c.display);
     });
   }
 });

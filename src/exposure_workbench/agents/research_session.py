@@ -1,173 +1,169 @@
-"""Research subagent session (M8 step) — bounded tool-calling loop.
+"""The research run: an Issuer Risk Brief, written by the analyst who read the evidence.
 
-Not a conversation: a single-shot analyst that explores an issuer with the
-FACE_RESEARCH tools and finishes by calling submit_brief. The explorer IS the
-writer — no hand-off — so every number it writes is one it just fetched.
-
-Enforcement is inherited, not re-implemented: every tool call goes through the
-registry wrapper (budget, trace, evidence refs), reached over an MCP client on
-the resident tool face (MCP_PLAN P4, R4). The loop just relays tool results back
-to the model until submit_brief is accepted or the budget runs out.
+A bounded loop over the research face — analyze, methods by name, the filings'
+text, the web — that ends when the model writes the brief: six sections under
+fixed headings, in prose. The observer reads every figure of it against the
+analyses the run produced and the passages it read; the brief is stored with that
+verification, section by section, and a figure that does not hold is sent back
+once as business feedback. There is no submission form and no claims grammar: the
+explorer is the writer, and what it writes is what is checked.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Sequence
 
-from exposure_workbench.agents import batch, repeats as rp
-from exposure_workbench.agents.llm_session import llm_session
-from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
+from sqlalchemy import select
+
+from exposure_workbench.agents import opening, tasks as T
+from exposure_workbench.agents.llm_session import Conversation, LlmSession, ModelPolicy
 from exposure_workbench.agents.tool_session import tool_session
 from exposure_workbench.analytics import handbook
 from exposure_workbench.app_state.settings import get_settings
 from exposure_workbench.auth.context import current_user_id
-from exposure_workbench.services import claims
+from exposure_workbench.db.models import IssuerBrief, ResearchRun
+from exposure_workbench.llm import client as llm_client
+from exposure_workbench.services import ledger as ledger_svc, method_index as mi, observer as ob, render as rd
 from exposure_workbench.tools import faces
 from exposure_workbench.utils import json as ejson
-
-# The research face's pause and exit: never held, never holding (agents/batch.py).
-# The registry decides this by class; this side of the mount spells it by name,
-# as the meta loop does, and test_v21_batch pins the two together.
-_BUDGET_FREE_TOOLS = ("think", "submit_brief")
+from exposure_workbench.utils.ids import new_brief_id
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = ("""You are an equity issuer-research analyst producing an Issuer Risk Brief for a portfolio team. \
-The analysis is your job: decide what to look at, what to compare it against, and what the evidence \
-means for a team that holds this name — what changed, why, and what would change your reading.
+SECTIONS = ("financial_summary", "key_changes", "management_explanation",
+            "market_context", "portfolio_implications", "open_questions")
+HEADINGS = {s: s.replace("_", " ").title() for s in SECTIONS}
+_HEADING = re.compile(r"^\s*#{1,3}\s*(" + "|".join(re.escape(h) for h in HEADINGS.values()) + r")\s*$", re.I | re.M)
+TOOL_RESULT_LIMIT = 28_000
+EVIDENCE_CALLS = 16
 
-Your tools are verbs over the issuer's evidence: see what the desk holds (list), read one filed line over a \
-stated period, read its prices, take a measure by its name, do one operation on figures you were already \
-shown, search its filings or read one Item, and search the web for what the filings cannot hold. Every call \
-says WHY. Every result is rows: a row says what it is, whose, over what period, the value, what it means and \
-where it came from, under the id (f_…) you point at. A refusal is a row too, with its reason and the way out. \
-Never compute in your head: a figure that is not on a row is a figure nothing stands behind.
+_ROLE = """You are an equity issuer-research analyst producing an Issuer Risk Brief for a portfolio team. \
+The analysis is your job: decide what to look at, what to compare it against, and what the evidence means for a team \
+that holds this name — what changed, why, and what would change your reading.
 
-The brief is six sections — financial_summary, key_changes, management_explanation, market_context, \
-portfolio_implications, open_questions — and each section is an answer in the same grammar as a reply: \
-CLAIMS and PROSE. Each figure you state is a claim with a relation its facts must fit — level, tier, \
-change, versus, ratio, rank, room, absent, quote, series, table — and the prose writes {cN} where the \
-figure goes. """ + claims.PROSE_RULE + """ A figure the desk does not hold is an absence row: claim it \
-as absent and say why — never a nearby figure wearing the asked-for name, never an estimate.
+Your tools: `analyze` runs one analysis as an aligned table — measures over the issuer (and peers you name), each at \
+its latest period and, with `compare`, against the comparable period before on the issuer's own calendar, with changes \
+in percentage points; `metric` takes a registry method by name; the text tools quote filings and the web; `list` shows \
+what the desk holds; `open` re-reads anything on the record. You never compute a date or copy an id: the desk binds, \
+pairs, computes and records.
 
-Every section but open_questions must rest on at least one claim pointing at a row from this session. \
-Work through the issuer's questions in your handbook chapter, read the filing text that explains what the \
-numbers did, check the market's reaction, and search the web once if the filings do not explain a \
-development. Then call submit_brief. A refusal names the section and the claim: fix that claim, pull the \
-row that gives the figure, or drop it.
-
-YOUR CHAPTER OF THE DESK'S HANDBOOK
-""" + handbook.chapter_text("issuer"))
+When you have read enough, write the brief in prose under exactly these six headings, each on its own line:
+{headings}
+State figures as the tables show them, with the period they are over, saying which are levels and which are changes \
+in percentage points. A figure the desk does not hold is said to be absent, never estimated. Every section but Open \
+Questions rests on evidence you read this run. The desk checks your figures against its record and tells you only \
+when one does not hold."""
 
 
-async def run_research_session(
-    db_factory,
-    session_id: str,
-    ticker: str,
-    deny: Sequence[str] = (),
-    max_turns: int = 30,
-) -> dict:
-    """Drive the loop. No registry: the tools and the database they commit into
-    are behind the mount now, one session per tool call there exactly as before,
-    so trace and ledger still persist as they happen.
+def instructions() -> str:
+    return (_ROLE.format(headings="\n".join(f"## {HEADINGS[s]}" for s in SECTIONS)) + "\n\n" + mi.index_text(None)
+            + "\n\nYOUR CHAPTER OF THE DESK'S HANDBOOK, IN SHORT\n" + handbook.guidance_text("issuer"))
 
-    db_factory came back at V4-S2, and it is not the tools' database returning
-    with it. Nothing on this side reaches a tool through it; it writes one row —
-    the completion this loop just paid for — and a completion is the one event
-    the mount never sees, because it happens on this side of the door. R4's
-    absence was about the tools; this is the ledger for what R4 does not cover.
 
-    `deny` is the tool names removed from the research face for this run — how
-    skip-flags work, unchanged in kind and moved in mechanism. The mount serves
-    FACE_RESEARCH minus deny, so dropping search_external_research still means
-    the capability does not exist for this session rather than an in-loop 'if
-    skip' branch. What moved is where the narrowing is said: it travels in the
-    token instead of in a face this side constructs, because the face itself no
-    longer lives here and two places trimming one face is the error class R4
-    removes."""
+def split_sections(text: str) -> dict[str, str] | None:
+    """The six sections by heading, or None when a heading is missing."""
+    found = list(_HEADING.finditer(text or ""))
+    by_name: dict[str, str] = {}
+    for i, m in enumerate(found):
+        name = next(s for s, h in HEADINGS.items() if h.lower() == m.group(1).strip().lower())
+        end = found[i + 1].start() if i + 1 < len(found) else len(text)
+        by_name[name] = text[m.end():end].strip()
+    return by_name if all(s in by_name for s in SECTIONS) else None
+
+
+async def run_research_session(db_factory, session_id: str, ticker: str, deny: Sequence[str] = (),
+                               max_turns: int = 30) -> dict:
+    """Drive the loop; the brief is stored when the observer has read it."""
     settings = get_settings()
-    model = settings.openai_model
-
-    messages: list[dict] = [
-        {"role": "system", "content": _SYSTEM},
-        {"role": "user", "content": f"Produce the Issuer Risk Brief for {ticker.upper()}."},
-    ]
-
+    ticker = ticker.upper()
+    policy = ModelPolicy.for_role("research")
+    llm = LlmSession(db_factory, session_id, None, policy=policy, actor="research")
+    conv = Conversation()
+    conv.say("user", f"Produce the Issuer Risk Brief for {ticker}.")
+    views: list[dict] = []
+    evidence_calls = completions = feedback_rounds = 0
     brief_id: str | None = None
-    turn = 0
-    # One connection for the run, where a chat turn gets one per turn: a research
-    # session IS the unit of work, and its lifetime budget is spent inside it.
-    # Which also fixes the token's lifetime — minted once here, and N8 sized its
-    # 30 minutes against the task lease for exactly this run. The tenant comes
-    # from the run's own owner, which the worker set before calling; a research
-    # run outlives no request, so there is nothing ambient to inherit.
-    async with tool_session(
-        faces.FACE_NAME_RESEARCH, session_id=session_id,
-        user_id=current_user_id(), deny=deny,
-    ) as tools_session, llm_session(db_factory, session_id) as llm:
-        tools = tools_session.tools
-        held_recorder = batch.trace_recorder(db_factory, session_id)
-        # V31: the brief payloads this run has already been refused. The brief's
-        # six sections are checked in order and the first refusal returns, so a
-        # brief wrong in section six is refused six times while the model walks
-        # forward one section at a time — which is progress and must not be
-        # stopped. What is stopped is the SAME six sections sent again.
-        repeated = rp.Repeats()
-        say_it_repeated: str | None = None
+    text: str | None = None
+    verdict: ob.Verdict | None = None
+    scope = {"subjects": [ticker], "basis": "the issuer of the brief"}
 
-        for turn in range(max_turns):
-            # No message_id: a research run has no message to hang a cost on. The
-            # session IS the unit of work, and the run reaches it through
-            # research_runs.agent_session_id — which is how the per-run view adds
-            # these up (V4-S2).
-            content, tool_calls = await llm.chat(
-                messages=messages, tools=tools, model=model, temperature=0.2,
-            )
-            assistant_msg: dict = {"role": "assistant", "content": content or ""}
-            if tool_calls:
-                assistant_msg["tool_calls"] = tool_calls
-            messages.append(assistant_msg)
-
-            if not tool_calls:
-                # model stopped calling tools without submitting — nudge once, then stop
-                if turn >= max_turns - 1:
-                    break
-                messages.append({"role": "user",
-                                 "content": "Continue with tools, then call submit_brief."})
+    async with tool_session(faces.FACE_NAME_RESEARCH, session_id=session_id, user_id=current_user_id(),
+                            deny=deny) as tools_session:
+        face_tools = list(tools_session.tools)
+        verbs = {t["name"] for t in face_tools}
+        for _ in range(max_turns):
+            exhausted = evidence_calls >= EVIDENCE_CALLS
+            tools = ([T.OPEN_TOOL] if exhausted else face_tools + [T.OPEN_TOOL])
+            tail = [llm_client.message("developer", f"Budget: {max(0, EVIDENCE_CALLS - evidence_calls)} analyses or reads left"
+                                                    + ("; none left — write the brief." if exhausted else "."))]
+            turn = await llm.next(conv, instructions=instructions(), tools=tools, tail=tail)
+            completions += 1
+            if turn.tool_calls:
+                for call in turn.tool_calls:
+                    try:
+                        args = json.loads(call.arguments or "{}")
+                    except json.JSONDecodeError:
+                        args = None
+                    if args is None:
+                        res: dict = {"error": "malformed_arguments", "detail": "the arguments were not JSON"}
+                    elif call.name == T.OPEN_TOOL_NAME:
+                        res = await opening.open_ref(db_factory, session_id, str(args.get("id") or ""),
+                                                     offset=int(args.get("offset") or 0))
+                    elif call.name in verbs:
+                        if call.name == "analyze" and not args.get("scope"):
+                            args["scope"] = scope
+                        if call.name != "list" and evidence_calls >= EVIDENCE_CALLS:
+                            res = {"error": "budget_exhausted", "detail": "this run's analyses and reads are used; write the brief"}
+                        else:
+                            evidence_calls += int(call.name != "list")
+                            res = await tools_session.call(call.name, args)
+                            res = res if isinstance(res, dict) else {"error": "tool_transport_error"}
+                            if call.name == "analyze" and isinstance(res.get("view"), str):
+                                views.append({k: v for k, v in res.items() if k != "_facts"})
+                    else:
+                        res = {"error": "unknown_tool", "detail": f"your tools are {', '.join(sorted(verbs))} and open"}
+                    conv.tool_output(call.call_id, ejson.dumps_capped(res, TOOL_RESULT_LIMIT, keep=("rows", "view")))
                 continue
-
-            # V21-S1. Same dispatcher as the meta loop, same rule: the batch
-            # stops at the first call-shaped refusal per tool.
-            dispatched = await batch.dispatch(
-                tools_session, tool_calls, free=_BUDGET_FREE_TOOLS, record=held_recorder)
-            stop_repeating = False
-            for tc, args, result in dispatched:
-                name = tc["function"]["name"]
-                # The same cap the meta-agent reads under: the table slice rides
-                # inside the result (registry.invoke attaches result["table"]),
-                # and a whole run's names at 8000 characters were cut before the
-                # model could spell one it was then refused for misspelling.
-                messages.append({
-                    "role": "tool", "tool_call_id": tc["id"],
-                    "content": ejson.dumps_capped(result, TOOL_RESULT_LIMIT, keep=("rows",)),
-                })
-                if name == "submit_brief":
-                    if result.get("accepted"):
-                        brief_id = result["brief_id"]
-                    elif result.get("error"):
-                        seen = repeated.record(args)
-                        if seen > rp.STOP:
-                            stop_repeating = True
-                        elif seen == rp.STOP:
-                            say_it_repeated = rp.nudge("submit_brief", result)
-
-            if brief_id:
+            draft = (turn.text or "").strip()
+            if not draft:
+                conv.say("developer", "Write the brief under the six headings.")
+                continue
+            sections = split_sections(draft)
+            if sections is None:
+                conv.say("developer", "The brief needs all six headings, each on its own line: "
+                                      + "; ".join(f"## {HEADINGS[s]}" for s in SECTIONS))
+                continue
+            async with db_factory() as db:
+                led = await ledger_svc.load(db, session_id)
+            verdict = ob.observe(draft, question=f"Produce the Issuer Risk Brief for {ticker}.", views=views,
+                                 passages=led.passages)
+            text = draft
+            if verdict.ok or feedback_rounds >= settings.observer_feedback_rounds:
                 break
-            if stop_repeating:
-                break
-            if say_it_repeated:
-                messages.append({"role": "user", "content": say_it_repeated})
-                say_it_repeated = None
+            feedback_rounds += 1
+            conv.say("developer", verdict.feedback() or "")
 
-    return {"brief_id": brief_id, "turns_used": turn + 1, "submitted": brief_id is not None}
+    if text and verdict is not None:
+        sections = split_sections(text) or {}
+        async with db_factory() as db:
+            led = await ledger_svc.load(db, session_id)
+            run = (await db.execute(select(ResearchRun).where(ResearchRun.agent_session_id == session_id))).scalar_one_or_none()
+            if run is None:
+                raise RuntimeError(f"session {session_id} belongs to no research run")
+            per_section = {name: rd.render(body, ob.observe(body, question="", views=views, passages=led.passages), views, led.by_id)
+                           for name, body in sections.items()}
+            brief_id = new_brief_id()
+            db.add(IssuerBrief(
+                id=brief_id, research_run_id=run.id, company_id=run.company_id, owner_id=run.owner_id,
+                **{name: sections[name] for name in SECTIONS},
+                blocks={name: per_section[name]["blocks"] for name in SECTIONS},
+                claims_by_section={name: per_section[name]["validation"] for name in SECTIONS},
+                citations=sorted({c for r in per_section.values() for c in r["citations"]}),
+                block_citations={name: per_section[name]["citations"] for name in SECTIONS},
+            ))
+            await db.commit()
+    return {"brief_id": brief_id, "turns_used": completions, "submitted": brief_id is not None,
+            "verification": verdict.summary() if verdict else None}

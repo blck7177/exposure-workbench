@@ -1,5 +1,5 @@
 {
-  "_note": "One set of cases for analytics/display_conventions.py (Python) and apps/web/lib/display.ts (TypeScript). Both suites read this file; a change to either side that the other does not mirror fails one of them.",
+  "_note": "One set of cases for analytics/display_conventions.py (Python) and apps/web/lib/display.ts (TypeScript). Both suites read this file; a change to either side that the other does not mirror fails one of them. A case may carry `kind` (level | absolute_change | relative_change, analytics/value_semantics); without it the case is a level.",
   "cases": [
     {
       "value": 0.1633512,
@@ -138,6 +138,62 @@
       "unit_class": "COUNT_PER_DAY",
       "display": "51,234,567/day",
       "reader_value": 51234567
+    },
+    {
+      "value": 0.6966025331943861,
+      "unit_class": "RATIO",
+      "kind": "level",
+      "display": "69.7%",
+      "reader_value": 0.6966
+    },
+    {
+      "value": -0.19297793726071044,
+      "unit_class": "RATIO",
+      "kind": "absolute_change",
+      "display": "-19.3 pp",
+      "reader_value": -0.193
+    },
+    {
+      "value": 0.017938616431574683,
+      "unit_class": "RATIO",
+      "kind": "absolute_change",
+      "display": "+1.79 pp",
+      "reader_value": 0.0179
+    },
+    {
+      "value": 0.004680629999999991,
+      "unit_class": "RATIO",
+      "kind": "absolute_change",
+      "display": "+0.47 pp",
+      "reader_value": 0.0047
+    },
+    {
+      "value": -0.21693140044091308,
+      "unit_class": "RATIO",
+      "kind": "relative_change",
+      "display": "-21.7%",
+      "reader_value": -0.2169
+    },
+    {
+      "value": 0.015930845842250685,
+      "unit_class": "RATIO",
+      "kind": "relative_change",
+      "display": "+1.59%",
+      "reader_value": 0.0159
+    },
+    {
+      "value": 1250000.0,
+      "unit_class": "MONEY",
+      "kind": "absolute_change",
+      "display": "+$1.25M",
+      "reader_value": 1250000
+    },
+    {
+      "value": -141972.82,
+      "unit_class": "MONEY",
+      "kind": "absolute_change",
+      "display": "$-142K",
+      "reader_value": -141973
     }
   ]
 }

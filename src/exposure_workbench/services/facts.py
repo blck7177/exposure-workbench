@@ -34,6 +34,7 @@ from typing import Any, Iterable, Sequence
 
 from exposure_workbench.analytics import display_conventions as dc
 from exposure_workbench.analytics import registry
+from exposure_workbench.analytics import value_semantics as vs
 from exposure_workbench.utils.ids import new_id
 
 # ── kinds ─────────────────────────────────────────────────────────────────────
@@ -241,6 +242,11 @@ def when_of(rec: dict) -> str:
     if isinstance(p.get("peak_date"), str) and isinstance(p.get("trough_date"), str):
         return (f"peak {p['peak_date']} to trough {p['trough_date']}"
                 + (f", recovered {p['recovery_date']}" if isinstance(p.get("recovery_date"), str) else ""))
+    semantic = vs.of(p)
+    if semantic.is_change and (semantic.baseline_period or semantic.current_period):
+        # a change says both of its endpoints: the reader must not take it for a level
+        return (f"change, {vs.period_words(semantic.baseline_period) or 'the earlier reading'} to "
+                f"{vs.period_words(semantic.current_period) or 'the later reading'}")
     if w.get("mixed"):
         return f"over two periods, {w['mixed']}"
     if w.get("start") and w.get("end"):
@@ -262,7 +268,8 @@ def value_of(rec: dict) -> str:
     kind, unit = rec.get("kind"), rec.get("unit")
     if kind == SCALAR:
         v = rec.get("value")
-        return dc.display(float(v), unit) if unit and isinstance(v, (int, float)) else str(v)
+        semantic_kind = vs.kind_of(rec.get("params"))
+        return dc.display(float(v), unit, semantic_kind) if unit and isinstance(v, (int, float)) else str(v)
     if kind == SERIES:
         every = [(str(p[0]), float(p[1])) for p in rec.get("points") or []]
         pts = _thin(every, SERIES_POINTS_INLINE)

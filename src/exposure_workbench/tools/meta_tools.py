@@ -5,8 +5,8 @@ so the turn stays responsive and the heavy work runs on the worker.
 
 This module was "the meta-agent's tools" until V1: the `start` registration for the
 old meta face and `respond`, the chat exit built on the claims grammar. The lead
-holds no tool face now (agents/meta_agent.py: ask, open, repair_answer) and its
-reply is natural prose checked by services/answer_check.py, so both are gone. The
+holds the lead face now (agents/lead.py: analyze, list, ask, open) and its
+reply is prose read by services/observer.py, so both are gone. The
 claims grammar itself is alive — it is the research brief's exit
 (tools/research_tools.submit_brief).
 """

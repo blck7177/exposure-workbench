@@ -25,7 +25,7 @@ THE VERBS.
     web_search        what the filings cannot hold
     scenario          the book after a sale or a purchase (a new book, by id)
     start             background preparation (returns an id, never evidence)
-    submit            the analyst's exit — in-process (agents/delegation), not here
+    (a specialist ends in prose; there is no exit verb — agents/specialist)
 
 A FACE IS A RESOURCE FAMILY, AND IT IS STRUCTURE. `build_analyst_registry(face)`
 registers only that analyst's verbs, with that analyst's names in each enum: the
@@ -72,6 +72,9 @@ from exposure_workbench.tools import periods
 from exposure_workbench.tools.meta_tools import _start as _start_work
 from exposure_workbench.tools.registry import DELEGATION, READ, Shapes, Tool, ToolRegistry, current_session_id
 from exposure_workbench.tools.research_tools import _search_external_research
+
+from exposure_workbench.tools import analysis_tools
+from exposure_workbench.tools import faces as faces_mod
 
 FACES = desk.FACES                      # ("issuer", "market", "risk")
 
@@ -620,13 +623,15 @@ def _start_for(face: str):
 # ── registration ─────────────────────────────────────────────────────────────
 
 def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[str, ...] | None = None,
-           what: tuple[str, ...] | None = None) -> dict[str, Tool]:
+           what: tuple[str, ...] | None = None, analyze_face: str | None = "") -> dict[str, Tool]:
     """Every verb, shaped for one face: `measures_of` are the faces whose measures
-    `metric` may name, `kinds` what `start` may start, `what` what `list` may list."""
+    `metric` may name, `kinds` what `start` may start, `what` what `list` may list,
+    `analyze_face` which face's measures `analyze` takes (None: every face's)."""
     metric_names = list(dict.fromkeys(m.name for f in (measures_of or (face,)) for m in desk.metrics_for(f)))
     start_kinds = list(kinds or START_KINDS[face])
     list_what = list(what or LIST_WHAT[face])
     t = {
+        "analyze": analysis_tools.analyze_tool(face if analyze_face == "" else analyze_face),
         "list": Tool(
             name="list", display="Looking at what the desk holds", rows=True, tool_class=READ, fn=_list_for(metric_names),
             description="What the desk holds, as names and dates — never a figure. `metrics`: the measures you may ask for "
@@ -777,24 +782,12 @@ def _tools(face: str, measures_of: tuple[str, ...] | None = None, kinds: tuple[s
     return t
 
 
-# which verbs each analyst has; `submit` is in-process and the same for all three
-FACE_TOOLS: dict[str, tuple[str, ...]] = {
-    "issuer": ("list", "filings_read", "metric", "calc", "filings_search", "filings_section", "web_search", "start"),
-    "market": ("list", "prices_read", "metric", "calc", "start"),
-    "risk": ("list", "book_read", "metric", "calc", "scenario", "start"),
-}
-
-
-# THE RESEARCH RUN (agents/research_session) writes an Issuer Risk Brief: an issuer
-# from its filings AND its price, so it holds the issuer analyst's verbs, the
-# price read, and both families' measures. It starts nothing: the workflow that
-# runs it has prepared the name already.
-RESEARCH_TOOLS: tuple[str, ...] = ("list", "filings_read", "prices_read", "metric", "calc",
-                                   "filings_search", "filings_section", "web_search")
-# THE DEBUG DOOR (apps/mcp/server, the mount named "meta"): every verb, for a
-# person at a terminal. No agent holds this face — the lead holds none at all.
-DESK_TOOLS: tuple[str, ...] = ("list", "filings_read", "prices_read", "book_read", "metric", "calc",
-                               "filings_search", "filings_section", "web_search", "scenario", "start")
+# which verbs each face holds is said once, in tools/faces
+FACE_TOOLS: dict[str, tuple[str, ...]] = {name: tuple(face) for name, face in faces_mod.ANALYST_FACES.items()}
+RESEARCH_TOOLS: tuple[str, ...] = tuple(faces_mod.FACE_RESEARCH)
+LEAD_TOOLS: tuple[str, ...] = tuple(faces_mod.FACE_LEAD)
+# THE DEBUG DOOR (apps/mcp/server, the mount named "meta"): every verb, for a person at a terminal.
+DESK_TOOLS: tuple[str, ...] = tuple(faces_mod.FACE_META_AGENT)
 _EVERYTHING = tuple(dict.fromkeys(w for f in FACES for w in LIST_WHAT[f]))
 
 
@@ -807,16 +800,21 @@ def _registry(names: tuple[str, ...], tools: dict[str, Tool]) -> ToolRegistry:
 
 def build_research_verbs() -> ToolRegistry:
     return _registry(RESEARCH_TOOLS, _tools("issuer", measures_of=("issuer", "market"),
-                                            what=("metrics", "fundamentals", "filings", "prices")))
+                                            what=("metrics", "fundamentals", "filings", "prices"), analyze_face=None))
 
 
 def build_desk_registry() -> ToolRegistry:
     return _registry(DESK_TOOLS, _tools("risk", measures_of=FACES, what=_EVERYTHING,
-                                        kinds=tuple(dict.fromkeys(k for f in FACES for k in START_KINDS[f]))))
+                                        kinds=tuple(dict.fromkeys(k for f in FACES for k in START_KINDS[f])), analyze_face=None))
+
+
+def build_lead_registry() -> ToolRegistry:
+    """The lead's two verbs: the catalogue of everything, and `analyze` over every measure."""
+    return _registry(LEAD_TOOLS, _tools("risk", measures_of=FACES, what=_EVERYTHING, analyze_face=None))
 
 
 def build_analyst_registry(face: str) -> ToolRegistry:
-    """One analyst's tools and nothing else: the face is what is REGISTERED, so a
+    """One specialist's tools and nothing else: the face is what is REGISTERED, so a
     verb or a measure of another family is not refused — it does not exist here."""
     if face not in FACES:
         raise ValueError(f"face {face!r} is not one of {FACES}")

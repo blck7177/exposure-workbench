@@ -1,0 +1,631 @@
+[
+ {
+  "type": "function",
+  "name": "list",
+  "description": "What the desk holds, as names and dates — never a figure. `metrics`: the measures you may ask for by name, each with what it is and the params it takes. The others take a `subject` and list what is there for it: filed lines and how far each is filed; filings and the Items indexed; the span of prices; a book's holdings, runs, tables and rows (no subject: the desk's books); a book's checks.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "what": {
+     "type": "string",
+     "enum": [
+      "metrics",
+      "fundamentals",
+      "filings"
+     ]
+    },
+    "subject": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "a ticker, or a port_/run_/calc_ id"
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "what",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "analyze",
+  "description": "One analysis as a table: measures over a scope of subjects, each at its latest period and, with `compare`, against the comparable period before — on each issuer's OWN calendar — with the change stated in percentage points, and ranked when asked. The desk binds dates, pairs numerators with denominators, computes and records every cell; you read the aligned table. Each cell carries its display, period and id; what could not be read says why; a scope that resolves to fewer subjects than expected is reported as a mismatch. The measures, by name, are listed in your MEASURES block.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "requests": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 8,
+     "items": {
+      "type": "object",
+      "properties": {
+       "measure": {
+        "type": "string",
+        "enum": [
+         "ebit",
+         "ebitda",
+         "free_cash_flow",
+         "total_debt",
+         "net_debt",
+         "ebit_interest_coverage",
+         "debt_to_ebitda",
+         "debt_to_operating_cash_flow",
+         "fcf_to_debt",
+         "current_ratio",
+         "gross_margin",
+         "operating_margin",
+         "net_margin",
+         "days_sales_outstanding",
+         "days_inventory",
+         "days_payable",
+         "roe",
+         "roa",
+         "tax_burden",
+         "nopat",
+         "invested_capital",
+         "roic",
+         "asset_turnover",
+         "equity_multiplier",
+         "quick_assets",
+         "quick_ratio",
+         "fcf_margin",
+         "capex_intensity",
+         "net_debt_to_ebitda",
+         "cash_conversion_cycle",
+         "cash_conversion",
+         "accruals",
+         "accruals_ratio",
+         "book.weight",
+         "book.market_value",
+         "accounts_payable",
+         "accounts_receivable",
+         "amortization_of_intangibles",
+         "buybacks",
+         "capex",
+         "cash_and_equivalents",
+         "cash_and_restricted_cash",
+         "commercial_paper",
+         "cost_of_revenue",
+         "current_assets",
+         "current_liabilities",
+         "current_portion_long_term_debt",
+         "current_portion_long_term_debt_and_leases",
+         "debt_current_total",
+         "depreciation",
+         "depreciation_amortization",
+         "dividends_paid",
+         "eps_basic",
+         "eps_diluted",
+         "gross_profit",
+         "income_tax_expense",
+         "interest_expense",
+         "interest_expense_nonoperating",
+         "interest_paid",
+         "inventory",
+         "long_term_debt_and_leases_noncurrent",
+         "long_term_debt_noncurrent",
+         "long_term_debt_total",
+         "net_income",
+         "net_income_including_noncontrolling",
+         "noncontrolling_interest",
+         "operating_cash_flow",
+         "operating_income",
+         "operating_lease_liability_current",
+         "operating_lease_liability_noncurrent",
+         "operating_lease_liability_total",
+         "pretax_income",
+         "revenue",
+         "revenue_including_assessed_tax",
+         "sbc",
+         "shares_basic_weighted",
+         "shares_diluted_weighted",
+         "shares_outstanding",
+         "short_term_borrowings",
+         "stockholders_equity",
+         "stockholders_equity_including_noncontrolling",
+         "total_assets",
+         "total_liabilities",
+         "total_revenues"
+        ]
+       },
+       "compare": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "previous_ttm",
+         "previous_fy",
+         "previous_quarter",
+         "previous_run",
+         null
+        ],
+        "description": "the period to set the latest against; issuer measures take previous_ttm | previous_fy | previous_quarter, book columns previous_run"
+       },
+       "change": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "absolute",
+         "relative",
+         null
+        ],
+        "description": "with compare: absolute (percentage points for a ratio) or relative; default absolute"
+       },
+       "rank": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "order the subjects on the measure (and on its change)"
+       },
+       "direction": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "highest",
+         "lowest",
+         null
+        ],
+        "description": "default highest first"
+       },
+       "params": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "a price statistic's own params (window, benchmark)"
+       }
+      },
+      "required": [
+       "measure"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "scope": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "description": "which subjects: {subjects: [tickers]}, or {book: port_…, sector: 'Technology'}, or {book: port_…, holdings: 'all'}; expected_count says how many the question said there were (a mismatch is reported, never resolved for you); basis says why these, in your words",
+     "properties": {
+      "subjects": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 32
+      },
+      "book": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "sector": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "holdings": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "enum": [
+        "all",
+        null
+       ]
+      },
+      "expected_count": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "minimum": 1
+      },
+      "basis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "why": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "optional: what this analysis is for"
+    }
+   },
+   "required": [
+    "requests"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "metric",
+  "description": "A measure of this desk's registry, by name, over one subject or a list of them (one row each, or each one's own refusal). The definition is the registry's: what it was built on, which filed line stood in for which, and what a composed total left out come back on the row. A measure built on filed lines takes a `period` — the same one `filings_read` takes, each issuer's own fiscal year or quarter — and `last_n` for a series; a price or book measure is over its own window and takes `params`. `list(what='metrics')` names every measure you may ask for and what each takes. Refused: a subject the measure has no meaning for, an input not filed, too little history, a measure over a window asked at a date — each with its reason.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "enum": [
+      "ebit",
+      "ebitda",
+      "free_cash_flow",
+      "total_debt",
+      "net_debt",
+      "ebit_interest_coverage",
+      "debt_to_ebitda",
+      "debt_to_operating_cash_flow",
+      "fcf_to_debt",
+      "current_ratio",
+      "gross_margin",
+      "operating_margin",
+      "net_margin",
+      "days_sales_outstanding",
+      "days_inventory",
+      "days_payable",
+      "roe",
+      "roa",
+      "tax_burden",
+      "nopat",
+      "invested_capital",
+      "roic",
+      "asset_turnover",
+      "equity_multiplier",
+      "quick_assets",
+      "quick_ratio",
+      "fcf_margin",
+      "capex_intensity",
+      "net_debt_to_ebitda",
+      "cash_conversion_cycle",
+      "cash_conversion",
+      "accruals",
+      "accruals_ratio",
+      "issuer.panel",
+      "book.weight",
+      "book.market_value",
+      "book.position"
+     ],
+     "description": "ebit = EBIT; ebitda = EBITDA; free_cash_flow = free cash flow; total_debt = total debt; net_debt = net debt; ebit_interest_coverage = EBIT / interest coverage; debt_to_ebitda = debt / EBITDA; debt_to_operating_cash_flow = debt / cash from operations; fcf_to_debt = free cash flow / debt; current_ratio = current ratio; gross_margin = gross margin; operating_margin = operating margin; net_margin = net margin; days_sales_outstanding = days sales outstanding; days_inventory = days inventory; days_payable = days payable; roe = ROE; roa = ROA; tax_burden = tax burden; nopat = NOPAT; invested_capital = invested capital; roic = ROIC; asset_turnover = asset turnover; equity_multiplier = equity multiplier; quick_assets = quick assets; quick_ratio = quick ratio; fcf_margin = free cash flow margin; capex_intensity = capex intensity; net_debt_to_ebitda = net debt / EBITDA; cash_conversion_cycle = cash conversion cycle; cash_conversion = cash conversion; accruals = accruals (net income − cash from operations); accruals_ratio = accruals ratio; issuer.panel = every issuer measure at once; book.weight = weight in the book; book.market_value = market value in the book; book.position = the name's place in the book"
+    },
+    "subject": {
+     "type": [
+      "string",
+      "array"
+     ],
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 40,
+     "description": "a ticker, a run_/port_ id, or a list of them — what the measure says it is over"
+    },
+    "period": {
+     "description": "the period, said ONE way — {\"fy\": 2025} the issuer's own fiscal year · {\"quarter\": \"2026Q2\"} its fiscal quarter · {\"ttm_to\": \"2025-06-30\"} the twelve months ending there · {\"months\": 6, \"end\": \"2025-06-30\"} N months ending there · {\"at\": \"2025-06-30\"} a date, for a balance. A date is YYYY-MM-DD; any of them may be \"latest\". Omitted: the latest — a flow's latest twelve months, a balance's latest date.",
+     "oneOf": [
+      {
+       "type": "object",
+       "properties": {
+        "fy": {
+         "oneOf": [
+          {
+           "type": "integer",
+           "minimum": 1990,
+           "maximum": 2100
+          },
+          {
+           "const": "latest"
+          }
+         ]
+        }
+       },
+       "required": [
+        "fy"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "quarter": {
+         "type": "string",
+         "pattern": "^(\\d{4}Q[1-4]|latest)$"
+        }
+       },
+       "required": [
+        "quarter"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "ttm_to": {
+         "type": "string",
+         "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+        }
+       },
+       "required": [
+        "ttm_to"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "months": {
+         "type": "integer",
+         "enum": [
+          3,
+          6,
+          9,
+          12
+         ]
+        },
+        "end": {
+         "type": "string",
+         "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+        }
+       },
+       "required": [
+        "months",
+        "end"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "at": {
+         "type": "string",
+         "pattern": "^(\\d{4}-\\d{2}-\\d{2}|latest)$"
+        }
+       },
+       "required": [
+        "at"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "last_n": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 1,
+     "maximum": 40,
+     "description": "a measure over its last N fiscal years or quarters, as one series"
+    },
+    "params": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "description": "only the keys the measure takes — book.weight, book.market_value — book: a port_… id or a run_… id; omitted: the one book holding the name; which = latest | prior ‖ book.position — book: a port_… or run_… id; omitted = every book that holds the name ‖ every other measure — no params: its window is `period`"
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "name",
+    "subject",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "filings_search",
+  "description": "Passages of one issuer's filings that match a query, each quotable verbatim under its id, with the form, Item, accession and the characters of the Item it spans. Narrow with `item`, `form` or `filed_after`. A figure stated only in prose is quoted from here, never computed. Refused: filings not indexed.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "ticker": {
+     "type": "string",
+     "description": "a ticker, e.g. NVDA"
+    },
+    "query": {
+     "type": "string",
+     "minLength": 3
+    },
+    "item": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "'1A', '7', '7A', …"
+    },
+    "form": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "10-K",
+      "10-Q",
+      "10-K/A",
+      "10-Q/A",
+      null
+     ],
+     "description": "narrow to one form; omit for any"
+    },
+    "filed_after": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "YYYY-MM-DD"
+    },
+    "k": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 10,
+     "default": 5
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "ticker",
+    "query",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "filings_section",
+  "description": "One Item of one filing, verbatim, a page at a time from `offset`: `next_offset` comes back while there is more. `filing` is an accession — the one a found passage shows, or one from the filings list; omitted, the latest filing that has the Item. A found passage shows where in its Item it sits, so reading on from there is this verb with that offset. Refused: an Item the filing does not have.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "ticker": {
+     "type": "string",
+     "description": "a ticker, e.g. NVDA"
+    },
+    "item": {
+     "type": "string",
+     "description": "'1', '1A', '7', '7A', '8', …"
+    },
+    "filing": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "an accession number, e.g. 0000034088-26-000012"
+    },
+    "form": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "10-K",
+      "10-Q",
+      "10-K/A",
+      "10-Q/A",
+      null
+     ],
+     "description": "narrow to one form; omit for any"
+    },
+    "offset": {
+     "type": "integer",
+     "minimum": 0,
+     "default": 0
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "ticker",
+    "item",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "web_search",
+  "description": "What the filings cannot hold: recent items about one issuer from the web, each a source quotable under its id with its publisher and date. Refused: a name that is not a listed SEC filer.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "ticker": {
+     "type": "string",
+     "description": "a ticker, e.g. NVDA"
+    },
+    "query": {
+     "type": "string",
+     "minLength": 3
+    },
+    "days": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 1,
+     "maximum": 365
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "ticker",
+    "query",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "open",
+  "description": "Open something already on this turn's record, by id: an analysis view (calc_…), a row of one (f_…), a measure's full entry (method:<name>), a specialist's chapter of the handbook (handbook:issuer | market | risk), or a task's log (tsk_…). Reads; it cannot pull a new figure.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "offset": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 0
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ }
+]

@@ -24,12 +24,12 @@ UNIT_CLASSES = ("RATIO", "PERCENT", "MONEY", "MONEY_PER_SHARE", "MULTIPLE", "COU
 CASES = json.loads(FIXTURE.read_text())["cases"]
 
 
-@pytest.mark.parametrize("case", CASES, ids=[f"{c['unit_class']}:{c['value']}" for c in CASES])
+@pytest.mark.parametrize("case", CASES, ids=[f"{c['unit_class']}:{c.get('kind', 'level')}:{c['value']}" for c in CASES])
 def test_display_reads_as_the_fixture_says(case):
-    assert dc.display(case["value"], case["unit_class"]) == case["display"]
+    assert dc.display(case["value"], case["unit_class"], case.get("kind", "level")) == case["display"]
 
 
-@pytest.mark.parametrize("case", CASES, ids=[f"{c['unit_class']}:{c['value']}" for c in CASES])
+@pytest.mark.parametrize("case", CASES, ids=[f"{c['unit_class']}:{c.get('kind', 'level')}:{c['value']}" for c in CASES])
 def test_reader_value_is_the_fixture_value_with_the_fixture_type(case):
     """An int in the fixture is an int on the table: `27` positions, not `27.0`,
     because the model reads it back as a count."""

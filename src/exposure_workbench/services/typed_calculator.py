@@ -1446,3 +1446,78 @@ async def constant(db: AsyncSession, value: float, *, unit_class: str, base: str
         {"value": value}, [], {}, invoked_by,
     )
     return {"calc_id": calc_id, "op": "constant", "value": value, "type": rt}
+
+
+# ── a change between two readings (value_semantics) ──────────────────────────
+
+CHANGE_OP = "calc.scalar.change"
+
+
+def _period_of(t: Typed) -> dict | None:
+    if t.interval:
+        return {"start": t.interval[0].isoformat(), "end": t.interval[1].isoformat()}
+    if t.instant:
+        return {"instant": t.instant.isoformat()}
+    mixed = (t.recorded_basis or {}).get("mixed")
+    return {"mixed": mixed} if isinstance(mixed, str) and mixed != "unspecified" else None
+
+
+async def change(db: AsyncSession, current: str, baseline: str, *, kind: str,
+                 invoked_by: str = "agent", as_quantity: str | None = None) -> dict:
+    """The change from `baseline` to `current`, of the kind the caller SAYS it wants.
+
+    `subtract` leaves the reader to infer what a difference of two ratios is; this
+    operation states it. An absolute change keeps the operands' unit and is written
+    in percentage points when they are dimensionless; a relative change is
+    (current − baseline) ÷ baseline, a dimensionless share of the baseline. Both
+    operands must be one measure of one subject in one unit — two different
+    measures have a difference, not a change.
+    """
+    from exposure_workbench.analytics import value_semantics as vs
+    if kind not in vs.CHANGES:
+        return _err("unsupported_kind", f"a change is one of {', '.join(vs.CHANGES)}; got {kind!r}")
+    cur = await _resolve(db, current)
+    if isinstance(cur, dict):
+        return cur
+    base = await _resolve(db, baseline)
+    if isinstance(base, dict):
+        return base
+    if isinstance(cur, TypedSeries) or isinstance(base, TypedSeries):
+        return _err("not_a_scalar", "a change is between two figures; take the point of a series first")
+    if cur.unit_class != base.unit_class:
+        return _err("incompatible_units", f"{current} is {cur.unit_class} and {baseline} is {base.unit_class}")
+    if _measure_key(cur) and _measure_key(base) and _measure_key(cur) != _measure_key(base):
+        return _err("not_the_same_measure",
+                    f"{current} is {_measure_key(cur)} and {baseline} is {_measure_key(base)}: a change is one "
+                    f"measure at two periods; two measures differ, they do not change")
+    if cur.issuers and base.issuers and not set(cur.issuers) & set(base.issuers):
+        return _err("subject_mismatch", f"{current} belongs to {', '.join(cur.issuers)} and {baseline} to "
+                                        f"{', '.join(base.issuers)}: a change is one subject at two periods")
+    if kind == vs.RELATIVE_CHANGE:
+        if base.value == 0:
+            return _err("division_by_zero", f"{baseline} is zero: a relative change against it is undefined")
+        value, unit = (cur.value - base.value) / abs(base.value), RATIO
+    else:
+        value, unit = cur.value - base.value, cur.unit_class
+    measure = _measure_key(cur) or cur.quantity
+    semantic = vs.Semantics(kind=kind, measure=measure, current=current, baseline=baseline,
+                            current_period=_period_of(cur), baseline_period=_period_of(base))
+    issuers = tuple(sorted(set(cur.issuers) | set(base.issuers)))
+    rt = {"unit_class": unit, "kind": kind,
+          "basis": {"change": {"current": cur.basis(), "baseline": base.basis()}},
+          "quantity": as_quantity or (f"{measure}.{kind}" if measure else f"change.{kind}"),
+          "issuers": list(issuers), vs.KEY: semantic.as_params()}
+    if cur.subject and cur.subject == base.subject:
+        rt["subject"] = cur.subject
+    if cur.base and cur.base == base.base:
+        rt["base"] = cur.base
+    calc_id = await cs._record(
+        db, None, CHANGE_OP,
+        {"op": "change", "kind": kind, "operands": [current, baseline],
+         "operand_types": [cur.as_dict(), base.as_dict()], "result_type": rt},
+        {"value": value}, [current, baseline], {}, invoked_by,
+    )
+    return {"calc_id": calc_id, "op": "change", "kind": kind, "value": value, "type": rt,
+            "unit_class": unit.upper(), "quantity": rt["quantity"], "operands": [current, baseline],
+            vs.KEY: semantic.as_params(),
+            "basis": f"{_basis_str(cur)} against {_basis_str(base)}"}

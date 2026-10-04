@@ -46,13 +46,36 @@ function fixed(v: number, digits: number): string {
   return `${neg ? "-" : ""}${intPart || "0"}${fracPart}`;
 }
 
-/** What a reader sees. Mirrors analytics/display_conventions.py `display` exactly. */
-export function display(value: number, unit_class: string): string {
+/** The kind of number a figure is (analytics/value_semantics): a level, an absolute change, a relative change. */
+export type Kind = "level" | "absolute_change" | "relative_change";
+
+function pctDigits(pct: number): number {
+  return Math.abs(pct) >= 10 ? PERCENT_DIGITS.ge10 : PERCENT_DIGITS.lt10;
+}
+
+function signed(s: string, v: number): string {
+  return v < 0 || s.startsWith("-") || s.startsWith("+") ? s : `+${s}`;
+}
+
+/** What a reader sees. Mirrors analytics/display_conventions.py `display` exactly:
+ *  a change carries its sign, and the absolute change of a dimensionless level is
+ *  written in percentage points. */
+export function display(value: number, unit_class: string, kind: Kind = "level"): string {
   const v = value;
+  if (kind === "absolute_change" && (unit_class === "RATIO" || unit_class === "PERCENT")) {
+    const pct = v * 100;
+    return `${signed(fixed(pct, pctDigits(pct)), pct)} pp`;
+  }
+  if (kind === "relative_change") {
+    const pct = v * 100;
+    return `${signed(fixed(pct, pctDigits(pct)), pct)}%`;
+  }
+  if (kind === "absolute_change") {
+    return signed(display(v, unit_class), v);
+  }
   if (unit_class === "RATIO" || unit_class === "PERCENT") {
     const pct = v * 100;
-    const digits = Math.abs(pct) >= 10 ? PERCENT_DIGITS.ge10 : PERCENT_DIGITS.lt10;
-    return `${fixed(pct, digits)}%`;
+    return `${fixed(pct, pctDigits(pct))}%`;
   }
   if (unit_class === "MONEY" || unit_class === "MONEY_PER_DAY") {
     let scale = 1;

@@ -10,8 +10,9 @@ removed exactly the thing the counter read: it reported 37 of 52 on V26_C3 where
 the full arguments, never truncated at the write, say 14.
 
 Two changes, tested here. The producer declares what it built, and the counter
-asks the producer. Where a round predates the declaration, the counter says it
-cannot see rather than guessing.
+asks the producer. (scripts/battery_counters.py left with the retired batteries
+and its tests went with it; what remains is the producer's declaration and the
+battery reader's width.)
 """
 
 from __future__ import annotations
@@ -53,66 +54,6 @@ def test_a_result_that_declares_nothing_is_summarised_as_before():
     assert _summarize({"rows": [1, 2], "as_of": "2026-09-04"}) == "keys: rows, as_of"
     assert _declared_nodes({"nodes": "not a mapping"}) == ""
     assert _declared_nodes({"nodes": {"_scratch": {"kind": "scalar"}}}) == ""
-
-
-# ── the counter asks the producer ────────────────────────────────────────────
-
-def _turn(answer: str, steps: list[dict]) -> dict:
-    return [{"tag": "T", "session_id": "s", "turns": [{"turn": 1, "answer": answer, "steps": steps}]}]
-
-
-def _count(tmp_path, answer, steps) -> dict:
-    import json
-    p = tmp_path / "round.json"
-    p.write_text(json.dumps(_turn(answer, steps)))
-    return _script("battery_counters").tally([str(p)])
-
-
-def _run_step(result: str) -> dict:
-    return {"step_type": "tool_call", "tool_name": "run", "status": "completed",
-            "result": result, "args": '{"let": [], "return": "r"}'}
-
-
-A = "MSFT is the largest holding at 16.1%, then AMZN at 14.2%."
-
-
-def test_a_declared_ranking_node_is_a_computed_ordering(tmp_path):
-    c = _count(tmp_path, A, [_run_step("keys: nodes, settled | nodes: w=vector, r=ranking")])
-    assert c["superlative_claims"] == 1
-    assert c["superlative_without_rank"] == 0 and c["superlative_rank_undeclared"] == 0
-
-
-def test_a_declaration_without_a_ranking_node_is_an_uncomputed_ordering(tmp_path):
-    c = _count(tmp_path, A, [_run_step("keys: nodes, settled | nodes: w=vector, t=scalar")])
-    assert c["superlative_without_rank"] == 1 and c["superlative_rank_undeclared"] == 0
-
-
-def test_a_run_step_with_no_declaration_is_undeclared_and_never_guessed(tmp_path):
-    """The V26_C3 shape: a round recorded before the producer declared. The
-    program text is NOT consulted, even when it plainly holds a rank node —
-    consulting it is what reported 37 where the answer is 14."""
-    step = _run_step("keys: program_id, returns, nodes, settled")
-    step["args"] = '{"let": [{"fn": "rank", "of": "$w"}], "return": "r"}'
-    c = _count(tmp_path, A, [step])
-    assert c["superlative_rank_undeclared"] == 1 and c["superlative_without_rank"] == 0
-
-
-def test_one_compute_call_is_its_own_declaration(tmp_path):
-    """The per-call protocol: one call is one op, and its arguments are bounded
-    by the protocol — 298 characters at their longest in either V26 round — so
-    nothing about this reading was ever truncated."""
-    ranked = {"step_type": "tool_call", "tool_name": "compute", "status": "completed",
-              "result": "keys: facts", "args": '{"op": "rank", "operands": ["f_a", "f_b"]}'}
-    assert _count(tmp_path, A, [ranked])["superlative_without_rank"] == 0
-    plain = {**ranked, "args": '{"op": "subtract", "operands": ["f_a", "f_b"]}'}
-    assert _count(tmp_path, A, [plain])["superlative_without_rank"] == 1
-
-
-def test_a_refused_run_does_not_count_as_a_computed_ordering(tmp_path):
-    step = _run_step("error: invalid_params")
-    step["status"] = "error"
-    c = _count(tmp_path, A, [step])
-    assert c["superlative_without_rank"] == 1
 
 
 # ── the cap that broke three counters does not come back ─────────────────────

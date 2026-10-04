@@ -49,7 +49,7 @@ from exposure_workbench.db.session import get_session_factory
 from exposure_workbench.tools import faces
 from exposure_workbench.tools.mcp_server import build_mcp_server
 from exposure_workbench.tools.registries import (
-    build_analyst_registry, build_meta_registry, build_research_registry,
+    build_analyst_registry, build_lead_registry, build_meta_registry, build_research_registry,
 )
 
 logging.basicConfig(
@@ -72,6 +72,7 @@ internal_token.require_secret()
 # three literals that agree until somebody edits one.
 MOUNTS = {
     faces.FACE_NAME_META: (build_meta_registry(), faces.FACE_META_AGENT),
+    faces.FACE_NAME_LEAD: (build_lead_registry(), faces.FACE_LEAD),
     faces.FACE_NAME_RESEARCH: (build_research_registry(), faces.FACE_RESEARCH),
     # V1: one door per analyst. Each registry holds that analyst's verbs and
     # nothing else, so the face and the registry are the same list by construction.

@@ -1,16 +1,9 @@
-"""Persist analyst reports and read them within their session.
+"""Persist specialists' records and read them within their session.
 
-S2 evidence-v2 reports hold retrieved evidence, individually checked notes and
-actual execution metadata. Their returned/stopped status never certifies that
-the question is complete. A stopped report can still contain accepted blocks;
-rejected note text belongs only in the trace. Scope and evidence fingerprints
-are rechecked by the follow-up reader before reusing either evidence or notes.
-
-Historical brief reports retain their original schema and verified/refused
-status; readers select the adapter using input_version/brief.protocol.
-
-Tenant rule is the session's, as for `facts` and `agent_steps`: the policy is on
-the table (infra/init.sql) and nothing here re-implements it.
+A record holds what a specialist was asked, what it wrote, the observer's reading of
+it, the analyses it ran and how it stopped. Its status is how the task ended; it never
+certifies that the question is complete. Tenant rule is the session's, as for `facts`
+and `agent_steps`: the policy is on the table (infra/init.sql).
 """
 
 from __future__ import annotations
@@ -25,14 +18,11 @@ from exposure_workbench.utils.ids import new_id
 
 logger = logging.getLogger(__name__)
 
-# Of the report's prose. The lead reads a brief; this bounds what `read_report`
-# can put back into its context when the brief was not enough.
-MAX_TEXT_CHARS = 6_000
+# Of the record's prose: a specialist's note is a reading, not a report.
+MAX_TEXT_CHARS = 12_000
 
 _FIELDS = ("message_id", "task_id", "domain", "status", "title", "brief", "text", "blocks",
-           "citations", "verified", "problems", "prompt_tokens", "completion_tokens", "evidence_calls",
-           # V2 P2: TaskState
-           "requirement_ids", "input_version", "accepted_lines", "attempts", "receipts")
+           "citations", "verified", "problems", "prompt_tokens", "completion_tokens", "evidence_calls")
 
 
 async def store(db: AsyncSession, session_id: str, **cols) -> str:
@@ -53,9 +43,6 @@ def as_dict(row: AnalystReport) -> dict:
             "citations": row.citations or [], "verified": row.verified or {}, "problems": row.problems or [],
             "cost": {"prompt_tokens": row.prompt_tokens, "completion_tokens": row.completion_tokens,
                      "evidence_calls": row.evidence_calls},
-            # V2 P2: TaskState — read by follow_up_of and by the analysis state
-            "requirement_ids": row.requirement_ids or [], "input_version": row.input_version or {},
-            "accepted_lines": row.accepted_lines or [], "attempts": row.attempts, "receipts": row.receipts or [],
             "created_at": row.created_at.isoformat() if row.created_at else None}
 
 

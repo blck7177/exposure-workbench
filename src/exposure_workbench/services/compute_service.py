@@ -35,7 +35,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exposure_workbench.analytics import skill
+from exposure_workbench.analytics import registry as skill
 from exposure_workbench.services import calc_service as cs
 from exposure_workbench.services import drawdown_service, formula_service, integration_service
 from exposure_workbench.services import price_analytics_service as pas
@@ -291,6 +291,10 @@ async def _run_method(db: AsyncSession, spec: skill.Method, subject: str, params
     if ex == "book.position":
         from exposure_workbench.services import position_service
         return await position_service.position(db, subject, p.get("book"))
+    if ex == "book.column":
+        from exposure_workbench.services import book_columns
+        return await book_columns.read_column(db, subject, column=spec.name.split(".", 1)[1],
+                                              book=p.get("book"), which=p.get("which") or "latest")
     raise ValueError(f"{spec.name}: executor {ex!r} has no dispatch")   # skill.EXECUTORS pins this
 
 

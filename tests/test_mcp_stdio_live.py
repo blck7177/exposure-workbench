@@ -123,7 +123,7 @@ async def test_a_call_is_attributed_and_tenant_scoped(two_users):
 
     built = await server.build_stdio_server()
     async with create_connected_server_and_client_session(built) as client:
-        out = await client.call_tool("get_portfolio_snapshot", {})
+        out = await client.call_tool("list", {"what": "book", "why": "which books the desk holds"})
 
     assert not out.isError, out.content
     body = out.content[0].text
@@ -148,7 +148,7 @@ async def test_a_call_is_attributed_and_tenant_scoped(two_users):
         assert row.turn_tool_budget is None
     await engine.dispose()
 
-    assert await _steps(server._session.id) == [("get_portfolio_snapshot", "completed")]
+    assert await _steps(server._session.id) == [("list", "completed")]
 
 
 async def test_the_door_binds_the_identity_its_handlers_read(two_users):
@@ -181,20 +181,20 @@ async def test_a_bad_call_is_refused_by_the_gate_not_the_transport(two_users):
 
     built = await server.build_stdio_server()
     async with create_connected_server_and_client_session(built) as client:
-        out = await client.call_tool("get_flow", {"ticker": "NVDA"})   # no metric
+        out = await client.call_tool("filings_read", {"ticker": "NVDA"})   # no `why`
 
     assert out.isError
     payload = json.loads(out.content[0].text)
     assert payload["error"] == "invalid_arguments"
-    assert [p["field"] for p in payload["problems"]] == ["metric"]
+    assert [p["field"] for p in payload["problems"]] == ["why"]
     assert "Input validation error" not in out.content[0].text
 
-    assert await _steps(server._session.id) == [("get_flow", "rejected")]
+    assert await _steps(server._session.id) == [("filings_read", "rejected")]
 
 
 async def test_the_door_serves_the_whole_meta_face(two_users):
-    """The four delegation/gate tools were trimmed away on every startup before
-    P1.1; now that a call can be attributed to a user, they are served."""
+    """The debug door serves every verb — the per-cell reads and `calc` included;
+    nothing is trimmed at startup (P1.1)."""
     from apps.mcp import server
     from exposure_workbench.tools import faces
 
@@ -203,7 +203,7 @@ async def test_the_door_serves_the_whole_meta_face(two_users):
         listed = await client.list_tools()
 
     assert [t.name for t in listed.tools] == faces.FACE_META_AGENT
-    assert {"ensure_company_ready", "start_issuer_research", "start_exposure_run", "respond"} <= {
+    assert {"book_read", "filings_read", "calc", "start"} <= {
         t.name for t in listed.tools
     }
     # and the schemas are the registry's own, not a signature-inspected stand-in

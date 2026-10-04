@@ -144,8 +144,10 @@ def network(monkeypatch):
     ids=["meta", "research"],
 )
 async def test_the_tools_the_model_sees_are_the_registrys_own(network, builder, face, face_name):
+    from exposure_workbench.llm import client as llm_client
     registry = builder()
-    before = registry.schemas(faces.resolve(registry, face))
+    before = [llm_client.function_tool(t.name, t.description, t.json_schema)
+              for t in (registry.get(n) for n in faces.resolve(registry, face))]
 
     async with mounted(registry, face, face_name=face_name) as door:
         network.doors[f"/mcp/{face_name}"] = door
@@ -164,7 +166,7 @@ async def test_the_order_survives_the_transport(network):
         network.doors["/mcp/meta"] = door
         async with tool_session(faces.FACE_NAME_META, session_id="sess_offline_probe",
                                 user_id="user_offline_probe") as tools:
-            assert [t["function"]["name"] for t in tools.tools] == faces.FACE_META_AGENT
+            assert [t["name"] for t in tools.tools] == faces.FACE_META_AGENT
 
 
 async def test_the_turns_identity_travels_with_the_request(network):

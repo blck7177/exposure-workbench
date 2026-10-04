@@ -165,9 +165,9 @@ async def main(argv: list[str]) -> int:
         reg = build_research_registry()
         face = [t for t in FACE_RESEARCH if t not in args.deny]
         try:
-            await AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"]).chat.completions.create(
-                model=os.environ.get("OPENAI_MODEL", "gpt-5.4-mini"), max_completion_tokens=16,
-                messages=[{"role": "user", "content": "say ok"}], tools=reg.schemas(face))
+            await AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"]).responses.create(
+                model=os.environ.get("OPENAI_MODEL", "gpt-5.4-mini"), max_output_tokens=16, store=False,
+                input="say ok", tools=reg.schemas(face))
             print(f"preflight: the provider accepts the research face as written ({len(face)} tools)", flush=True)
         except Exception as exc:                      # noqa: BLE001 — this is the whole point of the check
             # An account problem is not a schema problem, and reading one as the

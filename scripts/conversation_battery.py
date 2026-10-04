@@ -47,7 +47,7 @@ os.environ.update(_asked)
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from exposure_workbench.agents.meta_agent import handle_message   # noqa: E402
+from exposure_workbench.agents.lead import handle_message   # noqa: E402
 from exposure_workbench.auth.context import current_user_ctx      # noqa: E402
 from exposure_workbench.services import agent_session_service as sess   # noqa: E402
 from exposure_workbench.utils.ids import new_id                    # noqa: E402

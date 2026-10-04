@@ -149,13 +149,16 @@ class DirectLlmAgent:
         user_message = _build_user_message(inp)
 
         try:
-            content, model_name, prompt_tokens, completion_tokens = await llm_client.chat_complete(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                max_tokens=2048,
-            )
+            from exposure_workbench.agents.llm_session import ModelPolicy
+            policy = ModelPolicy.for_role("report")
+            turn = await llm_client.respond(
+                model=policy.model, instructions=system_prompt,
+                input_items=[llm_client.message("user", user_message)],
+                reasoning_effort=policy.reasoning_effort, max_output_tokens=2048)
+            content = turn.text or ""
+            model_name = turn.model or policy.model
+            prompt_tokens = turn.usage.get("input_tokens") or 0
+            completion_tokens = turn.usage.get("output_tokens") or 0
         except Exception as e:
             raise ReportUnavailable(f"the LLM call failed: {e}") from e
 

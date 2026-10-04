@@ -227,3 +227,53 @@ async def fiscal_calendar(db: AsyncSession, ticker: str) -> FiscalCalendar | Non
                FinancialFact.period_start.is_not(None), FinancialFact.dimensions_hash == ""))).all()
     cal = calendar_from(rows)
     return cal if cal.years or cal.quarters else None
+
+
+# ── the comparable period before a given one (analysis_execution) ─────────────
+
+COMPARES = ("previous_ttm", "previous_fy", "previous_quarter")
+_PERIOD_SNAP_DAYS = 7
+
+
+def period_ending(cal: FiscalCalendar, end: date) -> FiscalPeriod | None:
+    """The fiscal year or quarter whose filed end is `end` (within a week), the
+    quarter first: a year's end is also its fourth quarter's."""
+    for q in cal.quarters:
+        if abs((q.end - end).days) <= _PERIOD_SNAP_DAYS:
+            return q
+    for y in cal.years:
+        if abs((y.end - end).days) <= _PERIOD_SNAP_DAYS:
+            return y
+    return None
+
+
+def prior_comparable(cal: FiscalCalendar, end: date, compare: str) -> FiscalPeriod | None:
+    """The period a reading ending at `end` is compared against.
+
+    previous_ttm / previous_fy: the SAME fiscal period one year earlier — AAPL's
+    twelve months to its March quarter against the twelve months to the March
+    quarter before — read off the issuer's own calendar, never `end − 365 days`.
+    previous_quarter: the quarter filed before the one ending at `end`.
+    None when the calendar has no such period: the caller reports a gap, it
+    does not guess."""
+    if compare not in COMPARES:
+        raise ValueError(f"compare is one of {COMPARES}; got {compare!r}")
+    here = period_ending(cal, end)
+    if here is None:
+        return None
+    if compare == "previous_quarter":
+        if here.q is None:
+            return None
+        earlier = [q for q in cal.quarters if q.end < here.end]
+        return earlier[-1] if earlier else None
+    if here.q is None:
+        return cal.year(here.fy - 1)
+    return cal.quarter(here.fy - 1, here.q)
+
+
+async def comparable_end(db: AsyncSession, ticker: str, end: date, compare: str) -> date | None:
+    cal = await fiscal_calendar(db, ticker)
+    if cal is None:
+        return None
+    period = prior_comparable(cal, end, compare)
+    return period.end if period is not None else None

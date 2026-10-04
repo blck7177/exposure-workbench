@@ -197,6 +197,7 @@ FORMULA: dict[str, str] = {
     "cash_conversion_cycle": "cash conversion cycle",
     "accruals": "accruals (net income − cash from operations)",
     "accruals_ratio": "accruals ratio",
+    "cash_conversion": "cash conversion",
 }
 
 # ── sectors (as they arrive from the price provider) ─────────────────────────

@@ -42,7 +42,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env", override=True)
 
-from exposure_workbench.llm.client import chat_complete
+from exposure_workbench.llm import client as llm_client
 
 # --- the closed vocabulary -------------------------------------------------
 #
@@ -365,8 +365,9 @@ async def _judge_one(name: str, question: str, answer: str, model: str | None,
         # scored on this turn alone — so the context is appended, never mixed
         # into the answer under judgement.
         prompt += f"\n\nWHAT WAS SAID BEFORE THIS TURN (context, not under judgement):\n{context}\n"
-    content, _model, _p, _c = await chat_complete(
-        [{"role": "user", "content": prompt}], model=model, max_tokens=120)
+    turn = await llm_client.respond(model=model, instructions="You are a careful grader.",
+                                    input_items=[llm_client.message("user", prompt)], max_output_tokens=400)
+    content = turn.text
     head, _, rest = (content or "").strip().partition("\n")
     verdict = head.strip().upper()
     if verdict not in {"MET", "UNMET"}:

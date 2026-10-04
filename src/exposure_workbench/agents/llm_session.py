@@ -1,160 +1,138 @@
-"""The agents' connection to the provider (V4-S2) — one completion, one row.
+"""The agents' connection to the provider: one request, one recorded row, one conversation.
 
-A completion produces three things: text, tool_calls and usage. Two of them have
-something waiting for them. Text has to survive respond or submit_brief before a
-user can see it; every tool call goes through MCP and invoke(), which records it
-whether the loop wants that or not. usage had nothing waiting, so both loops
-threw it away — meta_agent named it `_usage`, research_session unpacked it and
-never read it — and the single action in this system that actually costs money
-was the only one leaving no trace of having happened.
+A loop holds a Conversation — the native input items of its own exchange with the
+model: what it said, what the model answered (reasoning included), what each tool
+returned — and asks `next` for the model's next turn. Two things are decided here
+and nowhere else:
 
-The fix is deliberately not "record the usage in both loops". That is a rule,
-and a rule is kept until the third loop is written by someone who never read
-this file. What this module does instead is take the discard away: `chat`
-returns (content, tool_calls), so a caller has nothing to throw away and no
-version of the loop can be written that spends money quietly. The import law in
-tests/test_v2_audit.py is what keeps this the agents layer's only way to the
-provider; without it the module is a convenience rather than a gate.
-
-There is no connection here to open or close, and the `async with` is not
-pretending there is. What it binds is a session id and a message id — the two
-facts that decide whose ledger a row lands in — for exactly as long as the turn
-they belong to, the same lifetime tool_session already has. A loop opening both
-at the top reads as one turn holding one identity, which is what it is.
+  * THE MUTABLE TAIL. The desk's current work view changes between requests, and a
+    changed block anywhere before the stable history invalidates the provider's
+    prefix cache for everything after it (the Q07 live runs: six lead requests of
+    18–21k tokens each, none cached). So the conversation is append-only and the
+    view travels as a tail the caller passes per request, placed last and never
+    kept.
+  * THE RECORD. Every request writes an `llm_call` step with what was sent since the
+    last one (the appended items and the tail), what came back (every output item),
+    the usage the provider charged and the configuration in force. A completion
+    that cannot be recorded does not count as having happened: the write failing
+    ends the turn, loudly. Nothing is discarded in order to keep an answer.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
-from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 
 from exposure_workbench.llm import client as llm_client
+from exposure_workbench.llm.client import ModelTurn
 from exposure_workbench.services import trace_service
 
 logger = logging.getLogger(__name__)
 
+ROLES = ("lead", "specialist", "research", "report")
 
-def model_for(actor: str | None) -> str | None:
-    """WHICH MODEL AN AGENT OF THE TURN SPENDS ON (V1 step 7). A measured round varies the lead's
-    model and the analysts' apart — a strong lead over weak analysts, and the other way — and until
-    now one setting moved both. An analyst spends under `sub:<analyst>` (for_actor); a loop that
-    spends under no name is the one that owns its session — the lead of a turn, or a research run.
-    None leaves the choice where it was: `settings.openai_model`. The row records the model the
-    provider SERVED, so a round reads back who ran on what."""
-    from exposure_workbench.app_state.settings import get_settings
-    s = get_settings()
-    chosen = s.analyst_model if str(actor or "").startswith("sub:") else s.lead_model
-    return chosen or None
+
+@dataclass(frozen=True)
+class ModelPolicy:
+    """Which model a role spends on, and how it thinks. Read from settings once per
+    turn; a combination the provider refuses is a configuration error it raises."""
+    model: str
+    reasoning_effort: str | None
+    max_output_tokens: int
+
+    @classmethod
+    def for_role(cls, role: str) -> "ModelPolicy":
+        from exposure_workbench.app_state.settings import get_settings
+        s = get_settings()
+        if role not in ROLES:
+            raise ValueError(f"role {role!r} is not one of {ROLES}")
+        model = {"lead": s.lead_model, "specialist": s.analyst_model, "research": s.research_model,
+                 "report": s.report_model}[role] or s.openai_model
+        effort = {"lead": s.lead_reasoning_effort, "specialist": s.analyst_reasoning_effort,
+                  "research": s.research_reasoning_effort, "report": s.report_reasoning_effort}[role]
+        return cls(model=model, reasoning_effort=effort or None, max_output_tokens=s.max_output_tokens)
+
+    def as_dict(self) -> dict:
+        return {"model": self.model, "reasoning_effort": self.reasoning_effort, "max_output_tokens": self.max_output_tokens}
+
+
+@dataclass
+class Conversation:
+    """The native items of one exchange, append-only."""
+    items: list[dict] = field(default_factory=list)
+    recorded: int = 0                 # how many items the last llm_call step has seen
+
+    def say(self, role: str, text: str) -> None:
+        self.items.append(llm_client.message(role, text))
+
+    def tool_output(self, call_id: str, output: str) -> None:
+        self.items.append(llm_client.tool_output(call_id, output))
+
+    def extend(self, output_items: list[dict]) -> None:
+        self.items.extend(output_items)
+
+    @property
+    def unanswered_calls(self) -> list[str]:
+        """Function calls the model made that have no output yet — a request sent with
+        one of these is refused by the provider."""
+        answered = {i.get("call_id") for i in self.items if i.get("type") == "function_call_output"}
+        return [i["call_id"] for i in self.items if i.get("type") == "function_call" and i.get("call_id") not in answered]
+
+
+def _sha(text: str) -> str:
+    return hashlib.sha256((text or "").encode()).hexdigest()[:16]
 
 
 class LlmSession:
-    """What a loop holds for the length of a turn: one verb, returning two things."""
+    """What a loop holds for a turn: identity for the record, policy for the model."""
 
-    def __init__(self, db_factory, session_id: str, message_id: str | None, actor: str | None = None):
+    def __init__(self, db_factory, session_id: str, message_id: str | None, *, policy: ModelPolicy,
+                 actor: str | None = None, task_id: str | None = None):
         self._db_factory = db_factory
         self._session_id = session_id
         self._message_id = message_id
         self._actor = actor
+        self._task_id = task_id
+        self.policy = policy
 
-    def for_actor(self, actor: str) -> "LlmSession":
-        """The same session, spending under another agent's name.
+    def for_actor(self, actor: str, task_id: str | None = None, policy: ModelPolicy | None = None) -> "LlmSession":
+        """The same session and message, spending under another agent's name, with its
+        own conversation (the caller makes one) and, if given, its own policy."""
+        return LlmSession(self._db_factory, self._session_id, self._message_id, policy=policy or self.policy,
+                          actor=actor, task_id=task_id)
 
-        V36: a turn holds a lead analyst and a domain analyst per delegated
-        task, and both spend. They share the session (the facts have to land on
-        one ledger) so what separates their rows is this name, and handing a
-        sub-analyst a session of its own would separate the ledger with it."""
-        return LlmSession(self._db_factory, self._session_id, self._message_id, actor)
-
-    async def chat(
-        self,
-        messages: list[dict],
-        tools: list[dict] | None = None,
-        note: dict | None = None,
-        **kw,
-    ) -> tuple[str | None, list[dict] | None]:
-        """One completion, recorded as an `llm_call` step.
-
-        The row goes in its OWN database session, committed on its own. A
-        completion is a fact the moment the provider answers, and hanging it off
-        whatever transaction the loop happens to have open would make the record
-        of a spend depend on whether the turn later succeeded — the rows that
-        would go missing are exactly the expensive ones.
-
-        prompt_peak (context_budget) is a different number and both stay: that
-        is a tiktoken estimate bounding the NEXT turn, this is what the provider
-        says it charged for the turn just taken. Reconciling them is a question
-        someone can now ask, because both are written down.
-
-        A call that never returns leaves no row, and deliberately: there is no
-        usage to record and no completion to attribute one to. The provider
-        raising still ends the turn at the caller exactly as it always has —
-        this module made the successful path unskippable, not the failed one
-        survivable.
-
-        `note` (V36.1) is what this completion READ since the last one — the
-        tool results, the digest, the delegate return, the refusal — as the
-        loop measured it: {"read": {"chars", "results"}}. It is written into
-        the row's args and never sent to the provider. Round A's communication
-        table had a size for every edge except the ones into a completion,
-        which were the largest; this is where they were missing from.
-        """
-        kw.setdefault("model", model_for(self._actor))
-        content, tool_calls, usage = await llm_client.chat_with_tools(
-            messages=messages, tools=tools, **kw,
-        )
-
-        # Unpacked BEFORE the try below, on purpose. A usage dict missing a key
-        # is chat_with_tools having changed its shape — a code error, which must
-        # stop the first turn that hits it rather than turn into a logged line
-        # and a silently empty ledger. The try covers the write, not the shape.
-        model = usage["model"]
-        prompt_tokens = usage["prompt_tokens"]
-        completion_tokens = usage["completion_tokens"]
-
-        calls = len(tool_calls or [])
-        try:
-            async with self._db_factory() as db:
-                await trace_service.record_step(
-                    db, self._session_id,
-                    step_type="llm_call",
-                    tool_name=None,          # nothing was called; this IS the call
-                    args=note,
-                    result_summary=f"{model}: {calls} tool call{'' if calls == 1 else 's'}",
-                    evidence_refs=[],
-                    message_id=self._message_id,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    actor=self._actor,
-                )
-                await db.commit()
-        except Exception:  # noqa: BLE001 — see below
-            # The same choice invoke() makes about its own trace write, for the
-            # same reason and with more at stake. The money is already spent and
-            # the answer is in hand; raising here would throw away a turn the
-            # user paid for in order to keep a book tidy, and the book would
-            # still be missing the row. Loud in the log, whole to the caller.
-            logger.exception(
-                "could not record llm_call for session %s (model %s, %d/%d tokens)",
-                self._session_id, model, prompt_tokens, completion_tokens,
-            )
-
-        return content, tool_calls
-
-
-@asynccontextmanager
-async def llm_session(db_factory, session_id: str, message_id: str | None = None, actor: str | None = None):
-    """The provider, bound to one session's ledger.
-
-    db_factory rather than a session: the row is committed per completion, and a
-    loop that handed its own open transaction in would be deciding, without
-    meaning to, that a failed turn spends nothing.
-
-    message_id is optional because a research run has no message to hang a step
-    off — it is a session that IS one unit of work. A chat turn has one, and
-    passing it is what lets a user's turn be costed rather than only their
-    session.
-
-    actor names which agent of a turn is spending (V36); None is the loop that
-    owns the turn, and `for_actor` makes the sub-analyst's copy.
-    """
-    yield LlmSession(db_factory, session_id, message_id, actor)
+    async def next(self, conversation: Conversation, *, instructions: str, tools: list[dict] | None,
+                   tail: list[dict] | None = None, tool_choice: str | dict | None = None,
+                   note: dict | None = None) -> ModelTurn:
+        """The model's next turn over `conversation` plus the mutable `tail`, recorded."""
+        pending = conversation.unanswered_calls
+        if pending:
+            raise RuntimeError(f"a request was about to be sent with function calls unanswered: {pending}")
+        appended = conversation.items[conversation.recorded:]
+        turn = await llm_client.respond(
+            model=self.policy.model, instructions=instructions, input_items=[*conversation.items, *(tail or [])],
+            tools=tools or None, reasoning_effort=self.policy.reasoning_effort,
+            max_output_tokens=self.policy.max_output_tokens, tool_choice=tool_choice)
+        conversation.extend(turn.output)
+        conversation.recorded = len(conversation.items)
+        record = {
+            "request": {**self.policy.as_dict(), "instructions_sha": _sha(instructions), "instructions_chars": len(instructions or ""),
+                        "tools": [t.get("name") for t in (tools or [])], "items_appended": appended, "tail": tail or [],
+                        "conversation_items": len(conversation.items) - len(turn.output)},
+            "response": {"output": turn.output, "status": turn.status, "incomplete_reason": turn.incomplete_reason,
+                         "response_id": turn.response_id, "model": turn.model},
+            "usage": turn.usage,
+            **({"note": note} if note else {}),
+        }
+        calls = len(turn.tool_calls)
+        async with self._db_factory() as db:
+            await trace_service.record_step(
+                db, self._session_id, step_type="llm_call", tool_name=None, args=record,
+                result_summary=f"{turn.model or self.policy.model}: {calls} tool call{'' if calls == 1 else 's'}"
+                               + ("" if turn.complete else f"; {turn.status}: {turn.incomplete_reason}"),
+                evidence_refs=[], message_id=self._message_id,
+                prompt_tokens=turn.usage.get("input_tokens"), completion_tokens=turn.usage.get("output_tokens"),
+                actor=self._actor, task_id=self._task_id)
+            await db.commit()
+        return turn

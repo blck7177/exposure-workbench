@@ -412,6 +412,22 @@ FORMULAS: dict[str, Formula] = {
     ),
 
     # ── earnings quality (V16, Tier 1) ───────────────────────────────────────
+    "cash_conversion": Formula(
+        expression="operating cash flow ÷ net income",
+        inputs=("operating_cash_flow", "net_income"), op="divide", basis="window",
+        unit_class="ratio", family="quality",
+        citation="CFA Institute, Financial Analysis Techniques (cash flow analysis)", source_url=CFA_FAT,
+        # Cash from operations against accounting profit applies to a bank as it does
+        # to anyone: it is a question about accruals, not about leverage.
+        not_for_financials=None,
+        denominator_must_be_positive=(
+            "net income at or below zero makes cash conversion meaningless: cash over a "
+            "loss prints as a negative or inverted share, so the ratio is refused rather than "
+            "displayed; read the two lines side by side instead"),
+        note=("How much of each dollar of reported profit arrived as operating cash over the same "
+              "window; above one, cash ran ahead of earnings. Read beside the accruals ratio: "
+              "both ask whether the profit is real."),
+    ),
     "accruals": Formula(
         expression="net income − operating cash flow",
         inputs=("net_income", "operating_cash_flow"), signs=(1, -1),

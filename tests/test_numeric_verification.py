@@ -225,73 +225,21 @@ def test_a_number_free_reply_yields_nothing():
     assert extract_numbers("") == []
 
 
-# ── group D: matching a number against the evidence (A1) ──────────────────────
+# ── group D: the prose route — what a cited passage's digits can vouch for ────
+# The match of a written number against a cited row's VALUE (the gate's A1,
+# `verify`) left with services/gate: a draft is now read against the view it was
+# written from (services/observer). What stays here is the prose route the quote
+# check still rests on — a number is "quoted" when its digits, as the kind of
+# thing it is, appear in a cited passage.
 
 from exposure_workbench.services.numeric_verification import (  # noqa: E402
-    RATIO,
-    EvidenceValue,
+    _is_quoted,
     quoted_keys,
-    resolve_cited_values,
-    verify,
 )
 
 
-def _val(v: float, unit: str = RATIO, label: str = "x") -> EvidenceValue:
-    return EvidenceValue(value=v, unit_class=unit, label=label, source_id="calc_1")
-
-
-def test_a_correctly_rounded_number_is_accepted():
-    """0.04061908 written as "4.1%" is 0.94% off in relative terms and would be
-    refused by rtol=0.005. It is the correct rounding, and half an ulp says so."""
-    assert verify(extract_numbers("a weight of 4.1%"), [_val(0.04061908)]) == []
-
-
-def test_a_corrupted_last_digit_is_refused():
-    """The other half of the same rule: rtol on "$82.886B" opens a ±$414M window,
-    so an $82.887B corruption slips through. Half an ulp of the written precision
-    is ±$500k, and 82.887 does not round to 82.886."""
-    numbers = extract_numbers("cash of $82.886B")
-    assert verify(numbers, [_val(82_887_000_000.0, MONEY)]) != []
-    assert verify(numbers, [_val(82_886_000_000.0, MONEY)]) == []
-
-
-def test_truncating_instead_of_rounding_is_refused():
-    """A live brief writes 32.2% for a true 32.2753% operating margin. Half an ulp
-    of one decimal is 0.0005, and the gap is 0.00075 — so this is a refusal by
-    design, not an accident: the rule is that the true value must ROUND to what
-    was written."""
-    assert verify(extract_numbers("a margin of 32.2%"), [_val(0.322753)]) != []
-    assert verify(extract_numbers("a margin of 32.3%"), [_val(0.322753)]) == []
-
-
-def test_a_class_is_checked_against_its_own_class_and_no_further():
-    """Both halves of what unit classes are worth, on a real risk_alerts row
-    that carries current_value 0.158, limit_value 0.15 and utilization 0.792 at
-    once.
-
-    What they buy: $0.16 is money, this row holds only ratios, and no amount of
-    digit similarity makes them meet.
-
-    What they do not: "AAPL is at 15.8%" is ACCEPTED, because 0.158 is one of
-    the three numbers the row holds — even if the sentence is about utilization,
-    which is 79.2%. A1 is an existence check on the number, not a reading of the
-    claim around it. This assertion is the honest one; the test used to be named
-    for a scale separation it does not perform."""
-    alert = [_val(0.15840195, RATIO, "current_value"),
-             _val(0.15, RATIO, "limit_value"),
-             _val(0.79200974, RATIO, "utilization")]
-    assert verify(extract_numbers("AAPL is at 15.8%"), alert) == []
-    assert verify(extract_numbers("AAPL is at $0.16"), alert) != []
-
-
-def test_money_and_ratio_never_meet():
-    assert verify(extract_numbers("revenue of $81.6B"), [_val(81.6, RATIO)]) != []
-    assert verify(extract_numbers("a weight of 81.6%"), [_val(81_600_000_000.0, MONEY)]) != []
-
-
-def test_a_bare_number_may_match_anything_because_it_claims_no_unit():
-    assert verify(extract_numbers("the series returned 2 points"), [_val(2.0, COUNT)]) == []
-    assert verify(extract_numbers("it was 81600000000"), [_val(81.6e9, MONEY)]) == []
+def _quoted(text: str, passage: str) -> bool:
+    return _is_quoted(_one(text), quoted_keys(passage))
 
 
 def test_a_figure_quoted_verbatim_from_a_cited_passage_is_accepted():
@@ -299,24 +247,8 @@ def test_a_figure_quoted_verbatim_from_a_cited_passage_is_accepted():
     check — a filing table's scale often lives in a header the chunk does not
     carry — and that limit is recorded rather than hidden."""
     passage = "Total net sales increased to 111,184 for the quarter"
-    assert verify(extract_numbers("net sales of 111,184"), [], quoted_keys(passage)) == []
-    assert verify(extract_numbers("net sales of 111,185"), [], quoted_keys(passage)) != []
-
-
-def test_every_refusal_names_the_nearest_thing_the_evidence_held():
-    """Without it the model can only guess again. With it, "you wrote $58.3B, the
-    nearest value this citation holds is $61.157B (gross_profit)" points straight
-    at the missing citation — which is the real live case this was measured on."""
-    problems = verify(extract_numbers("net income of $58.3B"),
-                      [_val(61_157_000_000.0, MONEY, "gross_profit@2026-04-26")])
-    assert len(problems) == 1
-    assert problems[0]["reason"] == "not_in_cited_evidence"
-    assert problems[0]["nearest"]["label"] == "gross_profit@2026-04-26"
-
-
-def test_no_evidence_at_all_reports_nearest_none_rather_than_crashing():
-    problems = verify(extract_numbers("revenue of $81.6B"), [])
-    assert problems[0]["nearest"] is None
+    assert _quoted("net sales of 111,184", passage)
+    assert not _quoted("net sales of 111,185", passage)
 
 
 def test_every_citable_prefix_has_a_value_source():
@@ -338,10 +270,11 @@ def test_a_short_digit_string_cannot_be_verified_by_prose_alone():
     the structured route or be refused. That does refuse some correct claims
     quoted from prose; in this domain a false accept costs more."""
     passage = "as described in Note 25 of the accompanying financial statements"
-    assert verify(extract_numbers("a 25% import tariff"), [], quoted_keys(passage)) != []
+    assert not _quoted("a 25% import tariff", passage)
+    assert not _quoted("the series returned 25 points", passage)      # two bare digits: a coincidence
     # a long enough string is still evidence
     long_passage = "Total net sales increased to 111,184 for the quarter"
-    assert verify(extract_numbers("net sales of 111,184"), [], quoted_keys(long_passage)) == []
+    assert _quoted("net sales of 111,184", long_passage)
 
 
 # ── group E: the sign axis (V3-R1) ────────────────────────────────────────────
@@ -365,38 +298,6 @@ def test_a_written_sign_reaches_the_value(text: str, value: float, unit_class: s
     assert n.value == pytest.approx(value, rel=1e-12)
 
 
-def test_a_sign_flip_is_refused():
-    """The blocker, in the shape the review reproduced it. A stored +81.615B is
-    not evidence for a claim of -$81.615B; before this it was, because the claim
-    was read as its own positive and matched exactly."""
-    numbers = extract_numbers("free cash flow of -$81.615B")
-    assert verify(numbers, [_val(81_615_000_000.0, MONEY)]) != []
-    assert verify(numbers, [_val(-81_615_000_000.0, MONEY)]) == []
-
-
-def test_a_negative_value_can_be_cited_at_all():
-    """The other half, and the larger one by volume: 117 of the 127 factor
-    contributions in the live database are negative, and every one of them was
-    uncitable — the claim was compared against its own positive and matched
-    nothing the run holds."""
-    assert verify(extract_numbers("the momentum factor contributed -0.8%"),
-                  [_val(-0.00804, RATIO, "factor_attributions.momentum.contribution")]) == []
-
-
-def test_dropping_the_sign_is_refused_like_any_other_wrong_number():
-    """The cost of the rule, stated rather than hidden. "the factor detracted
-    0.8%" is correct English and correct finance, and the sign lives in a verb
-    this module cannot read — so it is refused. Accepting either sign would be a
-    two-way "I do not know the sign" in the module whose entire job is refusing,
-    and it would take the sign flip above with it. The refusal is recoverable
-    where the false accept is not: it names the signed value, so the model can
-    restate the claim as a contribution of -0.8%."""
-    problems = verify(extract_numbers("the momentum factor detracted 0.8%"),
-                      [_val(-0.008, RATIO, "factor_attributions.momentum.contribution")])
-    assert len(problems) == 1
-    assert problems[0]["nearest"]["value"] == -0.008
-
-
 def test_a_hyphen_between_numbers_is_not_a_minus_sign():
     """A range, a product name and a date fragment all put a '-' in front of
     digits and none of them is a negative. A sign is a sign only when nothing
@@ -416,4 +317,4 @@ def test_the_prose_route_cannot_speak_to_sign():
     where every calc, fact, alert and run figure comes from. Same shape, and the
     same reason, as the scale limit quoted_keys already carries."""
     passage = "Operating cash flow for the quarter was (16,450), in thousands"
-    assert verify(extract_numbers("a swing of -16,450"), [], quoted_keys(passage)) == []
+    assert _quoted("a swing of -16,450", passage)

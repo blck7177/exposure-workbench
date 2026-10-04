@@ -662,7 +662,7 @@ async def test_an_ordering_of_one_books_figures_carries_that_base(monkeypatch):
 # ── the tool, its face, and what the model is told ──────────────────────────
 
 def test_the_scenario_schema_bounds_the_fraction_and_requires_a_ticker():
-    from exposure_workbench.analytics import skill
+    from exposure_workbench.analytics import registry as skill
     item = skill.METHODS["book.sell"].params_schema["properties"]["sales"]["items"]
     assert item["required"] == ["ticker"] and item["additionalProperties"] is False
     assert item["properties"]["fraction"]["exclusiveMinimum"] == 0

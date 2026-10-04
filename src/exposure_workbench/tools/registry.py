@@ -130,6 +130,10 @@ class Tool:
     # a row: an absence on the ledger with its reason and way out, so a line the
     # analyst cannot settle always has a boundary to point at.
     rows: bool = False
+    # An ANALYSIS tool's result is a view: an aligned table the model reads whole.
+    # Its cells are facts — recorded on the ledger, openable by id — and the view
+    # already shows each one, so nothing is appended to the payload.
+    view: bool = False
 
 
 @dataclass
@@ -147,15 +151,11 @@ class ToolRegistry:
         return self.tools[name]
 
     def schemas(self, names: list[str] | None = None) -> list[dict]:
-        """OpenAI-style function tool schemas for a face (or all tools)."""
+        """Function tools for a face (or all tools), in the shape the provider door
+        sends (llm/client.function_tool): flat, strict=False."""
         chosen = [self.tools[n] for n in (names or self.tools)]
-        return [
-            {
-                "type": "function",
-                "function": {"name": t.name, "description": t.description, "parameters": t.json_schema},
-            }
-            for t in chosen
-        ]
+        return [{"type": "function", "name": t.name, "description": t.description, "parameters": t.json_schema,
+                 "strict": False} for t in chosen]
 
 
 
@@ -367,6 +367,8 @@ async def invoke(
                 keep = {f.id for f in shown}
                 shown = [f for f in made if f.id in keep]
                 result = fa.present(tool.name, args, shown, note, held, pull)
+            elif tool.view:
+                result = note
             else:
                 result = {**note, "facts": fct.block_for_model(shown)} if shown else note
                 if held and isinstance(result, dict):

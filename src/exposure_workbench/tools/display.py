@@ -48,12 +48,16 @@ _IDENTIFIER_FIELDS = frozenset({"metric", "name", "formula", "op", "item_code", 
 def _humanise(field: str, value: object) -> object:
     """A metric's caption where there is one, its own words otherwise.
 
+    An analysis request ({measure, compare, rank}) reads as its measure's words.
+
     display_names is asked first because `operating_cash_flow` is "Cash from
     operations" and no amount of underscore-replacing gets there. Where it has
     nothing — a formula name, an operator — the identifier's own words are the
     right answer: `total_debt` IS "total debt", and inventing a table of formula
     captions to say so would be a second place for the same fact to live.
     """
+    if isinstance(value, dict) and isinstance(value.get("measure"), str):
+        return _humanise("name", value["measure"])
     if field not in _IDENTIFIER_FIELDS or not isinstance(value, str):
         return value
     from exposure_workbench.analytics import display_names as dn

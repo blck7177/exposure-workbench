@@ -123,7 +123,6 @@ services:
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
       TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
       EDGAR_IDENTITY: "${EDGAR_IDENTITY:-}"
-      REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
       DEMO_MODE: "${DEMO_MODE:-true}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       # MCP_PLAN R3/N7. The meta-agent mints a bearer per turn from this secret
@@ -199,7 +198,6 @@ services:
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
       TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
       EDGAR_IDENTITY: "${EDGAR_IDENTITY:-}"
-      REPORT_AGENT_MODE: "${REPORT_AGENT_MODE:-direct_llm}"
       DEMO_MODE: "${DEMO_MODE:-true}"
       WORKER_POLL_INTERVAL: "${WORKER_POLL_INTERVAL:-2}"
       # V2-E1 lease. Override to a few seconds to exercise takeover; the

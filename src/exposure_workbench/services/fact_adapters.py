@@ -45,7 +45,7 @@ from typing import Any, Callable
 
 from exposure_workbench.analytics import registry
 from exposure_workbench.analytics import resources as rs
-from exposure_workbench.analytics import skill
+from exposure_workbench.analytics import registry as skill
 from exposure_workbench.services import facts as F
 from exposure_workbench.utils import json as ejson
 
@@ -954,6 +954,14 @@ def start(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return [], _strip(result, Ctx("start"))
 
 
+def analysis_view(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
+    """`analyze` (services/analysis_execution): the cells arrive as records under
+    `_facts`; they go to the ledger and the view goes to the model without them."""
+    facts = [F.from_record(r) for r in (result.get("_facts") or []) if isinstance(r, dict)]
+    note = {k: v for k, v in result.items() if k != "_facts"}
+    return facts, note
+
+
 def no_facts(args: dict, result: dict) -> tuple[list[F.Fact], dict]:
     return [], _strip(result, Ctx("none"))
 
@@ -1157,8 +1165,7 @@ ADAPTERS: dict[str, Adapter] = {
     "metric": compute, "calc": compute, "scenario": scenario,
     "filings_search": read_filings, "filings_section": read_filings, "web_search": search_web,
     "start": start,
-    "think": no_facts,
-    "submit_brief": no_facts,
+    "analyze": analysis_view,
 }
 
 def adapt(tool: str, args: dict, result: dict) -> tuple[list[F.Fact], dict, dict | None]:

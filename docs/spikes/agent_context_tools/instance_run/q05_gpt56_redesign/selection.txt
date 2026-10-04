@@ -1,0 +1,22 @@
+question                             distance  new  shared with Q07
+Q05-aapl-risk-and-concentration          1.00    8  -
+Q19-aws-share-explains-return            0.96   12  obs:numbers
+Q06-jpm-riskier-than-a-year-ago          0.90   10  data:financial_facts, obs:numbers
+Q13-sell-half-nvda-into-tlt              0.90    9  data:runs, obs:numbers
+Q10-msft-leverage-and-rates              0.86   11  analyze:formula, data:financial_facts, obs:numbers
+Q04-lly-margin-pricing-mix-cost          0.86   10  analyze:formula, data:financial_facts, obs:numbers
+Q03-nvda-where-cash-goes                 0.84    8  analyze:formula, data:financial_facts, obs:numbers
+Q14-worst-drawdown-episode               0.84    8  data:runs, obs:numbers, view:rank
+Q20-lly-margins-next-year                0.84    8  analyze:formula, data:financial_facts, obs:numbers
+Q15-liquidity-and-limits                 0.83    7  data:runs, obs:numbers, view:rank
+Q18-attribution-reconcile                0.81    5  data:runs, obs:numbers, view:rank
+Q17-events-touching-holdings             0.80    9  analyze:book.column, data:runs, obs:numbers, view:rank
+Q09-aapl-working-capital-cycle           0.78    7  analyze:formula, data:financial_facts, obs:numbers, view:rank
+Q12-jpm-vs-peers-not-on-desk             0.76    6  analyze:formula, data:financial_facts, obs:numbers, view:rank
+Q02-xom-room-if-oil-falls                0.76   10  analyze:book.column, analyze:formula, compare:previous_ttm, data:runs, obs:numbers
+Q16-book-beta-change-since-prev          0.75    5  compare:previous_run, data:runs, obs:numbers, view:rank
+Q08-capex-roic-three-way                 0.73    4  analyze:formula, data:financial_facts, obs:numbers, view:rank
+Q11-closest-to-issuer-limit              0.73    4  analyze:book.column, data:runs, obs:numbers, view:rank
+Q01-amzn-earnings-quality                0.69    5  analyze:book.column, analyze:formula, data:financial_facts, data:runs, obs:numbers
+
+Q05 components not touched by Q07: ['ask:issuer', 'data:filings_text', 'obs:absent', 'obs:judgement', 'obs:passages', 'scope:single', 'verb:filings_search', 'verb:filings_section']

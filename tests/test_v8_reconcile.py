@@ -87,6 +87,6 @@ def test_identity_b_closes_against_the_total_return_revaluation():
 
 
 def test_the_tool_is_registered_and_carries_no_size_argument():
-    from exposure_workbench.analytics import skill
+    from exposure_workbench.analytics import registry as skill
     m = skill.METHODS["book.reconcile"]
     assert m.subject_kind == "run" and set(m.params_schema["properties"]) == set()

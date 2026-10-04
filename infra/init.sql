@@ -716,59 +716,44 @@ CREATE TABLE IF NOT EXISTS facts (
 );
 CREATE INDEX IF NOT EXISTS idx_facts_session ON facts(session_id);
 
--- V36: a domain analyst's full reading, kept for when the lead's brief is not
--- enough. The brief is what the lead reads in the turn; this is the record
--- behind it, and it has passed the same check the answer does — `status` says
--- which, and a refused report keeps its problems rather than its prose.
+-- A specialist's record for one task (agents/specialist): what it was asked, what
+-- it wrote, the observer's reading of it, the analyses it ran and how it stopped.
+-- `status` is how the task ended (returned | stopped); it never certifies the
+-- question complete.
 CREATE TABLE IF NOT EXISTS analyst_reports (
     id                 VARCHAR(64) PRIMARY KEY,
     session_id         VARCHAR(64) NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
     message_id         VARCHAR(64),
     task_id            VARCHAR(64),
     domain             VARCHAR(64) NOT NULL,
-    status             VARCHAR(16) NOT NULL,          -- verified | refused
+    status             VARCHAR(16) NOT NULL,          -- returned | stopped
     title              TEXT,
-    brief              JSONB NOT NULL DEFAULT '{}',   -- findings / not_done / caveats / follow_ups, as filed
-    text               TEXT,                          -- the report's prose, figures written as the desk showed them
-    blocks             JSONB NOT NULL DEFAULT '[]',   -- answer_check.accepted's blocks; empty when refused
+    brief              JSONB NOT NULL DEFAULT '{}',   -- task, scope, analyses, rows_read, stop_reason, budget
+    text               TEXT,                          -- the specialist's prose
+    blocks             JSONB NOT NULL DEFAULT '[]',   -- rendered: every supported figure a fact
     citations          JSONB NOT NULL DEFAULT '[]',
-    verified           JSONB NOT NULL DEFAULT '{}',
-    problems           JSONB NOT NULL DEFAULT '[]',   -- non-empty only when refused
+    verified           JSONB NOT NULL DEFAULT '{}',   -- the observer's summary
+    problems           JSONB NOT NULL DEFAULT '[]',   -- propositions that did not hold
     prompt_tokens      INTEGER,
     completion_tokens  INTEGER,
     evidence_calls     INTEGER,
-    -- V2 P2: TaskState, on the record a task already leaves.
-    requirement_ids    JSONB NOT NULL DEFAULT '[]',
-    input_version      JSONB NOT NULL DEFAULT '{}',   -- {state_version, ledger_rows} when the brief was checked
-    accepted_lines     JSONB NOT NULL DEFAULT '[]',   -- the entries that passed every check, as filed
-    attempts           INTEGER,
-    receipts           JSONB NOT NULL DEFAULT '[]',   -- ids the analyst's `start` calls got back
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_analyst_reports_session ON analyst_reports(session_id, message_id);
 
--- V2 P2: the minimal persistent analysis state (design v0.4 §07). One row per
--- turn, versioned; the requirements the lead declared, the scope the runtime
--- fixed, the findings and gaps that passed the fact boundary, the tasks. A
--- sentence a model wrote reaches this table only through analysis_state.propose,
--- which runs the same check a finding runs; what fails stays on agent_steps.
-CREATE TABLE IF NOT EXISTS analysis_state (
+-- One user turn's work view (agents/work_view): the analyses run, the specialists'
+-- notes with the observer's reading of them, how each task ended, the budget. A
+-- projection of the record, versioned; never a completion verdict.
+CREATE TABLE IF NOT EXISTS work_views (
     id            VARCHAR(64) PRIMARY KEY,
     session_id    VARCHAR(64) NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
     message_id    VARCHAR(64),
     version       INTEGER NOT NULL DEFAULT 1,
-    question      TEXT,
-    requirements  JSONB NOT NULL DEFAULT '[]',
-    scope         JSONB NOT NULL DEFAULT '{}',
-    findings      JSONB NOT NULL DEFAULT '[]',
-    gaps          JSONB NOT NULL DEFAULT '[]',
-    tasks         JSONB NOT NULL DEFAULT '[]',
-    budget        JSONB NOT NULL DEFAULT '{}',
-    completion    VARCHAR(32),
+    body          JSONB NOT NULL DEFAULT '{}',
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_analysis_state_session ON analysis_state(session_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_work_views_session ON work_views(session_id, message_id);
 
 -- ─── Artifact: Evidence Packs ────────────────────────────────────────────────
 -- pack is a refs LIST (not a full JSON snapshot): consistency guaranteed by the
@@ -964,9 +949,9 @@ CREATE POLICY tenant ON facts USING (EXISTS (SELECT 1 FROM agent_sessions s WHER
 ALTER TABLE analyst_reports ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON analyst_reports;
 CREATE POLICY tenant ON analyst_reports USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analyst_reports.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analyst_reports.session_id AND s.owner_id = current_setting('app.user_id', true)));
-ALTER TABLE analysis_state ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS tenant ON analysis_state;
-CREATE POLICY tenant ON analysis_state USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analysis_state.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = analysis_state.session_id AND s.owner_id = current_setting('app.user_id', true)));
+ALTER TABLE work_views ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant ON work_views;
+CREATE POLICY tenant ON work_views USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = work_views.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = work_views.session_id AND s.owner_id = current_setting('app.user_id', true)));
 ALTER TABLE evidence_packs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant ON evidence_packs;
 CREATE POLICY tenant ON evidence_packs USING (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true))) WITH CHECK (EXISTS (SELECT 1 FROM agent_sessions s WHERE s.id = evidence_packs.session_id AND s.owner_id = current_setting('app.user_id', true)));

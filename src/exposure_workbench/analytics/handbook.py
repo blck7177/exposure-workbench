@@ -398,3 +398,21 @@ def meaning_layer() -> str:
             + "\nThe factor instruments: " + "; ".join(f"{t} is {what}, standing for {risk}"
                                                         for t, what, risk in registry.INSTRUMENTS) + "."
             + "\n\nPOLICY\n" + policy_text())
+
+
+def guidance_text(analyst: str) -> str:
+    """What a specialist is told to START with: its title, its data, and how each of
+    its topics is compared and closed. The measures themselves are the method index
+    (services/method_index); the readings and the whole chapter open on demand
+    (`open("handbook:<analyst>")`), never pushed whole into every request."""
+    c = CHAPTERS[analyst]
+    why = {"data": "the desk does not hold it", "policy": "by policy", "withheld": "withheld"}
+    return "\n\n".join((
+        f"{c.title.upper()}\n{c.data}",
+        "HOW EACH QUESTION IS COMPARED AND CLOSED\n" + "\n".join(
+            f"- {t.name} — compare: " + "; ".join(t.compare) + ". Close: " + "; ".join(t.close) + "."
+            for t in c.topics),
+        "WHAT THE DESK HOLDS\n" + "\n".join(f"- {h}" for h in c.holds)
+        + "\nAbsent here:\n" + "\n".join(f"- {what} ({why[w]})" for what, w in c.absent),
+        "POLICY\n" + policy_text(),
+    ))

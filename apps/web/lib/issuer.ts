@@ -105,13 +105,26 @@ export type VerifiedMatch = {
   unit_class?: string;
 };
 
-export type Verified = { figures: number; sources: number; matches: VerifiedMatch[] };
+/** The observer's reading of an answer (services/observer): how many figures it
+ *  stated, how many a recorded analysis supports, how many did not hold or match
+ *  nothing, and how the answer covers what was analysed. */
+export type Verified = {
+  figures: number;
+  supported: number;
+  contradicted: number;
+  unsourced: number;
+  ambiguous: number;
+  sentences_checked: number;
+  sentences_judgement: number;
+  completion: "full" | "partial" | "not_stated" | "unknown" | null;
+};
 
-// meta carries out-of-band facts about the turn. {"gate":"exhausted"} means the
-// loop ended without the citation gate accepting an answer — a refusal, not a reply.
-// {"verified": …} is the record of the check that let this answer through — not a
-// second opinion computed later, which would be free to disagree with the first.
-export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: { gate?: string; verified?: Verified } & Record<string, unknown> };
+export type Delivery = "answered" | "answered_with_problems" | "not_answered";
+
+// meta carries the turn's record: `delivery` says whether the draft held against the
+// desk's analyses; `verified` is the observer's summary at the moment the answer was
+// delivered — never recomputed later.
+export type AgentMessage = { id: string; role: string; content: string | null; citations: string[]; meta?: { delivery?: Delivery; verified?: Verified } & Record<string, unknown> };
 export type SessionDetail = { id: string; kind: string; tools_used: number; messages: AgentMessage[]; steps: AgentStep[] };
 // V13-S0. The list a person navigates their own conversations by. `title` is
 // the first thing they asked — already written, already theirs — rather than a

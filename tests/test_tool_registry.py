@@ -121,10 +121,16 @@ async def test_a_gates_refusal_echoing_ids_records_nothing(monkeypatch):
 
 
 async def test_a_reflection_echoing_an_id_records_nothing(monkeypatch):
-    from exposure_workbench.tools.definitions import _think
+    """A REFLECTION-class tool gathers no evidence (the `think` tool is gone; the
+    class and its rule in invoke() are not), so an id it echoes is never on the
+    ledger for a sentence to point at."""
     log = _wire(monkeypatch)
+
+    async def _note(db, thought: str):
+        return {"noted": True, "thought": thought[:400]}
+
     think = Tool(name="think", description="", json_schema={"type": "object"},
-                 fn=_think, tool_class=REFLECTION)
+                 fn=_note, tool_class=REFLECTION)
     out = await R.invoke(_registry(think), _Db(), "sess_1", "think", {"thought": "calc_deadbeefcafe"})
     assert out["noted"] is True and log["recorded"] == [[]]
 
@@ -239,15 +245,15 @@ async def test_a_held_back_figure_is_in_the_facts_table_the_reader_opens(monkeyp
 def test_every_tool_on_a_face_has_a_fact_adapter():
     """V24: a tool's figures reach the model only through its adapter, so a
     read or delegation tool with none would show bare numbers. Pinned on the
-    real faces; the reflection and the brief's gate are the deliberate no-fact
-    adapters."""
+    real faces; the catalogue (`list`: names and dates, never a figure) is the
+    deliberate no-fact adapter."""
     from exposure_workbench.services import fact_adapters as fa
     from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
     for reg in (build_meta_registry(), build_research_registry()):
         missing = sorted(n for n in reg.tools if n not in fa.ADAPTERS)
         assert missing == [], f"tools with no fact adapter: {missing}"
-    assert fa.ADAPTERS["think"] is fa.no_facts and fa.ADAPTERS["submit_brief"] is fa.no_facts
-    assert "respond" not in fa.ADAPTERS          # V1: the chat exit is gone; the lead's reply is prose
+    assert fa.ADAPTERS["list"] is fa.no_facts
+    assert "respond" not in fa.ADAPTERS and "submit_brief" not in fa.ADAPTERS   # the exits are not tools
 
 
 # ── schemas, faces, redaction ─────────────────────────────────────────────────
@@ -258,14 +264,13 @@ def test_schemas_are_valid_function_defs():
     assert len(schemas) == len(reg.tools)
     for s in schemas:
         assert s["type"] == "function"
-        assert s["function"]["name"] in reg.tools
-        assert "parameters" in s["function"]
+        assert s["name"] in reg.tools and s["strict"] is False and isinstance(s["parameters"], dict)
 
 
 def test_required_judgment_fields_are_in_schema():
     """schema-as-interface: a filed line can't be read without a ticker — or without saying why."""
-    reg = build_analyst_registry("issuer")
-    gfs = reg.get("filings_read")
+    from exposure_workbench.tools.registries import build_meta_registry
+    gfs = build_meta_registry().get("filings_read")            # the per-cell read is the debug door's
     assert set(gfs.json_schema["required"]) == {"ticker", "why"}
 
 
@@ -277,11 +282,11 @@ def test_a_face_the_registry_cannot_satisfy_is_a_build_error():
     read that as a smaller face rather than as the wrong registry for this face.
     """
     reg = build_analyst_registry("issuer")
-    assert "filings_read" in faces.resolve(reg, faces.FACE_ISSUER)
+    assert "filings_search" in faces.resolve(reg, faces.FACE_ISSUER)
 
     with pytest.raises(faces.FaceNotRegistered) as exc:
         faces.resolve(reg, faces.FACE_RISK)                 # another family's face on this registry
-    assert "book_read" in str(exc.value) and "scenario" in str(exc.value)
+    assert "scenario" in str(exc.value)
 
 
 def test_redact_args_masks_key_class_fields_only():
@@ -311,18 +316,14 @@ def test_only_the_classes_that_retrieve_nothing_are_free_of_budget():
     assert READ not in BUDGET_FREE_CLASSES and DELEGATION not in BUDGET_FREE_CLASSES
 
 
-def test_both_faces_reach_their_exit_through_the_gate_class():
+def test_no_mount_registers_an_exit_tool():
     """The exemption is derived from the class, so an exit that is not declared
-    one is an exit that can be refused into a turn with no way out. Asserted for
-    both faces because research's exit is on the session budget, not the turn's,
-    and 25-32 tool calls against a limit of 40 is not a wide margin."""
+    one is an exit that can be refused into a turn with no way out. Since the
+    refactor no exit is a tool at all: the lead's reply is its own prose, a
+    specialist returns in-process (agents/tasks) and the research run writes its
+    brief from the session — so no mount registers a GATE-class tool, and the
+    class survives only as the budget rule above."""
     from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
 
-    # V1: the chat turn's exit is the lead's own prose, checked in-process, and an
-    # analyst's is `submit`, in-process too — neither is on a face. The research
-    # run's exit still is.
-    reg = build_research_registry()
-    assert reg.get("submit_brief").tool_class == GATE, "submit_brief is not declared a gate"
-    assert {n for n, t in reg.tools.items() if t.tool_class == GATE} == {"submit_brief"}
-    assert not [n for n, t in build_meta_registry().tools.items() if t.tool_class == GATE]
-
+    for reg in (build_meta_registry(), build_research_registry()):
+        assert not [n for n, t in reg.tools.items() if t.tool_class == GATE]

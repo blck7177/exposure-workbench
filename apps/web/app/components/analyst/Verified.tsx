@@ -2,48 +2,44 @@
 
 import React from "react";
 
-import type { Verified as VerifiedRecord, VerifiedMatch } from "@/lib/issuer";
+import type { Delivery, Verified as VerifiedRecord, VerifiedMatch } from "@/lib/issuer";
 
 /**
- * What the gate found, made visible (V13-S3/S6).
+ * What the observer found, made visible.
  *
- * This product's argument is that every figure in an answer was matched against
- * evidence before the answer was allowed out. The check has been running since
- * V3 and the page never said so, which left the strongest thing here as
- * something to be believed rather than seen. Meanwhile the market sells this
- * loudly and with less behind it: "No Hallucination Guarantee", an accuracy
- * benchmark, an LLM-as-judge score.
- *
- * The badge is a record, not a claim. It counts what the gate matched on the
- * turn it accepted the answer — never recomputed later, because a second
- * judgement of a stored answer is free to disagree with the one that let it
- * through.
+ * This product's argument is that every figure in an answer was read against the
+ * analyses the desk recorded before the answer was shown. The badge is a record,
+ * not a claim: it counts what the observer supported, what did not hold and what
+ * matched nothing, on the turn the answer was delivered — never recomputed later.
+ * An answer delivered with problems says so here, in the same place.
  */
-
-export function VerifiedBadge({ verified }: { verified?: VerifiedRecord }) {
+export function VerifiedBadge({ verified, delivery }: { verified?: VerifiedRecord; delivery?: Delivery }) {
   if (!verified) return null;
-  const { figures, sources } = verified;
+  const { figures, supported, contradicted, unsourced, ambiguous, completion } = verified;
+  const problems = (contradicted ?? 0) + (unsourced ?? 0) + (ambiguous ?? 0);
+  const clean = problems === 0 && delivery !== "answered_with_problems";
+  const tone = clean
+    ? "text-teal-300 border-teal-800/60 bg-teal-950/40"
+    : "text-amber-400 border-amber-800/60 bg-amber-950/30";
+  const title = clean
+    ? "Every figure in this answer was matched against an analysis the desk recorded this turn, before the answer was shown."
+    : `${problems} figure${problems === 1 ? "" : "s"} did not hold against the desk's record and could not be revised within the turn; they are marked in the record.`;
   return (
-    <span
-      title="Every figure in this answer was matched against a value held by the evidence cited for it, before the answer was shown."
-      className="inline-flex items-center gap-1.5 font-mono text-[10.5px] tracking-wide text-teal-300 border border-teal-800/60 bg-teal-950/40 rounded px-2 py-0.5 whitespace-nowrap">
-      <span aria-hidden className="font-semibold">✓</span>
+    <span title={title}
+      className={`inline-flex items-center gap-1.5 font-mono text-[10.5px] tracking-wide border rounded px-2 py-0.5 whitespace-nowrap ${tone}`}>
+      <span aria-hidden className="font-semibold">{clean ? "✓" : "!"}</span>
       {figures === 0
         ? "no figures to check"
-        : `${figures} figure${figures === 1 ? "" : "s"} checked`}
-      {sources > 0 && ` · ${sources} source${sources === 1 ? "" : "s"}`}
+        : `${supported} of ${figures} figure${figures === 1 ? "" : "s"} supported`}
+      {problems > 0 && ` · ${problems} not`}
+      {completion && completion !== "unknown" && ` · covers ${completion.replace("_", " ")}`}
     </span>
   );
 }
 
 /**
- * A figure with its basis attached.
- *
- * The gate knows which cited row supports each number and where in the text it
- * sits, so the reader can hover the number itself rather than hunt for the
- * matching citation. A figure with no match gets no underline: it is either a
- * date, a period label or one of the closed exemptions, and dressing it up as
- * verified would be the badge lying about its own scope.
+ * A figure with its basis attached — the prose renderer for answers stored
+ * before figures became blocks. Nothing new is written in this shape.
  */
 export function FiguredText({ text, matches, labels }: {
   text: string;
@@ -51,18 +47,10 @@ export function FiguredText({ text, matches, labels }: {
   labels?: Record<string, { type: string; label: string }>;
 }) {
   if (!matches || matches.length === 0) return <>{text}</>;
-
-  // Spans index into this exact string and cannot overlap; sorting makes the
-  // walk linear. A match whose span no longer lines up (a text edited after the
-  // fact — which cannot happen here, since the record is written with the
-  // answer) is skipped rather than mis-highlighted.
-  // V24 matches carry no span (the figure was a pointer, not a substring); a
-  // v1 answer's matches do, and those are the only ones this walk can place.
   const ordered = matches.filter((m): m is VerifiedMatch & { span: [number, number] } => Array.isArray(m.span))
     .sort((a, b) => a.span[0] - b.span[0]);
   const out: React.ReactNode[] = [];
   let cursor = 0;
-
   ordered.forEach((m, i) => {
     const [start, end] = m.span;
     if (start < cursor || end > text.length || text.slice(start, end) !== m.surface) return;

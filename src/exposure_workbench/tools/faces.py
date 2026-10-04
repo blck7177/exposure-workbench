@@ -4,8 +4,8 @@ A face is just a list of tool names. "What can an agent do" is answered in one
 place, as data, so an auditor sees the whole surface at a glance and skip-flags
 (P6) narrow it by removing names, not by branching inside a tool.
 
-FACE_META_AGENT and FACE_RESEARCH gain their delegation/gate tools in P6/P7;
-here we define the read+reflection core they share. Every consumer of a face —
+Every face is a list of the verbs below; the agents' in-process tools (ask, open)
+are on no face. Every consumer of a face —
 the meta-agent loop, the research session, the MCP server that fronts them — is
 handed the same tools under the same enforcement, with no privileged channel.
 
@@ -20,48 +20,39 @@ smaller face.
 
 from __future__ import annotations
 
-# V1: EVERY FACE IS MADE OF THE SAME TWELVE VERBS (tools/primitives). Until V1 the
-# faces were cut out of one read registry — describe, read_fundamentals, compute,
-# run, … — and `run` took a program in a language of its own; that language and
-# the tools it replaced are retired, and the verbs below are what remains.
-#
-# The meta mount serves the full debug surface. S3 gives the lead a read/calc
-# subset through a narrowed bearer; specialists retain their resource faces.
-FACE_META_AGENT = ["list", "filings_read", "prices_read", "book_read", "metric", "calc",
+# THE VERBS. `analyze` is one intent as a table (measures over a scope, compared and
+# ranked; tools/analysis_tools); `list` is the catalogue, names and dates only;
+# `metric` a registry method over subjects; the text reads quote filings and the web;
+# `scenario` and `start` act. The per-cell reads (`filings_read`, `book_read`,
+# `prices_read` by date) and `calc` over hand-picked operands are the DEBUG door's: a
+# person at a terminal may want a cell, an agent expresses an intent.
+FACE_META_AGENT = ["list", "analyze", "filings_read", "prices_read", "book_read", "metric", "calc",
                    "filings_search", "filings_section", "web_search", "scenario", "start"]
 
-# Lead deterministically reads/combines evidence through the existing meta mount.
-# The bearer denies the remainder at the server, not merely in the prompt.
-FACE_LEAD_READ = ["list", "filings_read", "prices_read", "book_read", "metric", "calc"]
+# The lead analyses and reads the catalogue; everything else it asks a specialist for.
+FACE_LEAD = ["list", "analyze"]
 
-# The research run writes an Issuer Risk Brief: an issuer from its filings and
-# its price. The issuer analyst's verbs, the price read, both families' measures
-# by name, the pause, and its exit. It starts nothing — the workflow that runs it
-# prepared the name — and it never reads the book: a brief is about the issuer,
-# not about whoever holds it.
-FACE_RESEARCH = ["list", "filings_read", "prices_read", "metric", "calc",
-                 "filings_search", "filings_section", "web_search", "think", "submit_brief"]
+# The research run writes an Issuer Risk Brief: an issuer from its filings and its
+# price. It analyses, takes measures by name, reads the filings' text and the web.
+FACE_RESEARCH = ["list", "analyze", "metric", "prices_read", "filings_search", "filings_section", "web_search"]
 
 # What a face is CALLED, once (MCP_PLAN R1). The resident server mounts each face
 # at /mcp/<name> and every token carries the name it was minted for, so the same
-# string is spelled by the mount, by the minting caller and by the verifier. Three
-# literals would let a token minted for "research" be spent on a mount that calls
-# itself "research_face" — verify() would reject it, correctly, and the operator
-# would go looking for a signature problem.
+# string is spelled by the mount, by the minting caller and by the verifier.
 FACE_NAME_META = "meta"
+FACE_NAME_LEAD = "lead"
 FACE_NAME_RESEARCH = "research"
 
-# V1: the three analysts. A face is a RESOURCE FAMILY — filings, prices, the book
-# — and each is its own mount with its own registry (tools/primitives
-# .build_analyst_registry), so what an analyst cannot reach is not refused: it is
-# not there, neither the verb nor the measure's name in an enum. `submit`, the
-# analyst's exit, is in-process (agents/delegation) and on no face.
+# The three specialists. A face is a RESOURCE FAMILY — filings, prices, the book —
+# and each is its own mount with its own registry (tools/primitives
+# .build_analyst_registry), so what a specialist cannot reach is not refused: it is
+# not there, neither the verb nor the measure's name in an enum.
 FACE_NAME_ISSUER = "issuer"
 FACE_NAME_MARKET = "market"
 FACE_NAME_RISK = "risk"
-FACE_ISSUER = ["list", "filings_read", "metric", "calc", "filings_search", "filings_section", "web_search", "start"]
-FACE_MARKET = ["list", "prices_read", "metric", "calc", "start"]
-FACE_RISK = ["list", "book_read", "metric", "calc", "scenario", "start"]
+FACE_ISSUER = ["list", "analyze", "metric", "filings_search", "filings_section", "web_search", "start"]
+FACE_MARKET = ["list", "analyze", "metric", "prices_read", "start"]
+FACE_RISK = ["list", "analyze", "metric", "scenario", "start"]
 ANALYST_FACES: dict[str, list[str]] = {
     FACE_NAME_ISSUER: FACE_ISSUER, FACE_NAME_MARKET: FACE_MARKET, FACE_NAME_RISK: FACE_RISK,
 }

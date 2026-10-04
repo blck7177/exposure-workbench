@@ -1,0 +1,7 @@
+=== RUN START 2026-10-04T01:41:47Z (freeze taken), face up on :8211 over exposure_dev ===
+$ BATTERY_DB=exposure_dev BATTERY_MCP_PORT=8211 .venv/bin/python scripts/conversation_battery.py run_input.json battery_out.json --owner user_3IDBMeAxLTbecvGorzwV7FCeroR --fixture --model gpt-5.6-sol
+1 conversation(s), 1 turn(s), concurrency 3, model gpt-5.6-sol (lead =, analysts =), db exposure_dev, mcp http://127.0.0.1:8211, deny ['start']
+[Q05-aapl-risk-and-concentration t1] 51.0s calls=13  Apple’s latest available filing is its **Q2 FY2026 Form 10‑Q**, filed **May 1, 2026**, cov
+
+written /tmp/claude-1000/-home-ubuntu/3cb19c40-7cda-4e1c-95b8-643c8ed48a60/scratchpad/q05_sol_out.json
+exit=0

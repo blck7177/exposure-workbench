@@ -28,26 +28,12 @@ def _names(rel: str) -> set[str]:
             if t.type == tokenize.NAME}
 
 
-def test_the_claims_exit_resolves_through_the_one_gate():
-    """V24: one gate, and an exit hands its verdict to that gate's `accepted`."""
-    # V31: the brief checks CLAIMS. V1: the chat exit that also did (`respond`,
-    # tools/meta_tools) is gone — the lead writes prose, checked by
-    # services/answer_check — so the brief's is the one claims exit left.
-    for rel, mod in (("tools/research_tools.py", "claims"),):
-        src = _src(rel)
-        assert f"{mod}.check(" in src and f"{mod}.accepted(" in src, f"{rel} does not go through the gate"
-        assert "resolver." not in src, f"{rel} still reaches the V15 resolver"
-        assert "numeric_verification" not in src, f"{rel} still reads figures out of prose"
-        assert "validate_citations" not in src, f"{rel} still checks citations against the old trail"
-        assert "evidence_trail_service" not in src, rel
-
-
-def test_standalone_is_decided_by_the_adapter_and_read_by_the_gate_only():
+def test_standalone_is_decided_by_the_adapter_and_carried_by_the_ledger_only():
     """V24: the row says it (quotable_individually / not_alone); the adapter
-    carries it onto the Fact as `standalone`; the gate reads the field. The
-    exits and the grammar never mention it in code."""
-    assert "standalone" in _names("services/fact_adapters.py") and "standalone" in _names("services/gate.py")
-    for rel in ("tools/research_tools.py", "services/answer.py"):
+    carries it onto the Fact as `standalone`; the ledger records and reads the
+    field (the gate that read it is gone). The exits never mention it in code."""
+    assert "standalone" in _names("services/fact_adapters.py") and "standalone" in _names("services/ledger.py")
+    for rel in ("tools/research_tools.py", "services/answer.py", "agents/lead.py", "agents/specialist.py"):
         assert "not_alone" not in _names(rel) and "quotable_individually" not in _names(rel), rel
 
 

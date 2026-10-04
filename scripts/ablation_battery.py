@@ -38,8 +38,8 @@ load_dotenv(".env", override=True)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from exposure_workbench.agents import meta_agent
-from exposure_workbench.agents.meta_agent import handle_message
+from exposure_workbench.agents import lead
+from exposure_workbench.agents.lead import handle_message
 from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.tools import faces
@@ -52,13 +52,10 @@ _STEPS = text(
     "       left(args::text, 300) AS args, prompt_tokens, completion_tokens "
     "FROM agent_steps WHERE session_id = :s ORDER BY seq")
 
-_ORIG_TOOL_SESSION = meta_agent.tool_session
+_ORIG_TOOL_SESSION = lead.tool_session
 
-# think and respond are never denied: one is free reflection, the other is the
-# session's ONLY exit. Denying respond would not narrow a face, it would remove
-# the turn's ability to end — which is a different experiment (V7-Q2 ran it by
-# accident and the finding was a loop that could not terminate).
-_NEVER_DENY = {"think", "respond"}
+# the lead's face is `list` and `analyze`; an ablation denies one of them
+_NEVER_DENY: set[str] = set()
 
 
 def _install_deny(keep: list[str] | None) -> list[str]:
@@ -68,15 +65,15 @@ def _install_deny(keep: list[str] | None) -> list[str]:
     rather than what the question file asked for.
     """
     if keep is None:
-        meta_agent.tool_session = _ORIG_TOOL_SESSION
+        lead.tool_session = _ORIG_TOOL_SESSION
         return []
     kept = set(keep) | _NEVER_DENY
-    deny = sorted(t for t in faces.FACE_META_AGENT if t not in kept)
+    deny = sorted(t for t in faces.FACE_LEAD if t not in kept)
 
     def patched(face_name, **kw):
         return _ORIG_TOOL_SESSION(face_name, deny=tuple(deny), **kw)
 
-    meta_agent.tool_session = patched
+    lead.tool_session = patched
     return deny
 
 
@@ -185,7 +182,7 @@ async def main(argv: list[str]) -> int:
                   flush=True)
             json.dump(results, open(args.out, "w"), indent=1, default=str)
     finally:
-        meta_agent.tool_session = _ORIG_TOOL_SESSION
+        lead.tool_session = _ORIG_TOOL_SESSION
         await engine.dispose()
     return 0
 

@@ -3,7 +3,7 @@
 A measure is written once, in analytics/registry: the handbook renders what it
 is and how it reads, a `metric` tool takes its name, and the fact it births
 carries its words. These tests pin the entry's new fields and that the old
-reader (analytics/skill) reads the very same objects.
+reader (analytics/skill, a re-export) is gone: one module, one set of objects.
 """
 
 from __future__ import annotations
@@ -12,15 +12,17 @@ import pytest
 
 from exposure_workbench.analytics import formulas as fm
 from exposure_workbench.analytics import registry as R
-from exposure_workbench.analytics import skill
 from exposure_workbench.services import compute_service
 from exposure_workbench.services import fact_adapters as FA
 from exposure_workbench.services import facts as F
 
 
-def test_the_skill_module_reads_the_registrys_own_objects():
-    assert skill.METHODS is R.METHODS and skill.Method is R.Method and skill.EXECUTORS is R.EXECUTORS
-    assert not hasattr(skill, "PROCEDURES") and not hasattr(skill, "DESK_RULES") and not hasattr(skill, "READINGS")
+def test_the_registry_is_the_one_reader_of_its_own_objects():
+    """analytics/skill was a re-export of this module and is gone; a measure's words
+    are read from the registry and nowhere else."""
+    import importlib.util
+    assert importlib.util.find_spec("exposure_workbench.analytics.skill") is None
+    assert not hasattr(R, "PROCEDURES") and not hasattr(R, "DESK_RULES") and not hasattr(R, "READINGS")
 
 
 def test_every_measure_has_a_financial_name_and_valid_words():

@@ -34,9 +34,9 @@ WORKFLOW_EVENT_PARENTS = {
 }
 
 RLS_VIEWS = ("session_cost", "research_run_cost")
-# V2 P2: the analysis state and the columns it added, in the fresh-database truth
-# and in the migration a live volume gets.
-V40_SQL = _INFRA / "migrations" / "v40_analysis_state.sql"
+# V41: the work view (agents/work_view) replaces analysis_state, in the fresh-database
+# truth and in the migration a live volume gets.
+V41_SQL = _INFRA / "migrations" / "v41_work_views.sql"
 
 
 def _sql(path: Path) -> str:
@@ -93,22 +93,37 @@ def test_cost_views_are_security_invoker(view: str):
     ), f"migration: {view} is never flipped on live volumes"
 
 
-@pytest.mark.parametrize("path", [INIT_SQL, V40_SQL], ids=["init", "v40"])
-def test_analysis_state_is_scoped_by_its_session_in_both_halves(path: Path):
-    """V2 P2. The new table carries the same tenant rule as facts and agent_steps —
+@pytest.mark.parametrize("path", [INIT_SQL, V41_SQL], ids=["init", "v41"])
+def test_work_views_is_scoped_by_its_session_in_both_halves(path: Path):
+    """V41. The work view carries the same tenant rule as facts and agent_steps —
     through the session's owner — and both halves of the policy say so."""
-    using, with_check = _halves(_effective_policy(_sql(path), "analysis_state"))
-    join = "s.id = analysis_state.session_id AND s.owner_id = current_setting('app.user_id', true)"
+    using, with_check = _halves(_effective_policy(_sql(path), "work_views"))
+    join = "s.id = work_views.session_id AND s.owner_id = current_setting('app.user_id', true)"
     assert join in using and join in with_check, path.name
-    assert re.search(r"ALTER TABLE analysis_state ENABLE ROW LEVEL SECURITY", _sql(path)), path.name
+    assert re.search(r"ALTER TABLE work_views ENABLE ROW LEVEL SECURITY", _sql(path)), path.name
 
 
-@pytest.mark.parametrize("path", [INIT_SQL, V40_SQL], ids=["init", "v40"])
-def test_the_task_state_columns_exist_in_both_files(path: Path):
-    sql = _sql(path)
+def _create_block(sql: str, table: str) -> str:
+    m = re.search(rf"CREATE TABLE IF NOT EXISTS {table}\s*\((.*?)\n\);", sql, re.S)
+    assert m, f"no CREATE TABLE for {table}"
+    return m.group(1)
+
+
+def test_the_settled_protocols_table_and_columns_are_gone():
+    """V41 drops analysis_state and the five task-state columns the settled/
+    requirements protocol put on analyst_reports. The migration drops them, the ORM
+    no longer maps them, and the fresh-database truth must not create what a live
+    volume has dropped."""
+    from exposure_workbench.db import models
+    v41, init = _sql(V41_SQL), _sql(INIT_SQL)
+    assert re.search(r"DROP TABLE IF EXISTS analysis_state", v41)
+    assert not hasattr(models, "AnalysisState") and models.WorkViewRow.__tablename__ == "work_views"
+    assert "analysis_state" not in init, "init.sql still creates the table v41 drops"
+    reports = _create_block(init, "analyst_reports")
     for col in ("requirement_ids", "input_version", "accepted_lines", "attempts", "receipts"):
-        assert re.search(rf"\b{col}\b", sql), f"{path.name}: analyst_reports lacks {col}"
-    assert re.search(r"task_id\s+VARCHAR\(64\)", sql), f"{path.name}: agent_steps lacks task_id"
+        assert re.search(rf"DROP COLUMN IF EXISTS {col}\b", v41), f"v41 does not drop analyst_reports.{col}"
+        assert col not in models.AnalystReport.__table__.columns, f"the ORM still maps analyst_reports.{col}"
+        assert not re.search(rf"\b{col}\b", reports), f"init.sql: analyst_reports still carries {col}"
 
 
 def test_tasks_table_has_no_rls():

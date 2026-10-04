@@ -1,0 +1,69 @@
+Q05 live on the Q07 redesign (gpt-5.6-sol), 2026-10-04
+=====================================================
+
+The question, from docs/spikes/v33/questions_v33.json:
+  What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography,
+  and does the desk hold any of that as figures?
+
+Why this one: of the twenty, it is the only question that shares no component with what the Q07 run exercised
+(Jaccard distance 1.00; selection.py / selection.txt). Q07 was the lead alone on analyze, formulas and book
+columns, ranked and compared, over a book sector. Q05 is a single issuer, a delegation to the issuer analyst,
+filing text through filings_search and filings_section, passage validation, and a question about what the desk
+does not hold.
+
+Run
+  code       HEAD 379f630 plus the redesign as uncommitted changes, tree fingerprint 80e9c0a32a480562
+             before and after the run (freeze_before.txt, freeze_after.txt); committed unchanged with this directory
+  database   exposure_dev: the battery-after-V37C-2026-09-16 snapshot with agent_steps.task_id, v39 facts.means
+             and v41 work_views applied; clock stopped by scripts/battery_fixture.sh restore
+  face       scripts/battery_fixture.sh serve on :8211 over exposure_dev; `start` denied (--fixture)
+  models     gpt-5.6-sol for every agent; lead reasoning effort medium, issuer analyst low
+  command    see run.log
+
+Outcome
+  delivery answered in 51.0 s. 7 model calls (lead 2, issuer analyst 5), 12 tool calls (list 1, filings_search 11,
+  filings_section 0), 63,000 prompt and 3,041 completion tokens, 0 observer feedback rounds.
+  All 18 dollar figures and all 10 growth rates in the note and the answer match Apple's 10-Q and 10-K text
+  (filing_check.txt).
+
+What the run showed (observer_repro.txt reproduces each point read-only)
+  1. A dollar figure with a scale word is never checked. The answer tokenizer yields '$142.263 billion' as one
+     number; the observer's parser accepts bare numbers only, returns None, and the observer skips the token.
+     20 of 20 such figures in the analyst's note and 12 of 12 in the answer were skipped. The answer's verdict
+     reads 0 figures, it carries no citations, and it was delivered as answered.
+  2. Passage support is a substring search over every passage of the turn. 9 of the 10 growth rates the note's
+     verdict called supported matched unrelated text (tax rates, a deferred-revenue schedule, R&D as a share of
+     sales). The one whose true source is in the ledger, Greater China 33%, was called unsourced: the ledger
+     keeps that row as '46023\xa034515\xa033\xa0%', without the thousands separators the model read and with a
+     no-break space before the percent sign.
+  3. Completion is 'unknown' whenever a turn has no analyze view, so the three parts of this question were never
+     checked and the delivery stands at answered.
+  4. The handbook says segment, product and geographic concentration figures are quoted, "never derived from
+     parts" (analytics/handbook.py, the issuer chapter's absent list), and no verb turns a filing-table figure
+     into a typed fact the calculator can use. So "how concentrated" was answered without the shares:
+     iPhone 55.8% and the Americas 40.6% of six-month net sales.
+  5. Smaller: the analyst spent its 12 reads on search snippets and never opened a section; the budget-exhausted
+     request sent the tool list [open] alone, so its 15,987-token prompt had 0 cached tokens; the lead's
+     llm_call steps carry no actor (the Q07 runs show the same).
+
+Files
+  run_input.json           the conversation fed to scripts/conversation_battery.py
+  run.log                  the command and its stdout
+  battery_out.json         the battery's output: answer, blocks, citations, meta, and every step with its full args
+  db_records.json          every database row of the session: agent_sessions, agent_messages, agent_steps (with
+                           timestamps), analyst_reports, work_views, the 70 passage facts, the cost views
+  face.log                 the fixture face's log for the run (3 requests to /mcp/lead, 16 to /mcp/issuer, no errors)
+  freeze_before.txt        tree fingerprint and git status before the face started
+  freeze_after.txt         the same after the run
+  instructions_lead.txt    the lead's instructions as sent, regenerated and matched to the recorded sha
+  instructions_issuer.txt  the issuer analyst's instructions as sent, regenerated and matched to the recorded sha
+  tools_lead.json          the lead's tool list as sent (list and analyze from /mcp/lead, ask and open in process)
+  tools_issuer.json        the issuer analyst's tool list as sent (/mcp/issuer with start denied, and open)
+  export_prompts.py        regenerates the four files above and checks them against every recorded request
+  wire.jsonl               one line per model request: the full input as sent, every output item, the usage
+  timeline.txt             one line per step
+  transcript.txt           every text the models read or wrote, in order and unabridged
+  render_wire.py           builds wire.jsonl, timeline.txt and transcript.txt from battery_out.json and db_records.json
+  selection.py / .txt      the coverage distance of the twenty questions from the Q07 run
+  observer_repro.py / .txt the read-only reproduction behind points 1 to 3
+  filing_check.py / .txt   every figure against the filing text, the shares, and the revenue the desk does hold

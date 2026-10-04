@@ -151,7 +151,7 @@ async def test_the_server_carries_its_instructions():
     read this repo's system prompts."""
     server = _build()
     assert server.instructions
-    assert "cite" in server.instructions.lower()
+    assert "identity" in server.instructions.lower()     # every result carries its identity; a refusal says why
 
 
 def test_the_transport_does_not_validate_arguments_itself():

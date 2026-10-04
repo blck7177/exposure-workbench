@@ -429,6 +429,13 @@ docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
 docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
   -v ON_ERROR_STOP=1 < infra/migrations/v40_analysis_state.sql
 
+# v41_work_views.sql adds the work_views table — one row per turn: the analyses run,
+# the specialists' notes with the observer's reading of them, how each task ended —
+# drops analysis_state and the settled-protocol columns of analyst_reports, and
+# backfills calc_ledger.unit_class for the rows typed by operation name alone.
+docker exec -i exposure-postgres psql -U exposure -d exposure_workbench \
+  -v ON_ERROR_STOP=1 < infra/migrations/v41_work_views.sql
+
 docker compose up -d
 
 # Fill it once, as the owner. Ingest re-derives per issuer from then on. The dry

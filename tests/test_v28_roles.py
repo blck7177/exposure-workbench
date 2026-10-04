@@ -18,8 +18,8 @@ import pytest
 from exposure_workbench.analytics.units import COUNT, MONEY, RATIO
 from exposure_workbench.services import compute_service as cmp
 from exposure_workbench.services import fact_adapters as fa
-from exposure_workbench.analytics import skill
-from exposure_workbench.services import gate, series_service
+from exposure_workbench.analytics import registry as skill
+from exposure_workbench.services import series_service
 from exposure_workbench.services import typed_calculator as tc
 from exposure_workbench.tools.arg_validation import validate_args
 from exposure_workbench.tools.faces import FACE_META_AGENT as FACE_META, FACE_RESEARCH
@@ -327,25 +327,6 @@ async def test_every_registry_method_survives_its_own_adapter():
     assert crashed == [], crashed
 
 
-# ── D1: the model is told validation's own sentence ──
-
-def test_the_prose_rule_is_one_sentence_given_verbatim_to_the_model():
-    from exposure_workbench.agents import meta_agent
-    from exposure_workbench.tools import mcp_server
-    # V30: the chat exit's rule is services/claims.PROSE_RULE (digits allowed when
-    # the ledger accounts for them); gate.PROSE_RULE stays the brief path's until D5.
-    from exposure_workbench.services import claims
-    # V33: the chat exit is prose checked by services/answer_check; the analyst is
-    # told the one rule that check enforces, in its own words. claims.PROSE_RULE
-    # stays the brief path's (submit_brief) and the registry's.
-    # V1 step 6: that rule is the style guide's first, written once (services/style_guide) and included whole
-    from exposure_workbench.services import style_guide
-    assert style_guide.RULES[0].text in meta_agent._SYSTEM and "Every number you write is one a row showed you" in meta_agent._SYSTEM
-    assert claims.PROSE_RULE in mcp_server.INSTRUCTIONS
-    assert gate._FIX.startswith(gate.PROSE_RULE)
-    assert "never write a number" not in meta_agent._SYSTEM
-
-
 @pytest.mark.live
 async def test_the_provider_accepts_every_face_as_written():
     """The structural test above encodes the provider's rule; this one asks the
@@ -358,9 +339,9 @@ async def test_the_provider_accepts_every_face_as_written():
     load_dotenv(".env", override=True)
     client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
     for reg, face in ((build_meta_registry(), FACE_META), (build_research_registry(), FACE_RESEARCH)):
-        await client.chat.completions.create(
-            model=os.environ["OPENAI_MODEL"], max_completion_tokens=16,
-            messages=[{"role": "user", "content": "say ok"}], tools=reg.schemas(face))
+        await client.responses.create(
+            model=os.environ["OPENAI_MODEL"], max_output_tokens=16, store=False,
+            input="say ok", tools=reg.schemas(face))
 
 
 @pytest.mark.live
@@ -379,7 +360,7 @@ async def test_every_method_the_desk_can_run_survives_its_own_adapter():
     from dotenv import load_dotenv
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-    from exposure_workbench.analytics import skill
+    from exposure_workbench.analytics import registry as skill
     from exposure_workbench.services import compute_service as cmp
     load_dotenv(".env", override=True)
     url = os.getenv("DATABASE_URL_RLS", "postgresql+asyncpg://app_rls:app_rls_pw@localhost:5433/exposure_workbench")

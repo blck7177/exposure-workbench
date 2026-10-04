@@ -166,7 +166,8 @@ def test_a_multiple_is_a_quotient_the_evaluator_can_actually_declare(name):
 
 PERCENTS = {"gross_margin", "operating_margin", "net_margin", "roe", "roa", "roic",
             "tax_burden", "fcf_margin", "capex_intensity", "accruals_ratio",
-            "fcf_to_debt"}
+            "fcf_to_debt",
+            "cash_conversion"}     # operating cash flow ÷ net income, declared `ratio`: a share of profit
 
 
 def test_every_dimensionless_measure_is_named_in_exactly_one_of_the_two_lists():

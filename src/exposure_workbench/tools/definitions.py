@@ -169,25 +169,6 @@ async def _read_prices(db: AsyncSession, ticker: str, window: str | None = None,
 
 # ── reflection ──────────────────────────────────────────────────────────────────
 
-async def _think(db: AsyncSession, thought: str) -> dict:
-    """Low-friction pause: no side effect, no budget, only a trace line."""
-    return {"noted": True, "thought": thought[:400]}
-
-
-# ── registration ────────────────────────────────────────────────────────────────
-
 _TICKER = {"type": "string", "description": "ticker, e.g. NVDA"}
 _FORM_TYPE = {"type": ["string", "null"], "enum": ["10-K", "10-Q", "10-K/A", "10-Q/A", None],
               "description": "narrow to one form; omit for any"}
-
-
-def register_think(reg: ToolRegistry) -> ToolRegistry:
-    reg.register(Tool(
-        name="think",
-        display="Thinking",
-        description="Pause and note a thought. Free; no evidence; never an answer.",
-        json_schema={"type": "object", "properties": {"thought": {"type": "string"}},
-                     "required": ["thought"], "additionalProperties": False},
-        fn=_think, tool_class=REFLECTION,
-    ))
-    return reg

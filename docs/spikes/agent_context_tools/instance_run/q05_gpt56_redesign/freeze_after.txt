@@ -1,0 +1,4 @@
+=== FREEZE AFTER (taken after the run, face stopped) ===
+tree fingerprint after: 80e9c0a32a480562
+git status lines: 164, sha e1d7728b7bfa9ef5
+verdict: identical to freeze_before; no source changed during the run

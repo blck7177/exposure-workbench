@@ -66,22 +66,25 @@ def test_each_analysts_registry_is_its_face_and_nothing_else(face):
     assert list(reg.tools) == faces.ANALYST_FACES[face] == list(P.FACE_TOOLS[face])
     assert faces.resolve(reg, faces.ANALYST_FACES[face]) == faces.ANALYST_FACES[face]
     for tool in reg.tools.values():
-        assert tool.rows and tool.display, tool.name
-        assert "why" in tool.json_schema["required"], f"{tool.name}: every call says why"
+        assert (tool.rows or tool.view) and tool.display, tool.name      # a primitive is rows; `analyze` is a view
+        if tool.rows:                                                    # a per-row pull says why; an analysis is its requests
+            assert "why" in tool.json_schema["required"], f"{tool.name}: every pull says why"
         assert validate_args(tool.json_schema, {}) != []          # nothing is callable with no arguments
 
 
 def test_the_faces_are_the_sizes_the_plan_states():
-    # plus `submit`, the in-process exit every analyst has: 9 / 6 / 7
-    assert {f: len(P.FACE_TOOLS[f]) + 1 for f in P.FACES} == {"issuer": 9, "market": 6, "risk": 7}
+    # plus the in-process return every specialist has; the per-cell reads
+    # (`filings_read`, `book_read`) are the debug door's now: 8 / 6 / 6
+    assert {f: len(P.FACE_TOOLS[f]) + 1 for f in P.FACES} == {"issuer": 8, "market": 6, "risk": 6}
 
 
 def test_a_raw_read_belongs_to_one_family_only():
     owners = {verb: [f for f in P.FACES if verb in P.FACE_TOOLS[f]]
               for verb in ("filings_read", "filings_search", "filings_section", "web_search", "prices_read",
                            "book_read", "scenario")}
-    assert owners == {"filings_read": ["issuer"], "filings_search": ["issuer"], "filings_section": ["issuer"],
-                      "web_search": ["issuer"], "prices_read": ["market"], "book_read": ["risk"], "scenario": ["risk"]}
+    # a per-cell read (`filings_read`, `book_read`) is the debug door's: on no specialist's face
+    assert owners == {"filings_read": [], "filings_search": ["issuer"], "filings_section": ["issuer"],
+                      "web_search": ["issuer"], "prices_read": ["market"], "book_read": [], "scenario": ["risk"]}
 
 
 @pytest.mark.parametrize("face", P.FACES)
@@ -207,9 +210,10 @@ def _book(monkeypatch):
 
 
 async def test_a_checks_figures_say_where_the_check_stands(monkeypatch):
+    # `book_read` is the debug door's verb (tools/primitives.build_desk_registry), not a specialist's
     log = _wire(monkeypatch)
     _book(monkeypatch)
-    out = await R.invoke(P.build_analyst_registry("risk"), _Db(), "sess", "book_read",
+    out = await R.invoke(P.build_desk_registry(), _Db(), "sess", "book_read",
                          {"book": "port_001", "table": "limit_checks", "column": "current_value", "why": WHY})
     assert len(out["rows"]) == 2 and out["book"] == "run_1" and out["as_of"] == "2026-09-10"
     by_subject = {r["subject"]: r for r in _recorded(log)}
@@ -222,7 +226,7 @@ async def test_a_checks_figures_say_where_the_check_stands(monkeypatch):
 async def test_a_coefficient_of_a_collinear_fit_is_withheld_as_a_row(monkeypatch):
     log = _wire(monkeypatch)
     _book(monkeypatch)
-    out = await R.invoke(P.build_analyst_registry("risk"), _Db(), "sess", "book_read",
+    out = await R.invoke(P.build_desk_registry(), _Db(), "sess", "book_read",
                          {"book": "run_1", "table": "factor_attributions", "why": WHY})
     (rec,) = _recorded(log)
     assert rec["kind"] == F.ABSENCE and "collinear" in rec["text"] and rec["means"]["reason"] == "meaningless"
@@ -232,7 +236,7 @@ async def test_a_coefficient_of_a_collinear_fit_is_withheld_as_a_row(monkeypatch
 async def test_a_row_or_column_the_book_does_not_hold_is_refused_with_what_it_does(monkeypatch):
     log = _wire(monkeypatch)
     _book(monkeypatch)
-    await R.invoke(P.build_analyst_registry("risk"), _Db(), "sess", "book_read",
+    await R.invoke(P.build_desk_registry(), _Db(), "sess", "book_read",
                    {"book": "run_1", "table": "limit_checks", "row": "issuer_concentration:NVDA", "why": WHY})
     (rec,) = _recorded(log)
     assert rec["means"]["reason"] == "no_such_name"

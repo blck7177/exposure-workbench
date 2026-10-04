@@ -18,7 +18,7 @@ import json
 import pytest
 
 from exposure_workbench.analytics import formulas as fm
-from exposure_workbench.analytics import skill
+from exposure_workbench.analytics import registry as skill
 from exposure_workbench.services import agent_session_service as sess
 from exposure_workbench.services import catalogue_service as cat
 from exposure_workbench.services import compute_service as cmp
@@ -176,40 +176,6 @@ def test_the_fundamentals_layer_lists_the_metric_names_by_default():
 def test_a_metric_refusal_lists_what_is_held_and_names_its_argument():
     src = inspect.getsource(definitions._read_fundamentals)
     assert '"available": have' in src and '"held_on": {"metric": metric}' in src
-
-
-def test_a_refusal_about_one_argument_holds_only_calls_that_repeat_it():
-    """The V21 §7 residual: live turn 3's first refusal (a wrong metric name)
-    held seven reads of OTHER metrics, twice."""
-    from exposure_workbench.agents import batch
-    about_capex = {"error": "metric_not_filed", "held_on": {"metric": "capital_expenditures"}}
-    assert batch.holds(about_capex, {"ticker": "AMZN", "metric": "capital_expenditures"})
-    assert not batch.holds(about_capex, {"ticker": "AMZN", "metric": "buybacks"})
-    assert batch.holds({"error": "unknown_run"}, {"anything": 1}), "no argument named: held by tool, as V21"
-
-
-async def test_a_batch_holds_by_argument_when_the_refusal_names_one():
-    from exposure_workbench.agents import batch
-
-    class _Face:
-        def __init__(self):
-            self.calls = []
-
-        async def call(self, name, args, *, actor=None, task_id=None):
-            self.calls.append((name, args))
-            if args.get("metric") == "capital_expenditures":
-                return {"error": "metric_not_filed", "held_on": {"metric": "capital_expenditures"}}
-            return {"calc_id": "calc_1", "table": {"quantities": {}}}
-
-    def _tc(i, **args):
-        return {"id": f"c{i}", "function": {"name": "read_fundamentals", "arguments": json.dumps(args)}}
-    face = _Face()
-    out = await batch.dispatch(face, [_tc(1, ticker="AMZN", metric="capital_expenditures"),
-                                      _tc(2, ticker="AMZN", metric="buybacks"),
-                                      _tc(3, ticker="MSFT", metric="capital_expenditures")],
-                               free=("think", "respond"))
-    assert [a["metric"] for _, a in face.calls] == ["capital_expenditures", "buybacks"]
-    assert out[2][2]["error"] == batch.NOT_ATTEMPTED
 
 
 async def test_scale_is_an_op_with_a_factor_not_an_operand():

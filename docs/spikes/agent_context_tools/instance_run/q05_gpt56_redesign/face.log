@@ -1,0 +1,82 @@
+INFO:     Started server process [1770031]
+INFO:     Waiting for application startup.
+2026-10-04 01:41:49,477 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,477 [INFO] mcp-http: mcp mount /mcp/meta serving 12 tools
+2026-10-04 01:41:49,477 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,477 [INFO] mcp-http: mcp mount /mcp/lead serving 2 tools
+2026-10-04 01:41:49,477 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,477 [INFO] mcp-http: mcp mount /mcp/research serving 7 tools
+2026-10-04 01:41:49,478 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,478 [INFO] mcp-http: mcp mount /mcp/issuer serving 7 tools
+2026-10-04 01:41:49,478 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,478 [INFO] mcp-http: mcp mount /mcp/market serving 5 tools
+2026-10-04 01:41:49,478 [INFO] mcp.server.streamable_http_manager: StreamableHTTP session manager started
+2026-10-04 01:41:49,478 [INFO] mcp-http: mcp mount /mcp/risk serving 5 tools
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8211 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51070 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47290 - "POST /mcp/lead HTTP/1.1" 200 OK
+2026-10-04 01:41:56,605 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47302 - "POST /mcp/lead HTTP/1.1" 202 Accepted
+2026-10-04 01:41:56,611 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47304 - "POST /mcp/lead HTTP/1.1" 200 OK
+2026-10-04 01:41:56,616 [INFO] mcp.server.lowlevel.server: Processing request of type ListToolsRequest
+2026-10-04 01:41:56,618 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47314 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:03,492 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47322 - "POST /mcp/issuer HTTP/1.1" 202 Accepted
+2026-10-04 01:42:03,501 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47334 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:03,508 [INFO] mcp.server.lowlevel.server: Processing request of type ListToolsRequest
+2026-10-04 01:42:03,510 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:47342 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:05,527 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:05,689 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:57596 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:09,347 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:13,549 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:13,611 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:57598 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:13,619 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:14,377 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:14,410 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:57604 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:14,417 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:15,161 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:15,210 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:57612 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:15,220 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:15,958 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:15,993 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:48774 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:21,381 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:22,139 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:22,168 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:48786 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:22,174 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:22,394 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:22,422 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:48794 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:22,427 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:22,614 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:22,641 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:48798 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:22,647 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:23,546 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:23,575 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:48810 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:23,581 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:23,763 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:23,786 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:53854 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:28,999 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:29,161 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:29,185 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:53856 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:29,191 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:29,379 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:29,407 [INFO] mcp.server.streamable_http: Terminating session: None
+INFO:     127.0.0.1:53868 - "POST /mcp/issuer HTTP/1.1" 200 OK
+2026-10-04 01:42:29,413 [INFO] mcp.server.lowlevel.server: Processing request of type CallToolRequest
+2026-10-04 01:42:29,595 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-10-04 01:42:29,616 [INFO] mcp.server.streamable_http: Terminating session: None

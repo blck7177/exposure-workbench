@@ -862,13 +862,12 @@ class FactRecord(Base):
 # ─── Runtime: Agent Steps (APPEND-ONLY audit trail) ─────────────────────────────
 
 class AnalystReport(Base):
-    """An analyst's persisted handoff, distinguished by input_version.protocol.
+    """A specialist's record for one task: what it was asked, what it wrote, the
+    observer's reading of it, the analyses it ran and how it stopped. Its status is
+    how the task ended (returned | stopped); it never certifies the question complete.
 
-    S2 evidence-v2 stores retrieved evidence and individually checked notes.
-    A returned/stopped status describes execution, never question completeness;
-    stopped work can still have accepted blocks. Historical verified/refused
-    briefs retain their original representation. Rejected note prose stays in
-    the execution trace rather than the current report or reusable context.
+    Tenant rule is the session's, as for `facts` and `agent_steps`: the policy is on
+    the table (infra/init.sql) and nothing here re-implements it.
     """
     __tablename__ = "analyst_reports"
 
@@ -878,48 +877,32 @@ class AnalystReport(Base):
     message_id: Mapped[str | None] = mapped_column(String(64))
     task_id: Mapped[str | None] = mapped_column(String(64))
     domain: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False)      # returned | stopped; legacy verified | refused
+    status: Mapped[str] = mapped_column(String(16), nullable=False)      # returned | stopped
     title: Mapped[str | None] = mapped_column(Text)
-    brief: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    text: Mapped[str | None] = mapped_column(Text)
-    blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    brief: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)   # task, scope, analyses, rows_read, stop_reason, budget
+    text: Mapped[str | None] = mapped_column(Text)                       # the specialist's prose
+    blocks: Mapped[list[Any]] = mapped_column(JSONB, default=list)       # rendered, every supported figure a fact
     citations: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    verified: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    problems: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    verified: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)   # the observer's summary
+    problems: Mapped[list[Any]] = mapped_column(JSONB, default=list)        # propositions that did not hold
     prompt_tokens: Mapped[int | None] = mapped_column(Integer)
     completion_tokens: Mapped[int | None] = mapped_column(Integer)
     evidence_calls: Mapped[int | None] = mapped_column(Integer)
-    # V2 P2: TaskState, on the record a task already leaves (design v0.4 §07).
-    requirement_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    input_version: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    accepted_lines: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    attempts: Mapped[int | None] = mapped_column(Integer)
-    receipts: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class AnalysisState(Base):
-    """The minimal persistent analysis state (V2 P2, design v0.4 §07): one row
-    per turn, versioned. What the lead declared the question asks (requirements),
-    the scope the runtime fixed, the findings and gaps that passed the fact
-    boundary, the tasks. A model's sentence reaches this row only through
-    services/analysis_state.propose — the same check a finding passes; a rejected
-    proposal is an agent_steps row and never a row here."""
-    __tablename__ = "analysis_state"
+class WorkViewRow(Base):
+    """One user turn's work view (agents/work_view): the analyses run, the specialists'
+    notes with the observer's reading of them, how each task ended, the budget. A
+    projection of the record, versioned; never a completion verdict."""
+    __tablename__ = "work_views"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"),
                                             nullable=False)
     message_id: Mapped[str | None] = mapped_column(String(64))
     version: Mapped[int] = mapped_column(Integer, default=1)
-    question: Mapped[str | None] = mapped_column(Text)
-    requirements: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    scope: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    findings: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    gaps: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    tasks: Mapped[list[Any]] = mapped_column(JSONB, default=list)
-    budget: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    completion: Mapped[str | None] = mapped_column(String(32))
+    body: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -931,7 +914,7 @@ class AgentStep(Base):
     session_id: Mapped[str] = mapped_column(String(64), ForeignKey("agent_sessions.id", ondelete="CASCADE"))
     message_id: Mapped[str | None] = mapped_column(String(64))
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
-    step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|think|delegation|respond|llm_call
+    step_type: Mapped[str] = mapped_column(String(16), nullable=False)   # tool_call|delegation|open|answer|report|llm_call
     tool_name: Mapped[str | None] = mapped_column(String(64))
     # V36: whose step this is. NULL is the lead analyst (every row before V36);
     # a domain analyst writes 'sub:<domain>'. Without it a `run` call made by a

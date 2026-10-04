@@ -8,7 +8,8 @@ two block kinds whose labels are structural, so there the label is now DERIVED
 from the slot's name and the model has no cell to write one in. Paragraph
 prose keeps its words; that is the critic's job, outside the gate.
 
-Also here: the web on the meta face, and the two evidence dead ends.
+The claims grammar (S1) left with services/claims and its pins went with it; what
+remains here is the web on the meta face and the two evidence dead ends.
 """
 
 from __future__ import annotations
@@ -20,49 +21,7 @@ import pytest
 from exposure_workbench.services import evidence_resolver_service as ev
 from exposure_workbench.services import quantities as qn
 from exposure_workbench.tools import definitions, faces
-from exposure_workbench.tools.arg_validation import validate_args
-# the claims grammar, which the research brief's sections are written in (V1: the chat exit
-# `respond` that also used it is gone; the grammar and these rules about it are not)
-from exposure_workbench.services.claims import ANSWER_SCHEMA as RESPOND_SCHEMA
 from exposure_workbench.tools.registries import build_meta_registry, build_research_registry
-
-
-def _fields(claim) -> list[str]:
-    """V30: the grammar is claims + prose; a table is a claim with rows of ids."""
-    return [p["field"] for p in validate_args(RESPOND_SCHEMA, {"claims": [{"id": "c1", "relation": "table", **claim}], "prose": ["{c1}"]})]
-
-
-S = {"ref": "calc_1", "name": "NVDA.adj_close@2026-06-05"}
-
-
-# ── S1: the grammar has no cell for words ─────────────────────────────────────
-
-def test_a_slot_cell_is_refused_by_the_schema_at_the_cell():
-    """V24: a cell is a fact id; a slot object has no place."""
-    assert _fields({"rows": [[S, "f_a"]]}) == ["claims.0.rows.0.0"]
-
-
-def test_columns_are_refused_by_the_schema_at_the_key():
-    assert _fields({"columns": ["Measure", "Value"], "rows": [["f_a"]]}) == ["claims.0.columns"]
-
-
-def test_the_schema_description_and_the_refusal_say_the_same_rule():
-    """One sentence, read twice — the schema before the gate, the refusal after."""
-    props = RESPOND_SCHEMA["properties"]["claims"]["items"]["properties"]
-    assert "one row per thing compared" in props["rows"]["description"]
-    assert "columns" not in props and "header" not in props and "labels" not in props
-
-
-# ── S1: what is derived, on the three shapes the battery produced ─────────────
-
-def test_the_model_cannot_supply_the_derived_keys_itself():
-    """`header`, `labels`, `explicit` are the renderer's; a block carrying them
-    is refused like any unknown key, so the derivation is the only writer."""
-    for key in ("header", "labels", "explicit"):
-        assert _fields({"rows": [["f_a"]], key: ["x"]}) == [f"claims.0.{key}"]
-
-
-# ── S1: a trend's series states its own direction ─────────────────────────────
 
 
 # ── S2: the web is on the meta face ───────────────────────────────────────────

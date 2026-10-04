@@ -1,0 +1,408 @@
+[
+ {
+  "type": "function",
+  "name": "list",
+  "description": "What the desk holds, as names and dates — never a figure. `metrics`: the measures you may ask for by name, each with what it is and the params it takes. The others take a `subject` and list what is there for it: filed lines and how far each is filed; filings and the Items indexed; the span of prices; a book's holdings, runs, tables and rows (no subject: the desk's books); a book's checks.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "what": {
+     "type": "string",
+     "enum": [
+      "metrics",
+      "fundamentals",
+      "filings",
+      "prices",
+      "book",
+      "checks"
+     ]
+    },
+    "subject": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "a ticker, or a port_/run_/calc_ id"
+    },
+    "why": {
+     "type": "string",
+     "description": "which line of your task this step serves and why this verb, in one sentence — your log is made of these"
+    }
+   },
+   "required": [
+    "what",
+    "why"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "analyze",
+  "description": "One analysis as a table: measures over a scope of subjects, each at its latest period and, with `compare`, against the comparable period before — on each issuer's OWN calendar — with the change stated in percentage points, and ranked when asked. The desk binds dates, pairs numerators with denominators, computes and records every cell; you read the aligned table. Each cell carries its display, period and id; what could not be read says why; a scope that resolves to fewer subjects than expected is reported as a mismatch. The measures, by name, are listed in your MEASURES block.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "requests": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 8,
+     "items": {
+      "type": "object",
+      "properties": {
+       "measure": {
+        "type": "string",
+        "enum": [
+         "ebit",
+         "ebitda",
+         "free_cash_flow",
+         "total_debt",
+         "net_debt",
+         "ebit_interest_coverage",
+         "debt_to_ebitda",
+         "debt_to_operating_cash_flow",
+         "fcf_to_debt",
+         "current_ratio",
+         "gross_margin",
+         "operating_margin",
+         "net_margin",
+         "days_sales_outstanding",
+         "days_inventory",
+         "days_payable",
+         "roe",
+         "roa",
+         "tax_burden",
+         "nopat",
+         "invested_capital",
+         "roic",
+         "asset_turnover",
+         "equity_multiplier",
+         "quick_assets",
+         "quick_ratio",
+         "fcf_margin",
+         "capex_intensity",
+         "net_debt_to_ebitda",
+         "cash_conversion_cycle",
+         "cash_conversion",
+         "accruals",
+         "accruals_ratio",
+         "book.weight",
+         "book.market_value",
+         "price.volatility",
+         "price.beta",
+         "price.momentum_12_1",
+         "price.distance_from_52w_high",
+         "price.adv",
+         "price.drawdown",
+         "price.window_return",
+         "accounts_payable",
+         "accounts_receivable",
+         "amortization_of_intangibles",
+         "buybacks",
+         "capex",
+         "cash_and_equivalents",
+         "cash_and_restricted_cash",
+         "commercial_paper",
+         "cost_of_revenue",
+         "current_assets",
+         "current_liabilities",
+         "current_portion_long_term_debt",
+         "current_portion_long_term_debt_and_leases",
+         "debt_current_total",
+         "depreciation",
+         "depreciation_amortization",
+         "dividends_paid",
+         "eps_basic",
+         "eps_diluted",
+         "gross_profit",
+         "income_tax_expense",
+         "interest_expense",
+         "interest_expense_nonoperating",
+         "interest_paid",
+         "inventory",
+         "long_term_debt_and_leases_noncurrent",
+         "long_term_debt_noncurrent",
+         "long_term_debt_total",
+         "net_income",
+         "net_income_including_noncontrolling",
+         "noncontrolling_interest",
+         "operating_cash_flow",
+         "operating_income",
+         "operating_lease_liability_current",
+         "operating_lease_liability_noncurrent",
+         "operating_lease_liability_total",
+         "pretax_income",
+         "revenue",
+         "revenue_including_assessed_tax",
+         "sbc",
+         "shares_basic_weighted",
+         "shares_diluted_weighted",
+         "shares_outstanding",
+         "short_term_borrowings",
+         "stockholders_equity",
+         "stockholders_equity_including_noncontrolling",
+         "total_assets",
+         "total_liabilities",
+         "total_revenues"
+        ]
+       },
+       "compare": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "previous_ttm",
+         "previous_fy",
+         "previous_quarter",
+         "previous_run",
+         null
+        ],
+        "description": "the period to set the latest against; issuer measures take previous_ttm | previous_fy | previous_quarter, book columns previous_run"
+       },
+       "change": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "absolute",
+         "relative",
+         null
+        ],
+        "description": "with compare: absolute (percentage points for a ratio) or relative; default absolute"
+       },
+       "rank": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "order the subjects on the measure (and on its change)"
+       },
+       "direction": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "highest",
+         "lowest",
+         null
+        ],
+        "description": "default highest first"
+       },
+       "params": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "a price statistic's own params (window, benchmark)"
+       }
+      },
+      "required": [
+       "measure"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "scope": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "description": "which subjects: {subjects: [tickers]}, or {book: port_…, sector: 'Technology'}, or {book: port_…, holdings: 'all'}; expected_count says how many the question said there were (a mismatch is reported, never resolved for you); basis says why these, in your words",
+     "properties": {
+      "subjects": {
+       "type": [
+        "array",
+        "null"
+       ],
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 32
+      },
+      "book": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "sector": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "holdings": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "enum": [
+        "all",
+        null
+       ]
+      },
+      "expected_count": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "minimum": 1
+      },
+      "basis": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "why": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "description": "optional: what this analysis is for"
+    }
+   },
+   "required": [
+    "requests"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "ask",
+  "description": "Ask a specialist for work that needs its own reading of the evidence: the text of a filing, a method of its family that is not a measure over subjects, an interpretation you want made by the analyst who holds the data. Pick the specialist by the family of evidence — the issuer analyst reads filings, the market analyst prices, the portfolio risk manager the book — give it a scope (subjects, or a book with a sector) and say what you want to know in short lines, in financial language. The specialist writes back in prose; its analyses and the rows it read land in the STATE block. Analyses over named measures you can run yourself with `analyze`.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "tasks": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 3,
+     "items": {
+      "type": "object",
+      "properties": {
+       "analyst": {
+        "type": "string",
+        "enum": [
+         "issuer",
+         "market",
+         "risk"
+        ]
+       },
+       "scope": {
+        "type": "object",
+        "properties": {
+         "subjects": {
+          "type": [
+           "array",
+           "null"
+          ],
+          "items": {
+           "type": "string"
+          }
+         },
+         "book": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "sector": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "holdings": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "enum": [
+           "all",
+           null
+          ]
+         },
+         "expected_count": {
+          "type": [
+           "integer",
+           "null"
+          ],
+          "minimum": 1
+         },
+         "basis": {
+          "type": [
+           "string",
+           "null"
+          ]
+         }
+        },
+        "additionalProperties": false
+       },
+       "lines": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+         "type": "string"
+        }
+       },
+       "context": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "one sentence on what the answer is for"
+       }
+      },
+      "required": [
+       "analyst",
+       "scope",
+       "lines"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "tasks"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ },
+ {
+  "type": "function",
+  "name": "open",
+  "description": "Open something already on this turn's record, by id: an analysis view (calc_…), a row of one (f_…), a measure's full entry (method:<name>), a specialist's chapter of the handbook (handbook:issuer | market | risk), or a task's log (tsk_…). Reads; it cannot pull a new figure.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "offset": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 0
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "additionalProperties": false
+  },
+  "strict": false
+ }
+]

@@ -1,0 +1,874 @@
+{
+ "view": "calc_258673deb58a",
+ "scope": {
+  "subjects": [
+   "MSFT",
+   "AAPL",
+   "NVDA"
+  ],
+  "resolved_count": 3,
+  "status": "mismatch",
+  "book": "port_001",
+  "runs": {
+   "latest": {
+    "id": "run_e2945c5ebd5a",
+    "as_of": "2026-09-10"
+   },
+   "prev": {
+    "id": "run_4ee5ca92b926",
+    "as_of": "2026-09-09"
+   }
+  },
+  "basis": "holdings of port_001 in sector Technology",
+  "expected_count": 5,
+  "sectors": {
+   "MSFT": "Technology",
+   "AAPL": "Technology",
+   "NVDA": "Technology"
+  }
+ },
+ "requests": [
+  {
+   "measure": "cash_conversion",
+   "compare": "previous_ttm",
+   "change": "absolute",
+   "rank": true,
+   "direction": "highest"
+  },
+  {
+   "measure": "book.weight",
+   "compare": "previous_run",
+   "change": "absolute",
+   "rank": true,
+   "direction": "highest"
+  }
+ ],
+ "columns": [
+  {
+   "key": "cash_conversion",
+   "measure": "cash_conversion",
+   "role": "current",
+   "kind": "level",
+   "unit": "RATIO",
+   "label": "cash conversion, latest twelve months"
+  },
+  {
+   "key": "cash_conversion@baseline",
+   "measure": "cash_conversion",
+   "role": "baseline",
+   "kind": "level",
+   "unit": "RATIO",
+   "label": "cash conversion, the same twelve months a year earlier"
+  },
+  {
+   "key": "cash_conversion.change",
+   "measure": "cash_conversion",
+   "role": "change",
+   "kind": "absolute_change",
+   "unit": "RATIO",
+   "label": "cash conversion, absolute change, the same twelve months a year earlier to latest twelve months (percentage points)"
+  },
+  {
+   "key": "book.weight",
+   "measure": "book.weight",
+   "role": "current",
+   "kind": "level",
+   "unit": "RATIO",
+   "label": "the name's weight in the book, latest run"
+  },
+  {
+   "key": "book.weight@baseline",
+   "measure": "book.weight",
+   "role": "baseline",
+   "kind": "level",
+   "unit": "RATIO",
+   "label": "the name's weight in the book, the run before"
+  },
+  {
+   "key": "book.weight.change",
+   "measure": "book.weight",
+   "role": "change",
+   "kind": "absolute_change",
+   "unit": "RATIO",
+   "label": "the name's weight in the book, absolute change, the run before to latest run (percentage points)"
+  }
+ ],
+ "rows": [
+  {
+   "subject": "MSFT",
+   "sector": "Technology",
+   "cells": {
+    "cash_conversion": {
+     "display": "135.9%",
+     "value": 1.3587800281114235,
+     "period": "2025-04-01..2026-03-31",
+     "ref": "f_a4461811eef4"
+    },
+    "cash_conversion@baseline": {
+     "display": "135.3%",
+     "value": 1.3526155119780618,
+     "period": "2024-04-01..2025-03-31",
+     "ref": "f_5a9069cf2355"
+    },
+    "cash_conversion.change": {
+     "display": "+0.62 pp",
+     "value": 0.006164516133361664,
+     "period": "2024-04-01..2025-03-31 \u2192 2025-04-01..2026-03-31",
+     "ref": "f_d9eab120d4fd"
+    },
+    "book.weight": {
+     "display": "16.0%",
+     "value": 0.16039003,
+     "period": "run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_6972f19e3232"
+    },
+    "book.weight@baseline": {
+     "display": "16.1%",
+     "value": 0.16072708,
+     "period": "run run_4ee5ca92b926 (2026-09-09)",
+     "ref": "f_9ab1ebd282ad"
+    },
+    "book.weight.change": {
+     "display": "-0.03 pp",
+     "value": -0.0003370500000000054,
+     "period": "run run_4ee5ca92b926 (2026-09-09) \u2192 run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_f490489a0c66"
+    }
+   }
+  },
+  {
+   "subject": "AAPL",
+   "sector": "Technology",
+   "cells": {
+    "cash_conversion": {
+     "display": "114.4%",
+     "value": 1.1439689985723027,
+     "period": "2025-03-30..2026-03-28",
+     "ref": "f_e7b0d067eada"
+    },
+    "cash_conversion@baseline": {
+     "display": "112.6%",
+     "value": 1.126030382140728,
+     "period": "2024-03-31..2025-03-29",
+     "ref": "f_31abb128e5e0"
+    },
+    "cash_conversion.change": {
+     "display": "+1.79 pp",
+     "value": 0.017938616431574683,
+     "period": "2024-03-31..2025-03-29 \u2192 2025-03-30..2026-03-28",
+     "ref": "f_088cf3c51412"
+    },
+    "book.weight": {
+     "display": "15.2%",
+     "value": 0.15195055,
+     "period": "run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_504c4493ae2f"
+    },
+    "book.weight@baseline": {
+     "display": "14.7%",
+     "value": 0.14726992,
+     "period": "run run_4ee5ca92b926 (2026-09-09)",
+     "ref": "f_cf8bf1fdd26f"
+    },
+    "book.weight.change": {
+     "display": "+0.47 pp",
+     "value": 0.004680629999999991,
+     "period": "run run_4ee5ca92b926 (2026-09-09) \u2192 run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_496fbbad35b7"
+    }
+   }
+  },
+  {
+   "subject": "NVDA",
+   "sector": "Technology",
+   "cells": {
+    "cash_conversion": {
+     "display": "69.7%",
+     "value": 0.6966025331943861,
+     "period": "2025-07-28..2026-07-26",
+     "ref": "f_c7c8053f033e"
+    },
+    "cash_conversion@baseline": {
+     "display": "89.0%",
+     "value": 0.8895804704550966,
+     "period": "2024-07-29..2025-07-27",
+     "ref": "f_96b226a1733e"
+    },
+    "cash_conversion.change": {
+     "display": "-19.3 pp",
+     "value": -0.19297793726071044,
+     "period": "2024-07-29..2025-07-27 \u2192 2025-07-28..2026-07-26",
+     "ref": "f_9df4ae581642"
+    },
+    "book.weight": {
+     "display": "4.06%",
+     "value": 0.0406405,
+     "period": "run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_76075d53cb1c"
+    },
+    "book.weight@baseline": {
+     "display": "4.18%",
+     "value": 0.0417833,
+     "period": "run run_4ee5ca92b926 (2026-09-09)",
+     "ref": "f_c0473a353555"
+    },
+    "book.weight.change": {
+     "display": "-0.11 pp",
+     "value": -0.0011427999999999994,
+     "period": "run run_4ee5ca92b926 (2026-09-09) \u2192 run run_e2945c5ebd5a (2026-09-10)",
+     "ref": "f_9d2276fcdfbd"
+    }
+   }
+  }
+ ],
+ "ranks": {
+  "cash_conversion": {
+   "direction": "highest",
+   "of": 3,
+   "order": [
+    {
+     "subject": "MSFT",
+     "place": 1,
+     "display": "135.9%"
+    },
+    {
+     "subject": "AAPL",
+     "place": 2,
+     "display": "114.4%"
+    },
+    {
+     "subject": "NVDA",
+     "place": 3,
+     "display": "69.7%"
+    }
+   ],
+   "ties": [],
+   "excluded": []
+  },
+  "cash_conversion.change": {
+   "direction": "highest",
+   "of": 3,
+   "order": [
+    {
+     "subject": "AAPL",
+     "place": 1,
+     "display": "+1.79 pp"
+    },
+    {
+     "subject": "MSFT",
+     "place": 2,
+     "display": "+0.62 pp"
+    },
+    {
+     "subject": "NVDA",
+     "place": 3,
+     "display": "-19.3 pp"
+    }
+   ],
+   "ties": [],
+   "excluded": []
+  },
+  "book.weight": {
+   "direction": "highest",
+   "of": 3,
+   "order": [
+    {
+     "subject": "MSFT",
+     "place": 1,
+     "display": "16.0%"
+    },
+    {
+     "subject": "AAPL",
+     "place": 2,
+     "display": "15.2%"
+    },
+    {
+     "subject": "NVDA",
+     "place": 3,
+     "display": "4.06%"
+    }
+   ],
+   "ties": [],
+   "excluded": []
+  },
+  "book.weight.change": {
+   "direction": "highest",
+   "of": 3,
+   "order": [
+    {
+     "subject": "AAPL",
+     "place": 1,
+     "display": "+0.47 pp"
+    },
+    {
+     "subject": "MSFT",
+     "place": 2,
+     "display": "-0.03 pp"
+    },
+    {
+     "subject": "NVDA",
+     "place": 3,
+     "display": "-0.11 pp"
+    }
+   ],
+   "ties": [],
+   "excluded": []
+  }
+ },
+ "missing": [],
+ "coverage": {
+  "subjects": 3,
+  "subjects_complete": 3,
+  "cells": 18,
+  "scope_status": "mismatch"
+ },
+ "definitions": {
+  "cash_conversion": "operating cash flow \u00f7 net income",
+  "book.weight": "the run's own weight of MSFT, run_e2945c5ebd5a as of 2026-09-10"
+ },
+ "limitations": [
+  "scope: 5 subjects were expected, 3 resolved (holdings of port_001 in sector Technology); the table covers the 3"
+ ],
+ "_facts": [
+  {
+   "id": "f_a4461811eef4",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": 1.3587800281114235,
+   "points": null,
+   "text": null,
+   "as_of": "2026-03-31",
+   "window": {
+    "start": "2025-04-01",
+    "end": "2026-03-31"
+   },
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_505a97b9484f"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_5a9069cf2355",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": 1.3526155119780618,
+   "points": null,
+   "text": null,
+   "as_of": "2025-03-31",
+   "window": {
+    "start": "2024-04-01",
+    "end": "2025-03-31"
+   },
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_8bab25c6dcf4"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_d9eab120d4fd",
+   "kind": "scalar",
+   "measure": "cash_conversion.absolute_change",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": 0.006164516133361664,
+   "points": null,
+   "text": null,
+   "as_of": "2026-03-31",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "cash_conversion",
+     "current": "calc_505a97b9484f",
+     "baseline": "calc_8bab25c6dcf4",
+     "current_period": {
+      "start": "2025-04-01",
+      "end": "2026-03-31"
+     },
+     "baseline_period": {
+      "start": "2024-04-01",
+      "end": "2025-03-31"
+     }
+    },
+    "compare": "previous_ttm",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_4510d5a98057"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_6972f19e3232",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": 0.16039003,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_e2945c5ebd5a"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_9ab1ebd282ad",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": 0.16072708,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-09",
+   "window": null,
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_4ee5ca92b926"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_f490489a0c66",
+   "kind": "scalar",
+   "measure": "book.weight.absolute_change",
+   "subject": "MSFT",
+   "unit": "RATIO",
+   "value": -0.0003370500000000054,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "issuer_exposures.weight",
+     "current": "run_e2945c5ebd5a:issuer_exposures.MSFT.weight",
+     "baseline": "run_4ee5ca92b926:issuer_exposures.MSFT.weight",
+     "current_period": {
+      "run": "run_e2945c5ebd5a",
+      "as_of": "2026-09-10"
+     },
+     "baseline_period": {
+      "run": "run_4ee5ca92b926",
+      "as_of": "2026-09-09"
+     }
+    },
+    "compare": "previous_run",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_f87dbe14ad28"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_e7b0d067eada",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 1.1439689985723027,
+   "points": null,
+   "text": null,
+   "as_of": "2026-03-28",
+   "window": {
+    "start": "2025-03-30",
+    "end": "2026-03-28"
+   },
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_bd51117997c9"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_31abb128e5e0",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 1.126030382140728,
+   "points": null,
+   "text": null,
+   "as_of": "2025-03-29",
+   "window": {
+    "start": "2024-03-31",
+    "end": "2025-03-29"
+   },
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_a766f8b5f1cc"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_088cf3c51412",
+   "kind": "scalar",
+   "measure": "cash_conversion.absolute_change",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 0.017938616431574683,
+   "points": null,
+   "text": null,
+   "as_of": "2026-03-28",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "cash_conversion",
+     "current": "calc_bd51117997c9",
+     "baseline": "calc_a766f8b5f1cc",
+     "current_period": {
+      "start": "2025-03-30",
+      "end": "2026-03-28"
+     },
+     "baseline_period": {
+      "start": "2024-03-31",
+      "end": "2025-03-29"
+     }
+    },
+    "compare": "previous_ttm",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_c5bd5514ce94"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_504c4493ae2f",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 0.15195055,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_e2945c5ebd5a"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_cf8bf1fdd26f",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 0.14726992,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-09",
+   "window": null,
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_4ee5ca92b926"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_496fbbad35b7",
+   "kind": "scalar",
+   "measure": "book.weight.absolute_change",
+   "subject": "AAPL",
+   "unit": "RATIO",
+   "value": 0.004680629999999991,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "issuer_exposures.weight",
+     "current": "run_e2945c5ebd5a:issuer_exposures.AAPL.weight",
+     "baseline": "run_4ee5ca92b926:issuer_exposures.AAPL.weight",
+     "current_period": {
+      "run": "run_e2945c5ebd5a",
+      "as_of": "2026-09-10"
+     },
+     "baseline_period": {
+      "run": "run_4ee5ca92b926",
+      "as_of": "2026-09-09"
+     }
+    },
+    "compare": "previous_run",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_4128f08a76ea"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_c7c8053f033e",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": 0.6966025331943861,
+   "points": null,
+   "text": null,
+   "as_of": "2026-07-26",
+   "window": {
+    "start": "2025-07-28",
+    "end": "2026-07-26"
+   },
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_49a2c424c4f9"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_96b226a1733e",
+   "kind": "scalar",
+   "measure": "cash_conversion",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": 0.8895804704550966,
+   "points": null,
+   "text": null,
+   "as_of": "2025-07-27",
+   "window": {
+    "start": "2024-07-29",
+    "end": "2025-07-27"
+   },
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_a82e5102e40a"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_9df4ae581642",
+   "kind": "scalar",
+   "measure": "cash_conversion.absolute_change",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": -0.19297793726071044,
+   "points": null,
+   "text": null,
+   "as_of": "2026-07-26",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "cash_conversion",
+     "current": "calc_49a2c424c4f9",
+     "baseline": "calc_a82e5102e40a",
+     "current_period": {
+      "start": "2025-07-28",
+      "end": "2026-07-26"
+     },
+     "baseline_period": {
+      "start": "2024-07-29",
+      "end": "2025-07-27"
+     }
+    },
+    "compare": "previous_ttm",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_c3538ae14396"
+   ],
+   "group": "derived",
+   "means": {}
+  },
+  {
+   "id": "f_76075d53cb1c",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": 0.0406405,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "current",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_e2945c5ebd5a"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_c0473a353555",
+   "kind": "scalar",
+   "measure": "book.weight",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": 0.0417833,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-09",
+   "window": null,
+   "params": {
+    "role": "baseline",
+    "semantic": {
+     "kind": "level"
+    },
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "run_4ee5ca92b926"
+   ],
+   "group": "book_derived",
+   "means": {}
+  },
+  {
+   "id": "f_9d2276fcdfbd",
+   "kind": "scalar",
+   "measure": "book.weight.absolute_change",
+   "subject": "NVDA",
+   "unit": "RATIO",
+   "value": -0.0011427999999999994,
+   "points": null,
+   "text": null,
+   "as_of": "2026-09-10",
+   "window": null,
+   "params": {
+    "role": "change",
+    "semantic": {
+     "kind": "absolute_change",
+     "measure": "issuer_exposures.weight",
+     "current": "run_e2945c5ebd5a:issuer_exposures.NVDA.weight",
+     "baseline": "run_4ee5ca92b926:issuer_exposures.NVDA.weight",
+     "current_period": {
+      "run": "run_e2945c5ebd5a",
+      "as_of": "2026-09-10"
+     },
+     "baseline_period": {
+      "run": "run_4ee5ca92b926",
+      "as_of": "2026-09-09"
+     }
+    },
+    "compare": "previous_run",
+    "view": "calc_258673deb58a"
+   },
+   "standalone": true,
+   "sources": [
+    "calc_f30f6b26e382"
+   ],
+   "group": "book_derived",
+   "means": {}
+  }
+ ]
+}

@@ -30,16 +30,17 @@ GOOD = {
 
 
 def _agent_returning(payload, monkeypatch):
-    """A DirectLlmAgent whose one completion returns `payload` as text."""
+    """A DirectLlmAgent whose one Responses call (llm/client.respond) returns `payload` as text."""
     from exposure_workbench.llm import client as llm_client
 
     monkeypatch.setattr(llm_client, "get_openai_client", lambda: object())
 
     async def _fake(**kwargs):
         text = payload if isinstance(payload, str) else json.dumps(payload)
-        return text, "gpt-test", 10, 20
+        return llm_client.ModelTurn(text=text, tool_calls=[], output=[], status="completed", model="gpt-test",
+                                    usage={"input_tokens": 10, "output_tokens": 20})
 
-    monkeypatch.setattr(llm_client, "chat_complete", _fake)
+    monkeypatch.setattr(llm_client, "respond", _fake)
     return DirectLlmAgent()
 
 
@@ -98,7 +99,7 @@ async def test_a_provider_error_is_refused_and_says_so(monkeypatch):
     async def _boom(**kwargs):
         raise RuntimeError("429 rate limited")
 
-    monkeypatch.setattr(llm_client, "chat_complete", _boom)
+    monkeypatch.setattr(llm_client, "respond", _boom)
     with pytest.raises(ReportUnavailable, match="429 rate limited"):
         await DirectLlmAgent().generate(_input())
 

@@ -157,7 +157,8 @@ async def test_roe_over_positive_equity_computes_and_names_its_row(monkeypatch):
 def test_the_bank_applicable_set_is_exactly_the_measures_banks_report():
     applies = {n for n, f in fm.FORMULAS.items() if f.not_for_financials is None}
     assert applies == {"roe", "roa", "tax_burden", "asset_turnover",
-                       "equity_multiplier", "accruals", "accruals_ratio"}
+                       "equity_multiplier", "accruals", "accruals_ratio",
+                       "cash_conversion"}      # cash against profit is an accruals question, not leverage
 
 
 def test_net_debt_to_ebitda_refuses_banks_exactly_as_debt_to_ebitda_does():

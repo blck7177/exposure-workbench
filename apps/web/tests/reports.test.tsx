@@ -5,51 +5,44 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReportChips, ReportPanelView, panelFor } from "../app/components/analyst/Reports";
 import type { AnalystReport, ReportRef } from "../lib/api";
 
-// V36: each answer carries a chip per domain analyst, and opening one shows that
-// analyst's report drawn like the answer. Rendered here with react-dom/server —
-// no DOM in this suite — so what is checked is what each state PUTS ON THE
-// PAGE: the chip's name and mark, which message's panel opens, and that a
-// refused report shows its problems and never its prose. The click itself is
-// the browser smoke's (scripts/smoke_ui.py).
+// Each answer carries a chip per specialist, and opening one shows that
+// specialist's reading drawn like the answer, with the observer's verification.
+// Rendered with react-dom/server — no DOM in this suite — so what is checked is
+// what each state PUTS ON THE PAGE.
 
-const verified: ReportRef = { domain: "book_limits_and_triggers", report_id: "rep_1", status: "verified" };
-const refused: ReportRef = { domain: "issuer_earnings_quality", report_id: "rep_2", status: "refused" };
+const returned: ReportRef = { domain: "issuer", report_id: "rep_1", status: "returned" };
+const stopped: ReportRef = { domain: "risk", report_id: "rep_2", status: "stopped" };
 const noop = () => {};
 
 const report = (over: Partial<AnalystReport> = {}): AnalystReport => ({
   id: "rep_1",
-  domain: "book_limits_and_triggers",
-  status: "verified",
-  title: "Issuer-concentration room, run of 2026-09-10",
-  brief: {
-    findings: [{ want: 1, finding: "MSFT is nearest: its check reads 16.0% [f_1] against a 15.0% [f_2] warning tier." }],
-    not_done: [{ want: 2, why: "the desk holds no prior run for this book" }],
-    caveats: ["room is in weight points; dollar room was not requested"],
-  },
-  text: "MSFT is nearest.",
-  blocks: [],
-  citations: ["f_1", "f_2"],
-  verified: {},
+  domain: "issuer",
+  status: "returned",
+  title: "the issuer analyst on AAPL, MSFT, NVDA",
+  brief: { analyses: ["calc_view1"], stop_reason: "finished", rows_read: [] },
+  text: "NVDA converts least of the three at 69.7% and fell 19.3 percentage points.",
+  blocks: [{ type: "paragraph", runs: ["NVDA converts least of the three at ", { fact: { id: "f_1", kind: "scalar", measure: "cash_conversion", subject: "NVDA", unit: "RATIO", value: 0.6966, display: "69.7%" } }, "."] }],
+  citations: ["f_1"],
+  verified: { figures: 2, supported: 2, contradicted: 0, unsourced: 0, ambiguous: 0 },
   problems: [],
   created_at: null,
   ...over,
 });
 
 describe("ReportChips", () => {
-  it("draws one chip per analyst, named by its domain in words, marked by whether the check passed", () => {
-    const html = renderToStaticMarkup(<ReportChips reports={[verified, refused]} onOpen={noop} />);
+  it("draws one chip per specialist, named by its family, marked by how the task ended", () => {
+    const html = renderToStaticMarkup(<ReportChips reports={[returned, stopped]} onOpen={noop} />);
     expect(html.match(/<button/g)?.length).toBe(2);
-    expect(html).toContain("book limits and triggers");
-    expect(html).toContain("issuer earnings quality");
+    expect(html).toContain("issuer");
+    expect(html).toContain("risk");
     expect(html).toContain("✓");
     expect(html).toContain("—");
   });
-  it("says in the title what the mark means — 'not checked' is a report on the record, not a missing one", () => {
-    const html = renderToStaticMarkup(<ReportChips reports={[refused]} onOpen={noop} />);
-    expect(html).toContain("did not pass the check");
-    expect(html).toContain("its figures are not quotable");
+  it("says in the title what the mark means — a stopped task is on the record, not a finding", () => {
+    const html = renderToStaticMarkup(<ReportChips reports={[stopped]} onOpen={noop} />);
+    expect(html).toContain("stopped before the specialist wrote its reading");
   });
-  it("draws nothing for an answer with no analysts behind it", () => {
+  it("draws nothing for an answer with no specialists behind it", () => {
     expect(renderToStaticMarkup(<ReportChips reports={[]} onOpen={noop} />)).toBe("");
     expect(renderToStaticMarkup(<ReportChips onOpen={noop} />)).toBe("");
   });
@@ -57,93 +50,55 @@ describe("ReportChips", () => {
 
 describe("panelFor — whose panel opens", () => {
   it("opens under the message whose chips include the report, and under no other", () => {
-    expect(panelFor(verified, [verified, refused])).toBe(verified);
-    expect(panelFor(verified, [refused])).toBeNull();
-    expect(panelFor(null, [verified])).toBeNull();
-    expect(panelFor(verified, undefined)).toBeNull();
+    expect(panelFor(returned, [returned, stopped])).toBe(returned);
+    expect(panelFor(returned, [stopped])).toBeNull();
+    expect(panelFor(null, [returned])).toBeNull();
+    expect(panelFor(returned, undefined)).toBeNull();
   });
 });
 
 describe("ReportPanelView", () => {
-  it("shows evidence-only handoffs without claiming an analysis was completed", () => {
-    const full = report({ status: "returned", brief: { protocol: "evidence-v2", stop_reason: "submitted",
-      evidence: [{ id: "f_weight1234", row: "[f_weight1234] MSFT weight: 16.0%, latest run" }], notes: [] }, blocks: [] });
-    const html = renderToStaticMarkup(<ReportPanelView report={{ ...verified, status: "returned" }} full={full}
-      error={null} onClose={noop} onOpenFact={noop} />);
-    expect(html).toContain(">returned</span>");
-    expect(html).toContain("MSFT weight: 16.0%, latest run");
-    expect(html).toContain("may still need further analysis");
-    expect(html).not.toContain("not checked");
-    expect(html).not.toContain("did not accept this reading");
-  });
-
-  it("keeps checked notes and evidence visible after another item failed", () => {
-    const full = report({ status: "stopped", brief: { protocol: "evidence-v2", stop_reason: "submission_rejected",
-      evidence: [{ id: "f_weight1234", row: "[f_weight1234] MSFT weight: 16.0%" }],
-      notes: [{ id: "nte_bad", text: "untrusted raw text is never a rendering source" }] },
-      blocks: [{ type: "paragraph", runs: ["A checked observation with its qualification."] }],
-      problems: [{ item: "nte_bad", reasons: ["unsourced_figure"] }] });
-    const html = renderToStaticMarkup(<ReportPanelView report={{ ...verified, status: "stopped" }} full={full}
-      error={null} onClose={noop} onOpenFact={noop} />);
-    expect(html).toContain("A checked observation with its qualification.");
-    expect(html).toContain("MSFT weight: 16.0%");
-    expect(html).toContain("Some submitted items did not pass checks");
-    expect(html).not.toContain("untrusted raw text");
-    expect(html).not.toContain(">checked</span>");
-  });
-
-  it("says it is opening until the report arrives, and names the domain from the chip meanwhile", () => {
+  it("a returned reading shows its blocks and the observer's count, never a completion claim", () => {
     const html = renderToStaticMarkup(
-      <ReportPanelView report={verified} full={null} error={null} onClose={noop} onOpenFact={noop} />);
+      <ReportPanelView report={returned} full={report()} error={null} onClose={noop} onOpenFact={noop} />);
+    expect(html).toContain(">returned</span>");
+    expect(html).toContain("69.7%");
+    expect(html).toContain("2 of 2 figures supported");
+    expect(html).toContain("1 analysis recorded");
+    expect(html).not.toContain("complete");
+  });
+
+  it("a reading with figures that did not hold says how many", () => {
+    const full = report({ verified: { figures: 3, supported: 2, contradicted: 1, unsourced: 0, ambiguous: 0 } });
+    const html = renderToStaticMarkup(
+      <ReportPanelView report={returned} full={full} error={null} onClose={noop} onOpenFact={noop} />);
+    expect(html).toContain("2 of 3 figures supported");
+    expect(html).toContain("; 1 did not hold");
+  });
+
+  it("a stopped task shows why it stopped and what it analysed, and no prose", () => {
+    const full = report({ id: "rep_2", domain: "risk", status: "stopped", text: "half a sentence", blocks: [],
+      brief: { analyses: ["calc_view2"], stop_reason: "turn_limit" } });
+    const html = renderToStaticMarkup(
+      <ReportPanelView report={stopped} full={full} error={null} onClose={noop} onOpenFact={noop} />);
+    expect(html).toContain(">stopped</span>");
+    expect(html).toContain("turn limit");
+    expect(html).toContain("1 analysis");
+    expect(html).not.toContain("half a sentence");
+  });
+
+  it("says it is opening until the report arrives, and names the family from the chip meanwhile", () => {
+    const html = renderToStaticMarkup(
+      <ReportPanelView report={returned} full={null} error={null} onClose={noop} onOpenFact={noop} />);
     expect(html).toContain("Opening…");
-    expect(html).toContain("book limits and triggers");
-    expect(html).not.toContain("checked");
+    expect(html).toContain("issuer");
   });
 
   it("shows the failure when the report cannot be opened", () => {
     const html = renderToStaticMarkup(
-      <ReportPanelView report={verified} full={null} error="This report could not be opened."
+      <ReportPanelView report={returned} full={null} error="This report could not be opened."
         onClose={noop} onOpenFact={noop} />);
     expect(html).toContain("This report could not be opened.");
     expect(html).not.toContain("Opening…");
-  });
-
-  it("a checked report reads like the answer: title, findings by line, what was not settled, caveats, blocks", () => {
-    const full = report({ blocks: [{ type: "paragraph", runs: ["Room to warning is the smallest of the ten checks."] }] });
-    const html = renderToStaticMarkup(
-      <ReportPanelView report={verified} full={full} error={null} onClose={noop} onOpenFact={noop} />);
-    expect(html).toContain(">checked</span>");
-    expect(html).not.toContain("not checked");
-    expect(html).toContain("Issuer-concentration room, run of 2026-09-10");
-    expect(html).toContain("MSFT is nearest: its check reads 16.0% [f_1]");
-    expect(html).toContain("Not settled");
-    expect(html).toContain("the desk holds no prior run for this book");
-    expect(html).toContain("room is in weight points");
-    expect(html).toContain("Room to warning is the smallest of the ten checks.");
-    expect(html).not.toContain("did not accept");
-  });
-
-  it("a refused report shows its problems and never its prose or its blocks", () => {
-    const full = report({
-      id: "rep_2", domain: "issuer_earnings_quality", status: "refused",
-      text: "Amazon's accruals ratio is 4.1% and the highest of the three.",
-      blocks: [{ type: "paragraph", runs: ["Amazon's accruals ratio is 4.1% and the highest of the three."] }],
-      problems: [{ reason: "superlative_without_rank" }, { reason: "unsourced_figure" }],
-    });
-    const html = renderToStaticMarkup(
-      <ReportPanelView report={refused} full={full} error={null} onClose={noop} onOpenFact={noop} />);
-    expect(html).toContain("not checked");
-    expect(html).toContain("The desk did not accept this reading, so its text is not shown.");
-    expect(html).toContain("superlative_without_rank");
-    expect(html).toContain("unsourced_figure");
-    expect(html).not.toContain("accruals ratio is 4.1%");
-  });
-
-  it("lists at most five problems, the way the drawer is sized", () => {
-    const full = report({ status: "refused", problems: Array.from({ length: 8 }, (_, i) => ({ reason: `reason_${i}` })) });
-    const html = renderToStaticMarkup(
-      <ReportPanelView report={refused} full={full} error={null} onClose={noop} onOpenFact={noop} />);
-    expect(html).toContain("reason_4");
-    expect(html).not.toContain("reason_5");
   });
 });

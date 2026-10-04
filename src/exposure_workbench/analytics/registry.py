@@ -414,7 +414,7 @@ EXECUTORS = (
     "price.rolling_volatility", "price.beta", "price.momentum_12_1",
     "price.distance_from_52w_high", "price.adv", "price.drawdown", "price.window_return",
     "book.analysis", "book.reconcile", "book.drawdown_episodes", "book.explain_episode",
-    "book.sell", "book.buy", "book.position",
+    "book.sell", "book.buy", "book.position", "book.column",
 )
 
 
@@ -709,6 +709,28 @@ _BOOK_METHODS: tuple[Method, ...] = (
 # measure on the asker's list, never by a wider face.
 
 _CROSS_METHODS: tuple[Method, ...] = (
+    Method(
+        name="book.weight", subject_kind="issuer", family="book",
+        reads_as="weight in the book", faces=("risk", "issuer"),
+        describes="one name's weight in a book — its share of the book's market value on the latest completed run (`which`='prior': the run before); compared against the previous run it is the weight change, in percentage points",
+        procedure="issuer_exposures.weight as the run holds it; no arithmetic",
+        authority="the run's own row", fails_when="the name is not a position of that run; the book has no completed run",
+        executor="book.column", unit_class="ratio", yields=("issuer_exposures.<T>.weight",),
+        params_schema={"type": "object", "properties": {
+            "book": {"type": ["string", "null"], "description": "a port_… id or a run_… id; omitted: the one book holding the name"},
+            "which": {"type": ["string", "null"], "enum": ["latest", "prior", None]}}, "additionalProperties": False},
+    ),
+    Method(
+        name="book.market_value", subject_kind="issuer", family="book",
+        reads_as="market value in the book", faces=("risk", "issuer"),
+        describes="one name's market value in a book on the latest completed run (`which`='prior': the run before)",
+        procedure="issuer_exposures.market_value as the run holds it; no arithmetic",
+        authority="the run's own row", fails_when="the name is not a position of that run; the book has no completed run",
+        executor="book.column", unit_class="money", yields=("issuer_exposures.<T>.market_value",),
+        params_schema={"type": "object", "properties": {
+            "book": {"type": ["string", "null"], "description": "a port_… id or a run_… id; omitted: the one book holding the name"},
+            "which": {"type": ["string", "null"], "enum": ["latest", "prior", None]}}, "additionalProperties": False},
+    ),
     Method(
         name="book.position", subject_kind="issuer", family="book",
         reads_as="the name's place in the book", faces=("issuer",),

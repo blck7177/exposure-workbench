@@ -33,11 +33,8 @@ system whose whole claim is that every failure is explainable, that was the one
 failure that explained nothing. ToolFaceUnavailable is the translation, and it
 is made here because here is the only place that still knows it was HTTP.
 
-The loops keep speaking OpenAI's function-calling dialect, so `tools` is
-converted back into that shape here. A test asserts the conversion is
-byte-identical to what registry.schemas() produced before, because a tool
-description that changes on the way to the model is a behaviour change nobody
-wrote.
+The loops speak the provider door's function-tool shape (llm/client.function_tool),
+so `tools` is converted into it here, once, from the MCP listing.
 """
 
 from __future__ import annotations
@@ -96,17 +93,10 @@ class ToolFaceUnavailable(RuntimeError):
         self.reason = reason
 
 
-def _as_openai_tool(tool) -> dict:
-    """An MCP tool as an OpenAI function schema — the shape registry.schemas()
-    produced when the loops read the registry directly."""
-    return {
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.inputSchema,
-        },
-    }
+def _as_function_tool(tool) -> dict:
+    """An MCP tool as the function tool the provider door sends (llm/client.function_tool)."""
+    return {"type": "function", "name": tool.name, "description": tool.description,
+            "parameters": tool.inputSchema, "strict": False}
 
 
 class ToolSession:
@@ -114,7 +104,7 @@ class ToolSession:
 
     def __init__(self, client, mcp_tools):
         self._client = client
-        self.tools = [_as_openai_tool(t) for t in mcp_tools]
+        self.tools = [_as_function_tool(t) for t in mcp_tools]
 
     async def call(self, name: str, args: dict, *, actor: str | None = None, task_id: str | None = None) -> dict:
         """One tool call, returning what invoke() returned.

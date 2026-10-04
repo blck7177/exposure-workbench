@@ -11,6 +11,7 @@ import {
   createSession, getSessionDetail, listSessions, postMessage,
   type AgentStep, type SessionSummary, type Verified,
 } from "@/lib/issuer";
+import type { Delivery } from "@/lib/issuer";
 import type { Usage } from "@/lib/types";
 import { AuthGate } from "../Auth";
 import { CitationList } from "../evidence/Cite";
@@ -80,7 +81,7 @@ type ChatMsg = {
   role: string;
   text: string;
   citations: string[];
-  gateFailed?: boolean;
+  delivery?: Delivery;
   verified?: Verified;
   // V14-C. Present on an answer whose figures were slots; absent on every
   // answer written before the exit changed, which keeps its prose renderer.
@@ -172,7 +173,7 @@ export function AnalystDock() {
         role: m.role,
         text: m.content ?? "",
         citations: m.citations ?? [],
-        gateFailed: (m.meta as { gate?: string } | undefined)?.gate === "exhausted",
+        delivery: (m.meta as { delivery?: Delivery } | undefined)?.delivery,
         reports: (m.meta as { reports?: ReportRef[] } | undefined)?.reports,
         verified: (m.meta as { verified?: Verified } | undefined)?.verified,
         blocks: (m.meta as { blocks?: Block[] } | undefined)?.blocks,
@@ -236,8 +237,8 @@ export function AnalystDock() {
       role: m.role,
       text: m.content ?? "",
       citations: m.citations ?? [],
-      gateFailed: (m.meta as { gate?: string } | undefined)?.gate === "exhausted",
-        reports: (m.meta as { reports?: ReportRef[] } | undefined)?.reports,
+      delivery: (m.meta as { delivery?: Delivery } | undefined)?.delivery,
+      reports: (m.meta as { reports?: ReportRef[] } | undefined)?.reports,
       verified: (m.meta as { verified?: Verified } | undefined)?.verified,
       blocks: (m.meta as { blocks?: Block[] } | undefined)?.blocks,
     }));
@@ -257,10 +258,10 @@ export function AnalystDock() {
     try {
       const sid = await ensureSession();
       const r = await postMessage(sid, text);
-      const meta = r.meta as { gate?: string; verified?: Verified; blocks?: Block[]; reports?: ReportRef[] } | undefined;
+      const meta = r.meta as { delivery?: Delivery; verified?: Verified; blocks?: Block[]; reports?: ReportRef[] } | undefined;
       setMessages((m) => [...m, {
         role: "assistant", text: r.text, citations: r.citations ?? [],
-        gateFailed: meta?.gate === "exhausted",
+        delivery: meta?.delivery,
         reports: meta?.reports,
         blocks: meta?.blocks,
         verified: meta?.verified,
@@ -350,12 +351,12 @@ export function AnalystDock() {
           <div key={i} className={m.role === "user" ? "flex flex-col items-end" : "flex flex-col gap-1.5"}>
             {m.role !== "user" && (
               <div className="flex items-center gap-2 flex-wrap">
-                {m.gateFailed ? (
+                {m.delivery === "not_answered" ? (
                   <span className="font-mono text-[10.5px] uppercase tracking-wide text-amber-500">
-                    Not answered — nothing here is verified
+                    Not answered — the desk produced no reply this turn
                   </span>
                 ) : (
-                  <VerifiedBadge verified={m.verified} />
+                  <VerifiedBadge verified={m.verified} delivery={m.delivery} />
                 )}
                 {m.seconds != null && (
                   <span className="ml-auto font-mono text-[10px] text-slate-600">{m.seconds}s</span>
@@ -365,7 +366,7 @@ export function AnalystDock() {
             <div className={`inline-block max-w-[94%] px-3 py-2 rounded-lg text-[12.5px] leading-relaxed text-left ${
               m.role === "user"
                 ? "bg-blue-600/20 text-slate-200 border border-blue-500/25"
-                : m.gateFailed
+                : m.delivery === "not_answered" || m.delivery === "answered_with_problems"
                   ? "bg-amber-950/40 border border-amber-800/50 text-amber-100/90"
                   : "bg-[#171d26] border border-[#21262d] text-slate-300"
             }`}>
@@ -380,7 +381,7 @@ export function AnalystDock() {
                   <AnswerBlocks blocks={m.blocks} onOpen={evidence.open} />
                 ) : (
                   <AnswerText text={m.text} citations={m.citations}
-                    matches={m.verified?.matches} labels={labels} onOpen={evidence.open} />
+                    labels={labels} onOpen={evidence.open} />
                 )
               )}
               {m.role !== "user" && (

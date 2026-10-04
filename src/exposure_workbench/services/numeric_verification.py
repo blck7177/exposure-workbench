@@ -461,11 +461,38 @@ def _is_quoted(n: ExtractedNumber, quoted: set[str]) -> bool:
 
 
 # ── quoted text (V11-Q) ───────────────────────────────────────────────────────
-# The block exit checks quotations in services/resolver.py against the block's
-# own cites. This copy serves the v1 eval over stored prose answers.
-from exposure_workbench.services.gate import quoted_spans, verify_quotes  # noqa: E402,F401  (V24: the quote check lives in the gate)
+# What quotation marks assert: the span is verbatim in a cited passage. The daily
+# report's check reads these; the agents' observer has its own reading of a draft.
+_QUOTE_PAIRS = (('"', '"'), ("“", "”"), ("‘", "’"))
+_MIN_QUOTED_WORDS = 4
+_WS = re.compile(r"\s+")
+_TYPOGRAPHIC = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'", "–": "-", "—": "-", " ": " "})
 
 
+def _normalise(text: str) -> str:
+    return _WS.sub(" ", (text or "").translate(_TYPOGRAPHIC)).strip().lower()
+
+
+def quoted_spans(text: str) -> list[str]:
+    out: list[str] = []
+    for open_q, close_q in _QUOTE_PAIRS:
+        pattern = (re.escape(open_q) + r"([^" + re.escape(open_q + close_q) + r"]+)" + re.escape(close_q)
+                   if open_q != close_q else
+                   re.escape(open_q) + r"([^" + re.escape(open_q) + r"]+)" + re.escape(close_q))
+        for m in re.finditer(pattern, text or ""):
+            span = m.group(1).strip()
+            if len(span.split()) >= _MIN_QUOTED_WORDS:
+                out.append(span)
+    return out
+
+
+def verify_quotes(text: str, passages: list[str]) -> list[dict]:
+    haystack = " … ".join(_normalise(p) for p in passages)
+    return [{"quote": span, "reason": "not_in_cited_passages"}
+            for span in quoted_spans(text) if _normalise(span) not in haystack]
+
+
+# ── the verdict over the numbers (the daily report's check reads these) ────────
 def verify(
     numbers: Iterable[ExtractedNumber],
     values: Iterable[EvidenceValue],

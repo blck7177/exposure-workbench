@@ -1,0 +1,724 @@
+Q05-aapl-risk-and-concentration · session sess_9dd4b75cc33a · message msg_4c4505433b54 · elapsed 51.0s · delivery answered
+Q: What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?
+Times are when each step was recorded, from the first record; a model call is recorded when its response is back, and the turn had been running for the difference between the elapsed time and the last record.
+
+====================================================================================================
+#1 REQUEST C1 · lead · gpt-5.6-sol effort=medium · instructions instructions_lead.txt (sha 2f18d48a5e6832e7) · tools ['list', 'analyze', 'ask', 'open']
+====================================================================================================
+
+--- appended: user message ---
+What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?
+
+--- tail (sent with this request only): developer message ---
+<state source="the desk's record of this turn" trust="analyses and notes are recorded facts; task requests are instructions, not facts" use="decide the next step against the original question; open a view or row with open(id)">
+{"id": "wv_92cc2fab5501", "question": "What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?", "scope_decisions": [], "analyses": [], "analyses_seen": [], "notes": [], "execution": [], "budget": {"completions_used": 0, "completions_limit": 12, "analyses_used": 0, "analyses_limit": 10}}
+</state>
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 4440, "output_tokens": 220, "reasoning_tokens": 42, "cached_input_tokens": 4234}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1464 chars]
+
+--- output: function_call ---
+ask({
+ "tasks": [
+  {
+   "analyst": "issuer",
+   "scope": {
+    "subjects": [
+     "AAPL"
+    ],
+    "basis": "Apple is an issuer on the desk; use its latest available filing disclosures."
+   },
+   "lines": [
+    "Identify the principal business risks Apple emphasizes in its latest available filing, prioritizing the risks most material to its business model rather than reproducing every generic risk factor.",
+    "Quote or closely report what Apple says about net sales concentration by product, including any percentages explicitly stated in the filing.",
+    "Quote or closely report what Apple says about net sales concentration by geography or reportable segment, including any percentages explicitly stated in the filing.",
+    "State the filing and period used, and distinguish exact filing disclosures from analyst interpretation."
+   ],
+   "context": "Answer whether Apple's risk and revenue-concentration disclosures are available and whether the desk holds product/geographic concentration as structured figures."
+  }
+ ]
+})
+
+====================================================================================================
+#2 REQUEST C2 · sub:issuer · tsk_61abb64e9181 · gpt-5.6-sol effort=low · instructions instructions_issuer.txt (sha 247e06a6f607eb14) · tools ['list', 'analyze', 'metric', 'filings_search', 'filings_section', 'web_search', 'open']
+====================================================================================================
+
+--- appended: user message ---
+<task source="the desk's lead analyst" trust="work instructions, not facts" use="investigate this request">
+{"task_id": "tsk_61abb64e9181", "analyst": "issuer", "scope": {"subjects": ["AAPL"], "resolved_count": 1, "status": "resolved", "basis": "Apple is an issuer on the desk; use its latest available filing disclosures."}, "lines": ["1. Identify the principal business risks Apple emphasizes in its latest available filing, prioritizing the risks most material to its business model rather than reproducing every generic risk factor.", "2. Quote or closely report what Apple says about net sales concentration by product, including any percentages explicitly stated in the filing.", "3. Quote or closely report what Apple says about net sales concentration by geography or reportable segment, including any percentages explicitly stated in the filing.", "4. State the filing and period used, and distinguish exact filing disclosures from analyst interpretation."], "context": "Answer whether Apple's risk and revenue-concentration disclosures are available and whether the desk holds product/geographic concentration as structured figures."}
+</task>
+<question source="the user">
+What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?
+</question>
+
+--- tail (sent with this request only): developer message ---
+Budget: 12 analyses or reads left on this task.
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 5975, "output_tokens": 91, "reasoning_tokens": 46, "cached_input_tokens": 0}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1444 chars]
+
+--- output: function_call ---
+list({
+ "what": "filings",
+ "subject": "AAPL",
+ "why": "Identify Apple's latest available filing and the indexed Items needed for business-risk and concentration disclosures."
+})
+
+--- #3 TOOL list · sub:issuer · status completed ---
+args: {"why": "Identify Apple's latest available filing and the indexed Items needed for business-risk and concentration disclosures.", "what": "filings", "subject": "AAPL"}
+result: r_4ca11561aece list(what="filings", subject="AAPL") → 3 names
+
+====================================================================================================
+#4 REQUEST C3 · sub:issuer · tsk_61abb64e9181 · gpt-5.6-sol effort=low · instructions instructions_issuer.txt (sha 247e06a6f607eb14) · tools ['list', 'analyze', 'metric', 'filings_search', 'filings_section', 'web_search', 'open']
+====================================================================================================
+
+--- appended: function_call_output ---
+{
+ "pull": "r_4ca11561aece",
+ "head": "r_4ca11561aece list(what=\"filings\", subject=\"AAPL\") → 3 names",
+ "rows": [],
+ "catalogue": [
+  "10-Q filed 2026-05-01, period to 2026-03-28 — accession 0000320193-26-000013",
+  "10-K filed 2025-10-31, period to 2025-09-27 — accession 0000320193-25-000079",
+  "items indexed: Item 1, Item 10, Item 11, Item 12, Item 13, Item 14, Item 15, Item 16, Item 1A, Item 1B, Item 1C, Item 2, Item 3, Item 4, Item 5, Item 6, Item 7, Item 7A, Item 8, Item 9, Item 9A, Item 9B, Item 9C, Part I, Item 1, Part I, Item 2, Part I, Item 3, Part I, Item 4, Part II, Item 1, Part II, Item 1A, Part II, Item 2, Part II, Item 3, Part II, Item 4, Part II, Item 5, Part II, Item 6"
+ ]
+}
+
+--- tail (sent with this request only): developer message ---
+Budget: 12 analyses or reads left on this task.
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 6385, "output_tokens": 304, "reasoning_tokens": 56, "cached_input_tokens": 5956}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1484 chars]
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "net sales by reportable segment geographic concentration percentage",
+ "form": "10-K",
+ "k": 8,
+ "why": "Find Apple's explicit geographic or reportable-segment net-sales concentration disclosures in the latest annual filing."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "iPhone net sales percentage of total net sales",
+ "form": "10-K",
+ "k": 8,
+ "why": "Find Apple's explicit product net-sales concentration disclosure and any stated percentages."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "risk factors global highly competitive supply chain third party components regulation",
+ "form": "10-Q",
+ "k": 10,
+ "why": "Read the latest filing's emphasized business risks and any updates to the annual risk factors."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "risk factors Company business results operations",
+ "form": "10-K",
+ "k": 10,
+ "why": "Identify the principal business-model risks Apple emphasizes in its latest annual filing."
+})
+
+--- #5 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 8, "why": "Find Apple's explicit geographic or reportable-segment net-sales concentration disclosures in the latest annual filing.", "form": "10-K", "query": "net sales by reportable segment geographic concentration percentage", "ticker": "AAPL"}
+result: r_574315c78d40 filings_search(ticker="AAPL", query="net sales by reportable segment geographic concentration pe, form="10-K", k=8) → 8 rows
+
+--- #6 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 8, "why": "Find Apple's explicit product net-sales concentration disclosure and any stated percentages.", "form": "10-K", "query": "iPhone net sales percentage of total net sales", "ticker": "AAPL"}
+result: r_d8da895d5fdd filings_search(ticker="AAPL", query="iPhone net sales percentage of total net sales", form="10-K", k=8) → 8 rows
+
+--- #7 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 10, "why": "Read the latest filing's emphasized business risks and any updates to the annual risk factors.", "form": "10-Q", "query": "risk factors global highly competitive supply chain third party components regulation", "ticker": "AAPL"}
+result: r_6040ed7653c1 filings_search(ticker="AAPL", query="risk factors global highly competitive supply chain third p, form="10-Q", k=10) → 9 rows
+
+--- #8 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 10, "why": "Identify the principal business-model risks Apple emphasizes in its latest annual filing.", "form": "10-K", "query": "risk factors Company business results operations", "ticker": "AAPL"}
+result: r_d4662d794597 filings_search(ticker="AAPL", query="risk factors Company business results operations", form="10-K", k=10) → 10 rows
+
+====================================================================================================
+#9 REQUEST C4 · sub:issuer · tsk_61abb64e9181 · gpt-5.6-sol effort=low · instructions instructions_issuer.txt (sha 247e06a6f607eb14) · tools ['list', 'analyze', 'metric', 'filings_search', 'filings_section', 'web_search', 'open']
+====================================================================================================
+
+--- appended: function_call_output ---
+{
+ "pull": "r_574315c78d40",
+ "head": "r_574315c78d40 filings_search(ticker=\"AAPL\", query=\"net sales by reportable segment geographic concentration pe, form=\"10-K\", k=8) → 8 rows",
+ "rows": [
+  "[f_2e1faf6b28e2] 10-K Item 8, AAPL, as of 2025-10-31: \"le to the segment. The information provided to the CODM for purposes of making decisions and assessing segment performance excludes asset information.\n\nThe following tables show information by reportable segment for 2025, 2024 and 2023 (in millions):\n\n2025\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$178,353 $111,032 $64,377 $28,703 $33,696 $— $416,161 \n\nCost of sales(95,699)(58,617)(35,141)(13,779)(17,724)— (220,960)\n\nResearch and development— — — — — (34,550)(34,550)\n\nSelling and marketing(10,174)(4,676)(2,319)(969)(1,386)— (19,524)\n\nGeneral and administrative— — — — — (8,077)(8,077)\n\nOperating income/(loss)$72,480 $47,739 $26,917 $13,955 $14,586 $(42,627)$133,050 \n\n2024\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$167,045 $101,328 $66,952 $25,052 $30,658 $— $391,035 \n\nCost of sales(89,587)(55,197)(37,519)(11,744)(16,305)— (210,352)\n\nResearch and development— — — — — (31,370)(31,370)\n\nSelling and marketing(9,802)(4,341)(2,351)(854)(1,291)— (18,639)\n\nGeneral and administrative— — — — — (7,458)(7,458)\n\nOperating income/(loss)$67,656 $41,790 $27,082 $12,454 $13,062 $(38,828)$123,216 \n\n2023\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$162,560 $94,294 $72,559 $24,257 $29,615 $— $383,285 \n\nCost of sales(92,394)(54,101)(39,787)(11,542)(16,313)— (214,137)\n\nResearch and development— — — — — (29,915)(29,915)\n\nSelling and marketing(9,658)(4,095)(2,444)(827)(1,236)— (18,260)\n\nGeneral and administrative— — — — — (6,672)(6,672)\n\nOperating income/(loss)$60,508 $36,098 $30,328 $11,888 $12,066 $(36,587)$114,301\" — r_574315c78d40 accession 0000320193-25-000079, chars 48770–50400 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]",
+   "[5]",
+   "[6]",
+   "[7]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_d8da895d5fdd",
+ "head": "r_d8da895d5fdd filings_search(ticker=\"AAPL\", query=\"iPhone net sales percentage of total net sales\", form=\"10-K\", k=8) → 8 rows",
+ "rows": [
+  "[f_a2559b88e79b] 10-K Item 7, AAPL, as of 2025-10-31: \"The following table shows net sales by category for 2025, 2024 and 2023 (dollars in millions):\n\n2025Change2024Change2023\n\niPhone$209,586 4 %$201,183 — %$200,583 \n\nMac33,708 12 %29,984 2 %29,357 \n\niPad28,023 5 %26,694 (6)%28,300 \n\nWearables, Home and Accessories35,686 (4)%37,005 (7)%39,845 \n\nServices (1)\n\n109,158 14 %96,169 13 %85,200 \n\nTotal net sales$416,161 6 %$391,035 2 %$383,285 \n\n(1)Services net sales include amortization of the deferred value of services bundled in the sales price of certain products.\n\niPhone\n\niPhone net sales increased during 2025 compared to 2024 due to higher net sales of Pro models.\n\nMac\n\nMac net sales increased during 2025 compared to 2024 primarily due to higher net sales of laptops and desktops.\n\niPad\n\niPad net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPad Air, iPad mini and iPad, partially offset by lower net sales of iPad Pro.\n\nWearables, Home and Accessories\n\nWearables, Home and Accessories net sales decreased during 2025 compared to 2024 primarily due to lower net sales of Accessories and Wearables.\n\nServices\n\nServices net sales increased during 2025 compared to 2024 primarily due to higher net sales from advertising, the App Store and cloud services.\n\nApple Inc. | 2025 Form 10-K | 23\n\nGross Margin\n\nProducts and Services gross margin and gross margin percentage for 2025, 2024 and 2023 were as follows (dollars in millions):\n\n202520242023\n\nGross margin:\n\nProducts$112,887 $109,633 $108,803 \n\nServices82,314 71,050 60,345 \n\nTotal gross margin$195,201 $180,683 $169,148\" — r_d8da895d5fdd accession 0000320193-25-000079, chars 5224–6787 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]",
+   "[5]",
+   "[6]",
+   "[7]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_6040ed7653c1",
+ "head": "r_6040ed7653c1 filings_search(ticker=\"AAPL\", query=\"risk factors global highly competitive supply chain third p, form=\"10-Q\", k=10) → 9 rows",
+ "rows": [
+  "[f_8b25fe6dcfab] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"m, regulatory action, legal liability, and other material adverse effects to its business, results of operations, financial condition and stock price.\n\nThe Company’s net sales and gross margins are subject to volatility and downward pressure due to a variety of factors.\n\nThe Company’s gross margins vary significantly across its products, services, geographic segments and distribution channels and can change over time. The Company’s net sales and gross margins are subject to volatility and downward pressure due to a variety of factors, including: industry-wide supply constraints and increasing costs for components such as advanced semiconductors, storage (NAND) and memory (DRAM); product pricing pressures and product pricing actions that the Company may take in response to such pressures; increased competition; the Company’s ability to effectively stimulate demand for certain of its products and services; compressed product life cycles; supply shortages; potential increases in the cost of outside manufacturing services, and developing, acquiring and delivering content for the Company’s services; the Company’s ability to manage product quality and warranty costs effectively; shifts in the mix of products and services, or in the geographic, currency or channel mix, including to the extent that regulatory changes require the Company to modify its product and service offerings; fluctuations in foreign exchange rates; inflation and other macroeconomic pressures; the imposition of new or increased tariffs and other trade restrictions, their overall magnitude and duration, and retaliatory actions in response; and the introduction of new products or services, including new products or services with lower profit margins. These and other factors could have a materially adverse impact on the Company’s results of operations, financial condition and stock price. Further, the Company generates a significant portion of its net sales from a single product category and a decline in demand for that product could significantly impact net sales and gross margins.\" — r_6040ed7653c1 accession 0000320193-26-000013, chars 20047–22125 of the Item"
+ ],
+ "held_back": "1 more rows were pulled and are on the ledger, not shown here: ask for less in one call (one column, one row, fewer subjects)",
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]",
+   "[5]",
+   "[6]",
+   "[7]",
+   "[8]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_d4662d794597",
+ "head": "r_d4662d794597 filings_search(ticker=\"AAPL\", query=\"risk factors Company business results operations\", form=\"10-K\", k=10) → 10 rows",
+ "rows": [
+  "[f_7d1c5970433a] 10-K Item 1A, AAPL, as of 2025-10-31: \"risks not originally contemplated, and materially adversely affect the Company’s business, reputation, results of operations and financial condition.\n\nThe Company has invested, and in the future may invest, in new business strategies, commercial relationships and acquisitions. Such endeavors may involve significant risks and uncertainties, including distraction of management from current operations, greater-than-expected liabilities and expenses, economic, political, legal and regulatory challenges associated with operating in new businesses, regions or countries, inadequate return on capital, potential impairment of tangible and intangible assets, and significant write-offs. Some transactions, including investments and acquisitions, are exposed to additional risks, including failing to obtain required regulatory approvals on a timely basis or at all, a counterparty’s failure to perform or deliver as anticipated, or the imposition of onerous conditions that could delay or prevent the Company from completing a transaction or otherwise limit the Company’s ability to fully realize the anticipated benefits of a transaction. New business strategies and ventures are inherently risky and may not be successful. The Company’s business strategies and investments may not be successful, which could materially adversely affect the Company’s business, reputation, results of operations, financial condition and stock price.\n\nLegal and Regulatory Compliance Risks\n\nThe Company’s business, results of operations and financial condition could be adversely impacted by unfavorable results of legal proceedings or government investigations.\" — r_d4662d794597 accession 0000320193-25-000079, chars 39021–40665 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]",
+   "[5]",
+   "[6]",
+   "[7]",
+   "[8]",
+   "[9]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- tail (sent with this request only): developer message ---
+Budget: 8 analyses or reads left on this task.
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 9896, "output_tokens": 386, "reasoning_tokens": 72, "cached_input_tokens": 6366}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1676 chars]
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "U.S. China net sales percentage total net sales 2025",
+ "form": "10-K",
+ "k": 5,
+ "why": "Find any explicit country-level net-sales concentration percentages stated by Apple."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "single product category significant portion net sales iPhone",
+ "form": "10-Q",
+ "k": 5,
+ "why": "Determine how Apple describes product concentration in its latest filing and whether it states an explicit percentage."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "competition innovation frequent introductions short product life cycles ecosystem",
+ "form": "10-Q",
+ "item": "1A",
+ "k": 5,
+ "why": "Capture Apple's latest disclosure on competition and innovation risk."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "outsourcing partners manufacturing components single source supply",
+ "form": "10-Q",
+ "item": "1A",
+ "k": 5,
+ "why": "Capture Apple's latest disclosure on supply-chain and manufacturing concentration risk."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "laws regulations App Store antitrust privacy digital markets",
+ "form": "10-Q",
+ "item": "1A",
+ "k": 5,
+ "why": "Capture Apple's latest disclosure on legal and regulatory risk affecting its platform and services model."
+})
+
+--- #10 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 5, "why": "Find any explicit country-level net-sales concentration percentages stated by Apple.", "form": "10-K", "query": "U.S. China net sales percentage total net sales 2025", "ticker": "AAPL"}
+result: r_3817e61fd773 filings_search(ticker="AAPL", query="U.S. China net sales percentage total net sales 2025", form="10-K", k=5) → 5 rows
+
+--- #11 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 5, "why": "Determine how Apple describes product concentration in its latest filing and whether it states an explicit percentage.", "form": "10-Q", "query": "single product category significant portion net sales iPhone", "ticker": "AAPL"}
+result: r_f97a2616f3d3 filings_search(ticker="AAPL", query="single product category significant portion net sales iPhon, form="10-Q", k=5) → 5 rows
+
+--- #12 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 5, "why": "Capture Apple's latest disclosure on competition and innovation risk.", "form": "10-Q", "item": "1A", "query": "competition innovation frequent introductions short product life cycles ecosystem", "ticker": "AAPL"}
+result: r_e96f7da0c047 filings_search(ticker="AAPL", query="competition innovation frequent introductions short product, form="10-Q", item="1A", k=5) → 5 rows
+
+--- #13 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 5, "why": "Capture Apple's latest disclosure on supply-chain and manufacturing concentration risk.", "form": "10-Q", "item": "1A", "query": "outsourcing partners manufacturing components single source supply", "ticker": "AAPL"}
+result: r_d81e7f3f3238 filings_search(ticker="AAPL", query="outsourcing partners manufacturing components single source, form="10-Q", item="1A", k=5) → 5 rows
+
+--- #14 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 5, "why": "Capture Apple's latest disclosure on legal and regulatory risk affecting its platform and services model.", "form": "10-Q", "item": "1A", "query": "laws regulations App Store antitrust privacy digital markets", "ticker": "AAPL"}
+result: r_a87dc8cbb94c filings_search(ticker="AAPL", query="laws regulations App Store antitrust privacy digital market, form="10-Q", item="1A", k=5) → 5 rows
+
+====================================================================================================
+#15 REQUEST C5 · sub:issuer · tsk_61abb64e9181 · gpt-5.6-sol effort=low · instructions instructions_issuer.txt (sha 247e06a6f607eb14) · tools ['list', 'analyze', 'metric', 'filings_search', 'filings_section', 'web_search', 'open']
+====================================================================================================
+
+--- appended: function_call_output ---
+{
+ "pull": "r_3817e61fd773",
+ "head": "r_3817e61fd773 filings_search(ticker=\"AAPL\", query=\"U.S. China net sales percentage total net sales 2025\", form=\"10-K\", k=5) → 5 rows",
+ "rows": [
+  "[f_edf056a63f35] 10-K Item 7, AAPL, as of 2025-10-31: \"The following table shows net sales by category for 2025, 2024 and 2023 (dollars in millions):\n\n2025Change2024Change2023\n\niPhone$209,586 4 %$201,183 — %$200,583 \n\nMac33,708 12 %29,984 2 %29,357 \n\niPad28,023 5 %26,694 (6)%28,300 \n\nWearables, Home and Accessories35,686 (4)%37,005 (7)%39,845 \n\nServices (1)\n\n109,158 14 %96,169 13 %85,200 \n\nTotal net sales$416,161 6 %$391,035 2 %$383,285 \n\n(1)Services net sales include amortization of the deferred value of services bundled in the sales price of certain products.\n\niPhone\n\niPhone net sales increased during 2025 compared to 2024 due to higher net sales of Pro models.\n\nMac\n\nMac net sales increased during 2025 compared to 2024 primarily due to higher net sales of laptops and desktops.\n\niPad\n\niPad net sales increased during 2025 compared to 2024 primarily due to higher net sales of iPad Air, iPad mini and iPad, partially offset by lower net sales of iPad Pro.\n\nWearables, Home and Accessories\n\nWearables, Home and Accessories net sales decreased during 2025 compared to 2024 primarily due to lower net sales of Accessories and Wearables.\n\nServices\n\nServices net sales increased during 2025 compared to 2024 primarily due to higher net sales from advertising, the App Store and cloud services.\n\nApple Inc. | 2025 Form 10-K | 23\n\nGross Margin\n\nProducts and Services gross margin and gross margin percentage for 2025, 2024 and 2023 were as follows (dollars in millions):\n\n202520242023\n\nGross margin:\n\nProducts$112,887 $109,633 $108,803 \n\nServices82,314 71,050 60,345 \n\nTotal gross margin$195,201 $180,683 $169,148\" — r_3817e61fd773 accession 0000320193-25-000079, chars 5224–6787 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_f97a2616f3d3",
+ "head": "r_f97a2616f3d3 filings_search(ticker=\"AAPL\", query=\"single product category significant portion net sales iPhon, form=\"10-Q\", k=5) → 5 rows",
+ "rows": [
+  "[f_bc384c7a5e39] 10-Q Part I, Item 2, AAPL, as of 2026-05-01: \"cies relative to the U.S. dollar had a net favorable year-over-year impact on Europe net sales during the second quarter and first six months of 2026.\n\nGreater China\n\nGreater China net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 due to higher net sales of iPhone. The strength in the renminbi relative to the U.S. dollar had a favorable year-over-year impact on Greater China net sales during the second quarter of 2026.\n\nApple Inc. | Q2 2026 Form 10-Q | 14\n\nJapan\n\nJapan net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone. The weakness in the yen relative to the U.S. dollar had an unfavorable year-over-year impact on Japan net sales during the first six months of 2026.\n\nRest of Asia Pacific\n\nRest of Asia Pacific net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone and Services. The strength in foreign currencies relative to the U.S. dollar had a net favorable year-over-year impact on Rest of Asia Pacific net sales during the second quarter of 2026.\n\nProducts and Services Performance\n\nThe following table shows net sales by category for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (dollars in millions):\n\nThree Months EndedSix Months Ended\n\nMarch 28,2026March 29,2025ChangeMarch 28,2026March 29,2025Change\n\niPhone$56,994 $46,841 22 %$142,263 $115,979 23 %\" — r_f97a2616f3d3 accession 0000320193-26-000013, chars 8179–9744 of the Item",
+  "[f_0dc2478fcb8f] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"rtion of its net sales from a single product category and a decline in demand for that product could significantly impact net sales and gross margins.\" — r_f97a2616f3d3 accession 0000320193-26-000013, chars 21975–22125 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]",
+   "[3]",
+   "[4]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_e96f7da0c047",
+ "head": "r_e96f7da0c047 filings_search(ticker=\"AAPL\", query=\"competition innovation frequent introductions short product, form=\"10-Q\", item=\"1A\", k=5) → 5 rows",
+ "rows": [
+  "[f_c51c7281c65f] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"rtion of its net sales from a single product category and a decline in demand for that product could significantly impact net sales and gross margins.\" — r_e96f7da0c047 accession 0000320193-26-000013, chars 21975–22125 of the Item",
+  "[f_80df8a2c83de] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"Item 1A.    Risk Factors\n\nThe Company’s business, reputation, results of operations, financial condition and stock price can be materially and adversely affected by a number of factors, whether currently known or unknown, including those described in Part I, Item 1A of the 2025 Form 10-K under the heading “Risk Factors.” Except as set forth below, there have been no material changes to the Company’s risk factors since the 2025 Form 10-K.\n\nThe Company’s products and services may be affected from time to time by design and manufacturing defects that could materially adversely affect the Company’s business and result in harm to the Company’s reputation.\n\nThe Company offers complex hardware and software products and services that can be affected by design and manufacturing defects. Sophisticated operating system software and applications, such as those offered by the Company, often have issues that can unexpectedly interfere with the intended operation of hardware or software products and services. Defects can also exist in components and products the Company purchases from third parties. Component defects could make the Company’s products unsafe and create a risk of environmental or property damage and personal injury. These risks may increase as the Company’s products are introduced into specialized applications, including health. In addition, the Company’s service offerings can have quality issues and from time to time experience outages, service slowdowns or errors. As a result, from time to time the Company’s services have not performed as anticipated and may not meet user expectations. The Company’s products and services may also be used in unintended ways, or in a manner that its users allege is harmful. The introduction of new and complex technologies, such as artificial intelligence features, can increase these and other safety risks, including exposing users to harmful, inaccurate or other negative content and experiences. The Company may not be able to detect and fix all issues and defects in the hardware, software and services it offers, which can result in widespread technical and performance issues affecting the Company’s products and services. Errors, bugs and vulnerabilities can be exploited by third parties, compromising the safety and security of a user’s device. In addition, the Company can be exposed to product liability claims, recalls, product replacements or modifications, write-offs of inventory, property, plant and equipment or intangible assets, and significant warranty and other expenses, including litigation costs and regulatory fines. Quality problems can adversely affect the experience for users of the Company’s products and services, and result in harm to the Company’s reputation, loss of competitive advantage, poor market acceptance, reduced demand for products and services, delay in new product and service introductions and lost sales.\" — r_e96f7da0c047 accession 0000320193-26-000013, chars 0–2916 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]",
+   "[3]",
+   "[4]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_d81e7f3f3238",
+ "head": "r_d81e7f3f3238 filings_search(ticker=\"AAPL\", query=\"outsourcing partners manufacturing components single source, form=\"10-Q\", item=\"1A\", k=5) → 5 rows",
+ "rows": [
+  "[f_fa51d089fbd9] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"rtion of its net sales from a single product category and a decline in demand for that product could significantly impact net sales and gross margins.\" — r_d81e7f3f3238 accession 0000320193-26-000013, chars 21975–22125 of the Item",
+  "[f_91943e6480d0] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"m, regulatory action, legal liability, and other material adverse effects to its business, results of operations, financial condition and stock price.\n\nThe Company’s net sales and gross margins are subject to volatility and downward pressure due to a variety of factors.\n\nThe Company’s gross margins vary significantly across its products, services, geographic segments and distribution channels and can change over time. The Company’s net sales and gross margins are subject to volatility and downward pressure due to a variety of factors, including: industry-wide supply constraints and increasing costs for components such as advanced semiconductors, storage (NAND) and memory (DRAM); product pricing pressures and product pricing actions that the Company may take in response to such pressures; increased competition; the Company’s ability to effectively stimulate demand for certain of its products and services; compressed product life cycles; supply shortages; potential increases in the cost of outside manufacturing services, and developing, acquiring and delivering content for the Company’s services; the Company’s ability to manage product quality and warranty costs effectively; shifts in the mix of products and services, or in the geographic, currency or channel mix, including to the extent that regulatory changes require the Company to modify its product and service offerings; fluctuations in foreign exchange rates; inflation and other macroeconomic pressures; the imposition of new or increased tariffs and other trade restrictions, their overall magnitude and duration, and retaliatory actions in response; and the introduction of new products or services, including new products or services with lower profit margins. These and other factors could have a materially adverse impact on the Company’s results of operations, financial condition and stock price. Further, the Company generates a significant portion of its net sales from a single product category and a decline in demand for that product could significantly impact net sales and gross margins.\" — r_d81e7f3f3238 accession 0000320193-26-000013, chars 20047–22125 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]",
+   "[3]",
+   "[4]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_a87dc8cbb94c",
+ "head": "r_a87dc8cbb94c filings_search(ticker=\"AAPL\", query=\"laws regulations App Store antitrust privacy digital market, form=\"10-Q\", item=\"1A\", k=5) → 5 rows",
+ "rows": [
+  "[f_af58c707c990] 10-Q Part II, Item 1A, AAPL, as of 2026-05-01: \"laws and regulations could materially adversely affect the Company’s business, reputation, results of operations, financial condition and stock price.\n\nThe Company is also currently subject to antitrust investigations and litigation in various jurisdictions around the world, which can result in legal proceedings and claims against the Company that could, individually or in the aggregate, have a material adverse impact on the Company’s business, results of operations, financial condition and stock price. For example, the Company is subject to civil antitrust lawsuits in the U.S. alleging monopolization or attempted monopolization in the markets for “performance smartphones” and “smartphones” generally in violation of U.S. antitrust laws. In addition, the Company is the subject of investigations in Europe and other jurisdictions relating to App Store terms and conditions. If such investigations or litigation are resolved against the Company, the Company can be exposed to significant fines and may be required to make further changes to its business practices, all of which could materially adversely affect the Company’s business, reputation, results of operations, financial condition and stock price.\n\nApple Inc. | Q2 2026 Form 10-Q | 22\n\nFurther, the Company has commercial relationships with other companies in the technology industry that are or may become subject to investigations and litigation that, if resolved against those other companies, could materially adversely affect the Company’s commercial relationships with those business partners and materially adversely affect the Company’s business, results of operations, financial condition and stock price. For example, the Company earns revenue from licensing arrangements with Google LLC (“Google”) and other companies to offer their search services on the Company’s platforms and applications, and certain of these arrangements are currently subject to government investigations and legal proceedings. On August 5, 2024, Google was found to have violated U.S. antitrust laws. In connection with this finding, on September 2, 2025, the U.S. District Court for the District of Columbia (“D.C. District Court”) ordered certain remedies. The court’s order is subject to further proceedings before the D.C. District Court, which may result in changes to the interpretation or application of the remedies ordered by the court, as well as new or changed remedies being ordered. The court’s order was appealed by both the DOJ and Google. A reversal of the order on appeal could result in imposition of certain remedies initially proposed by the DOJ, such as those prohibiting Google from offering the Company commercial terms for search distribution. If implemented, these remedies could materially adversely affect the Company’s ability to earn revenue from such licensing arrangements.\" — r_a87dc8cbb94c accession 0000320193-26-000013, chars 10848–13706 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[1]",
+   "[2]",
+   "[3]",
+   "[4]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- tail (sent with this request only): developer message ---
+Budget: 3 analyses or reads left on this task.
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 14262, "output_tokens": 317, "reasoning_tokens": 79, "cached_input_tokens": 9877}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1764 chars]
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "net sales to customers in the U.S. China percentage 2025 2024 2023",
+ "form": "10-K",
+ "item": "8",
+ "k": 3,
+ "why": "Locate Apple's exact country-level net-sales percentages, if explicitly disclosed in the latest annual filing."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "Americas net sales Europe Greater China Japan Rest of Asia Pacific three months ended March 28 2026",
+ "form": "10-Q",
+ "item": "2",
+ "k": 3,
+ "why": "Report the latest quarterly geographic-segment sales table without deriving unsupported percentages."
+})
+
+--- output: function_call ---
+filings_search({
+ "ticker": "AAPL",
+ "query": "iPhone Mac iPad Wearables Services six months ended March 28 2026 net sales",
+ "form": "10-Q",
+ "item": "2",
+ "k": 3,
+ "why": "Report the latest quarterly product-category sales table without deriving product shares not explicitly stated."
+})
+
+--- #16 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 3, "why": "Locate Apple's exact country-level net-sales percentages, if explicitly disclosed in the latest annual filing.", "form": "10-K", "item": "8", "query": "net sales to customers in the U.S. China percentage 2025 2024 2023", "ticker": "AAPL"}
+result: r_f1713a87a1ab filings_search(ticker="AAPL", query="net sales to customers in the U.S. China percentage 2025 20, form="10-K", item="8", k=3) → 3 rows
+
+--- #17 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 3, "why": "Report the latest quarterly geographic-segment sales table without deriving unsupported percentages.", "form": "10-Q", "item": "2", "query": "Americas net sales Europe Greater China Japan Rest of Asia Pacific three months ended March 28 2026", "ticker": "AAPL"}
+result: r_219740e9c519 filings_search(ticker="AAPL", query="Americas net sales Europe Greater China Japan Rest of Asia , form="10-Q", item="2", k=3) → 3 rows
+
+--- #18 TOOL filings_search · sub:issuer · status completed ---
+args: {"k": 3, "why": "Report the latest quarterly product-category sales table without deriving product shares not explicitly stated.", "form": "10-Q", "item": "2", "query": "iPhone Mac iPad Wearables Services six months ended March 28 2026 net sales", "ticker": "AAPL"}
+result: r_703dab534c34 filings_search(ticker="AAPL", query="iPhone Mac iPad Wearables Services six months ended March 2, form="10-Q", item="2", k=3) → 3 rows
+
+====================================================================================================
+#19 REQUEST C6 · sub:issuer · tsk_61abb64e9181 · gpt-5.6-sol effort=low · instructions instructions_issuer.txt (sha 247e06a6f607eb14) · tools ['open']
+====================================================================================================
+
+--- appended: function_call_output ---
+{
+ "pull": "r_f1713a87a1ab",
+ "head": "r_f1713a87a1ab filings_search(ticker=\"AAPL\", query=\"net sales to customers in the U.S. China percentage 2025 20, form=\"10-K\", item=\"8\", k=3) → 3 rows",
+ "rows": [
+  "[f_9792fa156049] 10-K Item 8, AAPL, as of 2025-10-31: \"ng table shows disaggregated net sales, as well as the portion of total net sales that was previously deferred, for 2025, 2024 and 2023 (in millions):\n\n202520242023\n\niPhone\n\n$209,586 $201,183 $200,583 \n\nMac\n\n33,708 29,984 29,357 \n\niPad\n\n28,023 26,694 28,300 \n\nWearables, Home and Accessories\n\n35,686 37,005 39,845 \n\nServices (1)\n\n109,158 96,169 85,200 \n\nTotal net sales$416,161 $391,035 $383,285 \n\nPortion of total net sales that was included in deferred revenue as of the beginning of the period$8,229 $7,728 $8,169 \n\n(1)Services net sales include amortization of the deferred value of services bundled in the sales price of certain products.\n\nThe Company’s proportion of net sales by disaggregated revenue source was generally consistent for each reportable segment in Note 13, “Segment Information and Geographic Data” for 2025, 2024 and 2023, except in Greater China, where iPhone revenue represented a moderately higher proportion of net sales.\n\nAs of September 27, 2025 and September 28, 2024, the Company had total deferred revenue of $13.7 billion and $12.8 billion, respectively. As of September 27, 2025, the Company expects 66% of total deferred revenue to be realized in less than a year, 23% within one-to-two years, 9% within two-to-three years and 2% in greater than three years.\n\nNote 3 – Earnings Per Share\n\nThe following table shows the computation of basic and diluted earnings per share for 2025, 2024 and 2023 (net income in millions and shares in thousands):\n\n202520242023\n\nNumerator:\n\nNet income$112,010 $93,736 $96,995\" — r_f1713a87a1ab accession 0000320193-25-000079, chars 16167–17710 of the Item",
+  "[f_ca8aaea0bc2b] 10-K Item 8, AAPL, as of 2025-10-31: \"le to the segment. The information provided to the CODM for purposes of making decisions and assessing segment performance excludes asset information.\n\nThe following tables show information by reportable segment for 2025, 2024 and 2023 (in millions):\n\n2025\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$178,353 $111,032 $64,377 $28,703 $33,696 $— $416,161 \n\nCost of sales(95,699)(58,617)(35,141)(13,779)(17,724)— (220,960)\n\nResearch and development— — — — — (34,550)(34,550)\n\nSelling and marketing(10,174)(4,676)(2,319)(969)(1,386)— (19,524)\n\nGeneral and administrative— — — — — (8,077)(8,077)\n\nOperating income/(loss)$72,480 $47,739 $26,917 $13,955 $14,586 $(42,627)$133,050 \n\n2024\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$167,045 $101,328 $66,952 $25,052 $30,658 $— $391,035 \n\nCost of sales(89,587)(55,197)(37,519)(11,744)(16,305)— (210,352)\n\nResearch and development— — — — — (31,370)(31,370)\n\nSelling and marketing(9,802)(4,341)(2,351)(854)(1,291)— (18,639)\n\nGeneral and administrative— — — — — (7,458)(7,458)\n\nOperating income/(loss)$67,656 $41,790 $27,082 $12,454 $13,062 $(38,828)$123,216 \n\n2023\n\nAmericasEuropeGreater\n\nChina\n\nJapanRest ofAsia PacificCorporateTotal\n\nNet sales$162,560 $94,294 $72,559 $24,257 $29,615 $— $383,285 \n\nCost of sales(92,394)(54,101)(39,787)(11,542)(16,313)— (214,137)\n\nResearch and development— — — — — (29,915)(29,915)\n\nSelling and marketing(9,658)(4,095)(2,444)(827)(1,236)— (18,260)\n\nGeneral and administrative— — — — — (6,672)(6,672)\n\nOperating income/(loss)$60,508 $36,098 $30,328 $11,888 $12,066 $(36,587)$114,301\" — r_f1713a87a1ab accession 0000320193-25-000079, chars 48770–50400 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_219740e9c519",
+ "head": "r_219740e9c519 filings_search(ticker=\"AAPL\", query=\"Americas net sales Europe Greater China Japan Rest of Asia , form=\"10-Q\", item=\"2\", k=3) → 3 rows",
+ "rows": [
+  "[f_27220576c354] 10-Q Part I, Item 2, AAPL, as of 2026-05-01: \"nternational disputes can have an adverse impact on the overall macroeconomic environment and result in shifts and reductions in consumer spending and\n\n negative consumer sentiment for the Company’s products and services, all of which can further adversely affect the Company’s business and results of operations.\n\nSegment Operating Performance\n\nThe following table shows net sales by reportable segment for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (dollars in millions):\n\nThree Months EndedSix Months Ended\n\nMarch 28,2026March 29,2025ChangeMarch 28,2026March 29,2025Change\n\nAmericas$45,093 $40,315 12 %$103,622 $92,963 11 %\n\nEurope28,055 24,454 15 %66,201 58,315 14 %\n\nGreater China20,497 16,002 28 %46,023 34,515 33 %\n\nJapan8,401 7,298 15 %17,814 16,285 9 %\n\nRest of Asia Pacific9,138 7,290 25 %21,280 17,581 21 %\n\nTotal net sales$111,184 $95,359 17 %$254,940 $219,659 16 %\n\nAmericas\n\nAmericas net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 due to higher net sales of iPhone and Services. The strength in foreign currencies relative to the U.S. dollar had a favorable year-over-year impact on Americas net sales during the second quarter of 2026.\n\nEurope\n\nEurope net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone and Services. The strength in foreign currencies relative to the U.S. dollar had a net favorable year-over-year impact on Europe net sales during the second quarter and first six months of 2026.\" — r_219740e9c519 accession 0000320193-26-000013, chars 6719–8329 of the Item",
+  "[f_27c2715261cf] 10-Q Part I, Item 2, AAPL, as of 2026-05-01: \"cies relative to the U.S. dollar had a net favorable year-over-year impact on Europe net sales during the second quarter and first six months of 2026.\n\nGreater China\n\nGreater China net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 due to higher net sales of iPhone. The strength in the renminbi relative to the U.S. dollar had a favorable year-over-year impact on Greater China net sales during the second quarter of 2026.\n\nApple Inc. | Q2 2026 Form 10-Q | 14\n\nJapan\n\nJapan net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone. The weakness in the yen relative to the U.S. dollar had an unfavorable year-over-year impact on Japan net sales during the first six months of 2026.\n\nRest of Asia Pacific\n\nRest of Asia Pacific net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone and Services. The strength in foreign currencies relative to the U.S. dollar had a net favorable year-over-year impact on Rest of Asia Pacific net sales during the second quarter of 2026.\n\nProducts and Services Performance\n\nThe following table shows net sales by category for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (dollars in millions):\n\nThree Months EndedSix Months Ended\n\nMarch 28,2026March 29,2025ChangeMarch 28,2026March 29,2025Change\n\niPhone$56,994 $46,841 22 %$142,263 $115,979 23 %\" — r_219740e9c519 accession 0000320193-26-000013, chars 8179–9744 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- appended: function_call_output ---
+{
+ "pull": "r_703dab534c34",
+ "head": "r_703dab534c34 filings_search(ticker=\"AAPL\", query=\"iPhone Mac iPad Wearables Services six months ended March 2, form=\"10-Q\", item=\"2\", k=3) → 3 rows",
+ "rows": [
+  "[f_05d78110ed77] 10-Q Part I, Item 2, AAPL, as of 2026-05-01: \"iPhone$56,994 $46,841 22 %$142,263 $115,979 23 %\n\nMac8,399 7,949 6 %16,785 16,936 (1)%\n\niPad6,914 6,402 8 %15,509 14,490 7 %\n\nWearables, Home and Accessories7,901 7,522 5 %19,394 19,269 1 %\n\nServices30,976 26,645 16 %60,989 52,985 15 %\n\nTotal net sales$111,184 $95,359 17 %$254,940 $219,659 16 %\n\niPhone\n\niPhone net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 due to higher net sales of Pro models.\n\nMac\n\nMac net sales increased during the second quarter of 2026 compared to the second quarter of 2025 due to higher net sales of laptops. Year-over-year Mac net sales during the first six months of 2026 were relatively flat.\n\niPad\n\niPad net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPad, partially offset by lower net sales of iPad mini®.\n\nWearables, Home and Accessories\n\nWearables, Home and Accessories net sales increased during the second quarter of 2026 compared to the second quarter of 2025 primarily due to higher net sales of Accessories and Wearables. Year-over-year Wearables, Home and Accessories net sales during the first six months of 2026 were relatively flat.\n\nServices\n\nServices net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales from advertising, the App Store® and cloud services.\n\nApple Inc. | Q2 2026 Form 10-Q | 15\n\nGross Margin\n\nProducts and Services gross margin and gross margin percentage for the three- and six-month periods ended March 28, 2026 and March 29, 2025, were as follows (dollars in millions):\" — r_703dab534c34 accession 0000320193-26-000013, chars 9696–11391 of the Item",
+  "[f_26f50242540a] 10-Q Part I, Item 2, AAPL, as of 2026-05-01: \"cies relative to the U.S. dollar had a net favorable year-over-year impact on Europe net sales during the second quarter and first six months of 2026.\n\nGreater China\n\nGreater China net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 due to higher net sales of iPhone. The strength in the renminbi relative to the U.S. dollar had a favorable year-over-year impact on Greater China net sales during the second quarter of 2026.\n\nApple Inc. | Q2 2026 Form 10-Q | 14\n\nJapan\n\nJapan net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone. The weakness in the yen relative to the U.S. dollar had an unfavorable year-over-year impact on Japan net sales during the first six months of 2026.\n\nRest of Asia Pacific\n\nRest of Asia Pacific net sales increased during the second quarter and first six months of 2026 compared to the same periods in 2025 primarily due to higher net sales of iPhone and Services. The strength in foreign currencies relative to the U.S. dollar had a net favorable year-over-year impact on Rest of Asia Pacific net sales during the second quarter of 2026.\n\nProducts and Services Performance\n\nThe following table shows net sales by category for the three- and six-month periods ended March 28, 2026 and March 29, 2025 (dollars in millions):\n\nThree Months EndedSix Months Ended\n\nMarch 28,2026March 29,2025ChangeMarch 28,2026March 29,2025Change\n\niPhone$56,994 $46,841 22 %$142,263 $115,979 23 %\" — r_703dab534c34 accession 0000320193-26-000013, chars 8179–9744 of the Item"
+ ],
+ "truncated": {
+  "container": "rows",
+  "dropped": [
+   "[2]"
+  ],
+  "detail": "omitted to fit the message size limit; they are on the record — read them by id (r_… with an offset) or ask for less"
+ }
+}
+
+--- tail (sent with this request only): developer message ---
+Budget: 0 analyses or reads left on this task; none left — write what you found.
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 15987, "output_tokens": 1017, "reasoning_tokens": 0, "cached_input_tokens": 0}
+
+--- output: assistant message ---
+## Bottom line
+
+Apple’s latest available filing is its **Q2 FY2026 Form 10‑Q**, filed **May 1, 2026**, covering the quarter and six months ended **March 28, 2026**. It says there were no material changes to the FY2025 10‑K risk factors except for the updates included in that 10‑Q. I therefore used the 10‑Q for current risks and concentration, supplemented by the **FY2025 Form 10‑K**, filed **October 31, 2025**, for the full annual disclosures.
+
+### Principal business risks
+
+The following prioritization is **my interpretation** of the filing, not Apple’s formal ranking:
+
+1. **Dependence on iPhone and continued product innovation.** Apple says it generates “a significant portion of its net sales from a single product category” and that declining demand for it could significantly affect sales and gross margins. The category is plainly iPhone from the accompanying sales table. This makes product cycles, successful new models, competition and demand stimulation central risks.
+
+2. **Margin pressure and supply-chain exposure.** Apple identifies component constraints and higher costs—specifically advanced semiconductors, NAND and DRAM—along with supply shortages, outside-manufacturing costs, pricing pressure, compressed product lives, product/geographic mix, currency movements, tariffs and trade restrictions. These risks can affect both availability and margins.
+
+3. **Regulatory and antitrust changes to the platform and Services model.** Apple cites antitrust litigation and investigations involving smartphones and App Store terms. Adverse outcomes could produce fines and force changes to business practices. It also specifically highlights its search-licensing arrangements with Google: potential remedies in Google’s U.S. antitrust litigation could restrict commercial search-distribution terms and materially reduce Apple’s licensing revenue.
+
+4. **Product, software, service and AI quality or safety failures.** The latest 10‑Q emphasizes design and manufacturing defects, service outages, security vulnerabilities, and harmful or inaccurate experiences from complex technologies such as AI. Apple says these could lead to recalls, warranty costs, litigation, regulatory fines, delayed launches, reputational harm and lost sales.
+
+## Revenue concentration
+
+### By product
+
+For the **six months ended March 28, 2026**, Apple reported:
+
+- iPhone: **$142.263 billion**
+- Services: **$60.989 billion**
+- Wearables, Home and Accessories: **$19.394 billion**
+- Mac: **$16.785 billion**
+- iPad: **$15.509 billion**
+- Total net sales: **$254.940 billion**
+
+The filing reports year-over-year growth percentages—iPhone **23%**, Services **15%**, iPad **7%**, Wearables/Home/Accessories **1%**, and Mac **down 1%**—but these are **growth rates, not revenue shares**. Apple does not state an explicit iPhone percentage of total sales in the cited disclosure; it describes the dependence qualitatively as a “significant portion.”
+
+For FY2025, the 10‑K reported iPhone sales of **$209.586 billion** out of **$416.161 billion** total sales, again as dollar figures rather than an explicitly stated concentration percentage.
+
+### By geography/reportable segment
+
+For the **six months ended March 28, 2026**, Apple reported:
+
+- Americas: **$103.622 billion**
+- Europe: **$66.201 billion**
+- Greater China: **$46.023 billion**
+- Rest of Asia Pacific: **$21.280 billion**
+- Japan: **$17.814 billion**
+- Total: **$254.940 billion**
+
+The stated percentages in this table are year-over-year growth rates, not shares: Americas **11%**, Europe **14%**, Greater China **33%**, Rest of Asia Pacific **21%**, and Japan **9%**.
+
+For FY2025, the 10‑K reported segment sales of **$178.353 billion Americas**, **$111.032 billion Europe**, **$64.377 billion Greater China**, **$33.696 billion Rest of Asia Pacific**, and **$28.703 billion Japan**, against **$416.161 billion** total sales. Apple also said its revenue-source mix was generally consistent across segments, except that **iPhone represented a “moderately higher proportion” of Greater China sales**. No percentage was attached to that statement in the located disclosure.
+
+## What the desk holds
+
+The disclosures are available, but the desk **does not hold product, geographic or segment concentration as structured figures**. By desk policy, these are filing-text/table disclosures that can be quoted or closely reported; the desk does not derive concentration percentages from their component amounts. Accordingly, I have not converted the sales amounts into implied shares. The explicit percentages above are only those Apple labels as year-over-year changes, not concentration shares.
+
+====================================================================================================
+#20 REQUEST C7 · lead · gpt-5.6-sol effort=medium · instructions instructions_lead.txt (sha 2f18d48a5e6832e7) · tools ['list', 'analyze', 'ask', 'open']
+====================================================================================================
+
+--- appended: function_call_output ---
+{
+ "returns": [
+  {
+   "task_id": "tsk_61abb64e9181",
+   "analyst": "issuer",
+   "status": "returned",
+   "stop_reason": "finished",
+   "analyses": [],
+   "rows_read": 69,
+   "note_chars": 4641,
+   "verification": {
+    "figures": 10,
+    "supported": 9,
+    "contradicted": 0,
+    "unsourced": 1,
+    "ambiguous": 0,
+    "sentences_checked": 2,
+    "sentences_judgement": 64,
+    "completion": "unknown"
+   }
+  }
+ ]
+}
+
+--- tail (sent with this request only): developer message ---
+<state source="the desk's record of this turn" trust="analyses and notes are recorded facts; task requests are instructions, not facts" use="decide the next step against the original question; open a view or row with open(id)">
+{"id": "wv_92cc2fab5501", "question": "What does Apple say its biggest business risks are, how concentrated is revenue by product and by geography, and does the desk hold any of that as figures?", "scope_decisions": [], "analyses": [], "analyses_seen": [], "notes": [{"task": "tsk_61abb64e9181", "analyst": "issuer", "report": "rep_de38cedf53d9", "text": "## Bottom line\n\nApple’s latest available filing is its **Q2 FY2026 Form 10‑Q**, filed **May 1, 2026**, covering the quarter and six months ended **March 28, 2026**. It says there were no material changes to the FY2025 10‑K risk factors except for the updates included in that 10‑Q. I therefore used the 10‑Q for current risks and concentration, supplemented by the **FY2025 Form 10‑K**, filed **October 31, 2025**, for the full annual disclosures.\n\n### Principal business risks\n\nThe following prioritization is **my interpretation** of the filing, not Apple’s formal ranking:\n\n1. **Dependence on iPhone and continued product innovation.** Apple says it generates “a significant portion of its net sales from a single product category” and that declining demand for it could significantly affect sales and gross margins. The category is plainly iPhone from the accompanying sales table. This makes product cycles, successful new models, competition and demand stimulation central risks.\n\n2. **Margin pressure and supply-chain exposure.** Apple identifies component constraints and higher costs—specifically advanced semiconductors, NAND and DRAM—along with supply shortages, outside-manufacturing costs, pricing pressure, compressed product lives, product/geographic mix, currency movements, tariffs and trade restrictions. These risks can affect both availability and margins.\n\n3. **Regulatory and antitrust changes to the platform and Services model.** Apple cites antitrust litigation and investigations involving smartphones and App Store terms. Adverse outcomes could produce fines and force changes to business practices. It also specifically highlights its search-licensing arrangements with Google: potential remedies in Google’s U.S. antitrust litigation could restrict commercial search-distribution terms and materially reduce Apple’s licensing revenue.\n\n4. **Product, software, service and AI quality or safety failures.** The latest 10‑Q emphasizes design and manufacturing defects, service outages, security vulnerabilities, and harmful or inaccurate experiences from complex technologies such as AI. Apple says these could lead to recalls, warranty costs, litigation, regulatory fines, delayed launches, reputational harm and lost sales.\n\n## Revenue concentration\n\n### By product\n\nFor the **six months ended March 28, 2026**, Apple reported:\n\n- iPhone: **$142.263 billion**\n- Services: **$60.989 billion**\n- Wearables, Home and Accessories: **$19.394 billion**\n- Mac: **$16.785 billion**\n- iPad: **$15.509 billion**\n- Total net sales: **$254.940 billion**\n\nThe filing reports year-over-year growth percentages—iPhone **23%**, Services **15%**, iPad **7%**, Wearables/Home/Accessories **1%**, and Mac **down 1%**—but these are **growth rates, not revenue shares**. Apple does not state an explicit iPhone percentage of total sales in the cited disclosure; it describes the dependence qualitatively as a “significant portion.”\n\nFor FY2025, the 10‑K reported iPhone sales of **$209.586 billion** out of **$416.161 billion** total sales, again as dollar figures rather than an explicitly stated concentration percentage.\n\n### By geography/reportable segment\n\nFor the **six months ended March 28, 2026**, Apple reported:\n\n- Americas: **$103.622 billion**\n- Europe: **$66.201 billion**\n- Greater China: **$46.023 billion**\n- Rest of Asia Pacific: **$21.280 billion**\n- Japan: **$17.814 billion**\n- Total: **$254.940 billion**\n\nThe stated percentages in this table are year-over-year growth rates, not shares: Americas **11%**, Europe **14%**, Greater China **33%**, Rest of Asia Pacific **21%**, and Japan **9%**.\n\nFor FY2025, the 10‑K reported segment sales of **$178.353 billion Americas**, **$111.032 billion Europe**, **$64.377 billion Greater China**, **$33.696 billion Rest of Asia Pacific**, and **$28.703 billion Japan**, against **$416.161 billion** total sales. Apple also said its revenue-source mix was generally consistent across segments, except that **iPhone represented a “moderately higher proportion” of Greater China sales**. No percentage was attached to that statement in the located disclosure.\n\n## What the desk holds\n\nThe disclosures are available, but the desk **does not hold product, geographic or segment concentration as structured figures**. By desk policy, these are filing-text/table disclosures that can be quoted or closely reported; the desk does not derive concentration percentages from their component amounts. Accordingly, I have not converted the sales amounts into implied shares. The explicit percentages above are only those Apple labels as year-over-year changes, not concentration shares.", "verification": {"figures": 10, "supported": 9, "contradicted": 0, "unsourced": 1, "ambiguous": 0, "sentences_checked": 2, "sentences_judgement": 64, "completion": "unknown"}, "problems": [{"sentence": 57, "span": [3567, 3570], "token": "33%", "status": "insufficient_evidence", "reason": "unsourced_figure"}]}], "execution": [{"task_id": "tsk_61abb64e9181", "actor": "sub:issuer", "status": "returned", "stop_reason": "finished", "completions": 5, "evidence_calls": 12}], "budget": {"completions_used": 1, "completions_limit": 12, "analyses_used": 0, "analyses_limit": 10}}
+</state>
+
+---------------------------------------- RESPONSE · status completed · usage {"input_tokens": 6055, "output_tokens": 706, "reasoning_tokens": 104, "cached_input_tokens": 4269}
+
+--- output: reasoning ---
+[reasoning, encrypted: 1868 chars]
+
+--- output: assistant message ---
+Apple’s latest available filing is its **Q2 FY2026 Form 10‑Q**, filed **May 1, 2026**, covering the six months ended **March 28, 2026**. The FY2025 10‑K supplies the fuller annual risk discussion.
+
+### Biggest business risks
+
+Apple does not formally rank its risks. My prioritization of what it emphasizes is:
+
+1. **Dependence on iPhone and continued innovation.** Apple says a “significant portion” of net sales comes from a single product category. Weak iPhone demand, unsuccessful launches, short product cycles or stronger competition could materially hurt sales and margins.
+2. **Supply-chain and margin pressure.** Risks include shortages and higher costs for advanced semiconductors, NAND and DRAM; reliance on outsourced manufacturing; tariffs and trade restrictions; pricing pressure; product and geographic mix; and currency movements.
+3. **Antitrust and platform regulation.** Litigation or regulation could force changes to App Store and other business practices, generate fines, and reduce revenue. Apple specifically flags possible restrictions on its search-distribution arrangements with Google as a risk to licensing revenue.
+4. **Product, software, service and AI failures.** Defects, outages, security vulnerabilities, and harmful or inaccurate AI outputs could cause recalls, warranty costs, delayed launches, litigation, fines, reputational damage and lost sales.
+
+### Revenue concentration
+
+For the **six months ended March 28, 2026**, Apple reported product net sales of:
+
+- **iPhone:** $142.263 billion  
+- **Services:** $60.989 billion  
+- **Wearables, Home and Accessories:** $19.394 billion  
+- **Mac:** $16.785 billion  
+- **iPad:** $15.509 billion  
+- **Total:** $254.940 billion  
+
+Thus, iPhone is clearly the dominant product category, but Apple does **not state an explicit concentration percentage** in the cited disclosure; it calls the contribution a “significant portion.”
+
+By geographic reportable segment for the same six-month period:
+
+- **Americas:** $103.622 billion  
+- **Europe:** $66.201 billion  
+- **Greater China:** $46.023 billion  
+- **Rest of Asia Pacific:** $21.280 billion  
+- **Japan:** $17.814 billion  
+- **Total:** $254.940 billion  
+
+The Americas is the largest geographic segment. Apple also says iPhone represents a **“moderately higher proportion”** of Greater China sales, without attaching a percentage.
+
+### Does the desk hold concentration as figures?
+
+**No.** The desk can quote or closely report Apple’s product and geographic sales tables and filing language, but it does **not** hold product, geographic or segment concentration as structured figures and does not derive percentage shares from the component amounts. Any percentages in those tables are year-over-year growth rates, not revenue-concentration shares.
+
+====================================================================================================
+#21 ANSWER · completed · accepted; completion unknown
+{
+ "problems": [],
+ "verified": {
+  "figures": 0,
+  "ambiguous": 0,
+  "supported": 0,
+  "unsourced": 0,
+  "completion": "unknown",
+  "contradicted": 0,
+  "sentences_checked": 0,
+  "sentences_judgement": 41
+ },
+ "completion": {
+  "status": "unknown",
+  "requests": []
+ }
+}
+
+====================================================================================================
+FINAL ANSWER (as delivered)
+====================================================================================================
+Apple’s latest available filing is its **Q2 FY2026 Form 10‑Q**, filed **May 1, 2026**, covering the six months ended **March 28, 2026**. The FY2025 10‑K supplies the fuller annual risk discussion.
+
+### Biggest business risks
+
+Apple does not formally rank its risks. My prioritization of what it emphasizes is:
+
+1. **Dependence on iPhone and continued innovation.** Apple says a “significant portion” of net sales comes from a single product category. Weak iPhone demand, unsuccessful launches, short product cycles or stronger competition could materially hurt sales and margins.
+2. **Supply-chain and margin pressure.** Risks include shortages and higher costs for advanced semiconductors, NAND and DRAM; reliance on outsourced manufacturing; tariffs and trade restrictions; pricing pressure; product and geographic mix; and currency movements.
+3. **Antitrust and platform regulation.** Litigation or regulation could force changes to App Store and other business practices, generate fines, and reduce revenue. Apple specifically flags possible restrictions on its search-distribution arrangements with Google as a risk to licensing revenue.
+4. **Product, software, service and AI failures.** Defects, outages, security vulnerabilities, and harmful or inaccurate AI outputs could cause recalls, warranty costs, delayed launches, litigation, fines, reputational damage and lost sales.
+
+### Revenue concentration
+
+For the **six months ended March 28, 2026**, Apple reported product net sales of:
+
+- **iPhone:** $142.263 billion  
+- **Services:** $60.989 billion  
+- **Wearables, Home and Accessories:** $19.394 billion  
+- **Mac:** $16.785 billion  
+- **iPad:** $15.509 billion  
+- **Total:** $254.940 billion  
+
+Thus, iPhone is clearly the dominant product category, but Apple does **not state an explicit concentration percentage** in the cited disclosure; it calls the contribution a “significant portion.”
+
+By geographic reportable segment for the same six-month period:
+
+- **Americas:** $103.622 billion  
+- **Europe:** $66.201 billion  
+- **Greater China:** $46.023 billion  
+- **Rest of Asia Pacific:** $21.280 billion  
+- **Japan:** $17.814 billion  
+- **Total:** $254.940 billion  
+
+The Americas is the largest geographic segment. Apple also says iPhone represents a **“moderately higher proportion”** of Greater China sales, without attaching a percentage.
+
+### Does the desk hold concentration as figures?
+
+**No.** The desk can quote or closely report Apple’s product and geographic sales tables and filing language, but it does **not** hold product, geographic or segment concentration as structured figures and does not derive percentage shares from the component amounts. Any percentages in those tables are year-over-year growth rates, not revenue-concentration shares.

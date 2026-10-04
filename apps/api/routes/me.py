@@ -147,10 +147,10 @@ async def my_audit_summary(
     # later would be a second opinion. A message with no `verified` predates
     # V13-S3 and contributes nothing rather than a guess.
     figures = sum(int((m or {}).get("verified", {}).get("figures", 0) or 0) for m in messages)
-    refused = sum(1 for m in messages if (m or {}).get("gate") == "exhausted")
+    refused = sum(1 for m in messages if (m or {}).get("delivery") in ("answered_with_problems", "not_answered"))
 
     return AuditSummaryOut(
-        answers_gated=await _steps(step_type="respond", status="completed"),
+        answers_gated=await _steps(step_type="answer", status="completed"),
         answers_refused=refused,
         lookups_made=await _steps(step_type="tool_call", status="completed"),
         lookups_refused=await _steps(step_type="tool_call", status="rejected"),

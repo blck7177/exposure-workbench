@@ -115,7 +115,7 @@ def test_the_span_is_an_enum_not_a_day_count():
     """"The last 37 days" is a window chosen after seeing the answer. Named spans
     can still be shopped between, but each one is a period a reader recognises
     and the set is small enough to see in the schema."""
-    from exposure_workbench.analytics import skill
+    from exposure_workbench.analytics import registry as skill
     schema = skill.METHODS["book.drawdown_episodes"].params_schema
     assert set(schema["properties"]["span"]["enum"]) == {"3m", "6m", "1y", "3y", None}
 

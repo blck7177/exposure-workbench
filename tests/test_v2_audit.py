@@ -28,7 +28,7 @@ TENANT_TABLES = {
     "agent_messages", "agent_steps", "evidence_packs",
     "facts",   # V24: a session's facts, tenant rule = the session's
     "analyst_reports",   # V36: a domain analyst's reading, tenant rule = the session's
-    "analysis_state",    # V2 P2: the turn's analysis state, tenant rule = the session's
+    "work_views",        # V41: the turn's work view (agents/work_view), tenant rule = the session's
     # V8-P2/P3. Children of a run, so they carry whatever the run's portfolio
     # carries — the same reasoning as issuer_exposures beside them, and the same
     # policy. A run child left out of RLS is one tenant's stress losses readable
@@ -359,15 +359,17 @@ def test_the_shipped_mounts_are_exactly_the_desks_doors(monkeypatch):
     the mount table says so. A door nobody listed, or one face served at two
     paths, would make 'the face is physical' a sentence rather than a fact.
 
-    V1: five doors. One per analyst — a face is a resource family, and a family's
-    verbs exist on its own mount and nowhere else — the research run's, and the
-    debug door a person opens (named "meta"; the lead analyst holds no face)."""
+    Six doors. One per analyst — a face is a resource family, and a family's
+    verbs exist on its own mount and nowhere else — the lead's (the catalogue and
+    `analyze`, nothing else), the research run's, and the debug door a person
+    opens (named "meta")."""
     from apps.mcp import http
     from exposure_workbench.tools import faces
 
     _pairings(monkeypatch)                                    # imports http under a signing key
     assert {name: face for name, (_registry, face) in http.MOUNTS.items()} == {
         faces.FACE_NAME_META: faces.FACE_META_AGENT,
+        faces.FACE_NAME_LEAD: faces.FACE_LEAD,
         faces.FACE_NAME_RESEARCH: faces.FACE_RESEARCH,
         faces.FACE_NAME_ISSUER: faces.FACE_ISSUER,
         faces.FACE_NAME_MARKET: faces.FACE_MARKET,
@@ -527,7 +529,7 @@ def test_the_agents_hold_a_face_name_and_a_token_and_nothing_else():
 # apps/mcp imports that module at startup to build both mounts, so its transitive
 # import graph IS the container's contents. Until S4 the research builder lived in
 # workflow/issuer_research_workflow, which imports agents/research_session, which
-# calls chat_with_tools — so the research loop and the completion call were inside
+# calls the provider — so the research loop and the completion call were inside
 # the tool container, imported and never used. Nothing failed, and nothing was
 # going to: an unused import is invisible to every functional test in this suite.
 #
@@ -590,13 +592,16 @@ def test_no_completion_call_is_reachable_from_the_tool_faces():
     llm.client IS reachable and stays reachable: filing_retrieval_service embeds
     its own query, which is the carve-out N10 names. So asserting the module
     absent would be asserting the wrong thing — and would have to be deleted the
-    first time someone read it. What may never be reachable is completion.
+    first time someone read it. What may never be reachable is a completion: a
+    call of the door's `respond`.
     """
     import ast
 
-    completion = {"chat_with_tools", "chat_complete"}
+    completion = {"respond"}                      # the Responses door's one verb (llm/client.respond)
     offenders = []
     for module, path in sorted(_reachable_from("exposure_workbench.tools.registries").items()):
+        if module == "exposure_workbench.llm.client":
+            continue                              # the door defines the verb; the container must not call it
         for node in ast.walk(ast.parse(path.read_text())):
             name = (node.attr if isinstance(node, ast.Attribute)
                     else node.id if isinstance(node, ast.Name)
@@ -608,20 +613,25 @@ def test_no_completion_call_is_reachable_from_the_tool_faces():
 
 
 # ── V4-S2/D1: one way from an agent to the provider ──────────────────────────
-# A completion returns text, tool_calls and usage. Two of those have something
-# waiting for them — the respond/submit_brief gate, and invoke(), which traces
+# A model turn returns text, tool calls and usage. Two of those have something
+# waiting for them — the loop that reads the reply, and invoke(), which traces
 # every tool call whether the loop cooperates or not. usage had nothing waiting,
 # so both loops discarded it and the only action in the system that actually
 # costs money was the only one with no record.
 #
-# agents/llm_session.py is the answer: its chat() returns (content, tool_calls)
-# and writes the llm_call row on the way through, so there is nothing left for a
-# loop to discard. That only holds while it is the ONLY way out of agents/ to
-# the provider — the moment a second loop imports llm.client directly it gets
-# usage back, and the discard returns as a one-line convenience nobody reviews.
-# Structural enforcement (D1) is exactly this test; without it the module is a
-# suggestion.
+# agents/llm_session.py is the answer: LlmSession.next() makes the Responses call
+# (llm/client.respond) and writes the llm_call row on the way through, so there
+# is nothing left for a loop to discard. That only holds while it is the ONLY
+# place in agents/ that calls the provider — the moment a second loop calls
+# llm.client.respond itself it gets usage back, and the discard returns as a
+# one-line convenience nobody reviews. Structural enforcement (D1) is exactly
+# this test; without it the module is a suggestion.
+#
+# The door's item SHAPES (message, tool_output, function_tool) are data a loop
+# may build — a Conversation is made of them — so importing llm.client for those
+# is not reaching the provider. Calling it is: these two names are the call.
 _PROVIDER_LAYER = "exposure_workbench.llm"
+_PROVIDER_CALLS = {"respond", "get_openai_client"}
 
 # D3, and the reason is stated rather than implied — an exemption nobody can
 # read is indistinguishable from an oversight.
@@ -649,21 +659,20 @@ def test_no_agent_reaches_the_provider_except_through_llm_session():
             continue
         for node in ast.walk(ast.parse(f.read_text())):
             module = getattr(node, "module", None) or ""
-            if isinstance(node, ast.ImportFrom) and module.startswith(_PROVIDER_LAYER):
-                offenders.append(f"{f.name}:{node.lineno} imports {module}")
-            if isinstance(node, ast.Import) and any(
-                a.name.startswith(_PROVIDER_LAYER) for a in node.names
+            # `from exposure_workbench.llm.client import respond`
+            if isinstance(node, ast.ImportFrom) and module.startswith(_PROVIDER_LAYER) and any(
+                a.name in _PROVIDER_CALLS for a in node.names
             ):
-                offenders.append(f"{f.name}:{node.lineno} imports the provider")
-            # The third spelling, and the one a guard usually misses: the package
-            # named as a NAME rather than as a module path. It reaches exactly the
-            # same client, so leaving it out would make this test something to
-            # route around rather than something to satisfy.
-            if (isinstance(node, ast.ImportFrom) and module == "exposure_workbench"
-                    and any(a.name == "llm" for a in node.names)):
-                offenders.append(f"{f.name}:{node.lineno} imports the provider package")
+                offenders.append(f"{f.name}:{node.lineno} imports the provider call")
+            # `llm_client.respond(...)`, `client.get_openai_client()` — whatever the
+            # module was imported as and however the package was reached, the call
+            # is the attribute, and the attribute is what this reads.
+            if isinstance(node, ast.Attribute) and node.attr in _PROVIDER_CALLS:
+                offenders.append(f"{f.name}:{node.lineno} calls .{node.attr}")
+            if isinstance(node, ast.Name) and node.id in _PROVIDER_CALLS:
+                offenders.append(f"{f.name}:{node.lineno} names {node.id}")
     assert offenders == [], (
-        f"an agent loop holding the provider directly, and with it the usage it "
+        f"an agent loop calling the provider directly, and with it the usage it "
         f"can discard: {offenders}"
     )
 

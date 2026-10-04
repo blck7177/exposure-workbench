@@ -8,7 +8,7 @@ what is there with the `list` verb (tools/primitives), and what the desk knows i
 the handbook's (analytics/handbook).
 
 What remains is what two readers still need, and neither is a model:
-  * the BRIEFING (services/briefing) — an issuer's identity, how far its filed
+  * the scope catalogue (services/scope) — an issuer's identity, how far its filed
     lines reach and which measures its filings cannot feed, its filings and
     indexed Items, its price history's span, and the books that hold it;
   * the POSITION measure (services/position_service) — a name's place in the

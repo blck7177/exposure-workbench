@@ -1,0 +1,8 @@
+=== FREEZE BEFORE (taken before the fixture face started) ===
+tree fingerprint before: 80e9c0a32a480562
+files: 530
+git status lines: 164, sha e1d7728b7bfa9ef5
+2026-10-04T01:41:47Z
+face log starts at line 17
+HEAD 379f630db9d6ea8ba92bdf17b399f4aaa7e6ae59 on codex/simplify-agent-loop-s2; the tree under test is HEAD plus the uncommitted redesign, identified by the fingerprint
+fingerprint = sha256 over sha256sum of every file under src tests scripts apps infra, excluding node_modules, __pycache__, .next, *.pyc, tsconfig.tsbuildinfo

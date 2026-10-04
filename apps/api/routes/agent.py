@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.auth_deps import optional_user, require_user
-from exposure_workbench.agents.meta_agent import handle_message
+from exposure_workbench.agents.lead import handle_message
 from exposure_workbench.agents.tool_session import ToolFaceUnavailable
 from exposure_workbench.auth.clerk import UserClaims
 from exposure_workbench.db.models import AgentMessage, AgentSession, AgentStep
@@ -83,10 +83,9 @@ class MessageOut(BaseModel):
     message_id: str
     text: str
     citations: list
-    # {"gate": "exhausted"} when the loop ended without the gate accepting an
-    # answer. The UI renders that message as a refusal rather than as an answer;
-    # without it, "I could not produce an answer" is a paragraph the user has no
-    # reason to read differently from any other.
+    # `delivery` (answered | answered_with_problems | not_answered), the observer's
+    # `verified` counts, `validation` and `completion`, the analyses run, the
+    # specialists' reports and the answer's blocks — the turn's record, as data.
     meta: dict = {}
 
 
@@ -182,7 +181,7 @@ async def post_message(
         # persists the assistant message only after the loop, so the failure
         # leaves the user's message standing there unanswered — which is what
         # happened. Writing a synthetic "sorry, tools are down" reply would be
-        # text reaching a user without passing the respond gate, and that gate is
+        # text reaching a user without the observer having read it, and that record is
         # the reason every other answer in this system can be trusted.
         #
         # The quota is NOT refunded (plan decision D2), same as the 413 below:
@@ -219,7 +218,7 @@ async def post_message(
         await _record_turn_error(factory, session_id, message_id, "turn_failed")
         raise
     finally:
-        # finally, not a happy-path call: chat_with_tools raises outright when no
+        # finally, not a happy-path call: the provider door raises outright when no
         # API key is configured, OpenAI network errors pass straight through, and
         # reserve's ValueError("unknown session") is outside the only except
         # clause in registry.invoke. Every one of those must still free the slot.
@@ -335,14 +334,11 @@ async def list_agent_sessions(
 
 
 class ReportOut(BaseModel):
-    """A domain analyst's full reading (V36).
-
-    S2 reports carry evidence-v2 in brief.protocol and status returned/stopped;
-    blocks contain only individually checked notes, not a completion verdict.
-    For historical reports, `status` is what the answer check said about it: a
-    refused report shows its problems, not its prose. `blocks` is the same shape
+    """A specialist's record for one task (agents/specialist): its prose, the
+    observer's reading of it, the analyses it ran and how it stopped. `status` is
+    returned | stopped and never a completion verdict. `blocks` is the same shape
     the answer uses, so the drawer renders it with the component the reply
-    already has and every figure opens the fact it equals."""
+    already has and every supported figure opens the fact it equals."""
     id: str
     domain: str
     status: str

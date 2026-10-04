@@ -36,7 +36,7 @@ load_dotenv(".env", override=True)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from exposure_workbench.agents.meta_agent import handle_message
+from exposure_workbench.agents.lead import handle_message
 from exposure_workbench.auth.context import current_user_ctx
 from exposure_workbench.services import agent_session_service as sess
 

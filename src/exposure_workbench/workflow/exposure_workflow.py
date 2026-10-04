@@ -959,7 +959,7 @@ class ExposureWorkflow:
         """
         from exposure_workbench.agents.direct_llm_agent import ReportUnavailable
 
-        from exposure_workbench.agents.report_agent import get_report_agent
+        from exposure_workbench.agents.direct_llm_agent import DirectLlmAgent
         from exposure_workbench.agents.schemas import ReportInput
 
         report_input = ReportInput(
@@ -1011,7 +1011,7 @@ class ExposureWorkflow:
             ],
         )
 
-        agent = get_report_agent()
+        agent = DirectLlmAgent()
         report_output = await agent.generate(report_input)
 
         # THE GATE. Every number the report states has to be a value of a
@@ -1039,7 +1039,6 @@ class ExposureWorkflow:
             run_id=run_id,
             portfolio_id=portfolio_id,
             as_of_date=as_of_date,
-            agent_mode=settings.report_agent_mode,
             executive_summary=report_output.executive_summary,
             key_movements=report_output.key_movements,
             factor_explanation=report_output.factor_explanation,

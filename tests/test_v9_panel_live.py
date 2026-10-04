@@ -182,8 +182,9 @@ async def test_the_panel_fits_the_context_cap_for_every_issuer():
     on every call is a design fault, not an accident to be reported: NVDA's panel
     was 8235 bytes against a 6000-byte cap and lost net_debt every time.
     """
-    from exposure_workbench.agents.meta_agent import TOOL_RESULT_LIMIT
+    from exposure_workbench.app_state.settings import get_settings
     from exposure_workbench.utils.json import dumps_capped
+    TOOL_RESULT_LIMIT = get_settings().specialist_result_chars     # the cap on one tool result a specialist reads
 
     engine, mk = await _mk()
     try:

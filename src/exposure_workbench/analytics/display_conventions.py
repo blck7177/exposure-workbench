@@ -13,9 +13,17 @@ vitest suite read one file and must both agree with it.
 `reader_value` is the numeric form the MODEL is shown — rounded so it reads as a
 figure rather than a float dump, and never authored back by the model (the exit
 takes names, not values). `display` is the string a person reads.
+
+THE KIND OF NUMBER CHANGES THE UNIT IN THE WRITING (analytics/value_semantics).
+A dimensionless level is a percent; the absolute change of one is percentage
+POINTS, written "pp" with its sign; a relative change is a percent with its
+sign. A difference of two ratios displayed by the percent rule read as a
+relative decline (the Q07 live runs: -0.193 shown as "-19.3%").
 """
 
 from __future__ import annotations
+
+from exposure_workbench.analytics import value_semantics as vs
 
 PERCENT_DIGITS = {"ge10": 1, "lt10": 2}
 MONEY_SCALES = ((1e9, "B"), (1e6, "M"), (1e3, "K"))
@@ -42,13 +50,29 @@ def reader_value(value: float, unit_class: str) -> float | int:
     return v
 
 
-def display(value: float, unit_class: str) -> str:
-    """What a reader sees. Mirrors apps/web/lib/display.ts exactly."""
+def _pct_digits(pct: float) -> int:
+    return PERCENT_DIGITS["ge10"] if abs(pct) >= 10 else PERCENT_DIGITS["lt10"]
+
+
+def display(value: float, unit_class: str, kind: str = vs.LEVEL) -> str:
+    """What a reader sees. Mirrors apps/web/lib/display.ts exactly.
+
+    `kind` is the figure's semantic kind (value_semantics.KINDS): a change is
+    written with its sign, and the absolute change of a dimensionless level in
+    percentage points."""
     v = float(value)
+    if kind == vs.ABSOLUTE_CHANGE and unit_class in ("RATIO", "PERCENT"):
+        pct = v * 100
+        return f"{pct:+.{_pct_digits(pct)}f} pp"
+    if kind == vs.RELATIVE_CHANGE:
+        pct = v * 100
+        return f"{pct:+.{_pct_digits(pct)}f}%"
+    if kind == vs.ABSOLUTE_CHANGE:
+        level = display(v, unit_class)
+        return level if v < 0 or level.startswith(("-", "+")) else "+" + level
     if unit_class in ("RATIO", "PERCENT"):
         pct = v * 100
-        digits = PERCENT_DIGITS["ge10"] if abs(pct) >= 10 else PERCENT_DIGITS["lt10"]
-        return f"{pct:.{digits}f}%"
+        return f"{pct:.{_pct_digits(pct)}f}%"
     if unit_class in ("MONEY", "MONEY_PER_DAY"):
         scale, suffix = 1.0, ""
         for s, name in MONEY_SCALES:

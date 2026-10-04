@@ -1,18 +1,15 @@
-"""The gate's textual half, and the coefficient that is not determined.
+"""The quote check, and the percentage a filing spells out (offline).
 
-Two checkers, both existence tests over what a cited row actually holds — the
-same shape as the numeric half, and neither of them semantic.
+Two existence tests over what a cited passage actually holds, neither of them
+semantic. (The collinear-coefficient flag was the gate's `verify` and left with it.)
 """
 
 from __future__ import annotations
 
 from exposure_workbench.services.numeric_verification import (
-    RATIO,
-    EvidenceValue,
     extract_numbers,
     quoted_keys,
     quoted_spans,
-    verify,
     verify_quotes,
     _is_quoted,
 )
@@ -75,37 +72,3 @@ def test_percent_the_word_is_matched_and_its_lookalikes_are_not():
     assert "%:5" not in quoted_keys("rose 5 points on the day")
     assert "%:3" not in quoted_keys("see 3 pages of notes")
     assert "%:12" not in quoted_keys("up 12 percentage points")
-
-
-# ── a coefficient that is not determined ──────────────────────────────────────
-
-MARKET = EvidenceValue(-0.00989278, RATIO, "factor_attributions.market.contribution", "run_x",
-                       "these factors are collinear, so no single beta is determined; "
-                       "their sum, -0.00717910, is")
-TOTAL = EvidenceValue(-0.00717910, RATIO, "factor_attributions.sum_of_contributions", "run_x")
-LLY_POS = EvidenceValue(-0.00392415, RATIO, "issuer_exposures.LLY.contribution", "run_x")
-
-
-def test_a_single_collinear_beta_is_refused_and_told_what_to_quote():
-    bad = verify(extract_numbers("the market factor contributed -0.00989278"),
-                 [MARKET, TOTAL, LLY_POS])
-    assert len(bad) == 1
-    assert bad[0]["reason"] == "not_quotable_individually"
-    assert "-0.00717910" in bad[0]["detail"]
-
-
-def test_the_sum_is_quotable_because_it_is_what_is_determined():
-    assert verify(extract_numbers("the factors together came to -0.00717910"),
-                  [MARKET, TOTAL, LLY_POS]) == []
-
-
-def test_a_position_contribution_is_untouched():
-    """The flag is about the regression, not about attribution in general."""
-    assert verify(extract_numbers("LLY contributed -0.00392415"),
-                  [MARKET, TOTAL, LLY_POS]) == []
-
-
-def test_a_figure_that_also_equals_a_determinate_value_passes():
-    """'Only these support it' has to mean only."""
-    both = EvidenceValue(-0.00989278, RATIO, "exposure_metrics.alpha", "run_x")
-    assert verify(extract_numbers("alpha was -0.00989278"), [MARKET, both]) == []

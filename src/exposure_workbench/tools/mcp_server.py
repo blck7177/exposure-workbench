@@ -30,7 +30,6 @@ from mcp import types
 from mcp.server.lowlevel import Server
 
 from exposure_workbench.auth.context import current_user_ctx
-from exposure_workbench.services import claims
 from exposure_workbench.tools import faces, mcp_request, registry as R
 
 SERVER_NAME = "exposure-workbench"
@@ -39,17 +38,15 @@ SERVER_NAME = "exposure-workbench"
 # prompts still learns the discipline the gate is going to hold it to. It says
 # why, not what: the rules are enforced in the wrapper, and a list of them here
 # would only be a second place for them to drift.
-INSTRUCTIONS = """Tools for a portfolio risk and issuer-intelligence desk: financial facts and
-calculations, filing search and full-text read, market stats, portfolio
-holdings and alerts, and delegation of long work to background runs.
+INSTRUCTIONS = """Tools for a portfolio risk and issuer-intelligence desk: one analysis as an aligned
+table (`analyze`: measures over a scope of subjects, compared on each issuer's own
+calendar, ranked), the catalogue of what the desk holds, registry methods by name,
+filing search and full-text read, web search, and the two actions (a scenario book,
+background preparation).
 
-Every tool is a verb over one family of evidence and says why it is called.
-Every result is rows: one line per figure — its id (f_…), what it is, whose,
-over what period, the value, what it means and where it came from — and a
-refusal is a row too. """ + claims.PROSE_RULE + """ A quote claim cites its passage and carries the verbatim span. The gate refuses an answer that points at what was
-never shown, or writes a number the facts cannot account for.
-
-Delegation tools return immediately with a run id; they do not block."""
+Every result carries its identity: a cell says what it is, whose, over what period,
+its value and its id; a refusal says why. Nothing here forecasts, estimates or
+substitutes a nearby figure for the one asked for."""
 
 
 def build_mcp_server(
